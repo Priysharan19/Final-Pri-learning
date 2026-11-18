@@ -120,6 +120,7 @@ export default function GuestPage() {
   const [hint, setHint] = useState(false);
   const [why, setWhy] = useState('limit');
   const [busy, setBusy] = useState(false);
+  const [arrived, setArrived] = useState(false);   // the question on the page is the one drawn on arrival (it draws in once)
   const headRef = useRef(null);
   const answerRef = useRef(null);
   const land = useRef(null);                      // where focus goes once the next view is drawn
@@ -155,6 +156,7 @@ export default function GuestPage() {
       // A fine pointer means a keyboard is at hand: the visitor can type at once. A phone keeps its keyboard down until asked.
       const typed = out.question?.answerType !== 'mcq';
       land.current = arrival ? (typed && globalThis.matchMedia?.('(pointer: fine)').matches ? 'answer' : null) : (typed ? 'answer' : 'head');
+      setArrived(arrival);
       setStage('question');
     } catch (error) {
       const r = error.reason || 'offline';
@@ -218,7 +220,7 @@ export default function GuestPage() {
   const number = q && !showChooser ? Math.max(1, used) : Math.min(limit, used + 1);
   const shown = (stage === 'question' || stage === 'verdict') && !showChooser ? asked : choice;
   const chapterName = chaptersFor(EDITION, shown?.year, shown?.course).find(c => c.id === shown?.chapter)?.name || '';
-  const preview = !mcq && answer.trim() ? answerToTex(answer.trim()) : '';
+  const preview = !mcq && answer.trim() ? numberTex(answer.trim()) : '';
   const typeset = preview.startsWith('$') ? preview : '';
   const correctIndex = mcq && verdict?.answer != null ? q.mcqOptions.findIndex(o => String(o) === String(verdict.answer)) : -1;
 
@@ -295,7 +297,7 @@ export default function GuestPage() {
               </section>
             ) : q && (
               <section className="gp-body" aria-labelledby="gp-title" data-guest-question>
-                <div className="gp-prompt" id="gp-prompt" lang="en"><MathText block text={q.prompt} /></div>
+                <div className={`gp-prompt${arrived ? ' is-arriving' : ''}`} id="gp-prompt" lang="en"><MathText block text={q.prompt} /></div>
                 <form onSubmit={check} className="gp-answer">
                   {mcq ? (
                     <fieldset className="gp-options" disabled={marked || busy}>
@@ -319,13 +321,14 @@ export default function GuestPage() {
                         {q.answerSuffix && <span className="gp-affix" lang="en"><MathText text={q.answerSuffix} /></span>}
                         {!marked && <button type="submit" className="btn btn-primary gp-check" disabled={!given || busy} data-guest-check>{busy ? t('guest.checking') : t('guest.check')}</button>}
                       </div>
-                      {!marked && (
-                        <p className="gp-reads" data-guest-reads>
-                          {typeset
-                            ? <><span className="gp-reads-k">{t('guest.readsAs')}</span> <span lang="en"><MathText text={typeset} /></span></>
-                            : <span className="gp-how">{t('guest.howToType')}</span>}
-                        </p>
-                      )}
+                      {/* The working line: what was typed, set out as maths, large, on a ruled line; once marked it carries the mark. */}
+                      <p className="gp-working" data-guest-reads>
+                        <span className="gp-reads-k">{t('guest.readsAs')}</span>
+                        {typeset
+                          ? <span className="gp-line" lang="en"><MathText text={typeset} /></span>
+                          : <span className="gp-how">{marked ? answer : t('guest.howToType')}</span>}
+                        {marked && verdict && <Mark right={verdict.correct} />}
+                      </p>
                     </div>
                   )}
                   {!marked && (mcq || (Array.isArray(q.hints) && q.hints[0] && !hint)) && (
@@ -341,7 +344,7 @@ export default function GuestPage() {
                   <div className="gp-verdict" role="status" data-guest-verdict={verdict.correct ? 'correct' : 'wrong'}>
                     <p className="gp-verdict-line"><Mark right={verdict.correct} />{verdict.correct ? t('guest.correct') : t('guest.notQuite')}</p>
                     {verdict.answer && (
-                      <p className="gp-verdict-answer"><span className="gp-reads-k">{t('guest.theAnswerIs')}</span> <ServerAnswer text={verdict.answer} q={q} /></p>
+                      <p className="gp-working gp-verdict-answer"><span className="gp-reads-k">{t('guest.theAnswerIs')}</span> <span className="gp-line"><ServerAnswer text={verdict.answer} q={q} /></span></p>
                     )}
                     <div className="gp-actions">
                       <button type="button" className="btn btn-primary" data-guest-next onClick={next} disabled={busy} autoFocus>{remaining === 0 ? t('guest.createAccount') : t('guest.next')}</button>

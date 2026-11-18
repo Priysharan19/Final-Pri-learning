@@ -89,7 +89,9 @@
 .gp-affix { flex: none; font-size: var(--text-lg); }
 .gp .gp-input { flex: 1 1 200px; min-width: 0; max-width: 440px; min-height: 56px; padding: 0 var(--space-4); font: 400 18px/1.2 var(--font-mono); background: var(--surface); }
 .gp-typed-row .gp-check { flex: none; min-height: 56px; padding-inline: var(--space-6); }
-.gp-reads { display: flex; align-items: baseline; gap: var(--space-3); min-height: 34px; margin: var(--space-3) 0 0; font-size: var(--text-lg); color: var(--ink); }
+/* The working lines: ruled, like the page a student writes on. The typed answer set out large, then the server's answer under it. */
+.gp-working { display: grid; grid-template-columns: 112px minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); max-width: 640px; min-height: 84px; margin: var(--space-4) 0 0; padding: var(--space-3) 0; box-sizing: border-box; border-bottom: 1px solid var(--hairline-strong); color: var(--ink); }
+.gp-line { min-width: 0; overflow-x: auto; overflow-y: hidden; font-size: clamp(24px, 1.4vw + 12px, 34px); line-height: 1.3; }
 .gp-how { font-size: var(--text-sm); line-height: 1.5; color: var(--ink-3); }
 .gp-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-5); margin-top: var(--space-4); }
 .gp-answer > .gp-actions:has(> .gp-link:only-child) { margin-top: 0; }
@@ -106,12 +108,13 @@
 .gp-mark { flex: none; fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
 .gp-mark.is-right { stroke: var(--good); }
 .gp-mark.is-wrong { stroke: var(--correction); }
-.gp-verdict { max-width: 640px; margin-top: var(--space-6); padding-top: var(--space-6); border-top: 1px solid var(--hairline-strong); }
+.gp-verdict { max-width: 640px; margin-top: var(--space-6); }
 .gp-verdict p { margin: 0; }
 .gp-verdict-line { display: flex; align-items: center; gap: var(--space-3); font-size: 22px; font-weight: 600; line-height: 1.2; }
-.gp-verdict-answer { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-3); margin-top: var(--space-4) !important; font-size: 22px; }
+.gp-verdict .gp-verdict-answer { margin-top: var(--space-4); }
 @media (prefers-reduced-motion: no-preference) {
   .gp-verdict { animation: gp-arrive var(--motion-base) var(--ease-standard) both; }
+  .gp-prompt.is-arriving { animation: gp-arrive 220ms var(--ease-standard) both; }
   @keyframes gp-arrive { from { opacity: 0; transform: translateY(6px); } }
 }
 
@@ -155,6 +158,8 @@
   .gp-margin .gp-link { margin: 0; }
   .gp-body { min-height: 0; padding: var(--space-6) 0 0; border-left: 0; border-top: 1px solid var(--hairline-strong); }
   .gp-prompt { margin: 0 0 var(--space-8); }
+  .gp-working { grid-template-columns: minmax(0, 1fr) auto; min-height: 72px; }
+  .gp-working .gp-reads-k { grid-column: 1 / -1; }
   .gp-actions .btn { flex: 1 1 100%; }
   .gp-chooser { margin: 0; }
   .gp-row > legend, .gp-row > label { float: none; display: block; width: auto; line-height: 1.4; padding-top: var(--space-3); }

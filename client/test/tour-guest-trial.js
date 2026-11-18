@@ -100,6 +100,8 @@ for (const edition of editions) {
       check(`${edition}: the server issued exactly one question for it`, issued.length === 1, String(issued.length));
       check(`${edition}: the answer field is ready: it has the focus, and its label and the question describe it`,
         await page.evaluate(() => document.activeElement?.id === 'gt-answer' && document.activeElement.labels.length === 1 && document.activeElement.getAttribute('aria-describedby') === 'gp-prompt'));
+      const motion = await page.locator('.gp-prompt').evaluate(e => { const c = getComputedStyle(e); return { name: c.animationName, ms: parseFloat(c.animationDuration) * 1000 }; });
+      check(`${edition}: the arrival question draws in once, in under 250 ms`, motion.name === 'gp-arrive' && motion.ms > 0 && motion.ms <= 250, JSON.stringify(motion));
       check(`${edition}: "Sign in" is top right, one click`, await page.getByTestId('guest-sign-in').isVisible());
       const bar = await page.locator('.gp-bar').boundingBox();
       const signBox = await page.getByTestId('guest-sign-in').boundingBox();
