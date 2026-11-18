@@ -31,6 +31,7 @@ export const EDITION_SUITES = [
   'client/test/brand-usage-check.mjs',
   'client/test/brand-assets-check.mjs',
   'client/test/edition-client-check.mjs',
+  'client/test/offering-check.mjs',
   'client/test/aurora-skin-check.mjs',
   'client/test/working-indicator-check.mjs',
   'client/test/i18n-coverage-check.mjs',
@@ -42,6 +43,7 @@ export const EDITION_SUITES = [
   'client/test/account-action-guardian-erase-check.mjs',
   // NSW curriculum, practice banks and exams; the library and the Exam Desk.
   'client/test/nsw-curriculum-check.mjs',
+  'client/test/syllabus-board-check.mjs',
   'client/test/nsw-bank-quality-check.mjs',
   'client/test/nsw-offer-check.mjs',
   'client/test/nsw-exams-check.mjs',
