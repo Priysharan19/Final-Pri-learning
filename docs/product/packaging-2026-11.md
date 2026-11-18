@@ -118,6 +118,7 @@ marked handwriting reads.
 | Marked handwriting and photo answers: up to 100 a day, per kind (proposed; 25 today) | `additional-ai-usage`, `server/platform/aiAllowance.js` |
 | Unlimited exam simulations | `premium-exams`, `server/platform/exams.js` |
 | Papers built around your weak topics, and targeted papers, with full marking | `premium-exams`, `exams.js` `entitlementRefusal` |
+| Assessment Readiness: sit an original timed Extension 1 paper in the app (Paper 01 is free for everyone, the others are Premium), criterion-level feedback on each part, a practice plan made from the sitting, and an unseen re-test. The paper and guideline PDFs themselves are FREE for any signed-in account (owner decision, 19 Nov 2026) | `premium-exams`, `server/platform/paperAttempts.js` |
 | Where the time went in each section of a paper | `premium-exams`, `exams.js` `withTimeReport` |
 | The estimate of your mark, and your mistake patterns | `advanced-analytics`, `forecast.js`, `mistakeDna.js` |
 | JEE Advanced track (Priyabhata) | `jee-advanced-content`, server question banks and papers |

@@ -1,0 +1,123 @@
+{
+  "keys": {
+    "q11a-ii": {
+      "answerType": "expression",
+      "key": {
+        "type": "expression",
+        "expr": "3*sqrt(207-k)",
+        "display": "3\\sqrt{207-k}"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p01.py: Heron's formula on numeric roots of x^3-18x^2+104x-k for 30 random k in range; max err 7e-15"
+    },
+    "q11a-iii": {
+      "answerType": "value",
+      "key": {
+        "type": "numeric",
+        "value": 189.75524314995323,
+        "display": "162\\sqrt{58}-1044"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p01.py: scan of the whole admissible k range for a^2+b^2=c^2 via numeric roots + bisection: exactly one solution 189.75524315"
+    },
+    "q11b-iii": {
+      "answerType": "expression",
+      "key": {
+        "type": "expression",
+        "expr": "2^n*(n!)^2/(2n)!",
+        "display": "p_n=\\dfrac{2^n(n!)^2}{(2n)!}=\\dfrac{n!}{1\\times3\\times\\cdots\\times(2n-1)}"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p01.py: exhaustive enumeration of all pairings n=1..5 (winners = top n gives 1,2/3,2/5,8/35,8/63); inequality checked n<=79"
+    },
+    "q12b-i": {
+      "answerType": "expression",
+      "key": {
+        "type": "expression",
+        "expr": "2*sqrt(d^2-(R-r)^2)+pi*(R+r)+2*(R-r)*asin((R-r)/d)",
+        "display": "2\\sqrt{d^2-(R-r)^2}+\\pi(R+r)+2(R-r)\\sin^{-1}\\!\\left(\\dfrac{R-r}{d}\\right)"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p01.py: convex-hull perimeter of two sampled discs (40000-gon) and explicit tangent geometry at 6 random (R,r,d); max err 1.7e-8"
+    },
+    "q12b-iii": {
+      "answerType": "value",
+      "key": {
+        "type": "numeric",
+        "value": 1.0225983326687036,
+        "display": "4\\sqrt{3}+\\dfrac{2\\pi}{3}-8"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p01.py: convex-hull belt lengths (c=1.5,d=4,u=1 minus u=0) = 1.0225983 vs closed form 1.0225983"
+    },
+    "q13a-i": {
+      "answerType": "value",
+      "key": {
+        "type": "numeric",
+        "value": 2,
+        "display": "2",
+        "answerSuffix": "years"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p01.py: RK4 of dx/dt=x(1-x)-1/4 from x(0)=1/4 hits 0 at t=2.000000; x0>1/2 never wiped out"
+    },
+    "q13b-ii": {
+      "answerType": "expression",
+      "key": {
+        "type": "expression",
+        "expr": "pi^2*c^2*x^4/k^2",
+        "display": "y=\\dfrac{\\pi^2c^2}{k^2}x^4"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p01.py: built the vessel numerically (x^2=k sqrt(y)/(pi c)) and confirmed dh/dt=-k sqrt(h)/V'(h)=-c at three depths; the key is the expression for y (the engine reads 'y = ...' as the right-hand side)"
+    },
+    "q14a-iii": {
+      "answerType": "expression",
+      "key": {
+        "type": "expression",
+        "expr": "g*cos(phi)^2/(2*V*cos(theta))",
+        "display": "\\dfrac{g\\cos^2\\phi}{2V\\cos\\theta}"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p01.py: numeric d(phi)/dt vs -g cos^2(phi)/(2V cos theta) at 40 random points; this is the magnitude (phi decreases); engine rejects a leading minus sign"
+    },
+    "q14a-iv": {
+      "answerType": "expression",
+      "key": {
+        "type": "expression",
+        "expr": "2*V/g*sqrt(1-5*cos(theta)^2)",
+        "display": "\\dfrac{2V}{g}\\sqrt{1-5\\cos^2\\theta}"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p01.py: dot-product sign scan and bisection of the interval where angle OPA is acute, 25 random (g,V,theta) with tan(theta)>2; max err 1.8e-15"
+    },
+    "q14b-ii": {
+      "answerType": "expression",
+      "key": {
+        "type": "expression",
+        "expr": "1/((2*m-1)*nCr(2*m-2,m-1))",
+        "display": "\\dfrac{1}{(2m-1)\\binom{2m-2}{m-1}}"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p01.py: mpmath quadrature of x^(m-1)(1-x)^(m-1) on [0,1] for m=2..11"
+    }
+  },
+  "_omitted": {
+    "q11a-i": "answer is an interval (|k-192|<16sqrt3/9); the engine takes no inequality/range answer",
+    "q11b-i": "proof by induction",
+    "q11b-ii": "show-that (counting argument)",
+    "q12a-i": "show-that",
+    "q12a-ii": "explanation",
+    "q12a-iii": "show-that (inequality proof)",
+    "q12b-ii": "show-that",
+    "q13a-i-second-result": "the 'never wiped out' result is a proof, only the time is keyed",
+    "q13a-ii": "answer T is in x_0 and a; the engine reads 'x0' as x*0 (the key collapses to 0 and then accepts wrong forms such as T/2) and does not parse 'x_0', so no safe key exists; verified numerically in p01.py only",
+    "q13a-iii": "show-that (limit)",
+    "q13b-i": "show-that",
+    "q13b-iii": "show-that (x^4 y constant and a volume bound)",
+    "q14a-i": "show-that",
+    "q14a-ii": "show-that",
+    "q14b-i": "show-that",
+    "q14b-iii": "proof"
+  }
+}

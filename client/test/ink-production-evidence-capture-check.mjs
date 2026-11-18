@@ -151,7 +151,7 @@ assert.ok(!/nativeInk\.(recognize|foundationRecognize)|performance\.now/.test(pa
 assert.ok(!/recognitionContext=\{?prompt|expectedAnswer|markScheme/.test(page), 'ground truth must never be passed into recognition context');
 // InkAnswer measures the one read it makes, around readWithCloud, and publishes it.
 assert.match(inkAnswer, /const pressedAt = [\s\S]{0,400}readWithCloud\(strokes, \{ user: who, signal: controller\?\.signal, freshReadiness: true \}\)/, 'the timer starts at the press, around the one readWithCloud call');
-assert.match(inkAnswer, /publish\(landed, now, \{ stale: nowSignature !== signature, readMs: sincePress\(\) \}\)/, 'a fresh server read is published with its round trip');
+assert.match(inkAnswer, /publish\(landed, now, \{ stale: nowSignature !== signature, readMs: sincePress\(\)(?:, live: auto)? \}\)/, 'a fresh server read is published with its round trip (InkAnswer also says whether the read was automatic: `live: auto`, added after this assertion was written; the timing assertion is unchanged)');
 assert.match(inkAnswer, /readMs: Number\.isFinite\(readMs\) \? Math\.max\(0, readMs\) : null/, 'every other publish carries readMs null');
 assert.equal((inkAnswer.match(/readMs: sincePress\(\)/g) || []).length, 1, 'only the landing of a fresh read is timed');
 

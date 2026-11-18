@@ -1,0 +1,2603 @@
+{
+ "format": "pri-paper-v1",
+ "id": "ext1-2027-p04",
+ "paperNumber": 4,
+ "title": "Practice Paper 4",
+ "course": "nsw-ext1",
+ "edition": "prithagoras",
+ "year": 2027,
+ "totalMarks": 70,
+ "readingTime": "10 minutes",
+ "workingTime": "2 hours",
+ "markingScheme": {
+  "status": "draft",
+  "note": "The marking guideline as written by the author. Not approved for criterion marks.",
+  "digest": "33fa225cee94f3221cfe7c214eb9d91c30746d959483b489f86bf0f5e552ec8a"
+ },
+ "sections": [
+  {
+   "id": "I",
+   "title": "Section I",
+   "marks": 10,
+   "minutes": 15,
+   "instructions": "Attempt Questions 1 to 10. Allow about 15 minutes for this section.",
+   "questions": [
+    {
+     "id": "q1",
+     "number": 1,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The zeros of $x^3 - 2x^2 + 3x - 4$ are $\\alpha$, $\\beta$ and $\\gamma$."
+      },
+      {
+       "k": "p",
+       "t": "What is the value of $(\\alpha + \\beta)(\\beta + \\gamma)(\\gamma + \\alpha)$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q1",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-2$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$2$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$4$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$10$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "B"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Since $\\alpha + \\beta + \\gamma = 2$, the product is $(2 - \\gamma)(2 - \\alpha)(2 - \\beta) = P(2)$, where $P(x) = (x - \\alpha)(x - \\beta)(x - \\gamma)$ is the given polynomial. So the value is $8 - 8 + 6 - 4 = 2$."
+        }
+       ],
+       "classification": {
+        "content": "Sums of zeros; factor theorem",
+        "outcomes": [
+         "ME1-11-02"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q2",
+     "number": 2,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The diagram shows a rectangle divided into 12 unit squares, one of which is shaded."
+      },
+      {
+       "k": "fig",
+       "name": "figgrid"
+      },
+      {
+       "k": "p",
+       "t": "How many rectangles, with sides along the grid lines, contain the shaded square?"
+      }
+     ],
+     "figures": [
+      "figgrid"
+     ],
+     "parts": [
+      {
+       "id": "q2",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "12"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "18"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "24"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "36"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "C"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Such a rectangle is fixed by its four sides. The left side can be chosen in 2 ways and the right side in 3 ways; the bottom side in 2 ways and the top side in 2 ways. So there are $2 \\times 3 \\times 2 \\times 2 = 24$ rectangles."
+        }
+       ],
+       "classification": {
+        "content": "Counting techniques",
+        "outcomes": [
+         "ME1-11-04"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q3",
+     "number": 3,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "A security camera stands at the centre $O$ of a square courtyard and turns so that it always points at a guard $G$, who walks around the walls of the courtyard at a constant speed. The guard takes time $T$ to walk once around, and is at the midpoint of a wall when $t = 0$."
+      },
+      {
+       "k": "fig",
+       "name": "figcourt"
+      },
+      {
+       "k": "p",
+       "t": "Which graph shows the rate $\\omega$ at which the camera is turning, against the time $t$? In each graph, $M$ is the greatest value of $\\omega$."
+      }
+     ],
+     "figures": [
+      "figcourt"
+     ],
+     "parts": [
+      {
+       "id": "q3",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figQ3OptA"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figQ3OptB"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figQ3OptC"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figQ3OptD"
+          }
+         ]
+        }
+       ],
+       "figureOptions": true,
+       "key": {
+        "type": "mcq",
+        "answer": "D"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Let the walls be at distance 1 from $O$ and let the guard have speed $v$. While the guard is on one wall, at a distance $s$ from its midpoint, the camera has turned through $\\theta = \\tan^{-1}s$ from the direction of the midpoint, so $\\omega = \\dfrac{d\\theta}{dt} = \\dfrac{1}{1 + s^2}\\dfrac{ds}{dt} = \\dfrac{v}{1 + s^2}$. So $\\omega$ is greatest, equal to $v$, at the midpoint of a wall ($t = 0, \\frac{T}{4}, \\ldots$), where the graph is smooth, and least, equal to $\\frac{v}{2}$, at a corner ($t = \\frac{T}{8}, \\frac{3T}{8}, \\ldots$). At a corner $\\dfrac{d\\omega}{dt}$ changes sign abruptly (from $-\\frac{v^2}{2}$ to $\\frac{v^2}{2}$), so the graph has a sharp point there. Only graph D has smooth maxima at the midpoints and sharp minima of half the greatest value at the corners."
+        }
+       ],
+       "classification": {
+        "content": "Inverse trigonometric functions; rates of change",
+        "outcomes": [
+         "ME1-12-03",
+         "ME1-12-05"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q4",
+     "number": 4,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The vectors $\\underset{\\sim}{a} = \\overrightarrow{OA}$ and $\\underset{\\sim}{b} = \\overrightarrow{OB}$ satisfy $\\left|\\underset{\\sim}{a}\\right| = 2$, $\\left|\\underset{\\sim}{b}\\right| = 3$ and $\\underset{\\sim}{a}\\cdot\\underset{\\sim}{b} = 1$."
+      },
+      {
+       "k": "p",
+       "t": "What is the area of the triangle $OAB$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q4",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{\\sqrt{35}}{2}$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\sqrt{35}$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$3$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{\\sqrt{37}}{2}$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "A"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "If $\\theta = \\angle AOB$ then $\\cos\\theta = \\dfrac{1}{6}$, so $\\sin\\theta = \\dfrac{\\sqrt{35}}{6}$, and the area is $\\dfrac12 \\times 2 \\times 3 \\times \\dfrac{\\sqrt{35}}{6} = \\dfrac{\\sqrt{35}}{2}$."
+        }
+       ],
+       "classification": {
+        "content": "Vectors in two dimensions; scalar product",
+        "outcomes": [
+         "ME1-12-02"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q5",
+     "number": 5,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "In a large population, 20% of people are left-handed. A random sample of 100 people is taken, and $\\hat{p}$ is the proportion of left-handed people in the sample."
+      },
+      {
+       "k": "p",
+       "t": "Using a normal approximation, in which $P(-2 < Z < 2) = 0.95$, which of the following is closest to $P(\\hat{p} > 0.28)$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q5",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$0.16$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$0.05$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$0.025$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$0.0015$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "C"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$\\hat{p}$ has mean $0.2$ and standard deviation $\\sqrt{\\dfrac{0.2 \\times 0.8}{100}} = 0.04$, so $0.28$ is 2 standard deviations above the mean. The probability of being more than 2 standard deviations above the mean is about $\\dfrac{1 - 0.95}{2} = 0.025$."
+        }
+       ],
+       "classification": {
+        "content": "Sample proportions; normal approximation",
+        "outcomes": [
+         "ME1-12-06"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q6",
+     "number": 6,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "What is the value of $\\displaystyle\\int_0^1 x(1 - x)^{99}\\,dx$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q6",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{1}{100}$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{1}{9900}$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{1}{10\\,000}$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{1}{10\\,100}$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "D"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "With $u = 1 - x$ the integral becomes $\\displaystyle\\int_0^1(1 - u)u^{99}\\,du = \\frac{1}{100} - \\frac{1}{101} = \\frac{1}{10\\,100}$."
+        }
+       ],
+       "classification": {
+        "content": "Integration by substitution",
+        "outcomes": [
+         "ME1-12-04"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q7",
+     "number": 7,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "What is the exact value of $\\sin^{-1}(\\sin 10)$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q7",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$3\\pi - 10$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$10 - 3\\pi$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$10 - 2\\pi$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$4\\pi - 10$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "A"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The value lies between $-\\frac{\\pi}{2}$ and $\\frac{\\pi}{2}$ and has the same sine as 10. Since $\\sin(3\\pi - 10) = \\sin 10$ and $3\\pi - 10 \\approx -0.575$ is in that interval, the value is $3\\pi - 10$."
+        }
+       ],
+       "classification": {
+        "content": "Inverse trigonometric functions",
+        "outcomes": [
+         "ME1-12-03"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q8",
+     "number": 8,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The function $y(x)$ satisfies $\\dfrac{dy}{dx} = y^2$ and $y(0) = 1$."
+      },
+      {
+       "k": "p",
+       "t": "What is the largest set of values of $x$, containing $x = 0$, on which this solution is defined?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q8",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "All real $x$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$x < 1$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$x < e$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-1 < x < 1$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "B"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$\\displaystyle\\int\\frac{dy}{y^2} = \\int dx$ gives $-\\dfrac1y = x + C$, and $y(0) = 1$ gives $C = -1$. So $y = \\dfrac{1}{1 - x}$, which is defined, and satisfies the equation, for $x < 1$; it becomes unbounded as $x \\to 1^-$."
+        }
+       ],
+       "classification": {
+        "content": "Differential equations; domain of a solution",
+        "outcomes": [
+         "ME1-12-05"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q9",
+     "number": 9,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "A river is 120 m wide and flows at 3 m s$^{-1}$. A boat that travels at 5 m s$^{-1}$ in still water crosses from $A$ to the point $B$ directly opposite, moving along the line $AB$."
+      },
+      {
+       "k": "fig",
+       "name": "figriver"
+      },
+      {
+       "k": "p",
+       "t": "How long does the crossing take?"
+      }
+     ],
+     "figures": [
+      "figriver"
+     ],
+     "parts": [
+      {
+       "id": "q9",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "24 s"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "30 s"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "40 s"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "15 s"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "B"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The velocity of the boat is the vector sum of its velocity through the water (magnitude 5) and the current (magnitude 3), and it must be perpendicular to the current. By Pythagoras' theorem its magnitude is $\\sqrt{5^2 - 3^2} = 4$ m s$^{-1}$, so the time is $\\dfrac{120}{4} = 30$ s."
+        }
+       ],
+       "classification": {
+        "content": "Vectors in two dimensions; relative velocity",
+        "outcomes": [
+         "ME1-12-02"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q10",
+     "number": 10,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "Some of the integers from 1 to 100 are chosen."
+      },
+      {
+       "k": "p",
+       "t": "What is the smallest number of integers that must be chosen to be certain that two of the chosen integers have no common factor greater than 1?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q10",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "26"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "50"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "51"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "67"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "C"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The 50 even integers have the common factor 2, so 50 integers are not enough. Split the integers into the 50 pairs $\\{1, 2\\}, \\{3, 4\\}, \\ldots, \\{99, 100\\}$. If 51 integers are chosen, two of them are in the same pair. They are consecutive integers, which have no common factor greater than 1. So the answer is 51."
+        }
+       ],
+       "classification": {
+        "content": "The pigeonhole principle",
+        "outcomes": [
+         "ME1-11-04"
+        ]
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "II",
+   "title": "Section II",
+   "marks": 60,
+   "minutes": 105,
+   "instructions": "Attempt Questions 11 to 14. Allow about 1 hour and 45 minutes for this section. Show relevant mathematical reasoning and/or calculations.",
+   "questions": [
+    {
+     "id": "q11",
+     "number": 11,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q11a",
+       "label": "(a)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A straight line touches the curve $y = x^4 - 6x^2 + 8x$ at two different points."
+        },
+        {
+         "k": "p",
+         "t": "Find the equation of the line and the $x$-coordinates of the two points."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct line and both $x$-coordinates"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Writes the difference as a perfect square and compares coefficients, or equivalent merit"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Recognises that the difference between the curve and the line has two double zeros"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Let the line be $y = mx + c$. The quartic $x^4 - 6x^2 + (8 - m)x - c$ has a double zero at each point of contact, so it equals $\\left(x^2 + px + q\\right)^2$. Comparing coefficients of $x^3$ gives $p = 0$, and then"
+        },
+        {
+         "k": "math",
+         "t": "x^4 - 6x^2 + (8 - m)x - c = x^4 + 2qx^2 + q^2,"
+        },
+        {
+         "k": "p",
+         "t": "so $q = -3$, $m = 8$ and $c = -9$. The line is $y = 8x - 9$, and it touches the curve where $x^2 - 3 = 0$, that is, at $x = \\sqrt3$ and $x = -\\sqrt3$."
+        }
+       ],
+       "classification": {
+        "content": "Tangents to polynomial curves; multiple zeros",
+        "outcomes": [
+         "ME1-11-02"
+        ]
+       },
+       "figures": [],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q11b",
+       "label": "(b)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Show that $\\tan^{-1}\\!\\left(\\dfrac{\\sqrt{1 + x^2} - 1}{x}\\right) = \\dfrac12\\tan^{-1}x$ for all $x > 0$, and hence find the exact value of $\\tan\\dfrac{\\pi}{12}$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides a correct demonstration and the correct exact value"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides a correct demonstration, or equivalent merit"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Writes $x = \\tan\\theta$ and simplifies the fraction, or equivalent merit"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Let $\\theta = \\tan^{-1}x$, so $0 < \\theta < \\dfrac{\\pi}{2}$ and $\\sqrt{1 + x^2} = \\sec\\theta$. Then"
+        },
+        {
+         "k": "math",
+         "t": "\\frac{\\sqrt{1 + x^2} - 1}{x} = \\frac{\\sec\\theta - 1}{\\tan\\theta} = \\frac{1 - \\cos\\theta}{\\sin\\theta} = \\frac{2\\sin^2\\frac{\\theta}{2}}{2\\sin\\frac{\\theta}{2}\\cos\\frac{\\theta}{2}} = \\tan\\frac{\\theta}{2}."
+        },
+        {
+         "k": "p",
+         "t": "Since $0 < \\dfrac{\\theta}{2} < \\dfrac{\\pi}{4}$, the inverse tangent of this is $\\dfrac{\\theta}{2} = \\dfrac12\\tan^{-1}x$."
+        },
+        {
+         "k": "p",
+         "t": "With $x = \\dfrac{1}{\\sqrt3}$, $\\theta = \\dfrac{\\pi}{6}$: $\\ \\tan\\dfrac{\\pi}{12} = \\sqrt3\\left(\\dfrac{2}{\\sqrt3} - 1\\right) = 2 - \\sqrt3$."
+        }
+       ],
+       "classification": {
+        "content": "Inverse trigonometric functions; half-angle results",
+        "outcomes": [
+         "ME1-12-03",
+         "ME1-11-03"
+        ]
+       },
+       "figures": [],
+       "answerType": "value",
+       "key": {
+        "type": "numeric",
+        "value": 0.2679491924311227,
+        "display": "2-\\sqrt{3}"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p04.py: mpmath tan(pi/12), and the half-angle identity checked at five x"
+      },
+      {
+       "id": "q11c",
+       "label": "(c)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Prove by mathematical induction that $2^{n+2} \\times 3^n + 5n - 4$ is divisible by 25 for all integers $n \\ge 1$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides a correct proof"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Verifies the base case and makes substantial progress with the inductive step"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Verifies the base case, or equivalent merit"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "When $n = 1$ the expression is $8 \\times 3 + 5 - 4 = 25$, which is divisible by 25."
+        },
+        {
+         "k": "p",
+         "t": "Assume that $2^{k+2} \\times 3^k + 5k - 4 = 25M$ for some integer $M$, so that $2^{k+2} \\times 3^k = 25M - 5k + 4$. Then"
+        },
+        {
+         "k": "math",
+         "t": "2^{k+3} \\times 3^{k+1} + 5(k + 1) - 4 = 6\\left(25M - 5k + 4\\right) + 5k + 1 = 150M - 25k + 25 = 25(6M - k + 1),"
+        },
+        {
+         "k": "p",
+         "t": "which is divisible by 25. Hence the result is true for all integers $n \\ge 1$ by mathematical induction."
+        }
+       ],
+       "classification": {
+        "content": "Proof by mathematical induction (divisibility)",
+        "outcomes": [
+         "ME1-12-01"
+        ]
+       },
+       "figures": [],
+       "answerType": "show-that",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q11d",
+       "label": "(d)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A fair die is rolled $n$ times."
+        },
+        {
+         "k": "p",
+         "t": "Find the probability that the product of the $n$ numbers rolled is divisible by 6."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct probability with justification"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds the probability that the product is not divisible by 2 or not divisible by 3, with an error in combining them"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds the probability that the product is odd, or that it is not divisible by 3"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The product is not divisible by 2 when every roll is odd: probability $\\left(\\frac12\\right)^n$. It is not divisible by 3 when no roll is 3 or 6: probability $\\left(\\frac23\\right)^n$. Both happen when every roll is 1 or 5: probability $\\left(\\frac13\\right)^n$."
+        },
+        {
+         "k": "p",
+         "t": "So the probability that the product fails to be divisible by 2 or by 3 is $\\left(\\frac12\\right)^n + \\left(\\frac23\\right)^n - \\left(\\frac13\\right)^n$, and the required probability is"
+        },
+        {
+         "k": "math",
+         "t": "1 - \\left(\\frac12\\right)^n - \\left(\\frac23\\right)^n + \\left(\\frac13\\right)^n."
+        }
+       ],
+       "classification": {
+        "content": "Probability; counting techniques",
+        "outcomes": [
+         "ME1-11-04"
+        ]
+       },
+       "figures": [],
+       "answerType": "expression",
+       "key": {
+        "type": "expression",
+        "expr": "1-(1/2)^n-(2/3)^n+(1/3)^n",
+        "display": "1-\\left(\\dfrac12\\right)^{n}-\\left(\\dfrac23\\right)^{n}+\\left(\\dfrac13\\right)^{n}"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p04.py: exact enumeration of all 6^N rolls for N=1..6"
+      },
+      {
+       "id": "q11e",
+       "label": "(e)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Let $a > 1$. Use the substitution $x = \\dfrac1u$ to show that"
+        },
+        {
+         "k": "math",
+         "t": "\\int_{\\frac1a}^{a}\\frac{\\tan^{-1}x}{x}\\,dx = \\frac{\\pi}{2}\\ln a."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides a correct demonstration"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Obtains an equation for the integral in terms of itself, or equivalent merit"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Transforms the integral correctly, or equivalent merit"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Let $I$ be the integral. With $x = \\dfrac1u$: $\\ \\dfrac{dx}{x} = -\\dfrac{du}{u}$, the limits $\\dfrac1a$ and $a$ are exchanged, and for $u > 0$, $\\tan^{-1}\\dfrac1u = \\dfrac{\\pi}{2} - \\tan^{-1}u$. Hence"
+        },
+        {
+         "k": "math",
+         "t": "I = \\int_{\\frac1a}^{a}\\frac{\\frac{\\pi}{2} - \\tan^{-1}u}{u}\\,du = \\frac{\\pi}{2}\\Bigl[\\ln u\\Bigr]_{\\frac1a}^{a} - I = \\pi\\ln a - I,"
+        },
+        {
+         "k": "p",
+         "t": "so $I = \\dfrac{\\pi}{2}\\ln a$."
+        }
+       ],
+       "classification": {
+        "content": "Integration by substitution; inverse trigonometric functions",
+        "outcomes": [
+         "ME1-12-04",
+         "ME1-12-03"
+        ]
+       },
+       "figures": [],
+       "answerType": "show-that",
+       "key": null,
+       "autoMarks": 0
+      }
+     ]
+    },
+    {
+     "id": "q12",
+     "number": 12,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q12a",
+       "label": "(a)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "The diagram shows a regular hexagon $ABCDEF$ with centre $O$. The point $M$ is the midpoint of $CD$, and the intervals $AM$ and $BE$ meet at $X$."
+        },
+        {
+         "k": "fig",
+         "name": "fighex"
+        },
+        {
+         "k": "p",
+         "t": "Let $\\underset{\\sim}{a} = \\overrightarrow{OA}$ and $\\underset{\\sim}{b} = \\overrightarrow{OB}$. Find $\\overrightarrow{OX}$ in terms of $\\underset{\\sim}{a}$ and $\\underset{\\sim}{b}$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct vector with justification"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds $\\overrightarrow{OM}$ and writes a general point of $AM$, or equivalent merit"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Expresses $\\overrightarrow{OC}$ or $\\overrightarrow{OD}$ in terms of $\\underset{\\sim}{a}$ and $\\underset{\\sim}{b}$"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "In a regular hexagon $OABC$ is a rhombus, so $\\overrightarrow{OC} = \\underset{\\sim}{b} - \\underset{\\sim}{a}$, and $\\overrightarrow{OD} = -\\underset{\\sim}{a}$. Hence $\\overrightarrow{OM} = \\dfrac12\\left(\\underset{\\sim}{b} - 2\\,\\underset{\\sim}{a}\\right) = \\dfrac12\\underset{\\sim}{b} - \\underset{\\sim}{a}$."
+        },
+        {
+         "k": "p",
+         "t": "A point of $AM$ has position vector $\\underset{\\sim}{a} + s\\left(\\dfrac12\\underset{\\sim}{b} - 2\\,\\underset{\\sim}{a}\\right) = (1 - 2s)\\,\\underset{\\sim}{a} + \\dfrac{s}{2}\\,\\underset{\\sim}{b}$, and a point of $BE$ has position vector $t\\,\\underset{\\sim}{b}$. These agree when $1 - 2s = 0$, so $s = \\dfrac12$ and $t = \\dfrac14$."
+        },
+        {
+         "k": "p",
+         "t": "Hence $\\overrightarrow{OX} = \\dfrac14\\underset{\\sim}{b}$. (Since $s = \\dfrac12$, $X$ is also the midpoint of $AM$.)"
+        }
+       ],
+       "classification": {
+        "content": "Vectors in two dimensions; ratios",
+        "outcomes": [
+         "ME1-12-02"
+        ]
+       },
+       "figures": [
+        "fighex"
+       ],
+       "answerType": "expression",
+       "key": {
+        "type": "expression",
+        "expr": "b/4",
+        "display": "\\overrightarrow{OX}=\\dfrac14\\,\\underset{\\sim}{b}"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p04.py: regular hexagon coordinates, X = AM meets BE solved exactly and decomposed on a and b: 0a + b/4"
+      },
+      {
+       "id": "q12b",
+       "label": "(b)",
+       "marks": 4,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "The diagram shows a grid of streets. Dana walks from $A$ to $B$, always moving north or east along the streets. At each corner where she could go either north or east, she tosses a fair coin to decide which way to go. One possible route is shown."
+        },
+        {
+         "k": "fig",
+         "name": "figstreets"
+        },
+        {
+         "k": "p",
+         "t": "Find the probability that Dana's route passes through the corner $T$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct probability with justification"
+          }
+         ],
+         "marks": 4
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Reduces the problem to a binomial probability for the first six tosses with a minor error"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Recognises that Dana passes through $T$ exactly when she reaches the top edge at or to the west of $T$"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Recognises that the moves along the top edge are forced, or equivalent merit"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Once Dana reaches the top edge she must walk east along it to $B$. So she passes through $T$ exactly when she reaches the top edge at $T$ or to the west of $T$, that is, when she makes her fourth move north before her third move east."
+        },
+        {
+         "k": "p",
+         "t": "Imagine that she tosses the coin 6 times whether or not the tosses are needed. Her fourth move north comes before her third move east exactly when at least 4 of these 6 tosses say north (otherwise at least 3 say east, and the third east comes first). Until one of these two things happens she is not on the top or right-hand edge, so every move is decided by a toss. The probability is"
+        },
+        {
+         "k": "math",
+         "t": "\\left[\\binom64 + \\binom65 + \\binom66\\right]\\left(\\frac12\\right)^6 = \\frac{15 + 6 + 1}{64} = \\frac{11}{32}."
+        }
+       ],
+       "classification": {
+        "content": "Counting techniques; binomial probability",
+        "outcomes": [
+         "ME1-11-04",
+         "ME1-12-06"
+        ]
+       },
+       "figures": [
+        "figstreets"
+       ],
+       "answerType": "value",
+       "key": {
+        "type": "exact",
+        "n": "11",
+        "d": "32",
+        "display": "\\dfrac{11}{32}"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p04.py: exact dynamic programme over the 4x4 street grid (fair toss at interior corners, forced moves on edges) gives P(visit T)=11/32"
+      },
+      {
+       "id": "q12c",
+       "label": "(c)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A circle of radius 1 with centre $C$ rolls without slipping around the inside of a fixed circle of radius 2 with centre $O$. At time $t$ the circles touch at $K$, where $OK$ makes an angle $t$ with the positive $x$-axis. The point $P$ on the rolling circle starts at $A(2, 0)$. Because the circle rolls without slipping, the radius $CP$ makes an angle $-t$ with the positive $x$-axis at time $t$. **(Do NOT prove this.)** The point $Q$ is the midpoint of $CP$."
+        },
+        {
+         "k": "fig",
+         "name": "figroll"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q12c-i",
+         "label": "(i)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that $P$ always lies on the $x$-axis."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds $\\overrightarrow{OC}$ or $\\overrightarrow{CP}$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$C$ is the midpoint of $OK$, so $\\overrightarrow{OC} = \\cos t\\,\\underset{\\sim}{i} + \\sin t\\,\\underset{\\sim}{j}$, and $\\overrightarrow{CP} = \\cos(-t)\\,\\underset{\\sim}{i} + \\sin(-t)\\,\\underset{\\sim}{j} = \\cos t\\,\\underset{\\sim}{i} - \\sin t\\,\\underset{\\sim}{j}$. Hence"
+          },
+          {
+           "k": "math",
+           "t": "\\overrightarrow{OP} = 2\\cos t\\,\\underset{\\sim}{i}."
+          },
+          {
+           "k": "p",
+           "t": "So $P$ moves backwards and forwards along the diameter of the fixed circle that lies on the $x$-axis, between $(2, 0)$ and $(-2, 0)$."
+          }
+         ],
+         "classification": {
+          "content": "Motion in vector form; parametric form; scalar product",
+          "outcomes": [
+           "ME1-12-02",
+           "ME1-11-01"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q12c-ii",
+         "label": "(ii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find all the positions of $Q$ at which its velocity is perpendicular to $\\overrightarrow{OQ}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides all the positions with justification"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the scalar product of $\\overrightarrow{OQ}$ and the velocity, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the position vector of $Q$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$\\overrightarrow{OQ} = \\overrightarrow{OC} + \\dfrac12\\overrightarrow{CP} = \\dfrac32\\cos t\\,\\underset{\\sim}{i} + \\dfrac12\\sin t\\,\\underset{\\sim}{j}$, so the velocity of $Q$ is $\\underset{\\sim}{v} = -\\dfrac32\\sin t\\,\\underset{\\sim}{i} + \\dfrac12\\cos t\\,\\underset{\\sim}{j}$ and"
+          },
+          {
+           "k": "math",
+           "t": "\\overrightarrow{OQ}\\cdot\\underset{\\sim}{v} = -\\frac94\\sin t\\cos t + \\frac14\\sin t\\cos t = -\\sin 2t."
+          },
+          {
+           "k": "p",
+           "t": "This is zero when $t$ is a multiple of $\\dfrac{\\pi}{2}$, that is, when $Q$ is at $\\left(\\dfrac32, 0\\right)$, $\\left(0, \\dfrac12\\right)$, $\\left(-\\dfrac32, 0\\right)$ or $\\left(0, -\\dfrac12\\right)$."
+          }
+         ],
+         "classification": {
+          "content": "Motion in vector form; parametric form; scalar product",
+          "outcomes": [
+           "ME1-12-02",
+           "ME1-11-01"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q12c-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the greatest and least speeds of $Q$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides both speeds with justification"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides one of the speeds, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the speed of $Q$ in terms of $t$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "By part (ii), the speed $v$ of $Q$ satisfies $v^2 = \\dfrac94\\sin^2 t + \\dfrac14\\cos^2 t = \\dfrac14 + 2\\sin^2 t$."
+          },
+          {
+           "k": "p",
+           "t": "So the least speed is $\\dfrac12$, when $\\sin t = 0$, and the greatest speed is $\\dfrac32$, when $\\sin t = \\pm1$. (The greatest speed occurs when $\\cos t = 0$, which is when $P$ is at $O$.)"
+          }
+         ],
+         "classification": {
+          "content": "Motion in vector form; parametric form; scalar product",
+          "outcomes": [
+           "ME1-12-02",
+           "ME1-11-01"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figroll"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "q13",
+     "number": 13,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q13a",
+       "label": "(a)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A child stands at the origin $O$ holding one end of a taut string of length $a$. The other end is tied to a toy boat on the water at $(0, a)$. The child walks along the positive $x$-axis, and the boat is pulled along a curve. At each instant the string is a tangent to the path of the boat. The diagram shows the child at $C$ and the boat at $B(x, y)$."
+        },
+        {
+         "k": "fig",
+         "name": "figtract"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q13a-i",
+         "label": "(i)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that the path of the boat satisfies $\\dfrac{dy}{dx} = -\\dfrac{y}{\\sqrt{a^2 - y^2}}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the horizontal distance from $B$ to $C$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The string $BC$ has length $a$ and $B$ is at height $y$ above the $x$-axis, so by Pythagoras' theorem the horizontal distance from $B$ to $C$ is $\\sqrt{a^2 - y^2}$, with $C$ to the right of $B$. The string is a tangent to the path at $B$, so the gradient of the path is the gradient of $BC$:"
+          },
+          {
+           "k": "math",
+           "t": "\\frac{dy}{dx} = \\frac{0 - y}{\\sqrt{a^2 - y^2}} = -\\frac{y}{\\sqrt{a^2 - y^2}}."
+          }
+         ],
+         "classification": {
+          "content": "Differential equations from geometric conditions; areas; volumes of solids of revolution",
+          "outcomes": [
+           "ME1-12-05",
+           "ME1-12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13a-ii",
+         "label": "(ii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "The shaded region lies below the path of the boat and above the $x$-axis, between the $y$-axis and the vertical line through $B$. Without solving the differential equation, show that the area of the shaded region is $\\displaystyle\\int_y^a\\sqrt{a^2 - u^2}\\,du$, and deduce that this area is less than $\\dfrac{\\pi a^2}{4}$ however far the child walks."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration and deduction"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Shows that the area is the given integral, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes the area as an integral with respect to $x$ and attempts to change the variable"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Let the boat be at height $h$ when it is at $B$ (so $h$ is the value of $y$ at $B$), and let $u$ be the height of a general point of the path. The area is $\\displaystyle\\int u\\,dx$, taken along the path from the point where $u = a$ to the point where $u = h$. By part (i), $dx = -\\dfrac{\\sqrt{a^2 - u^2}}{u}\\,du$, so"
+          },
+          {
+           "k": "math",
+           "t": "\\text{area} = \\int_a^h u \\times \\left(-\\frac{\\sqrt{a^2 - u^2}}{u}\\right)du = \\int_h^a\\sqrt{a^2 - u^2}\\,du."
+          },
+          {
+           "k": "p",
+           "t": "Since $h > 0$ and the integrand is positive, this is less than $\\displaystyle\\int_0^a\\sqrt{a^2 - u^2}\\,du$, which is the area of a quarter of a circle of radius $a$, namely $\\dfrac{\\pi a^2}{4}$."
+          }
+         ],
+         "classification": {
+          "content": "Differential equations from geometric conditions; areas; volumes of solids of revolution",
+          "outcomes": [
+           "ME1-12-05",
+           "ME1-12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13a-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "The shaded region is rotated about the $x$-axis. Find the volume of the solid formed, in terms of $a$ and $y$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct volume"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes the volume as a correct integral with respect to $u$, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes the volume as an integral with respect to $x$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "With the notation of part (ii), the volume is"
+          },
+          {
+           "k": "math",
+           "t": "\\pi\\int u^2\\,dx = \\pi\\int_h^a u^2 \\times \\frac{\\sqrt{a^2 - u^2}}{u}\\,du = \\pi\\int_h^a u\\sqrt{a^2 - u^2}\\,du = \\pi\\left[-\\frac13\\left(a^2 - u^2\\right)^{\\frac32}\\right]_h^a = \\frac{\\pi}{3}\\left(a^2 - h^2\\right)^{\\frac32}."
+          },
+          {
+           "k": "p",
+           "t": "So the volume is $\\dfrac{\\pi}{3}\\left(a^2 - y^2\\right)^{\\frac32}$, where $y$ is the height of $B$. (It is always less than $\\dfrac{\\pi a^3}{3}$.)"
+          }
+         ],
+         "classification": {
+          "content": "Differential equations from geometric conditions; areas; volumes of solids of revolution",
+          "outcomes": [
+           "ME1-12-05",
+           "ME1-12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "pi/3*(a^2-y^2)^(3/2)",
+          "display": "\\dfrac{\\pi}{3}\\left(a^{2}-y^{2}\\right)^{3/2}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p04.py: tractrix satisfying the stated ODE; volume of revolution pi*int y^2 dx by quadrature along the tractrix x(y), agrees to 2e-3 relative at three heights"
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figtract"
+       ]
+      },
+      {
+       "id": "q13b",
+       "label": "(b)",
+       "marks": 7,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A rectangular board with sides $a$ and $b$, where $a > b$, is held above horizontal ground with one pair of sides horizontal, and it is seen edge-on in the diagram. The Sun is directly overhead. The side of length $a$ makes an angle $\\theta$ with the horizontal, where $0 \\le \\theta \\le \\dfrac{\\pi}{2}$, and the shadow of the board on the ground has length $w$ in the plane of the diagram."
+        },
+        {
+         "k": "fig",
+         "name": "figshadow"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q13b-i",
+         "label": "(i)",
+         "marks": 1,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that $w = a\\cos\\theta + b\\sin\\theta$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The shadow is the projection of the board onto the horizontal. The side of length $a$ projects onto a length $a\\cos\\theta$, and the adjacent side of length $b$, which makes an angle $\\dfrac{\\pi}{2} - \\theta$ with the horizontal on the other side, projects onto a length $b\\sin\\theta$ that continues it. Hence $w = a\\cos\\theta + b\\sin\\theta$."
+          }
+         ],
+         "classification": {
+          "content": "Trigonometric functions; auxiliary angle; integration; inverse trigonometric functions",
+          "outcomes": [
+           "ME1-11-03",
+           "ME1-12-04",
+           "ME1-12-03"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13b-ii",
+         "label": "(ii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the mean value of $w$ over $0 \\le \\theta \\le \\dfrac{\\pi}{2}$, and show that it equals the perimeter of the rectangle divided by $\\pi$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct mean value and the comparison"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes the mean value as a correct integral"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The mean value is $\\dfrac{2}{\\pi}\\displaystyle\\int_0^{\\frac{\\pi}{2}}(a\\cos\\theta + b\\sin\\theta)\\,d\\theta = \\dfrac{2}{\\pi}\\Bigl[a\\sin\\theta - b\\cos\\theta\\Bigr]_0^{\\frac{\\pi}{2}} = \\dfrac{2(a + b)}{\\pi}$, and the perimeter is $2(a + b)$."
+          }
+         ],
+         "classification": {
+          "content": "Trigonometric functions; auxiliary angle; integration; inverse trigonometric functions",
+          "outcomes": [
+           "ME1-11-03",
+           "ME1-12-04",
+           "ME1-12-03"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "2*(a+b)/pi",
+          "display": "\\dfrac{2(a+b)}{\\pi}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p04.py: quadrature of the mean of a cos t + b sin t on [0,pi/2] for four (a,b)"
+        },
+        {
+         "id": "q13b-iii",
+         "label": "(iii)",
+         "marks": 4,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "The angle $\\theta$ is chosen at random, with every value from $0$ to $\\dfrac{\\pi}{2}$ equally likely. Find, in terms of a single inverse tangent, the probability that the shadow is longer than the longer side of the board."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct probability with justification"
+            }
+           ],
+           "marks": 4
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the set of values of $\\theta$ for which $w > a$"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes $w$ in the form $R\\sin(\\theta + \\alpha)$ or equivalent and sets up the inequality"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes $w$ in the form $R\\sin(\\theta + \\alpha)$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Let $R = \\sqrt{a^2 + b^2}$ and let $\\alpha$ be the acute angle with $\\sin\\alpha = \\dfrac{a}{R}$, $\\cos\\alpha = \\dfrac{b}{R}$. Then"
+          },
+          {
+           "k": "math",
+           "t": "w = R(\\sin\\alpha\\cos\\theta + \\cos\\alpha\\sin\\theta) = R\\sin(\\theta + \\alpha),"
+          },
+          {
+           "k": "p",
+           "t": "and $w > a$ when $\\sin(\\theta + \\alpha) > \\sin\\alpha$. As $\\theta + \\alpha$ lies between $\\alpha$ and $\\alpha + \\dfrac{\\pi}{2}$, this holds when $\\alpha < \\theta + \\alpha < \\pi - \\alpha$, that is, when $0 < \\theta < \\pi - 2\\alpha$."
+          },
+          {
+           "k": "p",
+           "t": "Since $a > b$, $\\alpha > \\dfrac{\\pi}{4}$, so $\\pi - 2\\alpha < \\dfrac{\\pi}{2}$ and all these values of $\\theta$ are allowed. Also $\\dfrac{\\pi}{2} - \\alpha = \\tan^{-1}\\dfrac{b}{a}$, so $\\pi - 2\\alpha = 2\\tan^{-1}\\dfrac{b}{a}$. The probability is"
+          },
+          {
+           "k": "math",
+           "t": "\\frac{2\\tan^{-1}\\frac{b}{a}}{\\frac{\\pi}{2}} = \\frac{4}{\\pi}\\tan^{-1}\\frac{b}{a}."
+          }
+         ],
+         "classification": {
+          "content": "Trigonometric functions; auxiliary angle; integration; inverse trigonometric functions",
+          "outcomes": [
+           "ME1-11-03",
+           "ME1-12-04",
+           "ME1-12-03"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "4/pi*atan(b/a)",
+          "display": "\\dfrac{4}{\\pi}\\tan^{-1}\\dfrac{b}{a}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p04.py: five (a,b), single interval where the shadow exceeds a, boundary by root-finding"
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figshadow"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "q14",
+     "number": 14,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q14a",
+       "label": "(a)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A fountain at a point $O$ on horizontal ground sends out jets of water in every direction above the ground, all with the same speed $V$. Water that leaves $O$ at time 0 at an angle $\\theta$ to the horizontal has position vector"
+        },
+        {
+         "k": "math",
+         "t": "Vt\\cos\\theta\\,\\underset{\\sim}{i} + \\left(Vt\\sin\\theta - \\tfrac12gt^2\\right)\\underset{\\sim}{j}"
+        },
+        {
+         "k": "p",
+         "t": "relative to $O$ at time $t$, in the vertical plane of its motion, where $g$ is the acceleration due to gravity. **(Do NOT prove this.)** The diagram shows some of the jets in one vertical plane."
+        },
+        {
+         "k": "fig",
+         "name": "figfount"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q14a-i",
+         "label": "(i)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find, in terms of $x$, $V$ and $g$, the greatest height at which water can pass over the point of the ground at a distance $x$ from $O$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct greatest height"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the value of $\\tan\\theta$ that maximises the height, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the height of a jet at horizontal distance $x$ in terms of $\\tan\\theta$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "A jet is at horizontal distance $x$ when $t = \\dfrac{x}{V\\cos\\theta}$, and its height is then"
+          },
+          {
+           "k": "math",
+           "t": "y = x\\tan\\theta - \\frac{gx^2}{2V^2}\\left(1 + \\tan^2\\theta\\right)."
+          },
+          {
+           "k": "p",
+           "t": "This is a quadratic in $T = \\tan\\theta$ with negative leading coefficient, greatest when $T = \\dfrac{V^2}{gx}$. The greatest height is"
+          },
+          {
+           "k": "math",
+           "t": "\\frac{V^2}{g} - \\frac{gx^2}{2V^2} - \\frac{V^2}{2g} = \\frac{V^2}{2g} - \\frac{gx^2}{2V^2}."
+          }
+         ],
+         "classification": {
+          "content": "Projectile motion; optimisation; volumes of solids of revolution",
+          "outcomes": [
+           "ME1-12-02",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "V^2/(2*g)-g*x^2/(2*V^2)",
+          "display": "\\dfrac{V^{2}}{2g}-\\dfrac{gx^{2}}{2V^{2}}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p04.py: golden-section maximisation over launch angle at four (V,g,x), agreement 1e-12"
+        },
+        {
+         "id": "q14a-ii",
+         "label": "(ii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the volume of the region of space above the ground that the water can reach."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct volume"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes a correct integral for the volume, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "By part (i) the region is formed by rotating about the vertical through $O$ the region under $y = H - \\dfrac{gx^2}{2V^2}$, where $H = \\dfrac{V^2}{2g}$. On the boundary $x^2 = \\dfrac{2V^2}{g}(H - y)$, so the volume is"
+          },
+          {
+           "k": "math",
+           "t": "\\pi\\int_0^H x^2\\,dy = \\frac{2\\pi V^2}{g}\\int_0^H(H - y)\\,dy = \\frac{\\pi V^2H^2}{g} = \\frac{\\pi V^6}{4g^3}."
+          }
+         ],
+         "classification": {
+          "content": "Projectile motion; optimisation; volumes of solids of revolution",
+          "outcomes": [
+           "ME1-12-02",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "pi*V^6/(4*g^3)",
+          "display": "\\dfrac{\\pi V^{6}}{4g^{3}}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p04.py: volume = integral of 2 pi r Hmax(r) with Hmax found numerically, two (V,g), agreement 1e-5 relative"
+        },
+        {
+         "id": "q14a-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find, in terms of $\\theta$, the horizontal distance from $O$ at which the jet at angle $\\theta$ touches the boundary of the region, and deduce which jets touch the boundary before they land."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct distance and the correct deduction"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct distance, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Uses the fact that a jet touches the boundary where its height is the greatest possible"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "A jet touches the boundary at the distance $x$ for which its value of $\\tan\\theta$ gives the greatest height, that is, where $\\tan\\theta = \\dfrac{V^2}{gx}$. So it touches the boundary at"
+          },
+          {
+           "k": "math",
+           "t": "x = \\frac{V^2}{g\\tan\\theta}."
+          },
+          {
+           "k": "p",
+           "t": "The boundary meets the ground where $\\dfrac{V^2}{2g} = \\dfrac{gx^2}{2V^2}$, that is, at $x = \\dfrac{V^2}{g}$. So the jet touches the boundary above the ground when $\\dfrac{V^2}{g\\tan\\theta} < \\dfrac{V^2}{g}$, that is, when $\\tan\\theta > 1$. Jets with $\\theta > \\dfrac{\\pi}{4}$ touch the boundary before they land; the jet with $\\theta = \\dfrac{\\pi}{4}$ reaches it as it lands; and jets with $\\theta < \\dfrac{\\pi}{4}$ land without touching it."
+          }
+         ],
+         "classification": {
+          "content": "Projectile motion; optimisation; volumes of solids of revolution",
+          "outcomes": [
+           "ME1-12-02",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "V^2/(g*tan(theta))",
+          "display": "\\dfrac{V^{2}}{g\\tan\\theta}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p04.py: the jet's gap to the numerically maximised boundary is zero and minimal at this distance for three (V,g,theta)"
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figfount"
+       ]
+      },
+      {
+       "id": "q14b",
+       "label": "(b)",
+       "marks": 7,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "The diagram shows a network of five switches $S_1, \\ldots, S_5$ between the terminals $A$ and $B$. Each switch is closed with probability $p$, independently of the others, where $0 < p < 1$. Current can flow from $A$ to $B$ if there is a path from $A$ to $B$ through closed switches (the path may pass through $S_3$ in either direction)."
+        },
+        {
+         "k": "fig",
+         "name": "figbridge"
+        },
+        {
+         "k": "p",
+         "t": "Let $R$ be the probability that current can flow from $A$ to $B$."
+        }
+       ],
+       "parts": [
+        {
+         "id": "q14b-i",
+         "label": "(i)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the probability that current can flow from $A$ to $B$ given that $S_3$ is open, and the probability that current can flow from $A$ to $B$ given that $S_3$ is closed."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides both probabilities"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides one of the probabilities"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "*$S_3$ open.* Current flows if $S_1$ and $S_4$ are both closed, or $S_2$ and $S_5$ are both closed. Each of these has probability $p^2$, and they are independent, so the probability is $1 - \\left(1 - p^2\\right)^2 = 2p^2 - p^4$."
+          },
+          {
+           "k": "p",
+           "t": "*$S_3$ closed.* Then $C$ and $D$ are joined, so current flows if at least one of $S_1$, $S_2$ is closed and at least one of $S_4$, $S_5$ is closed. The probability is $\\left[1 - (1 - p)^2\\right]^2 = \\left(2p - p^2\\right)^2$."
+          }
+         ],
+         "classification": {
+          "content": "Probability; polynomials; factor theorem; inequalities",
+          "outcomes": [
+           "ME1-11-04",
+           "ME1-11-02"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14b-ii",
+         "label": "(ii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that $R = 2p^2 + 2p^3 - 5p^4 + 2p^5$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Combines the two cases with the correct probabilities for $S_3$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$S_3$ is closed with probability $p$ and open with probability $1 - p$, so"
+          },
+          {
+           "k": "math",
+           "t": "\\begin{aligned}\nR &= p\\left(2p - p^2\\right)^2 + (1 - p)\\left(2p^2 - p^4\\right)\\\\\n&= \\left(4p^3 - 4p^4 + p^5\\right) + \\left(2p^2 - 2p^3 - p^4 + p^5\\right) = 2p^2 + 2p^3 - 5p^4 + 2p^5.\n\\end{aligned}"
+          }
+         ],
+         "classification": {
+          "content": "Probability; polynomials; factor theorem; inequalities",
+          "outcomes": [
+           "ME1-11-04",
+           "ME1-11-02"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14b-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find all values of $p$ for which the network is more likely to carry current than a single switch is to be closed."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct set of values with justification"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Factorises $R - p$ completely, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds one linear factor of $R - p$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "We need $R - p > 0$, where $R - p = p\\left(2p^4 - 5p^3 + 2p^2 + 2p - 1\\right)$."
+          },
+          {
+           "k": "p",
+           "t": "Let $Q(p) = 2p^4 - 5p^3 + 2p^2 + 2p - 1$. Then $Q(1) = 0$ and $Q\\left(\\frac12\\right) = \\frac18 - \\frac58 + \\frac12 + 1 - 1 = 0$, so $(p - 1)(2p - 1) = 2p^2 - 3p + 1$ is a factor, and by division"
+          },
+          {
+           "k": "math",
+           "t": "Q(p) = \\left(2p^2 - 3p + 1\\right)\\left(p^2 - p - 1\\right)."
+          },
+          {
+           "k": "p",
+           "t": "Hence $R - p = p(p - 1)(2p - 1)\\left(p^2 - p - 1\\right)$. For $0 < p < 1$: $\\ p > 0$, $p - 1 < 0$ and $p^2 - p - 1 = p(p - 1) - 1 < 0$, so $R - p$ has the same sign as $2p - 1$."
+          },
+          {
+           "k": "p",
+           "t": "The network is more likely to carry current than a single switch is to be closed exactly when $\\dfrac12 < p < 1$."
+          }
+         ],
+         "classification": {
+          "content": "Probability; polynomials; factor theorem; inequalities",
+          "outcomes": [
+           "ME1-11-04",
+           "ME1-11-02"
+          ]
+         },
+         "figures": [],
+         "answerType": "value",
+         "key": {
+          "type": "interval",
+          "region": "1/2 < p < 1",
+          "variable": "p",
+          "display": "\\dfrac12<p<1"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p04.py: all 32 switch states enumerated, R(p) = 2p^2+2p^3-5p^4+2p^5, R>p solved exactly on (0,1)"
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figbridge"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "figures": [
+  "figgrid",
+  "figcourt",
+  "figQ3OptA",
+  "figQ3OptB",
+  "figQ3OptC",
+  "figQ3OptD",
+  "figriver",
+  "fighex",
+  "figstreets",
+  "figroll",
+  "figtract",
+  "figshadow",
+  "figfount",
+  "figbridge"
+ ]
+}
