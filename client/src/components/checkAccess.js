@@ -5,7 +5,6 @@
 // connection and a server-issued question. The local backend refuses anything
 // else with a coded error and changes nothing; this module names the reason.
 // It is pure: no marking, no account state, no storage.
-import { walkthroughFixes } from '../platform/edition.js';
 export const CHECK_REFUSAL = Object.freeze({
   SIGN_IN: 'sign-in',
   RECONNECT: 'reconnect',
@@ -42,18 +41,6 @@ const UNTRUSTED_ANSWER = new Set([
 ]);
 
 /**
- * A fault of the server's own: a 5xx that is not one of its named "come back when connected" refusals.
- * Only an edition with the walk-through fixes says so (Prithagoras); elsewhere it stays "reconnect".
- */
-export function serverFault(error) {
-  if (!walkthroughFixes() || !error) return false;
-  const status = Number(error.status);
-  if (!Number.isInteger(status) || status < 500) return false;
-  return !['RECONNECT_TO_CHECK', 'CLOUD_DISABLED', 'QUESTION_CHECK_UNAVAILABLE', 'GUARDIAN_CONSENT_UNAVAILABLE'].includes(String(error.code || ''))
-    && error.name !== 'TimeoutError' && error.name !== 'AbortError';
-}
-
-/**
  * The reason a check was refused, or null when the error is not one of these
  * (a finished question, a reused key, an unreadable image keep their own copy).
  * The code is read first and the HTTP status second, as cloudReader does.
@@ -72,6 +59,7 @@ export function checkRefusal(error) {
   if (code === 'SIGN_IN_TO_CHECK' || code === 'AUTH_REQUIRED' || code === 'PRACTICE_ACCOUNT_MISMATCH' || code === 'CSRF_REJECTED') return CHECK_REFUSAL.SIGN_IN;
   if (code === 'PLACEMENT_RESTART_REQUIRED') return CHECK_REFUSAL.RESTART;
   if (code === 'FREE_CAP_REACHED' && status === 402) return CHECK_REFUSAL.FREE_CAP;
+  if (code === 'SERVER_FAULT') return CHECK_REFUSAL.SERVER_FAULT;
   if (code === 'RECONNECT_TO_CHECK' || code === 'CLOUD_DISABLED') return CHECK_REFUSAL.RECONNECT;
   if (code === 'QUESTION_CHECK_UNAVAILABLE') return CHECK_REFUSAL.QUESTION;
   if (code === 'QUESTION_NOT_SERVER_ISSUED' || code === 'QUESTION_PREPARED_EXPIRED') return CHECK_REFUSAL.NEW_QUESTION;
@@ -160,7 +148,7 @@ export function legacyDeviceReplay(result) {
 export function refusedCheckState(error, via, { diagnostic = false } = {}) {
   // The placement check is issued and marked by the server too, so it has the
   // same account and connection refusals as any other check.
-  const refusal = serverFault(error) ? CHECK_REFUSAL.SERVER_FAULT : checkRefusal(error);
+  const refusal = checkRefusal(error);
   return {
     phase: 'retry',
     res: {

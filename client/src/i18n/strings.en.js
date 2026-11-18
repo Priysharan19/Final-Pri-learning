@@ -4084,6 +4084,7 @@ export default {
   'msg.resume.answered': 'Showing the result of the answer you submitted before the app closed.',
   'msg.resume.open': 'Continuing your unfinished question.',
   'msg.check.signIn': 'Sign in to check this answer. Your working is kept.',
+  'msg.check.fault': 'Pri’s server had a problem. Your working is kept. Try again.',
   'msg.check.offline': 'Pri could not reach the server. Your working is kept — reconnect and try again.',
   'msg.check.unavailable': 'This question cannot be checked right now. Your working is kept — try again, or move to the next question.',
   'msg.check.draft': 'This question was opened without a connection, so it cannot be marked. Your working is kept — open a new question to be marked.',

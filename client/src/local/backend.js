@@ -36,7 +36,7 @@ import { evidenceProgress } from '../engine/progressEvidence.js';
 import { generateQuestion } from '../engine/generators/index.js';
 import { HINT_RUNGS, rungLevelOf, nextRungAfter, markWeightAfter, helpUnitsAfter } from '../engine/hintLadder.js';
 import { offeredScope, subtopicOffered } from '../engine/offering.js';
-import { hintsFree, yearOffered, pathwayOffered, courseOffered, offering } from '../platform/edition.js';
+import { hintsFree, walkthroughFixes, yearOffered, pathwayOffered, courseOffered, offering } from '../platform/edition.js';
 import { contentRefOf, contentHashOf, drawDistinct } from '../engine/contentIdentity.js';
 import { checkAnswer, stepCheck, methodMarks } from '../engine/checker.js';
 import { authoredRegion, formatRegion, formatMatrix, formatVector } from '../engine/answer-forms.js';
@@ -6314,6 +6314,8 @@ function checkUnavailable(reason, cause = null) {
     'sign-in': [401, 'SIGN_IN_TO_CHECK', translate('msg.check.signIn')],
     offline: [503, 'RECONNECT_TO_CHECK', translate('msg.check.offline')],
     unavailable: [503, 'QUESTION_CHECK_UNAVAILABLE', translate('msg.check.unavailable')],
+    // Owner decision, 19 Nov 2026 (Prithagoras): the server answered with a fault of its own (a 500).
+    fault: [503, 'SERVER_FAULT', translate('msg.check.fault')],
     // Opened with no connection: it was never the server's question.
     draft: [409, 'QUESTION_NOT_SERVER_ISSUED', translate('msg.check.draft')],
     expired: [409, 'QUESTION_PREPARED_EXPIRED', translate('msg.check.expired')]
@@ -6356,6 +6358,8 @@ const SERVER_MODES = ['practice', 'review', 'task', 'rush', 'match'];
 function unreachable(cause) {
   if (cause?.status === 401) return checkUnavailable('sign-in', cause);
   if (cause?.status === 403 || cause?.status === 426) return checkUnavailable('refused', cause);
+  // A server that answered with a 500 of its own is not "check your connection" (walk-through fix, Prithagoras).
+  if (walkthroughFixes() && cause?.status >= 500 && cause.status !== 503 && cause?.code !== 'CLOUD_DISABLED') return checkUnavailable('fault', cause);
   if (cause?.code === 'CLOUD_DISABLED' || !cause?.status || cause.status >= 500 || cause.status === 429 || cause.status === 408) {
     return checkUnavailable('offline', cause);
   }
