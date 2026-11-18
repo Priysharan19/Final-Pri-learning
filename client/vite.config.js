@@ -183,6 +183,10 @@ export const ON_DEMAND = [
   // chunk is always requested over a live connection and cached from then on.
   // A chunk that cannot load leaves the plain step report in its place.
   [/(^|\/)AnnotatedWorking-[^/]*\.(js|css)$/, 'annotated working (shown only after online marking)'],
+
+  // The course choice for an account on a year or course the edition no longer offers (owner decision, 19 Nov 2026):
+  // App.jsx renders it only for such an account, so a build whose edition offers everything never fetches it.
+  [/(^|\/)OfferedCourse-[^/]*\.(js|css)$/, 'course choice for an account on a course the edition no longer offers'],
   // The public landing and its plain pages (landing/): signed-out web routes
   // behind import() in App.jsx, for a visitor who has not installed anything
   // yet. A signed-in student never opens them, and an offline copy would serve

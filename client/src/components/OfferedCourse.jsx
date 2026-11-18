@@ -21,8 +21,6 @@ const COURSE_NAMES = { advanced: 'Advanced', ext1: 'Extension 1' };
 export const needsCoursePick = user => !!user && user.role !== 'teacher' && (user.course || 'nsw') === 'nsw'
   && !!offering() && !courseOffered(user.year, user.year >= 11 ? (user.pathway || 'advanced') : null);
 
-export { NotOffered } from './NotOffered.jsx';
-
 export function CoursePrompt({ user, setUser }) {
   const t = useT();
   const o = offering();

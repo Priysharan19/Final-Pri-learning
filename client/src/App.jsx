@@ -19,8 +19,10 @@ import Icon from './components/Icon.jsx';
 import { BrandWordmark, EditionByline } from './components/BrandMark.jsx';
 import { BRAND } from './brand/edition.js';
 import { guestTrialAvailable } from './guest/guestTrial.js';
-import { parentFeaturesOffered, gamesOffered } from './platform/edition.js';
-import { CoursePrompt } from './components/OfferedCourse.jsx';
+import { parentFeaturesOffered, gamesOffered, offering, courseOffered } from './platform/edition.js';
+// Owner decision, 19 Nov 2026: the course choice for an account on a year or course the edition no longer offers is its own
+// chunk, fetched only for such an account (never in India, whose offering is none).
+const CoursePrompt = React.lazy(() => import('./components/OfferedCourse.jsx').then(m => ({ default: m.CoursePrompt })));
 import ReaderPermissionHost from './ink/ReaderPermission.jsx';
 
 // ── Routes nobody has opened yet ─────────────────────────────────────────────
@@ -831,7 +833,9 @@ export default function App() {
       )}
       {/* D17: asks once, before the first handwriting or photo read. */}
       {/* Owner decision, 19 Nov 2026: a student on a year or course this edition no longer offers chooses one, once. */}
-      <CoursePrompt user={user} setUser={setUser} />
+      {offering() && user.role !== 'teacher' && (user.course || 'nsw') === 'nsw' && !courseOffered(user.year, user.year >= 11 ? (user.pathway || 'advanced') : null) && (
+        <React.Suspense fallback={null}><CoursePrompt user={user} setUser={setUser} /></React.Suspense>
+      )}
       <ReaderPermissionHost />
       <ToastLayer toasts={toasts} />
     </AppCtx.Provider>
