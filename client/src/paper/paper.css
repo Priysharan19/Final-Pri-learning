@@ -97,6 +97,10 @@
 .pp-final-answer { margin: 0 0 var(--space-2); font-weight: 600; }
 .pp-after { margin-top: var(--space-8); }
 
+/* On a phone the app's own bar sits at the bottom of the screen: the paper's bar rests on it, as every other sticky action bar does. */
+@media (max-width: 760px) {
+  .pp-bar { bottom: calc(var(--mobilenav-h, 66px) + var(--pri-inset-bottom, 0px)); padding-bottom: var(--space-3); }
+}
 @media (max-width: 480px) {
   .pp-title { font-size: 24px; }
   .pp-part { grid-template-columns: 1.75rem minmax(0, 1fr); column-gap: var(--space-2); }
