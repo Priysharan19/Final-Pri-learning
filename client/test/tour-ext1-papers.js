@@ -34,7 +34,10 @@ import { createVerifiedProfile, switchSyllabus } from './support/verified-onboar
 const CLIENT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PAPERS = join(CLIENT, '..', 'server', 'content', 'papers', 'nsw-ext1');
 const EDITION = 'prithagoras';
-const en = (await import('../src/i18n/strings.en.js')).default;
+const en0 = (await import('../src/i18n/strings.en.js')).default;
+// owner decision, 19 Nov 2026: the Prithagoras screen names the paid tier "HSC Pass" (its en-AU overrides), so the text it shows is read from them.
+const { AU_STRINGS } = await import('../src/i18n/strings.au.js');
+const en = { ...en0, ...AU_STRINGS };
 const manifest = JSON.parse(readFileSync(join(PAPERS, 'manifest.json'), 'utf8'));
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 const DAY = 86_400_000;
@@ -163,11 +166,12 @@ try {
   check('and its marking guidelines', sha(readFileSync(await guide.path())) === first.guidelines.sha256 && guide.suggestedFilename().endsWith('-Marking-Guidelines.pdf'));
   check('ACCESSIBILITY (Premium): every control on the page has a name', (await unnamedControls(page)).length === 0, JSON.stringify(await unnamedControls(page)));
 
-  // ── Year 10 sees nothing ────────────────────────────────────────────────────
-  await setProfile(platform, page, { year: 10 });
+  // ── Year 11 sees nothing ────────────────────────────────────────────────────
+  // (owner decision, 19 Nov 2026: Prithagoras offers Years 11 and 12 only, so Year 10 is no longer a choice; the papers are Year 12's.)
+  await setProfile(platform, page, { year: 11 });
   await openExams(platform, page);
   await page.waitForTimeout(1500);
-  check('an NSW Year 10 profile has no Extension 1 papers section', await page.locator('[data-ext1-papers]').count() === 0);
+  check('an NSW Year 11 profile has no Extension 1 papers section', await page.locator('[data-ext1-papers]').count() === 0);
 } catch (error) {
   failures.push(`the tour stopped: ${error.message.split('\n')[0]}`);
   console.error(error);
@@ -182,4 +186,4 @@ if (failures.length) {
   console.error(`EXT1 PAPERS TOUR: FAIL — ${failures.length} failed, ${pass} passed`);
   process.exit(1);
 }
-console.log(`EXT1 PAPERS TOUR: PASS — ${pass}/${pass} checks — a Prithagoras Extension 1 Year 12 student sees thirteen practice papers (Paper 01 free, the rest locked on the free plan, all unlocked on Premium), downloads the owner's PDFs, and other pathways and years see nothing. [SYNTHETIC student and entitlement]`);
+console.log(`EXT1 PAPERS TOUR: PASS — ${pass}/${pass} checks — a Prithagoras Extension 1 Year 12 student sees thirteen practice papers (Paper 01 free, the rest locked on the free plan, all unlocked on Premium), downloads the owner's PDFs, and other pathways and Year 11 see nothing. [SYNTHETIC student and entitlement]`);
