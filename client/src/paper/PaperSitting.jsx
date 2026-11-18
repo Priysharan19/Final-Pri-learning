@@ -251,7 +251,7 @@ export default function PaperSitting() {
   }, [attemptId]);
 
   if (loadError) return <div className="card pp-page"><p role="alert">{t(loadError)}</p><PageLink to="/exams">{t('paper.back')}</PageLink></div>;
-  if (!attempt) return <p className="muted pp-page" role="status"><Working pending size={24} /><span>{t('paper.loading')}</span></p>;
+  if (!attempt) return <p className="muted pp-page" role="status"><Working pending={attempt === null} size={24} /><span>{t('paper.loading')}</span></p>;
 
   const { paper } = attempt;
   const result = attempt.result;
