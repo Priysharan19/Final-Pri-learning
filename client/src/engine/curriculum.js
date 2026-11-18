@@ -657,7 +657,7 @@ export const STREAM_CURRICULUM = {
       T('me11-comb', 'Combinatorics', 'Statistics & Probability', 11, 'ME-A1', [
         'Arrangements with restrictions',
         'Selections and committees with conditions',
-        'The pigeonhole principle'
+        'Count arrangements and selections by cases and by complement'
       ]),
       T('me11-rates', 'Rates of Change', 'Calculus', 11, 'ME-C1', [
         'Related rates of change',
@@ -692,7 +692,7 @@ export const STREAM_CURRICULUM = {
       T('me12-calc', 'Further Calculus', 'Calculus', 12, 'ME-C2/C3', [
         'Integration by substitution',
         'Volumes of solids of revolution',
-        'Areas involving inverse functions'
+        'Areas between curves, including regions measured from the y-axis'
       ]),
       T('me12-binomial', 'The Binomial Distribution', 'Statistics & Probability', 10, 'ME-S1', [
         'Binomial probabilities for n trials',
@@ -945,7 +945,7 @@ export const DOTPOINT_FORMS = Object.freeze({
   'y11-quadfunc': [[1], [0], [2], [1]],
   'y11-polynomials': [[0], [0], [1], [2]],
   'y11-lines': [[0], [0, 1], [0, 1], [2]],
-  'y11-trigfunc': [[0], [0, 1], [2], []],
+  'y11-trigfunc': [[0], [0, 1], [2], [1, 2]],
   'y11-sine-cosine-rule': [[0], [0], [1], [2]],
   'y11-explog': [[1], [0], [2], [0, 2]],
   'y11-diff': [[0], [0], [1], [2]],
@@ -957,7 +957,7 @@ export const DOTPOINT_FORMS = Object.freeze({
   'y12-trigcalc': [[0], [1], [0], [2]],
   'y12-explogcalc': [[0], [1], [2], [2]],
   'y12-series': [[0], [0], [1], [2]],
-  'y12-financial': [[], [0, 1], [0, 1], [2]],
+  'y12-financial': [[0, 1], [0, 1], [0, 1], [2]],
   'y12-stats': [[0], [0], [1], [2]],
   'y12-motion': [[0], [1], [0, 2], [0]],
   'y12-integral-calc': [[0], [1], [0], [2]],

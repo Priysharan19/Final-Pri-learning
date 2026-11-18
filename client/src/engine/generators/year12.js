@@ -740,18 +740,31 @@ export const year12 = {
   // ── Financial maths & annuities ──────────────────────────────────────────
   'y12-financial': (rng, diff) => {
     if (diff === 1) {
-      const P = ri(rng, 4, 20) * 1000;
-      const rr = rc(rng, [4, 5, 6]);
-      const n = ri(rng, 5, 15);
-      const A = P * (1 + rr / 100) ** n;
+      // Dot point 1 (future value of regular deposits), one term of the annuity's geometric series:
+      // what does the first end-of-year deposit grow to by the end of year n?
+      let a, rr, n, g;
+      for (let i = 0; i < 200; i++) {
+        a = rc(rng, [100, 200, 250, 400, 500, 800, 1000, 1500]);
+        rr = rc(rng, [2, 3, 4, 5, 6, 8]);
+        n = ri(rng, 3, 6);
+        g = 1 + rr / 100;
+        const c = a * g ** (n - 1) * 100;
+        if (Math.abs((c - Math.floor(c)) - 0.5) > 0.05) break;   // keep clear of a rounding boundary
+      }
+      const val = r2(a * g ** (n - 1));
       return {
-        prompt: `${moneyPlain(P)} is invested at $${rr}\\%$ p.a., compounding annually, for $${n}$ years. Find the future value, to the nearest dollar.`,
-        answerType: 'numeric', answer: { value: Math.round(A), tol: 1.01 }, answerPrefix: '$',
-        traps: [{ value: Math.round(P * (1 + rr * n / 100)), why: 'That’s simple growth — compound growth uses the multiplier $(1+r)^n$.', tol: 1.01 }],
-        hints: ['$FV = P(1 + r)^n$.', `$FV = ${P}(${1 + rr / 100})^{${n}}$.`, `$(${1 + rr / 100})^{${n}} \\approx ${r3((1 + rr / 100) ** n)}$.`],
+        dotpoint: 0,
+        prompt: `${moneyPlain(a)} is deposited into an account at the **end** of each year for $${n}$ years. The account pays $${rr}\\%$ p.a. interest, compounded annually. The first deposit is made at the end of year 1 and earns interest until the end of year $${n}$. What is the value of this first deposit at the end of year $${n}$, to the nearest cent?`,
+        answerType: 'numeric', answer: { value: val, tol: 0.006 }, answerPrefix: '$',
+        traps: [
+          { value: r2(a * g ** n), why: `The first deposit is made at the end of year 1, so it earns interest for ${n - 1} years, not ${n}.`, tol: 0.006 },
+          { value: r2(a * (1 + rr * (n - 1) / 100)), why: 'Interest is compounded: multiply by $(1 + r)$ once for each year, not add simple interest.', tol: 0.006 }
+        ],
+        hints: ['Each year the balance of this deposit is multiplied by $1 + r$.', `The deposit is made at the end of year 1, so it grows for ${n - 1} years.`, `Evaluate $${a}(${g})^{${n - 1}}$.`],
         steps: [
-          { h: 'Formula', d: `$FV = P(1+r)^n = ${P}(${1 + rr / 100})^{${n}}$` },
-          { h: 'Evaluate', d: `$\\approx ${moneyPlain(Math.round(A))}$` }
+          { h: 'Years of growth', d: `Deposited at the end of year 1, so it earns interest for $${n} - 1 = ${n - 1}$ years` },
+          { h: 'Growth formula', d: `$${a}(1 + ${rr / 100})^{${n - 1}} = ${a}(${g})^{${n - 1}}$` },
+          { h: 'Evaluate', d: `$\\approx ${val}$ → ${moneyPlain(val)}` }
         ]
       };
     }

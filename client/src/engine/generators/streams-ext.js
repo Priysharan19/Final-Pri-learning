@@ -388,8 +388,8 @@ export const streamsExt = {
       if (branch === 1) {
         const a = ri(rng, 2, 5), h = nz(rng, -4, 4), k = nz(rng, -6, 6);
         return {
-          prompt: `$f(x) = ${a}\\sqrt{x ${sgn(-h)}} ${sgn(k)}$ has domain $x \\ge ${h}$. State the **domain of $f^{-1}$**, in the form $x \\ge c$.`,
-          answerType: 'numeric', answer: { value: k }, answerPrefix: 'x ≥',
+          prompt: `$f(x) = ${a}\\sqrt{x ${sgn(-h)}} ${sgn(k)}$ has domain $x \\ge ${h}$. The domain of $f^{-1}$ is $x \\ge c$. Find the value of $c$.`,
+          answerType: 'numeric', answer: { value: k }, answerPrefix: 'c =',
           traps: [
             { value: h, why: `$x \\ge ${h}$ is the domain of $f$ itself. The domain of $f^{-1}$ is the **range** of $f$, which is a set of $y$-values of $f$.` },
             { value: -k, why: `At the left end of the domain the surd is $0$, leaving $f(${h}) = ${k}$ — watch the sign of the constant.` }
@@ -940,58 +940,26 @@ export const streamsExt = {
         ]
       };
     }
-    const kind = ri(rng, 1, 3);
-    if (kind === 1) {
-      const k = ri(rng, 4, 20);
-      return {
-        prompt: `Socks come in $${k}$ colours, thoroughly mixed in a drawer in the dark. What is the **minimum** number of socks you must take to *guarantee* a matching pair? (Pigeonhole principle.)`,
-        answerType: 'numeric', answer: { value: k + 1 },
-        traps: [
-          { value: 2, why: 'Two socks might be different colours — you need to beat the worst case.' },
-          { value: k, why: `With ${k} socks you might have one of each colour — one more forces a repeat.` }
-        ],
-        hints: ['Think worst case: how many can you draw with all different colours?', `${k} socks could be all different.`, 'One more must repeat a colour.'],
-        steps: [
-          { h: 'Worst case', d: `${k} draws could give one of each colour` },
-          { h: 'Pigeonhole', d: `The $${k + 1}$th sock must match one already drawn` }
-        ]
-      };
-    }
-    if (kind === 2) {
-      const boxes = ri(rng, 3, 10), copies = ri(rng, 2, 5);
-      const val = boxes * (copies - 1) + 1;
-      return {
-        prompt: `A bag holds a large number of tiles in $${boxes}$ different colours. What is the **minimum** number of tiles you must draw to *guarantee* $${copies}$ of the same colour? (Pigeonhole principle.)`,
-        answerType: 'numeric', answer: { value: val },
-        traps: [{ value: boxes * copies, why: `The worst case stops one short in every colour: $${boxes} \\times ${copies - 1} = ${boxes * (copies - 1)}$ — then one more tile forces a ${copies}th.` }],
-        hints: [`Worst case: ${copies - 1} of every colour and no more.`, `That is $${boxes} \\times ${copies - 1} = ${boxes * (copies - 1)}$ tiles.`, 'One further tile must complete a set.'],
-        steps: [
-          { h: 'Worst case', d: `$${boxes} \\times (${copies} - 1) = ${boxes * (copies - 1)}$ tiles with no colour reaching ${copies}` },
-          { h: 'Pigeonhole', d: `Draw one more: $${val}$` }
-        ]
-      };
-    }
-    // A third pigeonhole count. The stars-and-bars question that used to sit
-    // here was a selection with repetition, not the pigeonhole principle, and
-    // this cell is the only route to that dot point — so every branch of it now
-    // forces a worst case. Here it is PAIRS being forced: the worst case leaves
-    // one sock of every colour unpaired before any pair is completed.
-    const colours = ri(rng, 3, 12), pairs = ri(rng, 2, 5);
-    const worst = colours + 2 * (pairs - 1);
-    const val = worst + 1;
+    // D4: counting with a restriction, done by complement (total minus the
+    // arrangements that break the condition). The pigeonhole principle that
+    // used to sit here is in no current NSW syllabus, so it is not issued.
+    const n = ri(rng, 6, 9);
+    const who = rc(rng, GROUP);
+    const total = factorial(n - 1), together = 2 * factorial(n - 2), val = total - together;
     return {
-      prompt: `A drawer holds plenty of socks in $${colours}$ colours, and the light is off. What is the **minimum** number of socks you must take to *guarantee* $${pairs}$ matching pairs? (Pigeonhole principle.)`,
+      prompt: `$${n}$ ${who}, including Asha and Ben, sit around a **circular** table. Rotations of the same seating count as one arrangement. In how many arrangements are Asha and Ben **not** next to each other?`,
       answerType: 'numeric', answer: { value: val },
       traps: [
-        { value: 2 * pairs, why: `Those $${2 * pairs}$ socks could be $${2 * pairs}$ different colours. The guarantee has to beat the worst case, not the best one.` },
-        { value: worst, why: `$${worst}$ socks can still be one of each colour plus $${2 * (pairs - 1)}$ more — that is only $${pairs - 1}$ pair${pairs - 1 === 1 ? '' : 's'}, so one further sock is needed.` }
-      ],
-      hints: [`Worst case first: one sock of each of the $${colours}$ colours pairs up with nothing.`,
-        `On top of those, $${2 * (pairs - 1)}$ socks make only $${pairs - 1}$ pair${pairs - 1 === 1 ? '' : 's'}.`,
-        'Every sock after that must complete the next pair.'],
+        { value: together, why: `$${together}$ counts the seatings where they ARE adjacent. The question asks for the complement.` },
+        { value: factorial(n) - 2 * factorial(n - 1), why: 'Around a circle rotations are the same arrangement, so use $(n-1)!$ and not $n!$ for the total.' }
+      ].filter(t => t.value !== val),
+      hints: ['Count all circular arrangements, then remove the ones the condition forbids.',
+        'To count Asha and Ben adjacent, glue them into one block and remember the block has 2 internal orders.',
+        `All arrangements: $(${n} - 1)!$. Adjacent: $(${n - 1} - 1)! \\times 2$.`],
       steps: [
-        { h: 'Worst case', d: `$${colours} + 2 \\times ${pairs - 1} = ${worst}$ socks give only $${pairs - 1}$ pair${pairs - 1 === 1 ? '' : 's'}` },
-        { h: 'Pigeonhole', d: `One more sock forces pair $${pairs}$: $${val}$` }
+        { h: 'All circular arrangements', d: `$(${n} - 1)! = ${total}$` },
+        { h: 'Asha and Ben adjacent', d: `Block counts as one: $(${n - 1} - 1)! \\times 2 = ${together}$` },
+        { h: 'Complement', d: `$${total} - ${together} = ${val}$` }
       ]
     };
   },
