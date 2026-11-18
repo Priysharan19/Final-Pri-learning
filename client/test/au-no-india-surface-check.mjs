@@ -115,7 +115,8 @@ check('the name pool is chosen by edition: NSW_NAMES has no Indian name, INDIA_S
   for (const name of ['Priya', 'Dev', 'Uma', 'Vik', 'Ravi', 'Rahul', 'Amit', 'Anita', 'Arjun']) assert.ok(!nsw.includes(name), `${name} is in the NSW name pool`);
   assert.equal(india.join(), 'Aria,Blake,Chen,Dev,Elif,Finn,Grace,Hana,Ivy,Jonah,Kiri,Leo,Mia,Noah,Ollie,Priya,Quinn,Ruby,Sam,Tara,Uma,Vik,Willa,Xavier,Yusuf,Zoe', 'the Indian edition\'s shared pool is unchanged');
   assert.deepEqual(nsw.map((n, i) => (n === india[i] ? null : i)).filter(i => i !== null), [3, 15, 20, 21], 'only the four Indian names are replaced, in place');
-  assert.match(src, /export const NAMES = RUNS_FOR === 'prithagoras' \? NSW_NAMES : INDIA_SHARED_NAMES;/);
+  assert.match(src, /export const NAMES = \[\.\.\.\(String\(globalThis\.process\?\.env\?\.PRI_EDITION[^)]*\)\.trim\(\) === 'prithagoras' \? NSW_NAMES : INDIA_SHARED_NAMES\)\];/);
+  assert.match(read('main.jsx'), /selectNamePool\(EDITION\)/, 'a Prithagoras build selects the NSW pool at start-up');
 });
 // The issued-question scan below is for the Prithagoras build: in Node the name pool follows PRI_EDITION, read when the generators load.
 process.env.PRI_EDITION = 'prithagoras';

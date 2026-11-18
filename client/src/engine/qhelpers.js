@@ -4,12 +4,6 @@
 // assembly used by every question generator.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { EDITION } from '../platform/edition.js';
-
-// The edition this code runs for: the build's own record (a Vite build replaces it with that edition's), and, in Node
-// (the server and the suites, where the record is always the default), the process's PRI_EDITION. Unset is Priyabhata.
-const RUNS_FOR = EDITION !== 'priyabhata' ? EDITION : String(globalThis.process?.env?.PRI_EDITION ?? '').trim();
-
 /** Deterministic RNG (mulberry32) so a seed reproduces a question exactly. */
 export function makeRng(seed) {
   let a = seed >>> 0;
@@ -188,7 +182,13 @@ export const rad = d => d * Math.PI / 180;
 // is the same for the same seed in both. (client/test/au-no-india-surface-check.mjs holds both halves.)
 export const INDIA_SHARED_NAMES = ['Aria', 'Blake', 'Chen', 'Dev', 'Elif', 'Finn', 'Grace', 'Hana', 'Ivy', 'Jonah', 'Kiri', 'Leo', 'Mia', 'Noah', 'Ollie', 'Priya', 'Quinn', 'Ruby', 'Sam', 'Tara', 'Uma', 'Vik', 'Willa', 'Xavier', 'Yusuf', 'Zoe'];
 export const NSW_NAMES = ['Aria', 'Blake', 'Chen', 'Dean', 'Elif', 'Finn', 'Grace', 'Hana', 'Ivy', 'Jonah', 'Kiri', 'Leo', 'Mia', 'Noah', 'Ollie', 'Piper', 'Quinn', 'Ruby', 'Sam', 'Tara', 'Una', 'Vera', 'Willa', 'Xavier', 'Yusuf', 'Zoe'];
-export const NAMES = RUNS_FOR === 'prithagoras' ? NSW_NAMES : INDIA_SHARED_NAMES;
+// The pool the generators draw from. One array, filled in place, so every `import { NAMES }` sees the choice: in Node
+// (the server and the suites) from PRI_EDITION when this module loads; in a browser build by selectNamePool(EDITION)
+// at start-up (client/src/main.jsx), because a build's edition is its record, not a global. Unset is Priyabhata.
+export const NAMES = [...(String(globalThis.process?.env?.PRI_EDITION ?? '').trim() === 'prithagoras' ? NSW_NAMES : INDIA_SHARED_NAMES)];
+export function selectNamePool(editionId) {
+  NAMES.splice(0, NAMES.length, ...(editionId === 'prithagoras' ? NSW_NAMES : INDIA_SHARED_NAMES));
+}
 export const ITEMS = [
   { name: 'a skateboard', price: [80, 320] },
   { name: 'a pair of sneakers', price: [60, 240] },

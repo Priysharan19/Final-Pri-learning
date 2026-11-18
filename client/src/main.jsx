@@ -6,6 +6,8 @@ import './theme.css';
 import './theme-state.css';
 import './ink/interactionGuard.js';
 import App from './App.jsx';
+import { selectNamePool } from './engine/qhelpers.js';
+import { EDITION } from './platform/edition.js';
 // The Instrument is the one student interface (client/interface.config.mjs), so
 // its stylesheets are part of the boot stylesheet, after theme.css which they
 // override: the shell, and the Map, Report and Scripts tabs. A tab opened for
@@ -121,7 +123,10 @@ if (LAN_DEV) {
   })();
 }
 
-const root = createRoot(document.getElementById('root'));
+const root = // The names in question text follow the build's edition (engine/qhelpers.js).
+selectNamePool(EDITION);
+
+createRoot(document.getElementById('root'));
 if (GUARDIAN_MODE || DELETE_REQUEST_MODE || ACCOUNT_ACTION_MODE || PARENT_EMAIL_MODE) bootPhase('render');
 if (PARENT_EMAIL_MODE) {
   const ParentReportEmailAction = React.lazy(() => import('./parent/ParentReportEmailAction.jsx'));
