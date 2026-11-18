@@ -14,8 +14,8 @@
 
 ## शिकायत अधिकारी
 
-- Priysharan Tripathi
-- शिकायत अधिकारी, Pri Learning
+- Priysharan Tripathi (Pri Learning के नाम से व्यापार)
+- शिकायत अधिकारी
 - ABN 20 192 090 394
 - prilearning19@gmail.com
 

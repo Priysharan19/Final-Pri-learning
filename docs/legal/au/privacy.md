@@ -12,7 +12,7 @@ has not yet been reviewed by one. The app says so above this notice, and will
 stop saying so only when that review has happened.
 
 The person responsible for your information is
-Priysharan Tripathi, Pri Learning, ABN 20 192 090 394.
+Priysharan Tripathi trading as Pri Learning, ABN 20 192 090 394.
 
 ## The short version
 
@@ -216,6 +216,21 @@ and whether it is active, and a record of each payment (Stripe's reference for
 it, the amount, the currency, the date and its status). See the
 [refund policy](/refund-policy).
 
+## Cookies and storage
+
+We use only what the app needs to work, and nothing to track you.
+
+- **Sign-in cookies.** When you sign in, our server sets cookies that keep you
+  signed in on that browser, protect your session against forged requests and,
+  for a moment, show that you have just confirmed your password. They are removed
+  when you sign out. They are not used to follow you around other sites.
+- **Storage on your device.** The app keeps your profile, your work and your
+  settings in your browser's or phone's own storage so it can open and keep your
+  place. This is what "What stays on your device" describes.
+
+We use no advertising or analytics cookies, no tracking pixels and no
+third-party trackers.
+
 ## Why we use it
 
 To sign you in, to set and mark practice questions, to show you your progress,
@@ -287,6 +302,11 @@ Only the services needed to run the parts you use:
   one-time codes and the confirmation sent to a parent or guardian. The delivery
   service sees the address and the message, as a postal service sees an
   envelope.
+- **An error-reporting service** (Sentry, or a service that accepts reports in
+  the same format), only if our server is set up to send to one. It receives the
+  same allow-listed fields as a crash report (the screen or route that failed, a
+  short error code, a fingerprint of the fault and the build number), never the
+  error message, a question, your writing or anything you typed.
 - **Our hosting and database providers**, named under "Where your information is
   stored", which store and process it for us.
 - **A handwriting reader** (OpenAI), while the handwriting-reading setting is on
@@ -313,6 +333,13 @@ This is the list of the overseas recipients we know of.
 - **Resend**, our email delivery provider, receives the email address and the
   message for each email we send. We have not been able to confirm the country
   where it processes them, and we treat the delivery as likely to be outside
+  Australia.
+- **An error-reporting service** (Sentry, or a service that accepts reports in
+  the same format), only if our server is set up to send to one. It receives the
+  same allow-listed fields as a crash report (the screen or route that failed, a
+  short error code, a fingerprint of the fault and the build number), never the
+  error message, a question, your writing or anything you typed. We have not been
+  able to confirm where it processes them, and we treat it as likely to be outside
   Australia.
 - **Our hosting and database providers** are named above. A provider outside
   Australia would hold your information outside Australia; the notice says which

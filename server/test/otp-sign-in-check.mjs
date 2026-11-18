@@ -423,7 +423,7 @@ try {
 
   // ── the email itself ─────────────────────────────────────────────────────
   const signIn = otpEmailMessage('483920', 'sign-in', 'https://staging.prilearning.example');
-  c.eq(signIn.subject, '483920 is your Pri Learning code', 'the subject carries the code and the name');
+  c.eq(signIn.subject, '483920 is your Priyabhata code', 'the subject carries the code and the name');
   c.ok(signIn.html.includes('Pri Learning') && signIn.text.includes('Pri Learning'), 'it is recognisably Pri Learning, in HTML and in plain text');
   c.ok(/font:700 34px/.test(signIn.html) && signIn.html.includes('483&nbsp;920'), 'the code is the largest thing in it, grouped 3 + 3 for reading aloud');
   c.ok(/10 minutes/.test(signIn.html) && /10 minutes/.test(signIn.text), 'the expiry is stated');
@@ -435,7 +435,7 @@ try {
   const hostile = otpEmailMessage('<script>alert(1)</script>', 'sign-in', 'https://x.example');
   c.ok(!hostile.html.includes('<script>'), 'whatever is passed as the code is HTML-escaped');
   const removal = otpEmailMessage('111222', 'reauth', 'https://x.example', { intent: 'account-delete' });
-  c.ok(/DELETE/.test(removal.html) && /delete your Pri Learning account/.test(removal.subject) && !/<a\b/i.test(removal.html), 'a deletion code says what it does and carries no link either');
+  c.ok(/DELETE/.test(removal.html) && /delete your Priyabhata account/.test(removal.subject) && !/<a\b/i.test(removal.html), 'a deletion code says what it does and carries no link either');
 
   const staging = otpEmailMessage('222333', 'guardian-consent', 'https://staging.prilearning.example');
   const production = otpEmailMessage('222333', 'guardian-consent', 'https://prilearning.example');

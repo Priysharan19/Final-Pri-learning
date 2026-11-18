@@ -125,7 +125,7 @@ try {
   const kept = r.data;
   c.ok(kept?.kind === 'code' && /^\d{6}$/.test(kept.code) && kept.purpose === 'sign-in' && kept.synthetic === true && kept.to === student,
     'the newest message is the sign-in code, top level, marked synthetic');
-  c.eq(kept.subject, `${kept.code} is your Pri Learning code`, 'with the real subject line');
+  c.eq(kept.subject, `${kept.code} is your Priyabhata code`, 'with the real subject line');
   c.ok(kept.text.startsWith(`${kept.code}\n\n`) && /valid for 10 minutes/.test(kept.text), 'the real plain-text body');
   c.ok(Number.isInteger(kept.receivedAt) && Math.abs(kept.receivedAt - Date.now()) < 60_000, 'and when it was received, in epoch ms');
   c.eq(r.headers.get('cache-control'), 'no-store', 'and is never cached');
@@ -211,7 +211,7 @@ try {
   r = await post('/v1/account/otp/delete-request', { email: student });
   c.eq(r.status, 202, 'the public deletion page asks for a code for the reserved account');
   r = await latest(student);
-  c.ok(r.data?.purpose === 'delete' && r.data?.subject === `${r.data?.code} is the code to delete your Pri Learning account` && /DELETE/.test(r.data?.text || ''),
+  c.ok(r.data?.purpose === 'delete' && r.data?.subject === `${r.data?.code} is the code to delete your Priyabhata account` && /DELETE/.test(r.data?.text || ''),
     'the deletion code is kept with purpose "delete" and its real subject');
   await freshLimits();
   const child = reserved('child.one');
@@ -227,7 +227,7 @@ try {
   r = await post('/v1/account/otp/guardian/request', { guardianName: 'Synthetic Parent', channel: 'email', destination: parent }, childJar);
   c.eq(r.status, 202, 'the child asks a reserved parent address');
   r = await latest(parent);
-  c.ok(r.data?.purpose === 'guardian' && r.data?.subject === `${r.data?.code} is the code to approve your child’s Pri Learning account`,
+  c.ok(r.data?.purpose === 'guardian' && r.data?.subject === `${r.data?.code} is the code to approve your child’s Priyabhata account`,
     'the parent\'s code is kept with purpose "guardian" and its real subject');
 
   // ── 5 · off: the route is /v1's ordinary 404, and mail is sent ─────────────

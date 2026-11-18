@@ -546,10 +546,20 @@ const LATIN_IN_HINDI = new Map([
 
 // The owner's facts as filled into the templates (docs/legal/README.md). Each
 // must appear in the English notices too, so this cannot hide prose.
-const OWNER_FACTS = ['Priysharan Tripathi', 'ABN 20 192 090 394'];
+const OWNER_FACTS = ['Priysharan Tripathi', 'ABN 20 192 090 394', 'Priysharan Tripathi trading as Pri Learning, ABN 20 192 090 394'];
 for (const fact of OWNER_FACTS) {
   ok(PAGES.some(([slug]) => readDoc(slug, 'en').replace(/\s+/g, ' ').includes(fact)),
     `owner fact "${fact}" is filled into the English notices as well`);
+}
+
+// Owner decisions of 18 Nov 2026: a short cookies-and-storage section, and the payment and error-reporting processors named.
+{
+  const enPrivacy = readDoc('privacy', 'en'), hiPrivacy = readFileSync(fileFor('privacy', 'hi'), 'utf8');
+  ok(/## Cookies and storage[\s\S]*Sign-in cookies[\s\S]*no advertising or analytics cookies/.test(enPrivacy), 'it names only sign-in cookies and functional storage, and says there is no tracking');
+  ok(/## कुकीज़ और स्टोरेज/.test(hiPrivacy), 'the Hindi notice has the same section');
+  ok(/\*\*Razorpay\*\*[\s\S]{0,400}we never\s+receive or store them/.test(enPrivacy), 'the Indian notice names Razorpay and says card, UPI and netbanking details never reach us');
+  ok(/error-reporting service\*\* \(Sentry/.test(enPrivacy), 'the Indian notice names the error-reporting processor');
+  ok(/रेज़रपे/.test(hiPrivacy) && /त्रुटि-रिपोर्ट सेवा/.test(hiPrivacy), 'the Hindi notice names both too');
 }
 
 for (const [slug] of PAGES) {

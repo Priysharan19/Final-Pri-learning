@@ -9,7 +9,7 @@ to give you. It has not yet been reviewed by a lawyer; the app says so above
 this notice, and will stop saying so only when that review has happened.
 
 The person responsible for your data (the "data fiduciary") is
-Priysharan Tripathi, Pri Learning, ABN 20 192 090 394.
+Priysharan Tripathi trading as Pri Learning, ABN 20 192 090 394.
 
 ## The short version
 
@@ -249,6 +249,21 @@ We do not use children's data for advertising, we do not track children across
 other services, and we do not build behavioural profiles for anything other than
 choosing the next maths question.
 
+## Cookies and storage
+
+We use only what the app needs to work, and nothing to track you.
+
+- **Sign-in cookies.** When you sign in, our server sets cookies that keep you
+  signed in on that browser, protect your session against forged requests and,
+  for a moment, show that you have just confirmed your password. They are removed
+  when you sign out. They are not used to follow you around other sites.
+- **Storage on your device.** The app keeps your profile, your work and your
+  settings in your browser's or phone's own storage so it can open and keep your
+  place. This is what "What stays on your device" describes.
+
+We use no advertising or analytics cookies, no tracking pixels and no
+third-party trackers.
+
 ## Who else sees your data
 
 Only the services needed to run the parts you use:
@@ -262,6 +277,16 @@ Only the services needed to run the parts you use:
 - **Apple and Google**, if you subscribe through the App Store or Google Play.
   We never see or store your card details; the store tells us only whether a
   subscription is active, which plan, and until when.
+- **Razorpay**, our payment processor for web payments in India. You enter
+  your card, UPI or netbanking details on Razorpay's page, not ours: we never
+  receive or store them. We send Razorpay your account's email address so it
+  can send you its payment receipts, and it tells us whether a subscription is
+  active, which plan, and a reference for each payment.
+- **An error-reporting service** (Sentry, or a service that accepts reports in
+  the same format), only if our server is set up to send to one. It receives the
+  same allow-listed fields as a crash report (the screen or route that failed, a
+  short error code, a fingerprint of the fault and the build number), never the
+  error message, a question, your writing or anything you typed.
 - **Our hosting and database providers** (Railway and Neon), which store and process it for us — see "Where your data is stored".
 - **A handwriting reader** (OpenAI), while the handwriting-reading setting is
   on and you have agreed to send it, and only the image of your writing or the

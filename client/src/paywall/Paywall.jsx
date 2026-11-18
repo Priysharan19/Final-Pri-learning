@@ -212,7 +212,11 @@ export default function Paywall() {
             anywhere: it says so, and names no store, price or plan. */}
         {!premium && !apple && !google && (sellsPremium(saleAvailable)
           ? (billing?.webCheckout
-            ? <p style={{ marginTop: 'var(--space-4)' }} data-paywall-web>{t('pricing.webSubscribe')}{' '}<PageLink to="/settings#cloud-account-title">{t('paywall.openAccount')}</PageLink></p>
+            ? <>
+              <p style={{ marginTop: 'var(--space-4)' }} data-paywall-web>{t('pricing.webSubscribe')}{' '}<PageLink to="/settings#cloud-account-title">{t('paywall.openAccount')}</PageLink></p>
+              {/* Australian Consumer Law: a web subscription states its price, its period, that it renews until cancelled and how to cancel, where the student chooses it. */}
+              {EDITION_ID === 'prithagoras' && webPrice && <p className="muted" data-paywall-web-disclosure style={{ fontSize: 'var(--text-xs)', lineHeight: 1.5 }}>{t('paywall.disclosureWeb', webPrice)}</p>}
+            </>
             : <p style={{ marginTop: 'var(--space-4)' }} data-paywall-in-app>{t('paywall.inAppOnly')}</p>)
           : <p style={{ marginTop: 'var(--space-4)' }} data-paywall-not-on-sale>{t('paywall.notOnSale')}</p>
         )}

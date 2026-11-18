@@ -2,8 +2,8 @@
 
 **Last updated: 18 November 2026**
 
-These terms are an agreement between you and Priysharan Tripathi,
-Pri Learning, ABN 20 192 090 394, about your use of Prithagoras
+These terms are an agreement between you and Priysharan Tripathi
+trading as Pri Learning, ABN 20 192 090 394, about your use of Prithagoras
 (Pri Learning's Australian edition) on the web, on iPhone and iPad, and on
 Android. They have not yet been reviewed by a lawyer; the app says so above
 them.

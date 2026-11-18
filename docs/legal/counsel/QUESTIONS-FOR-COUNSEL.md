@@ -46,18 +46,18 @@ number or address that has not been given to it.
 **Current text** · `docs/legal/privacy.md`
 
 > The person responsible for your data (the "data fiduciary") is
-> Priysharan Tripathi, Pri Learning, ABN 20 192 090 394.
+> Priysharan Tripathi trading as Pri Learning, ABN 20 192 090 394.
 
 **Current text** · `docs/legal/terms.md`
 
-> These terms are an agreement between you and Priysharan Tripathi,
-> Pri Learning, ABN 20 192 090 394, about your use of Pri Learning on
+> These terms are an agreement between you and Priysharan Tripathi
+> trading as Pri Learning, ABN 20 192 090 394, about your use of Pri Learning on
 > the web, on iPhone and iPad, and on Android.
 
 **Current text** · `docs/legal/grievance.md`
 
-> - Priysharan Tripathi
-> - Grievance officer, Pri Learning
+> - Priysharan Tripathi trading as Pri Learning
+> - Grievance officer
 > - ABN 20 192 090 394
 > - prilearning19@gmail.com
 

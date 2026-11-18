@@ -8,8 +8,8 @@ lawyer; the app says so above it.
 
 ## Grievance officer
 
-- Priysharan Tripathi
-- Grievance officer, Pri Learning
+- Priysharan Tripathi trading as Pri Learning
+- Grievance officer
 - ABN 20 192 090 394
 - prilearning19@gmail.com
 

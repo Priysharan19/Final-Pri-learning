@@ -55,8 +55,7 @@ the operator aims to follow the APPs and does not say the Act binds it.
 
 **For counsel:** does the Act apply (turnover, handling of children's information, trading in personal
 information)? Should the operator opt in, and is "aim to handle in line with the APPs" accurate and
-safe? Who should the legal operator be (an entity, an ABN)? Nothing in the notices claims an ABN or
-GST registration.
+safe? Who should the legal operator be (the sole trader, or an entity)? The notices name "Priysharan Tripathi trading as Pri Learning, ABN 20 192 090 394" and claim no GST registration.
 
 ## 2. Sending information overseas (APP 8) [overseas]
 

@@ -33,8 +33,8 @@ const real = loadManifest();
 
 // ── 1 · the manifest matches the files on disk ────────────────────────────────
 c.eq(real.edition, 'prithagoras', 'the manifest is the Prithagoras edition\'s');
-const SHIPPED = ['01', '02', '03', '04', '05', '06', '07', '10', '13'];
-c.deq(real.papers.map(p => p.id), SHIPPED.map(n => `ext1-2027-p${n}`), 'nine practice papers ship, in order: 01-07, 10 and 13');
+const SHIPPED = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13'];
+c.deq(real.papers.map(p => p.id), SHIPPED.map(n => `ext1-2027-p${n}`), 'thirteen practice papers ship, in order: 01-13 (08, 09, 11 and 12 are the scope-revised versions, each replaced part re-solved 18 Nov 2026)');
 c.deq(real.papers.map(p => p.title), SHIPPED.map(n => `Practice Paper ${n}`), 'titled "Practice Paper NN"');
 const named = new Set(['manifest.json']);
 for (const p of real.papers) {
@@ -51,15 +51,15 @@ for (const p of real.papers) {
   }
 }
 c.deq(readdirSync(PAPERS_DIR).sort(), [...named].sort(), 'the directory holds exactly the manifest and the files it names');
-c.deq(real.papers.filter(p => p.sample).map(p => p.id), ['ext1-2027-p01'], 'Practice Paper 01 is the only free sample; the other eight are Premium');
-c.deq(real.papers.map(p => [p.hasGuidelines, p.paper.pages, p.guidelines.pages]), [[true, 19, 14], [true, 18, 12], [true, 17, 11], [true, 18, 11], [true, 18, 12], [true, 17, 12], [true, 17, 11], [true, 16, 9], [true, 20, 22]], 'every paper has its marking guidelines, with the page counts of the rebuilt files');
+c.deq(real.papers.filter(p => p.sample).map(p => p.id), ['ext1-2027-p01'], 'Practice Paper 01 is the only free sample; the other twelve are Premium');
+c.deq(real.papers.map(p => [p.hasGuidelines, p.paper.pages, p.guidelines.pages]), [[true, 19, 14], [true, 18, 12], [true, 17, 11], [true, 18, 11], [true, 18, 12], [true, 17, 12], [true, 17, 11], [true, 18, 12], [true, 14, 10], [true, 16, 9], [true, 15, 10], [true, 15, 9], [true, 20, 22]], 'every paper has its marking guidelines, with the page counts of the rebuilt files');
 
 // Branding: every shipped PDF says Prithagoras and none says the old spelling.
 // PyMuPDF reads the text; the check is skipped loudly if python3 or pymupdf is absent.
 const brandScan = spawnSync('python3', ['-I', '-c', 'import sys,pymupdf\nfor f in sys.argv[1:]:\n    t="".join(p.get_text() for p in pymupdf.open(f))\n    print(f, "Prithagoras" in t, "Pritagoras" in t)', ...[...named].filter(f => f.endsWith('.pdf')).map(f => join(PAPERS_DIR, f))], { encoding: 'utf8' });
 if (brandScan.status !== 0) throw new Error(`the PDF brand scan could not run (python3 with pymupdf is required): ${brandScan.stderr}`);
 const brandRows = brandScan.stdout.trim().split('\n').map(l => l.split(' '));
-c.eq(brandRows.length, 18, 'the brand scan read all eighteen PDFs');
+c.eq(brandRows.length, 26, 'the brand scan read all twenty-six PDFs');
 c.deq(brandRows.filter(r => r[r.length - 2] !== 'True').map(r => r[0]), [], 'every shipped PDF contains "Prithagoras"');
 c.deq(brandRows.filter(r => r[r.length - 1] !== 'False').map(r => r[0]), [], 'no shipped PDF contains "Pritagoras"');
 c.eq(PAPERS_CAPABILITY, 'premium-exams', 'the capability is the existing premium one');

@@ -487,8 +487,10 @@ for (const code of ['MAV-11-01', 'MAV-12-05', 'ME1-12-02']) {
 {
   const { featureStates, PENDING_FEATURE_FLAGS } = await import('../vite.config.js');
   ok(PENDING_FEATURE_FLAGS.includes('SYLLABUS_BOARD'), 'SYLLABUS_BOARD is a pending build flag');
-  ok(featureStates('build', {}).syllabusBoard === false, 'a production build without PRI_FEATURE_SYLLABUS_BOARD has the board off');
+  ok(featureStates('build', {}).syllabusBoard === false, 'a Priyabhata production build without PRI_FEATURE_SYLLABUS_BOARD has the board off');
   ok(featureStates('build', { PRI_FEATURE_SYLLABUS_BOARD: '1' }).syllabusBoard === true, 'PRI_FEATURE_SYLLABUS_BOARD=1 turns it on');
+  ok(featureStates('build', { PRI_EDITION: 'prithagoras' }).syllabusBoard === true, 'a Prithagoras production build has the board on (owner decision, 18 Nov 2026)');
+  ok(featureStates('build', { PRI_EDITION: 'prithagoras', PRI_FEATURE_SYLLABUS_BOARD: '0' }).syllabusBoard === false, 'PRI_FEATURE_SYLLABUS_BOARD=0 still switches it off for Prithagoras');
 }
 
 if (failures.length) {

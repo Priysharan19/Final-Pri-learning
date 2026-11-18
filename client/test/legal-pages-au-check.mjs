@@ -151,7 +151,7 @@ ok(/import grievance from '\.\.\/\.\.\/\.\.\/docs\/legal\/grievance\.md\?raw'/.t
 const privacy = au('privacy'), terms = au('terms'), refund = au('refund-policy'), contact = au('contact');
 for (const [label, re] of [
   ['the Australian Privacy Principles / Privacy Act 1988', /Australian Privacy Principles[\s\S]{0,200}Privacy Act 1988|Privacy Act 1988[\s\S]{0,200}Australian Privacy Principles/],
-  ['who is responsible, with the ABN', /ABN 20 192 090 394/], ['what is collected', /What we collect/], ['why', /Why we use it/],
+  ['who is responsible, with the ABN (a sole trader trading as Pri Learning)', /Priysharan Tripathi trading as Pri Learning, ABN 20 192 090 394/], ['what is collected', /What we collect/], ['why', /Why we use it/],
   ['overseas disclosure under APP 8, with the recipients', /Sending information overseas[\s\S]*OpenAI[\s\S]*Resend/], ['APP 12 and 13: access and correction', /APP 12 and APP 13/],
   ['a complaint to us then the OAIC', /write to us first[\s\S]{0,300}Office of the Australian\s+Information Commissioner \(OAIC\)/],
   ['children: under 15 needs a parent or guardian to confirm; 15 and over does not', /A student under 15 needs a\s+parent or guardian to confirm the account\. A student who is 15 or older does\s+not, and nor does an adult/],
@@ -215,6 +215,8 @@ const found = new Set((all.match(/\{\{[A-Z_]+\}\}/g) || []).map(p => p.slice(2, 
 for (const name of found) ok(DECLARED.has(name), `placeholder {{${name}}} is one of the declared four`);
 ok(found.size === 0, 'no placeholder is left in the Australian notices');
 ok(/Railway[^.]*Singapore/.test(privacy) && /Neon[^.]*Sydney/.test(privacy) && /prilearning19@gmail\.com/.test(privacy + contact), 'the Australian notice states its hosting (Railway, Singapore), its database (Neon, Sydney) and the contact email');
+ok(/## Cookies and storage[\s\S]*Sign-in cookies[\s\S]*no advertising or analytics cookies/.test(privacy), 'the Australian notice has a Cookies and storage section: sign-in cookies and functional storage only, no tracking');
+ok(/error-reporting service\*\* \(Sentry/.test(privacy) && !/Razorpay/.test(privacy), 'the Australian notice names the error-reporting processor and no Indian payment processor');
 const statusPath = join(ROOT, 'docs/legal/au/review-status.json');
 ok(existsSync(statusPath), 'docs/legal/au/review-status.json exists');
 const status = JSON.parse(readFileSync(statusPath, 'utf8'));
