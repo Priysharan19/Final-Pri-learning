@@ -43,6 +43,8 @@ import { handwrite, pressRead } from './fakeServerReader.js';
 
 const SURELY_WRONG = '-987654';
 const MAX_SKIPS = 14;
+// The typed-working flow needs a question that offers typed working; the chapter now mixes in forms that do not, so it draws further.
+const TYPED_WORKING_SKIPS = 40;
 const EVIDENCE = 'SYNTHETIC-READER EVIDENCE';
 const shownId = page => page.locator('.qpage').first().getAttribute('data-question-id');
 
@@ -713,7 +715,7 @@ export const typedReloadFlow = {
     const answerBox = page.locator('.editor-body input.answer-input');
     const workingBox = page.locator('.editor-body textarea');
     let right = null;
-    for (let skips = 0; skips <= MAX_SKIPS; skips++) {
+    for (let skips = 0; skips <= TYPED_WORKING_SKIPS; skips++) {
       const typeTab = page.getByRole('button', { name: 'Answer by typing' });
       if (await typeTab.count()) { await typeTab.click(); await settle(); }
       if (await answerBox.count() === 1 && await page.locator('.editor-body .btn-disclose').count() === 1) {
