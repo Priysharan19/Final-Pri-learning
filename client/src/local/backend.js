@@ -1193,6 +1193,8 @@ const INDIA_WHY = {
 /** The difficulty as the student reads it: the words only where the edition offers a plain list (Prithagoras), the D-coded label elsewhere. */
 const diffLabelOf = d => (offering() ? DIFF_WORDS[d] : DIFF_LABELS[d]);
 
+const notOffered = () => Object.assign(new Error('That year or course is not offered yet.'), { status: 400, code: 'COURSE_NOT_OFFERED' });
+
 async function practicePoolFor(profile, now = Date.now()) {
   if (profile.course !== 'in') {
     const { own, revision } = offeredScope(scopeForYear(profile.year, pathwayOf(profile)));
@@ -3168,7 +3170,7 @@ const routes = {
     // A profile restored from the student's own account is a vessel for what the account holds: it keeps
     // its stored year and course (the student chooses an offered one on sign-in), never refused here.
     if (requestedCourse === 'nsw' && body.restoring !== true && offering() && !courseOffered(requestedYear, requestedYear >= 11 ? (body.pathway || 'advanced') : null)) {
-      throw Object.assign(new Error('That year or course is not offered yet.'), { status: 400, code: 'COURSE_NOT_OFFERED' });
+      throw notOffered();
     }
 
     const p = {
@@ -3322,7 +3324,7 @@ const routes = {
       const nextYear = body.year !== undefined ? Math.min(12, Math.max(7, Number(body.year) || p.year)) : p.year;
       const nextPathway = nextYear >= 11 ? (body.pathway ?? p.pathway ?? 'advanced') : null;
       if (offering() && (body.year !== undefined && !yearOffered(nextYear) || body.pathway !== undefined && nextYear >= 11 && !pathwayOffered(nextPathway))) {
-        throw Object.assign(new Error('That year or course is not offered yet.'), { status: 400, code: 'COURSE_NOT_OFFERED' });
+        throw notOffered();
       }
     }
     if (body.name !== undefined) p.name = String(body.name).trim().slice(0, 40) || p.name;
