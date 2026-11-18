@@ -67,6 +67,8 @@ export const AU_STRINGS = Object.freeze({
   'inst.noChapters': 'No chapters are set for your year yet.',
   'cloudError.consentDeclarationRequired': 'Tell us whether the learner is 18 or older, or their year with a parent or guardian’s name and email, then try again.',
   'upgrade.jeeAdvanced': "This part of the course is included with HSC Pass.",
+  // Owner decision, 19 Nov 2026: Years 11 and 12 only.
+  'notes.nsw.lede': 'Notes for NSW Mathematics, Years 11 and 12, Advanced and Extension 1: the ideas in plain words, the formulas, what markers look for, the usual traps and worked examples whose answers the maths engine has checked.',
   // Owner walk-through, 19 Nov 2026: the notebook said "Nothing filed yet" while Review listed wrong answers. Review
   // lists every wrong answer, including ones where the solution was shown and paper answers; the notebook files a
   // wrong answer only when its question was finished without the solution. It says so.

@@ -208,7 +208,7 @@ export const EDITIONS = Object.freeze({
       cut: 'square',                         // icon counter cut: the right-angle box
       accent: Object.freeze({ light: '#7d5a00', dark: '#e0b44a' }),
       onAccent: Object.freeze({ light: '#f4f3ef', dark: '#1a1a1b' }),
-      description: 'Maths practice for NSW students, Years 7–12 and the HSC. Handwriting read line by line, worked solutions. Answers are checked by our server with a Prithagoras account.'
+      description: 'Maths practice for NSW students, Years 11 and 12 and the HSC. Handwriting read line by line, worked solutions. Answers are checked by our server with a Prithagoras account.'
     }),
     region: 'AU',
     defaultCourse: 'nsw',
