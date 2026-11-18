@@ -141,9 +141,24 @@ try {
           ok(await tip.count() === 1 && /Now /.test(await tip.textContent()), `${where}: hover shows a tooltip with the meaning and the current value`);
           const lit = await f.locator(`.lf-slot.is-active[data-param="${pid}"]`).count();
           ok(lit === await f.locator(`.lf-slot[data-param="${pid}"]`).count() && lit >= 1, `${where}: every occurrence of the symbol is lit together`);
-          ok(await f.locator('.lf-list li.is-hot').count() >= 1, `${where}: a matching feature sentence is lit`);
+          ok(await f.locator('.lf-row.is-hot').count() >= 1, `${where}: a matching feature sentence is lit`);
           const boxAfter = await f.boundingBox();
           ok(boxBefore.height === boxAfter.height && boxBefore.y === boxAfter.y, `${where}: the note causes no layout shift`);
+          // a feature row: icon, label, value, meaning; hovering the row lights its mark on the graph
+          const rows = await f.locator('.lf-row').evaluateAll(rs => rs.map(r => ({ icon: !!r.querySelector('svg.lf-icon[aria-hidden="true"]'), label: r.querySelector('.lf-row-label')?.textContent, val: r.querySelector('.lf-row-val')?.textContent, note: r.querySelector('.lf-row-note')?.textContent, valFont: getComputedStyle(r.querySelector('.lf-row-val')).fontFamily, labelFont: getComputedStyle(r.querySelector('.lf-row-label')).fontFamily })));
+          ok(rows.length >= 2 && rows.every(r => r.icon && r.label && r.val && r.note), `${where}: every feature row has an icon, a label, a value and a meaning`);
+          ok(rows.every(r => /KaTeX|Latin Modern|STIX|Cambria|Georgia|serif/.test(r.valFont) && !/KaTeX|Latin Modern/.test(r.labelFont)), `${where}: the value is in the maths face, the label in the body face`);
+          ok(await f.locator('.lf-legend', { hasText: 'filled dot' }).count() === 0, `${where}: the marker legend line is gone`);
+          const hotBefore = await f.locator('.lf-mark.is-hot, .lf-guide.is-hot').count();
+          await page.mouse.move(2, 2);
+          const row = f.locator('.lf-row').filter({ has: f.locator('.lf-row-label', { hasText: /intercept|Roots|Turning|Corner|Centre|Peak|Midline|Axis|asymptote/ }) }).first();
+          if (await row.count()) {
+            await row.hover();
+            ok(await row.evaluate(r => r.classList.contains('is-hot')), `${where}: hovering a row lights it`);
+            ok(await f.locator('.lf-mark.is-hot, .lf-guide.is-hot').count() > hotBefore || hotBefore > 0, `${where}: hovering a row lights its mark on the graph`);
+            await page.mouse.move(2, 2);
+          }
+          await slot.hover();
           await page.keyboard.press('Escape');
           ok(await tip.count() === 0, `${where}: Escape closes the note`);
           await page.mouse.move(2, 2);

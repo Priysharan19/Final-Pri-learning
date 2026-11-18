@@ -11,8 +11,9 @@ import { speakMath } from '../lib/mathSpeech.js';
 import { useT } from '../i18n/index.js';
 import { curvePaths, projector, ticksFor } from '../engine/plot.js';
 import { defaultsOf, indexOf, stopsOf, valueAt } from './specs.js';
-import { featureVars, fmtParam, isRounded } from './format.js';
-import { FEATURE, MARK, NOTE, TITLE } from './keys.js';
+import { featureVars, fmtParam, featureRounded } from './format.js';
+import { FEATURE, NOTE, TITLE } from './keys.js';
+import { GLYPHS, KIND_ICON } from './icons.js';
 import './living.css';
 
 const BOX = { width: 320, height: 240, pad: { left: 34, right: 10, top: 10, bottom: 22 } };
@@ -32,15 +33,11 @@ function curveOf(spec, values, win, project) {
   return spec.polylines(values).map(pts => pts.map(([x, y], i) => `${i ? 'L' : 'M'}${project.x(x)} ${project.y(y)}`).join(' '));
 }
 
-function Glyph({ shape }) {
-  const c = { cx: 8, cy: 8 };
+/** The row's glyph: decorative, one family (icons.js). The row's words are the accessible content. */
+function FeatureIcon({ kind }) {
   return (
-    <svg className="lf-glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-      {shape === 'ring' && <circle {...c} r="4.2" className="lf-g-ring" />}
-      {shape === 'dot' && <circle {...c} r="4" className="lf-g-dot" />}
-      {shape === 'diamond' && <path d="M8 3.2 12.8 8 8 12.8 3.2 8Z" className="lf-g-diamond" />}
-      {shape === 'vline' && <path d="M8 1.5v13" className="lf-g-line" />}
-      {shape === 'hline' && <path d="M1.5 8h13" className="lf-g-line" />}
+    <svg className="lf-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      {GLYPHS[KIND_ICON[kind] || 'line'].map((d, i) => <path key={i} d={d} />)}
     </svg>
   );
 }
@@ -63,6 +60,7 @@ export default function LivingFormula({ spec }) {
   const [active, setActive] = useState(null);
   const [dragging, setDragging] = useState(false);
   const drag = useRef(null);
+  const [rowKind, setRowKind] = useState(null);   // the feature row under the pointer: its mark on the graph lights too
   const [pinned, setPinned] = useState(false);       // a touch or pen tap keeps its symbol lit until the next tap elsewhere
   const [dismissed, setDismissed] = useState(false); // Escape closes the note; moving to another symbol brings it back
   const [pop, setPop] = useState(null);
@@ -81,6 +79,7 @@ export default function LivingFormula({ spec }) {
   const group = (spec.together || []).find(g => active && g.includes(active)) || (active ? [active] : []);
   const lit = dragging ? group : (active ? [active] : []);
   const hotKinds = new Set(lit.flatMap(id => spec.emphasis?.[id] || []));
+  if (rowKind) hotKinds.add(rowKind);
   const isHot = f => hotKinds.has(f.kind);
   const isDefault = spec.params.every(p => values[p.id] === p.def);
 
@@ -117,7 +116,7 @@ export default function LivingFormula({ spec }) {
     if (dragging) return undefined;
     const id = setTimeout(() => {
       const before = spoken.current;
-      const changed = sentences.filter(s => !before.includes(s));
+      const changed = sentences.filter(s => !before.includes(s)).map(s => { const [l, v, n] = s.split('|'); return `${l}: ${v}, ${n}`; });
       spoken.current = sentences;
       if (changed.length) setStatus(changed.join('. '));
     }, 450);
@@ -184,7 +183,6 @@ export default function LivingFormula({ spec }) {
   const axisX = Math.min(win.yMax, Math.max(win.yMin, 0));
   const axisY = Math.min(win.xMax, Math.max(win.xMin, 0));
   const inner = { x0: BOX.pad.left, x1: BOX.width - BOX.pad.right, y0: BOX.pad.top, y1: BOX.height - BOX.pad.bottom };
-  const shapes = ['ring', 'dot', 'diamond'].filter(s => features.some(f => f.marks.some(m => m.shape === s)));
 
   return (
     <figure className="lf" aria-labelledby={`${uid}-t`} data-living-formula={spec.id}>
@@ -253,15 +251,21 @@ export default function LivingFormula({ spec }) {
       <div className="lf-feats">
         <p className="lf-sub">{t('living.ui.features')}</p>
         <ul className="lf-list">
-          {features.map((f, i) => (
-            <li key={`${f.kind}${i}`} className={isHot(f) ? 'is-hot' : undefined}>
-              <span className="lf-gl">{f.marks[0] ? <Glyph shape={f.marks[0].shape} /> : null}</span>
-              <span>{sentences[i]}</span>
-            </li>
-          ))}
+          {features.map((f, i) => {
+            const [label, value, note] = sentences[i].split('|');
+            return (
+              <li key={`${f.kind}${i}`} className={`lf-row${isHot(f) ? ' is-hot' : ''}`}
+                onPointerEnter={e => { if (e.pointerType === 'mouse') setRowKind(f.kind); }} onPointerLeave={e => { if (e.pointerType === 'mouse') setRowKind(null); }}
+                onClick={() => setRowKind(k => (k === f.kind ? null : f.kind))}>
+                <FeatureIcon kind={f.kind} />
+                <span className="lf-row-label">{label}</span>
+                <span className="lf-row-val">{value}</span>
+                <span className="lf-row-note">{note}</span>
+              </li>
+            );
+          })}
         </ul>
-        {features.some(f => Object.values(f.facts).some(isRounded)) && <p className="lf-legend">{t('living.ui.rounded')}</p>}
-        {shapes.length > 0 && <p className="lf-legend">{shapes.map(s => t(MARK[s])).join(' · ')}</p>}
+        {features.some(f => featureRounded(f.kind, f.facts)) && <p className="lf-legend">{t('living.ui.rounded')}</p>}
       </div>
       <p className="lf-status" role="status" aria-live="polite">{status}</p>
     </figure>

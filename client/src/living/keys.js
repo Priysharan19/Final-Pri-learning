@@ -72,8 +72,3 @@ export const FEATURE = {
   inflect: 'living.feat.inflect',
   rule: 'living.feat.rule',
 };
-export const MARK = {
-  ring: 'living.ui.markRing',
-  dot: 'living.ui.markDot',
-  diamond: 'living.ui.markDiamond'
-};

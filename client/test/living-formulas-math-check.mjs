@@ -14,8 +14,9 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { SPECS, SPEC_BY_ID, discriminantSign, periodInPi, valueAt, stopsOf } from '../src/living/specs.js';
-import { fmt, piText, featureVars, isRounded } from '../src/living/format.js';
-import { TITLE, NOTE, FEATURE, MARK } from '../src/living/keys.js';
+import { fmt, piText, featureVars, isRounded, numText, pointText, featureRounded } from '../src/living/format.js';
+import { GLYPHS, KIND_ICON } from '../src/living/icons.js';
+import { TITLE, NOTE, FEATURE } from '../src/living/keys.js';
 import EN from '../src/i18n/strings.en.js';
 import HI from '../src/i18n/strings.hi.js';
 
@@ -213,7 +214,21 @@ for (const spec of SPECS) {
   for (const p of spec.params) ok(NOTE[spec.id]?.[p.id] === `living.${spec.id}.p.${p.id}`, `${spec.id}.${p.id}: key table note`);
 }
 for (const k of kinds) ok(FEATURE[k] === `living.feat.${k}`, `feature ${k}: key table`);
-ok(Object.values(MARK).every(k => Object.hasOwn(EN, k)), 'marker legend keys exist');
+// every feature sentence is label | value | meaning, in both languages, and every kind has its glyph
+for (const k of kinds) {
+  ok(EN[`living.feat.${k}`].split('|').length === 3 && HI[`living.feat.${k}`].split('|').length === 3, `feature ${k}: label | value | meaning in en and hi`);
+  ok(Object.hasOwn(KIND_ICON, k) && GLYPHS[KIND_ICON[k]]?.length > 0, `feature ${k}: has a glyph`);
+}
+ok(Object.values(GLYPHS).flat().every(d => /^[MmLlHhVvCcSsQqTtAaZz0-9 .,\-]+$/.test(d)), 'glyphs are plain path data (no emoji, no font)');
+// exact first: the first maximum is c + (pn/pd)π exactly, written in π, with the rounded value after ≈
+for (const v of [{ a: 2, b: 1, c: 0, d: 0 }, { a: -1, b: 1.5, c: 1, d: 2 }, { a: 3, b: 2.5, c: -2, d: -1 }]) {
+  const fm = get(SPEC_BY_ID.sine.features(v), 'firstMax').facts;
+  ok(near(fm.x, fm.c + (fm.pn / fm.pd) * Math.PI, 1e-12), `first maximum is c + (pn/pd)π for ${JSON.stringify(v)}`);
+}
+ok(featureVars('firstMax', get(SPEC_BY_ID.sine.features({ a: 2, b: 1, c: 0, d: 0 }), 'firstMax').facts).pt === '(π/2, 2) \u2248 (1.57, 2)', 'first maximum reads (π/2, 2) ≈ (1.57, 2)');
+ok(numText(1 / 3) === '1/3 \u2248 0.33' && numText(-2.5) === '\u22122.5' && pointText(1 / 3, 2) === '(1/3, 2) \u2248 (0.33, 2)' && pointText(2, -3) === '(2, \u22123)', 'exact values first, rounded after ≈');
+ok(!featureRounded('firstMax', get(SPEC_BY_ID.sine.features({ a: 2, b: 1, c: 0, d: 0 }), 'firstMax').facts) && featureRounded('crossX', { x1: 3 - Math.sqrt(8), x2: 3 + Math.sqrt(8) }) && !featureRounded('peak', get(SPEC_BY_ID.normal.features({ mu: 50, sigma: 5 }), 'peak').facts), 'the rounding note appears only for values with no exact form');
+ok(isRounded(Math.SQRT2) && !isRounded(1 / 3) && !isRounded(2.5), 'only a value with no exact form counts as rounded');
 const KEYS = new Set(Object.keys(EN));
 ok(SPECS.length >= 8, `at least eight living formulas (${SPECS.length})`);
 for (const spec of SPECS) {
@@ -236,7 +251,7 @@ for (const spec of SPECS) for (const f of spec.features(Object.fromEntries(spec.
   const vars = featureVars(f.kind, f.facts), need = String(EN[`living.feat.${f.kind}`]).match(/\{(\w+)\}/g) || [];
   ok(need.every(n => Object.hasOwn(vars, n.slice(1, -1))), `${spec.id}/${f.kind}: every placeholder is supplied`);
 }
-ok(fmt(-1.5) === '−1.5' && fmt(1 / 3) === '0.33' && isRounded(1 / 3) && !isRounded(2.5) && fmt(2) === '2', 'number text');
+ok(fmt(-1.5) === '−1.5' && fmt(1 / 3) === '0.33' && fmt(2) === '2', 'number text');
 const src = ['specs.js', 'format.js', 'LivingFormula.jsx', 'LivingFormulas.jsx'].map(f => readFileSync(fileURLToPath(new URL(`../src/living/${f}`, import.meta.url)), 'utf8')).join('\n');
 ok(!/\bfetch\s*\(|XMLHttpRequest|sendBeacon|WebSocket|\bapi\.js|outbox|localStorage|sessionStorage/.test(src), 'living formulas make no network call and keep nothing');
 ok(!/checker|marker|attempt|hint|mastery|learnerState|recordAnswer/i.test(src.replace(/\/\/.*$/gm, '')), 'living formulas touch no marking, hint, attempt or learner state');

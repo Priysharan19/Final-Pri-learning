@@ -155,7 +155,9 @@ export const SPECS = [
       // The first maximum to the right of x = c is a quarter period on (a > 0), three quarters on (a < 0).
       const xMax = c + (a > 0 ? 0.25 : 0.75) * periodValue;
       out.push({ kind: 'shift', facts: { c }, marks: [pt('dot', c, d)] });
-      out.push({ kind: 'firstMax', facts: { x: xMax, y: d + amp }, marks: [pt('dot', xMax, d + amp)] });
+      // x = c + (pn/pd)π, exactly: a quarter period (a > 0) or three quarters (a < 0) of (n/d)π
+      const reach = fraction(BigInt(per.n) * (a > 0 ? 1n : 3n), 4n * BigInt(per.d));
+      out.push({ kind: 'firstMax', facts: { x: xMax, y: d + amp, c, pn: Number(reach.n), pd: Number(reach.d) }, marks: [pt('dot', xMax, d + amp)] });
       return out;
     }
   },
@@ -262,7 +264,7 @@ export const SPECS = [
       const top = 1 / (sigma * Math.sqrt(2 * Math.PI));
       const dens = x => Math.exp(-((x - mu) ** 2) / (2 * sigma * sigma)) / (sigma * Math.sqrt(2 * Math.PI));
       return [
-        { kind: 'peak', facts: { x: mu, y: top }, marks: [pt('dot', mu, top), vline(mu)] },
+        { kind: 'peak', facts: { x: mu, y: top, sigma }, marks: [pt('dot', mu, top), vline(mu)] },
         { kind: 'inflect', facts: { x1: mu - sigma, x2: mu + sigma }, marks: [pt('ring', mu - sigma, dens(mu - sigma)), pt('ring', mu + sigma, dens(mu + sigma))] },
         { kind: 'rule', facts: { lo1: mu - sigma, hi1: mu + sigma, lo2: mu - 2 * sigma, hi2: mu + 2 * sigma, lo3: mu - 3 * sigma, hi3: mu + 3 * sigma }, marks: [] }
       ];
