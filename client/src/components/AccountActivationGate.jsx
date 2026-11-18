@@ -226,9 +226,8 @@ export default function AccountActivationGate({ user, onReady, onSwitch }) {
           {status === 'signin' && (
             <div className="card" data-testid="activation-signin">
               {heading('activation.signInTitle')}
-              <p className="activation-status" role="status">{reason}</p>
-              <p className="activation-status">{t('activation.signInFor', { name: user.name })}</p>
-              <SignUpFlow variant="inline" initialName={user.name || ''} knownYear={user.year ?? null} knownTrack={user.indiaTrack || null}
+              <p className="activation-status activation-lead" role="status">{code === 'SIGN_IN_REQUIRED' ? t('activation.signedOut', { name: user.name }) : reason}</p>
+              <SignUpFlow variant="gate" initialName={user.name || ''} knownYear={user.year ?? null} knownTrack={user.indiaTrack || null}
                 allowCreate={link !== undefined && !link?.accountId} onFinish={finishSignIn} />
               {appleOffered && (
                 <div style={{ marginTop: 14 }}>

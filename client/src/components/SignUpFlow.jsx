@@ -103,7 +103,10 @@ export default function SignUpFlow({
 }) {
   const t = useT();
   const tx = useTx();
-  const inline = variant === 'inline';
+  // `gate` is `inline` inside the activation gate: the gate's own card names the
+  // page and says why, so this card adds no heading or lead of its own.
+  const inline = variant === 'inline' || variant === 'gate';
+  const bare = variant === 'gate';
   const [step, setStep] = useState('method');
   const [direction, setDirection] = useState('forward');
   const [channel, setChannel] = useState('email');
@@ -539,7 +542,7 @@ export default function SignUpFlow({
       <>
         {/* On the landing screen the page's own heading ("Welcome to Pri
             Learning") is this card's title; inside a page it names itself. */}
-        {inline
+        {inline && !bare
           ? <>{heading('signup.signinTitle')}<p className="signup-lead">{t('signup.inlineLead')}</p></>
           : <h2 className="sr-only" tabIndex={-1} ref={headingRef} id="signup-step-title">{t('signup.signinTitle')}</h2>}
         {!available && <p className="signup-hint" role="status">{t('signup.cloudUnavailable')}</p>}
@@ -817,7 +820,7 @@ export default function SignUpFlow({
   const showBack = !!backTarget || (step === 'method' && !!onCancel);
 
   return (
-    <div className={`signup-flow signup-${variant}`} data-signup-step={step} data-signin-card={variant} data-testid="signin-card">
+    <div className={`signup-flow signup-${variant}`} data-signup-step={step} data-signin-card={inline ? 'inline' : variant} data-testid="signin-card">
       {showBack && (
         <div className="signup-top">
           <button type="button" className="signup-back" aria-label={t(step === 'method' ? 'signup.close' : 'signup.back')}
