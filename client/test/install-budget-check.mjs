@@ -164,7 +164,11 @@ const INSTALL_GZIP_CEILING = 1_000_000;
 // panel and the new answer forms in the checker (checker-core: exact rationals, equations, subscripted names), their Hindi and English strings
 // (about 40 more catalogue entries each), and the HSC Pass arithmetic. The papers UI is already a lazy chunk (App.jsx React.lazy) and the
 // structured papers are server content, so there was no larger saving to take; the new ceiling leaves about 48 kB. Other ceilings unchanged.
-const FIRST_VISIT_RAW_CEILING = 5_400_000;
+// Merged with main's papers-in-app re-baseline (2026-11-19, PR 1064, same owner decision): main set the raw ceiling to 5,100,000 for
+// its own tree (Prithagoras 4,934 kB). This branch adds the NSW content-gap forms on top; the merged tree measured with a real build is
+// 5,047 kB raw / 1,719 kB gzipped install plus warm. FIRST_VISIT_RAW 5,100,000 -> 5,250,000 (about 80 kB headroom) and
+// FIRST_VISIT_GZIP 1,750,000 -> 1,850,000 (about 87 kB headroom); the higher of the two branches' measured needs is kept.
+const FIRST_VISIT_RAW_CEILING = 5_250_000;
 const FIRST_VISIT_GZIP_CEILING = 1_850_000;
 
 // Things that must never be in the install again, and what each one costs.
