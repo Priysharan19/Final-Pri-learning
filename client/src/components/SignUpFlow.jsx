@@ -346,10 +346,10 @@ export default function SignUpFlow({
     // from it, so nothing is asked twice and nothing stored is replaced by a
     // blank one. The class is asked only when the server truly holds none.
     // Inside a page the profile exists, so nothing more is asked at all.
+    // A child whose guardian has not approved yet cannot sync (the server refuses the pull), so nothing
+    // is stored to read: the class is asked, then the parent step, exactly as before.
+    if (!inline && year === null && parent) { go('class'); return; }
     if (!inline && year === null) {
-      // A child whose guardian has not approved yet cannot sync (the server refuses the pull), so nothing
-      // is stored to read: the class is asked, then the parent step, exactly as before.
-      if (parent) { go('class'); return; }
       let stored = null;
       try { stored = await readStoredAccountProfile(result.account?.id); }
       catch (err) { fail(err); return; }
