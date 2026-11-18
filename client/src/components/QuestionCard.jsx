@@ -2762,14 +2762,14 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                       setDropNote(null); setAnswerOpen(false);
                       takeFile(file);
                     }} />
-                  <input ref={photoCameraRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} data-photo-camera-input
+{touchDevice && <input ref={photoCameraRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} data-photo-camera-input
                     onChange={e => {
                       const file = e.target.files?.[0];
                       e.target.value = '';
                       if (!file) return;
                       setDropNote(null); setAnswerOpen(false);
                       takeFile(file);
-                    }} />
+                    }} />}
                   {photoIntake
                     ? <PhotoBusy t={t} kind={photoIntake} />
                     : !photo && !heldPdf && photoOCR.phase === 'idle'
