@@ -468,6 +468,18 @@ def q12cii():
     check("Q12c-ii", ok and P52 == Fr(26235, 2 ** 104),
           f"brute force over all 4^n pairs of shuffles, n=1..8: P(identity)=C(n+3,3)/4^n each time; at n=52: C(55,3)/4^52 = 26235/2^104")
 
+
+def override_exact_keys():
+    """The shipped exact keys are the values computed above, as exact fractions (no float)."""
+    import json, os
+    path = os.path.join(os.path.dirname(__file__), '..', 'overrides', 'ext1-2027-p13.json')
+    keys = json.load(open(path))['keys']
+    e52 = Fr(2 ** 52 - 1, 2 ** 51); p52 = Fr(comb(55, 3), 4 ** 52)
+    got1 = Fr(int(keys['q12c-i']['key']['n']), int(keys['q12c-i']['key']['d']))
+    got2 = Fr(int(keys['q12c-ii']['key']['n']), int(keys['q12c-ii']['key']['d']))
+    check("Q12c-i/ii exact keys", got1 == e52 and got2 == p52 == Fr(26235, 2 ** 104),
+          "the override's exact keys equal the exactly-computed expectation and the probability (Fractions)")
+
 # ---- Q13(a): float
 def q13ai():
     # lowest point at height 0; V(d) = volume below height d.
@@ -722,7 +734,7 @@ def q14bii():
         ok &= (Fr(tot, cnt) == Fr(5 * N + 3, N + 3))
     check("Q14b-ii", ok, "exact geometry (centre-in-hull via triangle test) over all k-subsets, N=3,5,...,13, and all N! orders for N=5,7: E[T] = " + ", ".join(f"N={n}:{e}" for n, e in rows) + " ; all equal (5N+3)/(N+3)")
 
-ITEMS = [q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, q11a, q11b, q11c, q11d, q12a, q12b, q12ci, q12cii,
+ITEMS = [override_exact_keys, q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, q11a, q11b, q11c, q11d, q12a, q12b, q12ci, q12cii,
          q13ai, q13aii, q13bi, q13bii, q14ai, q14aii, q14bi, q14bii]
 
 if __name__ == '__main__':

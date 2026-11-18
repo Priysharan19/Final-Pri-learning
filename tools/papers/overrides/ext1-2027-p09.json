@@ -1,0 +1,184 @@
+{
+  "keys": {
+    "q11a": {
+      "answerType": "expression",
+      "key": {
+        "type": "expression",
+        "expr": "tan(sin(x))",
+        "display": "y=\\tan(\\sin x)"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p09.py: RK4 integration of dy/dx=(1+y^2)cos x, y(0)=0 vs tan(sin x) at 8 points in [-3,3], max err < 1e-9"
+    },
+    "q11d": {
+      "answerType": "expression",
+      "key": {
+        "type": "expression",
+        "expr": "1-2*sqrt(2)",
+        "display": "1-2\\sqrt2"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p09.py: fine-grid then golden-section minimum of 3sin^2x-4sinx cosx-cos^2x over [0,2pi]: -1.828427125"
+    },
+    "q11e": {
+      "answerType": "expression",
+      "key": {
+        "type": "expression",
+        "expr": "(16+sqrt(13))/3",
+        "display": "\\dfrac{16+\\sqrt{13}}{3}"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p09.py: mpmath quadrature of the original integral to 30 digits"
+    },
+    "q12a": {
+      "answerType": "value",
+      "key": {
+        "type": "point",
+        "x": -4.4,
+        "y": 0.8,
+        "display": "\\left(-\\dfrac{22}{5},\\ \\dfrac45\\right)"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p09.py: minimisation of |A+t(B-A)-C|^2 over t (SymPy exact)"
+    },
+    "q12b": {
+      "answerType": "value",
+      "key": {
+        "type": "numeric",
+        "value": 11,
+        "display": "11"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p09.py: exact Fractions: for n=3..200 with p=11/(4n), P(X=2)=P(X=3) holds only for n=11"
+    },
+    "q12c-ii": {
+      "answerType": "value",
+      "key": {
+        "type": "numeric",
+        "value": 44.721359549995796,
+        "display": "20\\sqrt5"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p09.py: landing range from y(t)=-5 maximised over theta in [0,pi/2) (golden section): 44.72135955"
+    },
+    "q12c-iii": {
+      "answerType": "value",
+      "key": {
+        "type": "numeric",
+        "value": 0.894427190999916,
+        "display": "\\dfrac{2\\sqrt5}{5}"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p09.py: tan of the maximising theta from the same golden-section search: 0.894427191"
+    },
+    "q13a-ii": {
+      "answerType": "expression",
+      "key": {
+        "type": "expression",
+        "expr": "atan(n/2)",
+        "display": "S_n=\\tan^{-1}\\!\\left(\\dfrac n2\\right)"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p09.py: direct summation of T_k in mpmath at 30 digits for n=1..40"
+    },
+    "q13a-iii": {
+      "answerType": "expression",
+      "key": {
+        "type": "expression",
+        "expr": "pi/2",
+        "display": "\\dfrac{\\pi}{2}"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p09.py: mpmath nsum (Richardson) of the series T_k, k>=1, to 30 digits"
+    },
+    "q13a-iv": {
+      "answerType": "value",
+      "key": {
+        "type": "numeric",
+        "value": 200,
+        "display": "200"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p09.py: direct partial sums at 40 digits: first n with S_n > pi/2-1/100"
+    },
+    "q13b-ii": {
+      "answerType": "value",
+      "key": {
+        "type": "numeric",
+        "value": 8,
+        "display": "8"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p09.py: iterating a_{n+1}=2a_n^2-1 from cos(pi/64) at 120 digits: first n with a_n=1 (to 1e-100)"
+    },
+    "q13b-iii": {
+      "answerType": "value",
+      "key": {
+        "type": "set",
+        "values": [
+          1,
+          -0.5,
+          0.30901699437494745,
+          -0.8090169943749475
+        ],
+        "display": "a_1=1,\\ -\\dfrac12,\\ \\dfrac{-1\\pm\\sqrt5}{4}"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p09.py: real roots of a_3(a)-a=0 with a_3 from two applications of the recurrence (SymPy exact)"
+    },
+    "q14a-i": {
+      "answerType": "expression",
+      "key": {
+        "type": "expression",
+        "expr": "(47/50)^13",
+        "anyOf": [
+          "0.4474",
+          "0.44741"
+        ],
+        "display": "\\left(\\dfrac{47}{50}\\right)^{13}"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p09.py: exact binomial P(X>12) for 13 tickets"
+    },
+    "q14a-iv": {
+      "answerType": "value",
+      "key": {
+        "type": "numeric",
+        "value": 324,
+        "display": "324"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p09.py: exact Fractions: expected income for 13 and 14 tickets from the full binomial distributions; largest integer C with income14>income13"
+    },
+    "q14b-ii": {
+      "answerType": "value",
+      "key": {
+        "type": "numeric",
+        "value": 0.1193662073189215,
+        "display": "\\dfrac{3}{8\\pi}"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p09.py: V(h) by mpmath quadrature, dV/dh by differentiation, dh/dt=6/(dV/dh) at h=2"
+    },
+    "q14b-iii": {
+      "answerType": "expression",
+      "key": {
+        "type": "expression",
+        "expr": "16*pi/9",
+        "display": "\\dfrac{16\\pi}{9}"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p09.py: V(2) by quadrature divided by 6 dm^3/s"
+    },
+    "q14b-iv": {
+      "answerType": "value",
+      "key": {
+        "type": "numeric",
+        "value": 1.224744871391589,
+        "display": "\\dfrac{\\sqrt6}{2}"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p09.py: root-find of 6/(dV/dh)=1/pi using the quadrature V(h)"
+    }
+  }
+}

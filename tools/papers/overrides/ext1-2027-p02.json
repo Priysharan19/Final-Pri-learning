@@ -1,0 +1,11 @@
+{
+  "keys": {
+    "q11a": { "answerType": "value", "key": { "type": "interval", "region": "k < -44 or 40 < k < 449/4", "variable": "k", "display": "k < -44 \\ \\text{or}\\ 40 < k < \\dfrac{449}{4}" }, "autoMarks": 1, "keyChecks": "verified by tools/papers/verify/p02.py: exact distinct-real-root count of the quartic over a k grid with bisection of the transitions gives boundaries -44, 40, 112.25" },
+    "q11b": { "answerType": "value", "key": { "type": "numeric", "value": 56, "display": "56" }, "autoMarks": 1, "keyChecks": "verified by tools/papers/verify/p02.py: numeric roots of the quartic scanned over k; the only k with four positive roots in geometric progression is 56" },
+    "q12b": { "answerType": "expression", "key": { "type": "expression", "expr": "pi*ln(2)/8", "display": "\\dfrac{\\pi}{8}\\ln 2" }, "autoMarks": 1, "keyChecks": "verified by tools/papers/verify/p02.py: mpmath quadrature of atan(x)/(1+x) on [0,1] agrees with pi ln2/8 to 1e-20" },
+    "q12c-iii": { "answerType": "expression", "key": { "type": "expression", "expr": "n*pi", "display": "n\\pi" }, "autoMarks": 1, "keyChecks": "verified by tools/papers/verify/p02.py: quadrature of (sin n t / sin t)^2 over [0,pi] for n=1..8 equals n*pi" },
+    "q13a-i": { "answerType": "expression", "key": { "type": "expression", "expr": "2*acos(d/2)-(d/2)*sqrt(4-d^2)", "display": "2\\cos^{-1}\\dfrac{d}{2}-\\dfrac{d}{2}\\sqrt{4-d^{2}}" }, "autoMarks": 1, "keyChecks": "verified by tools/papers/verify/p02.py: numeric overlap area of two unit circles (vertical-chord quadrature) matches at 7 values of d to 1e-12" },
+    "q13a-iii": { "answerType": "value", "key": { "type": "numeric", "value": 1.5707963267948966, "display": "\\dfrac{\\pi}{2}" }, "autoMarks": 1, "keyChecks": "verified by tools/papers/verify/p02.py: chord length from solving the circle equations, mean value by quadrature = pi/2" },
+    "q14a-ii": { "answerType": "expression", "key": { "type": "expression", "expr": "g/2*(a*(a+d)/h+h*(2*a+d)^2/(a*(a+d)))", "display": "\\dfrac{g}{2}\\left[\\dfrac{a(a+d)}{h}+\\dfrac{h(2a+d)^{2}}{a(a+d)}\\right]" }, "autoMarks": 1, "keyChecks": "verified by tools/papers/verify/p02.py: 25 random exact rational (a,d,h,g); solving the two clearance conditions for tan(theta) and V^2 equals the key exactly" }
+  }
+}

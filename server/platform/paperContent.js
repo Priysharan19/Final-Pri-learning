@@ -21,7 +21,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 export const PAPER_FORMAT = 'pri-paper-v1';
-const KEY_TYPES = new Set(['mcq', 'numeric', 'expression']);
+const KEY_TYPES = new Set(['mcq', 'numeric', 'expression', 'exact', 'interval', 'point', 'set', 'equation']);
 const ANSWER_TYPES = new Set(['mcq', 'value', 'expression', 'show-that', 'proof-explain', 'sketch', 'open']);
 
 /** Every answerable part of a paper (a part with no children), in paper order. */
@@ -61,6 +61,12 @@ export function validateStructured(doc) {
       if (part.key.type === 'mcq' && !/^[ABCD]$/.test(part.key.answer)) fail(doc, `${part.id}: mcq key`);
       if (part.key.type === 'numeric' && !Number.isFinite(part.key.value)) fail(doc, `${part.id}: numeric key`);
       if (part.key.type === 'expression' && (typeof part.key.expr !== 'string' || !part.key.expr)) fail(doc, `${part.id}: expression key`);
+      if (part.key.type === 'exact' && !(/^-?\d{1,400}$/.test(part.key.n || '') && /^\d{1,400}$/.test(part.key.d || '') && /[1-9]/.test(part.key.d))) fail(doc, `${part.id}: exact key`);
+      if (part.key.type === 'interval' && (typeof part.key.region !== 'string' || !part.key.region)) fail(doc, `${part.id}: interval key`);
+      if (part.key.type === 'point' && !(Number.isFinite(part.key.x) && Number.isFinite(part.key.y))) fail(doc, `${part.id}: point key`);
+      if (part.key.type === 'set' && !(Array.isArray(part.key.values) && part.key.values.length && part.key.values.every(Number.isFinite))) fail(doc, `${part.id}: set key`);
+      if (part.key.type === 'equation' && !(typeof part.key.lhs === 'string' && typeof part.key.rhs === 'string')) fail(doc, `${part.id}: equation key`);
+      if (part.key.names !== undefined && !(part.key.type === 'expression' && Object.entries(part.key.names).every(([k, v]) => /^[A-Za-z]_?\{?[A-Za-z0-9]{1,3}\}?$/.test(k) && /^[A-Za-z]$/.test(v)))) fail(doc, `${part.id}: names`);
     }
     if (part.answerType === 'mcq' && (!part.options || part.options.length !== 4)) fail(doc, `${part.id}: options`);
     if (!Number.isInteger(part.autoMarks) || part.autoMarks < 0 || part.autoMarks > part.marks) fail(doc, `${part.id}: autoMarks`);
@@ -149,9 +155,15 @@ export function engineQuestion(doc, leaf) {
   const prompt = promptFor(doc, leaf);
   if (key.type === 'mcq') return { answerType: 'mcq', prompt, answer: { correctIndex: 'ABCD'.indexOf(key.answer) } };
   if (key.type === 'numeric') {
-    return { answerType: 'numeric', prompt, answer: { value: key.value, ...(key.angle ? { angle: key.angle } : {}) }, ...(part.answerSuffix ? { answerSuffix: part.answerSuffix } : {}) };
+    return { answerType: 'numeric', prompt, answer: { value: key.value, ...(key.angle ? { angle: key.angle } : {}), ...(key.tol != null ? { tol: key.tol } : {}) }, ...(part.answerSuffix ? { answerSuffix: part.answerSuffix } : {}) };
   }
-  return { answerType: 'expression', prompt, answer: { expr: key.expr, ...(key.anyOf?.length ? { anyOf: key.anyOf } : {}) } };
+  // The paper's own answer forms (checker-core.js): an exact rational, an interval, a coordinate pair, a set of values, an equation.
+  if (key.type === 'exact') return { answerType: 'exact-rational', prompt, answer: { n: key.n, d: key.d } };
+  if (key.type === 'interval') return { answerType: 'interval', prompt, answer: { region: key.region, variable: key.variable || 'x' } };
+  if (key.type === 'point') return { answerType: 'point', prompt, answer: { x: key.x, y: key.y } };
+  if (key.type === 'set') return { answerType: 'set', prompt, answer: { values: key.values, ...(key.tol != null ? { tol: key.tol } : {}) } };
+  if (key.type === 'equation') return { answerType: 'equation', prompt, answer: { lhs: key.lhs, rhs: key.rhs } };
+  return { answerType: 'expression', prompt, answer: { expr: key.expr, ...(key.anyOf?.length ? { anyOf: key.anyOf } : {}), ...(key.names ? { names: key.names } : {}) } };
 }
 
 /** Milliseconds from a paper's stated "10 minutes" / "2 hours" / "1 hour and 45 minutes". */

@@ -2160,14 +2160,15 @@
           ]
          },
          "figures": [],
-         "answerType": "expression",
+         "answerType": "value",
          "key": {
-          "type": "expression",
-          "expr": "2-1/2^51",
+          "type": "exact",
+          "n": "4503599627370495",
+          "d": "2251799813685248",
           "display": "2-\\dfrac{1}{2^{51}}"
          },
          "autoMarks": 1,
-         "keyChecks": "p13.py Q12c-i: brute force over all 2^n riffle strings for n<=16 gives E=2-2^(1-n) exactly; position-by-position count validated against it gives E(52)=2-1/2^51. Engine: 2-1/2^51, (2^52-1)/2^51, 2-2^(-51), 2-1/(2^51) accepted; 2, 2-1/2^50, 2-1/2^52 rejected. Decimals within ~1e-14 of 2 are also accepted (engine tolerance). Expression type used because the numeric type would accept a bare 2 (double precision cannot separate 2 and 2-2^-51) and rejects power forms."
+         "keyChecks": "verified by tools/papers/verify/p13.py: brute force over all 2^n riffle strings (n<=16) gives E=2-2^(1-n); position count at n=52 is exactly (2^52-1)/2^51. Exact comparison: 2 is not accepted."
         },
         {
          "id": "q12c-ii",
@@ -2272,9 +2273,15 @@
           ]
          },
          "figures": [],
-         "answerType": "open",
-         "key": null,
-         "autoMarks": 0
+         "answerType": "value",
+         "key": {
+          "type": "exact",
+          "n": "26235",
+          "d": "20282409603651670423947251286016",
+          "display": "\\dfrac{\\binom{55}{3}}{4^{52}}=\\dfrac{26235}{2^{104}}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p13.py: brute force over all 4^n pairs of shuffles (n<=8) gives C(n+3,3)/4^n; at n=52 it is 26235/2^104. Exact comparison: 0 or a rounded decimal is not accepted."
         }
        ],
        "answerType": "group",

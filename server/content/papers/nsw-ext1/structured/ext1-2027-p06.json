@@ -1032,9 +1032,14 @@
         ]
        },
        "figures": [],
-       "answerType": "open",
-       "key": null,
-       "autoMarks": 0
+       "answerType": "value",
+       "key": {
+        "type": "numeric",
+        "value": -7,
+        "display": "-7"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p06.py: numerical zeros of x^3-x-1 to 30 digits, sum of (1+z)/(1-z)"
       },
       {
        "id": "q11b",
@@ -1164,9 +1169,14 @@
         ]
        },
        "figures": [],
-       "answerType": "open",
-       "key": null,
-       "autoMarks": 0
+       "answerType": "value",
+       "key": {
+        "type": "numeric",
+        "value": 0.2853981633974483,
+        "display": "\\dfrac{\\pi}{4}-\\dfrac12"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p06.py: mpmath quadrature of sqrt(x/(1-x)) on [0,1/2] agrees to 1e-15"
       },
       {
        "id": "q11d",
@@ -1229,9 +1239,15 @@
         ]
        },
        "figures": [],
-       "answerType": "open",
-       "key": null,
-       "autoMarks": 0
+       "answerType": "value",
+       "key": {
+        "type": "exact",
+        "n": "2765",
+        "d": "4096",
+        "display": "\\dfrac{2765}{4096}"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p06.py: exact enumeration of the 32 outcomes of a round (10 odd-one-out), exact probability over three rounds"
       },
       {
        "id": "q11e",
@@ -1310,9 +1326,17 @@
         ]
        },
        "figures": [],
-       "answerType": "open",
-       "key": null,
-       "autoMarks": 0
+       "answerType": "value",
+       "key": {
+        "type": "set",
+        "values": [
+         -2.356194490192345,
+         0.7853981633974483
+        ],
+        "display": "\\dfrac{\\pi}{4}\\ \\text{and}\\ -\\dfrac{3\\pi}{4}"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p06.py: f evaluated at 285 values of x on both sides of -1 and at large |x| takes exactly two values"
       }
      ]
     },
@@ -1393,9 +1417,14 @@
        "figures": [
         "figmedian"
        ],
-       "answerType": "open",
-       "key": null,
-       "autoMarks": 0
+       "answerType": "value",
+       "key": {
+        "type": "numeric",
+        "value": 7,
+        "display": "7"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p06.py: coordinates of A, B, C with the three side lengths, exact |AM|"
       },
       {
        "id": "q12b",
@@ -1480,9 +1509,15 @@
        "figures": [
         "figortho"
        ],
-       "answerType": "open",
-       "key": null,
-       "autoMarks": 0
+       "answerType": "expression",
+       "key": {
+        "type": "equation",
+        "lhs": "x^2+2*y^2",
+        "rhs": "6",
+        "display": "x^{2}+2y^{2}=6"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p06.py: Taylor ODE solution of the orthogonal-trajectory equation from (2,1) satisfies x^2+2y^2=6 at six x-values; slope product -1 checked"
       },
       {
        "id": "q12c",
@@ -1592,9 +1627,14 @@
           ]
          },
          "figures": [],
-         "answerType": "open",
-         "key": null,
-         "autoMarks": 0
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "p^n",
+          "display": "p^{n}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p06.py: exact enumeration of win/loss sequences with stake f=1, n=1..7, two values of p"
         },
         {
          "id": "q12c-iii",
@@ -1666,9 +1706,14 @@
           ]
          },
          "figures": [],
-         "answerType": "open",
-         "key": null,
-         "autoMarks": 0
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "2*p-1",
+          "display": "f=2p-1"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p06.py: golden-section maximisation of (1+f)^(pn)(1-f)^((1-p)n), four values of p"
         },
         {
          "id": "q12c-iv",
@@ -1842,9 +1887,14 @@
           ]
          },
          "figures": [],
-         "answerType": "open",
-         "key": null,
-         "autoMarks": 0
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "D*r/(1-r)",
+          "display": "\\dfrac{Dr}{1-r}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p06.py: RK4 integration of dA/dt=-kA between 400 doses, three parameter sets"
         },
         {
          "id": "q13a-iii",
@@ -1897,9 +1947,14 @@
           ]
          },
          "figures": [],
-         "answerType": "open",
-         "key": null,
-         "autoMarks": 0
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "D/(1-r)",
+          "display": "D_1=\\dfrac{D}{1-r}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p06.py: RK4 simulation with first dose D/(1-r) keeps the post-dose amount constant over 30 doses"
         },
         {
          "id": "q13a-iv",
@@ -2088,9 +2143,14 @@
           ]
          },
          "figures": [],
-         "answerType": "open",
-         "key": null,
-         "autoMarks": 0
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "d*sqrt(2*g/H)",
+          "display": "d\\sqrt{\\dfrac{2g}{H}}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p06.py: shadow from the lamp-ball line meeting the ground, numerical |ds/dt| at landing, three parameter sets"
         },
         {
          "id": "q13b-iii",
@@ -2149,9 +2209,14 @@
           ]
          },
          "figures": [],
-         "answerType": "open",
-         "key": null,
-         "autoMarks": 0
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "sqrt(d*H)",
+          "display": "\\sqrt{dH}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p06.py: shadow speed set equal to ball speed g t, root-finding, shadow position, three parameter sets"
         }
        ],
        "answerType": "group",
@@ -2392,9 +2457,15 @@
           ]
          },
          "figures": [],
-         "answerType": "show-that",
-         "key": null,
-         "autoMarks": 0
+         "answerType": "value",
+         "key": {
+          "type": "numeric",
+          "value": 0.9,
+          "display": "0.9"
+         },
+         "autoMarks": 1,
+         "answerSuffix": "m",
+         "keyChecks": "verified by tools/papers/verify/p06.py: c solved from the rim geometry (c=1.8); O is c/2 above the vertex; reflection through O checked at three points"
         }
        ],
        "answerType": "group",
@@ -2608,9 +2679,14 @@
           ]
          },
          "figures": [],
-         "answerType": "open",
-         "key": null,
-         "autoMarks": 0
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "2^n+2*(-1)^n",
+          "display": "2^{n}+2(-1)^{n}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p06.py: brute-force proper 3-colourings of an n-sector wheel for n=3..11"
         }
        ],
        "answerType": "group",

@@ -1027,9 +1027,14 @@
         ]
        },
        "figures": [],
-       "answerType": "open",
-       "key": null,
-       "autoMarks": 0
+       "answerType": "expression",
+       "key": {
+        "type": "expression",
+        "expr": "n!",
+        "display": "n!"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p03.py: solving P(x)-P'(x)=x^n for P with unknown coefficients, n=1..8, gives P(0)=n!"
       },
       {
        "id": "q11b",
@@ -1096,9 +1101,14 @@
         ]
        },
        "figures": [],
-       "answerType": "open",
-       "key": null,
-       "autoMarks": 0
+       "answerType": "value",
+       "key": {
+        "type": "numeric",
+        "value": 0.3273268353539886,
+        "display": "\\dfrac{\\sqrt{21}}{14}"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p03.py: sign-change scan and refinement of asin x + asin 2x = pi/3 finds the single root sqrt(3/28)"
       },
       {
        "id": "q11c",
@@ -1233,9 +1243,14 @@
         ]
        },
        "figures": [],
-       "answerType": "open",
-       "key": null,
-       "autoMarks": 0
+       "answerType": "expression",
+       "key": {
+        "type": "expression",
+        "expr": "n*(n-1)*p^2/2",
+        "display": "\\dfrac{n(n-1)p^{2}}{2}"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p03.py: exact enumeration of all 2^N attendance patterns, N=1..7, two values of p"
       },
       {
        "id": "q11e",
@@ -1298,9 +1313,14 @@
         ]
        },
        "figures": [],
-       "answerType": "open",
-       "key": null,
-       "autoMarks": 0
+       "answerType": "expression",
+       "key": {
+        "type": "expression",
+        "expr": "(1+x)/(1-x)",
+        "display": "y=\\dfrac{1+x}{1-x}"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p03.py: mpmath Taylor ODE solution of the stated initial value problem agrees with (1+x)/(1-x) at six x<1 to 1e-12"
       }
      ]
     },
@@ -1461,9 +1481,17 @@
        "figures": [
         "figasin"
        ],
-       "answerType": "open",
-       "key": null,
-       "autoMarks": 0
+       "answerType": "expression",
+       "key": {
+        "type": "expression",
+        "expr": "pi*(3*pi/4-2)",
+        "anyOf": [
+         "3*pi^2/4-2*pi"
+        ],
+        "display": "\\pi\\left(\\dfrac{3\\pi}{4}-2\\right)"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p03.py: cylindrical-shell integral 2pi*int_0^1 (1-x) asin x dx agrees to 1e-20"
       },
       {
        "id": "q12c",
@@ -1663,9 +1691,14 @@
           ]
          },
          "figures": [],
-         "answerType": "open",
-         "key": null,
-         "autoMarks": 0
+         "answerType": "value",
+         "key": {
+          "type": "numeric",
+          "value": 385,
+          "display": "385"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p03.py: exact fractions give the least n with 1.96^2 p(1-p) <= 0.05^2 n for all p as 385 (worst case p=1/2)"
         }
        ],
        "answerType": "group",
@@ -1996,9 +2029,14 @@
           ]
          },
          "figures": [],
-         "answerType": "open",
-         "key": null,
-         "autoMarks": 0
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "27*a^4/4",
+          "display": "\\dfrac{27a^{4}}{4}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p03.py: five (a,p) pairs, tangent and second intersection solved, enclosed area by quadrature equals 27a^4/4"
         },
         {
          "id": "q13b-iii",
@@ -2275,9 +2313,14 @@
           ]
          },
          "figures": [],
-         "answerType": "show-that",
-         "key": null,
-         "autoMarks": 0
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "V/g*sqrt(9*sin(theta)^2-8)",
+          "display": "\\dfrac{V}{g}\\sqrt{9\\sin^{2}\\theta-8}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p03.py: four numeric cases, the two interior critical points of |r|^2 differ by exactly this time"
         }
        ],
        "answerType": "group",
@@ -2435,9 +2478,15 @@
           ]
          },
          "figures": [],
-         "answerType": "open",
-         "key": null,
-         "autoMarks": 0
+         "answerType": "value",
+         "key": {
+          "type": "interval",
+          "region": "0 < p < 1 - 3^(-1/3)",
+          "variable": "p",
+          "display": "0<p<1-\\dfrac{1}{\\sqrt[3]{3}}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p03.py: expected tests per person 1+1/k-q^k<1 for some k; bisection gives threshold p=0.30668"
         },
         {
          "id": "q14b-iii",

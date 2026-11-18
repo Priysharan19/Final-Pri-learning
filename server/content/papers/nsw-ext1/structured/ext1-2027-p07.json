@@ -1087,9 +1087,17 @@
         ]
        },
        "figures": [],
-       "answerType": "open",
-       "key": null,
-       "autoMarks": 0
+       "answerType": "value",
+       "key": {
+        "type": "set",
+        "values": [
+         1.0471975511965976,
+         2.0943951023931953
+        ],
+        "display": "x=\\dfrac{\\pi}{3},\\ \\dfrac{2\\pi}{3}"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p07.py: all roots of tan x+tan 2x-tan 3x in (0,pi) found by sign-change scan of the pole-free product form, poles excluded; exactly pi/3, 2pi/3"
       },
       {
        "id": "q11c",
@@ -1228,9 +1236,14 @@
         ]
        },
        "figures": [],
-       "answerType": "open",
-       "key": null,
-       "autoMarks": 0
+       "answerType": "value",
+       "key": {
+        "type": "numeric",
+        "value": 0.3333333333333333,
+        "display": "\\dfrac13"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p07.py: P(A wins) from the absorbing-chain linear equation and from a 400-term series; equal-win probability solved numerically: p=1/3"
       },
       {
        "id": "q11e",
@@ -1289,9 +1302,17 @@
         ]
        },
        "figures": [],
-       "answerType": "open",
-       "key": null,
-       "autoMarks": 0
+       "answerType": "expression",
+       "key": {
+        "type": "expression",
+        "expr": "atan(sqrt(2))/sqrt(2)",
+        "anyOf": [
+         "sqrt(2)*atan(sqrt(2))/2"
+        ],
+        "display": "\\dfrac{1}{\\sqrt2}\\tan^{-1}\\sqrt2"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p07.py: mpmath quadrature of the integral to 30 digits"
       }
      ]
     },
@@ -1376,9 +1397,14 @@
        "figures": [
         "figlaser"
        ],
-       "answerType": "open",
-       "key": null,
-       "autoMarks": 0
+       "answerType": "value",
+       "key": {
+        "type": "numeric",
+        "value": 3.2,
+        "display": "\\dfrac{16}{5}"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p07.py: exact minimisation of |A+t d-B|^2 over t>=0 (SymPy)"
       },
       {
        "id": "q12b",
@@ -1459,9 +1485,14 @@
        "figures": [
         "fignapkin"
        ],
-       "answerType": "open",
-       "key": null,
-       "autoMarks": 0
+       "answerType": "expression",
+       "key": {
+        "type": "expression",
+        "expr": "4*pi*h^3/3",
+        "display": "\\dfrac{4\\pi h^3}{3}"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p07.py: shell-method integral of sphere minus the drilled cylinder in SymPy, a cancels"
       },
       {
        "id": "q12c",
@@ -1512,9 +1543,18 @@
           ]
          },
          "figures": [],
-         "answerType": "open",
-         "key": null,
-         "autoMarks": 0
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "1/(2*sqrt(n))",
+          "anyOf": [
+           "0.5/sqrt(n)",
+           "sqrt(1/(4*n))"
+          ],
+          "display": "\\dfrac{1}{2\\sqrt n}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p07.py: exact binomial variance of the proportion for n=1..12 and symbolically"
         },
         {
          "id": "q12c-ii",
@@ -1559,9 +1599,17 @@
           ]
          },
          "figures": [],
-         "answerType": "open",
-         "key": null,
-         "autoMarks": 0
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "1/2+1/sqrt(n)",
+          "anyOf": [
+           "0.5+1/sqrt(n)"
+          ],
+          "display": "c=\\dfrac12+\\dfrac1{\\sqrt n}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p07.py: mean + 2 sd with exact binomial sd, n=1..12 and symbolically"
         },
         {
          "id": "q12c-iii",
@@ -1670,9 +1718,14 @@
           ]
          },
          "figures": [],
-         "answerType": "open",
-         "key": null,
-         "autoMarks": 0
+         "answerType": "value",
+         "key": {
+          "type": "numeric",
+          "value": 216,
+          "display": "216"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p07.py: exact integer search: least k with k/392 > 1/2+1/sqrt(392)"
         }
        ],
        "answerType": "group",
@@ -1823,9 +1876,14 @@
           ]
          },
          "figures": [],
-         "answerType": "open",
-         "key": null,
-         "autoMarks": 0
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "sqrt(2*a*L)",
+          "display": "v=\\sqrt{2aL}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p07.py: SymPy solve dF/dv=0 for F=v/(L+Tv+v^2/(2a)), checked against a numeric maximiser for random L,T,a"
         },
         {
          "id": "q13a-iii",
@@ -1874,9 +1932,14 @@
           ]
          },
          "figures": [],
-         "answerType": "open",
-         "key": null,
-         "autoMarks": 0
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "1/(T+sqrt(2*L/a))",
+          "display": "\\dfrac{1}{T+\\sqrt{2L/a}}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p07.py: F at the SymPy maximiser, and numeric maximum for random L,T,a"
         }
        ],
        "answerType": "group",
@@ -2062,9 +2125,14 @@
           ]
          },
          "figures": [],
-         "answerType": "open",
-         "key": null,
-         "autoMarks": 0
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "r^2+1/4",
+          "display": "c=r^2+\\dfrac14"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p07.py: for r in 0.55..4, bisection on c so that the least distance from (0,c) to y=x^2 equals r"
         },
         {
          "id": "q13b-iv",
@@ -2101,9 +2169,17 @@
           ]
          },
          "figures": [],
-         "answerType": "open",
-         "key": null,
-         "autoMarks": 0
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "(r-1/2)^2",
+          "anyOf": [
+           "r^2-r+1/4"
+          ],
+          "display": "\\left(r-\\dfrac12\\right)^2"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p07.py: c-r from the bisected c for r in 0.55..4"
         }
        ],
        "answerType": "group",
@@ -2266,9 +2342,14 @@
           ]
          },
          "figures": [],
-         "answerType": "open",
-         "key": null,
-         "autoMarks": 0
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "V^2/(2*g)-g*d^2/(2*V^2)",
+          "display": "\\dfrac{V^2}{2g}-\\dfrac{gd^2}{2V^2}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p07.py: numeric maximisation over theta of the wall height for random V,g,d with V^2>gd"
         },
         {
          "id": "q14a-iii",
@@ -2396,9 +2477,14 @@
           ]
          },
          "figures": [],
-         "answerType": "open",
-         "key": null,
-         "autoMarks": 0
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "nCr(2*n,n)",
+          "display": "\\dbinom{2n}{n}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p07.py: lattice paths enumerated for n=1..8"
         },
         {
          "id": "q14b-ii",
@@ -2524,9 +2610,14 @@
           ]
          },
          "figures": [],
-         "answerType": "open",
-         "key": null,
-         "autoMarks": 0
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "1/(n+1)",
+          "display": "\\dfrac{1}{n+1}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p07.py: all paths enumerated for n=1..9, exact fraction never touching y=x+1"
         }
        ],
        "answerType": "group",

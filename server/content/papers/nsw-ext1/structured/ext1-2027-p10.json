@@ -998,9 +998,14 @@
         ]
        },
        "figures": [],
-       "answerType": "open",
-       "key": null,
-       "autoMarks": 0
+       "answerType": "value",
+       "key": {
+        "type": "numeric",
+        "value": 4320,
+        "display": "4320"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p10.py: SymPy expansion of (3x+2/x)^6, coefficient of x^0"
       },
       {
        "id": "q11b",
@@ -1118,9 +1123,15 @@
         ]
        },
        "figures": [],
-       "answerType": "open",
-       "key": null,
-       "autoMarks": 0
+       "answerType": "value",
+       "key": {
+        "type": "point",
+        "x": 0,
+        "y": 6,
+        "display": "(0,\\ 6)"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p10.py: SymPy minimisation of |A+t(B-A)-C|^2 along AB"
       },
       {
        "id": "q11d",
@@ -1187,9 +1198,17 @@
         ]
        },
        "figures": [],
-       "answerType": "open",
-       "key": null,
-       "autoMarks": 0
+       "answerType": "value",
+       "key": {
+        "type": "set",
+        "values": [
+         0.5,
+         2.5
+        ],
+        "display": "\\tan\\theta=\\dfrac12,\\ \\dfrac52"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p10.py: scan of theta in (0,pi/2) for height 5 m at 60 m horizontally from the stated position vector, roots refined by bisection: tan = 0.5, 2.5"
       },
       {
        "id": "q11e",
@@ -1308,9 +1327,17 @@
         ]
        },
        "figures": [],
-       "answerType": "open",
-       "key": null,
-       "autoMarks": 0
+       "answerType": "expression",
+       "key": {
+        "type": "expression",
+        "expr": "-(sqrt(89)+3)/2",
+        "anyOf": [
+         "-3/2-sqrt(89)/2"
+        ],
+        "display": "-\\dfrac{3+\\sqrt{89}}{2}"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p10.py: grid + golden-section minimum of the original expression over [0,2pi]: -6.2169905660"
       },
       {
        "id": "q12b",
@@ -1377,9 +1404,14 @@
         ]
        },
        "figures": [],
-       "answerType": "open",
-       "key": null,
-       "autoMarks": 0
+       "answerType": "value",
+       "key": {
+        "type": "numeric",
+        "value": 15,
+        "display": "15"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p10.py: exact Fractions: mean 15/4 gives p=15/(4n); P(X=3)=P(X=4) holds only for n=15 over n=4..300"
       },
       {
        "id": "q12c",
@@ -1488,9 +1520,15 @@
           ]
          },
          "figures": [],
-         "answerType": "open",
-         "key": null,
-         "autoMarks": 0
+         "answerType": "value",
+         "key": {
+          "type": "exact",
+          "n": "15",
+          "d": "41",
+          "display": "\\dfrac{15}{41}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p10.py: all 861 pairs of the 42 segments classified by interleaved endpoints, exact Fraction"
         },
         {
          "id": "q12c-iii",
@@ -1584,9 +1622,14 @@
           ]
          },
          "figures": [],
-         "answerType": "open",
-         "key": null,
-         "autoMarks": 0
+         "answerType": "value",
+         "key": {
+          "type": "numeric",
+          "value": 10,
+          "display": "10"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p10.py: all pairs of the n^2 segments enumerated for n=2..16: crossing probability first exceeds 2/5 at n=10"
         }
        ],
        "answerType": "group",
@@ -1712,9 +1755,15 @@
           ]
          },
          "figures": [],
-         "answerType": "open",
-         "key": null,
-         "autoMarks": 0
+         "answerType": "value",
+         "key": {
+          "type": "point",
+          "x": 4,
+          "y": 3,
+          "display": "(4,\\ 3)"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p10.py: SymPy intersection of the path (4,1+2t), t>0, with the line through O along (4,3)"
         },
         {
          "id": "q13a-iii",
@@ -1851,9 +1900,14 @@
           ]
          },
          "figures": [],
-         "answerType": "open",
-         "key": null,
-         "autoMarks": 0
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "350*e^(-t/5)",
+          "display": "G=350e^{-t/5}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p10.py: RK4 integration of dG/dt=-G/5, G(0)=350 against the key at 8 times, max err < 1e-9"
         },
         {
          "id": "q13b-ii",
@@ -2174,9 +2228,14 @@
           ]
          },
          "figures": [],
-         "answerType": "open",
-         "key": null,
-         "autoMarks": 0
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "2*pi-4*ln(2)",
+          "display": "2\\pi-4\\ln2"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p10.py: mpmath quadrature of the integral of 2atan(x/4) over [0,4] to 30 digits"
         },
         {
          "id": "q14c-ii",
@@ -2231,9 +2290,14 @@
           ]
          },
          "figures": [],
-         "answerType": "open",
-         "key": null,
-         "autoMarks": 0
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "32*pi-8*pi^2",
+          "display": "32\\pi-8\\pi^2"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p10.py: mpmath quadrature pi*int_0^{pi/2}(4tan(y/2))^2 dy to 30 digits"
         },
         {
          "id": "q14c-iii",
@@ -2288,9 +2352,14 @@
           ]
          },
          "figures": [],
-         "answerType": "open",
-         "key": null,
-         "autoMarks": 0
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "16*pi^2-32*pi",
+          "display": "16\\pi^2-32\\pi"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p10.py: independent shell method 2pi*int_0^4 x*2atan(x/4) dx by mpmath to 30 digits"
         }
        ],
        "answerType": "group",
