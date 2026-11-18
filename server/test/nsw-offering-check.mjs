@@ -82,6 +82,16 @@ try {
     const r = await exam(body);
     c.deq([r.status, r.data?.error?.code], [403, 'COURSE_NOT_OFFERED'], `exams: ${label} is refused by name`);
   }
+  const gpost = (path, body) => h.request(path, { method: 'POST', jar: a.jar, body });
+  for (const [label, y, pw] of [['Year 9', 9], ['Year 12 Standard', 12, 'standard'], ['Year 12 Extension 2', 12, 'ext2']]) {
+    const o = await gpost('/v1/exams/generator/options', { year: y, ...(pw ? { pathway: pw } : {}) });
+    c.deq([o.status, o.data?.error?.code], [403, 'COURSE_NOT_OFFERED'], `generator options: ${label} is refused by name`);
+    for (const route of ['check', 'pdf']) {
+      const r = await gpost(`/v1/exams/generator/${route}`, gen(y, pw));
+      c.deq([r.status, r.data?.error?.code], [403, 'COURSE_NOT_OFFERED'], `generator ${route}: ${label} is refused by name`);
+    }
+  }
+  c.eq((await gpost('/v1/exams/generator/options', { year: 12, pathway: 'ext1' })).status, 200, 'generator options: Year 12 Extension 1 is served');
   for (const [label, body] of [['generated Year 12 Advanced', gen(12, 'advanced')], ['generated Year 11 Extension 1', gen(11, 'ext1')], ['practice paper Year 12 Advanced', paper(12, 'advanced')], ['HSC paper Advanced', { kind: 'nsw', blueprint: { id: 'nsw-hsc-advanced-2027' } }], ['HSC paper Extension 1', { kind: 'nsw', blueprint: { id: 'nsw-hsc-extension-1-2027' } }]]) {
     const r = await exam(body);
     c.ok(r.data?.error?.code !== 'COURSE_NOT_OFFERED', `exams: ${label} is not refused as hidden (${r.status} ${r.data?.error?.code || 'ok'})`);

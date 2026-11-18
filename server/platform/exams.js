@@ -2316,6 +2316,8 @@ export function createExamRouter(db, { transcribe = transcribeHandwriting, env =
     const pathway = typeof body.pathway === 'string' && /^[a-z0-9-]{1,24}$/.test(body.pathway) ? body.pathway : null;
     const track = typeof body.track === 'string' && /^[a-z0-9-]{1,24}$/.test(body.track) ? body.track : (curriculum === 'in' ? 'cbse' : undefined);
     if (!Number.isInteger(year) || year < 6 || year > 12) return reject(res, 400, 'EXAM_SPEC_INVALID', 'Name the year.');
+    const hidden = offeringRefusal({ kind: 'generated', generated: { year, pathway } }, process.env);
+    if (hidden) return reject(res, ...hidden.refused);
     const model = generatorModel({ year, pathway, track });
     return res.status(200).json({
       label: GENERATED_LABEL, edition: curriculum === 'in' ? 'priyabhata' : 'prithagoras', style: model.style, note: EDITION_NOTE[model.style],
@@ -2326,6 +2328,8 @@ export function createExamRouter(db, { transcribe = transcribeHandwriting, env =
 
   // Can the banks fill this request? Counts and names only; nothing is sealed or recorded.
   const assembleFor = async (req, res, { print = false } = {}) => {
+    const hidden = offeringRefusal({ kind: 'generated', generated: req.body?.generated }, process.env);
+    if (hidden) { reject(res, ...hidden.refused); return null; }
     const spec = readGeneratedSpec({ kind: 'generated', generated: req.body?.generated });
     if (!plain(req.body) || unknown(req.body, new Set(['generated'])).length) { reject(res, 400, 'EXAM_SPEC_INVALID', 'Send the generated paper’s request only.'); return null; }
     if (spec.refused) { reject(res, ...spec.refused); return null; }

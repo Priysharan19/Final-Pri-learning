@@ -21,6 +21,8 @@ process.env.NODE_ENV = 'test';
 process.env.PRI_PLATFORM_DB = join(scratch, 'platform.db');
 process.env.PRI_AUTH_DELIVERY_KEY = 'c4'.repeat(32);
 process.env.PRI_EDITION = 'prithagoras';
+// owner decision, 19 Nov 2026: CATALOGUE suite for generated papers; it lifts the offering in its own test process (nsw-offering-check.mjs holds the refusals).
+process.env.PRI_OFFERING = 'catalogue';
 delete process.env.PRI_PUBLIC_ORIGIN;
 delete process.env.PRI_METHOD_MARKS;
 
