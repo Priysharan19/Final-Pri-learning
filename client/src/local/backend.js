@@ -6233,7 +6233,8 @@ function resumedQuestionResponse(row) {
 }
 
 // ── Entitlement gates ────────────────────────────────────────────────────────
-// The free tier (20 practice questions a day, one exam simulation per 30 days)
+// The free tier (practice uncapped under value-2026-11, owner decision 2026-11-18 — 20 a
+// day under the superseded d19-d20 — and one exam simulation per 30 days)
 // and the Premium-only JEE Advanced track are enforced at the dispatcher, so a
 // smart-practice call, a retry from History and a teacher task all meet the same
 // rule on the same device-local counter. The route bodies stay pure builders.

@@ -75,6 +75,7 @@ export const EDITION_SUITES = [
 export const EXEMPT = {
   'client/test/a11y-gate.mjs': 'a browser walk: the CI browser shard "edition-prithagoras" runs it on a Prithagoras build and server',
   'client/test/a11y-check.mjs': 'the walk a11y-gate.mjs runs (exempt above for the same reason)',
+  'client/test/legal-owner-review-check.mjs': 'reads the Indian and the Australian notices side by side from the repository and compares them with both editions\' table entries; it does not depend on PRI_EDITION (it runs once in test:legal)',
   'client/test/brand-build-check.mjs': 'builds both editions itself (--both) in the "Client build and offline-first boundary" job'
 };
 

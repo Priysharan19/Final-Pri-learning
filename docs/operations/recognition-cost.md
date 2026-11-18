@@ -209,6 +209,22 @@ Per-account quotas and abuse protections, recommended: keep the per-account requ
 
 **Configuration changes** (model, fallback, reasoning effort, confidence floor, endpoint, prompt, schema) change the key, so old rows are simply never found again and expire.
 
+## 7b. Measured 2026-11-18 (five real reads)
+
+Evidence class: a real provider (`gpt-5.6-terra`) on a localhost server, **simulated handwriting**; no real student, no real device. Provider prices are unconfirmed.
+
+| Read | Input tokens | Output tokens |
+| --- | --- | --- |
+| 1 | 954 | 84 |
+| 2 | 1,020 | 65 |
+| 3 | 1,245 | 60 |
+| 4 | 1,525 | 60 |
+| 5 | 3,468 | 278 |
+
+Mean input 1,642 tokens, mean output 109 tokens. No read fell back to the fallback model. Average cost US$0.0046 a read; US$0.0103 for a full page. The account stopped at the free allowance of 5, so the photo read and the blank-page read did not run: **their cost is not measured.**
+
+Used for the owner decision of 2026-11-18 (`docs/product/packaging-2026-11.md`): 100 a day gave a worst case of about US$62 per student per month, so Premium is 50 reads and 50 photos a day, and Free stays at 5 and 5.
+
 ## 8. Not verified
 
 - Production and staging ceiling values and replica count (from the brief, not read).

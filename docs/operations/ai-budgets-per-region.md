@@ -28,9 +28,9 @@ and nothing has a regional default.
 | `PRI_HANDWRITING_API_KEY` | The model provider key. Setting it is what makes the two ceilings below **required**. | none |
 | `PRI_PAID_CALLS_PER_HOUR` | Model calls this deployment may make in an hour, across every student and every paid route. | **none: required with a key** |
 | `PRI_PAID_CALLS_PER_DAY` | The same, per rolling 24 hours. | **none: required with a key** |
-| `PRI_AI_DAILY_FREE_*`, `PRI_AI_DAILY_PREMIUM_*` (and `PRI_AI_DAILY_FREE`, `PRI_AI_DAILY_PREMIUM`) | Per-account daily reads of handwriting, working and question photos (`server/platform/aiAllowance.js`). | Handwriting and question photos: Free 5, Premium 50 a day each (D20). Working checks: Free 120, Premium 1,200 a day |
+| `PRI_AI_DAILY_FREE_*`, `PRI_AI_DAILY_PREMIUM_*` (and `PRI_AI_DAILY_FREE`, `PRI_AI_DAILY_PREMIUM`) | Per-account daily reads of handwriting, working and question photos (`server/platform/aiAllowance.js`). | Handwriting and question photos: Free 5, Premium 50 a day each (owner decision 2026-11-18, packaging `value-2026-11`). Working checks: Free 120, Premium 1,200 a day |
 | `PRI_TUTOR_CALLS_PER_ACCOUNT_DAY` | Per-account daily tutor calls (`server/platform/tutor.js`). | see `docs/product/tutor.md` |
-| `PRI_FREE_PRACTICE_PER_DAY` | Free practice questions per account per **edition day** (§4). Not a model cost; listed because it uses the same day. | 20 |
+| `PRI_FREE_PRACTICE_PER_DAY` | Free practice questions per account per **edition day** (§4). Not a model cost; listed because it uses the same day. | none (uncapped under `value-2026-11`; set only to cap on purpose) |
 
 A deployment with a model key and no ceiling **refuses to start**
 (`assertPlatformConfig`, `spendCeilingMissing`), in either edition. That rule

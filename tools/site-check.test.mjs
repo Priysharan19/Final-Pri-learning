@@ -124,7 +124,7 @@ expectFailure('a legal article cut short', run(mutate('refunds/index.html', s =>
 expectFailure('a numbered list rendered as bullets', run(mutate('support/index.html', s => s.replace('<ol><li>We acknowledge', '<ul><li>We acknowledge').replace('when we will answer.</li></ol>', 'when we will answer.</li></ul>'))), /support\/index\.html: <article data-source="docs\/legal\/grievance\.md"> parts from the source at word \d+: source "1\. We acknowledge/);
 expectFailure('a numbered list renumbered', run(mutate('support/index.html', s => s.replace('<ol><li>We acknowledge', '<ol start="2"><li>We acknowledge'))), /source "1\. We acknowledge[^"]*", page "2\. We acknowledge/);
 // A partial article must name its sections honestly, and every article a real notice.
-expectFailure('data-sections understating the body', run(mutate('delete-account/index.html', s => s.replace('data-sections="6,7"', 'data-sections="6"'))), /delete-account\/index\.html: <article data-source="docs\/legal\/privacy\.md"> parts from the source at word \d+: source "\(end\)"/);
+expectFailure('data-sections understating the body', run(mutate('delete-account/index.html', s => s.replace(/data-sections="(\d+),(\d+)"/, 'data-sections="$1"'))), /delete-account\/index\.html: <article data-source="docs\/legal\/privacy\.md"> parts from the source at word \d+: source "\(end\)"/);
 expectFailure('an article from an unknown file', run(mutate('terms/index.html', s => s.replace('data-source="docs/legal/terms.md"', 'data-source="docs/legal/other.md"'))), /names a file that is not a notice/);
 // The notice changed and the page did not: caught by fidelity even when the render is not stale.
 expectFailure('notice edited, page unchanged', run(clone(), vercel, withNotice('privacy', s => s.replace('Passwords are stored only as bcrypt hashes.', 'Passwords are stored as bcrypt hashes.'))), /privacy\/index\.html: <article data-source="docs\/legal\/privacy\.md"> parts from the source at word \d+: source "as bcrypt/);
@@ -170,10 +170,18 @@ expectFailure('escalation outlives the notice', run(clone(), vercel, withNotice(
 expectFailure('standing sentence outlives the terms', run(clone(), vercel, withNotice('terms', s => s.replaceAll('no standing outside it', 'no effect outside it'))), /support\/index\.html: repeats a sentence terms\.md no longer has/);
 expectFailure('OpenAI disclosure removed from home', run(mutate('index.html', s => s.replaceAll('OpenAI', 'a reading service'))), /index\.html: required text missing — OpenAI/);
 
-// 3c. The free plan's "20 practice questions a day" is a limit, not a count,
-// and the maths row ending in an 8 before the "Questions, hints…" paragraph is
-// two blocks: neither trips the count rule on the clean render (baseline above).
-assert.ok(/20 practice questions a day/.test(authoredText(rendered.get('index.html'))), 'the free-plan limit is still stated');
+// 3c. The free plan's daily read limits ("5 reads of your writing and 5 question
+// photos a day") are limits, not counts, and the maths row ending in an 8 before the
+// "Questions, hints…" paragraph is two blocks: neither trips the count rule on the
+// clean render (baseline above). Owner decision 2026-11-18: practice is uncapped, so
+// the home page states no daily practice number; the read limits must equal the
+// ACTIVE packaging (value-2026-11: Free 5, Premium 50).
+const home = authoredText(rendered.get('index.html'));
+assert.ok(/Practice questions with no daily limit/.test(home), 'the free plan states uncapped practice');
+assert.ok(!/20 practice questions a day/.test(home), 'the superseded 20-a-day limit is gone');
+const { PACKAGING } = await import('../client/src/engine/packaging.js');
+assert.deepEqual([PACKAGING.free.practicePerDay, PACKAGING.free.readsPerDay, PACKAGING.premium.readsPerDay], [null, 5, 50], 'the active packaging is the one the site states');
+assert.ok(/5 reads of your writing and 5 photos of a question a day/.test(home) && /50 reads of your writing and 50 photos of a question a day/.test(home), 'the home page states the active packaging\'s read limits');
 checks++;
 
 // 4. Prices: only the approved two, verbatim, in any spelling of the currency.

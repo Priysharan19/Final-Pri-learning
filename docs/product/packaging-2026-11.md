@@ -1,6 +1,8 @@
-# Packaging proposal: Free, Premium and School (November 2026)
+# Packaging: Free, Premium and School (November 2026)
 
-**Status: PROPOSAL. It needs the owner's approval.** Until the owner approves it,
+**Status: APPROVED by the owner on 2026-11-18, with lower read allowances than proposed (see "Owner decision" below). The text that follows is the original proposal and still shows its 10 and 100; the numbers in force are 5 and 50.**
+
+(Original status line:) **PROPOSAL. It needed the owner's approval.** Until the owner approves it,
 the code ships with today's packaging as the active one (owner defaults D19 and
 D20). The proposal is already written into the code as a second packaging, so
 approving it changes one line: `ACTIVE_PACKAGING_ID` in
@@ -9,6 +11,36 @@ this PR. Every price or Stripe change below is an **owner action**, written out
 as steps in §7 and not carried out by any agent.
 
 Risk: R4 (billing and entitlements). Branch `task/value-packaging`.
+
+## Owner decision (2026-11-18)
+
+The owner adopted the `value-2026-11` packaging in chat on 2026-11-18, with these
+numbers in place of the proposal's:
+
+| | Proposed | **Approved** |
+|---|---|---|
+| Free practice questions | no daily limit | **no daily limit** (`practicePerDay: null`) |
+| Free marked handwriting reads a day | 10 | **5** |
+| Free "Practise this" question photos a day | 10 | **5** |
+| Free exam simulations | 1 every 30 days | **1 every 30 days** (unchanged) |
+| Premium marked handwriting reads a day | 100 | **50** |
+| Premium question photos a day | 100 | **50** |
+| Price | unchanged | **unchanged** (A$9.99 a month in the AU edition; the India price is unchanged) |
+
+Reads and photos are separate kinds, so each has its own daily count.
+
+**Why lower numbers.** Cost measured on 2026-11-18 (`docs/operations/recognition-cost.md`,
+"Measured 2026-11-18") was US$0.0046 per read on average and US$0.0103 for a full page,
+five real reads on `gpt-5.6-terra`, provider prices unconfirmed. At the proposed 100 a day
+the worst case was about US$62 per student per month. At 50 a day the same worst case is
+about half that, and the figures stay configurable
+(`PRI_AI_DAILY_PREMIUM_HANDWRITING`, `PRI_AI_DAILY_PREMIUM_PHOTO`) so the owner can move them
+without a release once real usage is known.
+
+**In the code.** `client/src/engine/packaging.js`: `ACTIVE_PACKAGING_ID = 'value-2026-11'`,
+status `current`; `d19-d20` is `superseded` and still defined. Everything else derives from it
+(`READ_ALLOWANCE`, `server/platform/aiAllowance.js`, `practiceAllowance.js`, `PLAN_PROMISES`,
+the Premium screen). Where the proposal text below says 10 or 100, read 5 or 50.
 
 ## 1. What we are trying to do
 

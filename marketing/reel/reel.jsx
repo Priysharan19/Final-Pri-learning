@@ -381,7 +381,7 @@ function Price({T,CU}){
     <div style={{position:'absolute',left:0,right:0,top:410,textAlign:'center',...MOTION.enter(T,t0+0.05)}}>
       <Kicker T={T} at={t0+0.05}>The maths of the price</Kicker></div>
     <div style={{position:'absolute',left:0,right:0,top:540,textAlign:'center',opacity:dim,transform:`translateY(${up}px)`}}>
-      <div style={{fontFamily:SERIF,fontSize:30,color:C.ink3,...MOTION.enter(T,t0+0.15)}}>Free: 20 questions a day</div>
+      <div style={{fontFamily:SERIF,fontSize:30,color:C.ink3,...MOTION.enter(T,t0+0.15)}}>Free: practice with no daily limit</div>
       <div style={{marginTop:10,...MOTION.enter(T,t0+0.3)}}>
         <span style={{position:'relative',display:'inline-block',fontFamily:SERIF,fontSize:120,color:C.ink,fontVariantNumeric:'tabular-nums'}}>
           ₹0<span style={{fontSize:42,color:C.ink2}}> / month</span>
@@ -464,7 +464,7 @@ function AudioRig({musicOn,voOn,CU}){
     {at:CU.Match+0.1,text:'Race your rivals in Match Mode.'},
     {at:CU.Exam+0.1,text:'Timed papers. Automatic marking.'},
     {at:CU.Kit+0.1,text:'Smart practice, hints, photo answers, rush rounds, streaks, task packs, backups.'},
-    {at:CU.Price+0.1,text:'Free, twenty questions a day. Premium, one ninety nine a month.'},
+    {at:CU.Price+0.1,text:'Free, with no daily limit on practice. Premium, one ninety nine a month.'},
     {at:CU.Close+0.15,text:'Pri Learning. Coming soon.'},
   ],[CU]);
   let ai=-1;for(let i=0;i<VO.length;i++){const until=i+1<VO.length?VO[i+1].at:VO[i].at+3.8;if(T>=VO[i].at&&T<until)ai=i;}

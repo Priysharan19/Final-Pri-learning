@@ -28,7 +28,7 @@ export const AU_STRINGS = Object.freeze({
   'snap.chapterOption': 'Year {grade} · {name}',
   'classroom.classNamePlaceholder': 'Year 10 Mathematics',
   'paywall.from.practice': 'You have used today’s free practice questions. They come back at midnight (Sydney time).',
-  'check.freeCapHint': 'Checking this one would be another of today’s free practice questions, and the free plan includes 20 a day. They come back at midnight (Sydney time), and Premium removes the daily cap.',
+  'check.freeCapHint': 'Checking this one would be another of today’s free practice questions, and you have used the free plan’s daily allowance. They come back at midnight (Sydney time), and Premium removes the daily cap.',
   'legal.unreviewedBody': 'This notice is published so you can read what the app does with your data. No lawyer qualified in Australian law has reviewed it yet. When that review has happened, this banner will go.',
   'explain.kicker': 'Pri Explain · Exam mode',
   'insights.lead': 'Read from your own marked practice. Nothing here is a predicted exam score.',

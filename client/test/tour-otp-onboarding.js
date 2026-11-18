@@ -13,6 +13,8 @@ import { pathToFileURL } from 'node:url';
 import { onlinePlatform } from './support/online-session.mjs';
 import { freshEmail, lastEmailCode, resetOtpLimits, typeCode, waitForStep } from './support/verified-onboarding.mjs';
 
+// India reaches a parent by SMS or email; Prithagoras has no SMS channel (smsOffered() is India's), so it reaches the parent by email.
+const AU = (process.env.PRI_EDITION || 'priyabhata') !== 'priyabhata';
 const CARD = '[data-signin-card="page"]';
 const GATE = '[data-testid="account-activation-gate"]';
 
@@ -34,7 +36,7 @@ export const flow = {
     const card = page.locator(CARD);
     await check('the landing screen opens on the card, asking for an email', await card.getAttribute('data-signup-step') === 'method' &&
       await page.locator('#signup-destination').getAttribute('type') === 'email');
-    await check('a phone code is offered beside it only because this deployment has an SMS sender', await page.getByTestId('signup-channel-sms').count() === 1);
+    await check(AU ? 'Prithagoras offers no phone code: its sign-up is by email only' : 'a phone code is offered beside it only because this deployment has an SMS sender', await page.getByTestId('signup-channel-sms').count() === (AU ? 0 : 1));
     const animation = await page.locator('.signup-step').evaluate(el => getComputedStyle(el).animationName);
     await check('reduced motion removes the step animation', animation === 'none', animation);
     resetOtpLimits(await onlinePlatform());
@@ -89,8 +91,10 @@ export const flow = {
 
     // The parent is reached by SMS here (the deployment has an SMS sender).
     await page.locator('#signup-parent-name').fill('Meera');
-    await page.getByTestId('signup-parent-sms').click();
-    await page.locator('#signup-parent-destination').fill('99887 76655');
+    const parentEmail = freshEmail('meera');
+    if (AU) await check('Prithagoras reaches the parent by email only: no phone choice', await page.getByTestId('signup-parent-sms').count() === 0);
+    else await page.getByTestId('signup-parent-sms').click();
+    await page.locator('#signup-parent-destination').fill(AU ? parentEmail : '99887 76655');
     await page.getByTestId('signup-parent-send').click();
     await waitForStep(card, 'parent-wait');
     await check('the child’s screen only waits for the parent: no code box, no approve button',
@@ -98,7 +102,7 @@ export const flow = {
         await page.locator('input[autocomplete="one-time-code"]').count() === 0 &&
         await page.getByRole('button', { name: 'Approve' }).count() === 0);
     await check('and can ask for the code again once the cooldown ends', await page.getByTestId('signup-parent-resend').isDisabled());
-    const parentSms = sms.readTestOutbox({ to: '+919988776655' }).at(-1);
+    const parentSms = AU ? sms.readTestOutbox({ to: parentEmail, channel: 'email' }).filter(m => m.purpose === 'guardian-consent').at(-1) : sms.readTestOutbox({ to: '+919988776655' }).at(-1);
     await check('the parent’s phone got the consent code with the address of their own page',
       parentSms?.purpose === 'guardian-consent' && /^\d{6}$/.test(parentSms?.code || '') && /\/guardian\/consent|parent page/i.test(parentSms?.body || ''), JSON.stringify(parentSms?.body || '').slice(0, 160));
 
@@ -113,7 +117,7 @@ export const flow = {
       await check('the parent page shows the notice before the code can be entered', await parentPage.locator('#guardian-code-0').isDisabled());
       const phoneRadio = parentPage.getByRole('radio', { name: /Phone|SMS/i });
       if (await phoneRadio.count()) await phoneRadio.click();
-      await parentPage.locator('#guardian-destination').fill('99887 76655');
+      await parentPage.locator('#guardian-destination').fill(AU ? parentEmail : '99887 76655');
       await parentPage.getByTestId('guardian-agree').check();
       await parentPage.locator('#guardian-code-0').focus();
       await parentPage.evaluate(code => {
@@ -165,7 +169,7 @@ export const flow = {
     }
 
     const given = h.db.prepare('SELECT method, confirmed_at FROM guardian_consents WHERE account_id=?').get(account.id);
-    await check('the parent’s approval is recorded as a phone-code consent', given.method === 'guardian-phone-otp' && given.confirmed_at > 0, JSON.stringify(given));
+    await check(AU ? 'the parent’s approval is recorded as an email-code consent' : 'the parent’s approval is recorded as a phone-code consent', given.method === (AU ? 'guardian-email-otp' : 'guardian-phone-otp') && given.confirmed_at > 0, JSON.stringify(given));
     await check('every step went through the real server', seen.includes('POST /v1/account/otp/verify') && seen.includes('POST /v1/account/otp/guardian/approve'));
 
     await page.reload({ waitUntil: 'domcontentloaded' });

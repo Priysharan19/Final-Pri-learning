@@ -1,7 +1,8 @@
 // Pri Learning · the Premium screen says only what is true (client/src/paywall/).
 //   · D19 / D20: the comparison states the figures the server enforces, from
-//     the same definitions (20 questions a day, one timed paper in 30 days,
-//     5 / 50 reads and photos a day, JEE Advanced, unlimited on Premium);
+//     the same definitions (practice uncapped, one timed paper in 30 days,
+//     5 / 50 reads and photos a day, JEE Advanced, unlimited papers on Premium;
+//     owner decision 2026-11-18, packaging value-2026-11);
 //   · no price is written into the source or the copy: the billed amount is
 //     the store's displayPrice (StoreKit or Google Play);
 //   · the yearly per-month figure comes from the store's numeric price,
@@ -36,21 +37,22 @@ const keys = Object.keys(en).filter(k => k.startsWith('paywall.'));
 const text = cat => keys.map(k => (typeof cat[k] === 'string' ? cat[k] : Object.values(cat[k]).join(' '))).join(' \n ');
 const row = r => translateEnglish(r.key, r.vars);
 
-// 1 · D19 / D20, from the definitions the server enforces
-eq('D19: free practice is 20 questions a day', FREE_PRACTICE_ALLOWANCE.perDay, 20);
+// 1 · the active packaging (value-2026-11, owner decision 2026-11-18, replacing
+// D19 / D20), from the definitions the server enforces
+eq('free practice is not capped (owner decision 2026-11-18)', FREE_PRACTICE_ALLOWANCE.perDay, null);
 eq('D19: free papers are one every 30 days', [FREE_EXAM_ALLOWANCE.examsPerWindow, FREE_EXAM_ALLOWANCE.examWindowDays], [1, 30]);
-eq('D20: reads are 5 free and 50 Premium a day (owner decision, 18 Nov 2026)', READ_ALLOWANCE, { free: 5, premium: 50 });
-eq('D20: the server\'s read allowance defaults to the same definition, per kind', [AI_ALLOWANCE_DEFAULTS.handwriting, AI_ALLOWANCE_DEFAULTS['question-photo']].map(x => [x.free, x.premium]), [[5, 50], [5, 50]]);
-eq('the free column says exactly the free plan (active packaging d19-d20; every difficulty is free on every packaging)', FREE_ROWS.map(row), [
-  '20 practice questions a day', 'Every difficulty level, with spaced reviews of what you got wrong', 'One timed paper every 30 days', '5 handwritten answers and 5 question photos a day', 'The error notebook and its reviews'
+eq('reads are 5 free and 50 Premium a day (owner decision 2026-11-18)', READ_ALLOWANCE, { free: 5, premium: 50 });
+eq('the server\'s read allowance defaults to the same definition, per kind', [AI_ALLOWANCE_DEFAULTS.handwriting, AI_ALLOWANCE_DEFAULTS['question-photo']].map(x => [x.free, x.premium]), [[5, 50], [5, 50]]);
+eq('the free column says exactly the free plan (active packaging value-2026-11; every difficulty is free on every packaging)', FREE_ROWS.map(row), [
+  'Practice questions with no daily limit', 'Every difficulty level, with spaced reviews of what you got wrong', 'One timed paper every 30 days', '5 handwritten answers and 5 question photos a day', 'The error notebook and its reviews'
 ]);
 eq('the Premium column says exactly what Premium adds', PREMIUM_ROWS.map(row), [
-  'Unlimited practice questions', 'Unlimited timed papers', 'After each timed paper, where your time went, section by section',
+  'Unlimited timed papers', 'After each timed paper, where your time went, section by section',
   'The JEE Advanced track', '50 handwritten answers and 50 question photos a day',
   'An estimate of your mark from your own practice, with its range and how much of the paper it covers',
   'The slips you make most often, across chapters'
 ]);
-ok('the plan rows hold no figure of their own: every number comes from a definition', !/\b(5|20|25|30)\b/.test(plans.replace(/\/\/.*$/gm, '')));
+ok('the plan rows hold no figure of their own: every number comes from a definition', !/\b(5|20|25|30|50)\b/.test(plans.replace(/\/\/.*$/gm, '')));
 eq('the Premium screen has one address', PAYWALL_ROUTE, '/premium');
 
 // 1b · the screen sells only what the SERVER enforces (paywall review, L6)
@@ -163,7 +165,7 @@ ok('every arrival reason has copy in both languages', Object.values(ARRIVAL_KEYS
     /if \(!enabled \|\| !PREMIUM_ON_SALE\) \{\s*setPricing\(null\);\s*setWebCheckout\(false\);\s*return \(\) => \{ live = false; \};\s*\}\s*cloud\.billingConfig\(\)/.test(panel) &&
     panel.includes('const canUseWebBilling = canSync && webCheckout && !nativeShell;'));
   ok('and says Premium is not on sale where it is not (the edition sells nothing, or the server says it is not on sale)', /\{!sellsPremium\(saleAvailable\) && !premium && <div[^>]*data-premium-not-on-sale>\s*\{t\('paywall\.notOnSale'\)\}/.test(panel));
-  ok('every web price and checkout button in the panel is behind that', (panel.match(/price\(pricing\.(monthly|annual), pricing\.currency\)/g) || []).length === 2 &&
+  ok('every web price and checkout button in the panel is behind that (two buttons and the two prices of the auto-renewal disclosure, itself behind canUseWebBilling)', (panel.match(/price\(pricing\.(monthly|annual), pricing\.currency\)/g) || []).length === 4 &&
     panel.indexOf('{canUseWebBilling && <div') < panel.indexOf('price(pricing.monthly') && (panel.match(/startWebCheckout\('/g) || []).length === 2 && /async function startWebCheckout\(cadence\) \{\s*if \(!canUseWebBilling\) return;/.test(panel));
   for (const [lang, cat] of [['en', en], ['hi', hi]]) {
     ok(`the not-on-sale sentence (${lang}) promises no date, price or store`, typeof cat['paywall.notOnSale'] === 'string' && !/\d|₹|\$|soon|App Store|Google Play|Razorpay/i.test(cat['paywall.notOnSale']), cat['paywall.notOnSale']);

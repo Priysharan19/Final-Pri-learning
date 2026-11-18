@@ -323,7 +323,7 @@ function SecuritySection({ toast }) {
         <span className="set-k">{t('settings.email')}</span>
         {!editEmail ? (
           <span className="set-v" style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            {user.email || <span className="muted">{t('settings.emailNotSet')}</span>}
+            {user.email || <span className="muted">{t(user.cloudLinked ? 'settings.emailInAccount' : 'settings.emailNotSet')}</span>}
             <button className="btn btn-quiet btn-sm" aria-label={t('settings.editEmail')}
               onClick={() => { setEmail(user.email || ''); setEditEmail(true); }}><Icon name="pen" size={15} /></button>
           </span>
@@ -524,7 +524,7 @@ export default function Settings() {
             {storageInfo && storageInfo.quota > 0 && (
               <div className="set-row"><span className="set-k">{t('settings.spaceUsed')}</span><span className="set-v">{t('settings.spaceOf', { used: fmtBytes(storageInfo.usage), total: fmtBytes(storageInfo.quota), percent: usagePct })}</span></div>
             )}
-            <div className="set-row"><span className="set-k">{t('settings.accounts')}</span><span className="set-v">{t('settings.accountsValue')}</span></div>
+            <div className="set-row"><span className="set-k">{t('settings.accounts')}</span><span className="set-v" data-accounts-value={user.cloudLinked ? 'linked' : 'local'}>{t(user.cloudLinked ? 'settings.accountsValueLinked' : 'settings.accountsValue')}</span></div>
           </div>
 
           {/* ── Profile ── */}

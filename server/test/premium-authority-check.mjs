@@ -38,7 +38,8 @@ const env = {
 };
 const EXPECTED_CHECKS = 60; // every check is unconditional
 
-// ── configuration (owner default D20: 5 free / 50 Premium a day, per kind) ──
+// ── configuration (owner decision 2026-11-18, value-2026-11 packaging, replacing
+// owner default D20's 5 / 25: 5 free / 50 Premium a day, per kind) ──────────────
 const D20 = { free: 5, premium: 50 };
 ok(JSON.stringify(aiAllowance({}, 'handwriting')) === JSON.stringify(D20) && JSON.stringify(AI_ALLOWANCE_DEFAULTS.handwriting) === JSON.stringify(D20),
   'D20: reads of the student\'s writing default to 5 a day free and 50 a day Premium');
@@ -50,7 +51,7 @@ ok(aiAllowanceConfigProblems({ PRI_AI_DAILY_FREE: '-3' }).length === 1 && aiAllo
   'a non-positive or nonsense value, global or per kind, is a configuration problem (production refuses to boot)');
 ok(aiAllowanceConfigProblems({ PRI_AI_DAILY_FREE: '50', PRI_AI_DAILY_PREMIUM: '10' }).length === 3 &&
   ['handwriting', 'question-photo', 'working'].every(kind => aiAllowance({ PRI_AI_DAILY_FREE: '50', PRI_AI_DAILY_PREMIUM: '10' }, kind).premium === 50) &&
-  aiAllowanceConfigProblems({ PRI_AI_DAILY_FREE_PHOTO: '60' }).length === 1,
+  aiAllowanceConfigProblems({ PRI_AI_DAILY_FREE_PHOTO: '60' }).length === 1, // above Premium's 50 default (owner decision 2026-11-18; was 30 over 25)
   'Premium below free is flagged for each kind it affects, and never applied below free');
 ok(aiAllowance({ PRI_AI_DAILY_FREE: '9', PRI_AI_DAILY_FREE_PHOTO: '3' }, 'question-photo').free === 3 &&
   aiAllowance({ PRI_AI_DAILY_FREE: '9', PRI_AI_DAILY_FREE_PHOTO: '3' }, 'handwriting').free === 9,
@@ -171,8 +172,8 @@ try {
   ok(later.allowed && later.plan === 'free', 'a new window restores the allowance');
   ok(await consumeAiAllowance(db, { accountId: 'free', kind: 'video', env }).then(() => false, e => /unknown/.test(e.message)), 'an unknown kind is a programming error');
   ok(db.prepare("SELECT plan,status FROM entitlement_snapshots WHERE account_id='free'").get().plan === 'free', 'no request changed the server\'s entitlement record');
-  // 9 · D20 at its defaults, over HTTP: 5 / 50 a day for each kind, separately.
-  const d20 = async (account, path, body) => { let n = 0; let last = null; for (let i = 0; i < 60; i++) { last = await post(path, account, body()); if (last.status !== 200) break; n += 1; } return { n, r: last }; };
+  // 9 · the shipped defaults, over HTTP (owner decision 2026-11-18): 5 / 50 a day for each kind, separately.
+  const d20 = async (account, path, body) => { let n = 0; let last = null; for (let i = 0; i < 80; i++) { last = await post(path, account, body()); if (last.status !== 200) break; n += 1; } return { n, r: last }; };
   const ink = () => ({ image: freshPicture() });
   const photo = () => ({ image: freshPicture() });
   const before20 = readCalls;

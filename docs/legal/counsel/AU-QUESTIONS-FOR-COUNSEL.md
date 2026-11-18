@@ -27,17 +27,17 @@ no longer the text in the file it names, or if a location below no longer exists
    refuses the flag without those fields or if a notice is edited after the review date. Nothing in the
    code or any agent sets it.
 
-## Facts the notices leave open (the placeholders)
+## Facts the notices now state (filled 2026-11-18, formerly placeholders)
 
-The Australian notices say only what the code and the repository show. Three facts are not in either, so
-they are left as placeholders, and a notice with one unfilled shows as a template:
+The Australian notices say only what the code and the repository show. Three facts were not in either, so
+they were placeholders; the owner supplied them, verified from the live infrastructure on 2026-11-18, and they are now stated plainly:
 
 | Placeholder | What it must say | What engineering was told, and what the repository shows |
 | --- | --- | --- |
-| `{{AU_HOSTING_PROVIDER_AND_REGION}}` | Where the Australian server runs | Told: Railway, Singapore. The repository records no Australian service (`docs/operations/region-isolation-verification.md`: "The Prithagoras (Australia) deployment does not exist yet") |
-| `{{AU_DATABASE_PROVIDER_AND_REGION}}` | Where the Australian database is held | Told: Neon Postgres, Sydney. The repository's plan names Supabase, Sydney (`ap-southeast-2`) |
+| Hosting (was `AU_HOSTING_PROVIDER_AND_REGION`) | Where the Australian server runs | Railway, Singapore (`asia-southeast1`). Not recorded in the repository (`docs/operations/region-isolation-verification.md`: "The Prithagoras (Australia) deployment does not exist yet") |
+| Database (was `AU_DATABASE_PROVIDER_AND_REGION`) | Where the Australian database is held | Neon (AWS), Sydney (`ap-southeast-2`). The repository's older plan named Supabase, Sydney; the live infrastructure is Neon |
 | Payment processor (no longer a placeholder) | Who takes payment | Stripe: `client/edition.config.mjs` lists `stripe` for Prithagoras, in AUD, and `server/platform/stripe.js` hosts Checkout on Stripe. The prices (A$9.99 a month, A$99 a year) are set in Stripe and `PRI_DISPLAY_*`, not in code: the owner must keep the notices and Stripe in step |
-| Contact email (was `CONTACT_EMAIL`, filled 18 Nov 2026) | The contact address | `prilearning19@gmail.com`, owner-supplied; it replaces the personal iCloud address in both editions' notices |
+| Contact email (was `CONTACT_EMAIL`) | The contact address | `prilearning19@gmail.com`, owner-supplied, now used in both editions' notices |
 
 Counsel should be told which of these are real at the date they review. The notices must not name a
 provider or a region that is not the deployment.
@@ -55,8 +55,7 @@ the operator aims to follow the APPs and does not say the Act binds it.
 
 **For counsel:** does the Act apply (turnover, handling of children's information, trading in personal
 information)? Should the operator opt in, and is "aim to handle in line with the APPs" accurate and
-safe? Who should the legal operator be (an entity, an ABN)? Nothing in the notices claims an ABN or
-GST registration.
+safe? Who should the legal operator be (the sole trader, or an entity)? The notices name "Priysharan Tripathi trading as Pri Learning, ABN 20 192 090 394" and claim no GST registration.
 
 ## 2. Sending information overseas (APP 8) [overseas]
 
@@ -82,15 +81,17 @@ accountable" (APP 8.1 and s 16C) or rely on consent (APP 8.2(b))?
 
 ## 3. Children and students [children]
 
-The app does not ask for an age. A cloud account is a child's unless the person says they are 18 or
-older, and a child's needs a parent or guardian's name and email; the guardian confirms by link or code.
-The confirmation proves control of an inbox, not that the person is an adult or a guardian.
+The app asks an age at sign-up (11 to 17, or 18 or older) and keeps only the decision it makes from it,
+not the age. In Prithagoras a student who is under 15, or who gives no age, is a child's account: it needs
+a parent or guardian's name and email, and the guardian confirms by link or code. A student of 15 or older
+needs no guardian. The confirmation proves control of an inbox, not that the person is an adult or a
+guardian.
 
 **Current text** · `docs/legal/au/privacy.md`
 
-> When you create a cloud account it
-> asks whether you are 18 or older, and unless you say you are, the account is
-> treated as a child's.
+> A student under 15 needs a
+> parent or guardian to confirm the account. A student who is 15 or older does
+> not, and nor does an adult.
 
 **Current text** · `docs/legal/au/privacy.md`
 
@@ -98,13 +99,13 @@ The confirmation proves control of an inbox, not that the person is an adult or 
 > who can read that email inbox followed the link or entered the code. It does not
 > show that they are an adult, or that they are your parent or guardian.
 
-**Lives in** · `client/src/components/CloudAccountPanel.jsx` · `isAdult`
+**Lives in** · `server/platform/guardianConsent.js` · `AU_GUARDIAN_AGE = 15`
 **Lives in** · `server/platform/childErasure.js` · `UNCONSENTED_CHILD_RETENTION_MS`
 **Lives in** · `server/platform/guardianConsent.js` · `consentState`
 
 **For counsel:** the OAIC's guidance on capacity to consent (including a presumption for those aged 15
-and over) against this approach, which treats every account not declared adult as a child's; whether
-that is adequate, or too strict to be practicable, for 15 to 17 year olds; whether an email
+and over) against this approach, which sets the line at 15 on the age a student states and treats a
+missing age as a child; whether 15 is the right line, and whether relying on a stated age is adequate; whether an email
 confirmation is acceptable under the Act for a minor's account; the 30-day closure and 7-day erasure
 rule for an unconfirmed account; the guardian's erasure route.
 

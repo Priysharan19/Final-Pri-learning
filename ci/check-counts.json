@@ -113,8 +113,8 @@
         {"has":"INDIA EXAM WEIGHT: PASS — 668/668 checks"},
         {"has":"PLOTTING: PASS — 78/78 checks"},
         {"has":"README TRUTH: PASS — 16/16 checks"},
-        {"has":"LEGAL PAGES: PASS — 387/387 checks","note":"387 (owner privacy, 18 Nov): the street address and personal iCloud address are absent from every published surface, and the pattern is proven. 364 (m-finish-16): the review switch, store-purchase wording, retention and crash-report disclosures, and the generated third-party notices page. 374 (L7): no notice makes a coverage claim D24 forbids, in either language. 375 (L7): the D18 wording matches the accounts stream's code (#736). 378 (L7): the notice describes the D17 prompt and is pinned to its code (#737). 383 (L7, Train 4 truth): banner conditions walked, Practise-this and Hindi D18 pinned."},
-        {"has":"LEGAL PROMISES GATE: PASS — 23/23 checks","note":"16 (L7): the accounts stream's names, and PRI_CHILD_ERASURE=enforce printed at nomination. 19 (L7): the D17 prompt promise."},
+        {"has":"LEGAL PAGES: PASS — 393/393 checks","note":"393 (cookies and storage, Razorpay and the error-reporting processor, sole-trader entity wording, 18 Nov). 387 (owner privacy, 18 Nov): the street address and personal iCloud address are absent from every published surface, and the pattern is proven. 364 (m-finish-16): the review switch, store-purchase wording, retention and crash-report disclosures, and the generated third-party notices page. 374 (L7): no notice makes a coverage claim D24 forbids, in either language. 375 (L7): the D18 wording matches the accounts stream's code (#736). 378 (L7): the notice describes the D17 prompt and is pinned to its code (#737). 383 (L7, Train 4 truth): banner conditions walked, Practise-this and Hindi D18 pinned."},
+        {"has":"LEGAL PROMISES GATE: PASS — 35/35 checks","note":"23 → 35 (legal pages of 2026-11-18, re-derived by running node tools/legal-promises.test.mjs). 16 (L7): the accounts stream's names, and PRI_CHILD_ERASURE=enforce printed at nomination. 19 (L7): the D17 prompt promise."},
         {"has":"COUNSEL QUESTIONS: PASS — 13/13 checks","note":"L7: the counsel question sheet quotes the current text and code locations."},
         {"has":"CLOUD HANDWRITING CLIENT: PASS — 199/199 checks","note":"186 → 192 (#196): a remembered read is dropped when the cloud account changes, so account A's transcript and read receipt are never handed to account B on the same device."},
         {"has":"CONTENT HONESTY: PASS","note":"Content honesty (Nov 2026): no student surface claims a review a human never did; marketing, ad, promotion and store copy carry none of the retired claims; past papers are off by default (D23)."},
@@ -157,10 +157,10 @@
         {"has":"nothing emitted left uncovered; previous-year archive 0 kB","count":1,"op":"eq"},
         {"has":"INTERFACE DECISIONS: PASS — 39/39 checks","note":"The V1 interface decisions in source: one interface from one setting on web, iOS and Android (D7, D8), Classes hidden (D10), the language switch says questions stay in English (D11). 34 → 39: the Aurora skin is the default on chrome (D7) and the D8 fallback is one line of the setting, covered."},
         {"has":"AURORA SKIN: PASS — 47/47 checks","note":"The Aurora skin stays on chrome: scope, no content tokens, glass only on chrome, pools only on Index/Map/Settings, fallbacks, AA. 32 → 47 (Lit Instrument UI1, re-derived by running): violet retired, one edition pool, no glow, ink focus, contrast for both editions."},
-        {"has":"WORKING INDICATOR: PASS — 66/66 checks","note":"Lit Instrument D6: the working indicator is one component, shown only while real work is pending (400 ms in, 480 ms held). 62 → 66 (Paper Generator, re-derived by running: its two sites). 46 → 62 (UI-IND-2, re-derived by running): each of the new sites is checked for a real pending flag and its size."},
+        {"has":"WORKING INDICATOR: PASS — 68/68 checks","note":"Lit Instrument D6: the working indicator is one component, shown only while real work is pending (400 ms in, 480 ms held). 62 → 66 (Paper Generator, re-derived by running: its two sites). 46 → 62 (UI-IND-2, re-derived by running): each of the new sites is checked for a real pending flag and its size."},
         {"has":"CBSE STEP MARKING: PASS — 37/37 checks"},
         {"has":"ENTITLEMENT ENFORCEMENT: PASS — 68/68 checks"},
-        {"has":"PAYWALL HONESTY: PASS — 81/81 checks","note":"68 → 79 (plan E5): an edition with no payment provider has no store, no price and no purchase control, and says Premium is not on sale."},
+        {"has":"PAYWALL HONESTY: PASS — 79/79 checks","note":"81 → 79 (packaging value-2026-11, re-derived by running client/test/paywall-honesty-check.mjs: the Premium column no longer has the unlimited-practice row). 68 → 79 (plan E5): an edition with no payment provider has no store, no price and no purchase control, and says Premium is not on sale."},
         {"has":"NOTEBOOK VIEW: PASS — 19/19 checks"},
         {"has":"PARENT REPORT UI: PASS — 35/35 checks"},
         {"has":"LIBRARY UI: PASS — 56/56 checks","note":"39 → 56 (plan F2): the save toggle and its pending state, the hidden-count line, saved-first order, and the local route that never touches the question bookmarks."},
@@ -333,6 +333,13 @@
         {"has":"RESOURCE BOOKMARK SYNC — PASS — 30/30 checks"}
       ]
     },
+    "platform/papers.log": {
+      "job": "platform-contracts",
+      "log": "papers.log",
+      "pins": [
+        {"has":"PRACTICE PAPERS: PASS — 221/221 checks"}
+      ]
+    },
     "platform/resources.log": {
       "job": "platform-contracts",
       "log": "resources.log",
@@ -372,7 +379,7 @@
       "job": "platform-contracts",
       "log": "region-isolation.log",
       "pins": [
-        {"has":"REGION ISOLATION (H2): PASS — 537 checks (sqlite)","note":"423 → 429 (plan F6a): the check walks the route inventory, which now lists the two public catalogue routes. 429 → 467 (plan F3, re-derived by running): the 17 publishing routes and the two new tables; +3 Step15 authenticated sync ownership route assertions."}
+        {"has":"REGION ISOLATION (H2): PASS — 543 checks (sqlite)","note":"423 → 429 (plan F6a): the check walks the route inventory, which now lists the two public catalogue routes. 429 → 467 (plan F3, re-derived by running): the 17 publishing routes and the two new tables; +3 Step15 authenticated sync ownership route assertions."}
       ]
     },
     "platform/practice-http.log": {
@@ -423,7 +430,7 @@
       "log": "practice-http.log",
       "pins": [
         {"has":"INDIA BANK ISSUE COVERAGE: PASS"},
-        {"has":"DAILY PRACTICE CAP: PASS — 98/98 checks"},
+        {"has":"DAILY PRACTICE CAP: PASS — 100/100 checks","note":"98 → 100 (owner decision 2026-11-18, packaging value-2026-11): the suite now also pins that the active packaging leaves practice uncapped and that the deployment cap of 20 is what it exercises. Re-derived by running."},
         {"has":"PREMIUM PRACTICE CONTENT: PASS — 41/41 checks"},
         {"has":"MISTAKE NOTEBOOK: PASS — 49/49 checks"},
         {"has":"READINESS FORECAST: PASS — 29/29 checks"},
@@ -637,6 +644,7 @@
         {"has":"India exam · JEE Main handwritten, reloaded, analysed"},
         {"has":"India exam · the clock runs out and the paper submits itself"},
         {"has":"NSW PAPERS TOUR (G4): PASS — 24/24 checks"},
+        {"has":"EXT1 PAPERS TOUR: PASS — 20/20 checks"},
         {"has":"Placement · onboarding → diagnostic → evidence map"},
         {"has":"Phone · every destination reachable at 390px"},
         {"has":"iPhone portrait · safe areas, sticky bar, mode switch, write and photo space"},
@@ -736,8 +744,8 @@
       "job": "suites-contracts",
       "log": "edition-suites.log",
       "pins": [
-        {"has":"EDITION SUITES COVERAGE: PASS — 40 listed, 3 exempt, 25 importers accounted for","note":"34 → 36 listed, 20 → 21 importers (train 24 integration, as printed by the CI run). Plan E6: every suite that reads the edition is listed in tools/edition-suites.mjs or exempt with a reason."},
-        {"has":"EDITION SUITES (prithagoras): PASS — 40/40 suites"}
+        {"has":"EDITION SUITES COVERAGE: PASS — 41 listed, 4 exempt, 27 importers accounted for","note":"34 → 36 listed, 20 → 21 importers (train 24 integration, as printed by the CI run). Plan E6: every suite that reads the edition is listed in tools/edition-suites.mjs or exempt with a reason."},
+        {"has":"EDITION SUITES (prithagoras): PASS — 41/41 suites"}
       ]
     },
     "build/install-budget-prithagoras.log": {
@@ -755,7 +763,7 @@
         {"has":"ACCESSIBILITY SUITE PASSED — 45/45 checks across 14 groups","note":"Plan E6: the accessibility walk on a Prithagoras build and server, an NSW Year 10 student; India-only steps (placement, the JEE room, generated papers refused by D15, the India chapter table) are listed as not applicable."},
         {"has":"ACCESSIBILITY SUITE PASSED — 48/48 checks across 15 groups"},
         {"has":"not applicable on prithagoras (India-only): 7"},
-        {"has":"E2E SUITE PASSED — 35/35 checks across 1 flows","note":"Plan E6: OTP sign-up on a Prithagoras build and server."},
+        {"has":"E2E SUITE PASSED — 36/36 checks across 1 flows","note":"Plan E6: OTP sign-up on a Prithagoras build and server (36: one more check, no phone channel, parent reached by email)."},
         {"has":"E2E SUITE PASSED — 72/72 checks across 1 flows","note":"The activation gate on a Prithagoras build."},
         {"has":"E2E SUITE PASSED — 5/5 checks across 1 flows","note":"The Exam Desk dark without its flag, Prithagoras."},
         {"has":"E2E SUITE PASSED — 120/120 checks across 4 flows","note":"The Exam Desk sitting, import and desk journeys on Prithagoras."}

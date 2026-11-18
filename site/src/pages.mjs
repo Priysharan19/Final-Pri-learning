@@ -390,21 +390,22 @@ export function homePage({ docs }) {
   <div class="shell">
     <div class="section-head">
       <h2 id="plans-title">Free and Premium</h2>
-      <p>Both plans use the same marking engine. Premium lifts the limits and adds the JEE Advanced track.</p>
+      <p>Both plans use the same marking engine. Premium raises the daily reads, lifts the timed-paper limit and adds the JEE Advanced track.</p>
     </div>
     <div class="plans">
       <div class="plan"><h3>Free <span class="price">No charge</span></h3><ul>
-        <li>${FREE_PLAN.questionsPerDay} practice questions a day</li>
+        <li>Practice questions with no daily limit</li>
+        <li>${FREE_PLAN.readsPerDay} reads of your writing and ${FREE_PLAN.readsPerDay} photos of a question a day</li>
         <li>One timed paper every ${FREE_PLAN.paperEveryDays} days</li>
         <li>CBSE / NCERT Classes 7 to 12 and JEE Main</li>
       </ul></div>
       <div class="plan premium"><h3>Premium <span class="price">${PRICES.monthly} a month · ${PRICES.annual} a year</span></h3><ul>
-        <li>No daily practice limit</li>
+        <li>${FREE_PLAN.premiumReadsPerDay} reads of your writing and ${FREE_PLAN.premiumReadsPerDay} photos of a question a day</li>
         <li>No timed-paper limit</li>
         <li>The JEE Advanced track</li>
       </ul></div>
     </div>
-    <p class="plan-note">Premium prices are App Store prices, charged by Apple once the app is on sale; the price is shown before you pay and the subscription renews until you cancel it in your Apple account. Handwriting and photo reads have a daily allowance on each plan, which the app shows. See the <a href="${r.terms}">terms</a> and the <a href="${r['refund-policy']}">refund policy</a>.</p>
+    <p class="plan-note">Premium prices are App Store prices, charged by Apple once the app is on sale; the price is shown before you pay and the subscription renews until you cancel it in your Apple account. Handwriting and photo reads have a daily allowance on each plan, per kind, which the app shows. See the <a href="${r.terms}">terms</a> and the <a href="${r['refund-policy']}">refund policy</a>.</p>
   </div>
 </section>
 

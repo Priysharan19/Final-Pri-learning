@@ -34,14 +34,15 @@ export const AI_KINDS = Object.freeze(['handwriting', 'working', 'question-photo
 // (recognitionOps.js). The deployment-wide paid-call ceiling counts provider
 // calls and is unchanged (D21: 120 an hour, 300 a day, spendCeiling.js).
 //
-// Owner default D20 (docs/release/V1_DECISIONS_2026-11-01.md): handwriting and
-// photo reads are Free 5 a day and Premium 50 a day, PER KIND. They are
-// modelled defaults, to be revisited after real cost data, so each is
+// Owner decision 2026-11-18 (docs/product/packaging-2026-11.md, packaging
+// value-2026-11; it replaced owner default D20's 5 / 25): handwriting and photo
+// reads are Free 5 a day and Premium 50 a day, PER KIND. The figures follow
+// the measured cost (docs/operations/recognition-cost.md), and each is
 // configurable. "Handwriting" is every read of the student's own writing —
 // ink, or a photo of written working, both read by /v1/handwriting/transcribe.
 // "Photo" is the "Practise this" photo of a printed question
 // (/v1/question-photo). The working check is not a read and is not named by
-// D20; it keeps the allowance it had.
+// the packaging; it keeps the allowance it had.
 export const AI_ALLOWANCE_DEFAULTS = Object.freeze({
   handwriting: Object.freeze({ free: READ_ALLOWANCE.free, premium: READ_ALLOWANCE.premium }),
   'question-photo': Object.freeze({ free: READ_ALLOWANCE.free, premium: READ_ALLOWANCE.premium }),

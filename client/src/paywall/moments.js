@@ -15,6 +15,10 @@
 // known, "cancel anytime", and nothing that pressures — no timer, no scarcity.
 // ─────────────────────────────────────────────────────────────────────────────
 import { FORBIDDEN_UPGRADE_CONTEXTS, UPGRADE_MOMENTS } from '../engine/packaging.js';
+import { FREE_PRACTICE_ALLOWANCE } from '../engine/practiceAllowance.js';
+
+// The practice-cap moment, and the copy that says "a daily limit", exist only while free practice really has a cap.
+const PRACTICE_CAPPED = FREE_PRACTICE_ALLOWANCE.perDay !== null;
 
 /** Route prefixes that are a forbidden context by themselves. */
 export const SIGN_UP_ROUTES = Object.freeze(['/signup', '/sign-up', '/consent', '/onboarding', '/welcome', '/login']);
@@ -56,7 +60,7 @@ export function upgradeOffer(moment, context = {}) {
 
 /** Where the Premium screen says the student came from, per moment. */
 export const MOMENT_ARRIVAL = Object.freeze({
-  'practice-cap': 'practice',
+  ...(PRACTICE_CAPPED ? { 'practice-cap': 'practice' } : {}),
   'marked-work-allowance': 'reads',
   'exams-cap': 'exams',
   priorities: 'priorities',
@@ -68,7 +72,7 @@ export const MOMENT_ARRIVAL = Object.freeze({
 
 /** The one-line "what Premium adds here" for each moment (i18n keys). */
 export const MOMENT_KEYS = Object.freeze({
-  'practice-cap': 'upgrade.practiceCap',
+  ...(PRACTICE_CAPPED ? { 'practice-cap': 'upgrade.practiceCap' } : {}),
   'marked-work-allowance': 'upgrade.markedWork',
   'exams-cap': 'upgrade.examsCap',
   priorities: 'upgrade.priorities',

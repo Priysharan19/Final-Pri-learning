@@ -82,7 +82,7 @@ export function premiumCapabilityForGenerator(generator) {
 /**
  * Owner default D20: reads of the student's own writing (ink, or a photo of
  * written working) and "Practise this" question photos are Free 5 a day and
- * Premium 50 a day, PER KIND. ONE definition: the server's per-account
+ * Premium 50 a day (packaging value-2026-11, engine/packaging.js), PER KIND. ONE definition: the server's per-account
  * allowance defaults to it (server/platform/aiAllowance.js, configurable per
  * deployment) and the Premium screen states it. Modelled figures, to be
  * revisited after real cost data.

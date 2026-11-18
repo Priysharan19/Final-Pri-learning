@@ -69,6 +69,9 @@ WORKDIR /app
 COPY server/package.json server/index.js server/app.js ./server/
 COPY server/platform ./server/platform
 COPY server/tools ./server/tools
+# The owner's Extension 1 practice papers (PDFs + manifest), read by
+# server/platform/papers.js and never served as static files.
+COPY server/content ./server/content
 # Server-only canonical mathematics implementation. The platform grading
 # router imports these ESM files at runtime; the built web assets alone cannot
 # satisfy those imports. Never copy the whole client/src tree into runtime.

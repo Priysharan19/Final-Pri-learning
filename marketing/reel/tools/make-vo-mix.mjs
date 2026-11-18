@@ -121,7 +121,7 @@ const LINES = [
   { at: CUE.Match + 0.1,  until: CUE.Exam + 0.1,    text: 'Race your rivals in Match Mode.' },
   { at: CUE.Exam + 0.1,   until: CUE.Kit + 0.1,     text: 'Timed papers. Automatic marking.' },
   { at: CUE.Kit + 0.1,    until: CUE.Price + 0.1,   text: 'Smart practice, hints, photo answers, rush rounds, streaks, task packs, backups.' },
-  { at: CUE.Price + 0.1,  until: CUE.Close + 0.15,  text: 'Free, twenty questions a day. Premium, one ninety nine a month.' },
+  { at: CUE.Price + 0.1,  until: CUE.Close + 0.15,  text: 'Free, with no daily limit on practice. Premium, one ninety nine a month.' },
   { at: CUE.Close + 0.15, until: CUE.End - 0.4,     text: 'Pri Learning. Coming soon.' },
 ];
 
