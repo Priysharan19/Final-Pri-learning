@@ -15,7 +15,7 @@ import { CLASS10_ALGEBRA_FORMS, CLASS10_ALGEBRA_FORMS_MAP } from '../src/engine/
 import { IN_CHAPTERS } from '../src/engine/curriculum-in.js';
 
 await loadAllBanks();
-const SEEDS = 400;
+const SEEDS = 500;   // the extra forms take a share of each draw and have their own suite, so the authored forms need more seeds to be re-derived as often as before (6000 items on main)
 const nums = s => (String(s).replace(/\\dfrac\{(-?\d+)\}\{(\d+)\}/g, '($1/$2)').match(/-?\d+/g) || []).map(Number);
 const plain = p => String(p).replace(/\$/g, '').replace(/\\ /g, ' ').replace(/\\ldots/g, '...').replace(/\^\{\\text\{(st|nd|rd|th)\}\}/g, '');
 const near = (a, b) => Math.abs(a - b) < 1e-9;

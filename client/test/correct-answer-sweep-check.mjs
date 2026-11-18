@@ -33,7 +33,8 @@ const { proposeFinalAnswer } = await import(`${SRC}photo/finalAnswer.js`);
 const { answerTextFor } = await import('../../server/platform/practice.js');
 await loadAllBanks();
 
-const SEEDS = Number(process.argv[2]) || 24;
+// 24 on main (33992 right answers checked). The extra forms credit fewer answer spellings per question, so 30 seeds keep at least that many.
+const SEEDS = Number(process.argv[2]) || 30;
 const D13 = /Work it out first/;
 const fmt = x => (Number.isInteger(x) ? String(x) : String(Number(x.toPrecision(12))));
 

@@ -59,7 +59,8 @@ const { indiaRequestableDifficulties, indiaChapterGrade, indiaDifficultyWindow, 
 const { BOX_SHEETS_FOR_CHECK } = await import(`${SRC}engine/generators/india-class12-hardest.js`);
 const { checkAnswer } = await import(`${SRC}engine/checker.js`);
 
-const DRAWS = Number(process.argv[2]) || 300;
+// 300 on main. The extra forms now take a share of every draw (and have their own suite), so the authored forms get 420 to keep at least the 42600 re-derived questions the suite checked before.
+const DRAWS = Number(process.argv[2]) || 420;
 
 let pass = 0;
 const failures = [];
