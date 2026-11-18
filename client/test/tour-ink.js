@@ -484,7 +484,7 @@ export const flow = {
     await check('the correction did not go back to the reader — no second provider call', reader.requests.length === readsBeforeCorrection,
       `${reader.requests.length - readsBeforeCorrection} extra request(s)`);
     await check('with the line resolved nothing is left to confirm and Mark my working is enabled: the engine marks what the student wrote',
-      await page.getByRole('button', SUBMIT).count() === 1 && await page.getByRole('button', SUBMIT).isEnabled() && (await page.locator('[data-confirm-count]').innerText()).toLowerCase().includes('all confirmed'));
+      await page.getByRole('button', SUBMIT).count() === 1 && await page.getByRole('button', SUBMIT).isEnabled() && await page.locator('[data-confirm-count]').count() === 0);   // the one-view reading shows the confirm panel only while a line is in doubt
     // The edit changed the reading, so it is confirmed again: nothing is sent
     // until the tap, and what is sent is the edited reading.
     const submitsBeforeEditedTap = (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/)).length;
