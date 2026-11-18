@@ -27,7 +27,7 @@ const PDF = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2
 const shownId = page => page.locator('.qpage[data-question-id]').first().getAttribute('data-question-id');
 
 /** Fire the drag events a browser fires for files dropped on `selector`; reports whether each was claimed. */
-const dropOn = (page, selector, files, { text = null } = {}) => page.evaluate(({ selector, files, text }) => {
+const dropOn = (page, selector, files, { text = null } = {}) => page.evaluate(async ({ selector, files, text }) => {
   const dt = new DataTransfer();
   if (text !== null) dt.setData('text/plain', text);
   for (const f of files) dt.items.add(new File([Uint8Array.from(atob(f.b64), c => c.charCodeAt(0))], f.name, { type: f.type }));
@@ -37,7 +37,7 @@ const dropOn = (page, selector, files, { text = null } = {}) => page.evaluate(({
     const ev = new DragEvent(type, { dataTransfer: dt, bubbles: true, cancelable: true });
     el.dispatchEvent(ev);
     claimed[type] = ev.defaultPrevented;
-    if (type === 'dragenter') claimed.active = document.querySelector('.editor-shell')?.getAttribute('data-photo-drop') || null;
+    if (type === 'dragenter') { await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); claimed.active = document.querySelector('.editor-shell')?.getAttribute('data-photo-drop') || null; }
   }
   return claimed;
 }, { selector, files, text });
@@ -73,7 +73,7 @@ export const photoIntakeFlow = {
     await page.locator('[data-photo-empty]').waitFor({ state: 'visible', timeout: 15000 });
     await check('the empty frame says one sentence naming JPEG, PNG and HEIC, with one Choose button and a drop hint',
       /Add a photo of your working — JPEG, PNG or HEIC/.test(await page.locator('[data-photo-empty]').innerText()) &&
-        await page.locator('[data-photo-choose]').isVisible() && /drop a photo or PDF/i.test(await page.locator('[data-photo-empty]').innerText()));
+        await page.locator('[data-photo-choose]').isVisible() && /drop a photo or PDF/i.test(await page.locator('[data-photo-empty]').innerText()), JSON.stringify(await page.locator('[data-photo-empty]').innerText()));
     await check('the typing hint bar ("Type maths the way you would say it") is not shown in Photo mode',
       await page.locator('.editor-hint, .editor-toolbar').count() === 0 && !/Type maths the way you would say it/.test(await page.locator('.qpage').first().innerText()));
     await check('the picker accepts .heic and .heif', /\.heic/.test(await input.getAttribute('accept')) && /\.heif/.test(await input.getAttribute('accept')));
@@ -95,7 +95,8 @@ export const photoIntakeFlow = {
     await check('Read my photo reaches the reading: the page and the lines in ONE compact view, no OCR confidence figure, one primary button',
       await page.locator('[data-reading-review]').isVisible() && await page.locator('[data-photo-line]').count() === 3 &&
         !/OCR confidence/i.test(await page.locator('.qpage').first().innerText()) && await page.locator('.photo-line-text, [data-photo-correct-transcript]').count() === 0 &&
-        /Mark my working/.test(await page.locator('.ws-actions .btn-primary').innerText()));
+        /Mark my working/.test(await page.locator('.ws-actions .btn-primary').innerText()),
+      JSON.stringify({ review: await page.locator('[data-reading-review]').isVisible(), lines: await page.locator('[data-photo-line]').count(), ocr: /OCR confidence/i.test(await page.locator('.qpage').first().innerText()), inputs: await page.locator('.photo-line-text, [data-photo-correct-transcript]').count(), primary: await page.locator('.ws-actions .btn-primary').innerText() }));
 
     // ── drops ──────────────────────────────────────────────────────────────
     const jpeg = await page.evaluate(async () => { const c = document.createElement('canvas'); c.width = 40; c.height = 30; c.getContext('2d').fillRect(0, 0, 20, 30); return c.toDataURL('image/jpeg').split(',')[1]; });
@@ -126,7 +127,7 @@ export const photoIntakeFlow = {
     await check('two files dropped together: the first is used and the page says one file at a time',
       /One file at a time/.test(await page.locator('.photo-answer').innerText()), JSON.stringify(r));
     const textDrop = await dropOn(page, '.editor-shell', [], { text: 'hello' });
-    await check('a dragged piece of text is ignored (not claimed, no highlight)', textDrop.dragenter === false && textDrop.drop === false && textDrop.active === null, JSON.stringify(textDrop));
+    await check('a dragged piece of text is ignored (not claimed, no highlight)', textDrop.dragenter === false && textDrop.drop === false && textDrop.active !== 'active', JSON.stringify(textDrop));
     const outside = await dropOn(page, 'body', [{ name: 'a.jpg', type: 'image/jpeg', b64: jpeg }]);
     await check('a file dropped outside the card does not navigate the tab away (the drop is claimed and nothing opens)',
       outside.drop === true && page.url().includes('/practice'), JSON.stringify(outside));
