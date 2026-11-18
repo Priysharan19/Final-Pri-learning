@@ -405,9 +405,10 @@ export function placeLabels(items, { width, height, obstacles = [], ink = [], do
     const w = it.w ?? texWidth(it.tex); const h = it.h ?? 20;
     let best = null;
     const cands = it.positions ? OFFSETS.filter(o => it.positions.includes(o[0])) : OFFSETS;
-    for (const [k, [pos, dx, dy, anchor]] of cands.entries()) {
-      const x = it.px[0] + dx; const y = it.px[1] + dy; const box = boxOf(x, y, w, h, anchor);
-      let score = k * 0.5 + (pos.endsWith('2') ? 40 : 0);
+    const spots = it.alts || [it.px];
+    for (const [ai, spot] of spots.entries()) for (const [k, [pos, dx, dy, anchor]] of cands.entries()) {
+      const x = spot[0] + dx; const y = spot[1] + dy; const box = boxOf(x, y, w, h, anchor);
+      let score = k * 0.5 + ai * 6 + (pos.endsWith('2') ? 40 : 0);
       if (box[0] < 1 || box[1] < 1 || box[0] + box[2] > width - 1 || box[1] + box[3] > height - 1) score += 5000;
       for (const p of placed) if (overlaps(box, p.box, 3)) score += 2000;
       for (const o of obstacles) if (overlaps(box, o, 2)) score += 400;
@@ -423,9 +424,9 @@ export function placeLabels(items, { width, height, obstacles = [], ink = [], do
 const along = (p, q, n = 24) => Array.from({ length: n + 1 }, (_, k) => [p[0] + ((q[0] - p[0]) * k) / n, p[1] + ((q[1] - p[1]) * k) / n]);
 const axesInk = (frame, ax) => [...along([frame.left, ax.axisY], [frame.right, ax.axisY], 40), ...along([ax.axisX, frame.top], [ax.axisX, frame.bottom], 30)];
 /** Boxes of the tick labels and the axis names the axes draw (as algebra.jsx's PlotAxes places them). */
-function tickBoxes(m) {
+export function tickBoxes(m) {
   const out = [];
-  if (m.frame) { out.push(boxOf(m.frame.right - 2, m.axisY - 12, 20, 18, 'end')); out.push(boxOf(m.axisX + 8, m.frame.top + 4, 20, 18, 'start')); }
+  if (m.frame) { out.push(boxOf(m.frame.right + 5, m.axisY - 4, 14, 14, 'start')); out.push(boxOf(m.axisX + 8, m.frame.top - 8, 14, 14, 'start')); }
   for (const t of m.xTicks) if (t.value !== 0) out.push(boxOf(t.px, m.axisY + 14, texWidth(String(t.value)), 18, 'middle'));
   for (const t of m.yTicks) if (t.value !== 0) out.push(boxOf(m.axisX - 6, t.px, texWidth(String(t.value)), 18, 'end'));
   return out;
@@ -561,13 +562,15 @@ export function paramGraphModel(spec, values = null) {
   const items = [
     ...drawn.slice(0, 8),
     ...vLines.map(l => ({ px: [l.px[0][0], frame.top + 10], tex: `x=${fmt(l.x)}`, small: true, positions: ['e', 'w', 'se', 'sw', 'se2', 'sw2'] })),
-    ...hLines.map(l => ({ px: [frame.right - 2, l.px[0][1]], tex: `y=${fmt(l.y)}`, small: true, positions: ['nw', 'sw', 'nw2', 'sw2'] }))
+    ...hLines.map(l => ({ px: [frame.right - 2, l.px[0][1]], tex: `y=${fmt(l.y)}`, small: true, positions: ['nw', 'sw', 'nw2', 'sw2'] })),
+    ...fixed.filter(c => c.label && c.segments.length).map(c => { const seg = c.segments.slice().sort((p, q) => q.length - p.length)[0]; const alts = [1, 0.85, 0.7, 0.55, 0.4, 0.25].map(f => seg[Math.round(f * (seg.length - 1))]).map(q => [Math.min(q[0], frame.right - 2), q[1]]); return { px: alts[0], alts, tex: c.label, small: true, fixedId: c.id, positions: ['nw', 'sw', 'ne', 'se', 'n', 's'] }; })
   ];
   const labels = placeLabels(items, { width: frame.width, height: frame.height, obstacles: tickBoxes({ ...ax, frame }), ink, dots: drawn.map(p => p.px) });
+  for (const l of labels) if (l.fixedId) fixed.find(c => c.id === l.fixedId).place = l;
 
   return {
     frame, ...ax, values: vals, params: spec.params || [], equation: formatExpr(expr, vals), show,
-    segments: px, feat, points: drawn, labels, fixed, vLines, hLines
+    segments: px, feat, points: drawn, labels: labels.filter(l => !l.fixedId), fixed, vLines, hLines
   };
 }
 
