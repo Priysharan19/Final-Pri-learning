@@ -46,20 +46,20 @@ number or address that has not been given to it.
 **Current text** · `docs/legal/privacy.md`
 
 > The person responsible for your data (the "data fiduciary") is
-> Priysharan Tripathi, 5 Juniper Pl, Oakville NSW 2765, Australia.
+> Priysharan Tripathi, Pri Learning, ABN 20 192 090 394.
 
 **Current text** · `docs/legal/terms.md`
 
 > These terms are an agreement between you and Priysharan Tripathi,
-> 5 Juniper Pl, Oakville NSW 2765, Australia, about your use of Pri Learning on
+> Pri Learning, ABN 20 192 090 394, about your use of Pri Learning on
 > the web, on iPhone and iPad, and on Android.
 
 **Current text** · `docs/legal/grievance.md`
 
 > - Priysharan Tripathi
 > - Grievance officer, Pri Learning
-> - 5 Juniper Pl, Oakville NSW 2765, Australia
-> - impriysharan@icloud.com
+> - ABN 20 192 090 394
+> - prilearning19@gmail.com
 
 **Lives in** · `docs/legal/privacy.hi.md` · `Priysharan Tripathi`
 **Lives in** · `docs/release/store/app-store-listing.md` · `{{OWNER_LEGAL_NAME}}`
