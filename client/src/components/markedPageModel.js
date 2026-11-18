@@ -33,6 +33,7 @@ export const STATE = Object.freeze({
 export const isQuiet = status => status === 'not-verified' || status === 'unread';
 
 const clamp01 = v => Math.min(1, Math.max(0, v));
+const r6 = v => Math.round(v * 1e6) / 1e6;
 const finite = v => Number.isFinite(Number(v));
 const validBox = b => !!b && ['x', 'y', 'w', 'h'].every(k => finite(b[k])) && b.w > 0 && b.h > 0;
 
@@ -69,7 +70,7 @@ export function boxesFromInk(strokes, readLines) {
 export function boxesFromPhoto(lines) {
   const list = Array.isArray(lines) ? lines : [];
   if (!list.length) return null;
-  const boxes = list.map(l => (validBox(l?.box) ? { x: clamp01(l.box.x), y: clamp01(l.box.y), w: Math.min(1 - clamp01(l.box.x), l.box.w), h: Math.min(1 - clamp01(l.box.y), l.box.h) } : null));
+  const boxes = list.map(l => (validBox(l?.box) ? { x: clamp01(l.box.x), y: clamp01(l.box.y), w: r6(Math.min(1 - clamp01(l.box.x), l.box.w)), h: r6(Math.min(1 - clamp01(l.box.y), l.box.h)) } : null));
   if (boxes.some(b => !b)) return null;
   for (let i = 1; i < boxes.length; i += 1) if (boxes[i].y + boxes[i].h / 2 < boxes[i - 1].y + boxes[i - 1].h / 2) return null;
   return { view: null, boxes };
