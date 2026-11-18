@@ -101,7 +101,7 @@ export function Traps({ items }) {
  * then its line of maths, every line aligned on its relation sign in one column and in one maths style
  * (notes/workingRows.js). A row without an `&` is a statement and runs across both columns.
  */
-export function Working({ rows }) {
+export function WorkingRows({ rows }) {
   return (
     <div className="nn-wk" role="group">
       {rows.map((r, i) => (
@@ -143,7 +143,7 @@ export function WorkedExample({ ex, n }) {
         </div>
       ) : (
         <div className="nn-answer">
-          {rows.length > 0 && <><p className="nn-label">{t('notes.nsw.working')}</p><Working rows={rows} /></>}
+          {rows.length > 0 && <><p className="nn-label">{t('notes.nsw.working')}</p><WorkingRows rows={rows} /></>}
           <p className="nn-label">{t('notes.answer')}{ex.verify && ' '}{ex.verify && <span className="nn-checked">{t('notes.engineChecked')}</span>}</p>
           <MathText block className="nn-read nn-final" text={ex.answer} />
         </div>
