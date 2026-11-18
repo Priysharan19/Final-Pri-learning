@@ -221,8 +221,8 @@ Engineering cannot complete any line below. The gate that consumes them is
 
 | # | Action (owner / counsel) | Status | Evidence it produces |
 |---|---|---|---|
-| 1 | Decide the legal entity that holds the data and takes the money, and its registered address | Filled 19 Oct 2026 with the owner as an individual at a home address; **operator decision still open** (counsel pack §11 Q1–Q4) | the notices name the operator |
-| 2 | Appoint the grievance officer and a monitored mailbox | Filled 19 Oct 2026 (the owner; personal iCloud address) | `grievance.md` |
+| 1 | Decide the legal entity that holds the data and takes the money, and its registered address | Filled 19 Oct 2026 with the owner as an individual; on 18 Nov 2026 the street address was removed from every published surface and replaced by the ABN (Pri Learning, ABN 20 192 090 394); **operator decision and the confirmed legal entity name still open** (counsel pack §11 Q1–Q4) | the notices name the operator |
+| 2 | Appoint the grievance officer and a monitored mailbox | Filled 19 Oct 2026 (the owner); the contact address is now prilearning19@gmail.com | `grievance.md` |
 | 3 | Open the customer support mailbox | Same address; a `prilearning.com` mailbox has no MX record yet | `refund-policy.md` |
 | 4 | Choose the jurisdiction whose courts the terms name | New Delhi, 19 Oct 2026 | `terms.md` |
 | 5 | Have the English set reviewed by a lawyer qualified in Indian law; have the Hindi checked against it | **Open.** Record it in `review-status.json` | the banner goes; `legal-pages-check.mjs` enforces the paperwork |

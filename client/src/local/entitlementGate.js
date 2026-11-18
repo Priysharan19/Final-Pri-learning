@@ -3,7 +3,7 @@
 //
 // The FREE plan's pre-check lives here, on the device, so the student is told
 // before a request leaves: 20 practice questions per calendar day (the day
-// boundary is the profile's own timezone — Asia/Kolkata for India profiles),
+// boundary is the profile's own timezone — India Standard Time for India profiles),
 // one exam simulation every 30 days, and basic Pri Explain. The counter is a
 // device-local row and is a courtesy, not the limit: since every creditable
 // question is issued by the server, the SERVER decides the daily cap per
@@ -23,6 +23,7 @@ import { cloudLinkRowId } from '../platform/cloudAccount.js';
 import { ENTITLEMENTS, FREE_EXAM_ALLOWANCE, entitlementDecision, normalizeEntitlementSnapshot } from '../platform/entitlements.js';
 import { FREE_PRACTICE_ALLOWANCE } from '../engine/practiceAllowance.js';
 import { translate } from '../i18n/core.js';
+import { defaultTimezone, localeOf } from '../lib/locale.js';
 
 const DAY = 86_400_000;
 const USAGE_PREFIX = 'pri-free-usage-v1:';
@@ -64,11 +65,11 @@ function validTimeZone(tz) {
   try { new Intl.DateTimeFormat('en-CA', { timeZone: tz }); return true; } catch { return false; }
 }
 
-/** The calendar a profile lives in. India profiles default to Asia/Kolkata. */
+/** The calendar a profile lives in: its own, else its course's (India: IST; otherwise Sydney). */
 export function profileTimeZone(profile) {
   const tz = String(profile?.timezone || '').trim();
   if (tz && validTimeZone(tz)) return tz;
-  return profile?.course === 'in' ? 'Asia/Kolkata' : 'Australia/Sydney';
+  return defaultTimezone(profile?.course);
 }
 
 export function dayKey(ms, timeZone) {
@@ -136,9 +137,9 @@ function offlineNote(decision) {
     : '';
 }
 
-function whenLabel(ms, timeZone) {
+function whenLabel(ms, timeZone, profile) {
   try {
-    return new Intl.DateTimeFormat('en-IN', { timeZone, dateStyle: 'medium', timeStyle: 'short' }).format(new Date(ms));
+    return new Intl.DateTimeFormat(localeOf(profile?.course || 'in'), { timeZone, dateStyle: 'medium', timeStyle: 'short' }).format(new Date(ms));
   } catch { return new Date(ms).toISOString(); }
 }
 
@@ -192,7 +193,7 @@ export async function assertExamAllowed(profile, now = clock()) {
   if (allowance.allowed) return allowance;
   const timeZone = profileTimeZone(profile);
   throw gateError('FREE_CAP_REACHED',
-    `The free plan includes one exam simulation every ${FREE_TIER.examWindowDays} days. Your next free simulation unlocks on ${whenLabel(allowance.nextAt, timeZone)}; Premium includes unlimited simulations.${offlineNote({ reason: allowance.reason })}`,
+    `The free plan includes one exam simulation every ${FREE_TIER.examWindowDays} days. Your next free simulation unlocks on ${whenLabel(allowance.nextAt, timeZone, profile)}; Premium includes unlimited simulations.${offlineNote({ reason: allowance.reason })}`,
     { capability: ENTITLEMENTS.PREMIUM_EXAMS, used: allowance.used, limit: allowance.limit, nextAt: allowance.nextAt, windowDays: allowance.windowDays, timeZone, reason: allowance.reason, refreshRequired: allowance.refreshRequired });
 }
 

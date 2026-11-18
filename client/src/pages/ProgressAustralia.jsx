@@ -6,6 +6,7 @@ import EvidenceProgress from '../progress/EvidenceProgress.jsx';
 import SyllabusBoard from '../progress/SyllabusBoard.jsx';
 import { featureEnabled } from '../platform/features.js';
 import { hscCoursesFor } from '../engine/hscCourses.js';
+import { offeredChapters } from '../engine/curriculumAvailability.js';
 
 // The HSC 2027 priorities (Prithagoras, Years 11–12): its own on-demand chunk
 // with the NESA metadata behind it (vite.config.js 'hsc-priorities').
@@ -37,7 +38,7 @@ export default function ProgressAustralia() {
     const streams = (curriculum.streams || []).map(g => ({ key: g.key, title: g.title, ...g }));
     return [...core, ...streams].find(s => s.key === key) || core[0] || null;
   }, [curriculum, user.year, user.pathway, t]);
-  const rows = useMemo(() => (scope?.subtopics || []).map(s => ({ id: s.id, name: s.name, strand: s.strand })), [scope]);
+  const rows = useMemo(() => offeredChapters(scope?.subtopics).map(s => ({ id: s.id, name: s.name, strand: s.strand })), [scope]);
 
   const hscCourses = hscCoursesFor(user);
 

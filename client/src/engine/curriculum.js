@@ -440,17 +440,17 @@ export const CURRICULUM = [
         'Interpret motion graphs',
         'Solve rates-of-change problems'
       ]),
-      S('y12-integral-calc', 'Integral Calculus · Answer-Checked Practice', 'Calculus', AUTHORED_WEIGHT, [
+      S('y12-integral-calc', 'Integral Calculus: Practice', 'Calculus', AUTHORED_WEIGHT, [
         'Find antiderivatives of exponential and trigonometric functions',
         'Evaluate definite integrals of polynomial functions',
         'Find displacement from a velocity function'
       ]),
-      S('y12-random-var', 'Random Variables · Answer-Checked Practice', 'Statistics & Probability', AUTHORED_WEIGHT, [
+      S('y12-random-var', 'Random Variables: Practice', 'Statistics & Probability', AUTHORED_WEIGHT, [
         'Find the expected value of a discrete random variable',
         'Find the variance of a discrete random variable',
         'Use z-scores and the 68–95–99.7 rule for a normal distribution'
       ]),
-      S('y12-fin-exact', 'Financial Mathematics · Answer-Checked Practice', 'Financial Maths', AUTHORED_WEIGHT, [
+      S('y12-fin-exact', 'Financial Mathematics: Practice', 'Financial Maths', AUTHORED_WEIGHT, [
         'Find the value of a compound-interest investment',
         'Track the balance of a reducing-balance loan',
         'Find the future value of an annuity as a geometric series'

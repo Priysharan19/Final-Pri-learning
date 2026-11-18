@@ -43,7 +43,7 @@ imply that a purchase cannot be refunded.
 
 ## How to ask for a refund
 
-Write to {{CONTACT_EMAIL}} from the email address on the account, with the date
+Write to prilearning19@gmail.com from the email address on the account, with the date
 of the charge. We aim to acknowledge within 48 hours and reply within 3 business
 days. Whatever we decide, you keep the rights described above. If a payment for
 the current period is refunded in full, Premium for that period ends at once.

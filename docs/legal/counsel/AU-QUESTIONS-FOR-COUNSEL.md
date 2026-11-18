@@ -37,7 +37,7 @@ they are left as placeholders, and a notice with one unfilled shows as a templat
 | `{{AU_HOSTING_PROVIDER_AND_REGION}}` | Where the Australian server runs | Told: Railway, Singapore. The repository records no Australian service (`docs/operations/region-isolation-verification.md`: "The Prithagoras (Australia) deployment does not exist yet") |
 | `{{AU_DATABASE_PROVIDER_AND_REGION}}` | Where the Australian database is held | Told: Neon Postgres, Sydney. The repository's plan names Supabase, Sydney (`ap-southeast-2`) |
 | Payment processor (no longer a placeholder) | Who takes payment | Stripe: `client/edition.config.mjs` lists `stripe` for Prithagoras, in AUD, and `server/platform/stripe.js` hosts Checkout on Stripe. The prices (A$9.99 a month, A$99 a year) are set in Stripe and `PRI_DISPLAY_*`, not in code: the owner must keep the notices and Stripe in step |
-| `{{CONTACT_EMAIL}}` | The contact address | The address the Indian notices use; an agent session was prevented from writing it into a new file |
+| Contact email (was `CONTACT_EMAIL`, filled 18 Nov 2026) | The contact address | `prilearning19@gmail.com`, owner-supplied; it replaces the personal iCloud address in both editions' notices |
 
 Counsel should be told which of these are real at the date they review. The notices must not name a
 provider or a region that is not the deployment.

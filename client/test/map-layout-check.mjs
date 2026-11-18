@@ -117,9 +117,11 @@ check('every glyph is one line family: plain path data, decorative, no colour of
   assert.doesNotMatch(glyph, /aria-label|role=|<title|<text|fill="#|stroke="#/);
   assert.match(page, /aria-label=\{`\$\{node\.row\.name\} ·/);   // the node button is still named by the chapter
 });
-check('the three answer-checked sets are named for what they are, and not "Exact Results"', () => {
+check('the three practice sets are named for what they are, and not "Exact Results"', () => {
   const names = new Map(rows.map(r => [r.id, r.name]));
-  for (const id of ['y12-integral-calc', 'y12-random-var', 'y12-fin-exact']) assert.match(names.get(id), / · Answer-Checked Practice$/);
+  const EXPECTED = { 'y12-integral-calc': 'Integral Calculus: Practice', 'y12-random-var': 'Random Variables: Practice', 'y12-fin-exact': 'Financial Mathematics: Practice' };
+  for (const [id, name] of Object.entries(EXPECTED)) assert.equal(names.get(id), name);
+  assert.ok(![...names.values()].some(n => /Answer-Checked/.test(n) && /Integral Calculus|Random Variables|Financial Mathematics/.test(n)));
   assert.ok(![...names.values()].some(n => /Exact Results/.test(n)));
 });
 

@@ -1199,7 +1199,7 @@ seriesForms.push(V('series-context', [1, 2, 3, 4], (rng) => {
   if (kind === 1) {
     const a = ri(rng, 5, 40), d = ri(rng, 2, 15), n = ri(rng, 8, 30);
     const S = n * (2 * a + (n - 1) * d) / 2;
-    const q = numQ(`Aarav starts saving for a surfboard. He puts ${D(a)} into his account in week 1 and increases the amount by ${D(d)} each week. How much has he saved in total after $${n}$ weeks?`, S, {
+    const q = numQ(`Liam starts saving for a surfboard. He puts ${D(a)} into his account in week 1 and increases the amount by ${D(d)} each week. How much has he saved in total after $${n}$ weeks?`, S, {
       prefix: '$',
       traps: [{ value: a + (n - 1) * d, why: `That is what he saves in week $${n}$ alone. The total is the **sum** of all $${n}$ deposits.` }, { value: n * a + n * d, why: 'The deposits grow each week, so use $S_n = \\dfrac{n}{2}\\big(2a + (n-1)d\\big)$.' }].filter(t => t.value !== S),
       hints: ['Weekly deposits form an arithmetic sequence.', `$a = ${a}$, $d = ${d}$, $n = ${n}$.`, '$S_n = \\dfrac{n}{2}\\big(2a + (n-1)d\\big)$.'],
