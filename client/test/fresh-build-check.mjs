@@ -1,0 +1,123 @@
+#!/usr/bin/env node
+// Pri Learning · a returning browser moves to the live build (client/src/platform/freshBuild.js).
+// Deterministic: a fake window, a fake release.json reader, no browser and no network.
+import { readFileSync } from 'node:fs';
+import { freshnessAction, watchFreshBuild } from '../src/platform/freshBuild.js';
+import en from '../src/i18n/strings.en.js';
+import hi from '../src/i18n/strings.hi.js';
+
+let pass = 0;
+const failures = [];
+const ok = (c, label) => { if (c) pass++; else failures.push(label); };
+
+const A = 'a'.repeat(40);
+const B = 'b'.repeat(40);
+
+// ── the decision ─────────────────────────────────────────────────────────────
+ok(freshnessAction({ ownSha: A, liveSha: A, touched: false }) === 'none', 'same build: nothing');
+ok(freshnessAction({ ownSha: '', liveSha: B, touched: false }) === 'none', 'unknown own build (dev/native): nothing');
+ok(freshnessAction({ ownSha: A, liveSha: 'development-unknown', touched: false }) === 'none', 'unknown live build: nothing');
+ok(freshnessAction({ ownSha: A, liveSha: B, touched: false }) === 'reload', 'stale and untouched: reload');
+ok(freshnessAction({ ownSha: A, liveSha: B, touched: true }) === 'notice', 'stale and touched: notice, never reload');
+ok(freshnessAction({ ownSha: A, liveSha: B, touched: false, alreadyReloadedFor: B }) === 'notice', 'already reloaded for this build: notice, no loop');
+
+// ── a fake page ──────────────────────────────────────────────────────────────
+function fakeWin({ storage = true } = {}) {
+  const handlers = {};
+  const store = new Map();
+  const added = [];
+  const el = (tag) => ({ tag, children: [], style: {}, attrs: {}, listeners: {},
+    setAttribute(k, v) { this.attrs[k] = v; }, appendChild(c) { this.children.push(c); },
+    addEventListener(t, f) { this.listeners[t] = f; } });
+  const body = el('body');
+  const doc = { body, visibilityState: 'visible', createElement: el, getElementById: (id) => body.children.find(c => c.id === id) || null, addEventListener() {}, removeEventListener() {} };
+  const cachesState = { 'pri-old': new Set(['/index.html', '/', '/assets/x.js']), 'pri-new': new Set(['/index.html', '/']) };
+  const win = {
+    document: doc, reloads: 0, updates: 0, added,
+    addEventListener(t, f) { (handlers[t] = handlers[t] || []).push(f); },
+    removeEventListener() {},
+    fire(t) { (handlers[t] || []).forEach(f => f({})); },
+    location: { reload() { win.reloads++; } },
+    sessionStorage: storage ? { getItem: k => store.get(k) ?? null, setItem: (k, v) => store.set(k, v) } : { getItem() { throw new Error('no'); }, setItem() { throw new Error('no'); } },
+    navigator: { serviceWorker: { getRegistration: async () => ({ update: async () => { win.updates++; } }) } },
+    caches: {
+      keys: async () => Object.keys(cachesState),
+      open: async (n) => ({ delete: async (p) => cachesState[n].delete(p) })
+    },
+    cachesState, store
+  };
+  return win;
+}
+const live = (sha) => async () => ({ releaseSha: sha });
+const run = async (win, sha, own = A) => {
+  const w = watchFreshBuild(win, { read: live(sha), ownSha: own, immediate: false });
+  const r = await w.check();
+  return { w, r };
+};
+
+// stale + untouched → reloads once, drops the stale shell, asks the worker to update
+{
+  const win = fakeWin();
+  const { r } = await run(win, B);
+  ok(r === 'reload' && win.reloads === 1, 'untouched stale page reloads once');
+  ok(win.updates >= 1, 'worker asked to update');
+  ok(!win.cachesState['pri-old'].has('/index.html') && !win.cachesState['pri-new'].has('/') && win.cachesState['pri-old'].has('/assets/x.js'), 'only the shell is dropped from the caches');
+  ok(win.store.get('pri.freshBuild.reloaded.v1') === B, 'reload recorded for the live build');
+  // The reloaded page is still on the old shell (worker answered stale again): no second reload.
+  const again = await run(win, B);
+  ok(again.r === 'notice' && win.reloads === 1, 'a second visit to the same stale answer shows the notice, never loops');
+  ok(win.document.getElementById('pri-update-notice'), 'notice present');
+}
+
+// stale + the student typed → notice only, nothing reloaded, work untouched
+for (const type of ['keydown', 'input', 'pointerdown', 'touchstart', 'paste']) {
+  const win = fakeWin();
+  const w = watchFreshBuild(win, { read: live(B), ownSha: A, immediate: false });
+  win.fire(type);
+  const r = await w.check();
+  ok(r === 'notice' && win.reloads === 0, `${type} before the check: notice, no reload`);
+  ok(win.cachesState['pri-old'].has('/index.html'), `${type}: caches untouched until the student chooses`);
+}
+{
+  // The notice's own button reloads, once, after dropping the shell.
+  const win = fakeWin();
+  const w = watchFreshBuild(win, { read: live(B), ownSha: A, immediate: false });
+  win.fire('keydown');
+  await w.check();
+  const btn = win.document.getElementById('pri-update-notice').children[1];
+  btn.listeners.click();
+  await new Promise(r => setTimeout(r, 10));
+  ok(win.reloads === 1 && !win.cachesState['pri-old'].has('/index.html'), 'choosing the notice reloads once and drops the stale shell');
+}
+
+// current build, unreadable manifest, dev build, and no storage
+{
+  const win = fakeWin();
+  ok((await run(win, A)).r === 'none' && win.reloads === 0, 'current build: nothing');
+  const w = watchFreshBuild(fakeWin(), { read: async () => null, ownSha: A, immediate: false });
+  ok(await w.check() === 'none', 'manifest unreadable (offline): nothing');
+  const w2 = watchFreshBuild(fakeWin(), { read: async () => { throw new Error('x'); }, ownSha: A, immediate: false });
+  ok(await w2.check() === 'none', 'manifest throws: nothing');
+  ok((await run(fakeWin(), B, '')).r === 'none', 'development build never reloads');
+  const noStore = fakeWin({ storage: false });
+  const r = (await run(noStore, B)).r;
+  ok(r === 'notice' && noStore.reloads === 0, 'no sessionStorage: cannot prove a single reload, so notice only');
+}
+
+// started with the default (immediate) check: the boot check itself reloads an untouched stale page
+{
+  const win = fakeWin();
+  watchFreshBuild(win, { read: live(B), ownSha: A });
+  await new Promise(r => setTimeout(r, 20));
+  ok(win.reloads === 1, 'the boot check on an untouched stale page reloads');
+}
+
+// ── wiring and words ─────────────────────────────────────────────────────────
+const main = readFileSync(new URL('../src/main.jsx', import.meta.url), 'utf8');
+ok(/import\.meta\.env\.PROD[\s\S]{0,1500}watchFreshBuild\(window\)/.test(main), 'main.jsx starts it only where the service worker is registered');
+const vite = readFileSync(new URL('../vite.config.js', import.meta.url), 'utf8');
+ok(/__PRI_BUILD_SHA__: JSON\.stringify\(command === 'build'/.test(vite), 'build bakes in its own SHA');
+for (const k of ['update.available', 'update.reload']) ok(typeof en[k] === 'string' && typeof hi[k] === 'string' && en[k] !== hi[k], `${k} in en and hi`);
+
+if (failures.length) { console.error(`FRESH BUILD: FAIL — ${failures.length} failing of ${pass + failures.length}`); for (const f of failures) console.error('  ✗ ' + f); process.exit(1); }
+console.log(`FRESH BUILD: PASS — ${pass}/${pass} checks`);
