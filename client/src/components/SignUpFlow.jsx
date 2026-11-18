@@ -798,7 +798,7 @@ export default function SignUpFlow({
   const showBack = !!backTarget || (step === 'method' && !!onCancel);
 
   return (
-    <div className={`signup-flow signup-${variant}`} data-signup-step={step} data-signin-card={variant} data-testid="signin-card">
+    <div className={`signup-flow signup-${variant}`} data-signup-step={step} data-signin-card={inline ? 'inline' : variant} data-testid="signin-card">
       {showBack && (
         <div className="signup-top">
           <button type="button" className="signup-back" aria-label={t(step === 'method' ? 'signup.close' : 'signup.back')}
