@@ -190,6 +190,8 @@ function auditPage() {
 
   const shown = (el) => {
     if (!el.getClientRects().length) return false;
+    // The body of a closed <details> is not exposed to a screen reader until it is opened, so its controls are not audited as present.
+    if (el.closest('details:not([open])') && !el.closest('summary')) return false;
     const cs = getComputedStyle(el);
     return cs.visibility !== 'hidden' && cs.display !== 'none' && cs.opacity !== '0';
   };
@@ -732,7 +734,7 @@ async function run() {
     });
 
     await step('login · onboarding protection', '/', async () => {
-      await page.locator(YEAR_SELECT).selectOption('10');
+      await page.locator(YEAR_SELECT).selectOption(INDIA ? '10' : '11');   // owner decision, 19 Nov 2026: Prithagoras offers Years 11 and 12
       await click(page, '.auth-card .btn-primary');
       await page.locator('#signup-name').fill('Accessibility Draft');
       await click(page, '.auth-card .btn-primary');
@@ -1210,6 +1212,11 @@ async function run() {
       await wait(page, 700);
     });
 
+    // Owner decision, 19 Nov 2026: Rapid Fire and Match are hidden in Prithagoras (their URLs go Home), so they are walked on Priyabhata only.
+    if (!INDIA) {
+      notApplicableRoutes.add('/rush'); notApplicableRoutes.add('/match');
+      notApplicable.push(`rapid fire and match, lobby, running and refused — hidden in ${EDITION} (edition table: games)`);
+    } else {
     await step('rapid fire · lobby', '/rush', async () => { await goTo(page, BASE, '/rush'); });
 
     await step('rapid fire · running', '/rush', async () => {
@@ -1228,6 +1235,7 @@ async function run() {
       await page.waitForSelector('.race-track', { timeout: 40000 });
       await wait(page, 700);
     });
+    }
 
     await step('plan · this week, the week grid and settings', '/plan', async () => {
       await goTo(page, BASE, '/plan');
@@ -1350,14 +1358,14 @@ async function run() {
         await goTo(page, BASE, '/notes?class=10');
         await page.waitForSelector('.nt-map-node', { timeout: 20000 });
       } else {
-        await goTo(page, BASE, '/notes?year=7');
+        await goTo(page, BASE, '/notes?year=11&course=advanced');   // owner decision, 19 Nov 2026: Years 11 and 12 only
         await page.waitForSelector('[data-nsw-notes] [data-testid="notes-chapter"]', { timeout: 20000 });
       }
       await wait(page, 1200);
     });
 
     await step('notes · a chapter read through', '/notes/:chapterId', async () => {
-      await goTo(page, BASE, INDIA ? '/notes/c10-quadratic-equations' : '/notes/ma4-equ-c-01?year=7');
+      await goTo(page, BASE, INDIA ? '/notes/c10-quadratic-equations' : '/notes/mav-11-01?year=11&course=advanced');
       await page.waitForSelector(INDIA ? '.nt-formula' : '.nn-formula', { timeout: 20000 });
       await page.evaluate(() => document.querySelectorAll('.nt-reveal').forEach(el => el.classList.add('is-in')));
       await wait(page, 1600);
@@ -1559,7 +1567,7 @@ async function run() {
       refusals.placement = await refusalBlock('[data-placement-refused]');
     });
 
-    await step('rapid fire · refused, session ended', '/rush', async () => {
+    if (INDIA) await step('rapid fire · refused, session ended', '/rush', async () => {
       await insideLive('/rush');
       endSession();
       await click(page, '.qcard .btn-primary.btn-lg');
@@ -1568,7 +1576,7 @@ async function run() {
       refusals.rush = { ...(await refusalBlock('[data-game-refused]')), clock: await page.locator('.rush-timer').count() };
     });
 
-    await step('match · refused, session ended', '/match', async () => {
+    if (INDIA) await step('match · refused, session ended', '/match', async () => {
       await insideLive('/match');
       endSession();
       await click(page, '.btn-glow');
@@ -1617,7 +1625,7 @@ async function run() {
       await click(page, 'button.btn-ghost', { text: 'Add another profile' });
       await page.getByRole('button', { name: 'Teacher', exact: true }).click();
       await click(page, '.auth-card .btn-primary');
-      await page.locator(YEAR_SELECT).selectOption('10');
+      await page.locator(YEAR_SELECT).selectOption(INDIA ? '10' : '11');
       await click(page, '.auth-card .btn-primary');
       await page.locator('#signup-name').fill('Accessibility Teacher');
       await click(page, '.auth-card .btn-primary');
@@ -1776,7 +1784,7 @@ async function run() {
     ok('the session ended, an exam paper that does not start is an alert in words with the same named sign-in — and no exam room opens',
       // (Its icon alone has no word yet — Exams.jsx:82, tracked under "owned elsewhere".)
       announced({ ...refusals.exam, iconWord: refusals.exam?.iconWord || 'tracked elsewhere' }) && refusals.exam.room === 0, JSON.stringify(refusals.exam));
-    ok('the session ended, Rapid Fire and Match that do not start are alerts in words with the same named sign-in — and no clock or question appears',
+    if (INDIA) ok('the session ended, Rapid Fire and Match that do not start are alerts in words with the same named sign-in — and no clock or question appears',
       announced(refusals.rush) && refusals.rush.clock === 0 && announced(refusals.match) && refusals.match.question === 0,
       JSON.stringify({ rush: refusals.rush, match: refusals.match }));
 
