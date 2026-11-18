@@ -174,7 +174,12 @@ export function mcq(rng, correct, distractors) {
 /** Degrees → radians. */
 export const rad = d => d * Math.PI / 180;
 
-export const NAMES = ['Aria', 'Blake', 'Chen', 'Dev', 'Elif', 'Finn', 'Grace', 'Hana', 'Ivy', 'Jonah', 'Kiri', 'Leo', 'Mia', 'Noah', 'Ollie', 'Priya', 'Quinn', 'Ruby', 'Sam', 'Tara', 'Uma', 'Vik', 'Willa', 'Xavier', 'Yusuf', 'Zoe'];
+// The names in NSW question text (every consumer is a Prithagoras generator; the
+// India generators carry their own list, IN_NAMES). Owner decision 2026-11-18:
+// nothing Indian is visible in the Australian syllabus, so the four Indian
+// names that were here (Dev, Priya, Uma, Vik) are replaced in place, which
+// keeps every other name at the same position for the same seed.
+export const NAMES = ['Aria', 'Blake', 'Chen', 'Dean', 'Elif', 'Finn', 'Grace', 'Hana', 'Ivy', 'Jonah', 'Kiri', 'Leo', 'Mia', 'Noah', 'Ollie', 'Piper', 'Quinn', 'Ruby', 'Sam', 'Tara', 'Una', 'Vera', 'Willa', 'Xavier', 'Yusuf', 'Zoe'];
 export const ITEMS = [
   { name: 'a skateboard', price: [80, 320] },
   { name: 'a pair of sneakers', price: [60, 240] },

@@ -55,5 +55,16 @@ export const AU_STRINGS = Object.freeze({
   'exams.indiaHeading': 'Exams',
   'placement.provenance': 'The prerequisite map behind it is Pri’s own teaching judgement (version {version}), not a NESA publication.',
   'pricing.why.syllabus': "Built for the NSW Mathematics syllabuses, including the 2024 Stage 6 syllabuses first examined in the 2027 HSC.",
+  // Sweep of 18 Nov 2026: shared strings a Prithagoras screen draws that still said
+  // class, a Hindi search hint, or an India chooser.
+  'common.class': 'Year',
+  'gloss.filterTopics': 'Filter topics',
+  'login.stepCourseSub': 'Choose the year and course that should drive Practice, Exams and Progress.',
+  'login.courseRequired': 'Choose a year and course to continue.',
+  'login.chooseClassTrack': 'Choose a year or course…',
+  'notes.classLabel': 'Choose a year',
+  'notes.noBookmarks': 'No bookmarked chapters in this year yet.',
+  'inst.noChapters': 'No chapters are set for your year yet.',
+  'cloudError.consentDeclarationRequired': 'Tell us whether the learner is 18 or older, or their year with a parent or guardian’s name and email, then try again.',
   'upgrade.jeeAdvanced': "This part of the course is included with Premium."
 });
