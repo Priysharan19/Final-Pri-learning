@@ -622,6 +622,16 @@ diffForms.push({ diffs: [4], make: (rng) => {
 // ═════════════════════════════════════════════════════════════════════════════
 const appForms = [];
 
+/** The curve of a stationary-points question, for the value-chain step check (engine/valueChain.js). */
+const curveMeta = (coeffs, stationary, choose = null) => {
+  const n = coeffs.length - 1;
+  const term = (c, k) => (c === 0 ? null : `(${c})${k > 1 ? `*x^${k}` : k === 1 ? '*x' : ''}`);
+  const expr = coeffs.map((c, i) => term(c, n - i)).filter(Boolean).join('+') || '0';
+  const dco = coeffs.slice(0, -1).map((c, i) => c * (n - i));
+  const derivative = dco.map((c, i) => term(c, n - 1 - i)).filter(Boolean).join('+') || '0';
+  return { kind: 'value-chain', fn: { name: 'y', variable: 'x', expr }, curve: { derivative, stationary, choose } };
+};
+
 // D1 — stationary points ─────────────────────────────────────────────────────
 appForms.push({ diffs: [1], make: (rng) => {
   let a, h, c, val;
@@ -631,7 +641,7 @@ appForms.push({ diffs: [1], make: (rng) => {
   agree(val, f(h), 'vertex y');
   return {
     prompt: `The curve $y = ${poly([a, -2 * a * h, c])}$ has one stationary point. Find its $y$-coordinate.`,
-    answerType: 'numeric', answer: { value: val }, answerPrefix: 'y =',
+    answerType: 'numeric', answer: { value: val }, answerPrefix: 'y =', stepcheck: curveMeta([a, -2 * a * h, c], [h]),
     traps: keepT([
       { value: h, why: 'That is the $x$-coordinate of the stationary point: substitute it back into the curve.' },
       { value: c, why: 'That is the $y$-intercept, not the value at the stationary point.' }
@@ -657,7 +667,7 @@ appForms.push({ diffs: [1], make: (rng) => {
   const key = Math.max(p, q);
   return {
     prompt: `The curve $y = ${poly([A, B, C, 0])}$ has two stationary points. Find the **larger** $x$-coordinate.`,
-    answerType: 'numeric', answer: { value: key }, answerPrefix: 'x =',
+    answerType: 'numeric', answer: { value: key }, answerPrefix: 'x =', stepcheck: curveMeta([A, B, C, 0], [p, q], 'larger'),
     traps: keepT([
       { value: Math.min(p, q), why: 'That is the smaller $x$-coordinate: the question asks for the larger one.' },
       { value: p + q, why: 'That is the sum of the $x$-coordinates, not the larger one.' }
@@ -683,7 +693,7 @@ appForms.push({ diffs: [1], make: (rng) => {
   agree(key, simpson(t => 3 * A * (t - p) * (t - q), 0, xs), 'cubic stationary value');
   return {
     prompt: `The curve $y = ${poly([A, B, C, 0])}$ has two stationary points. Find the $y$-coordinate of the one with the ${which} $x$-coordinate.`,
-    answerType: 'numeric', answer: { value: key }, answerPrefix: 'y =',
+    answerType: 'numeric', answer: { value: key }, answerPrefix: 'y =', stepcheck: curveMeta([A, B, C, 0], [p, q], which),
     traps: keepT([
       { value: xs, why: 'That is the $x$-coordinate: substitute it into the curve to get $y$.' },
       { value: A * (which === 'larger' ? Math.min(p, q) : Math.max(p, q)) ** 3 + B * (which === 'larger' ? Math.min(p, q) : Math.max(p, q)) ** 2 + C * (which === 'larger' ? Math.min(p, q) : Math.max(p, q)), why: `Use the ${which} $x$-coordinate, $x = ${xs}$.` }

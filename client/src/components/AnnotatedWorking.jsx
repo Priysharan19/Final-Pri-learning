@@ -16,7 +16,7 @@ import { useT } from '../i18n/index.js';
 import { buildAnnotatedWorking, lineRange } from './annotatedWorkingModel.js';
 import './AnnotatedWorking.css';
 
-const STATUS_ICON = { checked: 'check', 'first-error': 'alert', follows: 'arrowRight', 'not-verified': 'uncertain', unread: 'uncertain' };
+const STATUS_ICON = { condition: 'check', checked: 'check', 'first-error': 'alert', follows: 'arrowRight', 'not-verified': 'uncertain', unread: 'uncertain' };
 // Every string key written out, so the catalogue checks can see each one used.
 const RULE_KEY = Object.freeze({
   'reciprocal': 'aw.rule.reciprocal',
@@ -47,7 +47,7 @@ const RULE_KEY = Object.freeze({
   'factorise': 'aw.rule.factorise',
   'difference-of-squares': 'aw.rule.differenceOfSquares',
 });
-const STATUS_KEY = Object.freeze({ checked: 'aw.status.checked', 'first-error': 'aw.status.firstError', 'not-verified': 'aw.status.notVerified', unread: 'aw.status.unread' });
+const STATUS_KEY = Object.freeze({ checked: 'aw.status.checked', 'first-error': 'aw.status.firstError', 'not-verified': 'aw.status.notVerified', unread: 'aw.status.unread', condition: 'aw.status.condition' });
 const SCOPE_KEY = Object.freeze({ numerator: 'aw.scope.numerator', denominator: 'aw.scope.denominator', both: 'aw.scope.both' });
 const listOf = ns => ns.join(', ');
 
@@ -63,6 +63,11 @@ function RuleLine({ rule, t }) {
 
 function CardBody({ card, model, t, renderBreakDetail }) {
   if (card.status === 'unread') return <p>{t('aw.body.unread')}</p>;
+  if (card.valueChain === 'given') return <p>{t('aw.body.given')}</p>;
+  if (card.valueChain === 'verified') return <p>{t('aw.body.valueVerified')}</p>;
+  if (card.status === 'condition') return <p>{t('aw.body.condition')}</p>;
+  // The lines of a value-chain report that were not verified share one reason, said once below the cards.
+  if (card.status === 'not-verified' && model.unverified) return null;
   if (card.status === 'not-verified') return <p>{t('aw.body.notVerified')}</p>;
   if (card.status === 'first-error') {
     return (
@@ -132,7 +137,8 @@ export function AnnotatedEvaluation({ model }) {
       </div>
       {attempt && <p className="aw-attempt" data-aw-attempt={attempt}>{t('aw.eval.markedAgain', { n: attempt })}</p>}
       {marks?.receiptId && <p className="aw-receipt">{t('aw.eval.receipt', { id: marks.receiptId })}</p>}
-      <p className="aw-provenance">{t(source === 'handwriting' ? 'aw.eval.provenanceInk' : 'aw.eval.provenanceTyped')}</p>
+      <p className="aw-provenance">{t(model.allChecked === false ? (source === 'handwriting' ? 'aw.eval.provenanceSomeInk' : 'aw.eval.provenanceSome') : (source === 'handwriting' ? 'aw.eval.provenanceInk' : 'aw.eval.provenanceTyped'))}</p>
+      {model.unverified && <p className="aw-unverified" data-aw-unverified={model.unverified.lines.join(',')}>{t('aw.eval.unverifiedRun', { list: listOf(model.unverified.lines), count: model.unverified.lines.length })}</p>}
       <p className="aw-summary">{t(summary.key, { ...summary.vars, count: summary.vars.rules ?? summary.vars.checked })}</p>
       {followThrough.length > 0 && <p className="aw-follow" data-aw-follow-through={followThrough.join(',')}>{t('aw.eval.followThrough', { list: lineRange(followThrough), count: followThrough.length })}</p>}
       {jumps.length > 0 && <p className="aw-jumps">{t('aw.eval.jumps', { list: listOf(jumps), count: jumps.length })}</p>}

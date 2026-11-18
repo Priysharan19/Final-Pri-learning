@@ -58,6 +58,7 @@ function mergeRules(steps) {
 export function buildAnnotatedWorking({ lines, stepReport, receipt = null, solution = null, readStates = null, source = 'typed', attempt = null } = {}) {
   const report = Array.isArray(stepReport?.lines) ? stepReport.lines.slice(0, MAX_LINES) : null;
   if (!report || report.length < 2) return null;
+  if (stepReport?.source === 'value-chain') return buildValueChainModel({ report, lines, stepReport, receipt, source, attempt });
   const texts = report.map((l, i) => String(l?.text ?? lines?.[i] ?? ''));
   const statement = proofStatementOf(solution);
   let ann;
@@ -124,4 +125,37 @@ export function buildAnnotatedWorking({ lines, stepReport, receipt = null, solut
   const marks = receipt && Number.isFinite(Number(receipt.awarded)) && Number(receipt.possible) > 0
     ? { awarded: Number(receipt.awarded), possible: Number(receipt.possible), receiptId: typeof receipt.id === 'string' && receipt.id ? receipt.id.slice(-8) : null } : null;
   return { cards, proof, summary, marks, criteria, jumps, followThrough, source, attempt: Number.isInteger(attempt) && attempt > 1 ? attempt : null };
+}
+
+/**
+ * A value-chain report (engine/valueChain.js) already says, per line, what it established: the line is
+ * given by the question, verified, a stated condition, wrong, unverified or unread. The cards follow
+ * that state one for one, and the lines Pri could not verify share ONE reason (the model's
+ * `unverified`) instead of repeating it on every card. The summary counts the lines honestly.
+ */
+function buildValueChainModel({ report: reportIn, stepReport, receipt, source, attempt }) {
+  let report = reportIn;
+  const STATUS = { given: 'checked', verified: 'checked', condition: 'condition', wrong: 'first-error', unverified: 'not-verified', unread: 'unread' };
+  // (a milestone tick added after the check carries no state: read it from its status)
+  report = report.map(l => ({ ...l, state: l?.state === 'unverified' && l.status === 'ok' ? 'verified' : l?.state || (l?.status === 'ok' ? 'verified' : l?.status === 'break' ? 'wrong' : 'unverified') }));
+  const firstBreak = report.findIndex(l => l?.state === 'wrong');
+  const cards = report.map((l, i) => ({
+    n: i + 1, line: i, status: STATUS[l?.state] || 'not-verified', valueChain: l?.state || 'unverified',
+    start: false, startSide: null, rules: [], more: false, same: false, unnamed: false, followsFrom: null,
+    diagnosis: l?.state === 'wrong' ? (l.diagnosis || null) : null, note: l?.state === 'wrong' || l?.state === 'given' ? (l.note || null) : null,
+    previousText: null, text: String(l?.text ?? '')
+  }));
+  const summaryOf = stepReport.summary || {};
+  const unverified = cards.filter(c => c.status === 'not-verified' || c.status === 'unread').map(c => c.n);
+  const checked = cards.filter(c => c.status === 'checked').length;
+  const total = cards.length;
+  const summary = firstBreak >= 0 ? { key: 'aw.summary.breaksSome', vars: { n: firstBreak + 1, checked, total } }
+    : unverified.length ? { key: 'aw.summary.some', vars: { checked, total } }
+      : { key: 'aw.summary.valueAll', vars: { checked, total } };
+  return {
+    cards, proof: null, summary, marks: receipt && Number.isFinite(Number(receipt.awarded)) && Number(receipt.possible) > 0 ? { awarded: Number(receipt.awarded), possible: Number(receipt.possible), receiptId: typeof receipt.id === 'string' && receipt.id ? receipt.id.slice(-8) : null } : null,
+    criteria: [], jumps: [], followThrough: [], source, attempt: Number.isInteger(attempt) && attempt > 1 ? attempt : null,
+    allChecked: unverified.length === 0 && firstBreak < 0,
+    unverified: unverified.length ? { lines: unverified, reason: summaryOf.reason || null } : null
+  };
 }

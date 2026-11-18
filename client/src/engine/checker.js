@@ -823,8 +823,11 @@ function judgeExpressionLine(cleaned, meta, { reference = null } = {}) {
   const same = (a, b) => exprEquivalent(a, b, { positiveOnly: meta.positiveOnly }) === true;
   const parts = text.split('=').map(x => x.trim());
   // A leading "=" continues the line above: `= -12` means `<reference> = -12`.
-  if (parts[0] === '' && parts.length > 1) parts[0] = reference || '';
+  const continued = parts[0] === '' && parts.length > 1;
+  if (continued) parts[0] = reference || '';
   const unread = { status: 'note', note: 'Not checked — Pri cannot place this line on the way to the answer, so it is not marked right or wrong.' };
+  // "= RHS" where the question states no sides concludes with a name that is not an expression (pinned by step-justify-check).
+  if (/^(?:RHS|LHS)$/i.test(parts[parts.length - 1]) && !same(parts[parts.length - 1], meta.canonical)) return { status: 'break', note: 'RHS is not an expression you have shown: the question does not give a right-hand side to reach.' };
   if (parts.some(x => !x)) return unread;
   const tail = parts[parts.length - 1];
   const rest = parts.slice(0, -1);
@@ -843,7 +846,7 @@ function judgeExpressionLine(cleaned, meta, { reference = null } = {}) {
   // Not the answer: a mistake only where the line says it IS the expression above.
   const allowed = new Set([...variablesOf(parseExpr(meta.canonical) || {}), ...(reference ? variablesOf(parseExpr(reference) || {}) : [])]);
   if (rest.length && reference && parseExpr(rest[0]) && parseExpr(tail) && same(rest[0], reference)
-      && [...variablesOf(parseExpr(tail))].every(v => allowed.has(v))) {
+      && (continued || [...variablesOf(parseExpr(tail))].every(v => allowed.has(v)))) {
     return { status: 'break', note: 'This line is no longer equivalent to the expression you started with — the slip is here.' };
   }
   // The question authors its own expression and the answer is that expression in another form
@@ -966,27 +969,6 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
     let restates = false;
     let impliedStep = false;
     try {
-      // The question is not an equation in this letter (an axis of symmetry, a trigonometric
-      // equation in θ): its authored answer is all Pri holds, so only a line that states it is
-      // judged and every other line is a note — never a mistake, because no line is
-      // an equation to be kept equivalent (markerOps.stepMetaFor).
-      if (meta.answerOnly === true) {
-        const stated = readSolutionList(line, meta);
-        const wanted = uniqueNumeric(meta.solutions);
-        let statesAnswer = false;
-        if (stated && !stated.invalid && stated.values.length === wanted.length) statesAnswer = wanted.every(sol => stated.values.some(v => numsClose(v, sol)));
-        if (!statesAnswer && wanted.length === 1) {
-          const ast = parse(normalize(proseCleanOf(line)));
-          const side = n => unwrapGroup(n)?.t === 'var' && unwrapGroup(n).v === meta.variable;
-          if (ast.t === 'equation' && ((side(ast.l) && !variablesOf(ast.r).size) || (side(ast.r) && !variablesOf(ast.l).size))) {
-            const v = evaluate(side(ast.l) ? ast.r : ast.l, {});
-            statesAnswer = numsClose(v, wanted[0]);
-          }
-        }
-        out.push(statesAnswer ? { text: line, status: 'ok', ...(wanted.length > 1 ? { coversAll: true } : {}) }
-          : { text: line, status: 'note', note: 'Not checked — Pri cannot place this line on the way to the answer, so it is not marked right or wrong.' });
-        return;
-      }
       const listed = readSolutionList(line, meta);
       if (listed) {
         const wanted = uniqueNumeric(meta.solutions);
@@ -1001,9 +983,9 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
             lineDiagnosis = extraListedRootDiagnosis(meta.variable, extra);
             note = lineDiagnosis.message;
           } else if (missing.length || listed.values.length !== wanted.length) {
-            // Every value named is a root and the rest are not named yet: incomplete, not wrong.
-            status = 'note';
-            note = `True for ${meta.variable} = ${listed.values.map(shownRoot).join(' or ')}, but the question has ${wanted.length} solutions, and the rest are still to find.`;
+            status = 'break';
+            lineDiagnosis = lostRootDiagnosis(meta.variable, listed.values.join(' or '), wanted.length);
+            note = lineDiagnosis.message;
           } else {
             status = 'ok';
             pendingExtraneous = []; expLogChain = false;
@@ -1398,22 +1380,12 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
               note = assessed.note;
               lineDiagnosis = assessed.diagnosis || null;
               impliedStep = assessed.implied === true;
-              // A line true of some of the question's roots and of no other value, with no product
-              // line before it that promised the rest, is incomplete, not wrong.
-              if (status === 'break' && (lineDiagnosis?.code === 'lost-solution' || lineDiagnosis?.code === 'lost-root') && !branchesOpen) {
-                const heldRoots = solutionsSatisfying(ast, meta);
-                if (heldRoots.length > 0 && heldRoots.length < wantedRoots.length && extraneousRootOf(ast, meta.variable, wantedRoots) === null) {
-                  status = 'note';
-                  note = `True for ${meta.variable} = ${heldRoots.map(shownRoot).join(' or ')}, but the question has ${wantedRoots.length} solutions, and the rest are still to find.`;
-                  lineDiagnosis = null;
-                }
-              }
               // A true identity that is not a trivial 0 = 0 (a factorisation, an
               // expansion: `x^2 - 1 = (x - 1)(x + 1)`) is a TRUE line. It does not carry the
               // equation forward, so it is not credited, but it is never crossed.
               if (status === 'break' && lineDiagnosis?.code === 'constraint-dropped' && variablesOf(ast.l).size && variablesOf(ast.r).size
                   && String(line).replace(/\s+/g, '') !== String(line).replace(/\s+/g, '').split('=').reverse().join('=')
-                  && restatesQuestionSide(ast, meta, prompt)) {
+                  && (restatesQuestionSide(ast, meta, prompt) || /^[A-Za-z]\s*\(\s*-?[\d.]+\s*\)\s*=/.test(String(line).trim()))) {
                 status = 'note';
                 note = 'True for every value (an identity), so it does not carry the equation forward: Pri neither marks it right nor wrong.';
                 lineDiagnosis = null;

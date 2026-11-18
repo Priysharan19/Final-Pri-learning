@@ -76,7 +76,23 @@ export function valueChainMeta(meta) {
   if (!/^[A-Za-z]$/.test(String(name)) || !/^[A-Za-z]$/.test(String(variable)) || name === variable) return null;
   const ast = parseSafe(expr);
   if (!ast || freeVars(ast).some(v => v !== variable)) return null;
-  return { name, variable, ast, expr, quantities: meta.quantities && typeof meta.quantities === 'object' ? meta.quantities : {} };
+  const out = { name, variable, ast, expr, quantities: meta.quantities && typeof meta.quantities === 'object' ? meta.quantities : {} };
+  // A curve with its derivative and stationary points (the stationary-points family). Each claim is
+  // checked against the function before it is trusted, so a bad meta abstains rather than ticks.
+  const c = meta.curve;
+  if (c && typeof c.derivative === 'string' && Array.isArray(c.stationary) && c.stationary.length) {
+    const dast = parseSafe(c.derivative);
+    if (dast && !freeVars(dast).some(v => v !== variable)) {
+      const num = (f, x) => { try { return evaluate(f, { [variable]: x }); } catch { return NaN; } };
+      const h = 1e-5;
+      const derivativeOk = [-2.3, -0.7, 0.4, 1.9, 3.3].every(x => { const d = (num(ast, x + h) - num(ast, x - h)) / (2 * h); return Math.abs(d - num(dast, x)) <= 1e-4 * Math.max(1, Math.abs(d)); });
+      const stationary = c.stationary.map(Number);
+      if (derivativeOk && stationary.every(x => Number.isFinite(x) && Math.abs(num(dast, x)) < 1e-9)) {
+        out.curve = { dast, derivative: c.derivative, stationary: [...new Set(stationary)].sort((a, b) => a - b), choose: c.choose === 'smaller' || c.choose === 'larger' ? c.choose : null };
+      }
+    }
+  }
+  return out;
 }
 
 /** The value of the function at a constant, or null. */
@@ -127,6 +143,7 @@ function labelOf(raw, fn) {
   const text = String(raw).trim();
   const word = text.toLowerCase().replace(/\s+/g, ' ').replace(/ value$/, '');
   if (Object.hasOwn(QUANTITY_WORDS, word)) return { type: 'quantity', key: QUANTITY_WORDS[word] };
+  if (fn.curve && text === fn.name) return { type: 'definition' };
   const call = text.match(/^([A-Za-z])\s*\(\s*(.+)\s*\)$/);
   if (call && call[1] === fn.name) {
     const arg = call[2].trim();
@@ -153,9 +170,14 @@ export function stepCheckValueChain(meta, workingText) {
     if (!fn) return note(line, GENERIC_NOTE);
     if (i >= LIMITS.lines || line.length > LIMITS.chars) return note(line, 'Not verified: this line is too long or too far down the working to check.');
     if (firstBreak !== -1) return note(line, 'Follows from the earlier slip.');
-    const text = line.replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore|thus)\s+/i, '').replace(/[−–—]/g, '-');
+    const text = line.replace(/[′’]/g, "'").replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore|thus)\s+/i, '').replace(/[−–—]/g, '-');
     if (/[<>≤≥≠≈]|==|!=/.test(text)) return note(line, GENERIC_NOTE);
     if (ambiguousCall(text)) return note(line, 'Not verified: write the function’s argument in brackets, like sin(π/2).');
+    const curveRule = fn.curve ? curveLine(fn, text, line) : null;
+    if (curveRule) {
+      if (curveRule.status === 'break') return breakLine(line, i, curveRule.note, curveRule.code);
+      out.push({ text: line, ...curveRule }); prev = curveRule.status === 'ok' ? prev : null; return;
+    }
     const parts = text.split('=').map(p => p.trim());
     const unreadable = () => note(line, 'This line could not be read as maths, so it is not checked.', { unreadable: true });
 
@@ -228,7 +250,94 @@ export function stepCheckValueChain(meta, workingText) {
     out.push({ text: line, status: 'break', note: message, diagnosis });
     prev = null;
   }
-  return { lines: out, firstBreak, diagnosis, source: 'value-chain' };
+  // One state per line, and ONE reason for the unverified ones, so a caller never has to repeat it.
+  const state = l => l.state || (l.status === 'ok' ? (l.restates ? 'given' : 'verified') : l.status === 'break' ? 'wrong' : l.unreadable ? 'unread' : 'unverified');
+  const lines = out.map(l => ({ ...l, state: state(l) }));
+  const at = st => lines.flatMap((l, k) => (l.state === st ? [k + 1] : []));
+  const unverified = at('unverified'), unread = at('unread');
+  const summary = {
+    total: lines.length,
+    checked: lines.filter(l => l.status === 'ok').length,
+    given: at('given'), verified: at('verified'), conditions: at('condition'), wrong: at('wrong'), unverified, unread,
+    reason: unverified.length ? 'Pri could not tie these lines to anything it can prove about this question, so it did not mark them.' : null
+  };
+  return { lines, firstBreak, diagnosis, source: 'value-chain', summary };
+}
+
+
+const STATIONARY_CONDITION = /(?:^|[\s(])(?:y'|dy\/dx|f'\(x\)|derivative)\s*(?:=|is|equals)\s*0\b/i;
+const ORDER_WORDS = { smaller: 'smaller', smallest: 'smaller', lower: 'smaller', lowest: 'smaller', least: 'smaller', larger: 'larger', largest: 'larger', bigger: 'larger', greater: 'larger', greatest: 'larger', higher: 'larger', highest: 'larger' };
+const sameNum = (a, b) => Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b));
+
+/**
+ * Lines about a curve with stationary points. Returns null when none of these rules is about the
+ * line (the general rules then apply), else { status, note?, state, code? }.
+ */
+function curveLine(fn, text, original) {
+  const { curve, variable, name } = fn;
+  const num = (ast, x) => { try { return evaluate(ast, { [variable]: x }); } catch { return NaN; } };
+  const at = x => num(fn.ast, x);
+  const fmt = v => shown(v);
+  const compact = text.replace(/\s+/g, '');
+  // A stated condition (prose or a bare "y' = 0"): accepted as what it says, never "not verified".
+  if (STATIONARY_CONDITION.test(text) && !text.replace(STATIONARY_CONDITION, '').includes('=')) {
+    return { status: 'note', state: 'condition', note: 'A stated condition: stationary points are where the derivative is 0.' };
+  }
+  // y' = …, dy/dx = …
+  const label = compact.split('=')[0];
+  if ((label === `${name}'` || label === `d${name}/d${variable}` || label === `${name}'(${variable})`) && compact.includes('=')) {
+    const rhs = text.split('=').slice(1).map(x => x.trim());
+    const asts = rhs.map(parseSafe);
+    if (asts.some(a => !a || freeVars(a).some(v => v !== variable))) return null;
+    if (asts.every(a => exprEquivalent(a, curve.dast) === true)) return { status: 'ok', state: 'verified', valueChain: { rule: 'derivative' } };
+    return { status: 'break', code: 'derivative-not-true', note: `This is not the derivative of the curve ${name} = ${fn.expr.replace(/\*/g, '')}.` };
+  }
+  // A choice between the stationary points: "smaller: (0,0)", "smaller x = -3"
+  const choice = text.match(/^(smaller|smallest|lower|lowest|least|larger|largest|bigger|greater|greatest|higher|highest)(?:\s+x(?:\s*-?\s*(?:value|coordinate))?)?\s*[:=-]?\s*(.+)$/i);
+  if (choice) {
+    const which = ORDER_WORDS[choice[1].toLowerCase()];
+    const body = choice[2].trim().replace(/^x\s*=\s*/i, '');
+    const pt = body.match(/^\(\s*([^,()]+?)\s*,\s*([^()]+?)\s*\)$/);
+    const a = constantValue(pt ? pt[1] : body);
+    const b = pt ? constantValue(pt[2]) : null;
+    if (a === null || (pt && b === null)) return null;
+    if (pt && Math.abs(b - at(a)) > 1e-9 * Math.max(1, Math.abs(b))) return { status: 'break', code: 'point-not-on-curve', note: `The point (${fmt(a)}, ${fmt(b)}) is not on the curve.` };
+    if (!curve.stationary.some(x => sameNum(x, a))) return { status: 'break', code: 'not-stationary', note: `x = ${fmt(a)} is not a stationary point.` };
+    const target = which === 'smaller' ? curve.stationary[0] : curve.stationary[curve.stationary.length - 1];
+    if (!sameNum(target, a)) {
+      const other = which === 'smaller' ? 'smaller' : 'larger';
+      return { status: 'break', code: 'wrong-stationary-point', note: `x = ${fmt(target)} is ${other} than x = ${fmt(a)}, so use x = ${fmt(target)}: ${name}(${fmt(target)}) = ${fmt(at(target))}.` };
+    }
+    return { status: 'ok', state: 'verified', valueChain: { rule: 'choice' } };
+  }
+  // x = 0 or x = -3  /  x = 0, x = -3 : the solutions of y' = 0
+  const pieces = text.split(/\bor\b|\band\b|[,;]/i).map(x => x.trim()).filter(Boolean);
+  if (pieces.length >= 1 && pieces.every(pc => new RegExp(`^(?:${variable}\\s*=\\s*)?[-+]?[0-9.]+(?:/[0-9.]+)?$|^(?:${variable}\\s*=\\s*)?\\(?-?[0-9./ ]+\\)?$`).test(pc)) && pieces.some(pc => pc.startsWith(variable))) {
+    const vals = pieces.map(pc => constantValue(pc.replace(new RegExp(`^${variable}\\s*=\\s*`), '')));
+    if (vals.every(v => v !== null)) {
+      const extra = vals.find(v => !curve.stationary.some(x => sameNum(x, v)));
+      if (pieces.length > 1) {
+        if (extra !== undefined) return { status: 'break', code: 'extra-stationary-value', note: `${variable} = ${fmt(extra)} does not make the derivative 0.` };
+        const complete = curve.stationary.every(x => vals.some(v => sameNum(x, v)));
+        return complete ? { status: 'ok', state: 'verified', valueChain: { rule: 'stationary-values' } } : { status: 'note', state: 'unverified', note: 'True, but the derivative is 0 at more values than these.' };
+      }
+      if (extra === undefined) return { status: 'ok', state: 'verified', valueChain: { rule: 'stationary-values' } };
+      return null;
+    }
+  }
+  // An equation that is the stationary condition in another form: A = B with A - B a constant multiple of y'.
+  const sides = text.split('=');
+  if (sides.length === 2) {
+    const A = parseSafe(sides[0]), B = parseSafe(sides[1]);
+    if (A && B && !freeVars(A).some(v => v !== variable) && !freeVars(B).some(v => v !== variable) && (freeVars(A).length || freeVars(B).length)) {
+      const g = x => num(A, x) - num(B, x);
+      const ratios = [-3.1, -1.7, 0.6, 1.3, 2.9, 4.1].map(x => { const d = num(curve.dast, x); return Math.abs(d) < 1e-6 ? NaN : g(x) / d; });
+      if (ratios.every(r => Number.isFinite(r)) && Math.abs(ratios[0]) > 1e-9 && ratios.every(r => Math.abs(r - ratios[0]) <= 1e-7 * Math.max(1, Math.abs(ratios[0])))) {
+        return { status: 'ok', state: 'verified', valueChain: { rule: 'stationary-equation' } };
+      }
+    }
+  }
+  return null;
 }
 
 /** The expression is the function's right-hand side: the same variable only, and equivalent. */

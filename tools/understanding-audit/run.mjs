@@ -11,6 +11,7 @@ import { stepMetaFor } from '../../server/platform/markerOps.js';
 import { stepCheck } from '../../client/src/engine/checker.js';
 import { SEEDS, EXTRA_SEEDS, editionOf, loadFamilies, questionsFor, transcriptsFor } from './corpus.mjs';
 import { buildReport } from './report.mjs';
+import { HAND_BUILT } from './handBuilt.mjs';
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
 
@@ -50,6 +51,17 @@ export async function runAudit({ limit = Infinity } = {}) {
           text: l.text, status: j.statuses[i], note: j.notes[i], index: i, first: j.firstBreak === i
         }));
       }
+    }
+  }
+  // Hand-built cases from live owner testing ride along (family ids start with "hand:").
+  for (const h of HAND_BUILT) {
+    familyInfo[h.family] = { edition: h.edition, questions: 1, supported: stepMetaFor(h.q) ? 1 : 0 };
+    for (const t of h.transcripts) {
+      const texts = t.lines.map(l => l.text);
+      const j = judge(h.q, texts);
+      const ti = transcripts.length;
+      transcripts.push({ family: h.family, edition: h.edition, style: t.style, slipKind: null, supported: j.supported, firstBreak: j.firstBreak, breakAt: t.lines.findIndex(l => l.truth === 'slip'), qkey: 'hand', prompt: h.q.prompt, lines: texts });
+      t.lines.forEach((l, i) => rows.push({ ti, family: h.family, edition: h.edition, style: t.style, supported: j.supported, truth: l.truth, template: false, text: l.text, status: j.statuses[i], note: j.notes[i], index: i, first: j.firstBreak === i }));
     }
   }
   return { rows, transcripts, familyInfo };
