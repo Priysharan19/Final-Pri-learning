@@ -410,7 +410,7 @@
          "blocks": [
           {
            "k": "fig",
-           "name": "figasA"
+           "name": "figQ5OptA"
           }
          ]
         },
@@ -419,7 +419,7 @@
          "blocks": [
           {
            "k": "fig",
-           "name": "figasB"
+           "name": "figQ5OptB"
           }
          ]
         },
@@ -428,7 +428,7 @@
          "blocks": [
           {
            "k": "fig",
-           "name": "figasC"
+           "name": "figQ5OptC"
           }
          ]
         },
@@ -437,7 +437,7 @@
          "blocks": [
           {
            "k": "fig",
-           "name": "figasD"
+           "name": "figQ5OptD"
           }
          ]
         }
@@ -2633,10 +2633,10 @@
   }
  ],
  "figures": [
-  "figasA",
-  "figasB",
-  "figasC",
-  "figasD",
+  "figQ5OptA",
+  "figQ5OptB",
+  "figQ5OptC",
+  "figQ5OptD",
   "figlaser",
   "fignapkin",
   "figcars",

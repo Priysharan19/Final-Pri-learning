@@ -858,7 +858,7 @@
          "blocks": [
           {
            "k": "fig",
-           "name": "figpfunctionsparametriccurvegraphscecadffiwra"
+           "name": "figQ10OptA"
           }
          ]
         },
@@ -867,7 +867,7 @@
          "blocks": [
           {
            "k": "fig",
-           "name": "figpfunctionsparametriccurvegraphscecadffiopt"
+           "name": "figQ10OptB"
           }
          ]
         },
@@ -876,7 +876,7 @@
          "blocks": [
           {
            "k": "fig",
-           "name": "figpfunctionsparametriccurvegraphscecadffiwrb"
+           "name": "figQ10OptC"
           }
          ]
         },
@@ -885,7 +885,7 @@
          "blocks": [
           {
            "k": "fig",
-           "name": "figpfunctionsparametriccurvegraphscecadffiwrc"
+           "name": "figQ10OptD"
           }
          ]
         }
@@ -2336,10 +2336,10 @@
   }
  ],
  "figures": [
-  "figpfunctionsparametriccurvegraphscecadffiwra",
-  "figpfunctionsparametriccurvegraphscecadffiopt",
-  "figpfunctionsparametriccurvegraphscecadffiwrb",
-  "figpfunctionsparametriccurvegraphscecadffiwrc",
+  "figQ10OptA",
+  "figQ10OptB",
+  "figQ10OptC",
+  "figQ10OptD",
   "figpinversetrigpictureanglecfifbjgcpicture",
   "figpstatisticsgaltonboarddfahcfcegalton",
   "figpprojectilesreachableregionhigecfgbreach"

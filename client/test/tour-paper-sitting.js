@@ -239,6 +239,11 @@ try {
   await page.waitForSelector('[data-paper-confirm-empty]', { timeout: 10000 });
   const emptyText = await page.locator('[data-paper-confirm-empty]').innerText();
   check('Submit all says how many parts are empty and names them', /You have not answered \d+ parts/.test(emptyText) && emptyText.includes('Q10') && emptyText.includes('Q11(a)(i)'), emptyText.slice(0, 120));
+  check('the dialog is modal: aria-modal is true and focus has moved inside it', await page.locator('[data-paper-confirm-empty]').getAttribute('aria-modal') === 'true' && await page.evaluate(() => !!document.activeElement?.closest('[data-paper-confirm-empty]')));
+  await page.keyboard.press('Escape');
+  check('Escape closes it and focus returns to the Submit button', await page.locator('[data-paper-confirm-empty]').count() === 0 && await page.evaluate(() => document.activeElement?.matches('[data-paper-submit]')));
+  await page.locator('[data-paper-submit]').click();
+  await page.waitForSelector('[data-paper-confirm-empty]', { timeout: 10000 });
   await page.screenshot({ path: join(SHOTS, '05-submit-confirm-390.png') });
   check('the student can keep working instead', await page.getByRole('button', { name: en['paper.confirm.keepWorking'] }).count() === 1);
   await page.locator('[data-paper-confirm-submit]').click();

@@ -340,6 +340,21 @@ export function assemble({ id, number, paper, guide, overrides = {}, meta = {} }
       }]
     };
   });
+  // The diagram of a multiple-choice OPTION is named by the question and the option letter only. A LaTeX macro name can carry the author's own
+  // marking (the right graph's macro ended "opt", the wrong ones "wra", "wrb", "wrc"), and a file name travels to the student before Submit.
+  const optionFigures = {};
+  for (const q of q1) {
+    const part = q.parts[0];
+    for (const o of part.options || []) {
+      o.blocks = o.blocks.map(b => {
+        if (b.k !== 'fig') return b;
+        const neutral = `figQ${q.number}Opt${o.label}`;
+        optionFigures[b.name] = neutral;
+        return { ...b, name: neutral };
+      });
+    }
+    q.figures = figsOf(q.stem);
+  }
   // Section II
   const q2 = paper.sectionII.map(q => {
     const decorate = part => {
@@ -396,6 +411,7 @@ export function assemble({ id, number, paper, guide, overrides = {}, meta = {} }
   report.counts = { totalMarks: total, mcq: q1.length, section2Leaves: q2.flatMap(q => [...leaves(q.parts)]).length,
     autoMarks: auto, selfCheckMarks: total - auto, keyedSection2Parts: q2.flatMap(q => [...leaves(q.parts)]).filter(p => p.key).length };
 
+  const figureSources = Object.fromEntries(Object.entries(optionFigures).map(([from, to]) => [to, from]));
   const paperDoc = {
     format: 'pri-paper-v1', id, paperNumber: number, title: `Practice Paper ${number}`,
     course: 'nsw-ext1', edition: 'prithagoras', year: 2027, totalMarks: total,
@@ -405,12 +421,12 @@ export function assemble({ id, number, paper, guide, overrides = {}, meta = {} }
       { id: 'I', title: 'Section I', marks: q1.length, minutes: 15, instructions: 'Attempt Questions 1 to 10. Allow about 15 minutes for this section.', questions: q1 },
       { id: 'II', title: 'Section II', marks: q2.reduce((a, q) => a + q.marks, 0), minutes: 105, instructions: 'Attempt Questions 11 to 14. Allow about 1 hour and 45 minutes for this section. Show relevant mathematical reasoning and/or calculations.', questions: q2 }
     ],
-    figures: paper.figures
+    figures: [...new Set(paper.figures.map(n => optionFigures[n] ?? n))]
   };
   // The digest an approval record names: the criteria text and marks only, so an
   // approval can never be read as covering text that changed after it.
   paperDoc.markingScheme.digest = sha(all.map(p => ({ id: p.id, criteria: p.criteria })));
-  return { paperDoc, report };
+  return { paperDoc, report, figureSources };
 }
 
 // ── Katex check ──────────────────────────────────────────────────────────────
@@ -458,7 +474,7 @@ async function main() {
     const id = paperIdOf(n);
     const overridePath = join(HERE, 'overrides', `${id}.json`);
     const overrides = existsSync(overridePath) ? JSON.parse(readFileSync(overridePath, 'utf8')) : {};
-    const { paperDoc, report } = assemble({ id, number: Number(n), paper: parsePaper(paperTex), guide: parseGuidelines(guideTex), overrides, meta: readMeta() });
+    const { paperDoc, report, figureSources } = assemble({ id, number: Number(n), paper: parsePaper(paperTex), guide: parseGuidelines(guideTex), overrides, meta: readMeta() });
     const bad = katexIssues(paperDoc);
     report.katex = bad;
     writeFileSync(join(out, 'structured', `${id}.json`), JSON.stringify(paperDoc, null, 1) + '\n');
@@ -466,7 +482,7 @@ async function main() {
       const figDir = join(out, 'figures', id);
       mkdirSync(figDir, { recursive: true });
       const figsFile = readdirSync(dir).find(f => /figs\.tex$/.test(f));
-      execFileSync('python3', [join(HERE, 'render_figures.py'), dir, figDir, figsFile, ...paperDoc.figures], { stdio: 'inherit' });
+      execFileSync('python3', [join(HERE, 'render_figures.py'), dir, figDir, figsFile, ...paperDoc.figures.map(n => (figureSources[n] ? `${figureSources[n]}=${n}` : n))], { stdio: 'inherit' });
     }
     reports[id] = report;
     console.log(`${id}: ${report.counts.totalMarks} marks, ${report.counts.keyedSection2Parts} keyed Section II parts, ${report.gaps.length} gaps, ${bad.length} maths problems`);

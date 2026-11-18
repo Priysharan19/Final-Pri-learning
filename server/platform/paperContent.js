@@ -69,6 +69,12 @@ export function validateStructured(doc) {
       if (part.key.names !== undefined && !(part.key.type === 'expression' && Object.entries(part.key.names).every(([k, v]) => /^[A-Za-z]_?\{?[A-Za-z0-9]{1,3}\}?$/.test(k) && /^[A-Za-z]$/.test(v)))) fail(doc, `${part.id}: names`);
     }
     if (part.answerType === 'mcq' && (!part.options || part.options.length !== 4)) fail(doc, `${part.id}: options`);
+    // An option's diagram is named by its question and letter only: a name the student receives before Submit must never tell the right option from a wrong one.
+    if (part.answerType === 'mcq') {
+      for (const o of part.options) {
+        for (const b of o.blocks || []) if (b.k === 'fig' && b.name !== `fig${part.id.replace(/^q/, 'Q')}Opt${o.label}`) fail(doc, `${part.id}: option ${o.label} diagram name ${b.name}`);
+      }
+    }
     if (!Number.isInteger(part.autoMarks) || part.autoMarks < 0 || part.autoMarks > part.marks) fail(doc, `${part.id}: autoMarks`);
     if (part.autoMarks > 0 && !part.key) fail(doc, `${part.id}: auto marks without a key`);
     if (part.key && part.autoMarks === 0) fail(doc, `${part.id}: a key that earns nothing`);
@@ -163,6 +169,21 @@ export function givensOf(prompt) {
     out.push({ kind: /^[a-zA-Z]\s*(\([a-z]\))?\s*=/.test(tex) && /\([a-z]\)\s*=/.test(tex) ? 'function' : 'equation', tex });
   }
   return out;
+}
+
+/**
+ * What the engine is given for a part. A multiple-choice answer is ONE letter, A to D, written as "B", "b", "(b)", "B." and nothing else: an empty
+ * answer, whitespace, a word that happens to start with a letter ("Banana"), two letters ("AB") or any other text is NOT an answer and earns nothing.
+ * (indexOf of the first character used to read '' as option A, and "Banana" as B.) Other answer types go to the engine as written; a blank is
+ * unanswered there and anything it cannot read is wrong.
+ */
+export function givenFor(part, text) {
+  const t = String(text ?? '');
+  if (part.key?.type === 'mcq') {
+    const m = /^\(?([ABCD])\)?\.?$/i.exec(t.trim());
+    return m ? String('ABCD'.indexOf(m[1].toUpperCase())) : '';
+  }
+  return t;
 }
 
 /** The engine question for a keyed part (the key never leaves the server). null when the part has no key. */

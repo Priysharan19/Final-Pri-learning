@@ -134,7 +134,7 @@
          "blocks": [
           {
            "k": "fig",
-           "name": "figpfunctionsparametriccurvegraphsjefjjbebwra"
+           "name": "figQ2OptA"
           }
          ]
         },
@@ -143,7 +143,7 @@
          "blocks": [
           {
            "k": "fig",
-           "name": "figpfunctionsparametriccurvegraphsjefjjbebopt"
+           "name": "figQ2OptB"
           }
          ]
         },
@@ -152,7 +152,7 @@
          "blocks": [
           {
            "k": "fig",
-           "name": "figpfunctionsparametriccurvegraphsjefjjbebwrb"
+           "name": "figQ2OptC"
           }
          ]
         },
@@ -161,7 +161,7 @@
          "blocks": [
           {
            "k": "fig",
-           "name": "figpfunctionsparametriccurvegraphsjefjjbebwrc"
+           "name": "figQ2OptD"
           }
          ]
         }
@@ -2072,7 +2072,7 @@
           "expr": "(47/50)^13",
           "anyOf": [
            "0.4474",
-           "0.44741"
+           "0.44737"
           ],
           "display": "\\left(\\dfrac{47}{50}\\right)^{13}"
          },
@@ -2469,10 +2469,10 @@
   }
  ],
  "figures": [
-  "figpfunctionsparametriccurvegraphsjefjjbebwra",
-  "figpfunctionsparametriccurvegraphsjefjjbebopt",
-  "figpfunctionsparametriccurvegraphsjefjjbebwrb",
-  "figpfunctionsparametriccurvegraphsjefjjbebwrc",
+  "figQ2OptA",
+  "figQ2OptB",
+  "figQ2OptC",
+  "figQ2OptD",
   "figpprojectilestowergreatestrangehjbbdcedtower"
  ]
 }

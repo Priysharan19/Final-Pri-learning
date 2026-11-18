@@ -130,10 +130,10 @@ try {
     return r.jar;
   }
   const get = (h, path, jar, headers = {}) => h.request(path, { jar, headers });
-  const bytesOf = async (h, path, jar) => {
+  const bytesOf = async (h, path, jar, headers = {}) => {
     const target = new URL(path, h.origin); // an id read from the manifest file can only ever name a path on this server
     if (target.origin !== new URL(h.origin).origin) throw new Error(`not this server: ${path}`);
-    const response = await fetch(target, { headers: { Cookie: cookieHeader(jar) } });
+    const response = await fetch(target, { headers: { Cookie: cookieHeader(jar), ...headers } });
     return { status: response.status, headers: response.headers, bytes: Buffer.from(await response.arrayBuffer()) };
   };
   const free = await student(hAu, 'free@example.test', null);
@@ -181,17 +181,16 @@ try {
   c.match(sampleGuide.headers.get('content-disposition'), /Marking-Guidelines\.pdf"$/, 'the guidelines file says what it is');
   // Every PDF, paper and guidelines, downloads for a FREE account, a free-plan row, an expired or revoked state and a false claim alike: the server
   // consults no entitlement for a PDF (decision of 19 Nov 2026). Sign-in is the only gate, kept so downloads can be counted.
-  for (const [name, jar, headers] of [['a free account', free], ['a free-plan row', freeRow], ['an expired period', expired], ['a revoked state', revoked], ['a header claim', free, { 'x-pri-plan': 'free' }]]) {
+  for (const [name, jar, headers] of [['a free account', free], ['a free-plan row', freeRow], ['an expired period', expired], ['a revoked state', revoked], ['a header claim', free, { 'x-pri-plan': 'premium', 'x-pri-capabilities': 'premium-exams' }]]) {
     for (const p of manifest.papers) {
       for (const [kind, f] of [['paper', p.paper], ['guidelines', p.guidelines]]) {
         if (!f) continue;
         const known = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13'].map(n => `ext1-2027-p${n}`).concat([NO_GUIDE]).find(x => x === p.id);
-        const got = await bytesOf(hAu, `/v1/papers/${known}/${kind}`, jar);
+        const got = await bytesOf(hAu, `/v1/papers/${known}/${kind}`, jar, headers ?? {});
         if (got.status !== 200 || sha(got.bytes) !== f.sha256) c.ok(false, `${name}: ${p.id}/${kind} should arrive intact (status ${got.status})`);
       }
     }
     c.ok(true, `${name}: every paper and guidelines PDF is free and arrives byte for byte`);
-    void headers;
   }
   const unauth = await get(hAu, `/v1/papers/${LOCKED}/paper`);
   c.eq(unauth.status, 401, 'signed out: a PDF is still refused (sign-in is kept so downloads can be counted)');

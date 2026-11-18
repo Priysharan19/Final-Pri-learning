@@ -60,7 +60,7 @@ import { parseOriginal, keepOriginal, OriginalRefused, originalProof } from './o
 import { recognitionOpsFor, sendRecognitionRefusal } from './recognitionOps.js';
 import { transcribeHandwriting, validateImage, HandwritingProviderError } from './handwritingProvider.js';
 import { SUBTOPIC_OUTCOMES, RETEST_ID, buildPlan, buildRetest, compare, retestDoc } from './paperPlan.js';
-import { engineQuestion, howMarked, publicPaper, schemeApproved, scopedLeaves, statedTime } from './paperContent.js';
+import { engineQuestion, givenFor, howMarked, publicPaper, schemeApproved, scopedLeaves, statedTime } from './paperContent.js';
 
 const DAY = 24 * 60 * 60 * 1000;
 export { SUBTOPIC_OUTCOMES };
@@ -73,6 +73,7 @@ const FIG = /^fig[A-Za-z0-9]{1,100}$/;
 const MODES = ['typed', 'ink', 'photo'];
 const MAX_TEXT = 12000;
 const MAX_OPEN = 24;
+const MAX_KEPT = 200;
 const plain = v => !!v && typeof v === 'object' && !Array.isArray(v);
 const unknownKeys = (o, ok) => Object.keys(o).filter(k => !ok.includes(k));
 const digest = v => createHash('sha256').update(JSON.stringify(v)).digest('hex');
@@ -155,12 +156,15 @@ export function mountPaperAttempts(router, db, ctx) {
       const same = open.filter(s => s.paperId === doc.id && JSON.stringify(s.scope || null) === JSON.stringify(scope)).sort((a, b) => b.issuedAt - a.issuedAt)[0];
       if (same && body.fresh !== true) return { id: same.id, resumed: true };
       if (open.length >= MAX_OPEN) return { full: true };
+      // Every kept sitting, open or submitted, counts: an account cannot grow its rows without bound.
+      if (rows.length >= MAX_KEPT) return { kept: true };
       const id = randomUUID();
       const sit = { paperId: doc.id, scope, issuedAt: now, timer: body.timer || 'paper' };
       await db.run(UPSERT, [accountId, 'paper-sitting', id, JSON.stringify(sit), digest(sit), now, now + KEEP]);
       return { id, resumed: false };
     }, { accountScope: accountId, lock: `paper-attempt:${accountId}` });
     if (out.full) return refuse(res, 409, 'PAPER_ATTEMPTS_OPEN_LIMIT', `Finish or leave one of your ${MAX_OPEN} open sittings first.`);
+    if (out.kept) return refuse(res, 409, 'PAPER_ATTEMPTS_KEPT_LIMIT', `Your account already keeps ${MAX_KEPT} sittings. Ask support to clear old ones before starting another.`);
     req.params.attemptId = out.id;
     const s = await sitting(req, res);
     if (!s) return undefined;
@@ -313,6 +317,8 @@ export function mountPaperAttempts(router, db, ctx) {
     const cooling = await markerCooldownUntil(db, s.accountId);
     if (cooling) return refuse(res, 429, 'MARKING_COOLDOWN', 'Several entries could not be checked. Wait a few minutes, then write the answers simply.', { retryAfterMs: Math.max(0, cooling - Date.now()) });
     const leaves = scopedLeaves(s.doc, s.sit.scope);
+    // A sitting with nothing answered is not submitted: it would record a zero as a result (and spend the sitting).
+    if (!leaves.some(l => s.saved.answers[l.part.id])) return refuse(res, 409, 'PAPER_NOTHING_ANSWERED', 'Answer at least one part before you submit.');
     // Handwritten parts must have been kept (the original is the evidence): never marked from a bare text.
     const unkept = leaves.filter(l => { const a = s.saved.answers[l.part.id]; return a && a.mode !== 'typed' && !a.originalId; }).map(l => l.part.id);
     if (unkept.length) return refuse(res, 409, 'PAPER_ORIGINALS_MISSING', 'Keep each handwritten or photographed part before submitting.', { parts: unkept });
@@ -327,7 +333,7 @@ export function mountPaperAttempts(router, db, ctx) {
       if (!part.key) { parts[part.id] = { ...base, checks: 'self', verdict: 'self-check', awarded: 0 }; continue; }
       if (!a) { parts[part.id] = { ...base, checks: 'pri', verdict: 'unanswered', awarded: 0 }; continue; }
       const q = engineQuestion(s.doc, { part, question, section });
-      const given = part.key.type === 'mcq' ? String('ABCD'.indexOf(String(a.text).trim().toUpperCase().slice(0, 1))) : a.text;
+      const given = givenFor(part, a.text);
       const grid = { correct: part.autoMarks, incorrect: 0, unanswered: 0 };
       const out = await pool.run('exam', { q, given, working: '', grid }, { key: s.accountId });
       if (!out.ok && out.code === MARKING_BUSY) return refuse(res, 503, MARKING_BUSY, BUSY_MESSAGE);
@@ -433,7 +439,7 @@ export function mountPaperAttempts(router, db, ctx) {
       const rows = await db.all("SELECT key,response_json FROM idempotency_keys WHERE account_id=? AND scope='paper-sitting' AND expires_at>?", [s.accountId, s.now]);
       const same = rows.map(r => ({ id: r.key, ...JSON.parse(r.response_json) })).find(x => x.retest?.of === s.id);
       if (same) return { id: same.id, resumed: true };
-      if (rows.length >= 200) return { full: true };
+      if (rows.length >= MAX_KEPT) return { full: true };
       const id = randomUUID();
       const sit = { paperId: RETEST_ID, scope: null, issuedAt: s.now, timer: 'off', retest: { of: s.id, parts: built.parts, fallbacks: built.fallbacks } };
       await db.run(UPSERT, [s.accountId, 'paper-sitting', id, JSON.stringify(sit), digest(sit), s.now, s.now + KEEP]);

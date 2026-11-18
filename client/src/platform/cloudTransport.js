@@ -342,7 +342,7 @@ const proofList = list => list.filter(kind => typeof kind === 'string' && PROOF_
 
 export async function cloudRequest(path, {
   method = 'GET', body = undefined, idempotencyKey = null, timeoutMs = DEFAULT_TIMEOUT_MS, signal = null,
-  query = null, csv = false
+  query = null, csv = false, keepalive = false
 } = {}) {
   if (!PATH.test(String(path || '')) || String(path).includes('..')) throw new Error('Cloud path is not allowed');
   const verb = String(method || 'GET').toUpperCase();
@@ -433,6 +433,8 @@ export async function cloudRequest(path, {
       credentials: 'include',
       cache: 'no-store',
       redirect: 'error',
+      // A small request may outlive the page (a save sent as the tab closes); the browser refuses more than 64 kB.
+      ...(keepalive && byteLength(payload || '') < 60_000 ? { keepalive: true } : {}),
       signal: controller.signal
     });
     const text = await response.text();

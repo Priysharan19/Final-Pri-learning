@@ -1,7 +1,7 @@
 // HSC Pass to the exams: the price schedule, the end date and the disclosure (client/src/engine/hscPass.js).
 // Pure arithmetic. No payment, no entitlement, no checkout is touched here.
 import assert from 'node:assert/strict';
-import { HSC_PASS, passEndDate, passOffer, wholeMonthsBetween } from '../src/engine/hscPass.js';
+import { HSC_PASS, passEndDate, passOffer, passOfferAt, sydneyDate, wholeMonthsBetween } from '../src/engine/hscPass.js';
 
 let n = 0;
 const eq = (a, b, m) => { assert.deepEqual(a, b, m); n += 1; };
@@ -31,6 +31,11 @@ eq(passOffer(2027, 'soon'), null, 'a malformed day is no offer');
 const offer = passOffer(2027, '2027-05-02');
 eq([offer.renews, offer.endsOn, offer.provisionalEndDate], [false, '2027-11-01', true], 'the offer shows no renewal, the end date and that it is provisional');
 eq(offer.disclosure, 'One payment of A$58. It does not renew. Your HSC Pass ends on 2027-11-01 (date to be confirmed by NESA).', 'the exact price and end date are stated before purchase');
+// The purchase day is the day in Sydney, not in UTC
+eq(sydneyDate(Date.UTC(2027, 4, 1, 14, 30)), '2027-05-02', '14:30 UTC on 1 May is already 2 May in Sydney (AEST +10)');
+eq(passOfferAt(2027, Date.UTC(2027, 4, 1, 14, 30)).priceAud, 58, 'so the price is the 2 May price (five whole months), not the 1 May full price');
+eq(passOfferAt(2027, Date.UTC(2027, 4, 1, 13, 30)).priceAud, 69, 'and 13:30 UTC is still 1 May in Sydney: full price');
+eq(passOfferAt(2027, Date.UTC(2027, 9, 31, 13, 30)), null, '13:30 UTC on 31 Oct is 1 Nov in Sydney (AEDT +11): the pass has ended, nothing to buy');
 for (let m = 0; m < 400; m += 1) {
   const day = new Date(Date.UTC(2026, 10, 20) + m * 86_400_000).toISOString().slice(0, 10);
   const p = price(day);

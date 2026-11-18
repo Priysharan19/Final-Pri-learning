@@ -19,7 +19,7 @@ export function startSitting(paperId, { question = null, fresh = false, timer = 
   return cloudRequest(`/v1/papers/${paperId}/attempts`, { method: 'POST', body: { ...(question ? { question } : {}), ...(fresh ? { fresh: true } : {}), ...(timer ? { timer } : {}) } });
 }
 export function loadSitting(id) { need(ID.test(id), 'sitting id'); return cloudRequest(`/v1/papers/attempts/${id}`); }
-export function saveAnswers(id, body) { need(ID.test(id), 'sitting id'); return cloudRequest(`/v1/papers/attempts/${id}/answers`, { method: 'POST', body }); }
+export function saveAnswers(id, body, { keepalive = false } = {}) { need(ID.test(id), 'sitting id'); return cloudRequest(`/v1/papers/attempts/${id}/answers`, { method: 'POST', body, keepalive }); }
 export function keepPart(id, partId, body) {
   need(ID.test(id) && PART.test(partId), 'part');
   return cloudRequest(`/v1/papers/attempts/${id}/parts/${partId}/original`, { method: 'POST', body, timeoutMs: 60_000 });
@@ -56,6 +56,8 @@ export function failureKey(error) {
   if (code === 'PAPER_ORIGINALS_MISSING') return 'paper.err.keep';
   if (code === 'RECOGNITION_READ_EXPIRED') return 'paper.err.readAgain';
   if (code === 'PAPER_ATTEMPT_SUBMITTED') return 'paper.err.submitted';
+  if (code === 'PAPER_NOTHING_ANSWERED') return 'paper.err.nothing';
+  if (code === 'PAPER_ATTEMPTS_KEPT_LIMIT') return 'paper.err.keptLimit';
   if (code === 'MARKING_BUSY' || code === 'MARKING_COOLDOWN') return 'paper.err.busy';
   return 'paper.err.generic';
 }

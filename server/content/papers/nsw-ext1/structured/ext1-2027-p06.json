@@ -787,7 +787,7 @@
          "blocks": [
           {
            "k": "fig",
-           "name": "figswA"
+           "name": "figQ9OptA"
           }
          ]
         },
@@ -796,7 +796,7 @@
          "blocks": [
           {
            "k": "fig",
-           "name": "figswB"
+           "name": "figQ9OptB"
           }
          ]
         },
@@ -805,7 +805,7 @@
          "blocks": [
           {
            "k": "fig",
-           "name": "figswC"
+           "name": "figQ9OptC"
           }
          ]
         },
@@ -814,7 +814,7 @@
          "blocks": [
           {
            "k": "fig",
-           "name": "figswD"
+           "name": "figQ9OptD"
           }
          ]
         }
@@ -2704,10 +2704,10 @@
  "figures": [
   "figdomino",
   "figsweep",
-  "figswA",
-  "figswB",
-  "figswC",
-  "figswD",
+  "figQ9OptA",
+  "figQ9OptB",
+  "figQ9OptC",
+  "figQ9OptD",
   "figmedian",
   "figortho",
   "figdose",

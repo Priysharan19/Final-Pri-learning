@@ -123,6 +123,7 @@ export default function PaperSitting() {
   const [timerOn, setTimerOn] = useState(true);
   const [elapsed, setElapsed] = useState(0);
   const [confirming, setConfirming] = useState(false);
+  const confirmRef = useRef(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const [solutions, setSolutions] = useState({});
@@ -159,6 +160,23 @@ export default function PaperSitting() {
     return () => clearInterval(tick);
   }, [attempt, submitted]);
 
+  // The "you have empty parts" dialog is modal: focus moves into it, Tab stays inside, Escape closes it, and focus goes back to where it was.
+  useEffect(() => {
+    if (!confirming) return undefined;
+    const before = document.activeElement;
+    confirmRef.current?.focus();
+    return () => { if (before && typeof before.focus === 'function' && document.contains(before)) before.focus(); };
+  }, [confirming]);
+  const confirmKeys = e => {
+    if (e.key === 'Escape') { e.stopPropagation(); setConfirming(false); return; }
+    if (e.key !== 'Tab') return;
+    const items = [...confirmRef.current.querySelectorAll('button')];
+    if (!items.length) return;
+    const first = items[0], last = items[items.length - 1];
+    if (e.shiftKey && (document.activeElement === first || document.activeElement === confirmRef.current)) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  };
+
   const flush = useCallback(() => {
     saving.current = saving.current.then(async () => {
       const ids = [...dirty.current];
@@ -194,10 +212,19 @@ export default function PaperSitting() {
   useEffect(() => {
     if (!attempt || submitted) return undefined;
     const hide = () => { if (document.visibilityState === 'hidden') flush(); };
+    // A hard tab close or navigation away: the unsaved answers are sent at once, with keepalive, so the request outlives the page.
+    const leave = () => {
+      const ids = [...dirty.current];
+      if (!ids.length) return;
+      const payload = {};
+      for (const id of ids) { const a = answersRef.current[id]; payload[id] = { mode: a?.mode || 'typed', text: a?.text || '', ...(a?.working ? { working: a.working } : {}) }; }
+      saveAnswers(attemptId, { answers: payload, ms: Math.round(elapsedRef.current), ...(timerRef.current ? { timer: timerRef.current } : {}) }, { keepalive: true }).catch(() => {});
+    };
+    window.addEventListener('pagehide', leave);
     document.addEventListener('visibilitychange', hide);
     const beat = setInterval(() => { timerRef.current = timerRef.current ?? (timerOn ? 'paper' : 'off'); flush(); }, 30_000);
-    return () => { document.removeEventListener('visibilitychange', hide); clearInterval(beat); };
-  }, [attempt, submitted, flush, timerOn]);
+    return () => { document.removeEventListener('visibilitychange', hide); window.removeEventListener('pagehide', leave); clearInterval(beat); };
+  }, [attempt, submitted, flush, timerOn, attemptId]);
 
   const change = useCallback((partId, next) => {
     // a kept flag is the server's word, set only by the Keep call; an edit clears it
@@ -310,7 +337,7 @@ export default function PaperSitting() {
       )}
 
       {confirming && (
-        <div className="pp-confirm" role="alertdialog" aria-modal="false" aria-labelledby="pp-confirm-h" data-paper-confirm-empty>
+        <div className="pp-confirm" role="alertdialog" aria-modal="true" aria-labelledby="pp-confirm-h" tabIndex={-1} ref={confirmRef} onKeyDown={confirmKeys} data-paper-confirm-empty>
           <h2 id="pp-confirm-h" className="pp-h3">{t('paper.confirm.title', { n: empty.length })}</h2>
           <p className="muted pp-empty-list">{empty.slice(0, 40).map(l => `Q${l.question.number}${l.label}`).join(', ')}{empty.length > 40 ? '…' : ''}</p>
           <div className="pp-confirm-row">

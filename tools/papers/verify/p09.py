@@ -317,6 +317,16 @@ def q14b():
     h = mp.findroot(lambda hh: 6 / dV(hh) - 1 / mp.pi, 1.0)
     check_num("q14b-iv", float(h), f"root of 6/V'(h)=1/pi: h={mp.nstr(h, 15)}")
 
-for f in (q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, q11a, q11d, q11e, q12a, q12b, q12c, q13, q13b, q14a, q14b):
+def q14a_decimals():
+    # every decimal spelling the key accepts must be (47/50)^13 rounded to the places it is written to (0.4474 and 0.44737; 0.44741 was a typo)
+    mp.mp.dps = 30
+    v = (mp.mpf(47) / 50) ** 13
+    shown = []
+    for t in kc("q14a-i").get("anyOf", []):
+        places = len(t.split(".")[1]) if "." in t else 0
+        shown.append((t, bool(abs(mp.mpf(t) - v) <= mp.mpf(10) ** (-places) / 2)))
+    report("q14a-i decimals", "PASS" if shown and all(g for _, g in shown) else "FAIL", f"anyOf decimals vs (47/50)^13 = {mp.nstr(v, 10)}: {shown}")
+
+for f in (q14a_decimals, q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, q11a, q11d, q11e, q12a, q12b, q12c, q13, q13b, q14a, q14b):
     f()
 finish("09")

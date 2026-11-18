@@ -11,9 +11,12 @@ and PyMuPDF; the app never runs this.
 import os, re, shutil, subprocess, sys, tempfile
 
 def main():
-    src, out, figs_file, names = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4:]
-    if not names:
+    src, out, figs_file, specs = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4:]
+    if not specs:
         return
+    # each spec is a LaTeX macro name, or macro=output name (an option's diagram is published under a neutral name)
+    names = [s.split('=')[0] for s in specs]
+    outs = [s.split('=')[-1] for s in specs]
     import pymupdf as fitz
     tex = open(os.path.join(src, 'paper.tex'), encoding='utf8').read()
     pre = tex.split('\\begin{document}')[0]
@@ -34,7 +37,7 @@ def main():
         if len(doc) != len(names):
             sys.exit('expected %d figure pages, got %d' % (len(names), len(doc)))
         os.makedirs(out, exist_ok=True)
-        for name, page in zip(names, doc):
+        for name, page in zip(outs, doc):
             svg = page.get_svg_image(text_as_path=True)
             # a figure is an image of the question's own diagram: keep it small and self-contained
             svg = re.sub(r'<\?xml[^>]*\?>\s*', '', svg)

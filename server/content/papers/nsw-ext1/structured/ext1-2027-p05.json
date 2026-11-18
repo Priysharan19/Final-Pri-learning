@@ -610,7 +610,7 @@
          "blocks": [
           {
            "k": "fig",
-           "name": "figwhA"
+           "name": "figQ7OptA"
           }
          ]
         },
@@ -619,7 +619,7 @@
          "blocks": [
           {
            "k": "fig",
-           "name": "figwhB"
+           "name": "figQ7OptB"
           }
          ]
         },
@@ -628,7 +628,7 @@
          "blocks": [
           {
            "k": "fig",
-           "name": "figwhC"
+           "name": "figQ7OptC"
           }
          ]
         },
@@ -637,7 +637,7 @@
          "blocks": [
           {
            "k": "fig",
-           "name": "figwhD"
+           "name": "figQ7OptD"
           }
          ]
         }
@@ -2701,10 +2701,10 @@
  "figures": [
   "figtrigrid",
   "figwheel",
-  "figwhA",
-  "figwhB",
-  "figwhC",
-  "figwhD",
+  "figQ7OptA",
+  "figQ7OptB",
+  "figQ7OptC",
+  "figQ7OptD",
   "figfield",
   "figfortyfive",
   "figcev",

@@ -320,7 +320,7 @@
          "blocks": [
           {
            "k": "fig",
-           "name": "figpfunctionsreciprocalabsolutegraphscaddijacwra"
+           "name": "figQ4OptA"
           }
          ]
         },
@@ -329,7 +329,7 @@
          "blocks": [
           {
            "k": "fig",
-           "name": "figpfunctionsreciprocalabsolutegraphscaddijacwrb"
+           "name": "figQ4OptB"
           }
          ]
         },
@@ -338,7 +338,7 @@
          "blocks": [
           {
            "k": "fig",
-           "name": "figpfunctionsreciprocalabsolutegraphscaddijacwrc"
+           "name": "figQ4OptC"
           }
          ]
         },
@@ -347,7 +347,7 @@
          "blocks": [
           {
            "k": "fig",
-           "name": "figpfunctionsreciprocalabsolutegraphscaddijacopt"
+           "name": "figQ4OptD"
           }
          ]
         }
@@ -2376,10 +2376,10 @@
  ],
  "figures": [
   "figpfunctionsreciprocalabsolutegraphscaddijacbase",
-  "figpfunctionsreciprocalabsolutegraphscaddijacwra",
-  "figpfunctionsreciprocalabsolutegraphscaddijacwrb",
-  "figpfunctionsreciprocalabsolutegraphscaddijacwrc",
-  "figpfunctionsreciprocalabsolutegraphscaddijacopt",
+  "figQ4OptA",
+  "figQ4OptB",
+  "figQ4OptC",
+  "figQ4OptD",
   "figpdifferentialequationsslopefieldmatchfbbafddcslope",
   "figpcombinatoricssegmentsbetweenlinesbceddfccsegments",
   "figpvectorsbilliardreflectionbidegffebilliard",

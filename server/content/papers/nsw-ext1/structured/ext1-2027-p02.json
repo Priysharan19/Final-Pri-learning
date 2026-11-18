@@ -237,7 +237,7 @@
          "blocks": [
           {
            "k": "fig",
-           "name": "figchA"
+           "name": "figQ3OptA"
           }
          ]
         },
@@ -246,7 +246,7 @@
          "blocks": [
           {
            "k": "fig",
-           "name": "figchB"
+           "name": "figQ3OptB"
           }
          ]
         },
@@ -255,7 +255,7 @@
          "blocks": [
           {
            "k": "fig",
-           "name": "figchC"
+           "name": "figQ3OptC"
           }
          ]
         },
@@ -264,7 +264,7 @@
          "blocks": [
           {
            "k": "fig",
-           "name": "figchD"
+           "name": "figQ3OptD"
           }
          ]
         }
@@ -2565,10 +2565,10 @@
  ],
  "figures": [
   "figdots",
-  "figchA",
-  "figchB",
-  "figchC",
-  "figchD",
+  "figQ3OptA",
+  "figQ3OptB",
+  "figQ3OptC",
+  "figQ3OptD",
   "figtri",
   "figcusp",
   "figquad",

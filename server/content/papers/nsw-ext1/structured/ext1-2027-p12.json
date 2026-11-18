@@ -236,7 +236,7 @@
          "blocks": [
           {
            "k": "fig",
-           "name": "figpfunctionsreciprocalabsolutegraphsehfehccbwra"
+           "name": "figQ3OptA"
           }
          ]
         },
@@ -245,7 +245,7 @@
          "blocks": [
           {
            "k": "fig",
-           "name": "figpfunctionsreciprocalabsolutegraphsehfehccbopt"
+           "name": "figQ3OptB"
           }
          ]
         },
@@ -254,7 +254,7 @@
          "blocks": [
           {
            "k": "fig",
-           "name": "figpfunctionsreciprocalabsolutegraphsehfehccbwrb"
+           "name": "figQ3OptC"
           }
          ]
         },
@@ -263,7 +263,7 @@
          "blocks": [
           {
            "k": "fig",
-           "name": "figpfunctionsreciprocalabsolutegraphsehfehccbwrc"
+           "name": "figQ3OptD"
           }
          ]
         }
@@ -2344,10 +2344,10 @@
  ],
  "figures": [
   "figpfunctionsreciprocalabsolutegraphsehfehccbbase",
-  "figpfunctionsreciprocalabsolutegraphsehfehccbwra",
-  "figpfunctionsreciprocalabsolutegraphsehfehccbopt",
-  "figpfunctionsreciprocalabsolutegraphsehfehccbwrb",
-  "figpfunctionsreciprocalabsolutegraphsehfehccbwrc",
+  "figQ3OptA",
+  "figQ3OptB",
+  "figQ3OptC",
+  "figQ3OptD",
   "figpdifferentialequationsslopefieldmatchfhafffdfslope",
   "figpvectorsparallelogramratiosbdhbiaccpgram",
   "figpinductionregionsbeccddffregions",

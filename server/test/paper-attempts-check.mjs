@@ -221,6 +221,28 @@ try {
   // Before Submit: no solution
   c.deq([(await get(hAu, free, `/v1/papers/attempts/${A.id}/parts/q1/solution`)).status, (await get(hAu, free, `/v1/papers/attempts/${A.id}/parts/q1/solution`)).data.error.code], [409, 'PAPER_NOT_SUBMITTED'], 'the sample answer is refused before Submit');
 
+  const sweeper = await student(hAu, null);
+  // An empty Submit (nothing answered) is refused: it would record a zero and spend the sitting.
+  const emptySit = (await post(hAu, sweeper, `/v1/papers/${P01}/attempts`, { fresh: true })).data.attempt;
+  const emptySubmit = await post(hAu, sweeper, `/v1/papers/attempts/${emptySit.id}/submit`, { submissionId: 'paper-submit-empty1' });
+  c.deq([emptySubmit.status, emptySubmit.data.error.code], [409, 'PAPER_NOTHING_ANSWERED'], 'an empty Submit is refused with a clear message, and the sitting stays open');
+  c.eq((await get(hAu, sweeper, `/v1/papers/attempts/${emptySit.id}`)).data.attempt.state, 'open', 'and open');
+  // A multiple-choice answer that is not one letter earns nothing: "" and "Banana" were read as options A and B.
+  await put(hAu, sweeper, `/v1/papers/attempts/${emptySit.id}/answers`, { answers: { q1: { mode: 'typed', text: 'Banana' }, q2: { mode: 'typed', text: 'AB' }, q3: { mode: 'typed', text: '(c)' } } });
+  const junkR = await post(hAu, sweeper, `/v1/papers/attempts/${emptySit.id}/submit`, { submissionId: 'paper-submit-empty2' });
+  const junk = junkR.data.attempt.result;
+  c.deq(['q1', 'q2'].map(id => [junk.parts[id].verdict, junk.parts[id].awarded]), [['unanswered', 0], ['unanswered', 0]], 'words and two letters in a multiple-choice box are not answered and earn nothing, whatever the key');
+  // Retained sittings are capped per account (open or submitted): the 201st is refused.
+  const capped = await student(hAu, null);
+  const { randomUUID } = await import('node:crypto');
+  const nowMs = Date.now();
+  for (let i = 0; i < 200; i += 1) {
+    const key = randomUUID();
+    await asStore(hAu.db).run('INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,?,?,?,?,?,?)', [capped.id, 'paper-sitting', key, JSON.stringify({ paperId: P01, scope: null, issuedAt: nowMs, timer: 'paper' }), 'x', nowMs, nowMs + 1e9]);
+    await asStore(hAu.db).run('INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,?,?,?,?,?,?)', [capped.id, 'paper-result', key, '{}', 'x', nowMs, nowMs + 1e9]);
+  }
+  const over = await post(hAu, capped, `/v1/papers/${P01}/attempts`, { fresh: true });
+  c.deq([over.status, over.data.error.code], [409, 'PAPER_ATTEMPTS_KEPT_LIMIT'], 'an account that already keeps 200 sittings is refused a new one');
   // ── 4 · Submit all ──────────────────────────────────────────────────────────
   c.eq((await post(hAu, free, `/v1/papers/attempts/${A.id}/submit`, { submissionId: 'x', price: 1 })).status, 400, 'an invalid submit body is refused');
   const sub = await post(hAu, free, `/v1/papers/attempts/${A.id}/submit`, { submissionId: 'paper-submit-0001', ms: 9000 });
@@ -259,6 +281,7 @@ try {
   // an approved digest lights criterion marks up
   const ap = await student(hApproved, null);
   const apA = (await post(hApproved, ap, `/v1/papers/${P01}/attempts`, {})).data.attempt;
+  await put(hApproved, ap, `/v1/papers/attempts/${apA.id}/answers`, { answers: { q1: { mode: 'typed', text: 'A' } } });
   await post(hApproved, ap, `/v1/papers/attempts/${apA.id}/submit`, {});
   const apSol = await get(hApproved, ap, `/v1/papers/attempts/${apA.id}/parts/q11a-iii/solution`);
   c.deq([apSol.data.howMarked.map(k => k.marks), apSol.data.criteriaMarksShown], [[3, 2, 1], true], 'WITH an approval record whose digest matches, the criteria carry their marks');

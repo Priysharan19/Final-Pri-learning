@@ -55,6 +55,14 @@ export function wholeMonthsBetween(from, to) {
   return Math.max(0, months);
 }
 
+/** The calendar date (YYYY-MM-DD) in Sydney at an instant: the purchase day is the day the student is in, not the UTC day. */
+export function sydneyDate(ms) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms));
+}
+
+/** The offer at an instant, on the Sydney date. */
+export const passOfferAt = (examYear, ms) => passOffer(examYear, sydneyDate(ms));
+
 /**
  * The offer on a given day: exact price (whole A$), end date, months it covers, and whether the end date is provisional.
  * `null` once the pass would have ended (nothing left to buy).
