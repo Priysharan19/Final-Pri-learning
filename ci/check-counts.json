@@ -485,7 +485,7 @@
       "log": "guest-trial.log",
       "pins": [
         {"has":"✓ guest-trial-check.mjs (103 checks)","note":"ADR-0003, the guest trial over real HTTP (re-derived by running)."},
-        {"has":"✓ guest-menu-issuable-check.mjs (3704 checks)","note":"Everything the guest picker lists, in both editions, is a request the edition's server issues (3704, re-derived by running; it follows the number of listed chapter-and-level cells)."}
+        {"has":"✓ guest-menu-issuable-check.mjs (3907 checks)","note":"Everything the guest picker lists, in both editions, is a request the edition's server issues (3907, re-derived by running on the marking-release tree; 3704 before its issued cells grew; it follows the number of listed chapter-and-level cells)."}
       ]
     },
     "platform/secret-shapes.log": {

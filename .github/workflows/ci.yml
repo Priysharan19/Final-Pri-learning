@@ -1033,6 +1033,9 @@ jobs:
             # Every NSW notes chapter in light and dark: no KaTeX error, one section order, CMU Serif
             # for reading, no stripe, gradient, emoji or overflow at phone width.
             node client/test/nsw-notes-visual-check.mjs 2>&1 | tee -a browser.log
+            # The living formulas (drag a number, the graph redraws) in light and dark, phone and desktop (needs Chromium, so here
+            # and not in the suites shards; the arithmetic is test:living in the shards).
+            node client/test/living-formulas-check.mjs 2>&1 | tee -a browser.log
             # Plan E5: a built Prithagoras client on a Prithagoras server shows
             # no price, plan or purchase control and reaches no store.
             node client/test/tour-paywall-edition.js 2>&1 | tee -a browser.log

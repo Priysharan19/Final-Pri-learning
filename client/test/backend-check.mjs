@@ -1754,7 +1754,7 @@ async function run() {
     // the build and on the server unless each turns it on; then forwarded to the
     // server's own issued question, charging nothing on the device.
     {
-      const hpQ = await answerableQuestion({ mode: 'topic', subtopic: topicId });
+      const hpQ = await answerableQuestion({ mode: 'topic', subtopic: topicId, difficulty: 3 });
       const priorOverrides = globalThis.__PRI_FEATURE_OVERRIDES__;
       await rejects('the help plan is dark unless the build turns it on', POST(`/practice/${hpQ.question.id}/help-plan`, { helpRequested: true }), { status: 404 });
       globalThis.__PRI_FEATURE_OVERRIDES__ = { ...(priorOverrides || {}), tutorPolicy: true };
