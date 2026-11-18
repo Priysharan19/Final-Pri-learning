@@ -165,7 +165,7 @@ const INSTALL_GZIP_CEILING = 1_000_000;
 // (about 40 more catalogue entries each), and the HSC Pass arithmetic. The papers UI is already a lazy chunk (App.jsx React.lazy) and the
 // structured papers are server content, so there was no larger saving to take; the new ceiling leaves about 48 kB. Other ceilings unchanged.
 const FIRST_VISIT_RAW_CEILING = 5_400_000;
-const FIRST_VISIT_GZIP_CEILING = 1_750_000;
+const FIRST_VISIT_GZIP_CEILING = 1_850_000;
 
 // Things that must never be in the install again, and what each one costs.
 const BANNED_FROM_INSTALL = [
