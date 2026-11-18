@@ -192,7 +192,8 @@ try {
     for (const p of manifest.papers) {
       for (const [kind, f] of [['paper', p.paper], ['guidelines', p.guidelines]]) {
         if (!f) continue;
-        const got = await bytesOf(hAu, `/v1/papers/${p.id}/${kind}`, jar);
+        const known = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13'].map(n => `ext1-2027-p${n}`).concat([NO_GUIDE]).find(x => x === p.id); // a literal from this file, never the manifest's own string
+        const got = await bytesOf(hAu, `/v1/papers/${known}/${kind}`, jar);
         if (got.status !== 200 || sha(got.bytes) !== f.sha256) c.ok(false, `${name}: ${p.id}/${kind} should arrive intact (status ${got.status})`);
       }
     }
