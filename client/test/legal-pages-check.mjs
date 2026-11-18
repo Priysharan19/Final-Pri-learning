@@ -368,8 +368,13 @@ ok(!/परीक्षा-परिणाम की भविष्यवाण
 const consentCode = readFileSync(join(ROOT, 'server/platform/guardianConsent.js'), 'utf8');
 ok(/CONSENT_METHOD = 'guardian-email-confirmation'/.test(consentCode),
   'the server records guardian consent as an email confirmation (the fact the notice must state)');
-ok(/it does not ask for your age/i.test(privacy),
-  'the notice says plainly that no age is collected');
+// The sign-up flow asks an age (SignUpFlow.jsx AGES, 11-17 or "18 or older") and the
+// server keeps only the decision it made from it (accounts.age_basis), so the notice
+// says exactly that: it asks, it does not keep, it never asks for a date of birth.
+ok(/it asks your age but does not keep it,\s+and it never asks for your date of birth/i.test(privacy)
+  && /const AGES = \[11, 12, 13, 14, 15, 16, 17\]/.test(readFileSync(join(ROOT, 'client/src/components/SignUpFlow.jsx'), 'utf8'))
+  && !/UPDATE accounts SET age\b/.test(readFileSync(join(ROOT, 'server/platform/otp.js'), 'utf8')),
+  'the notice says the app asks your age and keeps only the child/adult decision (SignUpFlow.jsx, otp.js)');
 ok(/asks for a parent\s+or guardian's name and email address/i.test(privacy),
   'the notice discloses that a guardian name and email are collected for an under-18 account');
 ok(/parent or guardian's name and email address\*\*, only for an account of\s+someone under 18/i.test(privacy),

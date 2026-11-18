@@ -119,6 +119,19 @@ ok(settingRow?.ok === null && /PRI_CHILD_ERASURE=enforce/.test(settingRow.detail
   ok((await legalPromiseGaps(reader({ 'docs/legal/privacy.md': 'No such promise.' }))).length === 0, 'a commit with no Australian notice at all is not a gap');
   ok((await legalPromiseGaps(reader({ ...au, ...notice, ...housekeeping, ...route }))).length === 0, 'both notices with the code at the commit: no gap');
 }
+// ── the 18 November 2026 promises: stored handwriting, teachers, automatic reading, distress ──
+{
+  const stored = { 'docs/legal/privacy.md': 'kept for 2 years (730 days) after it was kept. You hand in work to your class\nteacher. Settings → Reading my handwriting. the support line for your region' };
+  const gaps = await legalPromiseGaps(reader(stored));
+  ok(gaps.length === 9, `each new promise without its code is a gap (${gaps.length})`);
+  for (const [name, re] of [['retention', /730-day retention/], ['purge', /housekeeping purge of expired originals/], ['export', /originals in the account export/], ['teacher', /hand-in check/], ['visibility', /papers not handed in/], ['switch', /device switch/], ['section', /Reading my handwriting/], ['reply', /distress reply/], ['lines', /support lines/]]) {
+    ok(gaps.some(g => re.test(g)), `the ${name} promise is named in the gap list`);
+  }
+  const real = file => readFileSync(join(ROOT, file), 'utf8');
+  const files = Object.fromEntries(['server/platform/originalWork.js', 'server/platform/housekeeping.js', 'server/platform/accounts.js', 'server/platform/classroom.js', 'client/src/lib/autoRead.js', 'client/src/i18n/strings.en.js', 'server/platform/tutorSafety.js'].map(f => [f, real(f)]));
+  ok((await legalPromiseGaps(reader({ ...stored, ...files }))).length === 0, 'with the real code at those paths the same notice has no gap');
+  ok((await legalPromiseGaps(reader({ ...stored, ...files, 'server/platform/originalWork.js': files['server/platform/originalWork.js'].replace('priyabhata: 730 * DAY', 'priyabhata: 365 * DAY') }))).length === 1, 'a shorter retention in the code than the notice promises is a gap');
+}
 const source = readFileSync(join(ROOT, 'scripts/release-nominate.mjs'), 'utf8');
 ok(/legalPromiseGaps\(path => git\(\['show', `\$\{expected\}:\$\{path\}`\]\)\)/.test(source),
   'the nomination asks about the nominated commit, not the working tree');

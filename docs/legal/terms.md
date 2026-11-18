@@ -29,7 +29,17 @@ estimates progress. It is a practice tool.
 Handwriting and photos are read by an outside service, OpenAI, as the
 [privacy notice](/privacy) describes. The mark is always decided by our own
 marking engine, never by that service, and you can correct what it read before
-the answer counts.
+the answer counts. When a handwritten or photographed practice answer is marked,
+we keep your original handwriting or photo with the mark for 2 years, as the
+privacy notice describes.
+
+Explanations, hints and tutor replies may be written by an AI. They are labelled
+as written by AI and not checked by the maths engine, they can be wrong, and
+they never set a mark.
+
+If you join a class, your teacher can see what the privacy notice lists under
+"Teachers and classes", and nothing else. A teacher's own marks are recorded
+separately from the marking engine's.
 
 **It does not predict a percentile, a rank or an admission**, and it never
 converts practice into a CBSE percentage. What it does show, on the progress
@@ -45,10 +55,15 @@ no standing outside it.
 
 ## Subscriptions
 
-The free plan includes a daily allowance of practice questions and a periodic
-exam simulation; the app tells you what it is and when it resets. A paid
-subscription, Pri Learning Premium, removes those limits and unlocks the
-features listed at the point of purchase.
+In this version the free plan includes every difficulty level with step-by-step
+checking, up to 20 practice questions a day, up to 5 handwriting reads and 5
+"Practise this" photos a day, and one exam simulation every 30 days. Practice
+questions are counted by the Indian calendar day, and reads over any 24 hours.
+The app tells you what is left.
+A paid subscription, Pri Learning Premium, removes the practice and exam limits,
+raises the daily reads to 25 and 25, and unlocks the other features listed at
+the point of purchase. These numbers can change in a later version; the app
+always shows the current ones.
 
 Subscriptions are sold only through Apple's App Store, on iPhone and iPad, and
 through Google Play, on Android. There is no purchase on the website. The
@@ -77,8 +92,7 @@ free trial before and are not already paying for Premium.
   your account needs a parent's or guardian's approval, you can share or use an
   invite only once that approval is in place.
 - **One per person:** each person can have one invitation trial, ever, and an
-  account that has already had a free trial bought on our website does not get
-  another. Accounts at the same email inbox count as one person. An invite link
+  account that has already had any free trial from us does not get another. Accounts at the same email inbox count as one person. An invite link
   credits at most 5 friends in any 30 days.
 - **No card, no charge:** the trial needs no card and no payment details. At
   the end of the 7 days your account goes back to the free plan by itself.
@@ -87,7 +101,8 @@ free trial before and are not already paying for Premium.
 - **No cash value:** the trial cannot be exchanged for money, transferred or
   combined with another trial.
 - **Your friend's details:** you share the link yourself. We never ask you for
-  a friend's email address or phone number, and we do not contact them.
+  a friend's email address or phone number, and we do not contact them. The only
+  thing we keep is a record of who invited whom.
 - **Where it applies:** the invitation is offered on the website only. A trial
   you have works wherever you sign in with the same account.
 - We may end or change the invitation offer for the future. A trial that has
