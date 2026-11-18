@@ -252,7 +252,16 @@ export function MapCanvas({ areas, links, selected, onSelect, raised, label, axi
   // Taller for a map with more rows, so its labels keep their room.
   const rowCount = areas.length ? Math.max(...areas.map(a => a.row)) + 1 : 1;
   const height = phone ? Math.max(360, rowCount * 44 + 80) : Math.max(440, rowCount * (rowCount > 8 ? 84 : 72) + 128);
-  return <canvas ref={ref} className="sb-canvas" role="img" aria-label={label} onClick={pick} style={{ height, minHeight: height, maxHeight: 'none' }} data-board-map data-rows={rowCount} />;
+  // Picking a point with the pointer is an enhancement of the picture: the keyboard and screen-reader view is the
+  // list (the Map/List switch above is a tab stop), which does everything the picture does. The pointer listener is
+  // attached here, not as a React onClick, so the canvas is a labelled image and not a half-interactive control.
+  useEffect(() => {
+    const canvas = ref.current;
+    if (!canvas) return undefined;
+    canvas.addEventListener('click', pick);
+    return () => canvas.removeEventListener('click', pick);
+  });
+  return <canvas ref={ref} className="sb-canvas" role="img" aria-label={label} style={{ height, minHeight: height, maxHeight: 'none' }} data-board-map data-rows={rowCount} />;
 }
 
 // ── The list: the same areas, a listbox moved with the arrow keys ────────────

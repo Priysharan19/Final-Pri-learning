@@ -67,7 +67,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { startOnlinePlatform } from './support/online-session.mjs';
 import { createVerifiedProfile, freshEmail, signInOnCard } from './support/verified-onboarding.mjs';
 import { acceptReaderPermissionOnSight } from './fakeServerReader.js';
-import { resolveEdition } from '../edition.config.mjs';
+import { resolveEdition, EDITIONS } from '../edition.config.mjs';
 
 // Plan E6: the walk runs per edition (PRI_EDITION, unset = Priyabhata). The
 // app is the same; the student is the edition's own: CBSE Class 10 on
@@ -1245,7 +1245,11 @@ async function run() {
 
     // The parent weekly report (#743, D22): built only with PRI_FEATURE_PARENT_REPORT=1,
     // which this walk sets, so its route is rendered and audited like the others.
-    await step('parent report · the week, or why there is none', '/parent-report', async () => {
+    // An edition without parent features (edition.config.mjs family.parentFeatures) builds no such route.
+    if (EDITIONS[EDITION].family.parentFeatures !== true) {
+      notApplicableRoutes.add('/parent-report');
+      notApplicable.push(`parent report · the week, or why there is none — ${EDITION} offers no parent features (family.parentFeatures)`);
+    } else await step('parent report · the week, or why there is none', '/parent-report', async () => {
       await goTo(page, BASE, '/parent-report');
       await page.waitForSelector('.parent-page h1', { timeout: 20000 });
       await page.waitForSelector('.parent-page [data-parent-report], .parent-page [data-parent-error]', { timeout: 20000 });
