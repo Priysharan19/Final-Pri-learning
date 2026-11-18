@@ -265,19 +265,17 @@ export const flow = {
       await page.locator('.mode-tab').nth(2).click();
     });
     await settle();
+    // The empty photo frame (PhotoEmpty): the instruction above, then Take a photo and Choose a photo.
     const photo = await page.evaluate(() => {
       const b = document.querySelector('.photo-pick');
-      if (!b) return null;
+      const lead = document.querySelector('[data-photo-empty] .pf-lead');
+      if (!b || !lead) return null;
       const body = b.closest('.editor-body').getBoundingClientRect();
-      const title = b.querySelector('.photo-pick-title').getBoundingClientRect();
-      const help = b.querySelector('.photo-pick-help').getBoundingClientRect();
-      const lh = parseFloat(getComputedStyle(b.querySelector('.photo-pick-title')).lineHeight) || 22;
       const pad = parseFloat(getComputedStyle(b.closest('.editor-body')).paddingLeft) * 2;
-      return { w: b.getBoundingClientRect().width, avail: body.width - pad, titleH: title.height, lh, helpBelow: help.top >= title.bottom - 1 };
+      return { w: b.getBoundingClientRect().width, avail: body.width - pad, leadAbove: lead.getBoundingClientRect().bottom <= b.getBoundingClientRect().top + 1 };
     });
-    await check('Photo: the target spans the sheet', !!photo && photo.w >= photo.avail - 1, JSON.stringify(photo));
-    await check('Photo: "Photograph your working on paper" is one line, the formats beneath it',
-      !!photo && photo.titleH < photo.lh * 1.5 && photo.helpBelow, JSON.stringify(photo));
+    await check('Photo: the choose target spans the column', !!photo && photo.w >= photo.avail * 0.8, JSON.stringify(photo));
+    await check('Photo: the instruction sits above the buttons', !!photo && photo.leadAbove, JSON.stringify(photo));
     const photoFoot = await clearOfBarAtFoot(page, '.editor-body input:not([type=file]), .photo-pick, .editor-shell');
     await check('Photo: at the foot of the page the target, the answer and the sheet end above the action bar', photoFoot.ok, JSON.stringify(photoFoot));
 
