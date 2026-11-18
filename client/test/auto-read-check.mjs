@@ -25,7 +25,7 @@ ok(/<InkAnswer feedback autoRead=\{!resolved\}/.test(card), 'practice asks for i
 ok(!/autoRead/.test(exam), 'the exam room never asks for automatic reading: its reads follow the exam rules (submission, nothing shown before)');
 ok(/if \(\(auto && opts\?\.ask !== true\) \|\| askingRef\.current\) return;/.test(ink), 'an automatic read opens the permission prompt only when the idle pause asks for it (opts.ask, once per card); the live coach and the online resume never do');
 ok(/autoAskedRef\.current = true/.test(ink) && /permission === READER_PERMISSION\.UNASKED && !autoAskedRef\.current/.test(ink), 'a declined student is never asked by writing, and an unasked one is asked once');
-ok(/const showReadButton = canAskToRead && !autoOn;/.test(ink) && /const showQuietRead = canAskToRead && autoOn && autoQuiet;/.test(ink), 'with automatic reading on the Read my answer button and its hint are gone; a quiet text action appears only after a pause that read nothing');
+ok(/const showReadButton = showReading && canAskToRead && !autoOn;/.test(ink) && /const showQuietRead = showReading && canAskToRead && autoOn && autoQuiet;/.test(ink) && /showReading=\{false\}/.test(card), 'practice shows no Read button at all (19 Nov 2026: one press of Mark my working reads and marks); a surface that shows its reading (the exam room) keeps its own rules');
 ok(!/markWith|onSubmit\(|\.submit\(/.test(ink.slice(ink.indexOf('const onStrokesChange'), ink.indexOf('const onStrokesChange') + 3500)), 'the pause path calls no submit or marking');
 ok(/the same answer-blind picture/.test(ink) || /answer-blind/.test(ink), 'the read is the same answer-blind request');
 

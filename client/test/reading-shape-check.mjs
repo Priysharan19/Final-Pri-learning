@@ -28,20 +28,19 @@ ok(/\\operatorname\{max\}/.test(exprToLatex('max = 22 + 5')) && /\\operatorname\
 ok(/\\ln /.test(exprToLatex('2ln(x)')) && /\\cos /.test(exprToLatex('cos(x)')), 'ln and cos too');
 ok(!/\\operatorname\{max\}imum/.test(exprToLatex('maximum')), 'a longer word is not split');
 
-// One state per line, one panel.
+// The shape check still names a doubtful span (the tutor's help plan and the exam room use it); 19 Nov 2026: practice no longer
+// shows the reading or a confirmation panel, so the chips, list and panel assertions are retired with them.
 const ink = read('../src/ink/InkAnswer.jsx');
 const card = read('../src/components/QuestionCard.jsx');
-ok(/function readStateOf\(line, floor, index = 0\)/.test(ink) && /doubtfulSpan\(line\.text/.test(ink), 'the chips, the list and the strip share one well-formedness-aware state');
+ok(/function readStateOf\(line, floor, index = 0\)/.test(ink) && /doubtfulSpan\(line\.text/.test(ink), 'a surface that shows its reading (the exam room) shares one well-formedness-aware state');
 ok(!/in-read-cf/.test(ink) && /in-read-ok/.test(ink), 'no confidence dashes on the chips: a dot, and a word only where a line needs a look');
-ok(/filter\(r => unsureLines\.includes\(r\.idx\)\)/.test(card), 'the confirmation panel lists only the lines to check, not the whole reading again');
-ok(/data-confirm-span=\{i\}/.test(card) && /edit\?\.\(i\)/.test(card), 'the doubtful span is a control that opens the editor for that line');
-ok(/confirmFocusRef\.current\?\.focus/.test(card), 'focus goes to the first line to check');
+ok(!/data-confirm-span|confirmFocusRef|ws-confirm/.test(card), 'the practice card draws no confirmation panel before marking');
 ok(/replace\(\/\^\\s\*\[=/.test(card), 'a leading relation sign is stripped when stating the final answer');
 
 const en = (await import('../src/i18n/strings.en.js')).default;
 const hi = (await import('../src/i18n/strings.hi.js')).default;
-for (const k of ['verdict.confirmCheckOne', 'verdict.confirmCheckMany', 'verdict.confirmCheckLead', 'verdict.confirmSpanAria', 'verdict.checkShapeLine']) ok(en[k] && hi[k], `${k} exists in English and Hindi`);
-ok(/^Check line \{n\}, then confirm$/.test(en['verdict.confirmCheckOne']), 'the count says what to do in plain words');
+for (const k of ['verdict.markMyWorking', 'mark.finalUnreadable', 'mp.seeLine', 'mp.seePage', 'mp.unread', 'mp.unreadHow']) ok(en[k] && hi[k], `${k} exists in English and Hindi`);
+ok(/^Pri couldn’t read your final answer\. Rewrite that line or type it here\.$/.test(en['mark.finalUnreadable']), 'the final-answer sentence is the decided one, in plain words');
 const css = read('../src/workspace.css');
-ok(!/\.ws-confirm-unsure \{[^}]*uppercase/.test(css) && !/\.ws-confirm-line\.is-unsure \{[^}]*dashed/.test(css), 'the warning is a plain sentence in the body face, not capitals in a dashed box');
-console.log(`READING SHAPE: PASS - ${n}/${n} checks - one state per line, the doubtful span named, upright operators, one panel`);
+ok(!/\.ws-confirm/.test(css), 'the confirmation panel\'s styles are gone with it');
+console.log(`READING SHAPE: PASS - ${n}/${n} checks - the doubtful span named, upright operators, no reading panel before marking`);

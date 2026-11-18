@@ -132,7 +132,8 @@ export function buildMarkedPage({ model, boxes = null, markReady = true } = {}) 
     header: { parts, mark, everyLine },
     lines: judged,
     // Lines Pri could not read as maths are ONE card, not one each.
-    collapsed: quiet.length ? { lines: quiet, count: quiet.length, list: listOf(quiet), reason: model.unverified?.reason || null } : null,
+    // `unread`: the lines Pri could not read at all (the reading floor), a subset of `lines`; they get their own sentence.
+    collapsed: quiet.length ? { lines: quiet, count: quiet.length, list: listOf(quiet), unread: cards.filter(c => c.status === 'unread').map(c => c.n), reason: model.unverified?.reason || null } : null,
     aligned,
     firstError: first ? first.n : null
   };
@@ -147,7 +148,7 @@ export function commentItems(page) {
     if (!l.collapsed) { out.push({ id: `l${l.n}`, kind: 'line', line: l, y: l.box ? l.box.y + l.box.h / 2 : null }); return; }
     if (collapsedAt < 0) {
       collapsedAt = out.length;
-      out.push({ id: 'collapsed', kind: 'collapsed', lines: page.collapsed.lines, y: null, boxes: [] });
+      out.push({ id: 'collapsed', kind: 'collapsed', lines: page.collapsed.lines, unread: page.collapsed.unread || [], y: null, boxes: [] });
     }
     const item = out[collapsedAt];
     if (l.box) item.boxes.push(l.box);

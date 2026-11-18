@@ -225,33 +225,9 @@
 .exam-head { background: var(--page); -webkit-backdrop-filter: none; backdrop-filter: none; }
 .ws-read-by { margin-left: 8px; font-size: 12.5px; color: var(--ink-3); }
 
-/* ── Confirm the reading (P0 #11) ─ the whole recognised answer, typeset, before it is sent. */
-.ws-confirm-lines { display: grid; gap: 6px; margin: 8px 0; }
-.ws-confirm-line { display: flex; align-items: baseline; gap: 10px; padding: 4px 8px; border-radius: 4px; }
-.ws-confirm-line.is-unsure { box-shadow: inset 0 0 0 1px var(--in-slip, currentColor); background: color-mix(in srgb, var(--in-slip, currentColor) 10%, transparent); }
-.ws-confirm-unsure { font: inherit; font-size: 14px; color: var(--in-tx-2, inherit); }
-.ws-confirm-acts { display: flex; gap: 8px; }
-
-/* ── Check what Pri read (verified page, step 1) ─ recognised maths set in Computer
-   Modern (KaTeX's own face) under each line; an uncertain line is a static dashed
-   outline with its question in words. The only looping motion is the pulse, and it
-   exists only when motion is allowed; under reduced motion the outline and the
-   words carry it. */
-.ws-confirm-count { margin-left: auto; font: 500 13px inherit; font-family: inherit; font-variant-numeric: tabular-nums; color: var(--in-tx-2, inherit); }
-.ws-confirm-blind { margin: 2px 0 6px; font-size: 12.5px; }
-.ws-confirm-line { display: grid; grid-template-columns: 22px 1fr; gap: 4px 8px; align-items: baseline; }
-.ws-confirm-n { font: 500 11px var(--in-mono, monospace); color: var(--in-tx-3, inherit); }
-.ws-cm .katex { font-size: 1.15em; }
-.ws-confirm-line.is-unsure { outline: 0; box-shadow: none; border-left: 2px solid var(--uncertain, var(--warn, currentColor)); background: color-mix(in srgb, var(--uncertain, var(--warn, currentColor)) 8%, transparent); border-radius: 4px; }
-.ws-confirm-span { font: inherit; background: none; border: 0; border-bottom: 1px solid currentColor; padding: 0 2px; cursor: pointer; color: inherit; min-height: 24px; }
-.ws-confirm-ask { grid-column: 2; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.ws-confirm-ask .btn { min-height: 44px; }
-.ws-confirm-acts .btn { min-height: 44px; }
-@keyframes ws-unsure-pulse { 0%, 100% { outline-color: var(--in-slip, currentColor); } 50% { outline-color: color-mix(in srgb, var(--in-slip, currentColor) 35%, transparent); } }
 
 
-/* The panel is a quiet "needs a look" surface, not a dashed warning box. */
-.ws-confirm.ws-check { border: 1px solid var(--uncertain-line); }
+
 
 /* ── Photo answer: one calm flow (owner request, 18 Nov 2026) ──────────────
    Quiet instrument on paper: existing tokens, hairlines, no gradients. */
@@ -288,33 +264,7 @@
 .pf-lightbox-body img { display: block; max-width: 100%; max-height: calc(94vh - 90px); object-fit: contain; }
 @media (min-width: 900px) { .pf-attached { grid-template-columns: minmax(260px, 420px) minmax(0, 1fr); } }
 
-/* After a read: the page, and what Pri read, once. */
-.reading-review { display: grid; gap: 14px; margin-top: 4px; }
-.rr-page .pf-page.photo-thumb { max-height: 380px; }
-.rr-read { min-width: 0; }
-.rr-count { margin: 4px 0 6px; font-size: 13.5px; color: var(--ink); font-weight: 600; }
-.rr-lines { list-style: none; margin: 6px 0 0; padding: 0; display: grid; }
-.rr-line { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: baseline; gap: 2px 8px; padding: 2px 0; border-top: 1px solid var(--hairline); }
-.rr-line:first-child { border-top: 0; }
-.rr-n { font: 500 11px var(--font-mono); color: var(--ink-3); text-align: right; font-variant-numeric: tabular-nums; }
-.rr-open { text-align: left; background: none; border: 0; padding: 6px 4px; min-height: 36px; color: var(--ink); font: inherit; cursor: pointer; border-radius: 3px; }
-.rr-open:hover:not(:disabled) { background: var(--surface-2); }
 .rr-words { font-family: var(--font); font-size: var(--text-base); font-style: normal; color: var(--ink-2); }
 .rr-maths { font-size: var(--text-base); }
-.rr-edit { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
-.rr-input { flex: 1 1 200px; min-width: 0; }
-.rr-note { grid-column: 2 / -1; font-size: 12.5px; color: var(--ink-2); }
-.rr-note.is-doubt { color: var(--ink); font-weight: 600; }
-.rr-line.is-check { border-left: 2px solid var(--uncertain-line, var(--ink-3)); padding-left: 6px; background: var(--surface-2); }
-.rr-line.is-out .rr-text { text-decoration: line-through; color: var(--ink-3); }
-.rr-ask { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
-.rr-mark { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; font-size: 12.5px; color: var(--ink-2); }
-.rr-line.pm-break { box-shadow: inset 2px 0 0 var(--correction); }
-.rr-quiet { margin: 8px 0 0; font-size: 12.5px; color: var(--ink-3); }
-.rr-final { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--hairline); }
-.rr-final-line, .rr-final-why { margin: 0; font-size: var(--text-base); }
-.rr-final-value { font-weight: 600; }
-.rr-from { font-size: 12.5px; }
-@media (min-width: 900px) { .reading-review { grid-template-columns: minmax(240px, 400px) minmax(0, 1fr); align-items: start; } }
-@media (max-width: 520px) { .rr-line { grid-template-columns: 22px minmax(0, 1fr); } .pf-page.photo-thumb { width: 100%; } }
+@media (max-width: 520px) { .pf-page.photo-thumb { width: 100%; } }
 .tutor-launch-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }

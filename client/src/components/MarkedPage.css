@@ -47,3 +47,15 @@
 .mp-table td svg { vertical-align: -2px; margin-right: var(--space-1); }
 .mp-why { display: block; color: var(--ink-3); font-size: 12.5px; }
 .mp-label { margin: 0; color: var(--ink-3); font-size: 12.5px; }
+
+/* How Pri read a line: on demand only, a quiet text action, never shown before marking. */
+.mp-read-all { margin: 0; }
+.mp-link { appearance: none; background: none; border: 0; padding: var(--space-1) 0; font: inherit; font-size: 12.5px; color: var(--ink-2);
+  text-decoration: underline; text-underline-offset: 3px; cursor: pointer; min-height: 24px; }
+.mp-link:hover { color: var(--ink); }
+.mp-link:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: var(--radius-sm); }
+.mp-read { margin-top: var(--space-1); display: grid; gap: var(--space-1); justify-items: start; }
+.mp-how { color: var(--ink-2); }
+.mp-edit { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.mp-edit input { flex: 1 1 160px; min-width: 0; min-height: 36px; padding: 0 var(--space-2); font: inherit; color: var(--ink); background: var(--surface-raised);
+  border: 1px solid var(--hairline-strong); border-radius: var(--radius); }

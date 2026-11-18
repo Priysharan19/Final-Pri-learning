@@ -60,7 +60,8 @@ ok((ink.match(/\bpromptAsksInequality\b/g) || []).length === 2, 'the reader UI u
 ok(asksForInequality('Solve 2x + 3 > 7.') && !asksForInequality('Simplify 3(x + 2).'), 'the flag comes from the visible wording alone');
 const card = read('client/src/components/QuestionCard.jsx');
 ok(/promptAsksInequality=\{asksForInequality\(question\.prompt\)\}/.test(card), 'the question passes only whether its wording asks for an inequality');
-ok(/verdict\.checkLineDoubt/.test(card) && /doubt: lines\[doubtedLine\]\.doubt/.test(card), 'the check prompt names the doubted line, where the swaps are');
+// 19 Nov 2026: the check prompt is retired with the confirm step; the doubted line is still named for the tutor's help plan and never judged.
+ok(/doubt: lines\[doubtedLine\]\.doubt/.test(card) && !/verdict\.checkLineDoubt/.test(card), 'the doubted line is still named for help, and the card shows no check prompt before marking');
 const en = read('client/src/i18n/strings.en.js');
 ok(!/Tap it below if I read it wrong/.test(en), 'no prompt points at a symbol that is not there');
 ok(!/answer|expected|solution/i.test(read('client/src/ink/relationSwap.js').replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '')), 'the swap helpers know no answer');

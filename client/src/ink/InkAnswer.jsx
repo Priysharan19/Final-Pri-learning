@@ -30,7 +30,7 @@ import InkCanvas from './InkCanvas.jsx';
 import NativeInkCanvas from './NativeInkCanvas.jsx';
 import { nativeInkAvailable } from './native.js';
 import { exprToLatex } from './inkLatex.js';
-import { Typeset } from '../components/ReadingReview.jsx';
+import { Typeset } from '../components/Typeset.jsx';
 import { segmentsFor } from '../photo/transcript.js';
 import { ACCOUNT_BLOCKED_KEYS, inkReaderUiState, readerBlock, readerPaused, readinessIdentity, resumeReaderNow, readWithCloud, recordLocalHandwritingDiagnostics, toReading } from './cloudReader.js';
 import { retryClock, retryWhen } from './readerFailure.js';
@@ -129,7 +129,7 @@ function readStateOf(line, floor, index = 0) {
   return 'read';
 }
 
-export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, initialReading = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true, readExpired = 0, controlRef = null, checkingEarlier = false, promptAsksInequality = false, liveRead = false, feedback = false, autoRead = false, lineMarkers = null }) {
+export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, initialReading = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true, readExpired = 0, controlRef = null, checkingEarlier = false, promptAsksInequality = false, liveRead = false, feedback = false, autoRead = false, lineMarkers = null, showReading = true }) {
   const [NATIVE_INK] = useState(nativeInkAvailable);
   const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
   const [diagnostics] = useState(inkDiagnosticsVisible);
@@ -236,7 +236,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
       lines: r.lines.map(l => l.text),
       // What the reader said about each line (confidence, its own doubt, the
       // student's correction): the card's confirmation lists the unsure ones.
-      lineMeta: r.lines.map(l => ({ conf: l.conf, doubt: l.doubt, corrected: l.corrected === true })),
+      lineMeta: r.lines.map(l => ({ conf: l.conf, doubt: l.doubt, uncertain: l.uncertain === true, corrected: l.corrected === true })),
       lineBoxes: r.lines.map(l => l.box),
       text: r.text,
       answerLine: r.lines.length ? r.lines[r.lines.length - 1].text : '',
@@ -633,7 +633,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   const shownEngineNote = diagnostics ? engineNote : (rec.cloud === true ? t('verdict.readOnServer') : null);
   const lineConfidenceFloor = confidenceFloorOf(rec);
   const statusLine = shownStatus?.kind === 'reading'
-    ? t(slowRead ? 'ink.serverStillReading' : 'ink.serverReading')
+    ? (showReading ? t(slowRead ? 'ink.serverStillReading' : 'ink.serverReading') : null)
     : shownStatus?.kind === 'empty'
       ? t('ink.serverEmpty')
       : shownStatus?.kind === 'allowance'
@@ -656,8 +656,11 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   // after which nothing was read or scheduled (prompt closed, cap reached, a
   // page already tried). With the device preference off, the button is as before.
   const autoOn = autoReadRef.current;
-  const showReadButton = canAskToRead && !autoOn;
-  const showQuietRead = canAskToRead && autoOn && autoQuiet;
+  // Owner decision, 19 Nov 2026: the reading is not shown. The page is read silently (or when the student presses
+  // Mark my working) and the typeset reading is available only on demand from the marked page. So no Read button,
+  // no "Reading..." line, no reading list and no per-line chips while `showReading` is false.
+  const showReadButton = showReading && canAskToRead && !autoOn;
+  const showQuietRead = showReading && canAskToRead && autoOn && autoQuiet;
 
   return (
     <div className={`ink-answer ${disabled ? 'ink-disabled' : ''}`} data-engine={rec.engine || undefined}>
@@ -768,7 +771,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
             (which stays the accessible source and keeps Edit / I wrote): only
             on lines the geometry plausibly matched, the bar only from the
             reader's own confidence, the tag only from the engine's verdict. */}
-        {INSTRUMENT_PLOT && !stale && rec.lines.some(l => l.box) && (
+        {showReading && INSTRUMENT_PLOT && !stale && rec.lines.some(l => l.box) && (
           <div className="in-read-layer" aria-hidden="true" data-reading-chips={rec.lines.filter(l => l.box).length}>
             {rec.lines.map((line, li) => {
               if (!line.box) return null;
@@ -844,7 +847,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
         </div>
       )}
 
-      {rec.lines.length > 0 && (
+      {showReading && rec.lines.length > 0 && (
         <div className={`ink-preview${stale ? ' is-stale' : ''}`} data-stale={stale ? 'true' : undefined}>
           <div className="ink-preview-title" id="ink-reading" tabIndex={-1} ref={readingTitleRef}>
             {t('ink.reading')}

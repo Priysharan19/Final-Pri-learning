@@ -2162,6 +2162,16 @@ function solutionOf(q) {
  * first delivery and the replay cannot move a mark that already stands.
  */
 /** The explanation a submission was answered with, as stored with its record. */
+/**
+ * What the server's reading floor said about the page (ADR-0001 amendment 19 Nov 2026): the lines it left out as "couldn't
+ * read" and that nothing was confirmed by the student. Display only; never a mark.
+ */
+function readingFloorOf(reading) {
+  if (!reading || typeof reading !== 'object' || !Array.isArray(reading.excludedLines)) return {};
+  return { reading: { studentConfirmed: false, excludedLines: reading.excludedLines.filter(Number.isInteger).slice(0, 80),
+    lineStates: Array.isArray(reading.lineStates) ? reading.lineStates.slice(0, 80).map(x => (x === 'not-read' ? 'not-read' : 'judged')) : [] } };
+}
+
 function replayRecord({ feedback, stepReport, partial, diagnosis }) {
   return {
     feedback: feedback ?? null,
@@ -2268,6 +2278,7 @@ async function replaySubmission(p, row, q, submissionId, requestDigest, answer, 
     diagnosis: diagnosis || null,
     misconception: await namedTrap(p.id, owner, recorded.trapHit || null),
     solution: row.serverQuestionId ? row.serverReceipt.solution || null : solutionOf(q),
+    ...(row.serverQuestionId ? readingFloorOf(row.serverReceipt?.reading) : {}),
     // Replayed mark explanations come from the same immutable server receipt.
     ...(row.serverQuestionId && row.serverReceipt?.markRows ? { markRows: row.serverReceipt.markRows } : {}),
     ...(row.serverQuestionId ? {
@@ -4240,7 +4251,7 @@ const routes = {
       row.pendingGrade = null;
       await put('questions', row);
       return { ...certified,
-        correct: false, resolved: false, triesLeft: 1, feedback: feedback || translate('msg.notQuite'), stepReport, partial, diagnosis: stepReport?.diagnosis || null, misconception: await namedTrap(p.id, evidenceKeyOf(row, q), trapHit), ...(submissionId ? { submissionId } : {}) };
+        correct: false, resolved: false, triesLeft: 1, feedback: feedback || translate('msg.notQuite'), stepReport, partial, ...readingFloorOf(authoritative.reading), diagnosis: stepReport?.diagnosis || null, misconception: await namedTrap(p.id, evidenceKeyOf(row, q), trapHit), ...(submissionId ? { submissionId } : {}) };
     }
     if (result.invalid && !resolvedNow) {
       row.pendingGrade = null;
@@ -4284,6 +4295,7 @@ const routes = {
       diagnosis: stepReport?.diagnosis || null,
       misconception: await namedTrap(p.id, evidenceKeyOf(row, q), trapHit),
       solution: authoritative.solution || null,
+      ...readingFloorOf(authoritative.reading),
       // The server's mark as CBSE-style step rows (server/platform/markRows.js):
       // display only, passed through as the server sent them.
       markRows: authoritative.markRows || null,
@@ -6642,6 +6654,12 @@ async function gradeOnServer(row, body, submissionId, requestDigest, { receiptFl
     }
     // Student corrections cannot forge a provider receipt. The server saves
     // the original reading and the explicit correction under a second token.
+    // A reading the reader doubted is NOT confirmed on the student's behalf (owner decision 19 Nov 2026): this
+    // fallback path (a page too large to travel with the submission) cannot apply the line-by-line floor, so a
+    // doubted reading is refused as an unreadable answer rather than marked.
+    if (read.transcription.needsConfirmation === true && !(body.answerTyped === true)) {
+      throw Object.assign(new Error('Pri could not read your final answer.'), { status: 200, code: 'FINAL_ANSWER_UNREADABLE' });
+    }
     if (read.transcription.text !== String(body.answer) || read.transcription.needsConfirmation === true) {
       const corrected = await viaServer(() => cloud.confirmPracticeRecognition(row.serverQuestionId, receipt, String(body.answer)));
       if (!corrected?.receipt) throw new Error('The corrected reading was not acknowledged by the server.');
@@ -6660,6 +6678,8 @@ async function gradeOnServer(row, body, submissionId, requestDigest, { receiptFl
         // make the attempt count as supported.
         // (the live step coach also records its reads on row.assistance)
         ...(Number(row.tutorLevel) > 0 || row.assistance?.stepCoach?.reads > 0 ? { deviceHelp: true } : {}),
+        // A final answer the student typed themselves, beside the picture (the reading floor judges the rest).
+        ...(picture && body.answerTyped === true ? { answerTyped: true } : {}),
         ...(original ? { original } : {})
       };
   // `at` lets a sync pull tell a grade in flight from one abandoned after the
@@ -6735,6 +6755,13 @@ async function gradeOnServer(row, body, submissionId, requestDigest, { receiptFl
       await put('questions', row).catch(() => {});
     } else if (refusal && typeof refusal === 'object') delete refusal.beforeMarking;
     throw refusal;
+  }
+  // The server could not read the final answer line (its reading floor, ADR-0001 amendment 19 Nov 2026): nothing was
+  // marked or recorded and no try was spent. The question stays exactly as it was; the card asks for the line again.
+  if (acknowledged?.code === 'FINAL_ANSWER_UNREADABLE' && acknowledged.questionId === row.serverQuestionId) {
+    row.pendingGrade = null;
+    await put('questions', row).catch(() => {});
+    throw Object.assign(new Error('Pri could not read your final answer.'), { status: 200, code: 'FINAL_ANSWER_UNREADABLE' });
   }
   if (acknowledged?.authoritative !== true || acknowledged.questionId !== row.serverQuestionId ||
       acknowledged.submissionId !== submissionId || typeof acknowledged.attemptId !== 'string' ||

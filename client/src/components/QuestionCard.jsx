@@ -6,9 +6,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { doubtfulSpan } from '../ink/readingShape.js';
 import { autoReadEnabled } from '../lib/autoRead.js';
-import { confidenceFloorOf, isLowConfidence } from '../ink/readingCorrection.js';
-import { needsConfirmation, confirmedRevision } from '../ink/confirmGate.js';
-import { relationChoices, swapRelation } from '../ink/relationSwap.js';
+import { confirmedRevision } from '../ink/confirmGate.js';
+import { readingJudgement } from '../ink/readingFloor.js';
+import { carryPageIntoQuestion, clearMarkOnArrival, markOnArrivalPending } from '../ink/redoCarry.js';
+import { applyLineCorrection } from '../ink/readingCorrection.js';
+import { photoDraftPayload } from '../local/photoDrafts.js';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api.js';
 import { answerToTex } from '../engine/answerTex.js';
@@ -36,7 +38,6 @@ import { renderPdfPages, MAX_PDF_INPUT_BYTES } from '../ink/pdfPage.js';
 import { intakeImageFile, intakeMessageKey, isPdfFile, claimsHeic, PHOTO_OR_PDF_ACCEPT } from '../ink/photoIntake.js';
 import useFileDrop from '../lib/useFileDrop.js';
 import { PhotoEmpty, PhotoBusy, PhotoPreview, PhotoFailure, rotateDataUrl } from './PhotoFrame.jsx';
-import ReadingReview from './ReadingReview.jsx';
 import PriPlot from './PriPlot.jsx';
 import { canRetryPhotoReading, readerRefusalAtSubmit, definitiveSubmissionRefusal, draftPersistenceWarning, earlierSubmissionNotice, pdfReceiptWarning, photoEligibleForGrading, photoReadFailure, photoSupportedFormats, photoAwaitingOnlineReader, pdfReaderNeedsOnlineDownload } from './photoSubmissionGuard.js';
 import { plotSpecFor } from '../engine/plotSpec.js';
@@ -331,6 +332,39 @@ const REASON_TAG_KEY = {
 // `diagnostic.submitPath`, it is marked once by the same deterministic marker,
 // and nothing that belongs to practice is offered — no hints, no favourite, no
 // reveal, no self-marking, no XP or mastery tags. `I don't know` records a miss.
+/** How Pri read the page after a wrong first try: the lines it could not read, and the reading on demand, with Edit. */
+function OpenTryReading({ t, texOf, lines, unread, onCorrect }) {
+  const [open, setOpen] = React.useState(false);
+  const [editing, setEditing] = React.useState(null);
+  return (
+    <div className="open-try-reading" data-open-try-reading>
+      {unread.length > 0 && (
+        <p className="photo-lines-note" role="status" data-mp-unread={unread.join(',')}>{t('mp.unread', { count: unread.length, list: unread.join(', ') })} {t('mp.unreadHow')}</p>
+      )}
+      <button type="button" className="mp-link" data-mp-see-page aria-expanded={open} onClick={() => setOpen(v => !v)}>{t(open ? 'mp.hidePage' : 'mp.seePage')}</button>
+      {open && (
+        <ol className="open-try-lines">
+          {lines.map((text, i) => (
+            <li key={i} data-mp-reading={i + 1} data-text={text}>
+              {editing?.line === i ? (
+                <form onSubmit={e => { e.preventDefault(); const c = String(editing.text || '').trim(); if (c) { setEditing(null); onCorrect?.(i, c); } }}>
+                  <input autoFocus value={editing.text} aria-label={t('mp.editLabel', { n: i + 1 })} data-mp-edit-input={i + 1} onChange={e => setEditing({ line: i, text: e.target.value })} />
+                  <button type="submit" className="btn btn-primary btn-sm" data-mp-mark-again>{t('mp.markAgain')}</button>
+                </form>
+              ) : (
+                <>
+                  <MathText text={`$${texOf(text)}$`} />{' '}
+                  {onCorrect && <button type="button" className="mp-link" data-mp-edit-line={i + 1} onClick={() => setEditing({ line: i, text })}>{t('mp.edit')}</button>}
+                </>
+              )}
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
+
 export default function QuestionCard({ question, why, reason, reasonTag = null, onResolved, onNext, onRedo, onReplace = null, compact = false, diagnostic = null, sessionIndex = null, sessionLength = null, sessionAnswered = 0 }) {
   const { celebrate, refreshUser, refreshDue, refreshRecent, toast, user } = useApp();
   const t = useT();
@@ -358,8 +392,6 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // each { rung, text }, and the level the server has committed so far.
   const [hints, setHints] = useState([]);
   const inkControlRef = useRef(null);
-  // Submit pressed on stale ink reads the page again instead of sending (see rereadFromSubmit).
-  const [rereadAsked, setRereadAsked] = useState(false);
   const [hintLevel, setHintLevel] = useState(question.hintLevel || 0);
   // The last rung is the whole solution: like Show solution it takes two presses.
   const [solutionRungArmed, setSolutionRungArmed] = useState(false);
@@ -434,8 +466,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [inkPhase, setInkPhase] = useState(() => (inkModule ? 'ready' : 'idle'));   // idle | loading | ready | failed
   const [inkTry, setInkTry] = useState(0);
   const [toTex, setToTex] = useState(() => latexFn);
-  const [checking, setChecking] = useState(false);
-  const [vouched, setVouched] = useState(null);     // the exact reading the student stood behind
+  // The student pressed Mark my working before the page was read: it is read, then marked, under one "Marking...".
+  const [markWanted, setMarkWanted] = useState(false);
+  // The final answer line could not be read (said by the card before sending, or by the server's FINAL_ANSWER_UNREADABLE).
+  const [finalUnreadable, setFinalUnreadable] = useState(false);
   const startRef = useRef(Date.now());
   // ── One tap, one submission (§09) ──────────────────────────────────────────
   // `busy` is React state and lands a render late, so two taps inside one frame
@@ -517,7 +551,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
     setPhotoLines(null); setPhotoNote(null); setPhotoAnswerSource(null); setPhotoRestored(false);
     ++photoSaveRevision.current;
-    setChecking(false); setVouched(null); setPdfUnread(null); setPdfPageCount(0); setAttemptViaInk(false);
+    setMarkWanted(false); setFinalUnreadable(false); setPdfUnread(null); setPdfPageCount(0); setAttemptViaInk(false);
     setJudged(null); setJudgedStale(false); setInkSignature(null);
     setSaveState(draft?.typed || draft?.working ? 'saved' : null);
     latestInk.current = null;
@@ -624,7 +658,12 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // question on screen; the student sees every line and can change both.
   const proposeFrom = useCallback((transcript) => {
     if (isWorking || isMcq) return { status: 'not-applicable' };
-    return proposeFinalAnswer(includedLines(transcript), publicAnswerShape);
+    // A line the reader was unsure of is never judged and never the final answer (reading floor, 19 Nov 2026): the answer is
+    // taken only from lines it was sure of, and when the LAST line is one it was not sure of there is no answer to take.
+    const unsure = l => l.check === true && l.edited !== true;
+    const kept = (transcript?.lines || []).filter(l => !l.excluded && String(l.text).trim());
+    if (kept.length && unsure(kept[kept.length - 1])) return { status: 'none' };
+    return proposeFinalAnswer(includedLines({ ...transcript, lines: (transcript?.lines || []).filter(l => !unsure(l)) }), publicAnswerShape);
   }, [isWorking, isMcq, publicAnswerShape]);
   const showReading = useCallback((transcription) => {
     const transcript = buildTranscript(transcription, { prompt: question.prompt, answerType: question.answerType });
@@ -1280,11 +1319,6 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     : viewport.width <= 760 ? 340
       : viewport.height > viewport.width ? Math.min(640, Math.round(viewport.height * 0.48)) : 420;
 
-  // Only handwriting is gated: typing and photo carry no reading to doubt.
-  const doubt = useMemo(
-    () => (writeMode && !resolved ? doubtOf(inkResult) : null),
-    [writeMode, resolved, inkResult]
-  );
   const reading = inkResult?.answerLine || '';
   // ── The final answer inside handwritten working ────────────────────────────
   // A student ends their working with "38.5 - 24.5 = 14" or "∴ n = 24". The
@@ -1295,9 +1329,12 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // answer is PROPOSED from the lines by the same pure, key-less module Photo
   // uses, shown in an editable field, and never substituted silently; with two
   // candidates or none there is no guess and the student types it.
+  // Which read lines the reading floor lets through (owner decision 19 Nov 2026): a line read below the reader's
+  // floor, flagged uncertain or blank is never judged and never feeds the final answer.
+  const floorJudgement = useMemo(() => readingJudgement(inkResult), [inkResult]);
   const inkLastLineIsAnswer = useMemo(
-    () => !!reading && readsAsWritten(reading, publicAnswerShape),
-    [reading, publicAnswerShape]
+    () => !!reading && floorJudgement.lastJudged && readsAsWritten(reading, publicAnswerShape),
+    [reading, floorJudgement, publicAnswerShape]
   );
   // The reading on screen is of EARLIER writing (the ink changed after it was
   // read). It stays visible, labelled; nothing of it is proposed or sent.
@@ -1305,8 +1342,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const inkReadable = !!inkResult?.lines?.length && !inkStale;
   const inkProposal = useMemo(() => {
     if (!writeMode || isMcq || isWorking || !inkResult?.lines?.length || inkStale || inkLastLineIsAnswer) return null;
-    return proposeFinalAnswer(inkResult.lines, publicAnswerShape);
-  }, [writeMode, isMcq, isWorking, inkResult, inkStale, inkLastLineIsAnswer, publicAnswerShape]);
+    if (!floorJudgement.lastJudged) return null;
+    return proposeFinalAnswer(inkResult.lines.filter((_, i) => floorJudgement.judged[i]), publicAnswerShape);
+  }, [writeMode, isMcq, isWorking, inkResult, inkStale, inkLastLineIsAnswer, floorJudgement, publicAnswerShape]);
   // What the student typed over the proposal; null while the field follows it.
   const [inkAnswerEdit, setInkAnswerEdit] = useState(null);
   useEffect(() => {
@@ -1331,43 +1369,20 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     // thing on the page that cost a paid read to produce.
     if (latestInk.current?.length) { saveInk(latestInk.current); flushInkSave(); void flushInkDrafts(); }
   }, [inkKeptKey, inkAnswerEdit]); // eslint-disable-line react-hooks/exhaustive-deps
-  const inkAnswer = !inkProposal ? reading
-    : inkAnswerEdit !== null ? inkAnswerEdit
-      : inkProposal.status === 'proposed' ? inkProposal.answer : '';
-  // Every handwritten reading is confirmed before it is sent (P0 #11): a
-  // doubted one through the check-this-reading step, any other with one
-  // combined "Confirm and submit" tap. The gate is the pure confirmGate.js.
-  // A read photo or PDF is confirmed the same way as handwriting: the lines the
-  // reader found, with the ones it was unsure of asking the student first.
+  const inkAnswer = inkAnswerEdit !== null ? inkAnswerEdit
+    : !floorJudgement.lastJudged ? ''
+      : !inkProposal ? reading
+        : inkProposal.status === 'proposed' ? inkProposal.answer : '';
+  // The final answer is the student's own typed text (not read from the page).
+  const inkAnswerTyped = inkAnswerEdit !== null && String(inkAnswerEdit).trim() !== '';
+  // Pri could not read the final answer line: below the floor, absent, or not stated in a way that can be taken
+  // from the lines. The student is asked to rewrite that line or type it (one sentence, one box).
+  const inkFinalUnreadable = writeMode && !isMcq && !isWorking && !!inkResult?.lines?.length && !inkStale && !inkAnswerTyped
+    && (!floorJudgement.lastJudged || (!inkLastLineIsAnswer && inkProposal?.status !== 'proposed'));
+  // A read photo or PDF: the lines the reader found. Nothing is confirmed by the student before marking
+  // (owner decision, 19 Nov 2026): a line the reader was unsure of is never judged (reading floor).
   const photoKey = photoInUse ? JSON.stringify((photoLines.lines || []).filter(l => !l.excluded).map(l => String(l.text))) : '';
   const readingId = writeMode ? reading : photoKey;
-  const needsCheck = needsConfirmation({ writeMode: writeMode || photoInUse, resolved, reading: readingId, stale: writeMode ? inkStale : false, vouched });
-  // What still needs the student: the lines the reader was unsure of, until each
-  // is confirmed as written, changed to what they wrote, or (photo) left out.
-  const [ackedDoubt, setAckedDoubt] = useState(null);
-  // A line is to be checked when the reader was unsure of it or when it does not
-  // come out as finished maths (the same test the chips use).
-  const shapeLine = i => {
-    if (inkResult?.lineMeta?.[i]?.corrected === true) return null;
-    const l = (inkResult?.lines || [])[i];
-    return doubtfulSpan(typeof l === 'string' ? l : String(l?.text ?? ''), { continuation: i > 0 });
-  };
-  const unsureLines = writeMode
-    ? (inkResult?.lines || []).map((l, i) => (isLowConfidence(inkResult?.lineMeta?.[i] || { conf: 0 }, confidenceFloorOf(inkResult)) || shapeLine(i) ? i : -1)).filter(i => i >= 0)
-    : photoInUse ? (photoLines.lines || []).map((l, i) => (l.check && !l.edited && !l.confirmed && !l.excluded ? i : -1)).filter(i => i >= 0) : [];
-  const ackKey = `${readingId}|${inkResult?.text ?? ''}|${inkSignature ?? ''}`;
-  const doubtOnly = writeMode && !!doubt && unsureLines.length === 0 && ackedDoubt !== ackKey;
-  const toConfirm = unsureLines.length + (doubtOnly ? 1 : 0);
-  const firstToCheck = unsureLines.length ? unsureLines[0] : -1;
-  // Focus goes to the first line to check when a reading arrives that needs one.
-  const confirmFocusRef = useRef(null);
-  const focusedFor = useRef(null);
-  useEffect(() => {
-    const key = needsCheck && firstToCheck >= 0 ? `${readingId}|${firstToCheck}` : null;
-    if (!key || focusedFor.current === key) return;
-    focusedFor.current = key;
-    try { confirmFocusRef.current?.focus?.({ preventScroll: false }); } catch { /* focus is best-effort */ }
-  });
   // The page as it stands now. Submit records it; a graded result is shown as
   // a result of what is on screen only while this has not changed since.
   const photoIdentity = useMemo(() => photoFingerprint(photo), [photo]);
@@ -1382,30 +1397,6 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     revision: currentRevision, write: writeMode, lines: inkResult?.lines || null, inkStale,
     inkAnswer: isWorking ? '' : inkAnswer, answer, working, choice: isMcq ? mcqSel : null
   };
-  const checkFocus = needsCheck && doubt ? (doubt.weakest?.id || null) : null;
-
-  useEffect(() => { if (!needsCheck && checking) setChecking(false); }, [needsCheck, checking]);
-
-  // Said as a question about the ink, never as a complaint about the student.
-  const checkCopy = useMemo(() => {
-    if (!doubt) return '';
-    const nice = s => ({ pi: 'π', theta: 'θ', sqrt: '√', percent: '%' })[s] || s;
-    if (doubt.why === 'shape') {
-      return t('verdict.checkShapeLine', { n: (doubt.line ?? 0) + 1, span: doubt.span?.text || '' });
-    }
-    // Name a runner-up only when it is genuinely close and genuinely different:
-    // offering "1 or l?" on a number is a question with no useful answer.
-    // A cloud reading names the doubted line and its two readings; the swap
-    // buttons sit on that line in the reading below.
-    if (doubt.doubt) return t('verdict.checkLineDoubt', { n: doubt.line + 1, doubt: doubt.doubt });
-    const w = doubt.weakest;
-    const rival = w?.rival || w?.alts?.find(a => a.sym !== w.sym) || null;
-    const contested = rival && rival.conf >= w.conf - CONFIRM_MARGIN;
-    if (w && contested) return t('verdict.checkContested', { read: nice(w.sym), rival: nice(rival.sym) });
-    if (w) return t('verdict.checkCloseCall', { read: nice(w.sym) });
-    return t('verdict.checkCloseCallPlain');
-  }, [doubt, t]);
-
   // On a phone the question, the mode switch and the ink toolbar leave room
   // for only part of the sheet above the action bar. Choosing Write scrolls
   // just far enough to show the whole sheet, so the question stays as visible
@@ -1466,33 +1457,16 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (el) requestAnimationFrame(() => { el.focus(); el.setSelectionRange(st + s.length, st + s.length); });
   };
 
-  /** One tap: the student stands behind this reading, and it goes. */
-  function acceptReading() {
-    // Which revision of the reading was confirmed travels with the submission
-    // record on this device; the strokes are sent with it as always, so both
-    // the original ink and the confirmed reading are there for grading.
-    if (toConfirm > 0) return;
-    confirmedRef.current = confirmedRevision({ reading: readingId, signature: writeMode ? inkSignature : null, text: writeMode ? inkResult?.text : photoKey, edited: writeMode ? (inkResult?.lines || []).some(l => l?.corrected === true) : (photoLines?.lines || []).some(l => l.edited) });
-    setVouched(readingId);
-    setChecking(false);
-    submit(readingId);
-  }
+  // The reading used is recorded with the submission: nothing was confirmed by the student (owner decision, 19 Nov 2026).
   const confirmedRef = useRef(null);
-  // A confirmation belongs to the exact page and reading it was given for: if
-  // the transcript or the ink changes (a re-read, an edit), it is asked again.
-  useEffect(() => { setVouched(null); setAckedDoubt(null); confirmedRef.current = null; }, [inkResult?.text, inkSignature, photoKey, question.id]);
+  useEffect(() => { confirmedRef.current = null; setFinalUnreadable(false); }, [inkResult?.text, inkSignature, photoKey, question.id]);
 
-  // Every submit control leads here, so the confirmation step cannot be walked
-  // around: a reading in doubt turns the press into the question instead.
+  // Every submit control leads here.
   const originalBuildRef = useRef(false);
-  async function submit(vouchedNow) {
-    setRereadAsked(false);
+  async function submit() {
     if (inFlightRef.current || busy || resolved) return;
     // A question that can never be marked is not sent to be marked.
     if (unmarkable) return;
-    // A reading in doubt asks its question; any other waits for the one combined
-    // Confirm and submit tap (never opens the doubt panel, which has nothing to say).
-    if (needsCheck && vouchedNow !== readingId) return;
     // A stale answer left over from another attachment is not evidence that
     // the NEW photo was recognised. Never let Submit race its cloud reading or
     // quietly grade only the readable subset of a multi-page PDF.
@@ -1505,7 +1479,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     } else if (isWorking) {
       if (writeMode) {
         if (!inkResult?.lines?.length || inkStale) return;
+        // No line of the working was read well enough to be judged: say so, send nothing, spend nothing.
+        if (!floorJudgement.judged.some(Boolean)) { setFinalUnreadable(true); return; }
         given = inkResult.lines.join('\n');
+        steps = undefined;
         viaInk = true;
         lines = inkResult.lines.slice();
         ink = { strokes: compactInkStrokes(inkResult.strokes), recognized: inkResult.text, engine: inkResult.engine || null, attested: inkResult.attested || null };
@@ -1515,20 +1492,24 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       }
     } else if (writeMode) {
       // Never a transcript or a proposed answer that no longer matches the ink.
-      if (!inkResult?.answerLine || inkStale || !String(inkAnswer).trim()) return;
+      if (!inkResult?.answerLine || inkStale) return;
+      // The final answer line could not be read: say so here, send nothing, spend nothing.
+      if (!String(inkAnswer).trim()) { setFinalUnreadable(true); return; }
       // The last line as written when it is itself an answer; otherwise the
       // answer shown in the field (the proposal, or what the student typed).
       // Either way the recognised lines go as working, and an answer that is
       // not the receipt's own text is confirmed by the student through
       // /recognition/:receipt/confirm — the same path as a hand-corrected line.
       given = String(inkAnswer).trim();
+      // Every line as read, in page order, so the server can name the ones its reading floor leaves out.
       steps = inkResult.lines.length > 1 || inkProposal ? inkResult.lines.join('\n') : undefined;
       viaInk = true;
       lines = inkResult.lines.slice();
       ink = { strokes: compactInkStrokes(inkResult.strokes), recognized: inkResult.text, engine: inkResult.engine || null, attested: inkResult.attested || null };
     } else {
       given = answer;
-      if (String(given).trim() === '') return;
+      // Pri could not read the final answer: say so, send nothing, spend nothing.
+      if (String(given).trim() === '') { if (mode === 'photo') setFinalUnreadable(true); return; }
       steps = (workingOpen || mode === 'photo') && working.trim() ? working : undefined;
     }
     // The student's own page goes with the answer, to be kept with the mark
@@ -1547,6 +1528,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     // the typed answer alone.
     const sentPhoto = photo && readerPermission(user) === READER_PERMISSION.ACCEPTED ? photo : undefined;
     const sourceMode = viaInk ? 'ink' : (mode === 'photo' && sentPhoto ? 'photo' : 'typed');
+    // The reading this submission was made from, recorded as NOT confirmed by the student (owner decision 19 Nov 2026).
+    if (viaInk || sentPhoto) confirmedRef.current = confirmedRevision({ reading: readingId, signature: writeMode ? inkSignature : null, text: writeMode ? inkResult?.text : photoKey, edited: writeMode ? (inkResult?.lines || []).some(l => l?.corrected === true) : (photoLines?.lines || []).some(l => l.edited) });
+    // A final answer the student typed themselves (never read from the page) is theirs even when it equals an unread line.
+    const answerTyped = (viaInk && !isWorking && inkAnswerTyped) || (!viaInk && !!sentPhoto && !isWorking && photoAnswerSource === 'student');
     // The same answer through a different input authority is NOT a replay of
     // the same request. Never reuse a Photo idempotency key as a typed grade.
     const contentKey = submissionContentKey(given, steps);
@@ -1591,7 +1576,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     const scribbleStrokes = scribbleRef.current && !scribbleRef.current.isEmpty()
       ? compactInkStrokes(scribbleRef.current.getStrokes())
       : undefined;
-    await deliver({ answer: String(given), ms, steps, viaInk, ink, photo: sentPhoto, ...(sentPhoto && photoAttested ? { photoAttested } : {}), scribble: scribbleStrokes, submissionId }, { lines, sourceMode, revision: currentRevision });
+    await deliver({ answer: String(given), ms, steps, viaInk, ink, photo: sentPhoto, ...(sentPhoto && photoAttested ? { photoAttested } : {}), ...(answerTyped ? { answerTyped: true } : {}), scribble: scribbleStrokes, submissionId }, { lines, sourceMode, revision: currentRevision });
   }
 
   /**
@@ -1729,6 +1714,15 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       // reader's own (the service's reading limit, this account's allowance,
       // a reader that did not answer): said as that, never as "reconnect",
       // and never as a verdict. Nothing was marked and no try was used.
+      // The server could not read the final answer line (its reading floor): nothing was recorded, no try was spent, the
+      // page and the reading are kept. The student rewrites that line or types the answer.
+      if (e?.code === 'FINAL_ANSWER_UNREADABLE') {
+        pendingRef.current = null;
+        clearPendingSubmission(question.id);
+        setFinalUnreadable(true);
+        setState({ phase: 'answering' });
+        return;
+      }
       const readerRefusal = readerRefusalAtSubmit(e);
       if (readerRefusal) {
         noteReaderRefusal(readerRefusal);
@@ -1983,15 +1977,6 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
 
   const verdictGood = resolved && res.correct;
   const activeReport = state.res?.stepReport;
-  // Photo: the server's verdicts pinned to the transcript lines they judged
-  // (#430, #475). The report indexes the lines that were sent — the included,
-  // non-blank ones in page order — and is used only when its text is exactly
-  // theirs, so a ✗ never lands on a line that was edited or left out since.
-  const photoMarks = useMemo(() => {
-    if (!resolved || mode !== 'photo' || !photoLines?.lines?.length || !res?.stepReport || res?.revealed || res?.invalid) return null;
-    const kept = photoLines.lines.map((l, i) => i).filter(i => !photoLines.lines[i].excluded && String(photoLines.lines[i].text).trim());
-    return lineMarks(res.stepReport, includedLines(photoLines), { count: photoLines.lines.length, indexOf: i => kept[i] });
-  }, [resolved, mode, photoLines, res]);
   // ── Whose result this is ──────────────────────────────────────────────────
   // A graded "not yet" (a wrong first try, or an entry the engine could not
   // read) is a result of the judged revision. It is shown as a result of what
@@ -2200,8 +2185,12 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const photoAwaitingValidReading = !photoEligibleForGrading({ mode, photo,
     ocrPhase: photoOCR.phase, unreadPages: pdfUnread, pdfPageCount,
     reattachRequired: photoReattachRequired });
-  const canSubmit = (isMcq ? mcqSel !== null : isWorking ? (writeMode ? inkReadable : !!working.trim()) : writeMode ? (inkReadable && !!inkResult?.answerLine && !!String(inkAnswer).trim()) : !!answer.trim()) &&
-    !photoAwaitingValidReading && !(mode === 'photo' && photoReadExpired);
+  // Handwriting or a photo is marked on one press, as soon as there is ink or a photo (owner decision, 19 Nov 2026): the
+  // reading happens silently, and a press made before it has finished waits for it under "Marking...".
+  const hasPageToMark = writeMode ? inkHasStrokes : mode === 'photo' ? (!!photo || heldPdf) : false;
+  const canSubmit = isMcq ? mcqSel !== null
+    : isWorking ? (writeMode ? inkHasStrokes : mode === 'photo' ? hasPageToMark : !!working.trim())
+      : (writeMode || mode === 'photo') ? hasPageToMark : !!answer.trim();
   // Reader refused by authentication is not a handwriting error or a
   // server-issued grading receipt. Keep original ink and its verified local
   // save state separate; never unlock Submit with a guessed transcript.
@@ -2238,8 +2227,20 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const awInput = useMemo(() => {
     if (!resolved || previousAttempt || !res || res.revealed || res.invalid || !Array.isArray(res.stepReport?.lines) || res.stepReport.lines.length < 2) return null;
     const lines = writeMode ? (judged?.lines || inkResult?.lines || []) : String(working || '').split('\n').filter(Boolean);
+    // The lines the server's reading floor left out come back as "couldn't read" and were never checked: put them back in
+    // page order (their text is the reading's, for the on-demand view) so the marked page shows them as not checked.
+    const excluded = Array.isArray(res.reading?.excludedLines) ? res.reading.excludedLines.filter(Number.isInteger) : [];
+    let stepReport = res.stepReport, readStates = null;
+    if (excluded.length) {
+      const total = res.stepReport.lines.length + excluded.length;
+      let k = 0;
+      stepReport = { ...res.stepReport, lines: Array.from({ length: total }, (_, i) => (excluded.includes(i)
+        ? { text: String(typeof lines[i] === 'string' ? lines[i] : lines[i]?.text ?? ''), status: 'unread', state: 'unread', unreadable: true }
+        : res.stepReport.lines[k++])) };
+      readStates = stepReport.lines.map((_, i) => (excluded.includes(i) ? 'cant' : 'read'));
+    }
     return {
-      lines, stepReport: res.stepReport, solution: res.solution || null, source: writeMode ? 'handwriting' : 'typed',
+      lines, stepReport, ...(readStates ? { readStates } : {}), solution: res.solution || null, source: writeMode ? 'handwriting' : 'typed',
       receipt: shownGrade ? { awarded: shownGrade.awarded, possible: shownGrade.possible, id: typeof res.submissionId === 'string' ? res.submissionId : null } : null,
       attempt: markedCount
     };
@@ -2253,6 +2254,30 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const photoPageOn = markedOn && mode === 'photo' && !!photo && !!photoLines?.lines?.length;
   const inkPageOn = markedOn && writeMode;
   const photoPageLines = photoPageOn ? photoLines.lines.filter(l => !l.excluded && String(l.text).trim()) : null;
+  // How Pri read each line, for the on-demand view on the marked page (never shown before marking), and the
+  // correction that marks the page again: the same question issued again (Redo) with the corrected page carried in.
+  const pageReading = markedOn ? { lines: (writeMode ? (judged?.lines || inkResult?.lines || []) : includedLines(photoLines || { lines: [] })).map(l => (typeof l === 'string' ? l : String(l?.text ?? ''))) } : null;
+  const correctReadLine = (i, text) => {
+    if (!onRedo || busy || !markedOn) return;
+    const clean = String(text ?? '').replace(/\s+/g, ' ').trim();
+    if (!clean) return;
+    if (writeMode) {
+      const kept = inkResult?.kept;
+      const strokes = latestInk.current || [];
+      if (!kept?.reading || !strokes.length) return;
+      const corrected = applyLineCorrection(kept.reading, i, clean);
+      if (corrected === kept.reading) return;
+      onRedo(newId => carryPageIntoQuestion(newId, { ink: { strokes, reading: { signature: kept.signature, reading: corrected } }, label: question.subtopicName }));
+    } else if (mode === 'photo' && photoLines?.lines) {
+      const at = photoLines.lines.map((_, j) => j).filter(j => !photoLines.lines[j].excluded && String(photoLines.lines[j].text).trim())[i];
+      if (at === undefined) return;
+      const next = editLine(photoLines, at, clean);
+      const proposal = proposeFrom(next);
+      onRedo(newId => carryPageIntoQuestion(newId, { label: question.subtopicName, photo: { state: photoDraftPayload({
+        photo, transcript: next, answer: proposal.status === 'proposed' ? proposal.answer : '', answerSource: proposal.status === 'proposed' ? 'proposed' : null,
+        engine: photoOCR.engine, confidence: photoOCR.confidence, attested: photoAttested }) } }));
+    }
+  };
   const instrumentScore = INSTRUMENT && !!shownGrade && Number.isFinite(Number(shownGrade.awarded))
     && Number(shownGrade.possible) > 0 && Number(shownGrade.awarded) >= 0 && Number(shownGrade.awarded) <= Number(shownGrade.possible);
 
@@ -2332,7 +2357,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               : 'idle';
   // Only a genuine completed read with no usable transcription may ask the
   // student to rewrite. Account/network/readiness blocks are explained above.
-  const inkUnread = writeMode && !isMcq && inkHasStrokes && !needsCheck
+  const inkUnread = writeMode && !isMcq && inkHasStrokes
     && inkReaderState?.kind === INK_READER_STATE.READ_FAILED
     && (isWorking ? !inkResult?.lines?.length : !inkResult?.answerLine);
   // Waiting for an account, and nothing else: the work is here, it has not
@@ -2361,16 +2386,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // Why Submit is not available, said beside it — never a dead button.
   const autoReadOn = !resolved && autoReadEnabled();
   const touchDevice = (() => { try { return !!globalThis.matchMedia?.('(pointer: coarse)')?.matches; } catch { return false; } })();
-  const submitReasonKey = resolved || isMcq || busy ? null
-    : writeMode && inkHasStrokes && rereadAsked && inkReadable ? 'ink.submitReadAgainDone'
-    : writeMode && inkHasStrokes && inkStale && inkReadExpired ? 'ink.submitReadExpired'
-    : mode === 'photo' && photoInUse && photoReadExpired ? 'photo.readExpired'
-    : writeMode && inkHasStrokes && inkStale ? 'ink.submitReadAgain'
-      // Reading is automatic (owner decision 18 Nov 2026): no "read it first" order.
-      : writeMode && inkHasStrokes && !inkReadable && awaitingReading && !autoReadOn ? 'ink.submitReadFirst'
-        : writeMode && !isWorking && inkReadable && inkProposal && !String(inkAnswer).trim() ? 'verdict.submitNeedsAnswer'
-          : mode === 'photo' && !isWorking && photoInUse && !String(answer).trim() ? 'verdict.submitNeedsAnswer'
-            : null;
+  // Why Mark is not available is never "read it first": reading is silent and one press waits for it.
+  const submitReasonKey = null;
   // ONE state for the student's work, so the page can never say two things
   // about it at once. In order: a save that failed outranks everything but a
   // check in flight; "waiting for sign-in" is said for handwriting only once
@@ -2402,18 +2419,49 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     : vocab.key ? t(vocab.key)
       : (writeMode && !isMcq ? t('verdict.statusWriteHint') : '');
 
-  // Lines the reading marks "check this" or "can't read": said on Check, never a block on it.
-  const unsettledLines = INSTRUMENT && writeMode && !inkStale && inkResult?.lines?.length
-    ? inkResult.lines.filter(l => !String(l?.text ?? '').trim() || isLowConfidence(l, confidenceFloorOf(inkResult))).length : 0;
-
   // ── The one dominant next move ─────────────────────────────────────────────
   // Stale ink + Submit: the same read as "Read again" (same server reader, consent and online gates,
   // answer-blind), shown to the student. Nothing is sent: the reading must be seen first, and a
   // second Submit sends it only if the ink is unchanged since that read (inkStale is false then).
   // A reader that is already known to be blocked (signed out, a limit, the service down) has its own
   // reason and action beside the work, so Submit waits there instead of being a press that cannot read.
-  const rereadable = INSTRUMENT && writeMode && !isMcq && !resolved && inkHasStrokes && inkStale && !inkAccountBlocked && !inkBlockKey;
-  const rereadFromSubmit = () => { setRereadAsked(true); inkControlRef.current?.read?.(); };
+  // One press (owner decision, 19 Nov 2026): if the page has been read, mark it; otherwise read it (silently) and mark
+  // it when the reading lands. Nothing is shown of the reading before the mark.
+  const markFiredRef = useRef(false);
+  function pressMark() {
+    if (busy || inFlightRef.current || resolved) return;
+    if (writeMode) {
+      if (inkReadable) { void submit(); return; }
+      markFiredRef.current = false;
+      setMarkWanted(true);
+      if (inkReaderState?.kind !== INK_READER_STATE.READING) inkControlRef.current?.read?.();
+      return;
+    }
+    if (photoInUse) { void submit(); return; }
+    if (photoOCR.phase === 'idle' && photo) {
+      markFiredRef.current = false;
+      setMarkWanted(true);
+      if (pendingPdf.current) void decodePdf(pendingPdf.current); else void decodePhoto(photo);
+      return;
+    }
+    if (photoOCR.phase === 'reading') { markFiredRef.current = false; setMarkWanted(true); }
+  }
+  // A page carried in from a correction on the marked page is marked on arrival (ink/redoCarry.js).
+  useEffect(() => {
+    if (resolved || busy || inFlightRef.current || !markOnArrivalPending(question.id)) return;
+    if ((writeMode && inkReadable) || photoInUse) { clearMarkOnArrival(question.id); pressMark(); }
+  });
+  useEffect(() => {
+    if (!markWanted || markFiredRef.current) return;
+    if (writeMode) {
+      if (inkReadable) { markFiredRef.current = true; setMarkWanted(false); void submit(); return; }
+      // A read that cannot happen (refused, failed, blocked) ends the wait: its own reason is on the page.
+      if (inkAccountBlocked || inkBlockKey || [INK_READER_STATE.READ_FAILED, INK_READER_STATE.READER_UNAVAILABLE, INK_READER_STATE.NETWORK_ERROR, INK_READER_STATE.ACCOUNT_ACTION_REQUIRED].includes(inkReaderState?.kind)) setMarkWanted(false);
+    } else if (mode === 'photo') {
+      if (photoInUse) { markFiredRef.current = true; setMarkWanted(false); void submit(); return; }
+      if (['failed', 'unavailable'].includes(photoOCR.phase)) setMarkWanted(false);
+    } else setMarkWanted(false);
+  });
   const primary = resolved || state.res?.conflict
     ? { label: t('practice.nextQuestion'), run: () => onNext?.(), disabled: false }
     : unmarkable
@@ -2421,18 +2469,19 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       // that can — never a Submit that is bound to be refused. A teacher's
       // own question has no such replacement, so it offers none.
       ? (unmarkable.replace ? { label: t(replaceArmed ? 'check.draftConfirmAction' : 'check.draftAction'), run: replaceQuestion, disabled: busy } : null)
-    : needsCheck
-      ? { label: t('verdict.confirmAndSubmit'), run: acceptReading, disabled: busy || !canSubmit || toConfirm > 0 }
+    : (writeMode || mode === 'photo') && !isMcq
+      // One press marks the page; one quiet "Marking..." covers the silent read and the mark.
+      ? { label: t(busy || markWanted ? 'verdict.marking' : 'verdict.markMyWorking'), run: pressMark, disabled: busy || markWanted || !canSubmit }
       : {
-          label: t(busy ? 'verdict.marking' : 'verdict.submit') + (unsettledLines === 1 ? ' ' + t('inst.unsettledOne') : unsettledLines > 1 ? ' ' + t('inst.unsettledMany', { n: unsettledLines }) : ''),
-          run: () => (rereadable ? rereadFromSubmit() : submit()), disabled: busy || (!canSubmit && !rereadable)
+          label: t(busy ? 'verdict.marking' : 'verdict.submit'),
+          run: () => submit(), disabled: busy || !canSubmit
         };
 
   // v1.1 instrument: ⌘↵ / Ctrl+↵ presses the primary action while it is a
   // check (never Next; on a doubted reading it does not confirm; on an unremarkable one the reading is on screen beside the button). No other
   // shortcut in the app uses a modifier with Enter; Enter alone keeps its
   // field behaviour.
-  const instrumentCheckKey = INSTRUMENT && !!primary && !resolved && !state.res?.conflict && !unmarkable && !(needsCheck && toConfirm > 0);
+  const instrumentCheckKey = INSTRUMENT && !!primary && !resolved && !state.res?.conflict && !unmarkable;
   const checkKeyRef = useRef(null);
   checkKeyRef.current = instrumentCheckKey && !primary.disabled ? primary.run : null;
   useEffect(() => {
@@ -2800,7 +2849,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                                 status block used to live inside the photo branch — so every
                                 PDF failure message was unreachable and the screen simply did
                                 not move. After a reading, the page is shown by the reading itself. */}
-                            {!(photoOCR.phase === 'done' && photoLines) && (
+                            {!photoPageOn && (
                               <PhotoPreview t={t} src={photo} busy={photoOCR.phase === 'reading'} canChange={!resolved}
                                 canRotate={!!photo && !pendingPdf.current && !heldPdf && photoOCR.phase !== 'reading' && photoOCR.phase !== 'done'}
                                 removeLabel={t(photo ? 'verdict.removePhoto' : 'verdict.removeAttachment')}
@@ -2808,7 +2857,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                             )}
                             <div className="pf-status" role="status" aria-live="polite">
                           {photoOCR.phase === 'reading' && (
-                            <span className="muted"><Working pending={photoOCR.phase === 'reading'} label={t('verdict.readingWork')} /></span>
+                            <span className="muted"><Working pending={photoOCR.phase === 'reading'} label={t('verdict.marking')} /></span>
                           )}
                           {photoOCR.phase === 'done' && (
                             <>
@@ -2877,23 +2926,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                               </p>
                             </div>
                           )}
-                          {photoOCR.phase === 'idle' && (cloudReadingEnabled(user) && !offline && !resolved ? (
-                            <div data-photo-unread>
-                              <button type="button" className="btn btn-primary" data-photo-read
-                                onClick={() => {
-                                  // One press, one read: a second press in the same moment finds the read started.
-                                  if (photoReadStarting.current) return;
-                                  photoReadStarting.current = true;
-                                  setTimeout(() => { photoReadStarting.current = false; }, 0);
-                                  setHeldPdf(false);
-                                  if (pendingPdf.current) void decodePdf(pendingPdf.current); else if (photo) void decodePhoto(photo);
-                                }}>
-                                {t('photo.readMyPhoto')}
-                              </button>
-                              <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>{t('photo.readMyPhotoHint')}</p>
-                              {heldPdf && <p className="muted" style={{ fontSize: 12, marginTop: 4 }} data-photo-pdf-cost>{t('photo.readPdfHint')}</p>}
-                            </div>
-                          ) : <span className="muted">{photoAwaitingOnlineReader(language)}</span>)}
+                          {/* One press of Mark my working reads the photo and marks it (owner decision, 19 Nov 2026). */}
+                          {photoOCR.phase === 'idle' && !(cloudReadingEnabled(user) && !offline && !resolved) && <span className="muted">{photoAwaitingOnlineReader(language)}</span>}
+                          {photoOCR.phase === 'idle' && heldPdf && cloudReadingEnabled(user) && !offline && !resolved && <p className="muted" style={{ fontSize: 12, marginTop: 4 }} data-photo-pdf-cost>{t('photo.readPdfHint')}</p>}
                         </div>
                           </div>
                         )}
@@ -2903,38 +2938,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               )}
               {photoPageOn && (
                 <React.Suspense fallback={null}>
-                  <MarkedPage input={awInput} source={{ kind: 'photo', src: photo, lines: photoPageLines }} texOf={texOf} criteria={res?.methodCriteria} />
+                  <MarkedPage input={awInput} source={{ kind: 'photo', src: photo, lines: photoPageLines }} texOf={texOf} criteria={res?.methodCriteria} reading={pageReading} onCorrect={onRedo ? correctReadLine : null} />
                 </React.Suspense>
-              )}
-              {mode === 'photo' && photoOCR.phase === 'done' && photoLines && !photoPageOn && (
-                <ReadingReview t={t} photo={photo} transcript={photoLines} disabled={resolved || busy} marks={photoMarks} texOf={texOf}
-                  toConfirm={toConfirm} firstToCheck={firstToCheck} confirmFocusRef={confirmFocusRef}
-                  onEdit={(i, text) => changePhotoLines(editLine(photoLines, i, text))}
-                  onExclude={(i, out) => changePhotoLines(setLineExcluded(photoLines, i, out))}
-                  onKeep={i => changePhotoLines(confirmLine(photoLines, i))}
-                  onIncludeAll={() => changePhotoLines(includeAll(photoLines))}
-                  onReplace={() => chooseFile(false)} onRemove={dropPhoto}>
-                  {/* The final answer: taken from the working when a line states the asked
-                      quantity, said where it came from, and asked for only when nothing does. */}
-                  {!isWorking && !resolved && (
-                    <div className="rr-final" data-photo-final>
-                      {String(answer).trim() && photoAnswerSource === 'proposed' && !answerOpen ? (
-                        <p className="rr-final-line" data-photo-answer-note={photoNote?.status || 'proposed'} data-photo-final-value={String(answer).trim()}>
-                          <span>{t('photo.finalAnswerIs')}</span>{' '}
-                          <b className="rr-final-value">{question.answerPrefix ? <span lang="en"><MathText text={question.answerPrefix} /> </span> : null}<MathText text={`$${texOf(String(answer).trim())}$`} />{question.answerSuffix ? ` ${question.answerSuffix}` : ''}</b>
-                          {' '}<button type="button" className="btn btn-quiet btn-sm" data-photo-answer-change onClick={() => setAnswerOpen(true)}>{t('photo.change')}</button>
-                          {photoNote?.status === 'proposed' && <span className="rr-from muted"> {t('photo.answerFromLine', { n: photoLineNumber(photoLines, photoNote.line) })}</span>}
-                        </p>
-                      ) : photoNote && photoNote.status !== 'not-applicable' && photoNote.status !== 'proposed' ? (
-                        <p className="rr-final-why" role="status" data-photo-answer-note={photoNote.status}>
-                          {photoNote.status === 'ambiguous' ? t('photo.answerAmbiguous', { candidates: photoNote.candidates.join(', ') })
-                            : photoNote.missing ? t('photo.answerMissing', { v: photoNote.missing })
-                              : t('photo.answerNone')}
-                        </p>
-                      ) : null}
-                    </div>
-                  )}
-                </ReadingReview>
               )}
               {photoSignInOpen && photoOCR.blockedKey === 'verdict.photoReadingSignIn' && (
                 /* The same two ways in as the handwriting sign-in: the account
@@ -2956,6 +2961,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   rows={6}
                 />
               ) : (mode === 'photo' && !photoFieldShown) ? null : (
+                <>
+                {mode === 'photo' && photoOCR.phase === 'done' && !String(answer).trim() && !resolved && (
+                  <p className="photo-lines-note" role="status" data-final-answer-sentence data-final-answer-unreadable="true">{t('mark.finalUnreadable')}</p>
+                )}
                 <TypedAnswerFields
                   question={question} totalMarks={totalMarks} inputRef={inputRef}
                   answer={answer} working={working} onAnswer={photoInUse ? editPhotoAnswer : editAnswer} onWorking={editWorking} onSubmit={submit}
@@ -2972,6 +2981,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                     setTimeout(() => inputRef.current?.focus(), 60);
                   }}
                 />
+                </>
               )}
             </div>
           </div>
@@ -2979,7 +2989,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           <>
           {inkPageOn && (
             <React.Suspense fallback={null}>
-              <MarkedPage input={awInput} source={{ kind: 'ink', strokes: latestInk.current || restoredInk || [] }} texOf={texOf} criteria={res?.methodCriteria} />
+              <MarkedPage input={awInput} source={{ kind: 'ink', strokes: latestInk.current || restoredInk || [] }} texOf={texOf} criteria={res?.methodCriteria} reading={pageReading} onCorrect={onRedo ? correctReadLine : null} />
             </React.Suspense>
           )}
           <div className={`ink-row${awModel && !inkPageOn ? ' aw-row' : ''}`} hidden={inkPageOn || undefined}>
@@ -2988,37 +2998,34 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             <div className={`editor-shell${inkAccountBlocked ? ' ink-account-waiting' : ''}${inkReaderState?.blocker === 'ink.waitingSignIn' && inkAccountBlocked ? ' ink-account-signin' : ''}`}
               data-marked={(resolved && !res?.revealed) || (gradedRetry && judgedLive && !state.res?.invalid) ? 'yes' : undefined}>
               {InkAnswer && restoredInk !== undefined && (
-                <InkAnswer feedback autoRead={!resolved} liveRead={coachOn && !resolved} promptAsksInequality={asksForInequality(question.prompt)} onRecognized={onInkRecognized} onReaderState={setInkReaderState} height={inkPageHeight} lineVerdicts={lineVerdicts}
+                <InkAnswer feedback autoRead={!resolved} liveRead={coachOn && !resolved} promptAsksInequality={asksForInequality(question.prompt)} onRecognized={onInkRecognized} onReaderState={setInkReaderState} showReading={false} height={inkPageHeight} lineVerdicts={lineVerdicts}
                   lineMarkers={awModel && writeMode && awModel.cards.length === (inkResult?.lines?.length || 0) ? awModel.cards.map(c => c.n) : null}
                   disabled={resolved || (busy && !replaying)} checkingEarlier={replaying && !resolved}
-                  focusSymbol={checkFocus} recognitionContext={recognitionContext}
+                  focusSymbol={null} recognitionContext={recognitionContext}
                   initialStrokes={latestInk.current || restoredInk || null} onStrokes={onInkStrokes}
                   initialReading={inkExtrasRef.current.reading || restoredReading || null}
                   readExpired={inkExpiredCount}
-                  controlRef={INSTRUMENT ? inkControlRef : null}
+                  controlRef={inkControlRef}
                   draftSaved={saveState === 'saved'} />
               )}
               {/* The answer taken from handwritten working: shown, editable,
                   and only ever sent by the student's own Submit. */}
-              {inkProposal && !resolved && (
-                <div className="ink-final-answer" data-ink-answer-proposal={inkAnswerEdit !== null ? 'student' : inkProposal.status}>
+              {finalUnreadable && !resolved && isWorking && (
+                <p className="photo-lines-note" role="status" data-working-unreadable>{t('mark.workingUnreadable')}</p>
+              )}
+              {(inkFinalUnreadable || finalUnreadable || inkAnswerTyped) && !resolved && !isWorking && (
+                <div className="ink-final-answer" data-ink-answer-proposal={inkAnswerTyped ? 'student' : 'unreadable'} data-final-answer-unreadable={inkFinalUnreadable || finalUnreadable ? 'true' : undefined}>
+                  <p className="photo-lines-note" id={`ink-final-note-${question.id}`} role="status" data-final-answer-sentence>{t('mark.finalUnreadable')}</p>
                   <label className="sc-label" style={{ display: 'block' }} htmlFor={`ink-final-${question.id}`}>{t('verdict.finalAnswer')}</label>
                   <div className="answer-row">
                     {question.answerPrefix && <span className="answer-prefix" lang="en"><MathText text={question.answerPrefix} /></span>}
                     <input id={`ink-final-${question.id}`} className="answer-input" data-ink-final-answer
                       aria-describedby={`ink-final-note-${question.id}`}
-                      value={inkAnswer} disabled={busy}
-                      onChange={e => { setInkAnswerEdit(e.target.value); noteEdited(submissionContentKey(String(e.target.value).trim(), inkResult.lines.join('\n'))); }}
+                      value={inkAnswerEdit ?? ''} disabled={busy}
+                      onChange={e => { setInkAnswerEdit(e.target.value); setFinalUnreadable(false); noteEdited(submissionContentKey(String(e.target.value).trim(), inkResult.lines.join('\n'))); }}
                       autoCapitalize="none" autoCorrect="off" spellCheck={false} inputMode="text" enterKeyHint="go" />
                     {question.answerSuffix && <span className="answer-suffix" lang="en">{question.answerSuffix}</span>}
                   </div>
-                  <p className="photo-lines-note" id={`ink-final-note-${question.id}`} role="status" style={{ marginTop: 8 }}>
-                    {inkProposal.status === 'proposed'
-                      ? t('ink.answerProposed', { answer: inkProposal.answer, n: (inkProposal.line ?? inkResult.lines.length - 1) + 1 })
-                      : inkProposal.status === 'ambiguous' ? t('ink.answerAmbiguous', { candidates: inkProposal.candidates.join(', ') })
-                        : inkProposal.missing ? t('photo.answerMissing', { v: inkProposal.missing })
-                          : t('ink.answerNone')}
-                  </p>
                 </div>
               )}
               {/* The reader cannot read right now (a limit, an outage, no
@@ -3097,64 +3104,6 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             )}
           </div>
           </>
-        )}
-
-        {/* A reading in doubt asks about the smallest useful region — one
-            symbol — instead of asking for the whole solution again. */}
-        {needsCheck && !photoInUse && toConfirm > 0 && (
-          <div className="ws-check ws-confirm" role="group" aria-label={t('verdict.confirmTitle')} data-confirm-reading data-to-confirm={toConfirm}>
-            <div className="ws-check-title"><Icon name={toConfirm ? 'uncertain' : 'check'} />{t('verdict.confirmTitle')}
-              <span className="ws-confirm-count" role="status" aria-live="polite" data-confirm-count>{toConfirm ? (toConfirm === 1 && firstToCheck >= 0 ? t('verdict.confirmCheckOne', { n: firstToCheck + 1 }) : t('verdict.confirmCheckMany', { count: toConfirm })) : t('verdict.confirmDone')}</span>
-            </div>
-            <p className="ws-confirm-blind muted">{t('verdict.confirmBlind')}</p>
-            <div className="ws-confirm-lines">
-              {/* The reading itself is the list above the panel; this panel names only what needs a look. */}
-              {(writeMode ? (inkResult?.lines || []).map((l, idx) => ({ l, idx })).filter(r => unsureLines.includes(r.idx)) : (photoLines?.lines || []).map((l, idx) => ({ l, idx })).filter(r => !r.l.excluded)).map(({ l, idx: i }, shown) => {
-                const unsure = writeMode ? unsureLines.includes(i) : !!(l.check && !l.edited && !l.confirmed);
-                const spanOf = writeMode && unsure ? shapeLine(i) : null;
-                const text = String(typeof l === 'string' ? l : l?.text ?? '');
-                const swaps = writeMode && unsure ? relationChoices({ ...(inkResult?.lineMeta?.[i] || {}), text }) : null;
-                return (
-                  <div key={i} className={`ws-confirm-line${unsure ? ' is-unsure' : ''}`} data-confirm-line={i} data-unsure={unsure ? 'true' : undefined}
-                    tabIndex={unsure && i === firstToCheck ? -1 : undefined} ref={unsure && i === firstToCheck ? confirmFocusRef : undefined}>
-                    <span className="ws-confirm-n" aria-hidden="true">{writeMode ? i + 1 : shown + 1}</span>
-                    <span className="ws-confirm-math ws-cm"><MathText text={`$${texOf(text)}$`} /></span>
-                    {unsure && (
-                      <div className="ws-confirm-ask" role="group" aria-label={spanOf ? t('verdict.checkShapeLine', { n: i + 1, span: spanOf.text }) : t('verdict.confirmWhich', { n: i + 1 })}>
-                        {spanOf
-                          ? <span className="ws-confirm-unsure" data-confirm-shape={i}>{t('verdict.confirmCheckLead', { n: i + 1 })}{' '}
-                              <button type="button" className="ws-confirm-span" data-confirm-span={i} aria-label={t('verdict.confirmSpanAria', { n: i + 1, span: spanOf.text })}
-                                onClick={() => inkControlRef.current?.edit?.(i)}><MathText text={`$${texOf(spanOf.text)}$`} /></button></span>
-                          : <span className="ws-confirm-unsure">{t('verdict.confirmWhich', { n: i + 1 })}</span>}
-                        <button type="button" className="btn btn-quiet btn-sm" data-confirm-keep={i}
-                          onClick={() => (writeMode ? inkControlRef.current?.correct?.(i, text) : changePhotoLines(editLine(photoLines, i, text)))}>{t('verdict.confirmThatsIt')}</button>
-                        {swaps && swaps.options.map(sign => (
-                          <button key={sign} type="button" className="btn btn-quiet btn-sm" data-confirm-swap={sign}
-                            aria-label={t('ink.relationSwapTo', { from: swaps.current, to: sign })}
-                            onClick={() => inkControlRef.current?.correct?.(i, swapRelation(text, swaps.at, sign))}>{sign}</button>
-                        ))}
-                        {writeMode && <button type="button" className="btn btn-quiet btn-sm" data-confirm-edit onClick={() => inkControlRef.current?.edit?.(i)}>{t('verdict.confirmEdit')}</button>}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-              {doubtOnly && (
-                <div className="ws-confirm-line is-unsure" data-confirm-doubt>
-                  <div className="ws-confirm-ask" role="group" aria-label={checkCopy}>
-                    <span className="ws-confirm-unsure">{checkCopy}</span>
-                    <button type="button" className="btn btn-quiet btn-sm" data-confirm-keep="all" onClick={() => setAckedDoubt(ackKey)}>{t('verdict.confirmThatsIt')}</button>
-                    <button type="button" className="btn btn-quiet btn-sm" data-confirm-edit onClick={() => inkControlRef.current?.edit?.(-1)}>{t('verdict.confirmEdit')}</button>
-                  </div>
-                </div>
-              )}
-            </div>
-            {!unsureLines.length && !doubtOnly && writeMode && (
-              <div className="ws-confirm-acts">
-                <button type="button" className="btn btn-quiet btn-sm" data-confirm-edit onClick={() => inkControlRef.current?.edit?.(-1)}>{t('verdict.confirmEdit')}</button>
-              </div>
-            )}
-          </div>
         )}
 
         {/* Scratch: rough work that is kept with the attempt but never marked. */}
@@ -3326,6 +3275,14 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                       : markedLineFix && /checked when this question is finished/.test(String(state.res.feedback || '')) ? null
                       : <MathText text={state.res.feedback || t('verdict.oneMoreGo')} />}
                   </div>
+                  {/* CTO ruling 19 Nov 2026: after EVERY submit the page speaks. A wrong first try carries no per-line verdict (the server
+                      withholds it: a line's verdict would test a candidate answer), but it does say which lines were not read, and how Pri
+                      read the page is on demand, with a correction that is marked again as the second try. */}
+                  {gradedRetry && !state.res?.invalid && !technicalRetry && Array.isArray(judged?.lines) && judged.lines.length > 0 && state.res?.reading && (
+                    <OpenTryReading t={t} texOf={texOf} lines={judged.lines.map(l => (typeof l === 'string' ? l : String(l?.text ?? '')))}
+                      unread={(state.res.reading.excludedLines || []).map(i => i + 1)}
+                      onCorrect={writeMode && !busy ? (i, text) => { inkControlRef.current?.correct?.(i, text); setTimeout(() => pressMark(), 0); } : null} />
+                  )}
                 </>
               )}
               {attemptViaInk && !checkRefused && !previousAttempt && <div className="eval-provenance" data-provenance="handwriting" style={{ padding: '6px 0 0', border: 0 }}>{t('verdict.readByAiMarkedByEngine')}</div>}

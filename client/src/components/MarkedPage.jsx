@@ -16,7 +16,7 @@ import Icon from './Icon.jsx';
 import { useT } from '../i18n/index.js';
 import { buildAnnotatedWorking } from './annotatedWorkingModel.js';
 import { CardBody } from './AnnotatedWorking.jsx';
-import { Typeset } from './ReadingReview.jsx';
+import { Typeset } from './Typeset.jsx';
 import { strokePath } from './originalWorkModel.js';
 import { STATE, alignCards, boxesFromInk, boxesFromPhoto, buildMarkedPage, commentItems, listOf } from './markedPageModel.js';
 import { criteriaView } from './criteriaTableModel.js';
@@ -67,7 +67,7 @@ function Sheet({ source, geometry, page, active, setActive, t }) {
  * source: { kind: 'ink', strokes } or { kind: 'photo', src, lines } where `lines` are the judged
  * lines in order (each may carry the reader's normalised `box`). The geometry is worked out here.
  */
-export default function MarkedPage({ input, source, texOf = s => s, markReady = true, criteria = null, approved }) {
+export default function MarkedPage({ input, source, texOf = s => s, markReady = true, criteria = null, approved, reading = null, onCorrect = null }) {
   const t = useT();
   const uid = useId();
   const model = useMemo(() => { try { return input ? buildAnnotatedWorking(input) : null; } catch { return null; } }, [input]);
@@ -83,6 +83,10 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
   // Only for a question type the author has approved, for its current scheme; otherwise nothing is drawn.
   const table = useMemo(() => (page && model ? criteriaView({ criteria, mark: page.header.mark, cards: model.cards, ...(approved ? { approved } : {}) }) : null), [criteria, page, model, approved]);
   const [active, setActive] = useState(null);
+  // How Pri read the page is on demand only (owner decision, 19 Nov 2026): one line at a time, or the whole page.
+  const [shown, setShown] = useState(() => new Set());
+  const [showAll, setShowAll] = useState(false);
+  const [editing, setEditing] = useState(null);   // { line, text }
   const sheetRef = useRef(null);
   const colRef = useRef(null);
   const [tops, setTops] = useState(null);
@@ -108,12 +112,53 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
 
   if (!page) return null;
   const level = !!tops;
+  const textOf = n => { const l = reading?.lines?.[n - 1]; return typeof l === 'string' ? l : String(l?.text ?? ''); };
+  const lineOpen = n => showAll || shown.has(n);
+  const toggleLine = n => setShown(prev => { const next = new Set(prev); if (next.has(n)) next.delete(n); else next.add(n); return next; });
+  // One line's reading, on demand, with Edit. A correction marks the page again (the caller's business).
+  const readingOfLine = n => {
+    const open = lineOpen(n);
+    const text = textOf(n);
+    const isEditing = editing?.line === n;
+    return (
+      <div className="mp-read" data-mp-read-line={n}>
+        <button type="button" className="mp-link" data-mp-see-line={n} aria-expanded={open} aria-controls={`${uid}-read-${n}`}
+          onClick={() => toggleLine(n)}>{t('mp.seeLine')}</button>
+        <div id={`${uid}-read-${n}`} hidden={!open}>
+          {open && (
+            <>
+              {text.trim()
+                ? <p className="mp-expr" data-mp-reading={n} data-text={text} aria-label={t('mp.readingOf', { n })}><Typeset text={text} texOf={texOf} /></p>
+                : <p className="mp-text" data-mp-reading={n}>{t('mp.readingBlank')}</p>}
+              {onCorrect && !isEditing && (
+                <button type="button" className="mp-link" data-mp-edit-line={n} onClick={() => setEditing({ line: n, text })}>{t('mp.edit')}</button>
+              )}
+              {onCorrect && isEditing && (
+                <form className="mp-edit" onSubmit={e => { e.preventDefault(); const clean = String(editing.text || '').trim(); if (clean) { setEditing(null); onCorrect(n - 1, clean); } }}>
+                  <input autoFocus value={editing.text} aria-label={t('mp.editLabel', { n })} data-mp-edit-input={n}
+                    inputMode="text" autoCapitalize="off" autoCorrect="off" spellCheck={false} maxLength={400}
+                    onChange={e => setEditing({ line: n, text: e.target.value })} />
+                  <button type="submit" className="btn btn-primary btn-sm" data-mp-mark-again>{t('mp.markAgain')}</button>
+                  <button type="button" className="btn btn-quiet btn-sm" onClick={() => setEditing(null)}>{t('common.cancel')}</button>
+                </form>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    );
+  };
   const on = n => ({ onMouseEnter: () => setActive(n), onMouseLeave: () => setActive(null), onFocus: () => setActive(n), onBlur: () => setActive(null), onClick: () => setActive(n) });
 
   return (
     <section className="mp" aria-labelledby={`${uid}-h`} data-marked-page data-mp-source={source.kind} data-mp-aligned={page.aligned ? 'true' : 'false'} data-mp-level={level ? 'true' : undefined}>
       <h3 className="sr-only" id={`${uid}-h`}>{t('mp.title')}</h3>
       <Header page={page} t={t} />
+      {reading && (
+        <p className="mp-read-all">
+          <button type="button" className="mp-link" data-mp-see-page aria-expanded={showAll} onClick={() => setShowAll(v => !v)}>{t(showAll ? 'mp.hidePage' : 'mp.seePage')}</button>
+        </p>
+      )}
       <div className="mp-body">
         <figure className="mp-page" ref={sheetRef}>
           <Sheet source={source} geometry={geometry} page={page} active={active} setActive={setActive} t={t} />
@@ -127,7 +172,14 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
                 <li key={it.id} className={`mp-card is-quiet${it.lines.includes(active) ? ' is-active' : ''}`} data-mp-card="collapsed" data-mp-lines={it.lines.join(',')} tabIndex={0} style={pos}
                   {...on(it.lines[0])}>
                   <p className="mp-state"><Icon name="uncertain" size={14} /><span>{t('aw.status.notVerified')}</span></p>
-                  <p className="mp-text">{t('mp.collapsed', { count: it.lines.length, list: listOf(it.lines) })}</p>
+                  {it.lines.length > it.unread.length && <p className="mp-text">{t('mp.collapsed', { count: it.lines.length - it.unread.length, list: listOf(it.lines.filter(n => !it.unread.includes(n))) })}</p>}
+                  {it.unread.length > 0 && (
+                    <>
+                      <p className="mp-text" data-mp-unread={it.unread.join(',')}>{t('mp.unread', { count: it.unread.length, list: listOf(it.unread) })}</p>
+                      <p className="mp-text mp-how" data-mp-unread-how>{t('mp.unreadHow')}</p>
+                    </>
+                  )}
+                  {reading && it.unread.map(n => <React.Fragment key={n}>{readingOfLine(n)}</React.Fragment>)}
                 </li>
               );
             }
@@ -144,6 +196,7 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
                   <p className="mp-expr" data-mp-expr><Typeset text={card.text} texOf={texOf} /></p>
                 )}
                 <div className="mp-text"><CardBody card={card} model={model} t={t} /></div>
+                {reading && status !== 'unread' && readingOfLine(n)}
               </li>
             );
           })}
