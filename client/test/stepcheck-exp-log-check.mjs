@@ -77,7 +77,7 @@ ok('isExpLogLine ignores a constant log', !isExpLogLine(parse('x*ln(5)=ln(20)'),
 // ── 2. Step Check on whole working ──────────────────────────────────────────
 const eqMeta = (solutions, extra = {}) => ({ kind: 'equation', variable: 'x', solutions, ...extra });
 const statuses = (meta, lines, options = null) => stepCheck(meta, lines.join('\n'), options).lines.map(l => l.status);
-const report = (meta, lines) => stepCheck(meta, lines.join('\n'));
+const report = (meta, lines, options) => stepCheck(meta, lines.join('\n'), options);
 
 function allOk(label, meta, lines) {
   const s = statuses(meta, lines);

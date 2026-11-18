@@ -7,7 +7,7 @@
 // of them — says which slip in a sentence made of the question's own numbers.
 // Deterministic; marks are never read or changed (see slipKit.js).
 // ─────────────────────────────────────────────────────────────────────────────
-import { n4, rad, deg, SIN, COS, TAN } from '../slipKit.js';
+import { n4, deg, SIN, COS, TAN } from '../slipKit.js';
 
 const s = (en, hi) => ({ en, hi, 'en-AU': en });
 const FN = { sin: SIN, cos: COS, tan: TAN };
@@ -120,7 +120,6 @@ const pythagoras = {
     const t = String(q.prompt);
     let m;
     if ((m = t.match(/perpendicular sides of \$(\d+)\$ cm and \$(\d+)\$ cm.*hypotenuse/))) return { kind: 'hyp', a: num(m[1]), b: num(m[2]) };
-    if ((m = t.match(/\$(\d+)\$ m long.*?(?:ladder|wire|support wire).*?|(?:ladder|wire) \$(\d+)\$ m long/))) { /* fallthrough below */ }
     if ((m = t.match(/\$(\d+)\$ m long (?:runs|leans).*?(?:lower end is|top is) \$(\d+)\$ m (?:from the base|above the ground)\. (How high|How far)/))) {
       return { kind: 'leg', h: num(m[1]), a: num(m[2]) };
     }
@@ -316,7 +315,6 @@ const trigEquation = {
     const c = QUAD.cands(r);
     const quadsRight = { sin: neg ? ['q3', 'q4'] : ['q1', 'q2'], cos: neg ? ['q2', 'q3'] : ['q1', 'q4'], tan: neg ? ['q2', 'q4'] : ['q1', 'q3'] }[fn];
     const right = quadsRight.map(k => c[k]).sort((a, b) => a - b);
-    const wanted = which === 'smaller' ? right[0] : right[1];
     const other = which === 'smaller' ? right[1] : right[0];
     const out = [
       { id: 'trig-other-solution', value: other, say: s(
@@ -578,7 +576,6 @@ const compoundFraction = {
     const sg = op === '+' ? 1 : -1;
     const sinF = sg => A.s * B.c + sg * A.c * B.s;
     const cosF = sg => A.c * B.c - sg * A.s * B.s;
-    const right = fn === 'sin' ? sinF(sg) : cosF(sg);
     const wrongSign = fn === 'sin' ? sinF(-sg) : cosF(-sg);
     const mixed = fn === 'sin' ? cosF(sg) : sinF(sg);
     const mixed2 = fn === 'sin' ? cosF(-sg) : sinF(-sg);
@@ -607,7 +604,6 @@ const compoundExpression = {
     return { form, A, B, op };
   },
   slips({ form, A, B, op }) {
-    const total = A + B, diff = Math.abs(A - B);
     const f = form === 'cos' ? COS : SIN;
     const ang = form === 'cos' ? (op === '-' ? A + B : A - B) : (op === '+' ? A + B : A - B);
     const wrongAng = form === 'cos' ? (op === '-' ? A - B : A + B) : (op === '+' ? A - B : A + B);
@@ -701,7 +697,6 @@ const inverseTrig = {
     const t = String(q.prompt);
     if (!/^(?:Find|Evaluate)/.test(t) || /Evaluate \$\\cos\^\{-1\}\\left\(\\cos/.test(t)) return null;
     const terms = [];
-    const re = /(?:^|\s)([+-])?\s*\$?\\(sin|cos|tan)\^\{-1\}\\left\(([^$]*?)\\right\)/g;
     let m;
     const body = t.replace(/\$/g, ' ');
     const re2 = /([+-]\s)?\\(sin|cos|tan)\^\{-1\}\\left\((.*?)\\right\)/g;
@@ -718,7 +713,6 @@ const inverseTrig = {
     const principal = tm => INV[tm.fn](tm.x);
     const total = list => list.reduce((acc, tm) => acc + tm.sign * principal(tm), 0);
     const conv = v => (unit === 'deg' ? deg(v) : v);
-    const right = conv(total(terms));
     const out = [];
     terms.forEach((tm, i) => {
       if (tm.x >= 0) return;

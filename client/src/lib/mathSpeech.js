@@ -38,12 +38,12 @@ const LEXICON = {
   'en-AU': { ...EN, percent: 'per cent' },
   hi: {
     ...EN,
-    plus: 'जमा', minus: 'घटा', times: 'गुणा', divided: 'भाग', plusMinus: 'जमा या घटा', minusPlus: 'घटा या जमा', equals: 'बराबर', notEquals: 'बराबर नहीं', less: 'से कम', greater: 'से अधिक',
-    lessEq: 'से कम या बराबर', greaterEq: 'से अधिक या बराबर', approx: 'लगभग बराबर', tendsTo: 'की ओर जाता है', implies: 'इसलिए', infinity: 'अनंत', degrees: 'डिग्री', percent: 'प्रतिशत', dollar: 'डॉलर',
+    plus: 'जमा', minus: 'घटा', times: 'गुणा', divided: 'भाग', plusMinus: 'जमा या घटा', minusPlus: 'घटा या जमा', equals: 'बराबर', notEquals: 'बराबर नहीं', 
+    approx: 'लगभग बराबर', tendsTo: 'की ओर जाता है', implies: 'इसलिए', infinity: 'अनंत', degrees: 'डिग्री', percent: 'प्रतिशत', dollar: 'डॉलर',
     squared: 'का वर्ग', cubed: 'का घन', power: 'की घात', endPower: 'घात समाप्त', sub: 'सब', over: 'बटा', fraction: 'भिन्न', endFraction: 'भिन्न समाप्त',
     sqrt: 'वर्गमूल', cbrt: 'घनमूल', nthRoot: 'वाँ मूल', endRoot: 'मूल समाप्त', choose: 'चुनें', factorial: 'फैक्टोरियल', prime: 'प्राइम', open: 'कोष्ठक खुला', close: 'कोष्ठक बंद',
-    abs: 'निरपेक्ष मान', endAbs: 'निरपेक्ष मान समाप्त', evaluated: 'मान निकालें', sum: 'योग', integral: 'समाकल', from: 'से', to: 'तक', of: 'का', limit: 'सीमा', as: 'जब', base: 'आधार', comma: 'अल्पविराम', point: 'दशमलव',
-    vector: 'सदिश', bar: 'बार', hat: 'हैट', matrix: 'आव्यूह', rows: 'पंक्तियाँ', row: 'पंक्ति', columns: 'स्तंभ', column: 'स्तंभ', endMatrix: 'आव्यूह समाप्त', aligned: 'हल', lines: 'पंक्तियाँ', line: 'पंक्ति', endAligned: 'हल समाप्त',
+    endAbs: 'निरपेक्ष मान समाप्त', evaluated: 'मान निकालें', sum: 'योग', integral: 'समाकल', from: 'से', to: 'तक', of: 'का', limit: 'सीमा', as: 'जब', base: 'आधार', comma: 'अल्पविराम', point: 'दशमलव',
+    vector: 'सदिश', bar: 'बार', hat: 'हैट', matrix: 'आव्यूह', rows: 'पंक्तियाँ', row: 'पंक्ति', columns: 'स्तंभ', endMatrix: 'आव्यूह समाप्त', aligned: 'हल', lines: 'पंक्तियाँ', line: 'पंक्ति', endAligned: 'हल समाप्त',
     less: 'छोटा है', greater: 'बड़ा है', lessEq: 'छोटा या बराबर है', greaterEq: 'बड़ा या बराबर है', given: 'दिया गया', ifWord: 'यदि', floor: 'फ़र्श', endFloor: 'फ़र्श समाप्त', ceiling: 'छत', endCeiling: 'छत समाप्त',
     inverse: 'प्रतिलोम', fromAbove: 'ऊपर से', fromBelow: 'नीचे से', and: 'और', not: 'नहीं', or: 'या', divides: 'विभाजित करता है', suchThat: 'ऐसा कि', emptySet: 'रिक्त समुच्चय', leftArrow: 'बायाँ तीर', positive: 'धनात्मक', negative: 'ऋणात्मक', congruent: 'सर्वांगसम है', because: 'क्योंकि', partial: 'आंशिक', del: 'डेल', realPart: 'वास्तविक भाग', imagPart: 'काल्पनिक भाग',
     openSq: 'वर्ग कोष्ठक खुला', closeSq: 'वर्ग कोष्ठक बंद', openBrace: 'ब्रेस खुला', closeBrace: 'ब्रेस बंद', openAngle: 'कोण कोष्ठक खुला', closeAngle: 'कोण कोष्ठक बंद', angle: 'कोण', triangle: 'त्रिभुज',
@@ -68,7 +68,6 @@ const COMMAND_WORD = {
   langle: 'openAngle', rangle: 'closeAngle', lbrace: 'openBrace', rbrace: 'closeBrace', '{': 'openBrace', '}': 'closeBrace', prime: 'prime', circ: 'degrees', degree: 'degrees'
 };
 const SPACING = new Set([',', ';', ':', '!', ' ', 'quad', 'qquad', 'displaystyle', 'textstyle', 'scriptstyle', 'limits', 'nolimits', 'left', 'right', 'big', 'Big', 'bigg', 'Bigg', 'bigl', 'bigr', 'middle', 'hline', 'phantom', 'hspace', 'mathrm', 'operatorname', 'mathit', 'mathsf', 'mathtt', 'mathcal', 'mathrm', 'not', 'nonumber', 'tag']);
-const ENV_ROWS = new Set(['pmatrix', 'bmatrix', 'vmatrix', 'matrix', 'Bmatrix', 'array']);
 const ENV_LINES = new Set(['aligned', 'align', 'align*', 'gathered', 'split', 'eqnarray']);
 
 function tokenize(tex) {

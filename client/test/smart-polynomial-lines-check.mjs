@@ -111,7 +111,6 @@ for (const g of ['me11-poly', 'me12-induction', 'mex-proof']) {
   for (const d of NSW_ISSUED_CELLS[g] || []) for (let i = 0; i < 10; i++) {
     let q; try { q = generateQuestion(g, d, 7000 + i * 31 + d); } catch { continue; }
     const meta = stepMetaFor(q); if (!meta) continue;
-    const answerText = JSON.stringify(q.answer);
     const start = meta.kind === 'equation' ? null : spansOf(q.prompt).find(s => { try { return !/=/.test(s) && s.length > 2 && s.length < 80 && exprEquivalent(s, meta.canonical); } catch { return false; } }) || null;
     for (const t of (q.traps || []).slice(0, 3)) {
       const wrong = meta.kind === 'equation' ? (Number.isFinite(t?.value) ? `${meta.variable} = ${t.value}` : null) : (typeof t?.expr === 'string' ? `= ${t.expr}` : null);

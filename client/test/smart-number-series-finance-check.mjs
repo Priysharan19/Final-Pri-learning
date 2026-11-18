@@ -2,7 +2,6 @@
 // Each slip has wrong-line fixtures (named specifically, on the right line),
 // and correct working must never be flagged. Reports specificity and right-line
 // rate. Pure engine check: no network, no model, no mark touched.
-import assert from 'node:assert/strict';
 import { NUMBER_SLIPS } from '../src/engine/misconceptions/topics/number.slips.js';
 import { SEQUENCE_SLIPS } from '../src/engine/misconceptions/topics/sequences.slips.js';
 import { FINANCE_SLIPS } from '../src/engine/misconceptions/topics/finance.slips.js';

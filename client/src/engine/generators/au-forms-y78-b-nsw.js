@@ -209,7 +209,6 @@ const probability = [
       const a = ri(rng, 2, hi), b = ri(rng, 2, hi), c = ri(rng, 2, hi), e = ri(rng, 1, hi);
       const total = a + b + c + e;
       const either = rng() < 0.5;
-      const col = ['red', 'blue', 'green', 'yellow'];
       const f = new Frac(either ? a + b : total - a, total);
       return fracQ(
         `A bag holds $${a}$ red, $${b}$ blue, $${c}$ green and $${e}$ yellow counters. One counter is taken at random. Find the probability that it is ${either ? '**red or blue**' : '**not red**'}, as a fraction in simplest form.`, f, {

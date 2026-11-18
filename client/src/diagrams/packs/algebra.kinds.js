@@ -971,7 +971,6 @@ export function levelWords(m, k, tk, mode = 'tex') {
 // numberLineStepper / numberLineJumps
 // ═════════════════════════════════════════════════════════════════════════════
 const NL_OPS = ['add', 'subtract', 'multiply'];
-const qToNum = v => { try { return qnum(toQ(v)); } catch { return NaN; } };
 export function validateNumberLine(p) {
   const errs = [];
   need(errs, NL_OPS.includes(p.op), `op must be one of ${NL_OPS.join(', ')}`);

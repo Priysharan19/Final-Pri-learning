@@ -272,10 +272,8 @@ const nCr = (n, k) => { let r = 1; for (let i = 1; i <= k; i++) r = r * (n - k +
 const pmf = (n, k, p) => nCr(n, k) * p ** k * (1 - p) ** (n - k);
 const P4 = v => rnd(v, 4);
 const T4 = 0.000005;
-const pr = rng => ri(rng, 5, 95) / 100;
 const q2 = p => rnd(1 - p, 2);
 const okP = v => v >= 0.002 && v <= 0.998 && safe(v, 4);
-const eps = 0.001;
 
 const makeB1a = (rng) => go(() => {
   const q = ri(rng, 5, 95) / 100, p = q2(q), n = ri(rng, 4, 15), k = ri(rng, 1, n - 1);
@@ -467,7 +465,7 @@ const makeP1a = (rng) => go(() => {
   });
 });
 const makeP1b = (rng) => {
-  const [x, y, m] = rc(rng, [[3, 4, 5], [5, 12, 13], [8, 15, 17], [7, 24, 25], [20, 21, 29]]);
+  const [x, y] = rc(rng, [[3, 4, 5], [5, 12, 13], [8, 15, 17], [7, 24, 25], [20, 21, 29]]);
   const s = ri(rng, 1, 3), vx = (rng() < 0.5 ? x : y) * s, vy = (vx === x * s ? y : x) * s;
   if (!Number.isInteger(hyp(vx, vy))) throw new Error('projectile P1b');
   return num(`A cricket ball leaves the bat with horizontal velocity component $${vx}$ m/s and vertical component $${vy}$ m/s. Find its launch speed.`, hyp(vx, vy), {
@@ -527,15 +525,6 @@ const makeP2a = (rng) => go(() => {
     tol: 0.0005, suffix: 's', traps: [{ value: rnd(2 * t, 2), why: 'That is the whole time of flight; the top is reached at half of it.' }],
     hints: ['At the top the vertical velocity is zero.', '$0 = v\\sin\\theta - gt$.', `$t = \\dfrac{${v}\\sin(${th}°)}{10}$.`],
     steps: [{ h: 'Vertical velocity zero', d: `$0 = ${v}\\sin(${th}°) - 10t$` }, { h: 'Solve', d: `$t \\approx ${rnd(t, 2)}$ s` }]
-  });
-});
-const makeP2b = (rng) => go(() => {
-  const [v, th] = vTh(rng), t = ri(rng, 1, 6), y = v * sn(th) - 10 * t;
-  if (Math.abs(y) < 0.5 || !safe(y, 1)) return null;
-  return num(`A projectile is launched at $${v}$ m/s at $${th}°$ above the horizontal. ${G} Find its vertical velocity component after $${t}$ ${pl(t, "second")}, correct to 1 decimal place. Take upwards as positive.`, rnd(y, 1), {
-    tol: 0.005, suffix: 'm/s', traps: [{ value: rnd(-y, 1), why: 'Take upwards as positive: a downward velocity is negative.' }, { value: rnd(v * sn(th) + 10 * t, 1), why: 'Gravity reduces the upward velocity: $v_y = v\\sin\\theta - gt$.' }],
-    hints: ['Constant acceleration $-10$ m/s² vertically.', '$v_y = v\\sin\\theta - gt$.', `$${v}\\sin(${th}°) - 10(${t})$.`],
-    steps: [{ h: 'Initial vertical', d: `$${v}\\sin(${th}°) \\approx ${rnd(v * sn(th), 2)}$` }, { h: 'After ' + t + ' s', d: `$v_y \\approx ${rnd(y, 1)}$ m/s` }]
   });
 });
 const makeP2c = (rng) => {

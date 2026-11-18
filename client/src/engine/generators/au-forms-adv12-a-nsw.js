@@ -11,7 +11,7 @@
 // direct enumeration) in `agree`; a disagreement throws, so no wrong key can
 // be issued. SYNTHETIC: no student or examiner evidence.
 // ─────────────────────────────────────────────────────────────────────────────
-import { ri, rc, nz, mcq, term, poly, sgn, r2, r3, gcd } from '../qhelpers.js';
+import { ri, rc, nz, mcq, term, poly, sgn, r2, r3 } from '../qhelpers.js';
 
 // ── Local helpers ───────────────────────────────────────────────────────────
 const lin = (a, b, v = 'x') => (b === 0 ? term(a, v) : `${term(a, v)} ${sgn(b)}`);
@@ -674,7 +674,7 @@ appForms.push({ diffs: [1], make: (rng) => {
 appForms.push({ diffs: [1], make: (rng) => {
   let A, p, q, B, C, which, key;
   do {
-    ({ A, p, q, B, C } = cubicParts(rng)); A = rc(rng, [2, 4]); B = (-3 * A * (p + q)) / 2; C = 3 * A * p * q;
+    ({ A, p, q } = cubicParts(rng)); A = rc(rng, [2, 4]);
     p = ri(rng, -4, 4); q = ri(rng, -4, 4); B = (-3 * A * (p + q)) / 2; C = 3 * A * p * q;
     which = rc(rng, ['larger', 'smaller']); const xs = which === 'larger' ? Math.max(p, q) : Math.min(p, q);
     key = A * xs ** 3 + B * xs * xs + C * xs;

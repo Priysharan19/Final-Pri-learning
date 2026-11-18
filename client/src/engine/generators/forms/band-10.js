@@ -8,6 +8,8 @@ const gcd = (x, y) => (y ? gcd(y, x % y) : x);
 const TRIPLES = [[3, 4, 5], [5, 12, 13], [8, 15, 17], [7, 24, 25], [20, 21, 29], [9, 40, 41], [12, 35, 37]];
 const nzs = (rng, hi) => ri(rng, 1, hi) * (ri(rng, 0, 1) ? -1 : 1);
 const distinct = (rng, lo, hi, n) => { const out = []; while (out.length < n) { const x = ri(rng, lo, hi); if (!out.includes(x)) out.push(x); } return out; };
+// `a - b` written for a substitution: a zero b leaves no `- 0` term, a negative b is bracketed.
+const takeAway = (a, b) => (b === 0 ? `${a}` : `${a} - ${b < 0 ? `(${b})` : b}`);
 const RETRY = Symbol('retry');
 const retrying = list => list.map(f => ({ ...f, make(rng, d) { for (let i = 0; i < 500; i++) { try { return f.make(rng, d); } catch (e) { if (e !== RETRY) throw e; } } throw new Error('retry exhausted'); } }));
 const ord = n => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10 > 3 ? 0 : n % 10]}`;
@@ -256,7 +258,7 @@ function coordForms() {
       return {
         payload: numeric('collinear-k', `The points $(${x1}, ${y1})$, $(${x2}, ${y2})$ and $(${x3}, k)$ lie on one straight line. Find $k$.`, y3, {
           hints: ['Three points are collinear when the triangle they form has zero area.', 'Equivalently, the slope between the first two points equals the slope to the third.', 'Solve the resulting linear equation for $k$.'],
-          steps: [{ h: 'Slope of the first pair', d: `$\\dfrac{${y2} - ${y1 < 0 ? `(${y1})` : y1}}{${x2} - ${x1 < 0 ? `(${x1})` : x1}}$` }, { h: 'Same slope to the third point', d: 'solve for $k$' }],
+          steps: [{ h: 'Slope of the first pair', d: `$\\dfrac{${takeAway(y2, y1)}}{${takeAway(x2, x1)}}$` }, { h: 'Same slope to the third point', d: 'solve for $k$' }],
           traps: [{ value: y2, why: 'The third point is farther along the line, so its $y$-value differs from the second point\'s.' }]
         }),
         check: () => { for (let t = -400; t <= 400; t++) { const area = x1 * (y2 - t) + x2 * (t - y1) + x3 * (y1 - y2); if (area === 0) return t; } return NaN; }
@@ -749,6 +751,30 @@ function trigForms() {
         check: () => Math.round(h / Math.sin((30 * Math.PI) / 180))
       };
     } },
+    { form: 'kite-string', make(rng, d) {
+      const L = 2 * ri(rng, 3, 8 + 3 * d), who = person(rng);
+      return {
+        payload: numeric('kite-string', `${who} flies a kite in ${place(rng)}. The string is $${L}$ m long, taut, and makes an angle of $30^\\circ$ with the level ground. Find the height of the kite above the ground in metres.`, L / 2, {
+          figure: D.ladderFigure({ ground: L * Math.cos(Math.PI / 6), height: L / 2, shown: { angle: '30°', height: '?', ladder: `${L} m` } }).svg,
+          hints: ['The string is the hypotenuse; the height is the side opposite the $30^\\circ$ angle.', '$\\sin 30^\\circ = \\dfrac12$.', 'So the height is half of the string.'],
+          steps: [{ h: 'Ratio', d: `$\\sin 30^\\circ = \\dfrac{h}{${L}}$` }, { h: 'Solve', d: `$h = ${L}\\times\\dfrac12$` }],
+          traps: [{ value: 2 * L, why: 'The string is the hypotenuse, the longest side, so the height is less than the string.' }]
+        }),
+        check: () => Math.round(L * Math.sin((30 * Math.PI) / 180) * 1e6) / 1e6
+      };
+    } },
+    { form: 'cliff-depression', make(rng, d) {
+      const h = ri(rng, 4, 24 + 6 * d), who = person(rng);
+      return {
+        payload: numeric('cliff-depression', `${who} stands on the top of a $${h}$ m cliff in ${place(rng)}. The angle of depression of a boat at sea is $45^\\circ$. Find the distance of the boat from the foot of the cliff in metres.`, h, {
+          figure: D.ladderFigure({ ground: h, height: h, shown: { angle: '45°', height: `${h} m`, ground: '?' } }).svg,
+          hints: ['The angle of depression equals the angle of elevation from the boat.', '$\\tan 45^\\circ = 1$.', 'So the distance equals the height of the cliff.'],
+          steps: [{ h: 'Ratio', d: `$\\tan 45^\\circ = \\dfrac{${h}}{x}$` }, { h: 'Solve', d: `$x = ${h}$` }],
+          traps: [{ value: h * Math.SQRT2, why: 'That is the line of sight, not the horizontal distance.' }]
+        }),
+        check: () => Math.round(h / Math.tan(Math.PI / 4))
+      };
+    } },
     { form: 'shadow-45', make(rng, d) {
       const h = ri(rng, 3, 20 + 5 * d), m = ri(rng, 2, 6);
       return {
@@ -763,7 +789,9 @@ function trigForms() {
   ];
 }
 
-const AP = retrying(apForms()), MENS = retrying(mensForms()), CIRC = retrying(circleForms()), COORD = retrying(coordForms()), LIN = retrying(linearForms()), POLY = retrying(polyForms()), PROB = retrying(probForms()), QUAD = retrying(quadForms()), REAL = retrying(realForms()), STAT = retrying(statForms()), TRI = retrying(triForms()), TRIG = retrying(trigForms());
+// Some Applications of Trigonometry takes only the heights-and-distances form that draws its figure; the
+// table and identity expressions are the Trigonometry chapter's (the practice figure tour, tour-v3, relies on it).
+const AP = retrying(apForms()), MENS = retrying(mensForms()), CIRC = retrying(circleForms()), COORD = retrying(coordForms()), LIN = retrying(linearForms()), POLY = retrying(polyForms()), PROB = retrying(probForms()), QUAD = retrying(quadForms()), REAL = retrying(realForms()), STAT = retrying(statForms()), TRI = retrying(triForms()), TRIG = retrying(trigForms()), TRIG_APPLIED = retrying(trigForms().filter(f => ['ratio-from-3-4-5', 'ladder', 'kite-string', 'cliff-depression'].includes(f.form)));
 
 export const BAND_10 = {
   'c10-ap-inverse-competency': AP, 'c10-ap-sum-reasoning': AP, 'c10-arithmetic-progressions': AP,
@@ -777,5 +805,5 @@ export const BAND_10 = {
   'c10-quadratic-context': QUAD, 'c10-quadratic-discriminant': QUAD, 'c10-quadratic-factorisation-reasoning': QUAD, 'c10-quadratic-k-forms': QUAD, 'c10-quadratic-roots': QUAD, 'c10-quadratic-triangle-competency': QUAD,
   'c10-statistics': STAT,
   'c10-triangles-current': TRI, 'c10-bpt-reasoning': TRI,
-  'c10-trigonometry-current': TRIG, 'c10-trig-applications-current': TRIG, 'c10-trig-boundary-relations': TRIG
+  'c10-trigonometry-current': TRIG, 'c10-trig-applications-current': TRIG_APPLIED, 'c10-trig-boundary-relations': TRIG
 };

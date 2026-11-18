@@ -177,7 +177,7 @@ export const TEXT = Object.freeze({
 
 // ── Shared drawing pieces ────────────────────────────────────────────────────
 const poly = pts => pts.map(([x, y], i) => `${i ? 'L' : 'M'}${x} ${y}`).join(' ');
-const plain = tex => String(tex).replace(/\\(mathbf|operatorname|mathrm|text)\{([^}]*)\}/g, '$2').replace(/\\omega/g, 'ω').replace(/\\Pi/g, 'Π').replace(/\\pi/g, 'π').replace(/\\[a-zA-Z]+/g, '').replace(/[{}\\]/g, '').replace(/\^/g, '^');
+const plain = tex => String(tex).replace(/\\(mathbf|operatorname|mathrm|text)\{([^}]*)\}/g, '$2').replace(/\\omega/g, 'ω').replace(/\\Pi/g, 'Π').replace(/\\pi/g, 'π').replace(/\\[a-zA-Z]+/g, '').replace(/[{}\\]/g, '');
 const plus = t => (String(t).startsWith('-') ? t : `+${t}`);
 const paren = v => (v < 0 ? `(${ratTex(v)})` : ratTex(v));
 

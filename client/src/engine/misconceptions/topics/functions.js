@@ -269,7 +269,7 @@ const inverseDomain = {
   },
   slips(p) {
     if (p.kind === 'sqrt') {
-      const { a, b, k } = p;
+      const { b, k } = p;
       return [
         { id: 'fn-inverse-domain-of-f', value: -b, say: s(
           `x ≥ ${n4(-b)} is the domain of f itself. The domain of f⁻¹ is the RANGE of f: since a square root is never negative, find the least value f can take.`,
@@ -279,7 +279,7 @@ const inverseDomain = {
           `f का सबसे छोटा मान वहाँ मिलता है जहाँ करणी 0 है, और f⁻¹ का प्रांत वहीं से शुरू होता है: ऊर्ध्वाधर विस्थापन का चिह्न नहीं बदलता।`) }
       ];
     }
-    const { a, b, k } = p;
+    const { a, b } = p;
     return [
       { id: 'fn-inverse-domain-of-f', value: -b, say: s(
         `x = ${n4(-b)} is excluded from the domain of f. The inverse's missing value is f's horizontal asymptote, not its vertical one.`,

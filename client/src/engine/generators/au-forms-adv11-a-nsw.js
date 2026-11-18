@@ -6,7 +6,7 @@
 // machine-keyed: the student finds the constant, value or first faulty line
 // that the "show that" argument turns on. Variants are chosen by au-forms-apply.js.
 // ─────────────────────────────────────────────────────────────────────────────
-import { ri, rc, rs, nz, mcq, sgn, poly, r1, r2, r3, rad } from '../qhelpers.js';
+import { ri, rc, nz, mcq, sgn, poly, r1, r2, r3, rad } from '../qhelpers.js';
 
 const fin = v => typeof v === 'number' && Number.isFinite(v);
 const gcd = (a, b) => (b ? gcd(b, a % b) : Math.abs(a));
@@ -403,7 +403,6 @@ const TRIG = [
 // y11-quadfunc  (issued cells: 2, 3, 4)
 // ═════════════════════════════════════════════════════════════════════════════
 const sx = b => (b === 0 ? '' : b === 1 ? '+ x' : b === -1 ? '- x' : `${sgn(b)}x`);
-const sq = v => `(${v})^2`;
 const QUAD = [
   // D2 — the constant q in (x + p)² + q.
   {
@@ -1524,7 +1523,6 @@ const SCR = [
     diffs: [4],
     make: rng => until(() => {
       const a = ri(rng, 6, 30), b = ri(rng, 6, 30), C = ri(rng, 25, 85);
-      const e = (k, f) => `$${k}${f}$`;
       const key = `$\\frac{1}{2}(${a})(${b})\\sin ${C}°$`;
       const kv = 0.5 * a * b * sinD(C);
       const opts = [[`$(${a})(${b})\\sin ${C}°$`, a * b * sinD(C), 'The area of a triangle includes the factor $\\frac{1}{2}$.'], [`$\\frac{1}{2}(${a})(${b})\\cos ${C}°$`, 0.5 * a * b * cosD(C), 'The area formula uses the sine of the included angle.'], [`$\\frac{1}{2}(${a} + ${b})\\sin ${C}°$`, 0.5 * (a + b) * sinD(C), 'Multiply the two sides, do not add them.']];

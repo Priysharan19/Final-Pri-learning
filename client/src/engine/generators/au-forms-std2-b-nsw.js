@@ -1232,7 +1232,7 @@ const relfreq = [
       let key, ev, trap, why;
       if (kind === 0) { key = g.c; ev = `one of the ${r1n} who ${c0}`; trap = (g.c + g.d) / g.N; why = 'Use the single cell for this group, out of everyone surveyed.'; }
       else if (kind === 1) { key = g.a + g.b; ev = `one of the ${r0}`; trap = g.a / g.N; why = 'Add both cells in the row.'; }
-      else if (kind === 2) { key = g.b + g.d; ev = `someone who does ${c1.replace(/^do not/, 'not')}`.replace('does not', 'does not'); trap = g.d / g.N; why = 'Add both cells in the column.'; }
+      else if (kind === 2) { key = g.b + g.d; ev = `someone who does ${c1.replace(/^do not/, 'not')}`; trap = g.d / g.N; why = 'Add both cells in the column.'; }
       else { key = g.a + g.b + g.d; ev = `one of the ${r0}, or someone who ${c1} (or both)`; trap = (g.a + g.b + g.b + g.d) / g.N; why = 'The ' + g.b + ' who are in both groups are counted twice; count them once.'; }
       return fracQ(`${twoWayText(g)} One person is chosen at random, each equally likely. Find the probability that the person is ${ev}, as a fraction in simplest form.`, key, g.N, {
         traps: [{ value: trap, why }],

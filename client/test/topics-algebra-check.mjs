@@ -20,7 +20,7 @@ const T = [];   // [code, meta, working lines, line index expected to carry the 
 const NUMS = [[2, 3], [4, -5], [-3, 6], [5, 2], [7, -4], [3, 8]];
 for (const [b, d] of NUMS) {
   const q = `(x ${sg(b)})(x ${sg(d)})`;
-  const canon = `x^2 ${sg(b + d).replace('+ ', '+ ').replace('- ', '- ')}x ${sg(b * d)}`;
+  const canon = `x^2 ${sg(b + d)}x ${sg(b * d)}`;
   const meta = { kind: 'expression', canonical: canon.replace(/\s/g, '') };
   T.push(['expand-first-and-last-only', meta, [q, `= x^2 ${sg(b * d)}`], 1, [`${b} × ${d}`]]);
   T.push(['expand-last-term-added', meta, [q, `= x^2 ${sg(b + d)}x ${sg(b + d)}`], 1, [`${b} × ${d}`.replace('-', '−')]]);

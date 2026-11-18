@@ -607,7 +607,7 @@ const rawForms = {
     },
     { // zeros from factorised form
       make: (rng) => {
-        let r = [0, 0, 0];
+        let r;
         do { r = [ri(rng, -9, 9), ri(rng, -9, 9), ri(rng, -9, 9)]; } while (new Set(r).size < 3);
         const best = Math.max(...r), neg = Math.max(...r.map(v => -v));
         return N(`Find the largest zero of $P(x) = (${bin('x', -r[0])})(${bin('x', -r[1])})(${bin('x', -r[2])})$.`, best, {

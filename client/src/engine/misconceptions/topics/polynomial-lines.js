@@ -58,7 +58,6 @@ export function polynomialOf(text) {
 const termName = (v, j) => (j === 0 ? 'constant term' : j === 1 ? `term in ${v}` : `term in ${v}^${j}`);
 const termHi = (v, j, oblique = false) => (j === 0 ? 'अचर पद' : `${j === 1 ? v : `${v}^${j}`} ${oblique ? 'वाले' : 'वाला'} पद`);
 const NOTES = { sign: 'me1-11-02#mistakes', other: 'ma5-alg-c-01#mistakes' };
-const SECTION = meta => (meta?.kind === 'equation' ? 'me1-11-02#mistakes' : null);
 
 /** How the line differs from the one above: { degree, from, to } when exactly one coefficient differs. */
 function singleDifference(line, previous) {

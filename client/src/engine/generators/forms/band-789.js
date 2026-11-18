@@ -477,7 +477,8 @@ const CRYPT = () => [
       t: [{ value: n % 9, why: 'The remainder on division by $9$ is not the digit sum itself.' }].filter(t => t.value !== String(n).split('').reduce((s, x) => s + Number(x), 0)), c: () => { let s = 0, m = n; while (m) { s += m % 10; m = Math.floor(m / 10); } return s; } };
   }),
   mk('divisible-digit', (rng, d) => {
-    const k = [3, 9][ri(rng, 0, 1)], base = ri(rng, 10, 999), digit = ri(rng, 0, 9);
+    const k = [3, 9][ri(rng, 0, 1)], base = ri(rng, 10, 999);
+    ri(rng, 0, 9);   // the draw stays: the seed's stream is part of the content
     const s = `${base}?`, total = String(base).split('').reduce((a, x) => a + Number(x), 0);
     let ans = -1;
     for (let x = 0; x <= 9; x++) if ((total + x) % k === 0) { ans = x; break; }

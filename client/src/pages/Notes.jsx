@@ -16,8 +16,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import PageLink from '../components/PageLink.jsx';
 import { MathText } from '../lib/latex.jsx';
-import { ReadableFormula } from '../lib/ReadableFormula.jsx';
-import StudyDiagram from '../notes/StudyDiagram.jsx';
 import { useApp } from '../App.jsx';
 import { useT } from '../i18n/index.js';
 import { IN_CURRICULUM, IN_CHAPTER_BY_ID, OLYMPIAD_TOPICS } from '../engine/curriculum-in.js';

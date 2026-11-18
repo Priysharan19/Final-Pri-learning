@@ -49,6 +49,7 @@ ok(!r.lines.slice(2).some(l => l.secondBreak), 'unreadable, prose, unit and fore
 // Inequality kind: a later line unrelated to the wrong one.
 const iq = { kind: 'inequality', variable: 'x', source: '2x+3>5x-6', canonical: 'x < 3' };
 r = run(iq, ['2x+3>5x-6', '2x-5x>-6-3', '3x>-9', 'x>-3']);
+ok(r.firstBreak === 2 && !r.lines[3].secondBreak, 'inequality: a later line that follows from the wrong one is carried, not a second break');
 
 // eq-073: 2x - 5x is -3x, not 3x. The slip is on line 3 and the correct-looking
 // final line is NOT credited over it.

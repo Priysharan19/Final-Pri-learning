@@ -58,7 +58,7 @@ const polys = [
   { form: 'sum-of-squares', make(rng, d) {
     const r1 = ri(rng, -R(d), R(d)), r2 = ri(rng, -R(d), R(d)), s = r1 + r2, p = r1 * r2;
     return {
-      payload: numeric('sum-of-squares', `The roots of $x^2 ${s === 0 ? '' : (-s < 0 ? `- ${s}` : `+ ${-s}`) + 'x '}${p < 0 ? `- ${-p}` : `+ ${p}`} = 0$ are $\\alpha$ and $\\beta$. Find $\\alpha^2 + \\beta^2$, without solving the equation.`.replace('x^2 +', 'x^2 +'), r1 * r1 + r2 * r2, {
+      payload: numeric('sum-of-squares', `The roots of $x^2 ${s === 0 ? '' : (-s < 0 ? `- ${s}` : `+ ${-s}`) + 'x '}${p < 0 ? `- ${-p}` : `+ ${p}`} = 0$ are $\\alpha$ and $\\beta$. Find $\\alpha^2 + \\beta^2$, without solving the equation.`, r1 * r1 + r2 * r2, {
         hints: ['Vieta: the sum of the roots is $-b/a$ and the product is $c/a$.', '$\\alpha^2 + \\beta^2 = (\\alpha + \\beta)^2 - 2\\alpha\\beta$.', 'Substitute the sum and product.'],
         steps: [{ h: 'Vieta', d: `$\\alpha + \\beta = ${s}$, $\\alpha\\beta = ${p}$` }, { h: 'Identity', d: '$\\alpha^2 + \\beta^2 = (\\alpha+\\beta)^2 - 2\\alpha\\beta$' }, { h: 'Evaluate', d: `$${s}^2 - 2(${p})$` }],
         traps: [{ value: s * s, why: 'Squaring the sum also contains the cross term $2\\alpha\\beta$, which must come off.' }]
@@ -81,7 +81,7 @@ const polys = [
   { form: 'factor-k', make(rng, d) {
     const a = ri(rng, 1, R(d)), k = ri(rng, -R(d), R(d)), c = -a * a - k * a;
     return {
-      payload: numeric('factor-k', `$x - ${a}$ is a factor of $x^2 ${k < 0 ? '-' : '+'} ${Math.abs(k)}x ${c < 0 ? '-' : '+'} ${Math.abs(c)}$. Find $k$.`.replace('+ 0x', '+ 0x'), k, {
+      payload: numeric('factor-k', `$x - ${a}$ is a factor of $x^2 ${k < 0 ? '-' : '+'} ${Math.abs(k)}x ${c < 0 ? '-' : '+'} ${Math.abs(c)}$. Find $k$.`, k, {
         hints: ['If $x - a$ is a factor, then $x = a$ is a root.', 'Substitute $x = ' + a + '$ and set the result equal to $0$.', 'Solve the linear equation for $k$.'],
         steps: [{ h: 'Factor theorem', d: `$P(${a}) = 0$` }, { h: 'Substitute', d: `$${a}^2 + k(${a}) ${c < 0 ? '-' : '+'} ${Math.abs(c)} = 0$` }, { h: 'Solve', d: 'isolate $k$' }],
         traps: [{ value: -k, why: 'Check the sign when moving terms across the equals sign.' }]
@@ -323,7 +323,7 @@ const bayes = [
       n1 = p1 * a1; n2 = (100 - p1) * a2; g = n1 + n2;
       if (terminates(g / gcd(n1, g))) break;
     }
-    if (!terminates(g / gcd(n1, g))) { p1 = 50; a1 = 5; a2 = 5; n1 = 250; n2 = 250; g = 500; }
+    if (!terminates(g / gcd(n1, g))) { p1 = 50; a1 = 5; a2 = 5; n1 = 250; g = 500; }
     return {
       payload: numeric('bayes', `A factory has two machines. Machine A makes $${p1}\\%$ of the bolts and machine B the rest. $${a1}\\%$ of A's bolts and $${a2}\\%$ of B's are defective. A bolt chosen at random is defective. What is the probability that it came from machine A?`, r6(n1 / g), {
         hints: ['You are asked for a probability *given* the bolt is defective.', 'Use Bayes\' theorem: the share of defective bolts that come from A.', 'The denominator is the total probability of a defective bolt.'],

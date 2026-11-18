@@ -2,7 +2,7 @@
 // Notes are study examples, not authenticated grading items. No copied question artwork.
 // Questions, steps and answers are TeX ($…$, via texFormat.js); `verify` stays in engine syntax;
 // figure descriptions are plain text for screen readers.
-import { m, num, paren, sq, plus, minus, times, frac, ratio, surd, poly, shiftParen, pair, text, plainPoly, plainShift, plainPair } from './texFormat.js';
+import { m, num, paren, sq, plus, minus, times, frac, ratio, surd, poly, shiftParen, pair, text, plainPoly, plainPair } from './texFormat.js';
 
 export function makeVisualExample(kind,p){
   const round=n=>Number(n.toFixed(6)), val=(expr,answer)=>({kind:'value',expr:String(expr),answer:String(answer)}), pairs=items=>({kind:'values',pairs:items.map(([a,b])=>[String(a),String(b)])});

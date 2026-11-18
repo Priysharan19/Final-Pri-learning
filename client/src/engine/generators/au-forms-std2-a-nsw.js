@@ -6,7 +6,7 @@
 // prompt; every numeric key is a whole number (the Prithagoras bank asks for
 // no rounded values). Variants are chosen by au-forms-apply.js.
 // ─────────────────────────────────────────────────────────────────────────────
-import { ri, rc, rs, mcq } from '../qhelpers.js';
+import { ri, rc, mcq } from '../qhelpers.js';
 import { figNetwork, figRightTriangle } from '../figures.js';
 
 const D = v => `\\$${String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
@@ -185,7 +185,6 @@ export const forms = {
     { make: (rng, diff) => {
       const [a, b, c] = tri(rng, diff <= 2 ? 65 : 170);
       const which = ri(rng, 0, 2);
-      const lab = [`${a} cm`, `${b} cm`, '? cm'];
       const [bs, ht, hy] = which === 0 ? [`${a} cm`, `${b} cm`, '? cm'] : which === 1 ? [`${a} cm`, '? cm', `${c} cm`] : ['? cm', `${b} cm`, `${c} cm`];
       const key = which === 0 ? c : which === 1 ? b : a;
       const fig = figRightTriangle({ base: bs, height: ht, hyp: hy });
@@ -197,7 +196,8 @@ export const forms = {
       });
     } },
     { make: (rng) => {
-      const [a, b, c] = tri(rng, 100), k = rc(rng, [1, 1, 2]);
+      const [a, b, c] = tri(rng, 100);
+      rc(rng, [1, 1, 2]);   // the draw stays: the seed's stream is part of the content
       const good = [a, b, c].sort((p, q) => p - q);
       const opts = [];
       const bad = [[good[0], good[1], good[2] + ri(rng, 1, 3)], [good[0], good[1], good[0] + good[1]], [good[0] + 1, good[1], good[2]], [good[0], good[1] + 2, good[2]]]
@@ -357,7 +357,7 @@ export const forms = {
       throw new Error('dep case');
     } },
     { diffs: [2, 3], make: (rng) => {
-      const { P, r, n, A } = compound(rng, 2, 2, [4, 5, 10, 20]);
+      const { P, r, A } = compound(rng, 2, 2, [4, 5, 10, 20]);
       const y1 = P * r / 100, y2 = A - P - y1;
       return num(`${D(P)} is invested at ${r}% per annum, compounded annually. How much interest is earned in the second year only, in dollars?`, y2, {
         prefix: '$',

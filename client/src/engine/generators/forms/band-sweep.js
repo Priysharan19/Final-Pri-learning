@@ -1,10 +1,8 @@
 // Extra forms · sweep for Classes 7, 8 and 9: skills the earlier bands left under a target.
 // Each export is merged onto a skill's existing list (loader.js). See band-789.js for the builder.
-import { ri, numeric, span, place, r6, terminates } from './kit.js';
+import { ri, numeric, place, r6, terminates } from './kit.js';
 import { FORMS_789 } from './band-789.js';
-import * as D from './diagrams.js';
 
-const R = d => span(d, 20, 15);
 const gcd = (x, y) => (y ? gcd(y, x % y) : x);
 const RETRY = Symbol('retry');
 const distinct = (rng, lo, hi, n) => { const out = []; while (out.length < n) { const x = ri(rng, lo, hi); if (!out.includes(x)) out.push(x); } return out; };

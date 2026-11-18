@@ -972,16 +972,14 @@ const probability = [
   },
   { // find the number of blue counters from P(red)
     make: (rng) => {
-      for (let i = 0; i < 200; i++) {
+      {
         const T_ = ri(rng, 8, 40), r = ri(rng, 2, T_ - 2), f = new Frac(r, T_);
-        if (f.d === T_ && false) continue;
         return N(`A bag contains $${r}$ red counters and some blue counters. The probability of drawing a red counter is $${f.latex()}$. How many blue counters are in the bag?`, T_ - r, {
           traps: [T(T_, 'That is the total number of counters; subtract the red ones.'), T(f.d - f.n, 'The fraction is simplified, so these numbers may not be the actual counts.')],
           hints: [`$P(\\text{red}) = \\dfrac{${r}}{\\text{total}} = ${f.latex()}$.`, 'Find the total number of counters.', 'Subtract the red counters.'],
           steps: [{ h: 'Total', d: `$\\text{total} = ${r}\\div ${f.latex()} = ${T_}$` }, { h: 'Blue', d: `$${T_} - ${r} = ${T_ - r}$` }]
         });
       }
-      return probability[1].make(rng);
     }
   },
   { // MCQ: expression for both red without replacement

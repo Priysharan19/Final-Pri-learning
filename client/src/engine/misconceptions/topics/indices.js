@@ -4,7 +4,7 @@
 // Feedback only; no status, mark or first break moves.
 import { registerTopic } from './registry.js';
 import { parse, normalize, evaluate } from '../../expr.js';
-import { resetPolyBudget, sameAsPrevious, fmt, polyAdd, polyConst, polyEqual, polyFromAst, polyOfText, productFactors, unwrap } from './poly.js';
+import { resetPolyBudget, sameAsPrevious, fmt, polyEqual, polyFromAst, polyOfText, productFactors, unwrap } from './poly.js';
 
 const astOf = text => {
   const s = String(text ?? '').replace(/[−–—]/g, '-').trim();
@@ -13,7 +13,6 @@ const astOf = text => {
 };
 const num = n => { const u = unwrap(n); if (u?.t === 'num') return u.v; if (u?.t === 'neg' && unwrap(u.v)?.t === 'num') return -unwrap(u.v).v; return null; };
 const monomial = p => (p && p.size === 1 ? [...p.values()][0] : null);
-const varsText = e => Object.keys(e).filter(v => e[v]).sort().map(v => `${v}${e[v] === 1 ? '' : `^${e[v]}`}`).join('·');
 
 /** One factor as { coef, exps, outer }: (coef · Πv^e)^outer, or null when it is not that shape. */
 function powerFactor(node) {
@@ -88,7 +87,6 @@ function indexSlips(ctx) {
   }
   if (!results.length) return null;
   const r = results[0];
-  const showFactors = String(ctx.previous ?? '').replace(/[−–—]/g, '-').split('=').pop().trim().replace(/\*/g, '×').replace(/\^\(([^()]*)\)/g, '^$1');
   const first = factors.find(f => f.power) || factors[0];
   const v = Object.keys(first.exps)[0] || 'x';
   if (powered && r.expPower === 'add') {

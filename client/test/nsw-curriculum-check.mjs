@@ -395,7 +395,6 @@ try {
     const inMain = c => { try { git(['merge-base', '--is-ancestor', c, 'origin/main']); return true; } catch { return false; } };
     for (const m of mergeList) {
       const [, ...others] = git(['rev-list', '--parents', '-n', '1', m]).split(' ');
-      const first = others[0];
       for (const other of others.slice(1)) {
         if (inMain(other)) continue;
         units.push({ label: `merged ${other.slice(0, 9)} (${git(['log', '-1', '--format=%s', m])})`, ranges: [[git(['merge-base', other, 'origin/main']), other]] });

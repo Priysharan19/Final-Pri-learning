@@ -21,7 +21,6 @@ import base4 from '../src/notes/nsw/notes-nsw-stage4.js';
 import premium4 from '../src/notes/nsw/notes-nsw-stage4-premium.js';
 import six6a from '../src/notes/nsw/notes-nsw-stage6-advanced.js';
 import six6s from '../src/notes/nsw/notes-nsw-stage6-standard.js';
-import { readFileSync } from 'node:fs';
 
 const stage4 = mergePremium(base4, premium4);
 // The kit's kind names (diagrams/kinds.js: the registry without React, so plain node can read it).

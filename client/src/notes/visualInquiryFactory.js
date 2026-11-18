@@ -2,7 +2,7 @@
 // No server answer checking or copied external figures; external mathematical signoff remains required.
 // Questions, steps and answers are TeX ($…$, via texFormat.js); `verify` stays in engine syntax;
 // figure descriptions are plain text for screen readers.
-import { m, num, paren, plus, minus, times, frac, poly, shiftParen, pair, plainPoly, plainShift } from './texFormat.js';
+import { m, num, paren, plus, minus, times, frac, poly, pair, plainShift } from './texFormat.js';
 
 export function makeInquiryVisual(kind,p){
  const V=(a,b)=>({kind:"value",expr:String(a),answer:String(b)});

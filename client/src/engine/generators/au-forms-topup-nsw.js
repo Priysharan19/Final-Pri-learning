@@ -711,7 +711,8 @@ const nonlinear = [
     [{ h: 'Growth or decay', d: grows ? 'Base $> 1$: growth' : 'Base between $0$ and $1$: decay' }, { h: 'y-intercept', d: `$y = ${k} \\times 1 = ${k}$` }]);
   }),
   V([4], rng => {
-    const v = ri(rng, 6, 60) * 10, s = rc(rng, [20, 30, 40, 50, 60, 80, 100, 120]);
+    ri(rng, 6, 60);   // the draw stays: the seed's stream is part of the content
+    const s = rc(rng, [20, 30, 40, 50, 60, 80, 100, 120]);
     const D1 = ri(rng, 6, 60) * 20;
     rej(D1 % s !== 0);
     const t = D1 / s;

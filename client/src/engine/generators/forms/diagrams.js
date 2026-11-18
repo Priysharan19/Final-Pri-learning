@@ -15,7 +15,9 @@ const W = 360, H = 260, PAD = 34;
 
 /** Estimated text box (the app font is proportional; 0.58 em is a safe average advance). */
 function box(x, y, s, size = 13.5, anchor = 'middle') {
-  const w = Math.max(6, String(s).replace(/<[^>]+>/g, '').length * size * 0.58), h = size * 1.1;
+  let shown = String(s);
+  for (let before = ''; before !== shown;) { before = shown; shown = shown.replace(/<[^<>]*>/g, ''); }   // markup carries no width; strip until none is left
+  const w = Math.max(6, shown.length * size * 0.58), h = size * 1.1;
   const x0 = anchor === 'middle' ? x - w / 2 : anchor === 'end' ? x - w : x;
   return { x0, y0: y - h * 0.8, x1: x0 + w, y1: y - h * 0.8 + h };
 }

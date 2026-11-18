@@ -9,7 +9,7 @@ Target (owner, Nov 2026): **≥ 10^8 distinct questions per class**. Status belo
 | Class 7 | 103 | ≥ 3.02×10^8 | 2 | 28 | met |
 | Class 8 | 126 | ≥ 5.24×10^8 | 3 | 40 | met |
 | Class 9 | 32 | ≥ 1.45×10^8 | 1 | 2 | met |
-| Class 10 | 110 | ≥ 1.63×10^8 | 1 | 26 | met |
+| Class 10 | 110 | ≥ 1.63×10^8 | 1 | 30 | met |
 | Class 11 | 102 | ≥ 2.62×10^8 | 2 | 24 | met |
 | Class 12 | 93 | ≥ 3.60×10^8 | 2 | 27 | met |
 
@@ -109,8 +109,12 @@ Cells whose estimate is under 10^4: the first to widen (more forms, wider ranges
 | Generator | D | Draws | Distinct seen | Estimate |
 |---|---|---|---|---|
 | `c10-linear-graphs` | 1 | 2000 | 192 | 192 |
+| `c10-trig-applications-current` | 3 | 2000 | 383 | 385 |
+| `c10-trig-applications-current` | 4 | 2000 | 651 | 680 |
 | `c10-areas-circles` | 1 | 2000 | 1000 | 1381 |
 | `c10-surface-volume-combo` | 1 | 2000 | 1000 | 1392 |
+| `c10-trig-applications-current` | 1 | 2000 | 1140 | 1749 |
+| `c10-trig-applications-current` | 2 | 2000 | 1152 | 1756 |
 | `c10-zero-coefficient-forms` | 3 | 2000 | 944 | 2482 |
 | `c10-triangles-current` | 1 | 2000 | 1176 | 2578 |
 | `c10-surface-area-combo` | 1 | 2000 | 1360 | 2748 |

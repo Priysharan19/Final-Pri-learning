@@ -520,19 +520,6 @@ function namesValue(ast, variable) {
   return (alone(ast.l) && constant(ast.r)) || (alone(ast.r) && constant(ast.l));
 }
 
-/** Every `e` in the tree is the base of a power (and there is at least one). */
-function eOnlyAsBase(ast) {
-  let seen = false;
-  const walk = (node, asBase) => {
-    if (!node || typeof node !== 'object') return true;
-    if (node.t === 'var' && node.v === 'e') { seen = true; return asBase; }
-    if (Array.isArray(node.args)) return node.args.every(a => walk(a, false));
-    if (node.t === 'bin' && node.op === '^') return walk(node.l, true) && walk(node.r, false);
-    return ['l', 'r', 'v', 'arg'].every(k => walk(node[k], false));
-  };
-  return walk(ast, false) && seen;
-}
-
 const holdsWithin = (L, R) => Number.isFinite(L) && Number.isFinite(R)
   && Math.abs(L - R) <= Math.max(1e-6, Math.abs(L), Math.abs(R)) * 1e-6;
 
@@ -731,7 +718,7 @@ function checkLinesAfterBreakAgainstPrevious(out, firstBreak, meta) {
     if (row.unread || row.check || row.otherUnknown || row.coversAll || row.branch) continue;
     const prev = out[i - 1];
     if (!prev || prev.unread || (i - 1 !== firstBreak && prev.status === 'note' && prev.note !== 'Follows from the earlier slip.')) continue;
-    let verdict = 'unknown';
+    let verdict;
     try { verdict = lineVersusPrevious(prev.text, row.text, meta); } catch { verdict = 'unknown'; }
     if (verdict === 'different' && (row.status === 'ok' || row.status === 'note')) {
       let diagnosis = null;

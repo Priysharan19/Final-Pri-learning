@@ -458,7 +458,7 @@ const circle = [
         if (p < 20 || p > 85 || a === 2 * c) continue;
         const b = 2 * p - a * x;
         return numQ(`An arc subtends $(${lin(a, b)})^\\circ$ at the centre of a circle and $(${lin(c, d)})^\\circ$ at the circumference. Find $x$.`, x, {
-          traps: [{ value: (d - b) / (a - c), why: 'The angle at the centre is TWICE the angle at the circumference: write $${lin(a, b)} = 2(${lin(c, d)})$.' }],
+          traps: [{ value: (d - b) / (a - c), why: `The angle at the centre is TWICE the angle at the circumference: write $${lin(a, b)} = 2(${lin(c, d)})$.` }],
           hints: ['The angle at the centre is twice the angle at the circumference standing on the same arc.', `$${lin(a, b)} = 2(${lin(c, d)})$.`, 'Expand the bracket and collect the $x$ terms.'],
           steps: [{ h: 'Circle theorem', d: `$${lin(a, b)} = 2(${lin(c, d)})$` }, { h: 'Solve', d: `$${a - 2 * c}x = ${2 * d - b} \\Rightarrow x = ${x}$` }]
         });

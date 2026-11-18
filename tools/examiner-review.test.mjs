@@ -71,7 +71,6 @@ for (const [id, packet, label] of [['nsw-hsc', 'hsc', 'NSW'], ['cbse', 'cbse', '
 ok(!existsSync(path.join(ROOT, 'docs/marking/prereview/certification.json')), 'the pre-review folder holds no record');
 
 // Behavioural: load each page in a real browser with empty storage and look at what it does.
-let ran = 0;
 try {
   const { createRequire } = await import('node:module');
   const { chromium } = createRequire(path.join(ROOT, 'client/package.json'))('playwright');
@@ -94,7 +93,6 @@ try {
       ok(after === 1, `${id} one tap pressed ${after} buttons`);
       await page.close();
     }
-    ran = 1;
   } finally { await browser.close(); }
 } catch (e) { console.log(`EXAMINER REVIEW: browser check skipped (${String(e.message).split('\n')[0].slice(0, 80)}); the static checks still ran`); }
 

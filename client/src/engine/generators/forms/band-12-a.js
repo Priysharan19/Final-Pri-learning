@@ -2,7 +2,6 @@
 import { ri, numeric, choice, span, person, place } from './kit.js';
 
 const R = d => span(d, 30, 20);
-const sq = x => `${x}^2`;
 const coef = a => (a === 1 ? '' : String(a));
 
 const ineq = [

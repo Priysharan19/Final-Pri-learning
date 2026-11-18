@@ -811,7 +811,6 @@ expForms.push(V('exp-mcq-integral-error', [2, 3, 4], (rng) => {
 // y12-motion
 // ═════════════════════════════════════════════════════════════════════════════
 const motionForms = [];
-const mset = (m, k) => (m === 1 ? k : m * k);
 
 // Acceleration from a cubic displacement function
 motionForms.push(V('motion-accel-from-x', [1, 2], (rng) => {
@@ -1128,7 +1127,6 @@ motionForms.push(V('motion-first-rest-position', [3, 4], (rng) => {
 // ═════════════════════════════════════════════════════════════════════════════
 const seriesForms = [];
 const ordinal = n => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd', 'th', 'th', 'th', 'th', 'th', 'th'][n % 10]}`;
-const sInt = v => `${v}`;
 const termList = (a, d, n) => Array.from({ length: n }, (_, i) => a + i * d);
 
 // Two terms given: find d, a or a later term (arithmetic)
@@ -1185,7 +1183,6 @@ seriesForms.push(V('series-ap-find-n', [2, 3, 4], (rng) => {
 seriesForms.push(V('series-gp-sum-n', [2, 3, 4], (rng) => {
   const a = ri(rng, 1, 7), r = rc(rng, [2, 3, 4, 5, -2, -3]), n = ri(rng, 4, r > 3 ? 7 : 9);
   const S = a * (r ** n - 1) / (r - 1);
-  const terms = [a, a * r, a * r * r].map(v => (v < 0 ? `(${v})` : `${v}`));
   const lead = `$${a} ${a * r < 0 ? '-' : '+'} ${Math.abs(a * r)} ${a * r * r < 0 ? '-' : '+'} ${Math.abs(a * r * r)} ${a * r ** 3 < 0 ? '-' : '+'} ${Math.abs(a * r ** 3)} + \\cdots$`;
   const q = numQ(`Find the sum of the first $${n}$ terms of the geometric series ${lead}`, S, {
     traps: [{ value: a * (r ** n - 1) / (r - 1) + a * r ** n, why: `The sum of $${n}$ terms stops at $T_{${n}} = ar^{${n - 1}}$; $r^{${n}}$ belongs in the formula only through $r^n - 1$.` }, { value: a * (r ** (n - 1) - 1) / (r - 1), why: `The sum formula uses $r^{n}$ with $n = ${n}$, not $n - 1$.` }].filter(t => t.value !== S),

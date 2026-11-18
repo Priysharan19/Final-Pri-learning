@@ -99,7 +99,7 @@ try {
         ok(html.includes(`data-nsw-notes`) && html.includes(`data-year="${year}"`), `${label}: the NSW notes page is drawn with the Year tab`);
         ok(index.NSW_NOTES_YEARS.every(y => html.includes(`>${t('notes.nsw.yearTab', { n: y })}<`)), `${label}: the tabs read Year 7 … Year 12`);
         const topics = index.topicsFor(year, course);
-        ok(topics.length === 0 ? html.includes('data-no-topics') : topics.every(x => html.includes(x.name.replace(/&/g, '&amp;').replace(/’/g, '’'))) , `${label}: every topic of the NSW model for this year${course ? ' and course' : ''} is listed (${topics.length})`);
+        ok(topics.length === 0 ? html.includes('data-no-topics') : topics.every(x => html.includes(x.name.replace(/&/g, '&amp;'))) , `${label}: every topic of the NSW model for this year${course ? ' and course' : ''} is listed (${topics.length})`);
         ok(!/data-testid="notes-chapter"/.test(html) || year <= 8, `${label}: only topics with written notes link through (and only Stage 4 has any yet)`);
         if (year >= 11) ok(html.includes(t(`notes.nsw.course.${course}`)), `${label}: the course is named`);
       }

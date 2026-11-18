@@ -75,7 +75,7 @@ export function makeAdvancedVisual(kind,p){
  }
  if(kind==='tree'){
   const {a,ad,sa,sad,sb,sbd,mode='total'}=p;if(![a,ad,sa,sad,sb,sbd].every(Number.isInteger)||!(a>0&&a<ad&&sa>0&&sa<sad&&sb>0&&sb<sbd))throw Error('prob tree');
-  const b=ad-a,num_=mode==='total'?a*sa*sbd+b*sb*sad:a*sa,den=mode==='total'?ad*sad*sbd:ad*sad,answer=fraction(num_,den),ansTex=frac(num_,den);
+  const b=ad-a,num_=mode==='total'?a*sa*sbd+b*sb*sad:a*sa,den=mode==='total'?ad*sad*sbd:ad*sad,ansTex=frac(num_,den);
   const expr=mode==='total'?`(${a}/${ad})*(${sa}/${sad})+(${b}/${ad})*(${sb}/${sbd})`:`(${a}/${ad})*(${sa}/${sad})`;
   const fig={type:'tree',description:`Probability tree: P(A) = ${a}/${ad}; P(B) = ${b}/${ad}; P(S given A) = ${sa}/${sad}; P(S given B) = ${sb}/${sbd}.`,a,ad,sa,sad,sb,sbd};
   const f=(x,y)=>`\\tfrac{${x}}{${y}}`;

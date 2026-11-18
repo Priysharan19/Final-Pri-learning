@@ -12,7 +12,7 @@
 // t-formulae and Newton-cooling forms are not supported by that model; they are
 // correct mathematics kept as practice items and make no syllabus-placement claim.
 // ─────────────────────────────────────────────────────────────────────────────
-import { ri, rc, nz, gcd, Frac, mcq, poly, term, sgn, r1, r2, r3 } from '../qhelpers.js';
+import { ri, rc, nz, gcd, Frac, mcq, poly, term, sgn, r1, r3 } from '../qhelpers.js';
 
 const fa = f => ({ value: f.value, simplestFraction: { n: f.n, d: f.d } });
 const keep = (key, list) => list.filter((t, i, arr) => Number.isFinite(t.value) && Math.abs(t.value - key) > 1e-9 && arr.findIndex(u => Math.abs(u.value - t.value) < 1e-9) === i);
@@ -838,7 +838,7 @@ const inverseTrigForms = [
           prompt: `Given that $${given}$, find the exact value of $${ask}$ in radians.`,
           answerType: 'numeric', answer: { value: key.val, requireExact: true, canonicalInput: key.typed }, inputHint: 'e.g. 3pi/10',
           traps: keep(key.val, [{ value: -key.val, why }, { value: wrong1, why }]).filter((t, i, arr) => arr.findIndex(u => Math.abs(u.value - t.value) < 1e-9) === i).map(t => ({ ...t, tol: 0.001 })),
-          hints: ['Recall the identity linking the two inverse functions.', why.replace(/^Use /, 'Use ').replace(/\.$/, '.'), 'Substitute the given angle and simplify.'],
+          hints: ['Recall the identity linking the two inverse functions.', why, 'Substitute the given angle and simplify.'],
           steps: [{ h: 'Identity', d: `${why}` }, { h: 'Substitute', d: `with $${given.split('$')[0]}$` }, { h: 'Answer', d: `$${key.tex}$` }]
         };
       }
@@ -1348,7 +1348,7 @@ ratesForms.push(
   { // rate of change from N = A e^{kt}
     diffs: [1, 2],
     make: (rng) => {
-      for (let g = 0; g < 100; g++) {
+      {
         const A = 100 * ri(rng, 1, 20), k = nz(rng, -20, 20) / 100, n = 25 * ri(rng, 2, 40);
         const key = Math.round(k * n * 100) / 100;
         return {
@@ -1359,7 +1359,6 @@ ratesForms.push(
           steps: [{ h: 'Differentiate', d: `$\\dfrac{dN}{dt} = ${k}\\times ${A}e^{${k}t} = ${k}N$` }, { h: 'Substitute', d: `$${k}\\times ${n} = ${key}$` }]
         };
       }
-      return ratesForms[0].make(rng, 3);
     }
   },
   { // find the starting amount

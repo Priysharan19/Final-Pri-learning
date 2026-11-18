@@ -127,7 +127,6 @@ function bracketSlips(ctx) {
   const lin = (a, b) => polyAdd(polyMul(polyConst(a), polyVar(v, 1)), polyConst(b));
   const brackets = rows.filter(r => r.kind === 'bracket');
   const first = brackets[0];
-  const shown = `${first.sign < 0 ? '−' : ''}${fmt(first.k)}${bracketText(first.g, v)}`;
   // Only the first term of the bracket multiplied.
   if (polyEqual(line, build(r => (r.kind === 'plain' ? polyMul(polyConst(r.sign), r.poly) : polyMul(polyConst(r.sign), lin(r.k * r.g.a, r.g.b)))))) {
     return {

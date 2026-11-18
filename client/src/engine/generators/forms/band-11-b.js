@@ -319,7 +319,7 @@ const cAlg = [
   { form: 'reverse-modulus', make(rng, d) {
     const t = TRIPLES[ri(rng, 0, 7)], k = ri(rng, 1, 3 + d), neg = ri(rng, 0, 1) ? -1 : 1;
     return {
-      payload: numeric('reverse-modulus', `A complex number $z = ${neg * t[0] * k} + bi$ has modulus $${t[2] * k}$, with $b > 0$. Find $b$.`.replace('+ bi', '+ bi'), t[1] * k, {
+      payload: numeric('reverse-modulus', `A complex number $z = ${neg * t[0] * k} + bi$ has modulus $${t[2] * k}$, with $b > 0$. Find $b$.`, t[1] * k, {
         hints: ['$|z|^2 = a^2 + b^2$.', 'Substitute the real part and the modulus.', 'Solve for $b$ and take the positive root.'],
         steps: [{ h: 'Modulus', d: `$${(t[2] * k) ** 2} = ${(t[0] * k) ** 2} + b^2$` }, { h: 'Solve', d: '$b^2 = $ the difference' }],
         traps: [{ value: (t[1] * k) ** 2, why: 'That is $b^2$; take the square root.' }]
@@ -359,7 +359,7 @@ const cQuad = [
         steps: [{ h: 'Product', d: `$(${a} + ${b}i)(${a} - ${b}i)$` }, { h: 'Expand', d: `$${a}^2 + ${b}^2$` }],
         traps: [{ value: a * a - b * b, why: '$i^2 = -1$ makes $-b^2i^2 = +b^2$.' }].filter(t => t.value !== a * a + b * b)
       }),
-      check: () => { const p = [a * a + b * b, 0]; const re = a * a - b * -b, _ = 0; void _; return re; }
+      check: () => a * a - b * -b
     };
   } },
   { form: 'equal-roots', make(rng, d) {
@@ -512,7 +512,7 @@ const radians = [
     while (t === 180 || t === 270) t = ri(rng, 91, 359);
     const refDeg = t <= 180 ? 180 - t : t <= 270 ? t - 180 : 360 - t;
     return {
-      payload: numeric('reference-angle', `Find the reference angle, in degrees, for $${t}^\\circ$.`.replace('for $', 'for $'), refDeg, {
+      payload: numeric('reference-angle', `Find the reference angle, in degrees, for $${t}^\\circ$.`, refDeg, {
         hints: ['The reference angle is the acute angle to the nearest $x$-axis.', 'Find the quadrant of the angle.', 'Subtract from $180^\\circ$ or $360^\\circ$, or subtract $180^\\circ$.'],
         steps: [{ h: 'Quadrant', d: `$${t}^\\circ$ lies in the ${t <= 180 ? 'second' : t <= 270 ? 'third' : 'fourth'} quadrant` }, { h: 'Reference', d: 'distance to the $x$-axis' }],
         traps: [{ value: t, why: 'A reference angle is acute; it is not the angle itself.' }]

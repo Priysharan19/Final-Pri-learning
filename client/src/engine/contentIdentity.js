@@ -62,7 +62,10 @@
 // can serve (the direct form no longer shadowed by small extra forms, which cut the distinct-question counts), a
 // designed wrong answer that equals the key is dropped, `N decimal places` reads every digit of N, and the
 // exact-value slips name any angle.
-export const CONTENT_VERSION = '2026.11.39';
+// 2026.11.40 — Train editions-25 CI fix: Some Applications of Trigonometry (c10-trig-applications) draws only
+// figure-bearing heights-and-distances forms (the right-triangle ratio, the ladder and two new ones, a kite string
+// and an angle of depression); the table and identity expressions stay in the Trigonometry chapter.
+export const CONTENT_VERSION = '2026.11.40';
 export const LEGACY_CONTENT_VERSION = 'legacy-unversioned';
 
 /** FNV-1a over a string, two lanes, as 16 hex characters. */

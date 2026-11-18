@@ -1,6 +1,6 @@
 {
  "summary": {
-  "contentVersion": "2026.11.39",
+  "contentVersion": "2026.11.40",
   "mode": "full",
   "drawsPerDifficulty": 40,
   "examSeeds": 6,
@@ -426,7 +426,7 @@
   ["cbse/10/c10-trigonometry#4", "cbse", 10, 120, 0, 0, 120, 80, 0, 0, 0, 0, true],
   ["cbse/10/c10-trigonometry?pyq", "cbse", 10, 0, 0, 120, 0, 0, 0, 0, 0, 0, true],
   ["cbse/10/c10-trig-applications", "cbse", 10, 120, 0, 0, 120, 0, 0, 0, 0, 0, true],
-  ["cbse/10/c10-trig-applications#1", "cbse", 10, 120, 0, 0, 120, 0, 0, 0, 0, 0, true],
+  ["cbse/10/c10-trig-applications#1", "cbse", 10, 120, 0, 0, 119, 0, 0, 0, 0, 0, true],
   ["cbse/10/c10-trig-applications?pyq", "cbse", 10, 0, 0, 120, 0, 0, 0, 0, 0, 0, true],
   ["cbse/10/c10-circles", "cbse", 10, 120, 0, 0, 118, 0, 0, 0, 0, 0, true],
   ["cbse/10/c10-circles#1", "cbse", 10, 120, 0, 0, 118, 0, 0, 0, 0, 0, true],

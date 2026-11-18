@@ -120,7 +120,7 @@ export async function collect() {
 }
 
 const tick = b => (b ? 'yes' : '**no**');
-const esc = s => String(s).replace(/\|/g, '\\|');
+const esc = s => String(s).replace(/\\/g, '\\\\').replace(/\|/g, '\\|');
 
 export function render(rows) {
   const bands = [...new Set(rows.map(r => r.band))];

@@ -2,7 +2,7 @@
 // Study only, not student-answer grading, copyrighted examination content or P0 server authority.
 // Questions, steps and answers are TeX ($…$, via texFormat.js); `verify` stays in engine syntax;
 // figure descriptions are plain text for screen readers.
-import { m, num, paren, plus, minus, times, poly, shiftParen, pair, piTimes, plainPoly, plainShift } from './texFormat.js';
+import { m, num, paren, plus, minus, poly, shiftParen, pair, piTimes, plainPoly, plainShift } from './texFormat.js';
 
 export function makeInvestigation(kind,p) {
  const V=(a,b)=>({kind:'value',expr:String(a),answer:String(b)});

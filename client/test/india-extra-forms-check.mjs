@@ -104,5 +104,11 @@ for (const [skill, list] of Object.entries(EXTRA_FORMS)) {
     }
   }
 }
+// Some Applications of Trigonometry is the heights-and-distances chapter: every question drawn from it carries
+// its figure (the practice tour, tour-v3, draws six and needs one; it once drew only expression forms).
+for (let d = 1; d <= 4; d++) for (let i = 1; i <= 60; i++) {
+  const q = generateQuestion('c10-trig-applications-current', d, i * 7919 + d);
+  if (!/<svg/.test(JSON.stringify(q))) fail(`c10-trig-applications-current d${d} seed ${i * 7919 + d}: no figure (${String(q.prompt).slice(0, 70)})`);
+}
 console.log(failures ? `INDIA EXTRA FORMS: FAIL — ${failures} problem(s)` : `INDIA EXTRA FORMS: PASS — ${forms} forms (${heldBack} held back from the draw by their size, marked from their makers), ${draws} draws, every key matched its independent check; ${figured} figures drawn without printing a key; ${marked} issued questions run through the real marker (key accepted, wrong answers rejected)`);
 process.exit(failures ? 1 : 0);

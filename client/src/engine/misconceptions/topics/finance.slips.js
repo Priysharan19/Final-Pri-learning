@@ -3,7 +3,6 @@
 // carries the edition's currency (₹ for Priyabhata, $ AUD for Prithagoras).
 import { bare, clone, num, bin, numVal, fmt, eachRewrite } from './_ast.js';
 
-const money = (v, ctx) => (ctx?.edition === 'au' ? `$${fmt(v)}` : `₹${fmt(v)}`);
 
 /** Find (1 ± x) groups. */
 const onePlus = (n, sign = '+') => { const b = bare(n); return b?.t === 'bin' && b.op === sign && numVal(b.l) === 1 ? b : null; };

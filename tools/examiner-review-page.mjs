@@ -34,7 +34,7 @@ const katex = createRequire(path.join(ROOT, 'client/package.json'))('katex');
 const KATEX_DIST = path.join(ROOT, 'client/node_modules/katex/dist');
 const JURISDICTIONS = [['nsw-hsc', 'hsc', 'NSW HSC (Prithagoras)'], ['cbse', 'cbse', 'CBSE (Priyabhata)']];
 
-const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 /** Text with $…$ maths: rendered by KaTeX now, so the page needs no script to show it. */
 function renderMath(text) {
   const parts = String(text).split(/(?<!\\)\$((?:\\\$|[^$])+?)(?<!\\)\$/g);

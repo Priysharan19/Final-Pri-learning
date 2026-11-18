@@ -40,7 +40,7 @@ for (let i = 0; i < 4; i++) S.push(await person(`s${i}.board@example.test`, `Stu
 const OUT = await person('out.board@example.test', 'Outsider', 'student');
 const c1 = await req(T1, '/v1/classes', { method: 'POST', body: { name: 'Year 7' } });
 const c2 = await req(T2, '/v1/classes', { method: 'POST', body: { name: 'Other' } });
-const C1 = c1.data.class.id, C2 = c2.data.class.id;
+const C1 = c1.data.class.id;
 for (const s of S) await req(s, '/v1/classes/join', { method: 'POST', body: { code: c1.data.joinCode } });
 await req(OUT, '/v1/classes/join', { method: 'POST', body: { code: c2.data.joinCode } });
 
