@@ -18,6 +18,7 @@ import { featureEnabled } from '../platform/features.js';
 import { omittedNames } from '../local/nswExamBackend.js';
 import Working from '../instrument/Working.jsx';
 import { generatedPapersFor } from '../local/generatedPaperBackend.js';
+import Ext1Papers, { ext1PapersFor } from './Ext1Papers.jsx';
 
 const CLAIM_KEYS = {
   'official-mathematics-section': 'exams.claim.officialSection',
@@ -113,6 +114,7 @@ export default function Exams() {
       {!paper && <h1 className="sr-only">{t('nav.exams')}</h1>}
       {generatedPapersFor(user) && <GeneratorEntry nav={nav} />}
       {user.course === 'nsw' && featureEnabled('nswExams') && <NswPapers busy={busy} start={start} />}
+      {ext1PapersFor(user) && <Ext1Papers />}
       {hscCoursesFor(user).length > 0 && (
         <div className="card" data-hsc-link>
           <div className="card-title">{t('hsc.examsCardTitle')}</div>
