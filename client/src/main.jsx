@@ -6,7 +6,6 @@ import './theme.css';
 import './theme-state.css';
 import './ink/interactionGuard.js';
 import App from './App.jsx';
-import { selectNamePool } from './engine/qhelpers.js';
 import { EDITION } from './platform/edition.js';
 // The Instrument is the one student interface (client/interface.config.mjs), so
 // its stylesheets are part of the boot stylesheet, after theme.css which they
@@ -124,7 +123,9 @@ if (LAN_DEV) {
 }
 
 // The names in question text follow the build's edition (engine/qhelpers.js).
-selectNamePool(EDITION);
+// A dynamic import, so the chunk graph is the one both editions already share; no question can be generated before it settles
+// (the banks load on demand, after the first screen).
+import('./engine/qhelpers.js').then(m => m.selectNamePool(EDITION)).catch(() => { /* the default pool stands; question text only */ });
 
 const root = createRoot(document.getElementById('root'));
 if (GUARDIAN_MODE || DELETE_REQUEST_MODE || ACCOUNT_ACTION_MODE || PARENT_EMAIL_MODE) bootPhase('render');
