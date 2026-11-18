@@ -53,7 +53,7 @@
 // compound angles are built from Pythagorean triples so the sine of a sum is a
 // fraction rather than 0.8615384615384616, and every probability is reduced.
 // ─────────────────────────────────────────────────────────────────────────────
-import { ri, rc, rs, nz } from '../qhelpers.js';
+import { ri, rc, rs, nz, br } from '../qhelpers.js';
 import {
   exact, frac, fracTex, traps, twoCities, twoNames,
   IN_CITIES, IN_FESTIVALS, IN_TRAINS
@@ -961,7 +961,7 @@ export const indiaClass11 = {
           { h: 'Name the parts', d: `$u = ${cx(a)} ${sg(b)}$, $v = ${cx(c)} ${sg(d)}$, so $u' = ${a}$, $v' = ${c}$` },
           { h: 'Write the quotient rule', d: '$f\'(x) = \\dfrac{u\'v - uv\'}{v^2}$' },
           { h: 'Evaluate the parts at the point', d: `$u(${p}) = ${u}$, $v(${p}) = ${v}$` },
-          { h: 'Substitute', d: `$f'(${p}) = \\dfrac{(${a})(${v}) - (${u})(${c})}{${v}^2} = \\dfrac{${a * v - c * u}}{${v * v}}$` },
+          { h: 'Substitute', d: `$f'(${p}) = \\dfrac{(${a})(${v}) - (${u})(${c})}{${br(v)}^2} = \\dfrac{${a * v - c * u}}{${v * v}}$` },
           { h: 'Reduce', d: `$= ${fracTex(want.n, want.d)}$` }
         ]
       };

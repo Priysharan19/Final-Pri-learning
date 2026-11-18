@@ -320,7 +320,7 @@ export const year12 = {
       const F = x => a * x * x * x / 3 + b * x * x / 2;
       const val = F(hi) - F(lo);
       return {
-        prompt: `Evaluate $\\displaystyle\\int_{${lo}}^{${hi}} (${poly([a, b, 0]).replace(/ \+ 0$/, '')})\\,dx$.`,
+        prompt: `Evaluate $\\displaystyle\\int_{${lo}}^{${hi}} (${poly([a, b, 0]).replace(/ \+ 0$/, '')})\\,dx$, correct to 3 decimal places where needed.`,
         answerType: 'numeric', answer: { value: r3(val), tol: 0.002 },
         traps: [{ value: r3(a * hi * hi + b * hi), why: 'Integrate first (raise powers), *then* substitute the limits — don’t just plug the limit into the original.' }].filter(t => Math.abs(t.value - r3(val)) > 0.01),
         hints: ['Find the antiderivative first.', `$F(x) = \\frac{${a}}{3}x^3 + \\frac{${b}}{2}x^2$.`, `Compute $F(${hi}) - F(${lo})$.`],
@@ -336,7 +336,7 @@ export const year12 = {
       // area under y = k x (w - x) from 0 to w  = k w^3/6
       const area = k * w ** 3 / 6;
       return {
-        prompt: `Find the area enclosed between the curve $y = ${k === 1 ? '' : k}x(${w} - x)$ and the x-axis.`,
+        prompt: `Find the area enclosed between the curve $y = ${k === 1 ? '' : k}x(${w} - x)$ and the x-axis, correct to 3 decimal places where needed.`,
         answerType: 'numeric', answer: { value: r3(area), tol: 0.002 }, answerSuffix: 'units²',
         traps: [{ value: r3(k * w ** 3 / 3), why: 'Expand carefully: $\\int_0^{' + w + '} (' + (k * w) + 'x - ' + k + 'x^2)dx$ — both terms matter.' }].filter(t => Math.abs(t.value - r3(area)) > 0.01),
         hints: ['First find where the curve meets the x-axis.', `$y = 0$ at $x = 0$ and $x = ${w}$ — integrate between them.`, `$\\int_0^{${w}} (${k * w}x - ${k}x^2)\\,dx$.`],
@@ -355,7 +355,7 @@ export const year12 = {
     const area = width ** 3 / 6;
     const lineTex = m === 0 ? `${cc}` : `${term(m)}${cc === 0 ? '' : ` ${sgn(cc)}`}`;
     return {
-      prompt: `Find the area enclosed between the line $y = ${lineTex}$ and the parabola $y = x^2$.`,
+      prompt: `Find the area enclosed between the line $y = ${lineTex}$ and the parabola $y = x^2$, correct to 3 decimal places where needed.`,
       answerType: 'numeric', answer: { value: r3(area), tol: 0.002 }, answerSuffix: 'units²',
       traps: [{ value: r3(width ** 3 / 3), why: 'Integrate (top − bottom) across the interval between the intersections — halve nothing and double nothing.', tol: 0.002 }].filter(t => Math.abs(t.value - r3(area)) > 0.01),
       hints: ['Find the intersection points first.', `$x^2 = ${lineTex}$ gives $x = ${r1x}$ and $x = ${r2x}$.`, `Area $= \\displaystyle\\int_{${r1x}}^{${r2x}} \\left(${lineTex} - x^2\\right)dx$.`],
@@ -825,7 +825,7 @@ export const year12 = {
       const E = vals.reduce((s, v, i) => s + v * probs[i] / den, 0);
       return {
         prompt: `A discrete random variable $X$ has $P(X=0) = ${p0 / den}$, $P(X=1) = ${p1 / den}$, $P(X=2) = ${p2 / den}$, $P(X=3) = ${p3 / den}$. Find $E(X)$.`,
-        answerType: 'numeric', answer: { value: r2(E), tol: 0.011 },
+        answerType: 'numeric', answer: { value: r2(E) },
         traps: [{ value: 1.5, why: 'E(X) weights each value by its probability: $\\sum x\\,P(X=x)$ — not the midpoint of the values.', tol: 0.011 }].filter(t => Math.abs(t.value - r2(E)) > 0.03),
         hints: ['$E(X) = \\sum x \\cdot P(X = x)$.', `$0(${p0 / den}) + 1(${p1 / den}) + 2(${p2 / den}) + 3(${p3 / den})$.`, `$= ${r3(p1 / den)} + ${r3(2 * p2 / den)} + ${r3(3 * p3 / den)}$.`],
         steps: [
@@ -865,10 +865,10 @@ export const year12 = {
       const x = mu + z * sd;
       return {
         prompt: `Test scores are normally distributed with mean $${mu}$ and standard deviation $${sd}$. Find the **z-score** of a mark of $${x}$.`,
-        answerType: 'numeric', answer: { value: z, tol: 0.011 }, answerPrefix: 'z =',
+        answerType: 'numeric', answer: { value: z }, answerPrefix: 'z =',
         traps: [
-          { value: x - mu, why: `$${x - mu}$ is the raw distance from the mean — divide by the standard deviation ${sd} to standardise.`, tol: 0.011 },
-          { value: -z, why: 'Order matters: $z = \\frac{x - \\mu}{\\sigma}$ — a mark ' + (z > 0 ? 'above' : 'below') + ' the mean gives a ' + (z > 0 ? 'positive' : 'negative') + ' z.', tol: 0.011 }
+          { value: x - mu, why: `$${x - mu}$ is the raw distance from the mean — divide by the standard deviation ${sd} to standardise.` },
+          { value: -z, why: 'Order matters: $z = \\frac{x - \\mu}{\\sigma}$ — a mark ' + (z > 0 ? 'above' : 'below') + ' the mean gives a ' + (z > 0 ? 'positive' : 'negative') + ' z.' }
         ].filter(t => Math.abs(t.value - z) > 0.02),
         hints: ['$z = \\dfrac{x - \\mu}{\\sigma}$.', `$z = \\dfrac{${x} - ${mu}}{${sd}}$.`, `$= \\dfrac{${x - mu}}{${sd}}$.`],
         steps: [
@@ -895,9 +895,9 @@ export const year12 = {
     ]);
     return {
       prompt: `Heights are normally distributed with mean $${mu}$ and standard deviation $${sd}$. Using the empirical (68–95–99.7) rule, what **percentage** of values lie between $${pick.lo}$ and $${pick.hi}$?`,
-      answerType: 'numeric', answer: { value: pick.pct, tol: 0.11, percent: true }, answerSuffix: '%',
+      answerType: 'numeric', answer: { value: pick.pct, percent: true }, answerSuffix: '%',
       traps: [
-        { value: pick.pct === 68 ? 95 : 68, why: '68% covers ±1σ; 95% covers ±2σ — count how many standard deviations each bound is from the mean.', tol: 0.11 }
+        { value: pick.pct === 68 ? 95 : 68, why: '68% covers ±1σ; 95% covers ±2σ — count how many standard deviations each bound is from the mean.' }
       ].filter(t => Math.abs(t.value - pick.pct) > 1),
       hints: ['Convert the bounds to “number of σ from the mean”.', `${pick.lo} is $${(pick.lo - mu) / sd}σ$ and ${pick.hi} is $${(pick.hi - mu) / sd}σ$ from the mean.`, 'Use symmetry: ±1σ ↔ 68%, ±2σ ↔ 95%.'],
       steps: [

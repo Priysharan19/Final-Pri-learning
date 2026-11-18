@@ -8,7 +8,7 @@
 // check the key against something written differently. `make` is gen()[0].
 // Variants are chosen by au-forms-apply.js.
 // ─────────────────────────────────────────────────────────────────────────────
-import { ri, rc, nz, mcq, Frac, gcd, poly } from '../qhelpers.js';
+import { ri, rc, nz, mcq, Frac, gcd, poly, br } from '../qhelpers.js';
 
 /** An exponent m x written without a stray 1: 1 -> x, -1 -> -x. */
 const et = m => (m === 1 ? 't' : m === -1 ? '-t' : `${m}t`);
@@ -724,9 +724,9 @@ expForms.push(V('exp-show-ode', [3, 4], (rng) => {
   const val = askQ ? qq : p;
   const q = numQ(`Show that $y = ${cf(A)}e^{${ex(m)}} + ${cf(B)}e^{${ex(n)}}$ satisfies $\\dfrac{d^2y}{dx^2} + p\\dfrac{dy}{dx} + q\\,y = 0$ for constants $p$ and $q$. Find the value of $${askQ ? 'q' : 'p'}$.`, val, {
     prefix: askQ ? 'q =' : 'p =',
-    traps: askQ ? [{ value: -qq, why: `Substituting gives $(${m}^2 + p(${m}) + q) = 0$ and $(${n}^2 + p(${n}) + q) = 0$; $q$ is the **product** $${m} \\times ${n}$.` }, { value: m + n, why: 'The sum of the exponents gives $-p$, not $q$.' }] : [{ value: m + n, why: `The equation is $y'' + py' + qy = 0$, so $p = -(${m} + ${n})$ — check the sign.` }, { value: m * n, why: 'The product of the exponents gives $q$; $p$ comes from their sum.' }],
+    traps: askQ ? [{ value: -qq, why: `Substituting gives $(${br(m)}^2 + p(${m}) + q) = 0$ and $(${br(n)}^2 + p(${n}) + q) = 0$; $q$ is the **product** $${br(m)} \\times ${br(n)}$.` }, { value: m + n, why: 'The sum of the exponents gives $-p$, not $q$.' }] : [{ value: m + n, why: `The equation is $y'' + py' + qy = 0$, so $p = -(${m} + ${n})$ — check the sign.` }, { value: m * n, why: 'The product of the exponents gives $q$; $p$ comes from their sum.' }],
     hints: [`$y' = ${A * m}e^{${m}x} + ${B * n}e^{${n}x}$ and $y'' = ${A * m * m}e^{${m}x} + ${B * n * n}e^{${n}x}$.`, `For the equation to hold for every $A$ and $B$: $r^2 + pr + q = 0$ must hold for $r = ${m}$ and $r = ${n}$.`, 'So $r^2 + pr + q = (r - ' + m + ')(r - ' + n + ')$.'],
-    steps: [{ h: 'Differentiate twice', d: `$y'' = ${A * m * m}e^{${m}x} + ${B * n * n}e^{${n}x}$` }, { h: 'Substitute and group', d: `$${A}e^{${m}x}(${m}^2 + p(${m}) + q) + ${B}e^{${n}x}(${n}^2 + p(${n}) + q) = 0$` }, { h: 'Both brackets vanish', d: `$r^2 + pr + q = (r - ${m})(r - ${n})$, so $p = ${p}$ and $q = ${qq}$` }]
+    steps: [{ h: 'Differentiate twice', d: `$y'' = ${A * m * m}e^{${m}x} + ${B * n * n}e^{${n}x}$` }, { h: 'Substitute and group', d: `$${A}e^{${m}x}(${br(m)}^2 + p(${m}) + q) + ${B}e^{${n}x}(${br(n)}^2 + p(${n}) + q) = 0$` }, { h: 'Both brackets vanish', d: `$r^2 + pr + q = (r - ${m})(r - ${n})$, so $p = ${p}$ and $q = ${qq}$` }]
   });
   const f = x => A * Math.exp(m * x) + B * Math.exp(n * x);
   return [q, { kind: 'num', value: val, ode: { f, p, q: qq } }];

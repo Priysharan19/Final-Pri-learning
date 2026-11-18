@@ -3,8 +3,8 @@
 // A Prithagoras server issues a (subtopic, difficulty) cell only when it passed
 // every gate (server/platform/nswBanks.js). The app used to offer every form
 // the engine holds, so a student who picked a cell the server does not issue —
-// y10-compound, y10-quadratics at D4, y10-similarity at D3 — was handed a local
-// draft nothing could ever mark. This suite boots the shipped server as
+// y10-compound, y10-quadratics at D4, y10-similarity at D3 (all since fixed at the source and issued;
+// the suite now names cells that are still held back) — was handed a local draft nothing could ever mark. This suite boots the shipped server as
 // Prithagoras and drives the product's own dispatcher against it:
 //
 //   ONE TRUTH    the device's copy of the issued cells equals the server's
@@ -87,15 +87,18 @@ try {
   ok('and every dot point\'s requestable is its own forms the server issues',
     Object.entries(served).every(([id, s]) => dotpointsFor(id).every(dp => JSON.stringify(s.dotpoints[dp.id].requestable) === JSON.stringify(dp.forms.filter(d => nswCell(id, d))))));
   const unissued = allNsw.flatMap(id => LEVELS.filter(d => !nswCell(id, d)).map(d => ({ id, d })));
-  ok(`there are unissued cells to keep out (${unissued.length})`, unissued.length > 30);
-  for (const [id, d] of [['y10-compound', 1], ['y10-compound', 4], ['y10-quadratics', 4], ['y10-similarity', 3]]) ok(`${id} D${d} is not issued`, !nswCell(id, d) && !nswCellIssued(id, d));
+  // 69 chapter cells were held back when this was written (> 30); fixing the tolerance and wording defects behind
+  // the quality-gate exclusions issued most of them, so the bar is the count that remains plus a margin, not a
+  // lower aim: the suite still asks for every one of them and needs real ones to ask for.
+  ok(`there are unissued cells to keep out (${unissued.length})`, unissued.length >= 15);
+  for (const [id, d] of [['y9-simint', 3], ['y9-simint', 4], ['y11-trigfunc', 4], ['me11-poly', 4], ['me11-comb', 1]]) ok(`${id} D${d} is not issued`, !nswCell(id, d) && !nswCellIssued(id, d));
 
   // ── The cell a request may name (pure) ─────────────────────────────────────
   ok('a request never names an unissued cell', allNsw.every(id => LEVELS.every(d => { const c = nswOfferedCell({ generator: id, difficulty: d }); return c === null ? nswIssuedLevels(id).length === 0 : nswCell(id, c.difficulty); })));
   ok('with a dot point either', allNsw.every(id => dotpointsFor(id).every(dp => LEVELS.every(d => { const c = nswOfferedCell({ generator: id, difficulty: d, dotpoint: dp.id, dotpointForms: dp.forms }); return c === null || (nswCell(id, c.difficulty) && (c.dotpoint === null || dp.forms.includes(c.difficulty))); }))));
-  same('an issued cell is left as asked', nswOfferedCell({ generator: 'y10-quadratics', difficulty: 2 }), { difficulty: 2, dotpoint: null, moved: false });
-  same('an unissued level moves to the nearest issued one', nswOfferedCell({ generator: 'y10-quadratics', difficulty: 4 }), { difficulty: 3, dotpoint: null, moved: true });
-  same('a generator the server issues nothing from has no cell', nswOfferedCell({ generator: 'y10-compound', difficulty: 2 }), null);
+  same('an issued cell is left as asked', nswOfferedCell({ generator: 'y11-trigfunc', difficulty: 2 }), { difficulty: 2, dotpoint: null, moved: false });
+  same('an unissued level moves to the nearest issued one', nswOfferedCell({ generator: 'y11-trigfunc', difficulty: 4 }), { difficulty: 3, dotpoint: null, moved: true });
+  same('a generator the server issues nothing from has no cell', nswOfferedCell({ generator: 'me11-comb', difficulty: 2 }), null);
   for (const [year, pathway] of [[7], [8], [9], [10], [11, 'standard'], [11, 'advanced'], [11, 'ext1'], [12, 'standard'], [12, 'advanced'], [12, 'ext1'], [12, 'ext2']]) {
     for (let i = 0; i < 60; i++) {
       const pick = pickNext({ ratings: {}, reviewsDue: [], year, pathway, rand: (i + 0.5) / 60, recent: [], offered: id => nswIssuedLevels(id).length > 0 });
@@ -178,13 +181,13 @@ try {
   }
   ok(`every offered cell was asked for (${offeredCells}) and they are all the server's cells`, offeredCells === Object.values(ledger).reduce((n, l) => n + l.length, 0), `${offeredCells}`);
   ok(`every one was issued and marked correct on its stored answer (${marked})`, marked === offeredCells);
-  ok(`every unissued cell in scope was asked for and refused (${unissuedAsked})`, unissuedAsked > 30);
+  ok(`every unissued cell in scope was asked for and refused (${unissuedAsked})`, unissuedAsked >= 15);
 
   // An unlevelled request on a topic whose aimed level is not issued is moved, not drafted.
-  const y10 = (await POST('/profiles', { name: 'Moved', year: 10, course: 'nsw' })).user;
-  await POST('/profiles/select', { id: y10.id });
-  await authority.link(y10.id);
-  const noTopic = await refusal(() => POST('/practice/next', { mode: 'topic', subtopic: 'y10-compound' }));
+  const y11 = (await POST('/profiles', { name: 'Moved', year: 11, course: 'nsw', pathway: 'ext1' })).user;
+  await POST('/profiles/select', { id: y11.id });
+  await authority.link(y11.id);
+  const noTopic = await refusal(() => POST('/practice/next', { mode: 'topic', subtopic: 'me11-comb' }));
   same('a topic the server issues nothing from is refused even with no level named', noTopic?.code, 'PRACTICE_NOT_OFFERED');
 } catch (err) {
   failures.push(`the suite stopped: ${err.stack || err.message}`);

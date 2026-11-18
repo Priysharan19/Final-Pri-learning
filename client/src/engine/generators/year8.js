@@ -628,8 +628,8 @@ export const year8 = {
     const l = ri(rng, 20, 60), w = ri(rng, 15, 40), h = ri(rng, 10, 30);
     const litres = l * w * h / 1000;
     return {
-      prompt: `A fish tank measures $${l}$ cm × $${w}$ cm × $${h}$ cm. How many **litres** of water does it hold when full? (1 L = 1000 cm³)`,
-      answerType: 'numeric', answer: { value: litres }, answerSuffix: 'L',
+      prompt: `A fish tank measures $${l}$ cm × $${w}$ cm × $${h}$ cm. How many **litres** of water does it hold when full, correct to 3 decimal places where needed? (1 L = 1000 cm³)`,
+      answerType: 'numeric', answer: { value: litres, tol: 0.0006 }, answerSuffix: 'L',
       traps: [{ value: l * w * h, why: 'That’s the volume in cm³ — divide by 1000 to convert to litres.' }],
       hints: ['Find the volume in cm³ first.', `$${l} \\times ${w} \\times ${h} = ${l * w * h}$ cm³.`, 'Divide by 1000 to convert to litres.'],
       steps: [

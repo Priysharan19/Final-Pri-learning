@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `9900a3f0b4fbc73f65855afa21feca2d39fc41ea7848a690a71e0f9743821363` (`docs/marking/order14-examiner-certification-dossier.md`).
+Dossier digest: `58043d339ba35531051eb645bc8b36400972117b8de3dd43c918ffb4f7cdd384` (`docs/marking/order14-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -86,82 +86,82 @@ Final answer: 8
 ```
 </details>
 
-## `cbse-bank:c10-areas-circles/D1` — seed 96037
+## `cbse-bank:c10-areas-circles/D1` — seed 1009
 
-> Find the area of a sector of angle $180^\\circ$ in a circle of radius $21$ cm. Take $\\pi = \\dfrac{22}{7}$.
+> Find the area of a sector of angle $135^\\circ$ in a circle of radius $21$ cm. Take $\\pi = \\dfrac{22}{7}$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `693` | yes | 1/1 | 1/1 | The model page: every formula, substitution and value, with the right answer. |
-| alternative | `693` | yes | 1/1 | 1/1 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
-| common wrong | `694` | no | 0/1 | 0/1 | The model working, then a wrong final answer (a transcription slip at the end). |
+| correct | `2079/4` | yes | 1/1 | 1/1 | The model page: every formula, substitution and value, with the right answer. |
+| alternative | `2079/4` | yes | 1/1 | 1/1 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
+| common wrong | `2080/4` | no | 0/1 | 0/1 | The model working, then a wrong final answer (a transcription slip at the end). |
 
 <details><summary>Pages</summary>
 
 correct:
 ```text
-r = 21, θ = 180
+r = 21, θ = 135
 A = θ/360 × π × r^2
-A = (180)/360 × (22/7) × (21)^2
-= 693
-Final answer: 693
+A = (135)/360 × (22/7) × (21)^2
+= 2079/4
+Final answer: 2079/4
 ```
 common wrong:
 ```text
-r = 21, θ = 180
+r = 21, θ = 135
 A = θ/360 × π × r^2
-A = (180)/360 × (22/7) × (21)^2
-= 693
-Final answer: 694
+A = (135)/360 × (22/7) × (21)^2
+= 2079/4
+Final answer: 2080/4
 ```
 </details>
 
-## `cbse-bank:c10-areas-circles/D2` — seed 96037
+## `cbse-bank:c10-areas-circles/D2` — seed 1009
 
-> Find the perimeter of a sector of angle $180^\\circ$ in a circle of radius $21$ cm. Take $\\pi = \\dfrac{22}{7}$.
+> Find the perimeter of a sector of angle $120^\\circ$ in a circle of radius $21$ cm. Take $\\pi = \\dfrac{22}{7}$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `108` | yes | 2/2 | 2/2 | The model page: every formula, substitution and value, with the right answer. |
-| alternative | `108` | yes | 2/2 | 2/2 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
-| common wrong | `109` | no | 0/2 | 1/2 | The model working, then a wrong final answer (a transcription slip at the end). |
-| partial | `109` | no | 0/2 | 1/2 | One arithmetic slip in the first evaluated stage, carried forward correctly to the end. |
+| correct | `86` | yes | 2/2 | 2/2 | The model page: every formula, substitution and value, with the right answer. |
+| alternative | `86` | yes | 2/2 | 2/2 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
+| common wrong | `87` | no | 0/2 | 1/2 | The model working, then a wrong final answer (a transcription slip at the end). |
+| partial | `87` | no | 0/2 | 1/2 | One arithmetic slip in the first evaluated stage, carried forward correctly to the end. |
 
 <details><summary>Pages</summary>
 
 correct:
 ```text
-r = 21, θ = 180
+r = 21, θ = 120
 l = θ/360 × 2 × π × r
-l = (180)/360 × 2 × (22/7) × (21)
-= 66
-P = (66)+2 × (21)
-= 108
-Final answer: 108
+l = (120)/360 × 2 × (22/7) × (21)
+= 44
+P = (44)+2 × (21)
+= 86
+Final answer: 86
 ```
 common wrong:
 ```text
-r = 21, θ = 180
+r = 21, θ = 120
 l = θ/360 × 2 × π × r
-l = (180)/360 × 2 × (22/7) × (21)
-= 66
-P = (66)+2 × (21)
-= 108
-Final answer: 109
+l = (120)/360 × 2 × (22/7) × (21)
+= 44
+P = (44)+2 × (21)
+= 86
+Final answer: 87
 ```
 partial:
 ```text
-r = 21, θ = 180
+r = 21, θ = 120
 l = θ/360 × 2 × π × r
-l = (180)/360 × 2 × (22/7) × (21)
-= 67
-P = (67)+2 × (21)
-= 109
-Final answer: 109
+l = (120)/360 × 2 × (22/7) × (21)
+= 45
+P = (45)+2 × (21)
+= 87
+Final answer: 87
 ```
 </details>
 
-## `cbse-bank:c10-areas-circles/D3` — seed 96037
+## `cbse-bank:c10-areas-circles/D3` — seed 1009
 
 > A chord of a circle of radius $21$ cm subtends a right angle at the centre. Find the area of the minor segment cut off. Take $\\pi = \\dfrac{22}{7}$.
 
@@ -215,7 +215,7 @@ Final answer: 127
 ```
 </details>
 
-## `cbse-bank:c10-areas-circles/D4` — seed 96037
+## `cbse-bank:c10-areas-circles/D4` — seed 1009
 
 > From a square of side $42$ cm, four quarter-circles of radius $21$ cm are removed, one at each corner. Find the area remaining. Take $\\pi = \\dfrac{22}{7}$.
 
@@ -595,183 +595,183 @@ Final answer: 17
 ```
 </details>
 
-## `cbse-bank:c10-sector-reasoning/D1` — seed 135632
+## `cbse-bank:c10-sector-reasoning/D1` — seed 32685
 
-> The minute hand of a clock is $10$ cm long. Find the distance travelled by its tip in $42$ minutes. Take $\\pi = \\dfrac{22}{7}$.
+> The minute hand of a clock is $28$ cm long. Find the area swept by it in $11$ minutes. Take $\\pi = \\dfrac{22}{7}$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `44` | yes | 1/1 | 1/1 | The model page: every formula, substitution and value, with the right answer. |
-| alternative | `44` | yes | 1/1 | 1/1 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
-| common wrong | `45` | no | 0/1 | 0/1 | The model working, then a wrong final answer (a transcription slip at the end). |
-| partial | `2783/63` | no | 0/1 | 0/1 | One arithmetic slip in the first evaluated stage, carried forward correctly to the end. |
+| correct | `6776/15` | yes | 1/1 | 1/1 | The model page: every formula, substitution and value, with the right answer. |
+| alternative | `6776/15` | yes | 1/1 | 1/1 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
+| common wrong | `6777/15` | no | 0/1 | 0/1 | The model working, then a wrong final answer (a transcription slip at the end). |
+| partial | `20636/45` | no | 0/1 | 0/1 | One arithmetic slip in the first evaluated stage, carried forward correctly to the end. |
 
 <details><summary>Pages</summary>
 
 correct:
 ```text
-r = 10, m = 42
-θ = 6 × (42)
-= 252
-l = θ/360 × 2 × π × r
-l = (252)/360 × 2 × (22/7) × (10)
-= 44
-Final answer: 44
+r = 28, m = 11
+θ = 6 × (11)
+= 66
+A = θ/360 × π × r^2
+A = (66)/360 × (22/7) × (28)^2
+= 6776/15
+Final answer: 6776/15
 ```
 common wrong:
 ```text
-r = 10, m = 42
-θ = 6 × (42)
-= 252
-l = θ/360 × 2 × π × r
-l = (252)/360 × 2 × (22/7) × (10)
-= 44
-Final answer: 45
+r = 28, m = 11
+θ = 6 × (11)
+= 66
+A = θ/360 × π × r^2
+A = (66)/360 × (22/7) × (28)^2
+= 6776/15
+Final answer: 6777/15
 ```
 partial:
 ```text
-r = 10, m = 42
-θ = 6 × (42)
-= 253
-l = θ/360 × 2 × π × r
-l = (253)/360 × 2 × (22/7) × (10)
-= 2783/63
-Final answer: 2783/63
+r = 28, m = 11
+θ = 6 × (11)
+= 67
+A = θ/360 × π × r^2
+A = (67)/360 × (22/7) × (28)^2
+= 20636/45
+Final answer: 20636/45
 ```
 </details>
 
-## `cbse-bank:c10-sector-reasoning/D2` — seed 135632
+## `cbse-bank:c10-sector-reasoning/D2` — seed 32685
 
-> The minute hand of a clock is $10$ cm long. Find the distance travelled by its tip in $42$ minutes. Take $\\pi = \\dfrac{22}{7}$.
+> The minute hand of a clock is $28$ cm long. Find the area swept by it in $11$ minutes. Take $\\pi = \\dfrac{22}{7}$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `44` | yes | 2/2 | 2/2 | The model page: every formula, substitution and value, with the right answer. |
-| alternative | `44` | yes | 2/2 | 2/2 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
-| common wrong | `45` | no | 0/2 | 1/2 | The model working, then a wrong final answer (a transcription slip at the end). |
-| partial | `2783/63` | no | 0/2 | 1/2 | One arithmetic slip in the first evaluated stage, carried forward correctly to the end. |
+| correct | `6776/15` | yes | 2/2 | 2/2 | The model page: every formula, substitution and value, with the right answer. |
+| alternative | `6776/15` | yes | 2/2 | 2/2 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
+| common wrong | `6777/15` | no | 0/2 | 1/2 | The model working, then a wrong final answer (a transcription slip at the end). |
+| partial | `20636/45` | no | 0/2 | 1/2 | One arithmetic slip in the first evaluated stage, carried forward correctly to the end. |
 
 <details><summary>Pages</summary>
 
 correct:
 ```text
-r = 10, m = 42
-θ = 6 × (42)
-= 252
-l = θ/360 × 2 × π × r
-l = (252)/360 × 2 × (22/7) × (10)
-= 44
-Final answer: 44
+r = 28, m = 11
+θ = 6 × (11)
+= 66
+A = θ/360 × π × r^2
+A = (66)/360 × (22/7) × (28)^2
+= 6776/15
+Final answer: 6776/15
 ```
 common wrong:
 ```text
-r = 10, m = 42
-θ = 6 × (42)
-= 252
-l = θ/360 × 2 × π × r
-l = (252)/360 × 2 × (22/7) × (10)
-= 44
-Final answer: 45
+r = 28, m = 11
+θ = 6 × (11)
+= 66
+A = θ/360 × π × r^2
+A = (66)/360 × (22/7) × (28)^2
+= 6776/15
+Final answer: 6777/15
 ```
 partial:
 ```text
-r = 10, m = 42
-θ = 6 × (42)
-= 253
-l = θ/360 × 2 × π × r
-l = (253)/360 × 2 × (22/7) × (10)
-= 2783/63
-Final answer: 2783/63
+r = 28, m = 11
+θ = 6 × (11)
+= 67
+A = θ/360 × π × r^2
+A = (67)/360 × (22/7) × (28)^2
+= 20636/45
+Final answer: 20636/45
 ```
 </details>
 
-## `cbse-bank:c10-sector-reasoning/D3` — seed 135632
+## `cbse-bank:c10-sector-reasoning/D3` — seed 32685
 
-> The minute hand of a clock is $10$ cm long. Find the distance travelled by its tip in $42$ minutes. Take $\\pi = \\dfrac{22}{7}$.
+> The minute hand of a clock is $28$ cm long. Find the area swept by it in $11$ minutes. Take $\\pi = \\dfrac{22}{7}$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `44` | yes | 3/3 | 3/3 | The model page: every formula, substitution and value, with the right answer. |
-| alternative | `44` | yes | 3/3 | 3/3 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
-| common wrong | `45` | no | 0/3 | 2/3 | The model working, then a wrong final answer (a transcription slip at the end). |
-| partial | `2783/63` | no | 0/3 | 2/3 | One arithmetic slip in the first evaluated stage, carried forward correctly to the end. |
+| correct | `6776/15` | yes | 3/3 | 3/3 | The model page: every formula, substitution and value, with the right answer. |
+| alternative | `6776/15` | yes | 3/3 | 3/3 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
+| common wrong | `6777/15` | no | 0/3 | 2/3 | The model working, then a wrong final answer (a transcription slip at the end). |
+| partial | `20636/45` | no | 0/3 | 2/3 | One arithmetic slip in the first evaluated stage, carried forward correctly to the end. |
 
 <details><summary>Pages</summary>
 
 correct:
 ```text
-r = 10, m = 42
-θ = 6 × (42)
-= 252
-l = θ/360 × 2 × π × r
-l = (252)/360 × 2 × (22/7) × (10)
-= 44
-Final answer: 44
+r = 28, m = 11
+θ = 6 × (11)
+= 66
+A = θ/360 × π × r^2
+A = (66)/360 × (22/7) × (28)^2
+= 6776/15
+Final answer: 6776/15
 ```
 common wrong:
 ```text
-r = 10, m = 42
-θ = 6 × (42)
-= 252
-l = θ/360 × 2 × π × r
-l = (252)/360 × 2 × (22/7) × (10)
-= 44
-Final answer: 45
+r = 28, m = 11
+θ = 6 × (11)
+= 66
+A = θ/360 × π × r^2
+A = (66)/360 × (22/7) × (28)^2
+= 6776/15
+Final answer: 6777/15
 ```
 partial:
 ```text
-r = 10, m = 42
-θ = 6 × (42)
-= 253
-l = θ/360 × 2 × π × r
-l = (253)/360 × 2 × (22/7) × (10)
-= 2783/63
-Final answer: 2783/63
+r = 28, m = 11
+θ = 6 × (11)
+= 67
+A = θ/360 × π × r^2
+A = (67)/360 × (22/7) × (28)^2
+= 20636/45
+Final answer: 20636/45
 ```
 </details>
 
-## `cbse-bank:c10-sector-reasoning/D4` — seed 135632
+## `cbse-bank:c10-sector-reasoning/D4` — seed 32685
 
-> The minute hand of a clock is $10$ cm long. Find the distance travelled by its tip in $42$ minutes. Take $\\pi = \\dfrac{22}{7}$.
+> The minute hand of a clock is $28$ cm long. Find the area swept by it in $11$ minutes. Take $\\pi = \\dfrac{22}{7}$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `44` | yes | 3/3 | 3/3 | The model page: every formula, substitution and value, with the right answer. |
-| alternative | `44` | yes | 3/3 | 3/3 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
-| common wrong | `45` | no | 0/3 | 2/3 | The model working, then a wrong final answer (a transcription slip at the end). |
-| partial | `2783/63` | no | 0/3 | 2/3 | One arithmetic slip in the first evaluated stage, carried forward correctly to the end. |
+| correct | `6776/15` | yes | 3/3 | 3/3 | The model page: every formula, substitution and value, with the right answer. |
+| alternative | `6776/15` | yes | 3/3 | 3/3 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
+| common wrong | `6777/15` | no | 0/3 | 2/3 | The model working, then a wrong final answer (a transcription slip at the end). |
+| partial | `20636/45` | no | 0/3 | 2/3 | One arithmetic slip in the first evaluated stage, carried forward correctly to the end. |
 
 <details><summary>Pages</summary>
 
 correct:
 ```text
-r = 10, m = 42
-θ = 6 × (42)
-= 252
-l = θ/360 × 2 × π × r
-l = (252)/360 × 2 × (22/7) × (10)
-= 44
-Final answer: 44
+r = 28, m = 11
+θ = 6 × (11)
+= 66
+A = θ/360 × π × r^2
+A = (66)/360 × (22/7) × (28)^2
+= 6776/15
+Final answer: 6776/15
 ```
 common wrong:
 ```text
-r = 10, m = 42
-θ = 6 × (42)
-= 252
-l = θ/360 × 2 × π × r
-l = (252)/360 × 2 × (22/7) × (10)
-= 44
-Final answer: 45
+r = 28, m = 11
+θ = 6 × (11)
+= 66
+A = θ/360 × π × r^2
+A = (66)/360 × (22/7) × (28)^2
+= 6776/15
+Final answer: 6777/15
 ```
 partial:
 ```text
-r = 10, m = 42
-θ = 6 × (42)
-= 253
-l = θ/360 × 2 × π × r
-l = (253)/360 × 2 × (22/7) × (10)
-= 2783/63
-Final answer: 2783/63
+r = 28, m = 11
+θ = 6 × (11)
+= 67
+A = θ/360 × π × r^2
+A = (67)/360 × (22/7) × (28)^2
+= 20636/45
+Final answer: 20636/45
 ```
 </details>
 
