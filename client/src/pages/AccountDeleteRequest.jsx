@@ -19,6 +19,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useState } from 'react';
 import { cloud } from '../platform/cloudTransport.js';
+import { offeredLanguages } from '../platform/edition.js';
 import { LANGUAGES, tLater, useLanguage } from '../i18n/index.js';
 import OtpInput, { OTP_LENGTH } from '../components/OtpInput.jsx';
 import '../components/SignUpFlow.css';
@@ -68,12 +69,12 @@ export default function AccountDeleteRequest() {
       <main className="auth-col signup-flow guardian-page" lang={language}>
         <Wordmark large byline />
 
-        <div className="seg-tabs" role="group" aria-label={t('deleteRequest.languageLabel')} style={{ marginTop: 18 }}>
-          {LANGUAGES.map(({ id, label }) => (
+        {offeredLanguages(LANGUAGES).length > 1 && <div className="seg-tabs" role="group" aria-label={t('deleteRequest.languageLabel')} style={{ marginTop: 18 }}>
+          {offeredLanguages(LANGUAGES).map(({ id, label }) => (
             <button key={id} type="button" className={`seg-tab${language === id ? ' on' : ''}`} aria-pressed={language === id}
               onClick={() => chooseLanguage(id)} data-testid={`delete-request-lang-${id}`}>{label}</button>
           ))}
-        </div>
+        </div>}
 
         <h1 className="signup-title" style={{ marginTop: 18 }}>{t('deleteRequest.title')}</h1>
         <p className="signup-lead">{t('deleteRequest.lead')}</p>
