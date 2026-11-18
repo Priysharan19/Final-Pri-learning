@@ -150,9 +150,8 @@ Priorities:
    - on tablets, the question and working paper sit side by side; on phones, one column;
    - the working surface stays stable through hints, keyboards, resizing and rotation.
 5. **Recognition:**
-   - the whole expression is confirmed, with uncertainties highlighted, before authoritative submission;
-   - routine correct readings are quick to approve;
-   - the original and confirmed revisions are kept.
+   - **Amended 19 Nov 2026 (owner decision, ADR-0001 amendment):** the student does not confirm the reading before marking. Doubtful lines are never judged and are shown as not checked; the reading is available on demand, and a correction re-marks;
+   - the original is kept with the reading used and the lines excluded.
 6. **Feedback:** what was submitted, what was right, where it first went wrong, the marks earned and why marks were lost, how to improve, and what is uncertain. Wrong maths, unreadable handwriting, unverified reasoning and technical failure each look and read differently.
 7. **Progress:**
    - coverage, accuracy, independence, retention, transfer, review priority and uncertainty;

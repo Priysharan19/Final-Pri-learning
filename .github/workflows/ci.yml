@@ -388,6 +388,10 @@ jobs:
           # deleted with the account and expired after the edition's retention.
           node server/test/original-work-check.mjs 2>&1 | tee original-work.log
           node tools/ci-check-counts.mjs verify platform/original-work.log
+          # The reading floor on the submit route (owner decision 19 Nov 2026, ADR-0001 amendment): a below-floor or
+          # uncertain line is never judged, an unreadable final answer records nothing, the exclusions are exported.
+          node server/test/reading-floor-http-check.mjs 2>&1 | tee reading-floor-http.log
+          node tools/ci-check-counts.mjs verify platform/reading-floor-http.log
           # The anonymous public resource catalogue (plan F6a): off by default,
           # published rows of this server's edition only, no cookie, CORS only
           # for a listed origin, rate-limited; the signed-in library stays signed in.

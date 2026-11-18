@@ -1,8 +1,9 @@
 # ADR-0001 amendment, 19 November 2026: marking on an unconfirmed reading
 
-Status: **decided by the owner; implementation NOT landed.** This commit holds the decided rule as a tested pure
-module (`server/platform/readingFloor.js`, `server/test/reading-floor-check.mjs`) and this record. The submit route,
-the marked page, the removal of the confirm step and the tours are still to do (see "Not yet done").
+Status: **decided by the owner; implemented** in two passes on `task/train-editions-28`. Pass 1 (server): the rule
+(`server/platform/readingFloor.js`, `server/test/reading-floor-check.mjs`) is wired into `POST /v1/practice/:id/submit`
+and tested over HTTP (`server/test/reading-floor-http-check.mjs`). Pass 2 (client): the confirm step is removed and the
+marked page is the only result.
 
 ## Decision
 
@@ -37,22 +38,30 @@ preview. Mitigations: the verdict is drawn on the student's own line, so a misre
 correction and a free re-mark; below-floor lines are never judged; the misread rate is measured by the reader
 evaluation (`tools/ink-cloud-reader-eval.mjs`). Without a preview this risk is real and is the owner's accepted trade.
 
-## Server contract: what changes when it lands
+## Server contract (implemented)
 
-Today the server does not itself enforce confirmation: `POST /v1/practice/:id/submit` takes the confirmed `answer`
-and `steps` the client sends and records `reading.needsConfirmation` and `reading.corrected` (practice.js, section
-"1b"). The confirm gate is a client rule (the confirm panel, and Mark disabled while a line is in doubt). The
-change is therefore: (a) drop that client gate; (b) in section "1b", after the kept read is found, call
-`applyReadingFloor` on the read lines and the submitted `steps` and `answer`; judge only `judged`; if
-`answerUnreadable`, reply 200 `{ authoritative: true, resolved: false, code: 'FINAL_ANSWER_UNREADABLE' }` before
-marking and record nothing; (c) store `reading.studentConfirmed = false` and `reading.excludedLines` on the attempt and
-in the account export. A line the student edited is no longer a read line and is judged as typed.
+Before: `POST /v1/practice/:id/submit` took the `answer` and `steps` the client sent and recorded
+`reading.needsConfirmation` and `reading.corrected`; the confirm gate was a client rule only. After: in section "1b",
+after the kept read is found, `applyReadingFloor` runs on the read lines (their `confidence`, `uncertain` and the
+read's own `confidenceFloor`) and the submitted `steps` and `answer`. Only the lines it returns are judged: an excluded
+line is removed from the working given to the engine. If the final answer is unreadable or absent the reply is 200
+`{ authoritative, resolved: false, code: 'FINAL_ANSWER_UNREADABLE', excludedLines, lineStates }` before anything is
+marked: no attempt, no receipt, no try spent, and the kept read stays so the student can rewrite or type. A marked
+reply carries `reading: { receipt, corrected, reused, studentConfirmed: false, excludedLines, lineStates }`; the
+reading receipt row, the kept original's reading layer and therefore the account export carry `studentConfirmed:
+false`, the excluded line indexes and the reading used (text, confidence, uncertain per line). A line the student
+corrected is text the reader never returned, so it is judged as typed; text equal to a below-floor read line is
+still that line, unless the student typed it themselves: the request may carry `answerTyped: true` (with a picture
+only), the box that asks for the answer when Pri could not read that line, and then that answer is theirs even when
+it equals the unread line's text (an absent answer is unreadable either way).
 
-## Not yet done
+A correction after a resolved mark is the existing product rule, not a new attempt model: the same picture reads
+free (the kept read is reused: no provider call, no reading unit; the per-answer allowance in `aiAllowance.js` is keyed
+on the issued question), and the next attempt is the existing "Redo"/repeat of the same issued question.
 
-The submit-route wiring and its HTTP tests; removing the reading list, chips, confirm panel and the final-answer box
-(and their strings); "See how Pri read this line"; the "Marking..." state; the threat-model and authority-doc edits;
-updating the tours that pin the confirm step (tour-ink, tour-auto-read, tour-photo-answer, tour-truthful-ink,
-tour-hindi, tour-iphone-layout, tour-ink-reader-permission) and the new tours; the a11y-walk step for the marked page.
-Tests that currently pin the confirm step (`confirm-reading-check`, `reading-shape-check`, `ink-doubts` suites) are
-left as they are until the behaviour changes.
+A question answered BY its working (`answerType: 'working'`) sends its lines as the answer itself, so the floor is applied
+to each of those lines; the answer is unreadable only when no judged line is left.
+
+## Not in this amendment
+
+No threshold was changed. A model never sets a mark.

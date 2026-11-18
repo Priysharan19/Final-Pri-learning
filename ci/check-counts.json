@@ -775,6 +775,13 @@
       "pins": [
         {"has":"original-work-check (sqlite): 75 checks passed"}
       ]
+    },
+    "platform/reading-floor-http.log": {
+      "job": "platform-contracts",
+      "log": "reading-floor-http.log",
+      "pins": [
+        {"has":"READING FLOOR HTTP (sqlite): PASS: 60 checks"}
+      ]
     }
   },
   "retired": [

@@ -42,7 +42,8 @@ import {
   MARKING_TOO_COMPLEX, MARKING_BUSY, TOO_COMPLEX_MESSAGE, WORKING_NOT_READ_NOTE
 } from './markerPool.js';
 import { authoredRegion, formatRegion, formatMatrix, formatVector, formatComplex } from '../../client/src/engine/answer-forms.js';
-import { transcribeHandwriting, validateImage, HandwritingProviderError } from './handwritingProvider.js';
+import { transcribeHandwriting, validateImage, HandwritingProviderError, providerStaticStatus } from './handwritingProvider.js';
+import { applyReadingFloor } from './readingFloor.js';
 import { recognitionOpsFor, sendRecognitionRefusal } from './recognitionOps.js';
 // The free plan's daily cap is decided here, per account, where a creditable
 // question is issued (#537): practiceAllowance.js reads the server's own
@@ -131,7 +132,7 @@ const DOTPOINT = /^[a-zA-Z0-9._:-]{1,80}$/;
 // which need the same question twice; they are honoured in NODE_ENV=test and
 // nowhere else, and a suite can switch them off to exercise the real contract.
 const fixedSeedsAllowed = env => env.NODE_ENV === 'test' && env.PRI_PRACTICE_SERVER_SEEDS_ONLY !== '1';
-const GRADE_FIELDS = new Set(['submissionId', 'answer', 'mode', 'steps', 'transcriptionReceipt', 'ms', 'image', 'deviceHelp', 'original']);
+const GRADE_FIELDS = new Set(['submissionId', 'answer', 'mode', 'steps', 'transcriptionReceipt', 'ms', 'image', 'deviceHelp', 'original', 'answerTyped']);
 // One reading per request to /recognize, and per submission that carries its
 // own picture: the two share this bucket, so the one-request Submit cannot be
 // used to read more pictures an hour than the receipt route allows.
@@ -1164,6 +1165,11 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     // connection). It can only make an attempt LESS independent, so the
     // device's word is enough for it; nothing can claim independence
     // (attemptSupport.js). Only `true` is accepted.
+    // `answerTyped: true` — the student typed the final answer themselves (the box that asks for it when Pri could
+    // not read that line). Only meaningful with a picture; only `true` is accepted.
+    if (body.answerTyped !== undefined && (body.answerTyped !== true || body.image === undefined)) {
+      return reject(res, 400, 'PRACTICE_SUBMISSION_INVALID', 'answerTyped, when sent, is true and goes with a picture.');
+    }
     if (body.deviceHelp !== undefined && body.deviceHelp !== true) {
       return reject(res, 400, 'PRACTICE_SUBMISSION_INVALID', 'deviceHelp, when sent, is true.');
     }
@@ -1223,10 +1229,16 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     const hash = digest({ qid, submissionId, answer: body.answer, mode, steps: body.steps ?? [], transcriptionReceipt: body.transcriptionReceipt || null, ms: body.ms ?? null,
       ...(withPicture ? { picture: createHash('sha256').update(body.image).digest('hex') } : {}),
       ...(body.deviceHelp === true ? { deviceHelp: true } : {}),
+      ...(body.answerTyped === true ? { answerTyped: true } : {}),
       ...(original ? { original: original.sha256 } : {}) });
     const now = Date.now();
     const idKey = qid + ':' + submissionId;
-    const working = Array.isArray(body.steps) ? body.steps.join('\n') : String(body.steps || '');
+    // `let`: a submission that carries its picture is judged only on the lines the reading floor lets through
+    // (applyReadingFloor, section 1b); typed work and receipts are unchanged.
+    // `markAnswer`: what the engine is given as the answer (the submitted answer, less any line the reading floor left out of a
+    // question answered by its working).
+    let markAnswer = body.answer;
+    let working = Array.isArray(body.steps) ? body.steps.join('\n') : String(body.steps || '');
 
     // ── Mark first, with no transaction open; then commit under the lock ────
     // The marker runs in a worker thread (markerPool.js) and is awaited, so it
@@ -1374,17 +1386,49 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         // /recognition/:receipt/confirm records, and under its rule: a
         // correction is never blank.
         const corrected = text !== body.answer || needsConfirmation;
+        // ── The reading floor (owner decision 19 Nov 2026, ADR-0001 amendment) ──
+        // The student no longer confirms the reading. In its place: a line the reader read below
+        // PRI_HANDWRITING_CONFIDENCE_FLOOR (never lowered), flagged uncertain, or blank is NEVER judged. It
+        // is dropped from step checking and from the final answer, and comes back as "couldn't read"
+        // (not checked): no tick, no cross. A final answer that is unreadable or absent is not marked
+        // wrong: 200 FINAL_ANSWER_UNREADABLE, nothing recorded, no try spent, the page and reading kept.
+        // The reader never saw the answer, and the engine alone judges what is left. A line the student
+        // edited is their own text, absent from the read lines, and so is judged as typed.
+        const readLines = Array.isArray(read.result.lines) ? read.result.lines
+          // fail closed: a kept read with no per-line record is one doubtful block, never a judgeable page
+          : String(read.result.text || '').split('\n').map(t => ({ text: t, confidence: Number(read.result.confidence), uncertain: read.result.needsConfirmation === true }));
+        const floorOf = Number.isFinite(Number(read.result.confidenceFloor)) ? Number(read.result.confidenceFloor) : providerStaticStatus(env).confidenceFloor;
+        const stepsSent = Array.isArray(body.steps) ? body.steps.map(String) : [];
+        // A question answered BY its working (answerType 'working') sends its lines as the answer itself: there is no
+        // separate final-answer line, so the floor is applied to those lines and the answer is unreadable only when no
+        // judged line is left. Any other question: the working is `steps` and the final answer is `answer`.
+        const byWorking = forecast.q?.answerType === 'working';
+        const answerLines = byWorking ? String(body.answer).split('\n') : null;
+        const floored = byWorking
+          ? applyReadingFloor({ readLines, floor: floorOf, steps: answerLines, answer: answerLines.find(l => l.trim()) ?? '', answerTyped: true })
+          : applyReadingFloor({ readLines, floor: floorOf, steps: stepsSent, answer: body.answer, answerTyped: body.answerTyped === true });
+        const lineStates = (byWorking ? answerLines : stepsSent).map((_, i) => (floored.excluded.includes(i) ? 'not-read' : 'judged'));
+        if (byWorking ? floored.judged.length === 0 : floored.answerUnreadable) {
+          return res.status(200).json({ authoritative: true, questionId: qid, submissionId, resolved: false, code: 'FINAL_ANSWER_UNREADABLE',
+            unreadable: true, studentConfirmed: false, excludedLines: floored.excluded, lineStates,
+            message: 'Pri couldn\u2019t read your final answer. Rewrite that line or type it here.', serverAcknowledgedAt: now });
+        }
+        // (an absent answer was answered above: FINAL_ANSWER_UNREADABLE; this guards a blank answer that got through)
         if (corrected && !body.answer.trim()) {
           return reject(res, 400, 'RECOGNITION_CORRECTION_INVALID', 'Provide corrected text for a valid server receipt.');
         }
-        reading = { text, needsConfirmation, corrected, reused: read.reused === true, recognizedAt: Date.now() };
+        if (byWorking && floored.excluded.length) markAnswer = answerLines.filter((_, i) => !floored.excluded.includes(i)).join('\n');
+        else if (floored.excluded.length) working = stepsSent.filter((_, i) => !floored.excluded.includes(i)).join('\n');
+        reading = { text, needsConfirmation, corrected, reused: read.reused === true, recognizedAt: Date.now(),
+          studentConfirmed: false, excludedLines: floored.excluded, lineStates,
+          readLines: readLines.map(l => ({ text: String(l?.text ?? ''), confidence: Number(l?.confidence), uncertain: l?.uncertain === true })), floor: floorOf };
       }
 
       // ── 2. Mark ──────────────────────────────────────────────────────────
       // One round trip: the answer, and the working only when the reply could
       // use it (the answer is right, or a wrong answer resolves the question).
       const marked = await timePhase('marker', () => markerPool().run('practice', {
-        q: forecast.q, answer: body.answer, working,
+        q: forecast.q, answer: markAnswer, working,
         evidenceIfWrong: evidenceForced || forecast.spent || ONE_TRY_MODES.includes(forecast.q._practiceMode)
       }, { key: accountId }));
       // Refused before it ran: nothing marked, nothing spent, same key retries.
@@ -1577,7 +1621,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       if (reading) {
         const providerReceipt = randomUUID();
         const evidenceRow = { questionId: qid, mode, text: reading.text, recognizedAt: reading.recognizedAt,
-          providerNeedsConfirmation: reading.needsConfirmation, submissionId };
+          providerNeedsConfirmation: reading.needsConfirmation, submissionId,
+          studentConfirmed: false, excludedLines: reading.excludedLines, readLines: reading.readLines, floor: reading.floor };
         records.push(['practice-recognition', providerReceipt, JSON.stringify(evidenceRow), digest(evidenceRow)]);
         let receipt = providerReceipt;
         if (reading.corrected) {
@@ -1590,7 +1635,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         // receipt, whether the student corrected the reading, and whether the
         // read was one this account had already paid for. Never the reading
         // itself: the device showed it already.
-        response.reading = { receipt, corrected: reading.corrected, reused: reading.reused };
+        response.reading = { receipt, corrected: reading.corrected, reused: reading.reused,
+          studentConfirmed: false, excludedLines: reading.excludedLines, lineStates: reading.lineStates };
       }
       // The original, kept with the mark in this transaction and named in the
       // reply by its digest: the mark is recorded with THIS handwriting. An
@@ -1609,6 +1655,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         }
         const kept = await keepOriginal(db, { accountId, edition, questionId: qid, submissionId, attemptId, parsed: original, now,
           reading: { read, confirmed: body.answer, corrected: reading ? reading.corrected : readingProof?.correctedByStudent === true,
+            ...(reading ? { studentConfirmed: false, excludedLines: reading.excludedLines, readLines: reading.readLines } : {}),
             receipt: response.reading?.receipt || (typeof body.transcriptionReceipt === 'string' ? body.transcriptionReceipt : null) } });
         if (kept.saved) keptOriginal = kept.row;
         response.original = kept.saved ? { ...originalProof(kept.row), saved: true } : { sha256: original.sha256, saved: false, reason: kept.reason };

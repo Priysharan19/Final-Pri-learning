@@ -157,7 +157,7 @@ Honest reading of the model arm: **the model buys almost nothing on this corpus 
 
 ## 7. Safety argument, in brief
 
-1. **Perception is not interpretation.** The reading is confirmed by the student and stays answer-blind (unchanged). Interpretation never sees an answer: the request is a pure function of the public question, pinned by test in 412 families.
+1. **Perception is not interpretation.** The reading is no longer confirmed by the student (owner decision 19 Nov 2026): the reading floor excludes every doubtful line, and the reading stays answer-blind (unchanged). Interpretation never sees an answer: the request is a pure function of the public question, pinned by test in 412 families.
 2. **The interpreter cannot rewrite.** Verbatim token runs, whole-line coverage, name-only subjects, lexicon-only labels. A claim that edits, repairs or drops part of the student's maths is `unparseable`.
 3. **The verifier is the only authority.** It recomputes truth from the question's data; a claim is only the question it asks.
 4. **False tick:** a tick needs the statement, exactly as the student wrote it, to be true by the verifier's own computation (or recognised as the question's own). A mis-interpretation can only change which true-or-false statement is checked, and the guard has tied that statement to the whole line. Residual risk is a line the student meant differently from how it is written (degrees, `-1^2`, a location versus a value); those readings are detected and left unverified.
@@ -170,7 +170,7 @@ Honest reading of the model arm: **the model buys almost nothing on this corpus 
 * **Synthetic corpus.** Lines are built from authored solutions in a handful of styles; no real student, no handwriting recognition errors, no messy notation. Every rate above is an optimistic bound on how well the layer reads real working. 41 hand-annotated lines are an illustration, not a measurement.
 * **Coverage is capped by what the verifier can prove**, not by the reading. Largest silent classes on the corpus (lines with maths): a bare expression (16,004), an equation about an unknown with no check available (9,387), unreadable expressions (7,476), `x = c` with no equation in the question to test it against (6,808), unreadable shapes (3,869), ambiguity (1,877), restricted domains (1,608), inequalities (1,506).
 * Truth is computed for polynomials to degree 4, sinusoids with one frequency, quadratic extrema and plain arithmetic. No integrals, logs and exponentials as quantities, geometry, statistics, vectors, sets or probability yet.
-* The lines judged are the confirmed reading; this layer does not judge reading errors.
+* The lines judged are the lines the reading floor lets through (read at or above the floor, not flagged uncertain); a confident misread is not detected by this layer.
 * A tick means "this line is a true statement" and says nothing about whether it is a useful step or earns method credit.
 * The evaluation measures verdicts, not learning. Research (below) gives no support for a claim that per-line verdicts improve outcomes; this is a coverage and safety build.
 

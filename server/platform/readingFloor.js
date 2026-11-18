@@ -26,13 +26,14 @@ export const lineJudgeable = (line, floor) => {
  * @param floor      the reader's confidence floor for that read
  * @param steps      the working lines the student submitted (strings), in page order
  * @param answer     the final-answer line the submission names (string), or ''
+ * @param answerTyped true when the student typed that final answer themselves (never read from the page)
  * @returns {{ judged: string[], excluded: number[], answer: string, answerUnreadable: boolean, unconfirmed: true }}
  *   `judged`   the submitted lines the engine may judge (a submitted line equal to a below-floor read line is dropped)
  *   `excluded` 0-based indexes, in the submitted working, of the lines dropped
  *   `answerUnreadable`  true when the final answer is the text of a below-floor read line, or is absent
  *   `unconfirmed`  always true: nothing here was confirmed by the student; the attempt records it
  */
-export function applyReadingFloor({ readLines, floor, steps, answer }) {
+export function applyReadingFloor({ readLines, floor, steps, answer, answerTyped = false }) {
   const read = Array.isArray(readLines) ? readLines : [];
   const lines = (Array.isArray(steps) ? steps : []).map(norm);
   const below = new Set(read.filter(l => !lineJudgeable(l, floor)).map(l => norm(l?.text)).filter(Boolean));
@@ -44,6 +45,9 @@ export function applyReadingFloor({ readLines, floor, steps, answer }) {
     else if (text) judged.push(text);
   });
   const given = norm(answer);
-  const answerUnreadable = given === '' || (below.has(given) && !above.has(given));
+  // `answerTyped`: the student typed the final answer themselves (the box that asks for it when Pri could not read
+  // the line). It is their own text even when it equals the text of a below-floor line; it is never read from the page.
+  // An absent answer is unreadable either way.
+  const answerUnreadable = given === '' || (answerTyped !== true && below.has(given) && !above.has(given));
   return { judged, excluded, answer: answerUnreadable ? '' : given, answerUnreadable, unconfirmed: true };
 }

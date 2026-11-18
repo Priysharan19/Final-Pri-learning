@@ -18,6 +18,8 @@ const clear = applyReadingFloor({ readLines: [L('x = 5', 0.95)], floor: FLOOR, s
 ok(!clear.answerUnreadable && clear.answer === 'x = 5' && clear.excluded.length === 0, 'a line read at or above the floor is judged and may be the answer');
 ok(applyReadingFloor({ readLines: read, floor: FLOOR, steps: ['3x = 15'], answer: '' }).answerUnreadable === true, 'an absent final answer is unreadable, not wrong');
 ok(applyReadingFloor({ readLines: read, floor: FLOOR, steps: ['3x = 15', 'x = 5 (corrected by the student)'], answer: 'x = 5 (corrected by the student)' }).answerUnreadable === false, 'a line the student edited is their own text and is judged as typed');
+ok(applyReadingFloor({ readLines: read, floor: FLOOR, steps: ['3x = 15', 'x = 5'], answer: 'x = 5', answerTyped: true }).answerUnreadable === false, 'a final answer the student typed is theirs even when it equals a below-floor line');
+ok(applyReadingFloor({ readLines: read, floor: FLOOR, steps: ['3x = 15'], answer: '', answerTyped: true }).answerUnreadable === true, 'but an absent typed answer is still absent');
 ok(JSON.stringify(applyReadingFloor({ readLines: [], floor: FLOOR, steps: ['a'], answer: 'a' }).judged) === '["a"]', 'with no read (typed working) nothing is excluded');
 // no combination of confidences lets a below-floor text through
 let leaked = 0;
