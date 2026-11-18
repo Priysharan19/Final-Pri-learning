@@ -6,7 +6,8 @@
 //       Premium; never where nothing is on sale;
 //   2 · the surfaces of those forbidden moments never link to Premium;
 //   3 · free never blocks core practice: the device gate's only refusals are
-//       the packaged allowances, practice is uncapped under the proposal, and
+//       the packaged allowances, practice is uncapped under the approved packaging (owner decision
+//       2026-11-18), and
 //       no difficulty level is Premium-only;
 //   4 · price strings come from the edition table and match the AU legal
 //       documents, with an edition check (Priyabhata states no constant price);
@@ -119,7 +120,7 @@ for (const f of FORBIDDEN_SURFACES) ok(`${f} never links to Premium`, !PREMIUM_L
   ok('no Premium content rule is about difficulty: every level is free', PREMIUM_PRACTICE_CONTENT.every(rule => !('difficulty' in rule)) && PLAN_PROMISES.difficulties === 'all');
   ok('the gate holds no difficulty check (it reads no question\'s difficulty)', !/\.difficulty\b|\bdifficulty\s*(?:[<>]=?|===?)/.test(read('src/local/entitlementGate.js')));
   eq('games and the placement check are never counted', CAPPED_PRACTICE_MODES, ['practice', 'review', 'task']);
-  eq('under the proposal free practice is not capped at all', PACKAGINGS['value-2026-11'].free.practicePerDay, null);
+  eq('under the value packaging (approved 2026-11-18) free practice is not capped at all', PACKAGINGS['value-2026-11'].free.practicePerDay, null);
 }
 
 // ── 4 · prices ──────────────────────────────────────────────────────────────

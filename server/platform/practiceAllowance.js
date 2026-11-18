@@ -3,7 +3,8 @@
 // are issued (#537)
 //
 // Since #418 every creditable question is issued by this server, so the cap on
-// the free plan — 20 practice questions a day — is decided here, per ACCOUNT,
+// the free plan's daily cap, when the active packaging sets one (none since the owner's decision of
+// 2026-11-18; d19-d20 had 20 a day), is decided here, per ACCOUNT,
 // from the server's own entitlement record (entitlement_snapshots, written only
 // by verified billing events and support grants). A modified client, a second
 // device or a cleared IndexedDB changes nothing: the device's counter is a

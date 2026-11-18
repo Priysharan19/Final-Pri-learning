@@ -170,10 +170,18 @@ expectFailure('escalation outlives the notice', run(clone(), vercel, withNotice(
 expectFailure('standing sentence outlives the terms', run(clone(), vercel, withNotice('terms', s => s.replaceAll('no standing outside it', 'no effect outside it'))), /support\/index\.html: repeats a sentence terms\.md no longer has/);
 expectFailure('OpenAI disclosure removed from home', run(mutate('index.html', s => s.replaceAll('OpenAI', 'a reading service'))), /index\.html: required text missing — OpenAI/);
 
-// 3c. The free plan's "20 practice questions a day" is a limit, not a count,
-// and the maths row ending in an 8 before the "Questions, hints…" paragraph is
-// two blocks: neither trips the count rule on the clean render (baseline above).
-assert.ok(/20 practice questions a day/.test(authoredText(rendered.get('index.html'))), 'the free-plan limit is still stated');
+// 3c. The free plan's daily read limits ("5 reads of your writing and 5 question
+// photos a day") are limits, not counts, and the maths row ending in an 8 before the
+// "Questions, hints…" paragraph is two blocks: neither trips the count rule on the
+// clean render (baseline above). Owner decision 2026-11-18: practice is uncapped, so
+// the home page states no daily practice number; the read limits must equal the
+// ACTIVE packaging (value-2026-11: Free 5, Premium 50).
+const home = authoredText(rendered.get('index.html'));
+assert.ok(/Practice questions with no daily limit/.test(home), 'the free plan states uncapped practice');
+assert.ok(!/20 practice questions a day/.test(home), 'the superseded 20-a-day limit is gone');
+const { PACKAGING } = await import('../client/src/engine/packaging.js');
+assert.deepEqual([PACKAGING.free.practicePerDay, PACKAGING.free.readsPerDay, PACKAGING.premium.readsPerDay], [null, 5, 50], 'the active packaging is the one the site states');
+assert.ok(/5 reads of your writing and 5 photos of a question a day/.test(home) && /50 reads of your writing and 50 photos of a question a day/.test(home), 'the home page states the active packaging\'s read limits');
 checks++;
 
 // 4. Prices: only the approved two, verbatim, in any spelling of the currency.

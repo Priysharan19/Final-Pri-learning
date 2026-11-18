@@ -15,8 +15,11 @@ export const APP_DELETE_PATH = '/account/delete-request';
 // store prices once the app is on sale. tools/site-check.mjs refuses any other ₹ amount.
 export const PRICES = Object.freeze({ monthly: '₹199', annual: '₹1,499' });
 
-// D19 — free plan as the server enforces it (20 questions a day, one timed paper in 30 days).
-export const FREE_PLAN = Object.freeze({ questionsPerDay: 20, paperEveryDays: 30 });
+// Free plan as the server enforces it under the 'value-2026-11' packaging, owner-approved
+// 2026-11-18 (client/src/engine/packaging.js): practice is not capped; one timed paper in 30
+// days; marked handwriting reads and question photos a day, per kind, 5 on Free and 50 on
+// Premium. tools/site-check.test.mjs holds these equal to the packaging.
+export const FREE_PLAN = Object.freeze({ paperEveryDays: 30, readsPerDay: 5, premiumReadsPerDay: 50 });
 
 // Where each notice is published, per language. The notices link to each other
 // with the app's routes (/refund-policy, /grievance, /account/delete-request);

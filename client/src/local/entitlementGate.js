@@ -2,7 +2,9 @@
 // Pri Learning · Free tier and Premium gate for the local backend.
 //
 // The FREE plan's pre-check lives here, on the device, so the student is told
-// before a request leaves: 20 practice questions per calendar day (the day
+// before a request leaves: the free daily practice cap when the packaging sets one
+// (none under value-2026-11, owner decision 2026-11-18; 20 under the superseded
+// d19-d20) per calendar day (the day
 // boundary is the profile's own timezone — Asia/Kolkata for India profiles),
 // one exam simulation every 30 days, and basic Pri Explain. The counter is a
 // device-local row and is a courtesy, not the limit: since every creditable

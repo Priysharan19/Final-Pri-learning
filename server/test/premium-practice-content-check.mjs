@@ -24,7 +24,10 @@ import { randomUUID } from 'node:crypto';
 
 const scratch = mkdtempSync(join(tmpdir(), 'pri-premium-content-'));
 process.env.NODE_ENV = 'test';                  // fixed seeds: the same trap on demand
-delete process.env.PRI_FREE_PRACTICE_PER_DAY;   // the shipped default, 20
+// Owner decision 2026-11-18: the active packaging leaves free practice uncapped,
+// so the cap this suite proves a twin is refused at is the deployment's own,
+// set to the value the free plan used to ship (d19-d20: 20 a day).
+process.env.PRI_FREE_PRACTICE_PER_DAY = '20';
 process.env.PRI_PLATFORM_DB = join(scratch, 'platform.db');
 process.env.PRI_AUTH_DELIVERY_KEY = '5d'.repeat(32);
 process.env.PRI_AUTH_EMAIL_PROVIDER = 'test';
@@ -38,7 +41,7 @@ const { encryptDeliveryToken } = await import('../platform/deliveryCrypto.js');
 const h = await startApp({ engine: requestedEngine() });
 const c = checks();
 const DAY = 24 * 60 * 60 * 1000;
-const LIMIT = FREE_PRACTICE_ALLOWANCE.perDay;
+const LIMIT = 20; // the deployment cap set above
 const ADVANCED = 'jee-advanced-c11-binomial-theorem';
 const ARCHIVE = 'pyq-jee-advanced-c11-conic-sections';
 const PERCENT = 'c8-percentage-reasoning'; // seed 4242, D2: a 30% rise, with a trap value (an India bank, D15)

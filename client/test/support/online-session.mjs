@@ -57,10 +57,10 @@ const ENV = {
   // free plan's twenty in a day. The server's cap (#537) is proved at its
   // shipped default by server/test/practice-daily-cap-check.mjs and, in the
   // browser, by tour-free-cap.js — which boots this platform with the default
-  // (`env: { PRI_FREE_PRACTICE_PER_DAY: null }`). Every other flow runs with
+  // (`env: { PRI_FREE_PRACTICE_PER_DAY: '20' }`; since 2026-11-18 the shipped default is uncapped). Every other flow runs with
   // the cap raised by configuration so it is never read as a fault.
   PRI_FREE_PRACTICE_PER_DAY: '100000',
-  // Likewise the per-account read allowance (D20 defaults: 5 reads and 5
+  // Likewise the per-account read allowance (shipped defaults since 2026-11-18: 5 reads and 5
   // question photos a day on the free plan), proved at its defaults by
   // server/test/premium-authority-check.mjs: a flow that reads one account's
   // writing more than five times is not a flow about the allowance.
