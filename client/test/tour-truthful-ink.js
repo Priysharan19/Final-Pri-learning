@@ -336,7 +336,8 @@ export const flow = {
         await check('rewrite: ONE new stroke withdraws every annotation of the previous submission — no "Look here", no cross, no note on the canvas, no marked-page sweep',
           after.look === 0 && after.marks === 0 && after.sweep === 0, JSON.stringify(after));
         await check('rewrite: what remains is a neutral statement about the PREVIOUS attempt, and the new work is said not to be checked — on screen and to a screen reader',
-          after.previous.includes('Your previous attempt was not correct.') && after.previous.includes('What is on the page now has not been checked yet.') &&
+          // One sentence, placed with the result (owner, 18 Nov 2026): the page is unchecked, and the last attempt was not correct.
+            after.previous.includes('This page has not been checked yet.') && after.previous.includes('Your last attempt was not correct.') &&
             after.pinned === 0 && !/Not quite/.test(after.previous) && after.speech.includes('Your previous attempt was not correct.') && !/Not quite/.test(after.speech),
           JSON.stringify({ previous: after.previous, speech: after.speech, pinned: after.pinned }));
         await check('rewrite: the new ink was not sent anywhere by being written — not to be marked, not to be read',
@@ -406,7 +407,7 @@ export const flow = {
         await check('late grade: with the answer already corrected, that verdict is shown as the previous attempt\'s — never as "Not quite" on the new, unsubmitted answer',
           editable && await answerBox.inputValue() === String(right.text) &&
             await page.locator('.verdict[data-verdict-of="previous-attempt"]').count() === 1 && await page.locator('.verdict-bad').count() === 0 &&
-            flat(await page.locator('.verdict[data-verdict-of="previous-attempt"] .verdict-title').textContent().catch(() => '')) === 'Your previous attempt was not correct.',
+            flat(await page.locator('.verdict[data-verdict-of="previous-attempt"] .verdict-body').textContent().catch(() => '')) === 'This page has not been checked yet. Your last attempt was not correct.',
           `editable in flight: ${editable}; field ${JSON.stringify(await answerBox.inputValue())}; cards ${await page.locator('.verdict').count()}`);
         await submitNow();
         await page.waitForSelector('.eval-card', { timeout: 30000 }).catch(() => {});
