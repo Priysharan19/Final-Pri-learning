@@ -29,9 +29,9 @@ The server calls `stepCheck` only when `stepMetaFor(q)` returns a meta (an autho
 
 | Group | Scored lines | Any verdict | Correct lines ticked | False crosses | Wrong lines caught at the right line | FALSE TICKS |
 |---|---:|---:|---:|---:|---:|---:|
-| All | 80212 | 6.4% | 6.4% | 0 | 6.0% | 0 |
+| All | 80236 | 6.4% | 6.4% | 0 | 6.0% | 0 |
 | NSW | 26926 | 9.8% | 9.8% | 0 | 9.2% | 0 |
-| India | 53286 | 4.6% | 4.7% | 0 | 4.2% | 0 |
+| India | 53310 | 4.6% | 4.7% | 0 | 4.1% | 0 |
 
 ### 2b. Only questions where the server runs the step check
 
@@ -85,7 +85,7 @@ Same, over all questions (including those with no step check):
 | units | 2822 | 0.2% | 0.2% | 0 | n/a | 0 |
 | continuation | 508 | 2.4% | 2.4% | 0 | n/a | 0 |
 | labelled | 14877 | 5.4% | 5.4% | 0 | n/a | 0 |
-| slip | 14777 | 5.8% | 5.8% | 0 | 6.0% | 0 |
+| slip | 14801 | 5.8% | 5.8% | 0 | 6.0% | 0 |
 | bare | 15857 | 6.6% | 6.6% | 0 | n/a | 0 |
 | therefore | 14863 | 6.9% | 6.9% | 0 | n/a | 0 |
 | sentence | 5809 | 7.4% | 7.4% | 0 | n/a | 0 |
