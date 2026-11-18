@@ -45,7 +45,7 @@ import OtpInput, { OTP_LENGTH } from './OtpInput.jsx';
 import { priNative } from '../platform/native/index.js';
 import { isNetworkFailure, signInErrorCopy } from './signInErrors.js';
 import { readOnboardingAuthority } from './onboardingAuthority.js';
-import { parentFeaturesOffered } from '../platform/edition.js';
+import { parentFeaturesOffered, phoneDialCode, smsOffered } from '../platform/edition.js';
 import { EDITION_ID } from '../brand/edition.js';
 
 export { isNetworkFailure, signInErrorCopy };
@@ -169,7 +169,7 @@ export default function SignUpFlow({
     // default — asking for a code then says whatever is true.
     cloud.otpChannels().then(result => {
       if (!live || !result?.channels) return;
-      setChannels({ email: result.channels.email !== false, sms: result.channels.sms === true });
+      setChannels({ email: result.channels.email !== false, sms: result.channels.sms === true && smsOffered() });
     }).catch(() => {});
     return () => { live = false; };
   }, [available]);
@@ -212,7 +212,7 @@ export default function SignUpFlow({
   };
 
   const cleanDestination = () => (channel === 'email' ? destination.trim().toLowerCase() : destination.trim());
-  const shownDestination = () => (channel === 'sms' ? `+91 ${destination.trim()}` : destination.trim());
+  const shownDestination = () => (channel === 'sms' ? `${phoneDialCode()} ${destination.trim()}` : destination.trim());
   const profile = () => ({ name: name.trim(), year: year == null ? undefined : String(year), isAdult: age === null ? undefined : age >= 18, age: age === null ? undefined : age, role: 'student' });
   const detailsReady = () => !!name.trim() && age !== null && (inline || year !== null);
 
@@ -536,7 +536,7 @@ export default function SignUpFlow({
         <form className="signup-form" noValidate onSubmit={e => { e.preventDefault(); void sendCode(); }}>
           <label className="label" htmlFor="signup-destination">{isSms ? t('signup.phoneLabel') : t('signup.emailLabel')}</label>
           <div className={isSms ? 'signup-phone' : ''}>
-            {isSms && <span className="signup-cc" aria-hidden="true">+91</span>}
+            {isSms && <span className="signup-cc" aria-hidden="true">{phoneDialCode()}</span>}
             <input className="input" id="signup-destination" value={destination} disabled={!available} autoFocus={!isSms}
               type={isSms ? 'tel' : 'email'} inputMode={isSms ? 'tel' : 'email'} autoCapitalize="none" autoCorrect="off" spellCheck={false}
               autoComplete={isSms ? 'tel-national' : 'email'} maxLength={isSms ? 16 : 254}
@@ -731,7 +731,7 @@ export default function SignUpFlow({
           )}
           <label className="label" htmlFor="signup-parent-destination">{parentSms ? t('signup.parentPhoneLabel') : t('signup.parentEmailLabel')}</label>
           <div className={parentSms ? 'signup-phone' : ''}>
-            {parentSms && <span className="signup-cc" aria-hidden="true">+91</span>}
+            {parentSms && <span className="signup-cc" aria-hidden="true">{phoneDialCode()}</span>}
             <input className="input" id="signup-parent-destination" value={parentDestination}
               type={parentSms ? 'tel' : 'email'} inputMode={parentSms ? 'tel' : 'email'} autoComplete="off" autoCapitalize="none" maxLength={parentSms ? 16 : 254}
               aria-describedby={error ? errorId : undefined}
@@ -860,7 +860,7 @@ function ParentHome({ t, heading }) {
         <form className="signup-form" onSubmit={request}>
           <label className="label" htmlFor="signup-withdraw-phone">{t('signup.withdrawPhone')}</label>
           <div className="signup-phone">
-            <span className="signup-cc" aria-hidden="true">+91</span>
+            <span className="signup-cc" aria-hidden="true">{phoneDialCode()}</span>
             <input className="input" id="signup-withdraw-phone" type="tel" inputMode="tel" autoComplete="tel-national" value={phone} maxLength={16}
               onChange={e => setPhone(e.target.value)} />
           </div>

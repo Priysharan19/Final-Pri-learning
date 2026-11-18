@@ -23,6 +23,8 @@ import PageLink from '../components/PageLink.jsx';
 import { useApp } from '../App.jsx';
 import { api } from '../api.js';
 import { useT } from '../i18n/index.js';
+import { defaultCourse } from '../platform/edition.js';
+import { localeOf, timezoneOf } from '../lib/locale.js';
 import { cloudRequest } from '../platform/cloudTransport.js';
 import { blueprintLabel } from '../lib/blueprintKeys.js';
 import { chancesValues, chapterMatrix, headline, paperQuery, trendGeometry } from './insightsView.js';
@@ -71,10 +73,10 @@ function Coverage({ coverage, covered, total, t }) {
   );
 }
 
-function Trend({ trend, t, locale }) {
+function Trend({ trend, t, locale, timeZone }) {
   const g = useMemo(() => trendGeometry(trend), [trend]);
   if (!trend.length) return <p className="in-note">{t('insights.trendNone')}</p>;
-  const day = at => new Date(at).toLocaleDateString(locale, { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' });
+  const day = at => new Date(at).toLocaleDateString(locale, { day: 'numeric', month: 'short', timeZone });
   return (
     <figure className="ins-trend" data-trend-weeks={trend.length}>
       <svg viewBox={`0 0 ${g.width} ${g.height}`} role="img" aria-labelledby="ins-trend-cap" preserveAspectRatio="none">
@@ -107,7 +109,7 @@ function Trend({ trend, t, locale }) {
   );
 }
 
-function Forecast({ data, t, locale }) {
+function Forecast({ data, t, locale, timeZone }) {
   const paper = blueprintLabel(t, data.paper?.id, data.paper?.label);
   if (!data.premium) {
     return (
@@ -135,7 +137,7 @@ function Forecast({ data, t, locale }) {
       <p className="ins-sentence" data-forecast-sentence>{t(h.key, h.values)}</p>
       <Coverage coverage={f.coverage} covered={f.coveredMarks} total={f.totalMarks} t={t} />
       <h3 className="sc-label">{t('insights.trendTitle')}</h3>
-      <Trend trend={data.trend || []} t={t} locale={locale} />
+      <Trend trend={data.trend || []} t={t} locale={locale} timeZone={timeZone} />
       {f.priorities?.length > 0 && (
         <>
           <h3 className="sc-label">{t('insights.movesMost')}</h3>
@@ -154,9 +156,9 @@ function Forecast({ data, t, locale }) {
   );
 }
 
-function Habit({ row, names, t, locale }) {
+function Habit({ row, names, t, locale, timeZone }) {
   const c = chancesValues(row);
-  const when = at => new Date(at).toLocaleDateString(locale, { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' });
+  const when = at => new Date(at).toLocaleDateString(locale, { day: 'numeric', month: 'short', timeZone });
   return (
     <li className="ins-habit" data-habit={row.id}>
       <div className="ins-habit-head">
@@ -206,7 +208,7 @@ function Matrix({ habits, names, t }) {
   );
 }
 
-function Dna({ data, names, t, locale }) {
+function Dna({ data, names, t, locale, timeZone }) {
   if (!data.premium) {
     return (
       <section className="ins-sheet" aria-labelledby="ins-dna" data-insights-dna="free">
@@ -225,7 +227,7 @@ function Dna({ data, names, t, locale }) {
       <h2 className="sc-label" id="ins-dna">{t('insights.dnaTitle')}</h2>
       <p className="in-note">{t('insights.dnaLead', { count: data.answered, n: data.answered })}</p>
       {data.habits.length
-        ? <ul className="ins-habits">{data.habits.map(h => <Habit key={h.id} row={h} names={names} t={t} locale={locale} />)}</ul>
+        ? <ul className="ins-habits">{data.habits.map(h => <Habit key={h.id} row={h} names={names} t={t} locale={locale} timeZone={timeZone} />)}</ul>
         : <p>{t('insights.dnaNone', { count: data.answered, n: data.answered })}</p>}
       <Matrix habits={data.habits} names={names} t={t} />
       {data.oneOffs?.length > 0 && <p className="in-note">{t('insights.oneOffs', { count: data.oneOffs.length, n: data.oneOffs.length })}</p>}
@@ -279,7 +281,9 @@ function RootGap({ data, names, t }) {
 export default function Insights() {
   const { user } = useApp();
   const t = useT();
-  const locale = typeof document !== 'undefined' && document.documentElement.lang === 'hi' ? 'hi-IN' : 'en-IN';
+  const regional = user?.course || defaultCourse();
+  const locale = typeof document !== 'undefined' && document.documentElement.lang === 'hi' ? 'hi-IN' : localeOf(regional);
+  const timeZone = timezoneOf(user?.timezone ? user : regional);
   const q = paperQuery(user);
   const names = useChapterNames();
   const [forecast, setForecast] = useState({ status: q ? 'loading' : 'none' });
@@ -298,8 +302,8 @@ export default function Insights() {
     <div className="ins-page">
       <h1>{t('insights.title')}</h1>
       <p className="in-note">{t('insights.lead')}</p>
-      {forecast.status !== 'none' && <Load state={forecast} t={t}>{data => <Forecast data={data} t={t} locale={locale} />}</Load>}
-      <Load state={dna} t={t}>{data => <Dna data={data} names={names} t={t} locale={locale} />}</Load>
+      {forecast.status !== 'none' && <Load state={forecast} t={t}>{data => <Forecast data={data} t={t} locale={locale} timeZone={timeZone} />}</Load>}
+      <Load state={dna} t={t}>{data => <Dna data={data} names={names} t={t} locale={locale} timeZone={timeZone} />}</Load>
       {gap.status === 'error' && gap.code === 'PRACTICE_BANK_OUTSIDE_CURRICULUM'
         ? null
         : <Load state={gap} t={t}>{data => <RootGap data={data} names={names} t={t} />}</Load>}

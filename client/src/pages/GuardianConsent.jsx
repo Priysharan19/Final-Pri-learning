@@ -14,6 +14,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useEffect, useState } from 'react';
 import { cloud } from '../platform/cloudTransport.js';
+import { offeredLanguages, phoneDialCode, smsOffered } from '../platform/edition.js';
 import { LANGUAGES, rememberSignInLanguage, setLanguage, signInLanguage, tLater, useLanguage, useT } from '../i18n/index.js';
 import OtpInput, { OTP_LENGTH } from '../components/OtpInput.jsx';
 import { GUARDIAN_NOTICE_VERSION } from '../components/SignUpFlow.jsx';
@@ -50,10 +51,11 @@ function GuardianLanguagePicker() {
     void setLanguage(id);
   };
 
+  if (offeredLanguages(LANGUAGES).length < 2) return null;
   return (
     <div className="row" style={{ justifyContent: 'center', gap: 8, marginTop: 18 }}
       role="group" aria-label={t('login.chooseLanguage')}>
-      {LANGUAGES.map(l => (
+      {offeredLanguages(LANGUAGES).map(l => (
         <button key={l.id} type="button" className={`pill-opt ${chosen === l.id ? 'on' : ''}`}
           lang={l.htmlLang} aria-pressed={chosen === l.id}
           aria-label={t('lang.switchTo', { language: l.english })}
@@ -77,7 +79,7 @@ function Page({ children }) {
 
 export default function GuardianConsent({ linkToken = null }) {
   const t = useT();
-  const [channel, setChannel] = useState('sms');
+  const [channel, setChannel] = useState(smsOffered() ? 'sms' : 'email');
   const [destination, setDestination] = useState('');
   const [agree, setAgree] = useState(false);
   const [code, setCode] = useState('');
@@ -135,15 +137,15 @@ export default function GuardianConsent({ linkToken = null }) {
       <h1 className="signup-title">{t('guardianPage.title')}</h1>
       <p className="signup-lead">{t('guardianPage.lead')}</p>
       <Notice t={t} />
-      <div className="signup-segment signup-channel" role="radiogroup" aria-label={t('guardianPage.channelLabel')}>
+      {smsOffered() && <div className="signup-segment signup-channel" role="radiogroup" aria-label={t('guardianPage.channelLabel')}>
         <button type="button" role="radio" aria-checked={isSms} className={`signup-seg${isSms ? ' is-selected' : ''}`}
           onClick={() => { setChannel('sms'); setDestination(''); }}>{t('signup.channelPhone')}</button>
         <button type="button" role="radio" aria-checked={!isSms} className={`signup-seg${!isSms ? ' is-selected' : ''}`}
           onClick={() => { setChannel('email'); setDestination(''); }}>{t('signup.channelEmail')}</button>
-      </div>
+      </div>}
       <label className="label" htmlFor="guardian-destination">{isSms ? t('guardianPage.yourPhone') : t('guardianPage.yourEmail')}</label>
       <div className={isSms ? 'signup-phone' : ''}>
-        {isSms && <span className="signup-cc" aria-hidden="true">+91</span>}
+        {isSms && <span className="signup-cc" aria-hidden="true">{phoneDialCode()}</span>}
         <input className="input" id="guardian-destination" value={destination} type={isSms ? 'tel' : 'email'}
           inputMode={isSms ? 'tel' : 'email'} autoComplete={isSms ? 'tel-national' : 'email'} maxLength={isSms ? 16 : 254}
           onChange={e => { setDestination(e.target.value); setError(''); }} />

@@ -10,6 +10,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useCallback, useEffect, useState } from 'react';
 import { useT } from '../i18n/index.js';
+import { defaultCourse } from '../platform/edition.js';
+import { localeOf, timezoneOf } from '../lib/locale.js';
 import { parentReportApi, percent } from './parentReportApi.js';
 import './parent.css';
 
@@ -26,8 +28,8 @@ const ERROR_KEYS = {
 const errorKey = (code) => ERROR_KEYS[code] || 'parent.loadFailed';
 
 function weekRange(weekStart, locale) {
-  // Weeks are IST Monday–Sunday; show the dates as they fall in India.
-  const fmt = (at) => new Date(at).toLocaleDateString(locale, { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' });
+  // Weeks are Monday–Sunday in the edition's own calendar (India: IST); show the dates as they fall there.
+  const fmt = (at) => new Date(at).toLocaleDateString(locale, { day: 'numeric', month: 'short', timeZone: timezoneOf(defaultCourse()) });
   return { from: fmt(weekStart), to: fmt(weekStart + 6 * 86400000) };
 }
 
@@ -175,7 +177,7 @@ function LinkPanel({ link, onChange, t }) {
 
 export default function ParentReport() {
   const t = useT();
-  const locale = typeof document !== 'undefined' && document.documentElement.lang === 'hi' ? 'hi-IN' : 'en-IN';
+  const locale = typeof document !== 'undefined' && document.documentElement.lang === 'hi' ? 'hi-IN' : localeOf(defaultCourse());
   const [state, setState] = useState({ status: 'loading' });
 
   const load = useCallback(async () => {
