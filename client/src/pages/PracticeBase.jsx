@@ -1,3 +1,4 @@
+import { playSound } from '../lib/sound.js';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import PageLink from '../components/PageLink.jsx';
@@ -368,6 +369,7 @@ function ProfilePractice() {
     if (!assignmentMode && !sessionDoneShown.current && before < goal && before + 1 >= goal) {
       sessionDoneShown.current = true;
       setSessionDone({ goal });
+      playSound('setDone');
     }
     const current = sessionRef.current;
     const next = {

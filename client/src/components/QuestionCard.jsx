@@ -66,6 +66,7 @@ import { finalAnswerStatus, showDiagnoseButton, showLineCheckButton } from '../t
 import { INSTRUMENT_UI, featureEnabled } from '../platform/features.js';
 import QuestionHead from '../instrument/QuestionHead.jsx';
 import { haptic } from '../platform/native/haptics.js';
+import { playSound } from '../lib/sound.js';
 import UpgradeNote from '../paywall/UpgradeNote.jsx';
 // v1.1 instrument (display only): the s4/s5 header, chips, dial, ladder and footer.
 // The step credit itself is main's VerifiedMarkBreakdown (aggregate, no
@@ -1363,7 +1364,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   };
 
   const flipMode = (m) => {
-    if (m !== mode) haptic('selection');
+    if (m !== mode) { haptic('selection'); playSound('tick'); }
     setMode(m);
     // Explicitly changing to typing abandons the Photo provenance. A later
     // typed submission receives a fresh idempotency key, never the pending
@@ -1600,7 +1601,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           setJudged(submitted); setJudgedStale(false);
           setState({ phase: 'resolved', res: earlierAnswer === null ? r : { ...r, earlierAnswer } });
           if (!diagnostic) {
-            if (!r.replayed) { celebrate(r); haptic('confirm'); }
+            if (!r.replayed) { celebrate(r); haptic('confirm'); playSound(r.correct === true ? 'correct' : 'lookAgain'); }
             refreshUser(); refreshDue(); refreshRecent?.();
           }
           setSaveState(null);
@@ -1714,6 +1715,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** The ink surface reports here. Frozen while marking and after the verdict. */
+  // A handwriting read that has just finished (not one restored on mount).
+  const prevReaderKind = useRef(inkReaderState.kind);
+  useEffect(() => {
+    if (prevReaderKind.current === INK_READER_STATE.READING && inkReaderState.kind === INK_READER_STATE.READ_SUCCESS) playSound('read');
+    prevReaderKind.current = inkReaderState.kind;
+  }, [inkReaderState.kind]);
+
   const onInkRecognized = useCallback((r) => {
     if (inkFrozenRef.current) return;
     setInkResult(r);
