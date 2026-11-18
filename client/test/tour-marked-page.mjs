@@ -29,7 +29,7 @@ const url = (c, source, edition, theme) => `${origin}/test/support/marked-page-g
 // What the engine said, as the page must show it.
 const EXPECT = {
   buoy: { statuses: ['checked', 'checked', 'checked'], sentence: /^Every line was checked\.$/, mark: '2/2', collapsed: null, firstError: null },
-  stationary: { statuses: ['checked', 'checked', 'condition', 'checked', 'checked', 'checked', 'checked', 'first-error'], sentence: /^6 of 8 lines checked\. First error on line 8\.$/, mark: '0/3', collapsed: null, firstError: 8 },
+  stationary: { statuses: ['checked', 'checked', 'condition', 'checked', 'checked', 'checked', 'checked', 'first-error'], sentence: /^6 of 8 lines correct\. First error on line 8\.$/, mark: '0/3', collapsed: null, firstError: 8 },
   mixed: { statuses: ['checked', 'unread', 'checked', 'not-verified', 'checked', 'checked'], sentence: null, mark: '0/3', collapsed: '2,4', firstError: null }
 };
 const browser0 = await chromium.launch();
@@ -56,6 +56,16 @@ try {
     const errors = [];
     page.on('pageerror', e => errors.push(e.message));
     page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+    {
+      // The UI face is the one that loads: the used platform font for the sentence is the bundled Instrument Sans, not a system fallback.
+      await page.goto(url('buoy', 'ink', edition, theme), { waitUntil: 'networkidle' }); await page.waitForSelector('[data-marked-page]');
+      const cdp = await context.newCDPSession(page);
+      await cdp.send('DOM.enable'); await cdp.send('CSS.enable');
+      const { root } = await cdp.send('DOM.getDocument');
+      const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: '.mp-sentence' });
+      const { fonts } = await cdp.send('CSS.getPlatformFontsForNode', { nodeId });
+      ok(fonts.some(f => f.isCustomFont && /Instrument Sans/i.test(f.familyName)) && (edition !== 'prithagoras' || fonts.every(f => f.isCustomFont && /Instrument Sans/i.test(f.familyName))), `${edition}/${theme}/${size}: the Latin UI font used is the bundled Instrument Sans, never a system fallback; Devanagari may fall back (${JSON.stringify(fonts.map(f => [f.familyName, f.isCustomFont]))})`);
+    }
     for (const c of Object.keys(EXPECT)) for (const source of ['ink', 'photo']) {
       const where = `${c}/${source}/${edition}/${theme}/${size}`;
       await page.goto(url(c, source, edition, theme), { waitUntil: 'networkidle' });
@@ -108,6 +118,39 @@ try {
         ok(sorted.every((x, i) => i === 0 || x.top >= sorted[i - 1].bottom - 1), `${where}: no two comments overlap`);
       } else {
         ok(got.level !== 'true' && got.cards[0].top >= got.sheet.bottom - 1, `${where}: on a phone the comments follow the page, in line order`);
+      }
+      // Compact verified rows, one specific reason or none, the mark in proportion, tags in the margin, the first error in view
+      const shape = await page.evaluate(() => {
+        const sec = document.querySelector('[data-marked-page]');
+        const rows = [...sec.querySelectorAll('.mp-row')].map(r => ({ h: r.getBoundingClientRect().height, text: r.innerText.replace(/\s+/g, ' ').trim() }));
+        const fe = sec.querySelector('[data-mp-status="first-error"]'); const feBox = fe && fe.getBoundingClientRect();
+        const sheet = sec.querySelector('.mp-sheet-in').getBoundingClientRect();
+        const tags = [...sec.querySelectorAll('.mp-tag')].map(t => { const tr = t.getBoundingClientRect(); const b = t.parentElement.getBoundingClientRect(); return { outside: tr.right <= b.left + 1, inSheet: tr.left >= sec.querySelector('.mp-sheet').getBoundingClientRect().left - 1 }; });
+        return { rows, feBottom: feBox ? feBox.bottom : null, tags, quiet: sec.querySelector('.mp-mark-quiet')?.innerText || null, loud: !!sec.querySelector('p.mp-mark'), filler: /true for the question|Valid step \(checked\)/.test(sec.innerText) };
+      });
+      ok(shape.rows.every(r => r.h <= 30), `${where}: every verified line is one compact row (${shape.rows.map(r => Math.round(r.h))})`);
+      ok(!shape.filler, `${where}: no filler sentence on a verified line`);
+      ok(shape.tags.every(t => t.outside && t.inSheet), `${where}: every numbered tag sits in the margin, outside its line's box`);
+      if (e.mark === '0/3') ok(shape.quiet && !shape.loud && !/^0 of 3 marks$/.test(shape.quiet), `${where}: a wrong final answer never headlines 0 of N (${shape.quiet})`);
+      if (e.mark === '2/2') ok(shape.loud && !shape.quiet, `${where}: a right answer shows its mark prominently`);
+      if (c === 'stationary' && size === 'desktop') ok(shape.feBottom !== null && shape.feBottom <= 900, `${where}: the first-error card is in view on a 900px viewport (${Math.round(shape.feBottom)})`);
+      if (c === 'stationary' && edition === 'prithagoras') {
+        const typeset = await page.locator('[data-mp-why-error] .katex').count();
+        ok(typeset > 0, `${where}: the first-error sentence is typeset mathematics`);
+      }
+      if (size === 'phone' && c === 'stationary') {
+        await page.locator('[data-mp-card="3"]').click();
+        await page.waitForTimeout(400);
+        const hl = await page.evaluate(() => document.querySelector('[data-mp-box="3"]').classList.contains('is-active'));
+        ok(hl, `${where}: tapping a comment highlights its line`);
+      }
+      if (source === 'photo' && c === 'stationary' && size === 'desktop') {
+        const before = await page.locator('.mp-img').getAttribute('data-mp-photo');
+        await page.locator('[data-mp-photo-toggle]').click();
+        const after = await page.locator('.mp-img').getAttribute('data-mp-photo');
+        ok(before === 'cleaned' && after === 'original', `${where}: the photo is shown cleaned for display with a Show original toggle (${before} -> ${after})`);
+        await page.locator('[data-mp-photo-toggle]').click();
+        await page.keyboard.press('Shift'); // back to keyboard modality: the focus-ring check below is about keyboard focus
       }
       // tying a comment to its line: focus lights both
       if (size === 'desktop' && c === 'stationary') {

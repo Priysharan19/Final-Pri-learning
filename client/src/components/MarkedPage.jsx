@@ -15,7 +15,7 @@ import React, { useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import Icon from './Icon.jsx';
 import { useT } from '../i18n/index.js';
 import { buildAnnotatedWorking } from './annotatedWorkingModel.js';
-import { CardBody } from './AnnotatedWorking.jsx';
+import { CardBody, ruleLabel } from './AnnotatedWorking.jsx';
 import { Typeset } from './Typeset.jsx';
 import { strokePath } from './originalWorkModel.js';
 import { STATE, alignCards, boxesFromInk, boxesFromPhoto, buildMarkedPage, commentItems, listOf } from './markedPageModel.js';
@@ -27,24 +27,51 @@ const xy = p => (Array.isArray(p) ? { x: Number(p[0]), y: Number(p[1]) } : { x: 
 const WIDE = '(min-width: 800px)';
 const wide = () => typeof window !== 'undefined' && !!window.matchMedia?.(WIDE)?.matches;
 
-function Header({ page, t }) {
+/** The engine's one sentence about the first error: its first sentence only, so it is one clear line. */
+const firstSentence = text => { const clean = String(text || '').replace(/\s+/g, ' ').trim(); const m = clean.match(/^.*?[.!?](?=\s+[A-Z]|$)/); return (m ? m[0] : clean).trim(); };
+/** The specific reason a verified line is right, only where the engine has one; otherwise nothing (no filler sentence). */
+function whyOf(card, t) {
+  if (card.status === 'condition') return t('mp.why.condition');
+  if (card.valueChain === 'given') return t('mp.why.given');
+  if (card.valueChain === 'verified') return '';
+  if (card.start) return t('mp.why.start');
+  if (card.same) return t('mp.why.same', { n: card.n - 1 });
+  if (Array.isArray(card.rules) && card.rules.length) return card.rules.map(r => ruleLabel(r, t)).join(', ');
+  // a valid step with no named rule is still the engine's own finding: it follows from the line before
+  if ((card.unnamed || card.more) && card.n > 1) return t('mp.why.follows', { n: card.n - 1 });
+  return '';
+}
+function Header({ page, t, hasTable }) {
   const { parts, mark } = page.header;
+  // The mark is the server's, said truthfully and in proportion: a right answer shows it prominently; a wrong final answer
+  // never headlines "0 of 1" beside a page of correct lines. No partial mark is invented here (method marks are the
+  // criteria table's, for author-approved schemes only).
+  const full = mark && mark.awarded >= mark.possible;
+  const finalWrong = mark && mark.awarded === 0 && !hasTable;
   return (
     <header className="mp-head">
       <p className="mp-sentence" data-mp-sentence role="status">{parts.map(p => t(p.key, p.vars)).join(' ')}</p>
-      {mark && <p className="mp-mark" data-mp-mark={`${mark.awarded}/${mark.possible}`}>{t('mp.mark', { earned: mark.awarded, possible: mark.possible })}</p>}
+      {mark && full && <p className="mp-mark" data-mp-mark={`${mark.awarded}/${mark.possible}`}>{t('mp.mark', { earned: mark.awarded, possible: mark.possible })}</p>}
+      {mark && !full && (
+        <p className="mp-mark-quiet" data-mp-mark={`${mark.awarded}/${mark.possible}`}>
+          {t(finalWrong ? 'mp.mark.finalWrong' : 'mp.mark.quiet', { earned: mark.awarded, possible: mark.possible, count: mark.possible })}
+        </p>
+      )}
     </header>
   );
 }
 
 /** The page: ink drawn through its own samples, or the photo, with one outline per judged line. */
-function Sheet({ source, geometry, page, active, setActive, t }) {
+// Display only, deterministic: a gentle lift of the paper white and an even-out of soft shadow. The stored original is never altered.
+const CLEAN_FILTER = 'brightness(1.08) contrast(1.06) saturate(0.85)';
+function Sheet({ source, geometry, page, active, setActive, t, cleaned }) {
   const view = geometry?.view || null;
   const outlines = page.aligned && geometry ? page.lines : [];
   return (
     <div className="mp-sheet" data-mp-sheet={source.kind}>
+     <div className="mp-sheet-in" style={view ? { '--mp-ar': view.w / view.h } : undefined}>
       {source.kind === 'photo' ? (
-        <img className="mp-img" src={source.src} alt={t('mp.pageAlt.photo')} />
+        <img className="mp-img" src={source.src} alt={t('mp.pageAlt.photo')} data-mp-photo={cleaned ? 'cleaned' : 'original'} style={cleaned ? { filter: CLEAN_FILTER } : undefined} />
       ) : (
         <svg className="mp-ink" role="img" aria-label={t('mp.pageAlt.ink')}
           viewBox={view ? `${view.x} ${view.y} ${view.w} ${view.h}` : '0 0 1 1'} preserveAspectRatio="xMinYMin meet"
@@ -59,6 +86,7 @@ function Sheet({ source, geometry, page, active, setActive, t }) {
           <span className="mp-tag"><Icon name={STATE[l.status].icon} size={12} />{l.n}</span>
         </span>
       ))}
+     </div>
     </div>
   );
 }
@@ -87,6 +115,7 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
   const [shown, setShown] = useState(() => new Set());
   const [showAll, setShowAll] = useState(false);
   const [editing, setEditing] = useState(null);   // { line, text }
+  const [cleaned, setCleaned] = useState(true);
   const sheetRef = useRef(null);
   const colRef = useRef(null);
   const [tops, setTops] = useState(null);
@@ -148,12 +177,12 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
       </div>
     );
   };
-  const on = n => ({ onMouseEnter: () => setActive(n), onMouseLeave: () => setActive(null), onFocus: () => setActive(n), onBlur: () => setActive(null), onClick: () => setActive(n) });
+  const on = n => ({ onMouseEnter: () => setActive(n), onMouseLeave: () => setActive(null), onFocus: () => setActive(n), onBlur: () => setActive(null), onClick: () => { setActive(n); if (!wide()) sheetRef.current?.querySelector(`[data-mp-box="${n}"]`)?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }); } });
 
   return (
     <section className="mp" aria-labelledby={`${uid}-h`} data-marked-page data-mp-source={source.kind} data-mp-aligned={page.aligned ? 'true' : 'false'} data-mp-level={level ? 'true' : undefined}>
       <h3 className="sr-only" id={`${uid}-h`}>{t('mp.title')}</h3>
-      <Header page={page} t={t} />
+      <Header page={page} t={t} hasTable={!!table} />
       {reading && (
         <p className="mp-read-all">
           <button type="button" className="mp-link" data-mp-see-page aria-expanded={showAll} onClick={() => setShowAll(v => !v)}>{t(showAll ? 'mp.hidePage' : 'mp.seePage')}</button>
@@ -161,7 +190,13 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
       )}
       <div className="mp-body">
         <figure className="mp-page" ref={sheetRef}>
-          <Sheet source={source} geometry={geometry} page={page} active={active} setActive={setActive} t={t} />
+          <Sheet source={source} geometry={geometry} page={page} active={active} setActive={setActive} t={t} cleaned={cleaned} />
+          {source.kind === 'photo' && (
+            <figcaption className="mp-photo-note">
+              <button type="button" className="mp-link" data-mp-photo-toggle aria-pressed={!cleaned} onClick={() => setCleaned(v => !v)}>{t(cleaned ? 'mp.showOriginal' : 'mp.showCleaned')}</button>
+              {cleaned && <span> {t('mp.cleanedNote')}</span>}
+            </figcaption>
+          )}
         </figure>
         <ol className="mp-comments" ref={colRef} aria-label={t('mp.comments')} style={level ? { minHeight: tops.bottom } : undefined}>
           {items.map((it, i) => {
@@ -185,6 +220,20 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
             }
             const { card, n, status } = it.line;
             const st = STATE[status] || STATE['not-verified'];
+            // A verified line is ONE compact row: tick, "Line n", and the engine's own reason where it has one
+            // (a named rule, the question, a stated condition, the line before). No specific reason: just tick and number.
+            if (status === 'checked' || status === 'condition') {
+              const why = whyOf(card, t);
+              return (
+                <li key={it.id} className={`mp-card mp-row is-${status}${active === n ? ' is-active' : ''}`} data-mp-card={n} data-mp-status={status} tabIndex={0} style={pos} {...on(n)}>
+                  <Icon name={st.icon} size={14} />
+                  <span className="mp-row-n">{t('mp.line', { n })}</span>
+                  {why && <span className="mp-row-why" data-mp-why>{why}</span>}
+                  <span className="sr-only">{t(st.word)}</span>
+                </li>
+              );
+            }
+            const sentence = status === 'first-error' ? firstSentence(card.diagnosis?.message || card.diagnosis?.title || card.note || '') : '';
             return (
               <li key={it.id} className={`mp-card is-${status}${active === n ? ' is-active' : ''}`} data-mp-card={n} data-mp-status={status} tabIndex={0} style={pos} {...on(n)}>
                 <p className="mp-state">
@@ -195,7 +244,9 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
                 {(status === 'first-error' || status === 'follows') && card.text && (
                   <p className="mp-expr" data-mp-expr><Typeset text={card.text} texOf={texOf} /></p>
                 )}
-                <div className="mp-text"><CardBody card={card} model={model} t={t} /></div>
+                {status === 'first-error'
+                  ? <p className="mp-text mp-sentence-1" data-mp-why-error>{sentence ? <Typeset text={sentence} texOf={texOf} /> : (n > 1 ? t('aw.body.firstError', { n: n - 1 }) : t('aw.body.firstErrorStart'))}</p>
+                  : <div className="mp-text"><CardBody card={card} model={model} t={t} /></div>}
                 {reading && status !== 'unread' && readingOfLine(n)}
               </li>
             );

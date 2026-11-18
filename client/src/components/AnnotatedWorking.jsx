@@ -51,6 +51,8 @@ const STATUS_KEY = Object.freeze({ checked: 'aw.status.checked', 'first-error': 
 const SCOPE_KEY = Object.freeze({ numerator: 'aw.scope.numerator', denominator: 'aw.scope.denominator', both: 'aw.scope.both' });
 const listOf = ns => ns.join(', ');
 
+export const ruleLabel = (rule, t) => (RULE_KEY[rule.rule] ? t(RULE_KEY[rule.rule]) : rule.rule);
+
 function RuleLine({ rule, t }) {
   const where = SCOPE_KEY[rule.scope] ? t(SCOPE_KEY[rule.scope]) : '';
   return (

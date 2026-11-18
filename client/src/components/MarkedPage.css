@@ -9,7 +9,10 @@
 @media (min-width: 800px) { .mp-body { grid-template-columns: minmax(0, 1fr) minmax(240px, 320px); } }
 
 .mp-page { margin: 0; min-width: 0; }
-.mp-sheet { position: relative; border: 1px solid var(--hairline-strong); border-radius: var(--radius-lg); background: var(--surface-raised); overflow: hidden; }
+.mp-sheet { position: relative; padding-left: 30px; border: 1px solid var(--hairline-strong); border-radius: var(--radius-lg); background: var(--surface-raised); overflow: hidden; }
+.mp-sheet-in { position: relative; }
+/* A tall page of ink never pushes the first error below the fold on a wide screen: its height is capped and its width follows. */
+@media (min-width: 800px) { .mp-sheet-in { max-width: calc((100vh - 260px) * var(--mp-ar, 100)); } }
 .mp-img, .mp-ink { display: block; width: 100%; height: auto; }
 .mp-stroke { fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 
@@ -20,7 +23,7 @@
 .mp-box.is-quiet { border-color: var(--hairline-strong); border-style: dotted; }
 .mp-box.is-active { background: var(--accent-soft); outline: 2px solid var(--ink); outline-offset: 1px; }
 
-.mp-tag { position: absolute; right: 0; top: 50%; transform: translate(50%, -50%); display: inline-flex; align-items: center; gap: var(--space-1);
+.mp-tag { position: absolute; left: -4px; top: 50%; transform: translate(-100%, -50%); display: inline-flex; align-items: center; gap: var(--space-1);
   padding: 0 var(--space-1); font-size: 11px; line-height: 16px; font-variant-numeric: tabular-nums; color: var(--ink); background: var(--surface-raised);
   border: 1px solid var(--hairline-strong); border-radius: var(--radius-sm); }
 
@@ -59,3 +62,17 @@
 .mp-edit { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
 .mp-edit input { flex: 1 1 160px; min-width: 0; min-height: 36px; padding: 0 var(--space-2); font: inherit; color: var(--ink); background: var(--surface-raised);
   border: 1px solid var(--hairline-strong); border-radius: var(--radius); }
+
+/* The verified line is one compact row; only the first error and the not-read card are full cards. */
+.mp-card.mp-row { display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-3); min-height: 28px; height: 28px; overflow: hidden; white-space: nowrap; }
+.mp-card.mp-row svg { flex: none; color: var(--good); }
+.mp-row-n { color: var(--ink); }
+.mp-row-why { color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; }
+.mp-sentence-1 { color: var(--ink); }
+.mp-mark-quiet { flex-basis: 100%; margin: 0; color: var(--ink-3); font-size: 13px; line-height: 1.4; }
+.mp-photo-note { margin-top: var(--space-1); color: var(--ink-3); font-size: 12.5px; }
+@media (max-width: 799px) {
+  .mp-sheet { padding-left: 22px; }
+  .mp-tag { font-size: 10px; line-height: 14px; padding: 0 2px; gap: 0; }
+  .mp-tag svg { display: none; }
+}

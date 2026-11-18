@@ -2568,7 +2568,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const boundLines = judgedShown && judged.lines?.length ? judged.lines : null;
   const shownAnswerLine = judgedShown
     ? (isWorking ? (boundLines ? boundLines[boundLines.length - 1] : '') : judged.answer)
-    : (inkResult?.answerLine ? (isWorking ? inkResult.lines[inkResult.lines.length - 1] : inkAnswer) : '');
+    // owner decision, 19 Nov 2026: the reading is not shown before marking, whichever path (auto read, Try again) it arrived by
+    : '';
   // The reader's transcript ends in something other than the marked answer.
   const transcriptDiffers = !!judged && judged.viaInk && !isWorking && !!judged.lines?.length
     && String(judged.lines[judged.lines.length - 1]).trim() !== String(judged.answer).trim();
@@ -2663,7 +2664,12 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               being asked, so it is the first place worth pairing. The question
               itself below is untouched: it will be in English in the exam hall. */}
           <span className="tag" lang="en"><TermGloss text={question.subtopicName} /></span>
-          <span className={`tag ${DIFF_CLASS[question.difficulty] || ''}`}>{question.diffLabel}</span>
+          <span className={`tag ${DIFF_CLASS[question.difficulty] || ''}`}>{String(question.diffLabel || '').replace(/^D\d+\s*[·.:-]?\s*/, '')}</span>
+          {resolved && !diagnostic && (
+            <span className="tag tag-marked" data-q-marked>
+              <Icon name="check" size={12} />{t('mp.marked')}{Number(shownGrade?.possible) > 0 ? ` · ${t('examRoom.marksCount', { count: Number(shownGrade.possible), n: Number(shownGrade.possible) })}` : ''}
+            </span>
+          )}
           {reasonTag && REASON_TAG_KEY[reasonTag] && <span className="tag tag-brand" data-reason-tag={reasonTag}>{t(REASON_TAG_KEY[reasonTag])}</span>}
           {!reasonTag && reason === 'review' && <span className="tag tag-brand">{t('verdict.spacedReview')}</span>}
           {!reasonTag && reason === 'weak-spot' && <span className="tag tag-brand">{t('verdict.weakSpot')}</span>}
