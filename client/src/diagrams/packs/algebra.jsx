@@ -158,7 +158,7 @@ export function SequenceExplorer({ title = null, ...spec }) {
 // ═════════════════════════════════════════════════════════════════════════════
 function SlopeFigure({ m, title, description, caption = null, svgProps = {} }) {
   const labels = useMemo(() => K.placeLabels(m.curves.map(c => ({ px: [m.frame.sx(c.x0), m.frame.sy(c.y0)], tex: `(${K.fmt(c.x0)},\\,${K.fmt(c.y0)})` })), {
-    width: m.frame.width, height: m.frame.height, ink: m.curves.flatMap(c => c.px.filter((_, i) => i % 4 === 0)), dots: m.curves.map(c => [m.frame.sx(c.x0), m.frame.sy(c.y0)])
+    width: m.frame.width, height: m.frame.height, obstacles: K.tickBoxes(m), ink: m.curves.flatMap(c => c.px.filter((_, i) => i % 4 === 0)), dots: m.curves.map(c => [m.frame.sx(c.x0), m.frame.sy(c.y0)])
   }), [m]);
   return (
     <Figure width={m.frame.width} height={m.frame.height} title={title} description={description} caption={caption} svgProps={svgProps}>

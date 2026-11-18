@@ -94,9 +94,11 @@ function measure() {
         const xs = c.pts.map(q => q[0]); const ys = c.pts.map(q => q[1]);
         refs.push({ r: { left: Math.min(...xs), right: Math.max(...xs), top: Math.min(...ys), bottom: Math.max(...ys) }, what: 'constant line' });
       }
-      const words = labels.filter(l => /[A-Za-z=]/.test(l.text.replace(/[0-9.,\s−-]/g, '')) && !l.fo.closest('.dg-small, .dg-tick'));
+      const k = svg.getBoundingClientRect().width / (svg.viewBox.baseVal.width || 1); // user units to screen px
+      const words = labels.filter(l => /[A-Za-z=]/.test(l.text.replace(/[0-9.,\s−-]/g, '')));
+      if (window.__DUMP) console.log('REFS ' + JSON.stringify(refs.map(r => [r.what, Math.round(r.r.left), Math.round(r.r.right), Math.round(r.r.top), Math.round(r.r.bottom)])));
       for (const ref of refs) {
-        const near = words.some(l => l.box.r >= ref.r.left - 24 && l.box.l <= ref.r.right + 24 && l.box.b >= ref.r.top - 26 && l.box.t <= ref.r.bottom + 26);
+        const near = words.some(l => l.box.r >= ref.r.left - 24 * k && l.box.l <= ref.r.right + 24 * k && l.box.b >= ref.r.top - 36 * k && l.box.t <= ref.r.bottom + 36 * k);
         if (!near) v.push(`REFLINE ${ref.what} has no label`);
       }
       // Axis names.

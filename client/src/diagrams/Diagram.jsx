@@ -17,7 +17,7 @@ import { edition } from '../platform/edition.js';
 import {
   functionGraphModel, unitCircleModel, triangleModel, regularPolygonModel, circleTheoremModel, numberLineModel, treeModel, vennModel,
   twoWayModel, histogramModel, boxPlotModel, normalCurveModel, vectorModel, sequenceModel, compoundModel, timelineModel,
-  secantTangentModel, riemannModel, networkModel, scatterModel, solidModel, ftex, ftext, r3
+  secantTangentModel, riemannModel, networkModel, scatterModel, solidModel, ftex, ftext, r3, layoutLabels, textW
 } from './geometry.js';
 
 const poly = pts => pts.map(([x, y], i) => `${i ? 'L' : 'M'}${x} ${y}`).join(' ');
@@ -121,6 +121,18 @@ export function UnitCircle({ deg = 30, showTan = false, title, caption = null, o
   const tk = useTk();
   const m = unitCircleModel({ deg });
   const p = m.point;
+  // The point's coordinates go where no tick number, other label, ray or the circle is: beside the point, else further out or inside.
+  const coordTex = `(${p.cos},\\,${p.sin})`;
+  const box = (x, y, w, anchor = 'middle') => ({ l: anchor === 'start' ? x : anchor === 'end' ? x - w : x - w / 2, r: anchor === 'start' ? x + w : anchor === 'end' ? x : x + w / 2, t: y - 7, b: y + 7 });
+  const circle = Array.from({ length: 73 }, (_, k) => [m.centre[0] + m.radius * Math.cos((k * Math.PI) / 36), m.centre[1] + m.radius * Math.sin((k * Math.PI) / 36)]);
+  const thetaW = textW(`\\theta=${p.deg}^{\\circ}`);
+  const cands = [];
+  for (const [dy, dx] of [[-16, 10], [16, 10], [-16, -10], [16, -10], [-34, 8], [34, 8], [-34, -8], [34, -8], [0, 14], [0, -14], [-52, 6], [52, 6], [-52, -6], [52, -6]]) cands.push({ anchor: dx > 0 ? 'start' : 'end', x: m.px[0] + dx, y: m.px[1] + dy });
+  const [coord] = layoutLabels([{ w: textW(coordTex), at: m.px, cands }], {
+    fixed: [...m.ticks.map(t => box(t.px[0], t.px[1], textW(`${t.deg}^{\\circ}`))), box(m.centre[0] + 36, m.centre[1] - 8, thetaW, 'start')],
+    lines: [{ pts: circle, weight: 8 }, { pts: [m.centre, m.px], weight: 6 }, { pts: [m.px, m.foot], weight: 6 }, { pts: [m.centre, m.foot], weight: 6 }, { pts: [[m.frame.left, m.centre[1]], [m.frame.right, m.centre[1]]], weight: 4 }, { pts: [[m.centre[0], m.frame.top], [m.centre[0], m.frame.bottom]], weight: 4 }],
+    dots: [m.px], bounds: { left: 0, right: m.frame.width, top: 0, bottom: m.frame.height }
+  });
   const desc = sentence(
     tk('unitCircle.desc', { deg: p.deg, cos: p.cos, sin: p.sin, tan: p.tan !== null ? tk('unitCircle.tan', { tan: p.tan }) : tk('unitCircle.tanUndefined') }),
     p.quadrant ? tk('unitCircle.quadrant', { quadrant: p.quadrant, reference: p.reference }) : tk('unitCircle.onAxis', { reference: p.reference })
@@ -137,7 +149,7 @@ export function UnitCircle({ deg = 30, showTan = false, title, caption = null, o
       <line className="dg-dash is-cos" x1={m.px[0]} y1={m.px[1]} x2={m.foot[0]} y2={m.foot[1]} />
       <line className="dg-dash is-sin" x1={m.centre[0]} y1={m.centre[1]} x2={m.foot[0]} y2={m.foot[1]} />
       <circle className="dg-dot is-key" cx={m.px[0]} cy={m.px[1]} r="5" />
-      <Tex x={p.cos >= 0 ? Math.min(m.px[0] + 10, m.frame.width - 128) : Math.max(m.px[0] - 10, 128)} y={m.px[1] + (p.sin >= 0 ? -16 : 16)} tex={`(${p.cos},\\,${p.sin})`} w={120} anchor={p.cos >= 0 ? 'start' : 'end'} />
+      <Tex x={coord.x} y={coord.y} tex={coordTex} w={coord.w} anchor={coord.anchor} />
       <Tex x={m.centre[0] + 36} y={m.centre[1] - 8} tex={`\\theta=${p.deg}^{\\circ}`} w={90} anchor="start" className="dg-small" />
       {showTan && p.tan !== null && <Tex x={m.frame.left + 8} y={m.frame.top + 12} tex={`\\tan\\theta=${p.tan}`} w={150} anchor="start" />}
       {overlay && overlay(m)}
@@ -424,6 +436,11 @@ export function SecantTangent({ title, caption = null, ...spec }) {
 export function RiemannRectangles({ title, caption = null, ...spec }) {
   const tk = useTk();
   const m = riemannModel(spec); const f = m.frame;
+  // The sum and the area are read in whichever top corner the curve leaves free.
+  const sumTex = [`\\text{${tk('tex.sum')}}=${m.sum}`, `\\text{${tk('tex.area')}}=${m.area}`];
+  const corner = (tex, row) => [{ anchor: 'end', x: f.right - 6, y: f.top + 10 + row * 20 }, { anchor: 'start', x: f.left + 10, y: f.top + 10 + row * 20 }, { anchor: 'end', x: f.right - 6, y: f.bottom - 10 - (1 - row) * 20 }, { anchor: 'start', x: f.left + 10, y: f.bottom - 10 - (1 - row) * 20 }];
+  const spots = layoutLabels(sumTex.map((tex, row) => ({ w: textW(tex), cands: corner(tex, row) })), { lines: m.curve.map(pts => ({ pts, weight: 16 })), bounds: f });
+  const sumArea = sumTex.map((tex, i) => ({ ...spots[i], tex }));
   const desc = tk('riemann.desc', { n: m.n, mode: riemannMode(tk, m.mode), expr: m.expr, a: m.a, b: m.b, width: m.width, sum: m.sum, area: m.area });
   return (
     <Figure width={f.width} height={f.height} title={title ?? tk('riemann.title')} description={desc} caption={caption}>
@@ -432,8 +449,7 @@ export function RiemannRectangles({ title, caption = null, ...spec }) {
         <line className="dg-axis" x1={f.left} x2={f.right} y1={f.sy(0)} y2={f.sy(0)} markerEnd="url(#dg-arrow)" /><line className="dg-axis" x1={f.left} x2={f.left} y1={f.bottom} y2={f.top} markerEnd="url(#dg-arrow)" /></g>
       {m.rects.map((r, i) => <rect key={i} className="dg-bar" x={r.x1} y={r.y} width={Math.max(0, r.x2 - r.x1)} height={Math.max(0, r.base - r.y)} />)}
       {m.curve.map((s, i) => <path key={i} className="dg-curve is-primary" d={poly(s)} fill="none" />)}
-      <Tex x={f.right - 6} y={f.top + 10} tex={`\\text{${tk('tex.sum')}}=${m.sum}`} w={140} anchor="end" className="dg-small" />
-      <Tex x={f.right - 6} y={f.top + 30} tex={`\\text{${tk('tex.area')}}=${m.area}`} w={140} anchor="end" className="dg-small" />
+      {sumArea.map((l, i) => <Tex key={i} x={l.x} y={l.y} tex={l.tex} w={l.w} anchor={l.anchor} className="dg-small" />)}
     </Figure>
   );
 }

@@ -424,7 +424,7 @@ export function placeLabels(items, { width, height, obstacles = [], ink = [], do
 const along = (p, q, n = 24) => Array.from({ length: n + 1 }, (_, k) => [p[0] + ((q[0] - p[0]) * k) / n, p[1] + ((q[1] - p[1]) * k) / n]);
 const axesInk = (frame, ax) => [...along([frame.left, ax.axisY], [frame.right, ax.axisY], 40), ...along([ax.axisX, frame.top], [ax.axisX, frame.bottom], 30)];
 /** Boxes of the tick labels and the axis names the axes draw (as algebra.jsx's PlotAxes places them). */
-function tickBoxes(m) {
+export function tickBoxes(m) {
   const out = [];
   if (m.frame) { out.push(boxOf(m.frame.right + 5, m.axisY - 4, 14, 14, 'start')); out.push(boxOf(m.axisX + 8, m.frame.top - 8, 14, 14, 'start')); }
   for (const t of m.xTicks) if (t.value !== 0) out.push(boxOf(t.px, m.axisY + 14, texWidth(String(t.value)), 18, 'middle'));
