@@ -1,0 +1,2302 @@
+{
+ "format": "pri-paper-v1",
+ "id": "ext1-2027-p11",
+ "paperNumber": 11,
+ "title": "Practice Paper 11",
+ "course": "nsw-ext1",
+ "edition": "prithagoras",
+ "year": 2027,
+ "totalMarks": 70,
+ "readingTime": "10 minutes",
+ "workingTime": "2 hours",
+ "markingScheme": {
+  "status": "draft",
+  "note": "The marking guideline as written by the author. Not approved for criterion marks.",
+  "digest": "f329dcc92fdbe7fce0666e584a0063aca875ba1976a05ce67960ca1d55c6bb0d"
+ },
+ "sections": [
+  {
+   "id": "I",
+   "title": "Section I",
+   "marks": 10,
+   "minutes": 15,
+   "instructions": "Attempt Questions 1 to 10. Allow about 15 minutes for this section.",
+   "questions": [
+    {
+     "id": "q1",
+     "number": 1,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "Which expression is equal to $\\displaystyle\\sum_{k=0}^{n}(-1)^{k}\\dbinom{n}{k}5^{k}$ for every positive integer $n$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q1",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$(-4)^{n}$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$4^{n}$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$6^{n}$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-4^{n}$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "A"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Put $x = -5$ in $(1 + x)^n = \\sum_k \\dbinom{n}{k}x^k$."
+        }
+       ],
+       "classification": {
+        "content": "Binomial theorem; sums of binomial coefficients",
+        "outcomes": [
+         "ME1-11-05"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q2",
+     "number": 2,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "In a large population, a proportion $\\dfrac{4}{5}$ of people have a certain property. Random samples of size $100$ are taken, and $\\hat{p}$ is the proportion in a sample with the property. What is the standard deviation of $\\hat{p}$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q2",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{1}{625}$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{1}{25}$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{2}{5}$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$4$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "B"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$\\sigma_{\\hat{p}} = \\sqrt{\\dfrac{p(1 - p)}{n}} = \\sqrt{\\dfrac{\\dfrac{4}{5} \\times \\dfrac{1}{5}}{100}} = \\dfrac{1}{25}$."
+        }
+       ],
+       "classification": {
+        "content": "Sample proportions",
+        "outcomes": [
+         "ME1-12-07"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q3",
+     "number": 3,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The random variable $X$ has a binomial distribution with mean $36$ and variance $\\dfrac{72}{5}$."
+      },
+      {
+       "k": "p",
+       "t": "Which of the following gives the parameters of the distribution?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q3",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$n = 90$, $p = \\dfrac{2}{5}$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$n = 120$, $p = \\dfrac{3}{10}$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$n = 60$, $p = \\dfrac{3}{5}$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$n = 61$, $p = \\dfrac{3}{5}$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "C"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$np = 36$ and $np(1 - p) = \\dfrac{72}{5}$, so $1 - p = \\dfrac{\\dfrac{72}{5}}{36}$, giving $p = \\dfrac{3}{5}$ and $n = 36 \\div \\dfrac{3}{5} = 60$."
+        }
+       ],
+       "classification": {
+        "content": "Binomial distribution; mean and variance",
+        "outcomes": [
+         "ME1-12-06"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q4",
+     "number": 4,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "A fish population $P$ satisfies $\\dfrac{dP}{dt} = \\dfrac{1}{2}\\,P\\left(1 - \\dfrac{P}{1000}\\right) - h$, where $h \\ge 0$ is the constant rate at which fish are caught."
+      },
+      {
+       "k": "p",
+       "t": "What is the greatest value of $h$ for which there is a population size that stays constant?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q4",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$250$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$500$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$125$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{125}{2}$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "C"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "A constant population needs $\\dfrac{dP}{dt} = 0$, that is, $h = \\dfrac{1}{2}\\,P\\left(1 - \\dfrac{P}{1000}\\right)$. The right-hand side is a quadratic in $P$ with greatest value at $P = 500$, where it equals $125$. So $h$ can be at most $125$."
+        }
+       ],
+       "classification": {
+        "content": "Logistic models with harvesting; equilibrium solutions",
+        "outcomes": [
+         "ME1-12-05"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q5",
+     "number": 5,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "How many solutions does the equation $\\sin 6x = \\sin 5x$ have for $0 \\le x \\le 2\\pi$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q5",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "12"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "14"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "22"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "13"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "D"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$\\sin A = \\sin B$ exactly when $A = B + 2k\\pi$ or $A = \\pi - B + 2k\\pi$. So $x = 2k\\pi$, giving 2 values in $[0, 2\\pi]$, or $x = \\dfrac{(2k + 1)\\pi}{11}$, giving 11 values. No value is counted twice. There are 13 solutions."
+        }
+       ],
+       "classification": {
+        "content": "Trigonometric equations; general solutions",
+        "outcomes": [
+         "ME1-11-03"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q6",
+     "number": 6,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "A statement $S(n)$ about positive integers $n$ is such that $S(2)$ is true, and whenever $S(k)$ is true, $S(k + 4)$ is also true."
+      },
+      {
+       "k": "p",
+       "t": "For which positive integers $n$ must $S(n)$ be true?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q6",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "all positive integers $n$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "all $n \\ge 2$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "only $n = 2$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "exactly those $n$ that leave remainder 2 on division by 4"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "D"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Starting from $S(2)$ and adding 4 any number of times reaches exactly the integers with the same remainders on division by 4 as the starting values, that is, remainder 2. Nothing in the information forces $S(n)$ for any other $n$."
+        }
+       ],
+       "classification": {
+        "content": "Mathematical induction; what a step proves",
+        "outcomes": [
+         "ME1-12-01"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q7",
+     "number": 7,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "Let $\\underset{\\sim}{a} = -5\\underset{\\sim}{i} + 3\\underset{\\sim}{j}$ and $\\underset{\\sim}{b} = -4\\underset{\\sim}{i} + 2\\underset{\\sim}{j}$."
+      },
+      {
+       "k": "p",
+       "t": "For which value of $t$ is $\\underset{\\sim}{a} + t\\,\\underset{\\sim}{b}$ perpendicular to $\\underset{\\sim}{a} - \\underset{\\sim}{b}$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q7",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$- \\dfrac{4}{3}$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{4}{3}$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$- \\dfrac{2}{5}$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{17}{10}$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "A"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$\\left(\\underset{\\sim}{a} + t\\,\\underset{\\sim}{b}\\right)\\cdot\\left(\\underset{\\sim}{a} - \\underset{\\sim}{b}\\right) = \\underset{\\sim}{a}\\cdot(\\underset{\\sim}{a} - \\underset{\\sim}{b}) + t\\,\\underset{\\sim}{b}\\cdot(\\underset{\\sim}{a} - \\underset{\\sim}{b}) = 8 + 6 t = 0$, so $t = - \\dfrac{4}{3}$."
+        }
+       ],
+       "classification": {
+        "content": "Vectors; scalar product and perpendicularity",
+        "outcomes": [
+         "ME1-12-02"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q8",
+     "number": 8,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "What is the coefficient of $x^{5}$ in the expansion of $\\left(x + \\dfrac{3}{x}\\right)^{7}$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q8",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$7$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$21$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$5103$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$189$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "B"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The general term is $\\dbinom{7}{k}\\left(x\\right)^{7 - k}\\left(\\dfrac{3}{x}\\right)^{k}$, with power of $x$ equal to $7 - 2 k$. This is $5$ when $k = 1$, giving $\\dbinom{7}{1} \\times 3 = 21$."
+        }
+       ],
+       "classification": {
+        "content": "Binomial expansion; general term",
+        "outcomes": [
+         "ME1-11-05"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q9",
+     "number": 9,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "Let $f(x) = \\dfrac{kx + 9}{x - 7}$, where $k$ is a constant and $x \\ne 7$."
+      },
+      {
+       "k": "p",
+       "t": "For which value of $k$ is $f$ its own inverse function?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q9",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$7$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-7$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$9$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$1$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "A"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$f$ is its own inverse exactly when $f(f(x)) = x$. With $y = f(x)$, solving $y = \\dfrac{kx + 9}{x - 7}$ for $x$ gives $x = \\dfrac{7y + 9}{y - k}$, so $f^{-1}(x) = \\dfrac{7x + 9}{x - k}$. This is $f(x)$ exactly when $k = 7$. (For $k = -7$ the formula still describes a function, but not its own inverse.)"
+        }
+       ],
+       "classification": {
+        "content": "Inverse functions; self-inverse rational functions",
+        "outcomes": [
+         "ME1-11-01"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q10",
+     "number": 10,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "Which graph shows the curve with parametric equations $x = \\cos t$, $y = \\sin 4t$ for $0 \\le t \\le 2\\pi$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q10",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figpfunctionsparametriccurvegraphscecadffiwra"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figpfunctionsparametriccurvegraphscecadffiopt"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figpfunctionsparametriccurvegraphscecadffiwrb"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figpfunctionsparametriccurvegraphscecadffiwrc"
+          }
+         ]
+        }
+       ],
+       "figureOptions": true,
+       "key": {
+        "type": "mcq",
+        "answer": "B"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The curve meets the line $x = 1$ only where $\\cos t = 1$, that is at the single point $(1, 0)$. It meets the line $y = 1$ where $\\sin 4t = 1$, that is at $t = \\dfrac{\\pi}{8}, \\dfrac{5\\pi}{8}, \\dfrac{9\\pi}{8}, \\dfrac{13\\pi}{8}$, which give four different values of $x$. Eliminating $t$ gives $y^2 = 16x^2\\left(1 - x^2\\right)\\left(2x^2 - 1\\right)^2$, which is zero only for $x = 0, \\pm\\dfrac{1}{\\sqrt2}, \\pm 1$, so the curve crosses the $x$-axis at five points and has four lobes. This matches only graph B."
+        }
+       ],
+       "classification": {
+        "content": "Parametric equations; sketching curves",
+        "outcomes": [
+         "ME1-11-01"
+        ]
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "II",
+   "title": "Section II",
+   "marks": 60,
+   "minutes": 105,
+   "instructions": "Attempt Questions 11 to 14. Allow about 1 hour and 45 minutes for this section. Show relevant mathematical reasoning and/or calculations.",
+   "questions": [
+    {
+     "id": "q11",
+     "number": 11,
+     "marks": 16,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q11a",
+       "label": "(a)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Find $y$ as a function of $x$, given that $\\dfrac{dy}{dx} = \\left(1 + y^2\\right)\\cos x$ and $y(0) = 1$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct function"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Integrates both sides correctly"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Separates the variables"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$\\displaystyle\\int\\frac{dy}{1 + y^2} = \\int\\cos x\\,dx$ gives $\\tan^{-1}y = \\sin x + C$. At $x = 0$, $C = \\tan^{-1}1$. Hence $y = \\tan\\left(\\sin x + \\dfrac{\\pi}{4}\\right)$."
+        }
+       ],
+       "classification": {
+        "content": "Separable differential equations",
+        "outcomes": [
+         "ME1-12-05"
+        ]
+       },
+       "figures": [],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q11b",
+       "label": "(b)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Let $f(x) = \\dfrac{12}{x^{2} + 4}$. Find the exact area of the region bounded by $y = f(x)$, the $x$-axis and the lines $x = 0$ and $x = \\dfrac{2 \\sqrt{3}}{3}$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct area"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds a correct primitive"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Writes a correct definite integral"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$f$ does not change sign on $\\left[0, \\dfrac{2 \\sqrt{3}}{3}\\right]$, and a primitive of $f$ is $6 \\tan^{-1}{\\left(\\dfrac{x}{2} \\right)}$. The area is"
+        },
+        {
+         "k": "math",
+         "t": "\\left|\\left[6 \\tan^{-1}{\\left(\\dfrac{x}{2} \\right)}\\right]_{0}^{\\tfrac{2 \\sqrt{3}}{3}}\\right| = \\pi."
+        }
+       ],
+       "classification": {
+        "content": "Functions and calculus: area",
+        "outcomes": [
+         "ME1-12-03",
+         "12-04; MA-C3"
+        ]
+       },
+       "figures": [],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q11c",
+       "label": "(c)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Find the exact value of $\\displaystyle\\int_0^{\\tfrac{\\pi}{4}} \\sin^{4} 3x\\,dx$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct value"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds a correct primitive"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Uses double-angle results to rewrite the integrand"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$\\sin^{4} 3x = \\left(\\tfrac12(1 - \\cos 6x)\\right)^2 = \\tfrac14 - \\tfrac12\\cos 6x + \\tfrac18(1 + \\cos 12x) = \\tfrac38 - \\tfrac12\\cos 6x + \\tfrac18\\cos 12x$. So the integral is $\\left[\\dfrac{3 x}{8} - \\dfrac{\\sin 6x}{12} + \\dfrac{\\sin 12x}{96}\\right]_0^{\\tfrac{\\pi}{4}} = \\dfrac{1}{12} + \\dfrac{3 \\pi}{32}$."
+        }
+       ],
+       "classification": {
+        "content": "Integrals using double-angle results",
+        "outcomes": [
+         "ME1-12-03"
+        ]
+       },
+       "figures": [],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q11d",
+       "label": "(d)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "10 people, including Dev, Ella and Farah, sit in a row of 10 chairs. Dev and Ella sit next to each other, but Dev does not sit next to Farah."
+        },
+        {
+         "k": "p",
+         "t": "Find the number of possible seating arrangements."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct number with justification"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Deals correctly with one restriction"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Counts the unrestricted arrangements, or equivalent merit"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Treat Dev and Ella as a block: $2 \\times 9!$ arrangements. Among these, Farah is also next to Dev exactly when the three sit together with Dev in the middle (Farah, Dev, Ella or Ella, Dev, Farah), which gives $2 \\times 8!$ arrangements. So the number is $2 \\times 9! - 2 \\times 8! = 645120$."
+        }
+       ],
+       "classification": {
+        "content": "Arrangements with restrictions",
+        "outcomes": [
+         "ME1-11-04"
+        ]
+       },
+       "figures": [],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q11e",
+       "label": "(e)",
+       "marks": 4,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "The random variable $X$ has a binomial distribution with mean $\\dfrac{15}{4}$. It is given that $P(X = 3) = P(X = 4)$."
+        },
+        {
+         "k": "p",
+         "t": "Find the number of trials $n$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct value of $n$"
+          }
+         ],
+         "marks": 4
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Obtains an equation in $n$ alone"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds $p$ in terms of $n$"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Writes the two probabilities correctly"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Equating $\\dbinom{n}{3}p^{3}(1 - p)^{n - 3}$ and $\\dbinom{n}{4}p^{4}(1 - p)^{n - 4}$ gives $(n - 3)p = 4(1 - p)$, so $p = \\dfrac{4}{n + 1}$. Then $np = \\dfrac{4n}{n + 1} = \\dfrac{15}{4}$, which gives $n = 15$."
+        }
+       ],
+       "classification": {
+        "content": "Binomial probabilities and mean",
+        "outcomes": [
+         "ME1-12-06"
+        ]
+       },
+       "figures": [],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      }
+     ]
+    },
+    {
+     "id": "q12",
+     "number": 12,
+     "marks": 14,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q12a",
+       "label": "(a)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Use the substitution $u = x^2 + 9$ to find the exact value of $\\displaystyle\\int_{0}^{6}\\frac{x^3}{\\sqrt{x^2 + 9}}\\,dx$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct exact value"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Obtains a correct primitive in terms of $u$"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Transforms the integral and the limits correctly"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Changing the variable and the limits, the integral becomes"
+        },
+        {
+         "k": "math",
+         "t": "\\frac12\\int_{9}^{45}\\frac{u - 9}{\\sqrt{u}}\\,du = \\left[\\frac13u^{\\tfrac32} - 9u^{\\tfrac12}\\right]_{9}^{45} = 18 + 18 \\sqrt{5}."
+        }
+       ],
+       "classification": {
+        "content": "Integration by substitution",
+        "outcomes": [
+         "ME1-12-04"
+        ]
+       },
+       "figures": [],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q12b",
+       "label": "(b)",
+       "marks": 4,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Use the substitution $t = \\tan\\dfrac{\\theta}{2}$ to solve $7\\cos\\theta - \\sin\\theta = 5$ for $0 \\le \\theta \\le 2\\pi$. Give your answers in exact form."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct solutions"
+          }
+         ],
+         "marks": 4
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Solves the quadratic in $t$"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Obtains the correct quadratic in $t$"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correctly substitutes the t-formulae"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "With $\\cos\\theta = \\dfrac{1 - t^2}{1 + t^2}$ and $\\sin\\theta = \\dfrac{2t}{1 + t^2}$ the equation becomes $12 t^{2} + 2 t - 2 = 0$, that is, $2 \\left(2 t + 1\\right) \\left(3 t - 1\\right) = 0$, so $t = \\dfrac{1}{3}$ or $t = - \\dfrac{1}{2}$. Checking $\\theta = \\pi$ (where $t$ is undefined): $7\\cos\\pi = -7 \\ne 5$, so it is not a solution. Since $0 \\le \\dfrac{\\theta}{2} \\le \\pi$, the solutions are $\\theta = 2\\tan^{-1}\\left(\\dfrac{1}{3}\\right)$ and $\\theta = 2\\pi - 2\\tan^{-1}\\left(\\dfrac{1}{2}\\right)$."
+        }
+       ],
+       "classification": {
+        "content": "The t-formulae; solving trigonometric equations",
+        "outcomes": [
+         "ME1-11-03"
+        ]
+       },
+       "figures": [],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q12c",
+       "label": "(c)",
+       "marks": 7,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A picture hangs on a vertical wall. Its bottom edge is $4$ m and its top edge $9$ m above the eye $E$ of an observer, who is $x$ m from the wall. The picture subtends an angle $\\theta$ at $E$."
+        },
+        {
+         "k": "fig",
+         "name": "figpinversetrigpictureanglecfifbjgcpicture"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q12c-i",
+         "label": "(i)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that $\\ \\theta = \\tan^{-1}\\left(\\dfrac{9}{x}\\right) - \\tan^{-1}\\left(\\dfrac{4}{x}\\right)$ and that $\\tan\\theta = \\dfrac{5x}{x^2 + 36}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes $\\theta$ as a difference of two angles"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The lines from $E$ to the top and bottom edges make angles $\\tan^{-1}\\dfrac{9}{x}$ and $\\tan^{-1}\\dfrac{4}{x}$ with the horizontal, and $\\theta$ is their difference. Then $\\tan\\theta = \\dfrac{\\frac{9}{x} - \\frac{4}{x}}{1 + \\frac{36}{x^2}} = \\dfrac{5x}{x^2 + 36}$."
+          }
+         ],
+         "classification": {
+          "content": "Inverse tangent; maximising an angle; circle tangent to the $x$-axis",
+          "outcomes": [
+           "ME1-12-03",
+           "12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q12c-ii",
+         "label": "(ii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the distance from the wall at which $\\theta$ is greatest, and the greatest value of $\\theta$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct distance and greatest angle"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds where the derivative is zero"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Maximises $\\tan\\theta$ (or $\\theta$) as a function of $x$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Since $\\tan$ is increasing on $\\left(0, \\dfrac{\\pi}{2}\\right)$, maximise $u = \\dfrac{5x}{x^2 + 36}$. $\\dfrac{du}{dx} = \\dfrac{5\\left(36 - x^2\\right)}{\\left(x^2 + 36\\right)^2}$, which is zero at $x = 6$, positive before and negative after. So $\\theta$ is greatest at $x = 6$ m, where $\\tan\\theta = \\dfrac{5}{12}$ and $\\theta = \\tan^{-1}\\left(\\dfrac{5}{12}\\right)$."
+          }
+         ],
+         "classification": {
+          "content": "Inverse tangent; maximising an angle; circle tangent to the $x$-axis",
+          "outcomes": [
+           "ME1-12-03",
+           "12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q12c-iii",
+         "label": "(iii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Let $E$ be the origin, with the wall along the line $x = d$ for some $d > 0$, so that the bottom and top of the picture are $(d, 4)$ and $(d, 9)$. A circle passes through these two points and touches the $x$-axis. Show that it touches the $x$-axis at the point whose distance from the wall is the distance found in (ii), and explain why this means that point gives the greatest angle."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration and explanation"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Locates the centre of the circle"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The centre is equidistant from $(d, 4)$ and $(d, 9)$, so it is at height $\\dfrac{13}{2}$, and since the circle touches the $x$-axis its radius is $\\dfrac{13}{2}$. If the centre is $(h, \\dfrac{13}{2})$, the distance to $(d, 4)$ gives $(d - h)^2 + \\left(\\dfrac{13}{2} - 4\\right)^2 = \\left(\\dfrac{13}{2}\\right)^2$, so $(d - h)^2 = 36$ and $d - h = 6$: the point of contact $(h, 0)$ is $6$ m from the wall, as in (ii). Every other point $P$ on the $x$-axis lies outside the circle, so the angle the picture subtends at $P$ is smaller than the angle at the point of contact (an angle subtended by a chord from outside the circle is less than the angle in the segment). So the point of contact gives the greatest angle."
+          }
+         ],
+         "classification": {
+          "content": "Inverse tangent; maximising an angle; circle tangent to the $x$-axis",
+          "outcomes": [
+           "ME1-12-03",
+           "12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figpinversetrigpictureanglecfifbjgcpicture"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "q13",
+     "number": 13,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q13a",
+       "label": "(a)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A sequence is defined by its first term $a_1$ and the rule $a_{n+1} = 2a_n^2 - 1$ for $n \\ge 1$."
+        }
+       ],
+       "parts": [
+        {
+         "id": "q13a-i",
+         "label": "(i)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Suppose that $a_1 = \\cos\\theta$. Find $a_2$, $a_3$ and $a_4$ in the form $\\cos(\\ldots)$, and write down a formula for $a_n$ in terms of $n$ and $\\theta$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct formula with justification"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds $a_2$, $a_3$ and $a_4$ correctly"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds $a_2$ using a double-angle result"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$a_2 = 2\\cos^2\\theta - 1 = \\cos 2\\theta$, so $a_3 = 2\\cos^2 2\\theta - 1 = \\cos 4\\theta$ and $a_4 = 2\\cos^2 4\\theta - 1 = \\cos 8\\theta$. Each term doubles the angle, so $a_n = \\cos\\left(2^{n-1}\\theta\\right)$."
+          }
+         ],
+         "classification": {
+          "content": "Double-angle results; recurrences; closed forms",
+          "outcomes": [
+           "ME1-11-03"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13a-ii",
+         "label": "(ii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Suppose that $a_1 = \\cos\\dfrac{\\pi}{64}$. Find the smallest $n$ for which $a_n = 1$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct value with justification"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Uses part (i) with a suitable $\\theta$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "By part (i) with $\\theta = \\dfrac{\\pi}{64}$, $a_n = \\cos\\dfrac{2^{n-1}\\pi}{64} = 1$ exactly when $\\dfrac{2^{n-1}}{64}$ is an even integer, that is, $2^{n-1} \\ge 128$. The smallest $n$ is $8$."
+          }
+         ],
+         "classification": {
+          "content": "Double-angle results; recurrences; closed forms",
+          "outcomes": [
+           "ME1-11-03"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13a-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Suppose instead that $a_1 = \\dfrac12\\left(t + \\dfrac1t\\right)$, where $t > 1$. Find $a_2$ and $a_3$ in terms of $t$, and write down a formula for $a_n$. Hence find the smallest $n$ for which $a_n > 10^6$ when $t = 2$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct value of $n$ with justification"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds $a_2$ and $a_3$ and writes down the formula"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds $a_2$ in terms of $t$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$a_2 = 2 \\times \\dfrac14\\left(t + \\dfrac1t\\right)^2 - 1 = \\dfrac12\\left(t^2 + 2 + t^{-2}\\right) - 1 = \\dfrac12\\left(t^2 + t^{-2}\\right)$, and in the same way $a_3 = \\dfrac12\\left(t^4 + t^{-4}\\right)$. Each term squares $t$, so $a_n = \\dfrac12\\left(t^{2^{n-1}} + t^{-2^{n-1}}\\right)$."
+          },
+          {
+           "k": "p",
+           "t": "When $t = 2$, $a_n = \\dfrac12\\left(2^{2^{n-1}} + 2^{-2^{n-1}}\\right)$. For $n = 5$, $a_5$ is a little more than $\\dfrac12 \\times 2^{16} = 32\\,768$, which is less than $10^6$. For $n = 6$, $a_6$ is a little more than $\\dfrac12 \\times 2^{32} > 10^6$. The terms increase, so the smallest value is $n = 6$."
+          }
+         ],
+         "classification": {
+          "content": "Double-angle results; recurrences; closed forms",
+          "outcomes": [
+           "ME1-11-03"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": []
+      },
+      {
+       "id": "q13b",
+       "label": "(b)",
+       "marks": 7,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "In a Galton board, a ball falls through $n$ rows of pegs. At each peg it moves one place to the right with probability $p$ or one place to the left with probability $1 - p$, independently of the other pegs. It lands in one of the slots numbered $0, 1, \\dots, n$, where the slot number is the number of moves to the right. The diagram shows a board with $6$ rows, the path of one ball, and the shape of the pile when $p = \\tfrac12$."
+        },
+        {
+         "k": "fig",
+         "name": "figpstatisticsgaltonboarddfahcfcegalton"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q13b-i",
+         "label": "(i)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Explain why the probability that the ball lands in slot $k$ is $\\dbinom{n}{k}p^k(1 - p)^{n-k}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct explanation"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Recognises that the number of moves to the right is binomial"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The ball makes $n$ independent moves, each to the right with probability $p$, so the number of moves to the right is binomial with parameters $n$ and $p$. Landing in slot $k$ means exactly $k$ right moves, which can happen in $\\dbinom{n}{k}$ orders, each with probability $p^k(1 - p)^{n-k}$."
+          }
+         ],
+         "classification": {
+          "content": "Binomial distribution; most likely value; ratio of consecutive probabilities",
+          "outcomes": [
+           "ME1-12-06"
+          ]
+         },
+         "figures": [],
+         "answerType": "proof-explain",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13b-ii",
+         "label": "(ii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "A board has $12$ rows and $p = \\dfrac{3}{10}$. By considering the ratio of the probabilities of landing in slots $k + 1$ and $k$, find the slot in which the ball is most likely to land."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct slot"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Simplifies the ratio of consecutive probabilities, or finds when it exceeds 1"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{P(k + 1)}{P(k)} = \\dfrac{12 - k}{k + 1} \\times \\dfrac{\\dfrac{3}{10}}{\\dfrac{7}{10}}$, which exceeds $1$ exactly when $\\dfrac{3}{10}(12 - k) > \\dfrac{7}{10}(k + 1)$, that is, $k < \\dfrac{29}{10}$. So the probabilities increase up to slot $3$ and decrease after it: the most likely slot is $3$."
+          }
+         ],
+         "classification": {
+          "content": "Binomial distribution; most likely value; ratio of consecutive probabilities",
+          "outcomes": [
+           "ME1-12-06"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13b-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Now let $p = \\tfrac12$ and let the board have $2m$ rows. Let $u_m$ be the probability that the ball lands in the middle slot. Find $\\dfrac{u_{m+1}}{u_m}$ in terms of $m$, and hence find $u_5$ as a fraction in its simplest form."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct value with justification"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Simplifies the ratio $\\dfrac{u_{m+1}}{u_m}$"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes $u_m = \\dbinom{2m}{m}\\dfrac{1}{4^m}$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The middle slot with $2m$ rows is slot $m$, so $u_m = \\dbinom{2m}{m}\\dfrac{1}{4^m}$. Then"
+          },
+          {
+           "k": "math",
+           "t": "\\frac{u_{m+1}}{u_m} = \\frac{(2m + 2)(2m + 1)}{(m + 1)^2} \\times \\frac14 = \\frac{2m + 1}{2m + 2}."
+          },
+          {
+           "k": "p",
+           "t": "Since $u_1 = \\dfrac12$,"
+          },
+          {
+           "k": "math",
+           "t": "u_5 = \\frac12 \\times \\frac34 \\times \\frac56 \\times \\frac78 \\times \\frac{9}{10} = \\frac{63}{256}."
+          }
+         ],
+         "classification": {
+          "content": "Binomial distribution; most likely value; ratio of consecutive probabilities",
+          "outcomes": [
+           "ME1-12-06"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figpstatisticsgaltonboarddfahcfcegalton"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "q14",
+     "number": 14,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q14a",
+       "label": "(a)",
+       "marks": 7,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Let $n = 10$, and let $P(x) = x^n + bx + c$, where $b$ and $c$ are constants."
+        }
+       ],
+       "parts": [
+        {
+         "id": "q14a-i",
+         "label": "(i)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find $b$ and $c$ so that $(x + 3)^2$ is a factor of $P(x)$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides both values"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Uses $P(-3) = 0$ and $P'(-3) = 0$"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "States that a double zero is a zero of $P'(x)$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$(x + 3)^2$ is a factor exactly when $P(-3) = 0$ and $P'(-3) = 0$. Now $P'(x) = 10x^{9} + b$, so $b = -10 \\times (-3)^{9} = 196830$. Then $P(-3) = 59049 - 590490 + c = 0$ gives $c = 531441$."
+          }
+         ],
+         "classification": {
+          "content": "Multiple zeros of polynomials; derivatives; inequalities",
+          "outcomes": [
+           "ME1-11-02",
+           "12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14a-ii",
+         "label": "(ii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "With these values, $P(x) = (x + 3)^2Q(x)$ for a polynomial $Q(x)$. Find $Q(-3)$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct value"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Differentiates $P(x) = (x - r)^2Q(x)$ twice, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Differentiating twice, $P''(x) = 2Q(x) + 4(x + 3)Q'(x) + (x + 3)^2Q''(x)$, so $P''(-3) = 2Q(-3)$. Since $P''(x) = 90x^{8}$, $Q(-3) = \\dfrac{90 \\times 6561}{2} = 295245$."
+          }
+         ],
+         "classification": {
+          "content": "Multiple zeros of polynomials; derivatives; inequalities",
+          "outcomes": [
+           "ME1-11-02",
+           "12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14a-iii",
+         "label": "(iii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that $P(x) \\ge 0$ for all real $x$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Considers the sign of $P'(x)$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$P'(x) = 10\\left(x^{9} - (-3)^{9}\\right)$. Since $9$ is odd, $x^{9}$ is increasing, so $P'(x) < 0$ for $x < -3$ and $P'(x) > 0$ for $x > -3$. So $P$ has its least value at $x = -3$, where $P(-3) = 0$. Hence $P(x) \\ge 0$ for all $x$."
+          }
+         ],
+         "classification": {
+          "content": "Multiple zeros of polynomials; derivatives; inequalities",
+          "outcomes": [
+           "ME1-11-02",
+           "12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": []
+      },
+      {
+       "id": "q14b",
+       "label": "(b)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A ball is projected from the origin $O$ on horizontal ground with speed $V$ m s$^{-1}$ at an angle $\\theta$ above the horizontal, where $0 < \\theta < \\dfrac{\\pi}{2}$. Take $g = 10$ m s$^{-2}$, so that its position at time $t$ is $Vt\\cos\\theta\\,\\underset{\\sim}{i} + \\left(Vt\\sin\\theta - 5t^2\\right)\\underset{\\sim}{j}$. The diagram shows paths for several values of $\\theta$ with the same $V$, and the dashed boundary of the points that can be reached."
+        },
+        {
+         "k": "fig",
+         "name": "figpprojectilesreachableregionhigecfgbreach"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q14b-i",
+         "label": "(i)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that if the ball passes through the point $(X, Y)$, where $X > 0$, then $T = \\tan\\theta$ satisfies $\\ 5X^2T^2 - V^2XT + 5X^2 + V^2Y = 0$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Eliminates $t$ using $t = \\dfrac{X}{V\\cos\\theta}$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "At the point, $t = \\dfrac{X}{V\\cos\\theta}$, so $Y = X\\tan\\theta - \\dfrac{5X^2}{V^2\\cos^2\\theta} = XT - \\dfrac{5X^2}{V^2}\\left(1 + T^2\\right)$. Multiplying by $V^2$ and rearranging gives the result."
+          }
+         ],
+         "classification": {
+          "content": "Projectile motion; the region that can be reached; quadratic in tan",
+          "outcomes": [
+           "ME1-12-02"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14b-ii",
+         "label": "(ii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Hence show that the ball can pass through $(X, Y)$ for some $\\theta$ if and only if $\\ Y \\le \\dfrac{V^2}{20} - \\dfrac{5X^2}{V^2}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes the discriminant condition"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Recognises that a suitable $\\theta$ exists exactly when there is a real positive $T$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Each real $T > 0$ gives an angle $\\theta = \\tan^{-1}T$ in $\\left(0, \\dfrac{\\pi}{2}\\right)$. The quadratic has real roots if and only if $V^4X^2 - 20X^2\\left(5X^2 + V^2Y\\right) \\ge 0$, that is, $V^4 - 20V^2Y - 100X^2 \\ge 0$, which is $Y \\le \\dfrac{V^2}{20} - \\dfrac{5X^2}{V^2}$. When the roots are real their sum is $\\dfrac{V^2}{5X} > 0$: if their product is non-negative both are positive, and if it is negative exactly one is positive. Either way there is a positive root, so a suitable $\\theta$ exists."
+          }
+         ],
+         "classification": {
+          "content": "Projectile motion; the region that can be reached; quadratic in tan",
+          "outcomes": [
+           "ME1-12-02"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14b-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "A target is on top of a tower, at the point $(15, 20)$. Find the least value of $V$ for which the ball can hit the target, and the value of $\\tan\\theta$ needed at that speed."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct speed and value of $\\tan\\theta$"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Solves the quadratic inequality in $V^2$"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes the condition with $X = 15$, $Y = 20$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "We need $V^4 - 400V^2 - 22500 \\ge 0$. As a quadratic in $V^2$ its roots are $V^2 = 200 \\pm \\sqrt{200^2 + 22500}$, that is $V^2 = 200 \\pm 250$, and the product of the roots is negative, so the condition is $V^2 \\ge 450$. The least speed is $V = 15 \\sqrt{2}$ m s$^{-1}$. Then the discriminant is zero, so $T = \\dfrac{V^2X}{10X^2} = \\dfrac{450}{150} = 3$."
+          }
+         ],
+         "classification": {
+          "content": "Projectile motion; the region that can be reached; quadratic in tan",
+          "outcomes": [
+           "ME1-12-02"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figpprojectilesreachableregionhigecfgbreach"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "figures": [
+  "figpfunctionsparametriccurvegraphscecadffiwra",
+  "figpfunctionsparametriccurvegraphscecadffiopt",
+  "figpfunctionsparametriccurvegraphscecadffiwrb",
+  "figpfunctionsparametriccurvegraphscecadffiwrc",
+  "figpinversetrigpictureanglecfifbjgcpicture",
+  "figpstatisticsgaltonboarddfahcfcegalton",
+  "figpprojectilesreachableregionhigecfgbreach"
+ ]
+}

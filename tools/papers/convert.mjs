@@ -29,8 +29,8 @@ import { envBlocks, matchBrace, readArg, splitItems, stripComments, toBlocks, fi
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '..', '..');
 
-/** The papers cleared to ship, with the id the manifest uses. 08, 09, 11 and 12 await the owner's version choice. */
-export const CLEARED = Object.freeze(['01', '02', '03', '04', '05', '06', '07', '10', '13']);
+/** The papers that ship, with the id the manifest uses: all thirteen (08, 09, 11 and 12 are the scope-revised versions). */
+export const CLEARED = Object.freeze(['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13']);
 export const paperIdOf = n => `ext1-2027-p${String(n).padStart(2, '0')}`;
 
 const roman = n => ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii'][n] || String(n + 1);
@@ -461,7 +461,11 @@ async function main() {
     reports[id] = report;
     console.log(`${id}: ${report.counts.totalMarks} marks, ${report.counts.keyedSection2Parts} keyed Section II parts, ${report.gaps.length} gaps, ${bad.length} maths problems`);
   }
-  writeFileSync(join(out, 'conversion-report.json'), JSON.stringify(reports, null, 1) + '\n');
+  // A run over some papers keeps the report entries of the others.
+  const reportFile = join(out, 'conversion-report.json');
+  const before = existsSync(reportFile) ? JSON.parse(readFileSync(reportFile, 'utf8')) : {};
+  const merged = Object.fromEntries(Object.entries({ ...before, ...reports }).sort(([a], [b]) => a.localeCompare(b)));
+  writeFileSync(reportFile, JSON.stringify(merged, null, 1) + '\n');
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main().catch(e => { console.error(e); process.exit(1); });

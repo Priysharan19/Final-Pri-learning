@@ -235,7 +235,7 @@ export function toBlocks(raw, notes = new Set()) {
     }
   };
   // Tokens that become blocks of their own.
-  const token = /\\\[|\\begin\{(align\*?|gather\*?|equation\*?|itemize|enumerate|center|minipage|tabular|tabularx|array)\}|\$\$|\\figc\{|\\(fig[A-Za-z0-9]+)\b/g;
+  const token = /\\\[|\\begin\{(align\*?|gather\*?|equation\*?|itemize|enumerate|center|minipage|tabular|tabularx|array)\}|(?<!\\)\$\$|\\figc\{|\\(fig[A-Za-z0-9]+)\b/g;
   let pos = 0;
   let m;
   while ((m = token.exec(s))) {
