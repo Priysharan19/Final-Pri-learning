@@ -45,8 +45,8 @@ function PlotAxes({ m, xLabel = 'x', yLabel = 'y', grid = true }) {
       <line className="dg-axis" x1={m.axisX} x2={m.axisX} y1={f.bottom} y2={f.top} markerEnd="url(#dg-arrow)" />
       {m.xTicks.filter(t => t.value !== 0).map(t => <Tex key={`lx${t.value}`} x={t.px} y={m.axisY + 14} tex={String(t.value)} w={K.texWidth(String(t.value))} h={18} className="dg-small" />)}
       {m.yTicks.filter(t => t.value !== 0).map(t => <Tex key={`ly${t.value}`} x={m.axisX - 6} y={t.px} tex={String(t.value)} w={K.texWidth(String(t.value))} h={18} anchor="end" className="dg-small" />)}
-      {xLabel && <Tex x={f.right - 2} y={m.axisY - 12} tex={xLabel} w={20} h={18} anchor="end" />}
-      {yLabel && <Tex x={m.axisX + 8} y={f.top + 4} tex={yLabel} w={20} h={18} anchor="start" />}
+      {xLabel && <Tex data-axis-name="x" x={f.right + 5} y={m.axisY - 4} tex={xLabel} w={14} h={14} anchor="start" />}
+      {yLabel && <Tex data-axis-name="y" x={m.axisX + 8} y={f.top - 8} tex={yLabel} w={14} h={14} anchor="start" />}
     </g>
   );
 }
@@ -66,6 +66,7 @@ function ParamFigure({ m, title, description, caption = null }) {
       {m.vLines.map(a => <line key={`va${a.x}`} className="dg-asymptote" x1={a.px[0][0]} y1={a.px[0][1]} x2={a.px[1][0]} y2={a.px[1][1]} />)}
       {m.hLines.map(a => <line key={`ha${a.y}`} className="dg-asymptote" x1={a.px[0][0]} y1={a.px[0][1]} x2={a.px[1][0]} y2={a.px[1][1]} />)}
       {m.fixed.map(c => c.segments.map((seg, k) => <path key={`${c.id}-${k}`} className="dg-curve is-secondary" d={poly(seg)} />))}
+      {m.fixed.map(c => c.place && <Tex key={`fl${c.id}`} className="dg-ref-label" x={c.place.x} y={c.place.y} tex={c.label} w={c.place.w} h={c.place.h} anchor={c.place.anchor} />)}
       {m.segments.map((seg, k) => <path key={`c${k}`} className="dg-curve is-primary" d={poly(seg)} />)}
       {m.points.map((p, i) => <circle key={`p${i}`} className={`dg-dot${p.kinds.includes('min') || p.kinds.includes('max') ? ' is-key' : ''}`} cx={p.px[0]} cy={p.px[1]} r="4.5" />)}
       <Labels labels={m.labels} />

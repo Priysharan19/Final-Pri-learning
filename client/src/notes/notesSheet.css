@@ -36,8 +36,11 @@
 /* Teaching diagrams: the picture and the note that says what to look at. */
 .nn-diagrams { display: grid; gap: var(--nn-s6); }
 .nn-diagram { margin: 0; }
-.nn-diagram-t { font-family: var(--nn-ui); font-size: 15px; font-weight: 600; margin: 0 0 var(--nn-s1); }
-.nn-diagram-note { font-family: var(--nn-read); font-size: 17px; line-height: 1.5; color: var(--nt-ink-2); text-align: left; max-width: 64ch; margin: var(--nn-s2) 0 0; }
+.nn-diagram-t { font-family: var(--nn-ui); font-size: 15px; font-weight: 500; line-height: 1.4; margin: 0 0 var(--nn-s1); }
+.nn-diagram-t .katex { font-size: 1em; }
+/* The caption is prose: the page's body face at body size. Only the mathematics inside it is set in the maths face. */
+.nn-diagram-note { font-family: var(--nn-ui); font-size: 15px; line-height: 1.55; color: var(--nt-ink); text-align: left; max-width: 64ch; margin: var(--nn-s2) 0 0; }
+.nn-diagram-note .katex { font-size: 1.04em; }
 
 /* Checkpoint: the question first; the answer only when asked for (a real button). */
 .nn-check { margin: 0; padding-left: var(--nn-s5); display: grid; gap: var(--nn-s5); }

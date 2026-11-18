@@ -554,7 +554,7 @@ export default {
       'Both cases of an absolute value equation are written and each solution is checked.'
     ],
     diagrams: [
-      { title: 'The tide $d(t)=5+2\\sin\\left(\\dfrac{\\pi t}{6}\\right)$', spec: { kind: 'function', xmin: 0, xmax: 12, ymin: 0, ymax: 8, curves: [{ expr: '5+2*sin(pi*x/6)', label: 'd(t)' }, { expr: '6', tone: 'secondary' }], asymptotes: [{ y: 5, label: 'midline' }], points: [{ x: 3, y: 7, label: '(3,\\,7)' }, { x: 9, y: 3, label: '(9,\\,3)' }, { x: 1, y: 6, label: '(1,\\,6)' }] }, note: 'The midline is $5$, the maximum $7$ is at $t=3$ and the minimum $3$ at $t=9$. The line $d=6$ meets the curve at $t=1$ and $t=5$.' },
+      { title: 'The tide $d(t)=5+2\\sin\\left(\\dfrac{\\pi t}{6}\\right)$', spec: { kind: 'function', xmin: 0, xmax: 12, ymin: 0, ymax: 8, xUnit: 'hours', yUnit: 'metres', curves: [{ expr: '5+2*sin(pi*x/6)', label: 'd(t)' }, { expr: '6', tone: 'secondary' }], asymptotes: [{ y: 5, label: 'midline' }], points: [{ x: 3, y: 7, label: '(3,\\,7)' }, { x: 9, y: 3, label: '(9,\\,3)' }, { x: 1, y: 6, label: '(1,\\,6)' }, { x: 5, y: 6, label: '(5,\\,6)' }] }, note: 'The midline is $5$, the maximum $7$ is at $t=3$ and the minimum $3$ at $t=9$. The line $d=6$ meets the curve at $t=1$ and $t=5$.' },
       { title: 'Shift $y=2^x$ right and up', spec: { kind: 'transform', base: 'exponential', show: ['h', 'k'], initial: { h: 3, k: 1 } }, note: 'With $h=3$ and $k=1$ the graph is $y=2^{x-3}+1$, with asymptote $y=1$.' }
     ],
     check: [
