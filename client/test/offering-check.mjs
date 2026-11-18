@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { editionOf, editionProblems, EDITIONS } from '../edition.config.mjs';
 import { subtopicOfferedIn, courseOfferedIn, pathwayOfSubtopic } from '../src/engine/offeringRules.js';
-import { SUBTOPICS, DIFF_WORDS, DIFF_LABELS } from '../src/engine/curriculum.js';
+import { SUBTOPICS, DIFF_WORDS, DIFF_LABELS, STREAM_CURRICULUM } from '../src/engine/curriculum.js';
 import { markWeightAfter, ladderEvidence, HINT_RUNGS } from '../src/engine/hintLadder.js';
 import { editionRecord } from '../src/platform/edition-record.js';
 import { brandIndexHtml } from '../brand/edition-brand.mjs';
@@ -39,6 +39,12 @@ eq(editionRecord('prithagoras').offering.years, [11, 12], 'the Prithagoras recor
 eq(editionOffering({ PRI_EDITION: 'prithagoras' }).years, [11, 12], 'the server reads the same offering');
 eq(editionOffering({}), null, 'and the default (India) server offers all');
 
+// A stream subtopic's id names its course (offeringRules.js pathwayOfSubtopic): proved against the whole catalogue.
+for (const [key, stream] of Object.entries(STREAM_CURRICULUM)) {
+  const want = key.startsWith('standard') ? 'standard' : key.startsWith('ext2') ? 'ext2' : 'ext1';
+  ok(stream.subtopics.every(s => pathwayOfSubtopic(s.id) === want), `every ${key} subtopic id says ${want}`);
+}
+ok(SUBTOPICS.filter(s => !s.stream).every(s => pathwayOfSubtopic(s.id) === null), 'and no year subtopic id names a course');
 const hidden = SUBTOPICS.filter(s => !subtopicOfferedIn(AU.offering, s.id));
 const shown = SUBTOPICS.filter(s => subtopicOfferedIn(AU.offering, s.id));
 ok(hidden.length > 0 && shown.length > 0, 'the catalogue splits into hidden and offered subtopics');

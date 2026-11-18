@@ -9,25 +9,21 @@
 // server reads it directly with its deployment's edition (defence in depth:
 // the client hides, the server enforces).
 // ─────────────────────────────────────────────────────────────────────────────
-import { SUBTOPIC_BY_ID, STREAM_CURRICULUM } from './curriculum.js';
+import { SUBTOPIC_BY_ID } from './curriculum.js';
 
-const STREAM_OF = Object.freeze(Object.fromEntries(
-  Object.entries(STREAM_CURRICULUM).flatMap(([key, st]) => st.subtopics.map(s => [s.id, key.startsWith('standard') ? 'standard' : key.startsWith('ext2') ? 'ext2' : 'ext1']))
-));
-
-/** The pathway a stream subtopic belongs to ('standard' | 'ext1' | 'ext2'), or null for a year subtopic. */
-export const pathwayOfSubtopic = id => STREAM_OF[id] || null;
+// A senior stream subtopic's id names its course: ms… Standard, me… Extension 1, mex… Extension 2 (held by offering-check.mjs
+// against the whole catalogue); a year subtopic (y7-…, y11-…) has none.
+export const pathwayOfSubtopic = id => (/^ms/.test(id) ? 'standard' : /^mex/.test(id) ? 'ext2' : /^me/.test(id) ? 'ext1' : null);
 
 /**
- * Whether an offering (null = everything) includes a subtopic by id. An id the
- * catalogue does not know is not this module's to hide.
+ * Whether an offering (null = everything) includes a subtopic by id. An id the catalogue does not know is not this module's to hide.
  */
 export function subtopicOfferedIn(offering, id) {
   if (!offering) return true;
   const s = SUBTOPIC_BY_ID[id];
   if (!s) return true;
   if (!offering.years.includes(Number(s.year))) return false;
-  const pw = STREAM_OF[id];
+  const pw = pathwayOfSubtopic(id);
   return !pw || offering.pathways.includes(pw);
 }
 
