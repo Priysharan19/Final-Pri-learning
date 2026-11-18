@@ -17,7 +17,7 @@
 // Run on its own:  node client/test/tour-fresh-release.js
 // ─────────────────────────────────────────────────────────────────────────────
 import { createServer } from 'node:http';
-import { cpSync, mkdtempSync, readFileSync, writeFileSync, copyFileSync, rmSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { extname, join, normalize, sep } from 'node:path';
