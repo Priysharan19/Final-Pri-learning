@@ -1224,30 +1224,11 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
               // One branch of a factorisation already shown. It is true of the
               // roots it names; whether the working keeps the rest is settled
               // once every line has been read.
-              // A VALUE line (x = 5) written straight under a branch (x - 3 = 0)
-              // must be one of the roots that branch gives: a true root of the question that
-              // the line above does not produce is a slip, however true it is.
-              // (Any branch in the unbroken run of branch lines just above may give it:
-              // x - 3 = 0, x - 5 = 0, then x = 3, x = 5.)
-              const run = [];
-              for (let k = branchLines.length - 1, at = i - 1; k >= 0 && branchLines[k].index === at && !branchLines[k].valued && !branchLines[k].expLog; k--, at--) run.push(branchLines[k]);
-              const above = run[0];
-              const given = run.flatMap(b => b.covered);
-              // A residual product (`(x-2)(x-3)=0` after the first factor was split off) is an open
-              // line, not a solved branch: a value beside it may be the factor that was split off.
-              if (valued && above && !run.some(b => b.product) && !held.every(h => given.some(c => numsClose(h, c)))) {
-                status = 'break';
-                lineDiagnosis = {
-                  code: 'branch-value-mismatch', title: 'This value does not follow from the line above',
-                  message: `The line above gives ${meta.variable} = ${given.map(v => Number(v.toPrecision(8))).join(' or ')}, not ${meta.variable} = ${held.map(v => Number(v.toPrecision(8))).join(' or ')}.`,
-                  fix: 'Solve the line above for the unknown, then write that value.', confidence: 'high'
-                };
-                lineDiagnosis = withConfidence(lineDiagnosis);
-                note = lineDiagnosis.message;
-                if (firstBreak === -1) firstBreak = i;
-                out.push({ text: line, status, note, diagnosis: lineDiagnosis });
-                return;
-              }
+              // A VALUE line (x = 5) under a branch (x - 3 = 0) is a TRUE consequence of the original
+              // equation whenever it is one of its roots (CTO ruling on PR #1054, superseding the review's
+              // finding 1 at 11df4cf48): listing roots factor by factor is correct mathematics, and breaking
+              // a true line is a false rejection. A value that is no root of the question breaks above;
+              // completeness is the lost-root rule's job, not this line's.
               status = 'ok';
               if (valued) expLogStated.push(...held);
               if (expLogLine && expLog) {
@@ -1263,7 +1244,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
                   if (workedFrom) workedFrom.closed = true;
                 } else if (workedFrom) expLogSteps.push(workedFrom);
               }
-              branchLines.push({ index: i, covered: held, lone, product: productEqualsZero(ast), expLog: expLogLine, value: !expLogLine && valued, valued });
+              branchLines.push({ index: i, covered: held, lone, expLog: expLogLine, value: !expLogLine && valued, valued });
               out.push({ text: line, status, branch: true });
               return;
             }

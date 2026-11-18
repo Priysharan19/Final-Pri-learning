@@ -32,7 +32,7 @@ ok(claim.length === 1 && Math.abs(evaluate(claim[0].ast.l, { x: 2 }) - 8) < 1e-9
 const m = { kind: 'equation', variable: 'x', solutions: [3, 5] };
 const run = L => stepCheck(m, L.join('\n'));
 r = run(['(x-3)(x-5)=0', 'x-3=0', 'x=5']);
-ok(r.firstBreak === 2 && r.lines[2].status === 'break', 'x-3=0 then x=5 is a break at the value line (5 is a root, but not of the line above)');
+ok(r.firstBreak === -1 && r.lines[2].status === 'ok', 'x-3=0 then x=5 is not a break: 5 is a root of the original equation (CTO ruling on PR #1054: a true line is never broken; completeness is the lost-root rule\'s)');
 r = run(['(x-3)(x-5)=0', 'x-3=0', 'x=3', 'x-5=0', 'x=5']);
 ok(r.firstBreak === -1 && r.lines.every(l => l.status === 'ok'), 'each branch followed by its own value is correct');
 r = run(['(x-3)(x-5)=0', 'x=3 or x=5']);
@@ -51,35 +51,55 @@ ok(r.firstBreak === -1, 'both branches written first, then their values in order
 r = run(['(x-3)(x-5)=0', 'x-3=0', 'x-5=0', 'x=3', 'x=6']);
 ok(r.firstBreak === 4, 'a value no branch above gives is still a break');
 
-// A value under a multi-root branch, or under a run of two or more branch lines, that none of them
-// gives is a break at the value line, and the page is never marked correct (review of #1054).
+// A value that IS a root of the original equation is never a break, whatever branch lines sit above it
+// (CTO ruling on PR #1054, superseding finding 1 of the review at 11df4cf48): listing roots factor by factor is
+// correct mathematics. Completeness is the lost-root rule's job: an incomplete ending is flagged, not credited.
 {
   const eqMeta = sol => ({ kind: 'equation', variable: 'x', solutions: sol });
-  const wrong = [
-    [[3, -3, 5], '(x^2-9)(x-5)=0 | x^2-9=0 | x=5', 2],
-    [[1, -1, 2], '(x^2-1)(x-2)=0 | x^2-1=0 | x=2', 2],
-    [[2, -2, 3], '(x^2-4)(x-3)=0 | x^2-4=0 | x=3', 2],
-    [[1, 2, 3], '(x-1)(x-2)(x-3)=0 | x-1=0 | x-2=0 | x=3', 3],
-    [[1, 2, 3, 4], '(x-1)(x-2)(x-3)(x-4)=0 | x-1=0 | x-2=0 | x=3', 3],
-    [[1, 2, 3], '(x-1)(x-2)(x-3)=0 ; x-1=0 ; x-2=0 ; x=3 ; x=1 or x=2 or x=3', 3],
-    [[4, -4, 1], '(x^2-16)(x-1)=0 | x^2-16=0 | x=1', 2],
-    [[1, 2, 3, 4], '(x-1)(x-2)(x-3)(x-4)=0 | x-1=0 | x-2=0 | x-3=0 | x=4', 4]
+  const mark = (sol, lines) => checkAnswer({ answerType: 'working', answer: { stepMeta: eqMeta(sol), minLines: 1 } }, lines.join('\n'));
+  const page = s => s.split(/\s*[|;]\s*/);
+  // True lines: ok, never a break.
+  const trueLines = [
+    [[3, -3, 5], '(x^2-9)(x-5)=0 | x^2-9=0 | x=5'],
+    [[2, -2, 3], '(x^2-4)(x-3)=0 | x^2-4=0 | x=3'],
+    [[1, 2, 3], '(x-1)(x-2)(x-3)=0 | x-1=0 | x-2=0 | x=3'],
+    [[1, -1, 2], '(x^2-1)(x-2)=0 | x^2-1=0 | x=2'],
+    [[4, -4, 1], '(x^2-16)(x-1)=0 | x^2-16=0 | x=1']
   ];
-  for (const [sol, page, at] of wrong) {
-    const lines = page.split(/\s*[|;]\s*/);
-    const res = stepCheck(eqMeta(sol), lines.join('\n'));
-    ok(res.firstBreak === at && res.lines[at].status === 'break', `${page} breaks at its value line`);
-    const mark = checkAnswer({ answerType: 'working', answer: { stepMeta: eqMeta(sol), minLines: 1 } }, lines.join('\n'));
-    ok(mark.correct !== true, `${page} is not marked correct`);
+  for (const [sol, text] of trueLines) {
+    const res = stepCheck(eqMeta(sol), page(text).join('\n'));
+    ok(res.firstBreak === -1 && res.lines.every(l => l.status === 'ok'), `${text}: every line is ok (the value is a root of the original equation)`);
+    ok(mark(sol, page(text)).correct !== true, `${text}: an incomplete ending is not credited as a complete answer`);
+  }
+  // Complete final line: correct.
+  for (const [sol, text] of [
+    [[1, 2, 3], '(x-1)(x-2)(x-3)=0 ; x-1=0 ; x-2=0 ; x=3 ; x=1 or x=2 or x=3'],
+    [[3, -3, 5], '(x^2-9)(x-5)=0 ; x^2-9=0 ; x=5 ; x-5=0 ; x=3 or x=-3 or x=5'],
+    [[2, -2, 3], '(x^2-4)(x-3)=0 ; x^2-4=0 ; x=3 ; x=2 or x=-2 or x=3']
+  ]) {
+    ok(stepCheck(eqMeta(sol), page(text).join('\n')).firstBreak === -1 && mark(sol, page(text)).correct === true, `${text}: ok lines and a complete final line is correct`);
+  }
+  // Incomplete: the lost-root rule flags it.
+  r = stepCheck(eqMeta([1, 2, 3, 4]), page('(x-1)(x-2)(x-3)(x-4)=0 | x-1=0 | x-2=0 | x=3').join('\n'));
+  ok(r.lines.some(l => l.status === 'break') && mark([1, 2, 3, 4], page('(x-1)(x-2)(x-3)(x-4)=0 | x-1=0 | x-2=0 | x=3')).correct !== true, 'a four-factor page that drops x = 4 is flagged and not credited');
+  r = stepCheck(eqMeta([3, -3]), 'x^2-9=0\nx=3');
+  ok(r.lines[1].incomplete === true && mark([3, -3], ['x^2-9=0', 'x=3']).correct === false, 'x^2-9=0 then x=3 as the final answer: the other root is still to find, not credited');
+  // Genuinely wrong: the value is no root of the original equation.
+  for (const [sol, text, at] of [
+    [[1, 2, 3], '(x-1)(x-2)(x-3)=0 | x-1=0 | x=4', 2],
+    [[3, -3, 5], '(x^2-9)(x-5)=0 | x^2-9=0 | x=9', 2],
+    [[1, 2, 3], '(x-1)(x-2)(x-3)=0 | x-1=0 | x-2=0 | x=4', 3]
+  ]) {
+    const res = stepCheck(eqMeta(sol), page(text).join('\n'));
+    ok(res.firstBreak === at && res.lines[at].status === 'break' && mark(sol, page(text)).correct !== true, `${text} breaks at its value line`);
   }
   // What the earlier review required stays accepted.
   r = stepCheck(eqMeta([3, -3]), 'x^2=9\nx=3\nx=-3');
   ok(r.firstBreak === -1, 'x^2=9 split across value lines is still correct');
   r = stepCheck(eqMeta([3, 5]), 'x-3=0\nx-5=0\nx=3\nx=5');
   ok(r.firstBreak === -1, 'x-3=0, x-5=0, x=3, x=5 is still correct');
-  r = stepCheck(eqMeta([1, 2, 3]), '(x-1)(x-2)(x-3)=0\n(x-2)(x-3)=0\nx=1\nx=2\nx=3');
-  ok(r.firstBreak === -1, 'a residual product, then each root read off, is still correct');
 }
+
 
 // 4. `e` as the variable.
 r = stepCheck({ kind: 'derivative', variable: 'e', source: 'e^2' }, '2e');
