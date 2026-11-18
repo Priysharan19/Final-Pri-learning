@@ -33,9 +33,9 @@ How it is held:
    own token, on top of the origin guard every browser mutation already passes.
 3. **Limits, enforced on the server** (`server/platform/guestTrial.js`): 5 questions per token per
    day; 15 per client address bucket per day across any number of tokens (IPv6 collapsed to its /64);
-   6 tokens minted per address per day; a process-wide daily ceiling of 5,000 questions as a
-   backstop against many addresses; a per-address route limit (120 an hour); one verdict per issued
-   question; a 2 second minimum think time; at most 3 retries of an unreadable entry. These bound
+   6 tokens minted per address per day; for IPv6 also 60 questions and 24 tokens per /48 per day (a host with a /56 or /48 can rotate /64 buckets, so the /48 is the bound that holds); a process-wide daily ceiling of 5,000 questions as a
+   backstop against many addresses; a per-address route limit (120 an hour, its counter named with the same per-purpose key as the others, so no row holds an unkeyed hash of an address); every counter is taken together or not at all: a request refused by the address, /48 or process limit gives back the token's unit, so a refusal that was not the visitor's costs them nothing; one verdict per issued
+   question; a 2 second minimum think time; at most 3 retries of an unreadable entry; and a verdict lost in transit may be re-fetched, with the same answer by the same token, for 2 minutes after it was given, from one keyed right-or-wrong counter written with the claim (the question is not marked a second time). These bound
    the feature as a marking oracle: the most one connection can learn is 15 verdicts a day, each on
    a different question, with the answer only after the verdict. No CAPTCHA is used.
 4. **Typed and multiple-choice only.** A guest cannot reach handwriting or photo reading (a paid
@@ -44,8 +44,8 @@ How it is held:
    progress for a guest. The client shows a calm sign-up prompt after the fifth question or when a
    guest chooses handwriting or a photo.
 5. **Retention.** The server keeps only `rate_limits` rows (a count and a window start under a
-   hashed bucket name) for the token, the address bucket, the issued question and the process
-   ceiling; the existing housekeeping sweep deletes each a day after its window opens. The question
+   hashed bucket name) for the token, the address bucket, the /48 bucket, the route limit, the issued question, the process
+   ceiling and, for two minutes' use, one right-or-wrong count per answered question; the existing housekeeping sweep deletes each a day after its window opens. The question
    ticket is a stateless encrypted token held by the browser. Both privacy notices (India, Australia;
    English and Hindi) carry one plain paragraph saying this.
 6. **Age and guardian rules.** A guest gives no personal data, so there is no consent step. When a

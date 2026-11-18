@@ -29,8 +29,8 @@
 //   1. the origin guard and the CSRF header, as for every browser mutation;
 //   2. a per-address rate limit on every route (bot-unfriendly without a CAPTCHA);
 //   3. the per-token daily limit (GUEST_LIMIT);
-//   4. the per-address daily limit and token-mint limit, so rotating tokens
-//      does not mint more questions;
+//   4. the per-address (IPv4, or IPv6 /64) and per-/48 daily limits and token-mint
+//      limits, so rotating tokens or /64s does not mint more questions;
 //   5. a process-wide daily ceiling, so the whole feature is never an open
 //      marking oracle however many addresses are used;
 //   6. one verdict per issued question, a minimum think time before a verdict,
@@ -39,7 +39,7 @@
 import { createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
 import { asyncRouter, asyncHandler } from './asyncRouter.js';
 import { asStore } from './store.js';
-import { consumeRateLimit, clientIdentity, rateLimit } from './security.js';
+import { consumeRateLimit, clientIdentity } from './security.js';
 import { tagPolicy } from './routePolicy.js';
 import { encryptDeliveryToken, decryptDeliveryToken, guestKey } from './deliveryCrypto.js';
 import { bankPolicy, sealForEdition } from './editionBanks.js';
@@ -69,6 +69,12 @@ export const GUEST_DEFAULTS = Object.freeze({
   // botnet across many addresses). 5000 verdicts is a few seconds of marker
   // time in total, and tiny next to the paid plans' allowance.
   globalDayLimit: 5000,
+  // The same, per IPv6 /48 (a site's or a provider's allocation): a host with a
+  // /56 or /48 can rotate /64 buckets at will, so the /48 is the one that bounds it.
+  // 60 questions and 24 tokens a day is four times the /64 allowance, which
+  // leaves a school or an office behind one allocation served.
+  prefixDayLimit: 60,
+  prefixMintDayLimit: 24,
   // Per address and hour, across all guest routes (the route limiter below).
   routeHourLimit: 120,
   // A question cannot be answered faster than a person can read it. Scripts
@@ -78,6 +84,8 @@ export const GUEST_DEFAULTS = Object.freeze({
   questionTtlMs: 30 * 60 * 1000,
   // Entries the marker could not read at all, before the question is closed.
   unreadableTries: 3,
+  // After a verdict, the same token may re-fetch it (same answer) for this long.
+  verdictRetryMs: 2 * 60 * 1000,
   // Search for a question of the asked-for form (typed / choice).
   formDraws: 60
 });
@@ -101,14 +109,34 @@ function csrfFor(rawToken) {
 /** A counter's name: keyed, so a database copy cannot be searched for an address, token or question. */
 const scramble = value => createHmac('sha256', guestKey('bucket')).update(String(value)).digest('hex').slice(0, 24);
 
-/** The address a request comes from, for a bucket: an IPv6 address collapses to its /64 so one host cannot rotate within its own prefix. */
-export function guestAddressBucket(req) {
-  let ip = String(clientIdentity(req) || 'unknown');
+/** The eight 16-bit groups of an IPv6 address, '::' expanded; null when it is not one. */
+function ipv6Groups(ip) {
+  if (!ip.includes(':') || ip.includes(':::')) return null;
+  const [head, tail, ...more] = ip.split('::');
+  if (more.length) return null;
+  const a = head ? head.split(':') : [];
+  const b = tail ? tail.split(':') : [];
+  if (tail === undefined ? a.length !== 8 : a.length + b.length > 7) return null;
+  const groups = tail === undefined ? a : [...a, ...Array(8 - a.length - b.length).fill('0'), ...b];
+  if (!groups.every(g => /^[0-9a-f]{1,4}$/i.test(g))) return null;
+  return groups.map(g => g.toLowerCase().padStart(4, '0'));
+}
+
+/**
+ * The address buckets a request counts against, keyed: `address` (an IPv4
+ * address, or an IPv6 /64, so one host cannot rotate within its own prefix) and
+ * `prefix` (an IPv6 /48, null for IPv4), so a /56 or /48 cannot rotate /64s.
+ */
+export function guestAddressBuckets(req) {
+  let ip = String(clientIdentity(req) || 'unknown').trim();
   const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(ip);
   if (mapped) ip = mapped[1];
-  if (ip.includes(':')) ip = ip.split(':').slice(0, 4).join(':');
-  return scramble(`ip:${ip}`);
+  const groups = ipv6Groups(ip);
+  if (!groups) return { address: scramble(`ip:${ip}`), prefix: null };
+  return { address: scramble(`ip:${groups.slice(0, 4).join(':')}`), prefix: scramble(`ip48:${groups.slice(0, 3).join(':')}`) };
 }
+/** The /64 (or IPv4) bucket alone (kept for callers that only need it). */
+export const guestAddressBucket = req => guestAddressBuckets(req).address;
 
 function readToken(req, now) {
   const raw = req.cookies?.[GUEST_COOKIE];
@@ -134,7 +162,39 @@ export function createGuestTrialRouter(db, { env = process.env, banks = bankPoli
   router.use((req, res, next) => (String(env.PRI_GUEST_TRIAL || 'on').toLowerCase() === 'off'
     ? reject(res, 404, 'NOT_FOUND', 'Platform endpoint not found.') : next()));
 
-  const perAddress = rateLimit(db, 'guest-route', { limit: L.routeHourLimit, windowMs: 60 * 60 * 1000 });
+  // The per-address route limiter. It is the shared rateLimit() in every way but
+  // one: its counter is named with the guest key, so no row holds an unkeyed hash
+  // of an address (the shared limiter's names are a plain sha256, which an IPv4
+  // address can be recovered from).
+  const routeWindow = 60 * 60 * 1000;
+  const perAddress = tagPolicy(asyncHandler(async (req, res, next) => {
+    const verdict = await consumeRateLimit(db, `guest-route:${scramble(`route:${clientIdentity(req)}`)}`, { limit: L.routeHourLimit, windowMs: routeWindow }, clock());
+    res.set('RateLimit-Remaining', String(verdict.remaining));
+    res.set('RateLimit-Reset', String(Math.ceil(verdict.resetAt / 1000)));
+    if (!verdict.allowed) {
+      res.set('Retry-After', String(Math.max(1, Math.ceil((verdict.resetAt - clock()) / 1000))));
+      return res.status(429).json({ error: { code: 'RATE_LIMITED', message: 'Too many requests. Try again later.' } });
+    }
+    next();
+  }), { rateLimit: { key: 'guest-route', limit: L.routeHourLimit, windowMs: routeWindow } });
+
+  /**
+   * Spend one unit from each counter in turn; if any refuses, give back what was
+   * already spent, so a refused request costs the visitor nothing. `plan` is
+   * [{ bucket, limit, tag }]; resolves { ok: true, taken } or { ok: false, tag, verdict }.
+   */
+  const spendAll = async (plan, now) => {
+    const taken = [];
+    for (const step of plan) {
+      const verdict = await consumeRateLimit(db, step.bucket, { limit: step.limit, windowMs: DAY }, now);
+      if (!verdict.allowed) {
+        for (const t of taken) await db.run('UPDATE rate_limits SET count = count - 1 WHERE bucket = ? AND window_start = ? AND count > 0', [t.bucket, t.windowStart]);
+        return { ok: false, tag: step.tag, verdict };
+      }
+      taken.push({ bucket: step.bucket, windowStart: verdict.resetAt - DAY, verdict });
+    }
+    return { ok: true, taken };
+  };
 
   // The guest CSRF gate: the header must equal the HMAC of the cookie's own
   // token. Tagged so the route inventory reports a CSRF check on every route
@@ -160,8 +220,12 @@ export function createGuestTrialRouter(db, { env = process.env, banks = bankPoli
     res.set('Cache-Control', 'no-store');
     let token = readToken(req, now);
     if (!token) {
-      const mint = await consumeRateLimit(db, `guest-mint:${guestAddressBucket(req)}`, { limit: L.mintDayLimit, windowMs: DAY }, now);
-      if (!mint.allowed) return reject(res, 429, 'GUEST_ADDRESS_LIMIT', 'This connection has used its free questions for today.', { resetAt: mint.resetAt });
+      const b = guestAddressBuckets(req);
+      const mint = await spendAll([
+        { bucket: `guest-mint:${b.address}`, limit: L.mintDayLimit, tag: 'addr' },
+        ...(b.prefix ? [{ bucket: `guest-mint48:${b.prefix}`, limit: L.prefixMintDayLimit, tag: 'prefix' }] : [])
+      ], now);
+      if (!mint.ok) return reject(res, 429, 'GUEST_ADDRESS_LIMIT', 'This connection has used its free questions for today.', { resetAt: mint.verdict.resetAt });
       const id = randomBytes(16).toString('hex');
       const exp = now + DAY;
       const raw = encryptDeliveryToken(JSON.stringify({ id, iat: now, exp }), TOKEN_CONTEXT);
@@ -208,14 +272,23 @@ export function createGuestTrialRouter(db, { env = process.env, banks = bankPoli
     if (!q) return reject(res, 422, 'GUEST_NO_QUESTION', 'There is no question of that kind at this level yet.');
 
     const now = clock();
-    // The counters, widest ambiguity last so a refusal spends the least: the
-    // device's own, then the address's, then the process's.
-    const mine = await consumeRateLimit(db, `guest-q:${scramble(`token:${req.guest.id}`)}`, { limit: L.limit, windowMs: DAY }, now);
-    if (!mine.allowed) return reject(res, 429, 'GUEST_LIMIT_REACHED', 'You have tried today\'s free questions.', { resetAt: mine.resetAt, limit: L.limit, remaining: 0 });
-    const addr = await consumeRateLimit(db, `guest-ip:${guestAddressBucket(req)}`, { limit: L.ipDayLimit, windowMs: DAY }, now);
-    if (!addr.allowed) return reject(res, 429, 'GUEST_ADDRESS_LIMIT', 'This connection has used its free questions for today.', { resetAt: addr.resetAt });
-    const all = await consumeRateLimit(db, 'guest-all', { limit: L.globalDayLimit, windowMs: DAY }, now);
-    if (!all.allowed) return reject(res, 429, 'GUEST_BUSY', 'The free trial is busy. Please try again later.', { resetAt: all.resetAt });
+    // All the counters or none: the device's own, the address's /64, its /48, then
+    // the process's. A request any of them refuses gives back what it took, so the
+    // visitor's remaining count is unchanged by a refusal that was not theirs.
+    const b = guestAddressBuckets(req);
+    const spent = await spendAll([
+      { bucket: `guest-q:${scramble(`token:${req.guest.id}`)}`, limit: L.limit, tag: 'token' },
+      { bucket: `guest-ip:${b.address}`, limit: L.ipDayLimit, tag: 'addr' },
+      ...(b.prefix ? [{ bucket: `guest-ip48:${b.prefix}`, limit: L.prefixDayLimit, tag: 'prefix' }] : []),
+      { bucket: 'guest-all', limit: L.globalDayLimit, tag: 'all' }
+    ], now);
+    if (!spent.ok) {
+      const { tag, verdict } = spent;
+      if (tag === 'token') return reject(res, 429, 'GUEST_LIMIT_REACHED', 'You have tried today\'s free questions.', { resetAt: verdict.resetAt, limit: L.limit, remaining: 0 });
+      if (tag === 'all') return reject(res, 429, 'GUEST_BUSY', 'The free trial is busy. Please try again later.', { resetAt: verdict.resetAt });
+      return reject(res, 429, 'GUEST_ADDRESS_LIMIT', 'This connection has used its free questions for today.', { resetAt: verdict.resetAt });
+    }
+    const mine = spent.taken[0].verdict;
 
     const nonce = randomUUID();
     const sealed = encryptDeliveryToken(JSON.stringify({ g: generator, d: difficulty, s: q.seed, t: req.guest.id, n: nonce, i: now, x: now + L.questionTtlMs }), QUESTION_CONTEXT);
@@ -246,7 +319,27 @@ export function createGuestTrialRouter(db, { env = process.env, banks = bankPoli
     if (!banks.issues(ticket.g)) return reject(res, banks.outside.status, banks.outside.code, banks.outside.message);
     // A closed question is closed; and an unreadable entry may be retried only a few times.
     const closed = await db.get('SELECT 1 AS x FROM rate_limits WHERE bucket=? AND window_start>?', [`guest-done:${scramble(`q:${ticket.n}`)}`, now - DAY]);
-    if (closed) return reject(res, 409, 'GUEST_ALREADY_ANSWERED', 'This question has already been answered.');
+    // A verdict lost in transit: the same token sending the same answer again, for
+    // a short while after the claim, is told the same verdict. This is a read of
+    // a keyed bit written with the claim; the question is not marked a second time.
+    const replayBucket = `guest-ver:${scramble(`q:${ticket.n}:t:${req.guest.id}:a:${body.answer.trim()}`)}`;
+    if (closed) {
+      const kept = await db.get('SELECT count FROM rate_limits WHERE bucket=? AND window_start>?', [replayBucket, now - L.verdictRetryMs]);
+      if (kept && (Number(kept.count) === 1 || Number(kept.count) === 2)) {
+        let q;
+        try { q = generateQuestion(ticket.g, ticket.d, ticket.s, undefined, null); } catch { q = null; }
+        if (q) {
+          q._generator = ticket.g;
+          q._practiceMode = 'practice';
+          if (sealForEdition(q, banks)) {
+            res.set('Cache-Control', 'no-store');
+            const left = await view(req.guest, now);
+            return res.status(200).json({ resolved: true, correct: Number(kept.count) === 1, answer: answerTextFor(q), remaining: left.remaining, limit: L.limit, replayed: true });
+          }
+        }
+      }
+      return reject(res, 409, 'GUEST_ALREADY_ANSWERED', 'This question has already been answered.');
+    }
     const attempts = await consumeRateLimit(db, `guest-try:${scramble(`q:${ticket.n}`)}`, { limit: L.unreadableTries + 1, windowMs: DAY }, now);
     if (!attempts.allowed) return reject(res, 409, 'GUEST_ALREADY_ANSWERED', 'This question has already been answered.');
 
@@ -272,6 +365,8 @@ export function createGuestTrialRouter(db, { env = process.env, banks = bankPoli
     // A verdict: claim the question exactly once, then reveal the answer (it is closed).
     const claim = await consumeRateLimit(db, `guest-done:${scramble(`q:${ticket.n}`)}`, { limit: 1, windowMs: DAY }, now);
     if (!claim.allowed) return reject(res, 409, 'GUEST_ALREADY_ANSWERED', 'This question has already been answered.');
+    // One keyed bit (1 right, 2 wrong) under a name only this token and this entry can recompute, kept for the retry window only.
+    await db.run('INSERT INTO rate_limits(bucket, window_start, count) VALUES (?, ?, ?) ON CONFLICT(bucket) DO NOTHING', [replayBucket, now, result.correct === true ? 1 : 2]);
     const mine = await view(req.guest, now);
     return res.status(200).json({ resolved: true, correct: result.correct === true, answer: answerTextFor(q), remaining: mine.remaining, limit: L.limit });
   }));

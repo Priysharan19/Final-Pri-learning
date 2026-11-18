@@ -197,6 +197,91 @@ try {
     c.deq([stale.status, stale.data.error.code], [410, 'GUEST_QUESTION_EXPIRED'], 'a question not answered within half an hour has expired');
   } finally { await hf.close(); }
 
+  // ── review findings (19 Nov 2026): /48 rotation, refusals that cost nothing, keyed route counter, lost verdicts ──
+  {
+    const { guestAddressBuckets } = await import('../platform/guestTrial.js');
+    const { createHash } = await import('node:crypto');
+    const fake = ip => ({ ip, get: () => undefined, headers: {} });
+    const a = guestAddressBuckets(fake('2001:db8:abcd:1::1')), b = guestAddressBuckets(fake('2001:db8:abcd:2:ffff::9')), cc = guestAddressBuckets(fake('2001:db8:abce:1::1'));
+    c.deq([a.address !== b.address, a.prefix === b.prefix, a.prefix !== cc.prefix], [true, true, true], 'two /64s of one /48 share a /48 bucket and not a /64 bucket; another /48 shares neither');
+    c.eq(guestAddressBuckets(fake('2001:db8:abcd::1')).address, guestAddressBuckets(fake('2001:0db8:ABCD:0000:0:0:0:1')).address, 'a compressed and an expanded spelling of one address are one bucket');
+    c.eq(guestAddressBuckets(fake('203.0.113.7')).prefix, null, 'an IPv4 address has no /48 bucket');
+    const env = process.env.PRI_CLIENT_IP_HEADER;
+    process.env.PRI_CLIENT_IP_HEADER = 'x-real-ip';
+    const open = async limits => {
+      const app = await startApp({ engine: requestedEngine(), guest: { limits: { minAnswerMs: 0, mintDayLimit: 100, ipDayLimit: 100, ...limits } } });
+      const at = (path, body, jar, ip, headers = {}) => app.request(path, { method: 'POST', jar, body, headers: { 'x-real-ip': ip, ...headers } });
+      return { app, at };
+    };
+    try {
+      // rotating /64s inside one /48 cannot mint tokens or questions past the /48 counters
+      const m = await open({ prefixMintDayLimit: 3, prefixDayLimit: 3 });
+      try {
+        const minted = [];
+        for (let i = 1; i <= 5; i++) minted.push((await m.at('/v1/guest/session', {}, {}, `2001:db8:5:${i}::1`)).status);
+        c.deq(minted, [200, 200, 200, 429, 429], 'tokens minted from rotating /64s of one /48 stop at the /48 limit (3), though no /64 has minted more than one');
+        const refusedMint = await m.at('/v1/guest/session', {}, {}, '2001:db8:5:9::1');
+        c.eq(refusedMint.data.error.code, 'GUEST_ADDRESS_LIMIT', 'refused as the address limit');
+        const other = await m.at('/v1/guest/session', {}, {}, '2001:db8:6:1::1');
+        c.eq(other.status, 200, 'another /48 is unaffected');
+        const asked = [];
+        for (let i = 1; i <= 5; i++) {
+          const jar = {}; const sess = await m.at('/v1/guest/session', {}, jar, `2001:db8:7:${i}::1`);
+          if (sess.status !== 200) { asked.push('no-token'); continue; }
+          asked.push((await m.at('/v1/guest/question', ASK(), jar, `2001:db8:7:${i}::1`, { [GUEST_CSRF_HEADER]: sess.data.csrf })).status);
+        }
+        c.ok(asked.filter(x => x === 201).length <= 3, `at most three questions from rotating /64s of one /48 (${asked.join(',')})`);
+      } finally { await m.app.close(); }
+
+      // a refusal by the address or the process costs the visitor nothing
+      const o = await open({ ipDayLimit: 1, globalDayLimit: 2 });
+      try {
+        const jar = {}; const sess = await o.at('/v1/guest/session', {}, jar, '203.0.113.20');
+        const hd = { [GUEST_CSRF_HEADER]: sess.data.csrf };
+        const first = await o.at('/v1/guest/question', ASK(), jar, '203.0.113.20', hd);
+        c.deq([first.status, first.data.remaining], [201, 4], 'the first question spends one of the five');
+        const refusedAddr = await o.at('/v1/guest/question', ASK(), jar, '203.0.113.20', hd);
+        c.deq([refusedAddr.status, refusedAddr.data.error.code], [429, 'GUEST_ADDRESS_LIMIT'], 'the address limit refuses the second');
+        c.eq((await o.at('/v1/guest/session', {}, jar, '203.0.113.20')).data.remaining, 4, 'GUEST_ADDRESS_LIMIT leaves the token with four remaining (nothing spent by the refusal)');
+        const second = await o.at('/v1/guest/question', ASK(), jar, '203.0.113.21', hd);
+        c.deq([second.status, second.data.remaining], [201, 3], 'from another address the same token goes on, at three');
+        const busy = await o.at('/v1/guest/question', ASK(), jar, '203.0.113.22', hd);
+        c.deq([busy.status, busy.data.error.code], [429, 'GUEST_BUSY'], 'past the process ceiling: GUEST_BUSY');
+        c.eq((await o.at('/v1/guest/session', {}, jar, '203.0.113.22')).data.remaining, 3, 'GUEST_BUSY leaves the token with three remaining');
+        const ip22 = await o.app.db.get("SELECT COUNT(*) AS n FROM rate_limits WHERE bucket LIKE 'guest-ip:%'");
+        c.eq(Number(ip22.n), 3, 'and the refused address left its counter at what it had spent (three addresses, each 1 or 0)');
+        const sumRow = await o.app.db.get("SELECT SUM(count) AS n FROM rate_limits WHERE bucket LIKE 'guest-ip:%'");
+        c.eq(Number(sumRow.n), 2, 'the address counters sum to the two questions actually served');
+        // keyed route counter: no row is the plain sha256 of an address
+        const routeRows = (await o.app.db.all("SELECT bucket FROM rate_limits WHERE bucket LIKE 'guest-route:%'")).map(r => r.bucket);
+        const plainHashes = ['203.0.113.20', '203.0.113.21', '203.0.113.22', '127.0.0.1', '::ffff:127.0.0.1', '::1'].map(ip => `guest-route:${createHash('sha256').update(ip).digest('hex').slice(0, 24)}`);
+        c.ok(routeRows.length >= 3 && routeRows.every(r => !plainHashes.includes(r)), 'the route limiter names its counters with the guest key: no guest-route row is an unkeyed hash of an address');
+      } finally { await o.app.close(); }
+
+      // a verdict lost in transit is re-fetched by the same token, once, without a second marking
+      const v = await open({});
+      try {
+        const jar = {}; const sess = await v.at('/v1/guest/session', {}, jar, '203.0.113.30');
+        const hd = { [GUEST_CSRF_HEADER]: sess.data.csrf };
+        const qq = await v.at('/v1/guest/question', ASK(), jar, '203.0.113.30', hd);
+        const key = answerKeyOf(qq.data.sealed);
+        const wrong = key.text + '9';
+        const one = await v.at('/v1/guest/answer', { sealed: qq.data.sealed, answer: wrong }, jar, '203.0.113.30', hd);
+        const again = await v.at('/v1/guest/answer', { sealed: qq.data.sealed, answer: wrong }, jar, '203.0.113.30', hd);
+        c.deq([one.data.resolved, one.data.correct, again.status, again.data.resolved, again.data.correct, again.data.remaining], [true, false, 200, true, false, one.data.remaining], 'the same answer sent again after a lost reply gets the same verdict');
+        c.eq((await v.at('/v1/guest/session', {}, jar, '203.0.113.30')).data.remaining, one.data.remaining, 'and spends nothing');
+        const other = await v.at('/v1/guest/answer', { sealed: qq.data.sealed, answer: key.text }, jar, '203.0.113.30', hd);
+        c.deq([other.status, other.data.error.code], [409, 'GUEST_ALREADY_ANSWERED'], 'a different answer to a closed question is not marked');
+        const jar2 = {}; const sess2 = await v.at('/v1/guest/session', {}, jar2, '203.0.113.30');
+        const stranger = await v.at('/v1/guest/answer', { sealed: qq.data.sealed, answer: wrong }, jar2, '203.0.113.30', { [GUEST_CSRF_HEADER]: sess2.data.csrf });
+        c.eq(stranger.status, 403, 'another token cannot re-fetch it');
+        offset += GUEST_DEFAULTS.verdictRetryMs + 1000;
+        const late = await v.at('/v1/guest/answer', { sealed: qq.data.sealed, answer: wrong }, jar, '203.0.113.30', hd);
+        c.eq(late.status, 409, 'after the short window the question is closed for good');
+      } finally { await v.app.close(); }
+    } finally { if (env === undefined) delete process.env.PRI_CLIENT_IP_HEADER; else process.env.PRI_CLIENT_IP_HEADER = env; }
+  }
+
   // ── expiry ──────────────────────────────────────────────────────────────────
   offset += DAY + 60_000;
   const late = await post('/v1/guest/question', ASK(), g.jar, g.headers);
