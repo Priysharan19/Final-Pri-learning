@@ -2,6 +2,7 @@
 // Pri Learning · Local backend — the entire platform running on this device.
 // Implements every API the UI uses against IndexedDB. No network required.
 // ─────────────────────────────────────────────────────────────────────────────
+import { derivedMetaOff } from '../engine/derivedMetaOff.js';
 import {
   get, put, del, add, all, byIndex, rawByIndex, atomicBatch, uuid, wipeProfile,
   requestPersistentStorage, storageEstimate,
@@ -1893,6 +1894,7 @@ function criteriaFor(q) {
  */
 function stepMetaFor(q) {
   if (q.stepcheck) return q.stepcheck;
+  if (derivedMetaOff(q)) return null;   // answer only until the family has a structured meta
   const a = q.answer;
   if (!a) return null;
   if (q.answerType === 'expression' && a.expr) return { kind: 'expression', canonical: a.expr };
