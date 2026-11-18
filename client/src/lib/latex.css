@@ -9,3 +9,6 @@
 .pri-readable-text:empty { display: none; }
 @media print { .pri-readable-btn, .pri-readable-text { display: none; } }
 .tag-icon { vertical-align: -2px; margin-inline-end: 2px; }
+/* A blank line inside a stem ("Line 1 … Line 2 …"): its own line, with room for a fraction's height. */
+.mt-par { display: block; height: 0.6em; }
+.q-prompt .mt-par { height: 0.75em; }
