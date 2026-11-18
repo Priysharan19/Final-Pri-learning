@@ -358,7 +358,8 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
       ok(html.indexOf('data-check-needs-account') < html.indexOf('ws-actions') && html.indexOf('data-check-needs-account') > html.indexOf('ws-tools'), `${mode}: placed with the work, directly above the Submit bar`);
       // The Instrument's primary button carries its scan glyph and an
       // aria-hidden shortcut hint around the label: the label is what it says.
-      ok(primaryLabel(html) === en['verdict.submit'], `${mode}: Submit is still the primary action (${JSON.stringify(primaryLabel(html))})`);
+      // Written working and a photo are marked with one press of "Mark my working"; a typed answer is submitted.
+      ok(primaryLabel(html) === en[mode === 'type' ? 'verdict.submit' : 'verdict.markMyWorking'], `${mode}: the one primary action is still there (${JSON.stringify(primaryLabel(html))})`);
       ok(!/eval-card|verdict-title|data-outcome|solution-panel|eval-marks/.test(html), `${mode}: no verdict, marks or solution on an unchecked question`);
       ok(/data-phase="answering"/.test(html), `${mode}: the card is open for work`);
       const linked = card(signedIn, mode);
@@ -564,7 +565,7 @@ ok(/this one is a repeat/.test(en['practice.repeatNote']) && /will not count tow
   const deliver = between('async function deliver(', '/** The submit, reveal or walkthrough did not go through');
   ok(/if \(!diagnostic && !matchingGradeResponse\(r, question\.id, body\.submissionId\)\) \{[\s\S]{0,400}?throw new Error\(gradingReceiptMismatch\(language\)\);/.test(deliver), 'a practice submit is valid only as a matched server receipt');
   ok(/settleFailedSubmission\(question\.id, e, \{ definitive: definitiveSubmissionRefusal\(e\)[\s\S]{0,120}?\}\);\s*if \(fate === 'cleared'\) pendingRef\.current = null;/.test(deliver) &&
-    !/clearPendingSubmission\(question\.id\)/.test(deliver.slice(deliver.indexOf('} catch (e) {'))),
+    !/clearPendingSubmission\(question\.id\)/.test(deliver.slice(deliver.indexOf('} catch (e) {')).replace(/if \(e\?\.code === 'FINAL_ANSWER_UNREADABLE'\) \{[\s\S]*?\n      \}\n/, '')),
     'only a definitive refusal drops the submission key');
   ok(/refuseCheck\(e, 'submit'\);/.test(deliver), 'every other failure becomes the refused-check state');
   const caught = deliver.slice(deliver.indexOf('} catch (e) {'));

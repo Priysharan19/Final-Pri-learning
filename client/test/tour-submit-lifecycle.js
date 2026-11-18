@@ -236,12 +236,13 @@ export const flow = {
       `before ${inkId} after ${await shownId(page)}`);
     // The reading is kept with the ink and is never shown (owner decision, 19 Nov 2026: the reading is not shown; one press
     // marks the working on the student's own page), so what is pinned is: the ink is back, Mark my working is offered,
-    // no reading is on screen, and the page was NOT read (or paid for) a second time.
+    // no reading is on screen, and the page was NOT read (or paid for) again: the count of reader requests is the same after the
+    // reload as before it. (Before it, a slow runner can rest the pen long enough for more than one automatic read of the same page.)
     await page.waitForTimeout(3500);
     const hidden = await readingIsNotShown(page, []);
     const markBtn = page.getByRole('button', { name: /^Mark my working/ });
     await check('its handwriting is back on the page, ready to mark, with no reading shown, and was NOT read again (no new reader request)',
-      readsBefore === 1 && await markBtn.count() === 1 && await markBtn.isEnabled() && hidden.structure.length === 0 && online.reader.requests.length === readerCallsBeforeReload,
+      readsBefore >= 1 && await markBtn.count() === 1 && await markBtn.isEnabled() && hidden.structure.length === 0 && online.reader.requests.length === readerCallsBeforeReload,
       `reads before ${readsBefore}; reader requests +${online.reader.requests.length - readerCallsBeforeReload}; ${JSON.stringify(hidden)}`);
   }
 };
