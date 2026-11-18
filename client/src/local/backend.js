@@ -6449,6 +6449,8 @@ async function serveQuestion(pid, asked, localDraft) {
       const gate = serverGateRefusal(cause);
       if (gate) throw gate;
       if (nsw && SERVER_BANK_REFUSALS.has(cause?.code)) throw practiceNotOffered();
+      // Owner decision, 19 Nov 2026: a year or course the server does not offer is refused, never drafted.
+      if (cause?.code === 'COURSE_NOT_OFFERED') throw cause;
       /* not issuable right now: prepared or draft below */
     }
   }
@@ -6459,6 +6461,7 @@ async function serveQuestion(pid, asked, localDraft) {
     }
   } catch (cause) {
     if (nsw && SERVER_BANK_REFUSALS.has(cause?.code)) throw practiceNotOffered();
+    if (cause?.code === 'COURSE_NOT_OFFERED') throw cause;
     /* no server: an offline draft */
   }
   // Requests cancelled because the page is navigating away fail exactly like a

@@ -551,11 +551,12 @@ async function chooseQuestionFor(db, accountId, request, now, { draw = () => ran
  * may start working on before signing in, and the sealed token that lets one
  * account turn it into an issued question later.
  */
-export function createPracticePrepareRoute(db, { banks = bankPolicy() } = {}) {
+export function createPracticePrepareRoute(db, { banks = bankPolicy(), env = process.env } = {}) {
   db = asStore(db);
   return [rateLimit(db, 'practice-prepare', { limit: 90, windowMs: 60 * 60 * 1000 }), asyncHandler(async (req, res) => {
     const request = readQuestionRequest(req.body, PREPARE_FIELDS, banks);
     if (request.error) return reject(res, ...request.error);
+    if (!subtopicOfferedIn(editionOffering(env), request.generator)) return refuseNotOffered(res);
     await ensureBanks();
     let chosen;
     try { chosen = chooseQuestion(request, null, { banks }); }

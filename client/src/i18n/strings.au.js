@@ -67,6 +67,9 @@ export const AU_STRINGS = Object.freeze({
   'inst.noChapters': 'No chapters are set for your year yet.',
   'cloudError.consentDeclarationRequired': 'Tell us whether the learner is 18 or older, or their year with a parent or guardian’s name and email, then try again.',
   'upgrade.jeeAdvanced': "This part of the course is included with HSC Pass.",
+  // Owner walk-through, 19 Nov 2026: difficulty is read in words, never as D1 to D4.
+  'settings.allDifficulties': 'All difficulties',
+  'home.difficultyChip': '{label}',
   // Owner decision, 19 Nov 2026: no "session 1/1" in the student's view.
   'practice.sessionScore': ' · {correct} of {answered} right',
   // Owner decision, 19 Nov 2026: hints are free in Prithagoras practice.

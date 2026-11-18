@@ -21,6 +21,7 @@ import { textMatches, useGlossary } from '../i18n/glossary.js';
 import { practiceDifficulties, practiceHref } from '../lib/practiceLinks.js';
 import { studyHref } from '../lib/studyJourney.js';
 import { offeredYears } from '../platform/edition.js';
+import { difficultyLabel, difficultyPair } from '../lib/difficultyText.js';
 
 const DIFF_KEYS = { 1: 'difficulty.1', 2: 'difficulty.2', 3: 'difficulty.3', 4: 'difficulty.4' };
 
@@ -316,14 +317,14 @@ export default function TopicGenerator({ user, curriculum }) {
                     {offeredDifficulties.map(d => (
                       <button key={d} className={`gen-opt ${chosenDifficulty === d ? 'on' : ''}`} aria-pressed={chosenDifficulty === d}
                         onClick={() => setDifficulty(chosenDifficulty === d ? null : d)}>
-                        {`D${d}`} · {t(DIFF_KEYS[d])}
+                        {difficultyPair(d, t)}
                       </button>
                     ))}
                   </div>
                   {selSub && missingDifficulties.length > 0 && (
                     <p className="muted" data-difficulty-unavailable style={{ margin: '10px 0 0' }}>
                       {t(selectedDotpoint ? 'home.difficultyMissingDotpoint' : 'home.difficultyMissingTopic', {
-                        levels: missingDifficulties.map(d => `D${d} · ${t(DIFF_KEYS[d])}`).join(', ')
+                        levels: missingDifficulties.map(d => difficultyPair(d, t)).join(', ')
                       })}
                     </p>
                   )}
@@ -338,7 +339,7 @@ export default function TopicGenerator({ user, curriculum }) {
           <h3 className="gen-pane-title">{t('study.choosePath')}</h3>
           <p className="muted" data-study-context>
             {selSub.name}{selectedDotpoint ? ` · ${typeof selectedDotpoint === 'string' ? selectedDotpoint : selectedDotpoint.text}` : ''}
-            {chosenDifficulty != null ? ` · D${chosenDifficulty}` : ''}
+            {chosenDifficulty != null ? ` · ${difficultyLabel(chosenDifficulty, t)}` : ''}
           </p>
           <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
             {studyAvailable && (
