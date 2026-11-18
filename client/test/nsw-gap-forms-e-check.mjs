@@ -11,6 +11,8 @@
 // Usage: node client/test/nsw-gap-forms-e-check.mjs [seeds]
 // ─────────────────────────────────────────────────────────────────────────────
 const SRC = new URL('../src/', import.meta.url).href;
+import { bareNumberLeaks, bareNumberSelfTest } from './support/hint-leak.mjs';
+{ const e = bareNumberSelfTest(); if (e.length) { console.error(`hint-leak (bare number) self-test FAILED: ${e.join(' | ')}`); process.exit(1); } }
 const { generateQuestion, loadAllBanks } = await import(`${SRC}engine/generators/index.js`);
 const { checkAnswer } = await import(`${SRC}engine/checker.js`);
 await loadAllBanks();
@@ -56,7 +58,8 @@ function commonChecks(cell, seed, q, finals) {
     for (const h of q.hints) if (h.includes(right)) fail(cell, seed, `hint states the correct option: ${h}`, q);
   }
   for (const f of new Set(finals)) {
-    if (!f || f.length < 3) continue;
+    if (f && f.length < 3) { if (cell.startsWith('me11-comb')) for (const b of bareNumberLeaks(q.hints, f, q.prompt)) fail(cell, seed, `hint quotes the key as a count the prompt does not print: ${b}`, q); continue; }  // (counting hints work out counts; in calculus an intermediate value equal to a short key is a coincidence)
+    if (!f) continue;
     const esc = f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const re = new RegExp(`(?<![\\d.,])${esc}(?![\\d.]|,\\d)`);
     for (const h of q.hints || []) if (re.test(h)) fail(cell, seed, `hint contains the final answer "${f}": ${h}`, q);

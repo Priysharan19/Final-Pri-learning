@@ -11,9 +11,17 @@ import { ri, rc, nz, gcd, mcq, poly } from '../qhelpers.js';
 const REJ = Symbol('reject');
 const rej = cond => { if (cond) throw REJ; };
 /** Re-draw (same rng, so still deterministic) until a variant accepts its numbers. */
+/** A whole-number key that a hint quotes as a count the prompt never prints (C(6, 1) = 6 after "6 people to choose from") is handed over. */
+const hintHandsOverKey = q => {
+  const f = String(q.answer?.value);
+  if (!/^\d+$/.test(f)) return false;
+  const token = new RegExp(`(?<![\\d.,\\w])${f}(?![\\d.]\\d|[\\d,\\w])`);
+  const flat = s => String(s).replace(/\$/g, ' ').replace(/\s+/g, ' ');
+  return !token.test(flat(q.prompt)) && (q.hints || []).some(h => token.test(flat(h)));
+};
 const R = fn => (rng, diff) => {
   for (let i = 0; i < 300; i++) {
-    try { return fn(rng, diff); } catch (e) { if (e !== REJ) throw e; }
+    try { const q = fn(rng, diff); if (hintHandsOverKey(q)) continue; return q; } catch (e) { if (e !== REJ) throw e; }
   }
   throw new Error('gaps-e variant: no acceptable draw');
 };
@@ -68,7 +76,7 @@ const comb = [
     const val = choose(n - 2, k - 2);
     return cnt(`A committee of $${k}$ is to be chosen from $${n}$ ${who}, including ${p} and ${q}. ${p} and ${q} have both agreed to serve, and must **both** be on the committee. How many committees are possible?`, val, {
       traps: [{ value: choose(n, k), why: `That ignores the condition. Once ${p} and ${q} are in, only the remaining places are chosen freely.` }, { value: choose(n - 2, k), why: `${p} and ${q} are already on the committee, so they fill two of the $${k}$ places; do not choose $${k}$ from the others.` }],
-      hints: [`Put ${p} and ${q} on the committee first. How many places are left, and how many people can fill them?`, `There are $${k} - 2 = ${k - 2}$ places left and $${n} - 2 = ${n - 2}$ people to choose from.`, `Count the ways to choose $${k - 2}$ people from $${n - 2}$.`],
+      hints: [`Put ${p} and ${q} on the committee first. How many places are left, and how many people can fill them?`, (k - 2 === 1 ? `There is $${k} - 2 = 1$ place left, and everyone except ${p} and ${q} can fill it.` : `There are $${k} - 2 = ${k - 2}$ places left and $${n} - 2 = ${n - 2}$ people to choose from.`), (k - 2 === 1 ? 'Count the people who could fill that one place.' : `Count the ways to choose $${k - 2}$ people from $${n - 2}$.`)],
       steps: [{ h: 'Fix the two named people', d: `${p} and ${q} are in: $${k - 2}$ places remain, $${n - 2}$ people available` }, { h: 'Choose the rest', d: `$\\binom{${n - 2}}{${k - 2}} = ${val}$` }]
     });
   }),

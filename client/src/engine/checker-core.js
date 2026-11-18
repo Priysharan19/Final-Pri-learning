@@ -241,7 +241,7 @@ export function namedDecimalPlaces(question) {
 }
 // "evaluate … exactly", "find the exact gradient": the answer is a value, not a rounded one.
 // Maths inside $…$ is not the sentence ("P(\\text{exactly } 1)" asks for a probability).
-const EXACT_ASK = /\bexact\b(?!\s+(?:change|same))|\bexactly\b(?!\s+(?:\d|one|two|three|four|five|when|the same|equal|half|as many|divisible))/i;
+const EXACT_ASK = /\bexact\b(?!\s+(?:change|same))|\bexactly\b(?!\s+(?:\d|once|twice|thrice|one|two|three|four|five|when|the same|equal|half|as many|divisible))/i;
 export function asksForExactValue(question) {
   return EXACT_ASK.test(String(question?.prompt ?? '').replace(/\$[^$]*\$/g, ' '));
 }

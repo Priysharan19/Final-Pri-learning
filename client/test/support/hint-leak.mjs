@@ -39,3 +39,27 @@ export function hintLeakSelfTest() {
   caught.forEach((c, i) => { if (!c.length) errors.push(`rephrased leak #${i + 1} was not caught`); });
   return errors;
 }
+
+/**
+ * A short whole-number key (1-2 digits) turns up in a hint by coincidence as often as by leak, so it is only a leak when the
+ * hint quotes it as a number the PROMPT never prints: a count the hint has just worked out ("6 people to choose from" when the
+ * key is C(6, 1) = 6) is the answer handed over. A number the question itself prints is not.
+ */
+export function bareNumberLeaks(hints, key, prompt) {
+  const f = String(key);
+  if (!/^\d+$/.test(f)) return [];
+  const token = new RegExp(`(?<![\\d.,\\w])${f}(?![\\d.]\\d|[\\d,\\w])`);
+  const inPrompt = token.test(String(prompt).replace(/\$/g, ' ').replace(/\s+/g, ' '));
+  if (inPrompt) return [];
+  return (hints || []).filter(h => token.test(String(h).replace(/\$/g, ' ').replace(/\s+/g, ' '))).map(h => `"${f}" in: ${h}`);
+}
+
+export function bareNumberSelfTest() {
+  const prompt = 'A committee of 3 is chosen from 8 students, including Asha and Ben, who must both serve.';
+  const errors = [];
+  if (!bareNumberLeaks(['There is 1 place left and 6 people to choose from.'], 6, prompt).length) errors.push('a worked-out count equal to the key was not caught');
+  if (!bareNumberLeaks(['Choose 1 person from the other $6$.'], 6, prompt).length) errors.push('a count in maths mode equal to the key was not caught');
+  if (bareNumberLeaks(['Choose 3 from the list.'], 3, prompt).length) errors.push('a number the prompt prints was flagged');
+  if (bareNumberLeaks(['The total is 16 here.'], 6, prompt).length) errors.push('a longer number containing the key was flagged');
+  return errors;
+}
