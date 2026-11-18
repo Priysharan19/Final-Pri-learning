@@ -16,7 +16,7 @@ import { translate } from '../i18n/core.js';
 import { DEFAULT_THEME_PREF, THEME_PREFS, cleanThemePref } from '../lib/theme.js';
 import {
   CURRICULUM, STREAM_CURRICULUM, PATHWAYS, streamSubtopics, SUBTOPIC_BY_ID, subtopicsForYear,
-  scopeForYear, DIFF_LABELS, dotpointsFor, dotpointById, dotpointAt
+  scopeForYear, DIFF_LABELS, DIFF_WORDS, dotpointsFor, dotpointById, dotpointAt
 } from '../engine/curriculum.js';
 import {
   cleanIndiaTrack, indiaTrack, indiaCourseLabel, indiaScope, indiaChapter,
@@ -35,6 +35,8 @@ import { IN_CHAPTERS, OLYMPIAD_TOPICS } from '../engine/curriculum-in.js';
 import { evidenceProgress } from '../engine/progressEvidence.js';
 import { generateQuestion } from '../engine/generators/index.js';
 import { HINT_RUNGS, rungLevelOf, nextRungAfter, markWeightAfter, helpUnitsAfter } from '../engine/hintLadder.js';
+import { offeredScope, subtopicOffered } from '../engine/offering.js';
+import { hintsFree, walkthroughFixes, yearOffered, pathwayOffered, courseOffered, offering } from '../platform/edition.js';
 import { contentRefOf, contentHashOf, drawDistinct } from '../engine/contentIdentity.js';
 import { checkAnswer, stepCheck, methodMarks } from '../engine/checker.js';
 import { authoredRegion, formatRegion, formatMatrix, formatVector } from '../engine/answer-forms.js';
@@ -1188,9 +1190,14 @@ const INDIA_WHY = {
  * India Progress. Everything either mode needs is a chapter with an id and a
  * strand, which both spines provide.
  */
+/** The difficulty as the student reads it: the words only where the edition offers a plain list (Prithagoras), the D-coded label elsewhere. */
+const diffLabelOf = d => (offering() ? DIFF_WORDS[d] : DIFF_LABELS[d]);
+
+const notOffered = () => Object.assign(new Error('That year or course is not offered yet.'), { status: 400, code: 'COURSE_NOT_OFFERED' });
+
 async function practicePoolFor(profile, now = Date.now()) {
   if (profile.course !== 'in') {
-    const { own, revision } = scopeForYear(profile.year, pathwayOf(profile));
+    const { own, revision } = offeredScope(scopeForYear(profile.year, pathwayOf(profile)));
     // Rapid Fire and Match draw only from subtopics the server issues
     // (engine/nswOffer.js); a scope with none has nothing to play.
     const entries = [...own, ...revision].filter(s => nswIssuedLevels(s.id).length > 0);
@@ -1494,12 +1501,12 @@ export function namedDifficultyOf(requested) {
 export function difficultyUnavailable(requested, available, scope = {}) {
   const levels = [...new Set((available || []).map(Number).filter(d => Number.isInteger(d) && d !== requested))].sort((a, b) => a - b);
   return Object.assign(
-    new Error(`There are no questions at ${DIFF_LABELS[requested] || `D${requested}`} for this ${scope.dotpoint != null ? 'dot point' : 'topic'} yet.`),
+    new Error(`There are no questions at ${diffLabelOf(requested) || `D${requested}`} for this ${scope.dotpoint != null ? 'dot point' : 'topic'} yet.`),
     {
       status: 409, code: 'DIFFICULTY_UNAVAILABLE',
       detail: {
-        difficultyRequested: requested, requestedLabel: DIFF_LABELS[requested] || `D${requested}`,
-        available: levels.map(d => ({ difficulty: d, label: DIFF_LABELS[d] || `D${d}` })),
+        difficultyRequested: requested, requestedLabel: diffLabelOf(requested) || `D${requested}`,
+        available: levels.map(d => ({ difficulty: d, label: diffLabelOf(d) || `D${d}` })),
         subtopic: scope.subtopic ?? null, dotpoint: scope.dotpoint ?? null, track: scope.track ?? null
       }
     }
@@ -1954,7 +1961,7 @@ function sanitize(q, row) {
     dotpoint: inChapter ? inDp : (dp ? dp.id : null),
     dotpointText: inChapter && inDp != null ? inChapter.dotpoints[inDp] : (dp ? dp.text : null),
     dotpointIndex: inChapter ? inDp : (dp ? dp.ordinal : null),
-    difficulty: q.difficulty, diffLabel: DIFF_LABELS[q.difficulty] || 'Custom',
+    difficulty: q.difficulty, diffLabel: diffLabelOf(q.difficulty) || 'Custom',
     prompt: q.prompt, answerType: q.answerType, mcqOptions: q.mcqOptions,
     figure: safeFigure(q.figure), code: s?.code || null,
     // A previous-year question carries its sitting and its sources with it, so
@@ -3134,7 +3141,7 @@ const routes = {
     // Profile creation is an authority boundary, not just a form handler. Reject
     // contradictory explicit identity before anything is written rather than
     // silently cleaning a JEE/Class mismatch into a different learner.
-    const requestedYear = body.year === undefined ? 9 : Number(body.year);
+    const requestedYear = body.year === undefined ? (offering()?.defaultYear ?? 9) : Number(body.year);
     if (!Number.isInteger(requestedYear) || requestedYear < 7 || requestedYear > 12) {
       throw Object.assign(new Error('Choose a supported class or year from 7 to 12.'), { status: 400 });
     }
@@ -3158,6 +3165,12 @@ const routes = {
     }
     if (requestedCourse === 'nsw' && body.pathway === 'ext2' && requestedYear !== 12) {
       throw Object.assign(new Error('Mathematics Extension 2 is only supported for Year 12.'), { status: 400 });
+    }
+    // Owner decision, 19 Nov 2026: a new student can only start on an offered year and course.
+    // A profile restored from the student's own account is a vessel for what the account holds: it keeps
+    // its stored year and course (the student chooses an offered one on sign-in), never refused here.
+    if (requestedCourse === 'nsw' && body.restoring !== true && offering() && !courseOffered(requestedYear, requestedYear >= 11 ? (body.pathway || 'advanced') : null)) {
+      throw notOffered();
     }
 
     const p = {
@@ -3305,6 +3318,16 @@ const routes = {
   'PATCH /me': async (body) => {
     const p = await requireProfile();
     const original = { ...p };
+    // Owner decision, 19 Nov 2026: a year or pathway this edition does not offer cannot be chosen
+    // (a student already on one keeps it, and their history, until they pick an offered course).
+    if ((body.year !== undefined || body.pathway !== undefined) && (body.course ?? p.course ?? 'nsw') === 'nsw') {
+      const nextYear = body.year !== undefined ? Math.min(12, Math.max(7, Number(body.year) || p.year)) : p.year;
+      const nextPathway = nextYear >= 11 ? (body.pathway ?? p.pathway ?? 'advanced') : null;
+      if (offering() && (body.year !== undefined && !yearOffered(nextYear) || body.pathway !== undefined && nextYear >= 11 && !pathwayOffered(nextPathway))) {
+        throw notOffered();
+      }
+    }
+    const wasCourse = { year: p.year, pathway: p.pathway ?? null };
     if (body.name !== undefined) p.name = String(body.name).trim().slice(0, 40) || p.name;
     if (body.year !== undefined) p.year = Math.min(12, Math.max(7, Number(body.year) || p.year));
     if (body.pathway !== undefined && p.course === 'nsw') p.pathway = cleanPathway(body.pathway, p.year) || (p.year >= 11 ? 'advanced' : null);
@@ -3331,6 +3354,9 @@ const routes = {
       if (p.course === 'nsw') p.pathway = cleanPathway(p.pathway, p.year) || (p.year >= 11 ? 'advanced' : null);
       else p.pathway = null;
     }
+    // The one-time re-choice (components/OfferedCourse.jsx) keeps what the student was on, on the profile (no schema change).
+    if (offering() && p.course === 'nsw' && !p.previousCourse && !courseOffered(wasCourse.year, wasCourse.year >= 11 ? (wasCourse.pathway || 'advanced') : null)
+        && courseOffered(p.year, p.year >= 11 ? (p.pathway || 'advanced') : null)) p.previousCourse = { ...wasCourse, at: Date.now() };
     if (body.avatar !== undefined) p.avatar = String(body.avatar).slice(0, 4);
     if (body.handwriting !== undefined) p.handwriting = !!body.handwriting;
     // Server-side handwriting reading is off unless the student turns it on:
@@ -3436,7 +3462,9 @@ const routes = {
         generated: issued.length > 0
       };
     });
-    const years = CURRICULUM.map(y => ({
+    // Owner decision, 19 Nov 2026: Prithagoras offers Years 11 and 12 only (the edition table
+    // `offering`); the other years stay in the catalogue, hidden. India (offering null) is unchanged.
+    const years = CURRICULUM.filter(y => yearOffered(y.year)).map(y => ({
       year: y.year, title: y.title, caption: y.caption,
       courseLabel: courseLabel(p.course || 'nsw', y.year),
       subtopics: y.subtopics.map(s => {
@@ -3453,7 +3481,7 @@ const routes = {
     }));
     // Senior pathway streams: appended as extra sections for Years 11–12
     const pw = pathwayOf(p);
-    const streamKeys = p.year >= 11
+    const streamKeys = p.year >= 11 && pathwayOffered(pw)
       ? (pw === 'standard' ? ['standard-11', 'standard-12']
         : pw === 'ext1' ? ['ext1-11', 'ext1-12']
         : pw === 'ext2' ? ['ext1-11', 'ext1-12', 'ext2-12'] : [])
@@ -3768,7 +3796,7 @@ const routes = {
     }
     await put('questions', row);
     return { hint: typeof r?.hint === 'string' ? r.hint : null, rung: r?.rung || asked, level, thin: r?.thin === true,
-      remaining: Math.max(0, HINT_RUNGS.length - level), markWeight: markWeightAfter(level), next: nextRungAfter(level) };
+      remaining: Math.max(0, HINT_RUNGS.length - level), markWeight: markWeightAfter(level, hintsFree()), next: nextRungAfter(level) };
   },
 
   // ---- AI tutor (vision item 3) ----
@@ -4416,7 +4444,7 @@ const routes = {
     const minutes = Math.round(Math.min(90, Math.max(10, Number(body?.minutes) || (length * 3))));
     const year = Math.min(12, Math.max(7, Math.round(Number(body?.year) || p.year)));
     const examPw = year >= 11 ? (cleanPathway(p.pathway, year) || 'advanced') : null;
-    const subtopics = examPw ? scopeForYear(year, examPw).own : subtopicsForYear(year);
+    const subtopics = examPw ? offeredScope(scopeForYear(year, examPw)).own : subtopicsForYear(year);
     const diffs = [];
     for (let i = 0; i < length; i++) { const t = i / length; diffs.push(t < 0.2 ? 1 : t < 0.6 ? 2 : t < 0.9 ? 3 : 4); }
     // A paper weighted by the HSC 2027 priorities (Prithagoras, Year 12 only):
@@ -4752,7 +4780,7 @@ const routes = {
     const days = await activityFor(pid);
     let lastPred = null;
     const trajectory = days.map(d => { if (d.predicted != null) lastPred = d.predicted; return { date: d.date, predicted: lastPred }; }).filter(d => d.predicted != null);
-    const { own, revision } = scopeForYear(p.year, pathwayOf(p));
+    const { own, revision } = offeredScope(scopeForYear(p.year, pathwayOf(p)));
     const strandAgg = {};
     for (const s of [...own, ...revision]) {
       const st = ratings[s.id];
@@ -4886,7 +4914,7 @@ const routes = {
       };
     }
     const pred = predictMark(ratings, p.year, now, pathwayOf(p));
-    const { own } = scopeForYear(p.year, pathwayOf(p));
+    const { own } = offeredScope(scopeForYear(p.year, pathwayOf(p)));
     const rows = own.map(s => {
       const st = ratings[s.id];
       const m = st ? Math.round(100 * masteryOf(st.rating, st.attempts, st.last_at, now)) : 0;
@@ -6292,6 +6320,8 @@ function checkUnavailable(reason, cause = null) {
     'sign-in': [401, 'SIGN_IN_TO_CHECK', translate('msg.check.signIn')],
     offline: [503, 'RECONNECT_TO_CHECK', translate('msg.check.offline')],
     unavailable: [503, 'QUESTION_CHECK_UNAVAILABLE', translate('msg.check.unavailable')],
+    // Owner decision, 19 Nov 2026 (Prithagoras): the server answered with a fault of its own (a 500).
+    fault: [503, 'SERVER_FAULT', translate('msg.check.fault')],
     // Opened with no connection: it was never the server's question.
     draft: [409, 'QUESTION_NOT_SERVER_ISSUED', translate('msg.check.draft')],
     expired: [409, 'QUESTION_PREPARED_EXPIRED', translate('msg.check.expired')]
@@ -6334,6 +6364,8 @@ const SERVER_MODES = ['practice', 'review', 'task', 'rush', 'match'];
 function unreachable(cause) {
   if (cause?.status === 401) return checkUnavailable('sign-in', cause);
   if (cause?.status === 403 || cause?.status === 426) return checkUnavailable('refused', cause);
+  // A server that answered with a 500 of its own is not "check your connection" (walk-through fix, Prithagoras).
+  if (walkthroughFixes() && cause?.status >= 500 && cause.status !== 503 && cause?.code !== 'CLOUD_DISABLED') return checkUnavailable('fault', cause);
   if (cause?.code === 'CLOUD_DISABLED' || !cause?.status || cause.status >= 500 || cause.status === 429 || cause.status === 408) {
     return checkUnavailable('offline', cause);
   }
@@ -6427,6 +6459,8 @@ async function serveQuestion(pid, asked, localDraft) {
       const gate = serverGateRefusal(cause);
       if (gate) throw gate;
       if (nsw && SERVER_BANK_REFUSALS.has(cause?.code)) throw practiceNotOffered();
+      // Owner decision, 19 Nov 2026: a year or course the server does not offer is refused, never drafted.
+      if (cause?.code === 'COURSE_NOT_OFFERED') throw cause;
       /* not issuable right now: prepared or draft below */
     }
   }
@@ -6437,6 +6471,7 @@ async function serveQuestion(pid, asked, localDraft) {
     }
   } catch (cause) {
     if (nsw && SERVER_BANK_REFUSALS.has(cause?.code)) throw practiceNotOffered();
+    if (cause?.code === 'COURSE_NOT_OFFERED') throw cause;
     /* no server: an offline draft */
   }
   // Requests cancelled because the page is navigating away fail exactly like a

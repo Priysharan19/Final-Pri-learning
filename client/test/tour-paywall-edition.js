@@ -37,6 +37,10 @@ import { createVerifiedProfile } from './support/verified-onboarding.mjs';
 const CLIENT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const EDITION = 'prithagoras';
 const en = (await import('../src/i18n/strings.en.js')).default;
+// owner decision, 19 Nov 2026: the Prithagoras screen names the paid tier "HSC Pass" (its en-AU overrides), so what it shows is read from them.
+const { AU_STRINGS } = await import('../src/i18n/strings.au.js');
+const { renameTier } = await import('../src/i18n/tierName.js');
+const au = { ...Object.fromEntries(Object.entries(en).map(([k, v]) => [k, renameTier(v)])), ...AU_STRINGS };
 // A currency amount in any form the app could print one.
 const AMOUNT = /[₹$]\s?\d|\b(?:INR|AUD|Rs\.?)\s?\d/;
 
@@ -110,13 +114,13 @@ try {
   await page.waitForSelector('[data-paywall] [data-paywall-close]', { timeout: 30000 });
   await page.waitForTimeout(800);
   const paywall = await visibleText(page, '[data-paywall]');
-  check('the Premium screen says Premium is not on sale yet', await shown(page, '[data-paywall-not-on-sale]') === 1 && paywall.includes(en['paywall.notOnSale']), paywall.slice(0, 300));
+  check('the Premium screen says Premium is not on sale yet', await shown(page, '[data-paywall-not-on-sale]') === 1 && paywall.includes(au['paywall.notOnSale']), paywall.slice(0, 300));
   check('it shows no currency amount', !AMOUNT.test(paywall), (paywall.match(AMOUNT) || [])[0]);
   check('it shows no plan, purchase, restore, renewal terms or "buy it in the app" line',
     await shown(page, '[data-paywall-plan], [data-paywall-plans], [data-paywall-buy], [data-paywall-restore], [data-paywall-disclosure], [data-paywall-in-app], [data-paywall-manage]') === 0);
   check('the screen is the web one: no store is selected', await page.locator('[data-paywall]').getAttribute('data-paywall-store') === 'web');
   const paywallButtons = await enabledButtons(page, '[data-paywall]');
-  check('the only button that can be pressed is Close', paywallButtons.length === 1 && paywallButtons[0] === en['paywall.close'], JSON.stringify(paywallButtons));
+  check('the only button that can be pressed is Close', paywallButtons.length === 1 && paywallButtons[0] === au['paywall.close'], JSON.stringify(paywallButtons));
   check('it still says what the free plan includes and what Premium adds', await shown(page, '[data-paywall-free] li') >= 4 && await shown(page, '[data-paywall-premium-rows] li') >= 5);
   check('Terms, Privacy and Refunds are still linked', await shown(page, '[data-paywall-legal] a') === 3);
   await page.locator('[data-paywall-close]').click();
@@ -131,7 +135,7 @@ try {
   const settings = await visibleText(page, 'main');
   check('the account panel says Premium is not on sale yet', await shown(page, '[data-premium-not-on-sale]') === 1, settings.slice(0, 200));
   check('Settings shows no currency amount', !AMOUNT.test(settings), (settings.match(AMOUNT) || [])[0]);
-  const purchaseLabels = [en['cloud.restoreWeb'], en['cloud.restoreApple'], en['cloud.restoreGoogle'], en['cloud.cancelSubscription'], en['paywall.restore']].filter(Boolean);
+  const purchaseLabels = [au['cloud.restoreWeb'], au['cloud.restoreApple'], au['cloud.restoreGoogle'], au['cloud.cancelSubscription'], au['paywall.restore']].filter(Boolean);
   const settingsButtons = await enabledButtons(page, 'main');
   check('Settings offers no purchase, restore or cancel-subscription button',
     !settingsButtons.some(label => purchaseLabels.includes(label) || /per month|per year|a month|a year|subscribe/i.test(label)) && await shown(page, '[data-google-play-billing]') === 0,

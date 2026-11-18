@@ -35,7 +35,11 @@ import { createVerifiedProfile, switchSyllabus } from './support/verified-onboar
 const CLIENT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PAPERS = join(CLIENT, '..', 'server', 'content', 'papers', 'nsw-ext1');
 const EDITION = 'prithagoras';
-const en = (await import('../src/i18n/strings.en.js')).default;
+const en0 = (await import('../src/i18n/strings.en.js')).default;
+// owner decision, 19 Nov 2026: the Prithagoras screen names the paid tier "HSC Pass" (its en-AU overrides), so the text it shows is read from them.
+const { AU_STRINGS } = await import('../src/i18n/strings.au.js');
+const { renameTier } = await import('../src/i18n/tierName.js');
+const en = { ...Object.fromEntries(Object.entries(en0).map(([k, v]) => [k, renameTier(v)])), ...AU_STRINGS };
 const manifest = JSON.parse(readFileSync(join(PAPERS, 'manifest.json'), 'utf8'));
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 const DAY = 86_400_000;
@@ -168,11 +172,12 @@ try {
   check('and its marking guidelines', sha(readFileSync(await guide.path())) === first.guidelines.sha256 && guide.suggestedFilename().endsWith('-Marking-Guidelines.pdf'));
   check('ACCESSIBILITY (Premium): every control on the page has a name', (await unnamedControls(page)).length === 0, JSON.stringify(await unnamedControls(page)));
 
-  // ── Year 10 sees nothing ────────────────────────────────────────────────────
-  await setProfile(platform, page, { year: 10 });
+  // ── Advanced sees nothing, in either offered year ───────────────────────────
+  // (owner decision, 19 Nov 2026: Prithagoras offers Years 11 and 12 only, so Year 10 is no longer a choice.)
+  await setProfile(platform, page, { year: 11, pathway: 'Advanced' });
   await openExams(platform, page);
   await page.waitForTimeout(1500);
-  check('an NSW Year 10 profile has no Extension 1 papers section', await page.locator('[data-ext1-papers]').count() === 0);
+  check('an NSW Year 11 Advanced profile has no Extension 1 papers section', await page.locator('[data-ext1-papers]').count() === 0);
 } catch (error) {
   failures.push(`the tour stopped: ${error.message.split('\n')[0]}`);
   console.error(error);

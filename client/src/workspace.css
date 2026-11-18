@@ -248,3 +248,17 @@
 .ws-confirm-acts .btn { min-height: 44px; }
 @keyframes ws-unsure-pulse { 0%, 100% { outline-color: var(--in-slip, currentColor); } 50% { outline-color: color-mix(in srgb, var(--in-slip, currentColor) 35%, transparent); } }
 @media (prefers-reduced-motion: no-preference) { .ws-confirm-line.is-unsure { animation: ws-unsure-pulse 1.4s ease-in-out infinite; } }
+
+/* ── Walk-through fixes, 19 Nov 2026 (Prithagoras: [data-edition] is on <html>) ───────────────────────────
+   1. The sticky action bar sits over the foot of the page. Anything the page scrolls to (a "Not quite" card, the
+      offline or server-fault notice, its Try again button) has to land ABOVE it, not under it: the page reserves
+      the bar's height when it scrolls something into view, and those cards keep their own margin.
+   2. In Write mode beside the hint ladder (about 900 to 1180 px wide) the status text was squeezed into a column
+      of its own beside three buttons. It takes its own full row under them instead. */
+html[data-edition=prithagoras]:has(.qpage.ws){scroll-padding-bottom:148px}
+html[data-edition=prithagoras] .qpage.ws .verdict{scroll-margin-bottom:148px}
+@media (max-width:1180px){
+  html[data-edition=prithagoras] .ws-actions.editor-foot{row-gap:6px}
+  html[data-edition=prithagoras] .ws-actions.editor-foot .status-line{flex:1 1 100%;order:2;min-width:0}
+  html[data-edition=prithagoras] .ws-actions.editor-foot .in-wbar-note{display:none}
+}

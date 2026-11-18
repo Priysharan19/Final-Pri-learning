@@ -46,6 +46,8 @@ import { annotationsLive, inkLineVerdicts, photoFingerprint, revisionKey, sameLi
 import { misconceptionById } from '../engine/misconceptions.js';
 import { practiceWorkState } from '../platform/workState.js';
 import { HINT_RUNGS, RUNG_COST, markWeightAfter } from '../engine/hintLadder.js';
+import { hintsFree, walkthroughFixes } from '../platform/edition.js';
+import { plainPromptText } from '../lib/plainMath.js';
 
 // The hint ladder's rungs, as catalogue keys.
 const RUNG_KEY = { nudge: 'verdict.rung.nudge', method: 'verdict.rung.method', worked: 'verdict.rung.worked', solution: 'verdict.rung.solution' };
@@ -569,9 +571,18 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const nextRung = ladderOffered ? (HINT_RUNGS[hintLevel] || null) : null;
   const helpUsed = hintLevel + tutorUsed;
   const rungLevelUsed = Math.min(HINT_RUNGS.length, hintLevel);
-  const credit = hintLevel > 0
-    ? Math.min(markWeightAfter(hintLevel), Math.max(0.55, 1 - 0.15 * tutorUsed))
-    : Math.max(0.55, 1 - 0.15 * tutorUsed);
+  // Owner decision, 19 Nov 2026 (Prithagoras): hints are free. No percentage is
+  // shown or taken; the full solution still ends the attempt.
+  const HINTS_FREE = hintsFree();
+  const credit = HINTS_FREE
+    ? (hintLevel >= HINT_RUNGS.length ? 0 : 1)
+    : hintLevel > 0
+      ? Math.min(markWeightAfter(hintLevel), Math.max(0.55, 1 - 0.15 * tutorUsed))
+      : Math.max(0.55, 1 - 0.15 * tutorUsed);
+  const rungOpenText = (n, rung) => (HINTS_FREE
+    ? t('verdict.rungLabelFree', { n, rung: t(RUNG_KEY[rung]) })
+    : t('verdict.rungLabel', { n, rung: t(RUNG_KEY[rung]), percent: Math.round(markWeightAfter(n) * 100) }));
+  const rungCostText = rung => (rung === 'solution' ? t('inst.rungEnds') : HINTS_FREE ? '' : t('inst.rungCost', { percent: Math.round(RUNG_COST[rung] * 100) }));
   const writeMode = mode === 'write';
   const recognitionContext = useMemo(
     () => recognitionContextForQuestion(question),
@@ -1207,9 +1218,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [peekOpen]);
-  const plainPrompt = useMemo(() => String(question.prompt || '')
+  // Owner walk-through, 19 Nov 2026: powers keep their meaning ("9x²", not "9x2") — lib/plainMath.js.
+  const plainPrompt = useMemo(() => (walkthroughFixes() ? plainPromptText(question.prompt) : String(question.prompt || '')
     .replace(/\$\$?([^$]*)\$\$?/g, (_, m) => m.replace(/\\[a-zA-Z]+/g, ' ').replace(/[{}^_]/g, ''))
-    .replace(/\s+/g, ' ').trim(), [question.prompt]);
+    .replace(/\s+/g, ' ').trim()), [question.prompt]);
   // A page of paper sized to the device: a phone gets a shorter first sheet so
   // the action bar and the question are never pushed off-screen.
   const [, setViewportKey] = useState(0);
@@ -2205,6 +2217,14 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       + (res.solution?.answerText ? t('verdict.speechExpected', { answer: res.solution.answerText }) : '');
   }, [state.phase, state.res, resolved, res, verdictGood, shownGrade?.awarded, shownGrade?.possible, previousAttempt, markedLineFix, t]);
 
+  // Walk-through fix, 19 Nov 2026 (Prithagoras): a "Not quite", offline or server-fault card, and its Try again button,
+  // come into view above the sticky action bar rather than beneath it (workspace.css keeps the bar's height clear).
+  useEffect(() => {
+    if (!walkthroughFixes() || (state.phase !== 'retry' && !resolved)) return undefined;
+    const id = requestAnimationFrame(() => document.querySelector('.qpage.ws .verdict')?.scrollIntoView({ block: 'nearest' }));
+    return () => cancelAnimationFrame(id);
+  }, [state.phase, state.res, resolved]);
+
   const answerLines = isMcq ? [] : writeMode
     ? (inkResult?.lines || [])
     : isWorking ? working.split('\n').filter(Boolean)
@@ -2485,7 +2505,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           <section className={`hints-block in-ladder${inSheet ? ' in-sheet' : ''}`} aria-label={t('verdict.hints')} data-hint-ladder={`${hintLevel}/${HINT_RUNGS.length}`}>
             <div className="hints-block-title">{t('inst.ladderHead', { used: rungLevelUsed, total: HINT_RUNGS.length })}</div>
             {HINT_RUNGS.map((rung, i) => {
-              const cost = rung === 'solution' ? t('inst.rungEnds') : t('inst.rungCost', { percent: Math.round(RUNG_COST[rung] * 100) });
+              const cost = rungCostText(rung);
               const shown = hints.find(h => h.rung === rung);
               if (shown) {
                 return (
@@ -2498,7 +2518,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               if (!resolved && rung === nextRung) {
                 const label = rung === 'solution'
                   ? (solutionRungArmed ? t('verdict.rungSolutionConfirm') : t('verdict.rungSolutionTitle'))
-                  : t('verdict.rungLabel', { n: i + 1, rung: t(RUNG_KEY[rung]), percent: Math.round(markWeightAfter(hintLevel + 1) * 100) });
+                  : rungOpenText(i + 1, rung);
                 return (
                   <button type="button" className={`in-rung is-next${solutionRungArmed && rung === 'solution' ? ' is-armed' : ''}`} key={rung}
                     data-hint-rung-open={rung} disabled={busy} aria-label={label} onClick={getHint}>
@@ -2517,7 +2537,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 </div>
               );
             })}
-            {!resolved && hintLevel > 0 && <div className="hints-block-title">{t('verdict.markWeightLeft', { percent: Math.round(credit * 100) })}</div>}
+            {!HINTS_FREE && !resolved && hintLevel > 0 && <div className="hints-block-title">{t('verdict.markWeightLeft', { percent: Math.round(credit * 100) })}</div>}
           </section>
   );
 
@@ -2548,7 +2568,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         {/* A practice question's marks are the server's alone to state, so the
             card promises no credit figure for it. */}
         {helpUsed > 0 && !resolved && diagnostic && (
-          <p className="q-credit">{t('verdict.creditAvailable', { percent: Math.round(credit * 100), marks: Math.round(totalMarks * credit * 10) / 10 })}</p>
+          HINTS_FREE ? null : <p className="q-credit">{t('verdict.creditAvailable', { percent: Math.round(credit * 100), marks: Math.round(totalMarks * credit * 10) / 10 })}</p>
         )}
 
         {/* Question content is English by design under any interface language;
@@ -2582,7 +2602,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 {h.text ? <MathText text={h.text} /> : <span className="muted">{t('verdict.rungThin')}</span>}
               </div>
             ))}
-            {!resolved && <div className="hints-block-title">{t('verdict.markWeightLeft', { percent: Math.round(credit * 100) })}</div>}
+            {!HINTS_FREE && !resolved && <div className="hints-block-title">{t('verdict.markWeightLeft', { percent: Math.round(credit * 100) })}</div>}
           </div>
         )}
 
@@ -2626,15 +2646,14 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 it leaves. nudge → method → worked step → full solution. */}
             {/* Under the instrument the footer's Hint is this control (same hook, label and arming). */}
             {!INSTRUMENT && ladderOffered && !resolved && nextRung && (() => {
-              const left = Math.round(markWeightAfter(hintLevel + 1) * 100);
               const label = nextRung === 'solution'
                 ? (solutionRungArmed ? t('verdict.rungSolutionConfirm') : t('verdict.rungSolutionTitle'))
-                : t('verdict.rungLabel', { n: hintLevel + 1, rung: t(RUNG_KEY[nextRung]), percent: left });
+                : rungOpenText(hintLevel + 1, nextRung);
               return (
                 <button type="button" className={`icon-btn hint-bulb${solutionRungArmed ? ' on' : ''}`} disabled={busy}
                   data-hint-rung={nextRung} title={label} aria-label={label} aria-keyshortcuts="H" onClick={getHint}>
                   <Icon name="hint" /><span>{solutionRungArmed ? t('verdict.rungSolutionConfirmShort') : t(RUNG_KEY[nextRung])}</span>
-                  <span className="hint-left">{nextRung === 'solution' ? t('verdict.rungEndsShort') : t('verdict.markWeightShort', { percent: left })}</span>
+                  <span className="hint-left">{nextRung === 'solution' ? t('verdict.rungEndsShort') : HINTS_FREE ? null : t('verdict.markWeightShort', { percent: Math.round(markWeightAfter(hintLevel + 1) * 100) })}</span>
                 </button>
               );
             })()}
@@ -3442,8 +3461,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               const solution = nextRung === 'solution';
               const label = solution
                 ? (solutionRungArmed ? t('verdict.rungSolutionConfirm') : t('verdict.rungSolutionTitle'))
-                : t('verdict.rungLabel', { n: i + 1, rung: t(RUNG_KEY[nextRung]), percent: Math.round(markWeightAfter(hintLevel + 1) * 100) });
-              const cost = solution ? t('inst.rungEnds') : t('inst.rungCost', { percent: Math.round(RUNG_COST[nextRung] * 100) });
+                : rungOpenText(i + 1, nextRung);
+              const cost = rungCostText(nextRung);
               return (
                 <button type="button" className="btn btn-ghost in-hintrow-next"
                   data-hint-rung-open={nextRung} disabled={busy} aria-label={label} onClick={getHint}>
@@ -3533,7 +3552,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 const solution = nextRung === 'solution';
                 const label = solution
                   ? (solutionRungArmed ? t('verdict.rungSolutionConfirm') : t('verdict.rungSolutionTitle'))
-                  : t('verdict.rungLabel', { n: hintLevel + 1, rung: t(RUNG_KEY[nextRung]), percent: Math.round(markWeightAfter(hintLevel + 1) * 100) });
+                  : rungOpenText(hintLevel + 1, nextRung);
                 return (
                   <button type="button" className={`btn btn-quiet hint-bulb in-wbar-hint${solution && solutionRungArmed ? ' on is-armed' : ''}`}
                     data-wbar-hint={nextRung} data-hint-rung={nextRung} data-armed={solution && solutionRungArmed ? 'true' : undefined}

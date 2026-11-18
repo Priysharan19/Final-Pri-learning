@@ -41,7 +41,10 @@ import { createVerifiedProfile, switchSyllabus } from './support/verified-onboar
 const CLIENT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const EDITION = 'prithagoras';
 const TEST_PAPER = 'nsw-test-extension-1-short';
-const HSC_PAPERS = ['nsw-hsc-standard-1-2027', 'nsw-hsc-standard-2-2027', 'nsw-hsc-advanced-2027', 'nsw-hsc-extension-1-2027', 'nsw-hsc-extension-2-2027'];
+// owner decision, 19 Nov 2026: Prithagoras offers Advanced and Extension 1 only, so the Exams page lists those two HSC blueprints (the server filters
+// the catalogue; Standard 1 and 2 and Extension 2 stay in the catalogue, hidden).
+const HSC_PAPERS = ['nsw-hsc-advanced-2027', 'nsw-hsc-extension-1-2027'];
+const HIDDEN_PAPERS = ['nsw-hsc-standard-1-2027', 'nsw-hsc-standard-2-2027', 'nsw-hsc-extension-2-2027'];
 const en = (await import('../src/i18n/strings.en.js')).default;
 const BANDISH = /\bband\s*\d|\bATAR\b|\bHSC mark\b|\bpredicted\b|\bstate (mean|average)\b/i;
 
@@ -103,10 +106,10 @@ try {
   await page.goto(`${platform.origin}/exams`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('[data-nsw-papers] [data-nsw-paper]', { timeout: 30000 });
   const listed = await page.locator('[data-nsw-paper]').evaluateAll(els => els.map(el => [el.getAttribute('data-nsw-paper'), el.getAttribute('data-released')]));
-  check('the Exams page lists the five blueprints and the test paper', HSC_PAPERS.every(id => listed.some(([x]) => x === id)) && listed.some(([x]) => x === TEST_PAPER), JSON.stringify(listed));
+  check('the Exams page lists the two offered blueprints and the test paper, and none of the hidden ones', HSC_PAPERS.every(id => listed.some(([x]) => x === id)) && listed.some(([x]) => x === TEST_PAPER) && !HIDDEN_PAPERS.some(id => listed.some(([x]) => x === id)), JSON.stringify(listed));
   const state = id => listed.find(([x]) => x === id)?.[1];
   // The release state of each HSC-style paper on the current pool of approved forms (see docs/content/nsw-papers-released.md).
-  const EXPECT = { 'nsw-hsc-standard-1-2027': 'yes', 'nsw-hsc-standard-2-2027': 'yes', 'nsw-hsc-advanced-2027': 'yes', 'nsw-hsc-extension-1-2027': 'yes', 'nsw-hsc-extension-2-2027': 'yes' };
+  const EXPECT = { 'nsw-hsc-advanced-2027': 'yes', 'nsw-hsc-extension-1-2027': 'yes' };
   check('the released and refused HSC-style papers are exactly the ones the approved-form pool supports; the test paper releases',
     Object.entries(EXPECT).every(([id, want]) => state(id) === want) && state(TEST_PAPER) === 'yes', JSON.stringify(listed));
   // A refused paper (if any is left) says how much it covers, names what it lacks and has no start.

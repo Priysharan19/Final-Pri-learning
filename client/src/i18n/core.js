@@ -38,6 +38,7 @@ import en from './strings.en.js';
 import { DEFAULT_LANGUAGE, LANGUAGES, cleanLanguage, htmlLangOf, pluralCategory } from './languages.js';
 import { brandVars, EDITION_ID } from '../brand/edition.js';
 import { AU_STRINGS } from './strings.au.js';
+import { renameTier } from './tierName.js';
 
 export { LANGUAGES, DEFAULT_LANGUAGE, cleanLanguage, pluralCategory, speechTagsOf } from './languages.js';
 
@@ -143,8 +144,12 @@ function fill(template, vars, language) {
  */
 function select(strings, key, vars, language) {
   // The Prithagoras edition's own wording (en-AU) replaces the shared English.
-  let entry = EDITION_ID === 'prithagoras' && language === 'en' && Object.hasOwn(AU_STRINGS, key) ? AU_STRINGS[key] : strings[key];
+  const au = EDITION_ID === 'prithagoras' && language === 'en';
+  const overridden = au && Object.hasOwn(AU_STRINGS, key);
+  let entry = overridden ? AU_STRINGS[key] : strings[key];
   if (entry === undefined) entry = en[key];
+  // Owner decision, 19 Nov 2026: the paid tier is "HSC Pass" in Prithagoras (i18n/tierName.js).
+  if (au && !overridden && entry !== undefined) entry = renameTier(entry);
   if (entry === undefined) return key;
   if (typeof entry === 'string') return entry;
   const form = entry[pluralCategory(vars?.count, language)] ?? entry.other;

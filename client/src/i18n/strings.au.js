@@ -17,18 +17,18 @@ export const AU_STRINGS = Object.freeze({
   'inst.mapTitleScope': '{scope} Mathematics',
   'inst.mapProvenance': 'Prerequisite links are Pri’s own teaching map, not a NESA publication.',
   'login.heroSub': 'Maths practice for NSW students — your working marked line by line, with worked solutions. Answers are checked by Pri’s server, so checking needs a Pri account and a connection.',
-  'login.brandKicker': 'NSW Years 7–10 · Stage 6 Standard, Advanced, Extension 1 & 2',
+  'login.brandKicker': 'NSW Years 11 and 12 · Advanced and Extension 1',
   'login.welcomeSub': 'Practise for the HSC. Your working is checked line by line.',
   'login.point1': 'Generated practice questions for NSW Mathematics',
   'settings.freeCourses': 'NSW Mathematics',
-  'settings.premiumAdds': 'Premium removes the daily practice and exam-simulation limits, and adds advanced Pri Explain and advanced analytics. Your work, history and progress are kept if Premium ends.',
+  'settings.premiumAdds': 'HSC Pass will remove the daily practice and exam-simulation limits, and add advanced Pri Explain and advanced analytics. Your work, history and progress are kept if HSC Pass ends.',
   'verifiedMarks.notOfficial': 'Pri practice feedback, not an official NESA marking guideline.',
   'verdict.boardStyleNote': 'Step marking worked out from this question’s own solution. It is not an official NESA marking guideline.',
   'inst.stepMarksNote': 'Pri practice feedback, not an official NESA marking guideline.',
   'snap.chapterOption': 'Year {grade} · {name}',
   'classroom.classNamePlaceholder': 'Year 10 Mathematics',
   'paywall.from.practice': 'You have used today’s free practice questions. They come back at midnight (Sydney time).',
-  'check.freeCapHint': 'Checking this one would be another of today’s free practice questions, and you have used the free plan’s daily allowance. They come back at midnight (Sydney time), and Premium removes the daily cap.',
+  'check.freeCapHint': 'Checking this one would be another of today’s free practice questions, and you have used the free plan’s daily allowance. They come back at midnight (Sydney time), and HSC Pass will remove the daily cap.',
   'legal.unreviewedBody': 'This notice is published so you can read what the app does with your data. No lawyer qualified in Australian law has reviewed it yet. When that review has happened, this banner will go.',
   'explain.kicker': 'Pri Explain · Exam mode',
   'insights.lead': 'Read from your own marked practice. Nothing here is a predicted exam score.',
@@ -66,7 +66,22 @@ export const AU_STRINGS = Object.freeze({
   'notes.noBookmarks': 'No bookmarked chapters in this year yet.',
   'inst.noChapters': 'No chapters are set for your year yet.',
   'cloudError.consentDeclarationRequired': 'Tell us whether the learner is 18 or older, or their year with a parent or guardian’s name and email, then try again.',
-  'upgrade.jeeAdvanced': "This part of the course is included with Premium.",
+  'upgrade.jeeAdvanced': "This part of the course is included with HSC Pass.",
+  // Owner decision, 19 Nov 2026: Years 11 and 12 only.
+  'notes.nsw.lede': 'Notes for NSW Mathematics, Years 11 and 12: the ideas in plain words, the formulas, what markers look for, the usual traps, and worked examples the maths engine has checked.',
+  // Owner walk-through, 19 Nov 2026: the notebook said "Nothing filed yet" while Review listed wrong answers. Review
+  // lists every wrong answer, including ones where the solution was shown and paper answers; the notebook files a
+  // wrong answer only when its question was finished without the solution. It says so.
+  'notebook.empty': 'Nothing filed yet. A wrong answer is filed once you finish the question without showing its solution. Review lists them all.',
+  // Owner walk-through, 19 Nov 2026: difficulty is read in words, never as D1 to D4.
+  'settings.allDifficulties': 'All difficulties',
+  'home.difficultyChip': '{label}',
+  // Owner decision, 19 Nov 2026: no "session 1/1" in the student's view.
+  'practice.sessionScore': ' · {correct} of {answered} right',
+  // Owner decision, 19 Nov 2026: hints are free in Prithagoras practice.
+  'tutor.intro': 'Help comes in three levels, in order. Opening a level is free.',
+  // Owner decision, 19 Nov 2026: the paid tier is called "HSC Pass" in Prithagoras copy. The words that say "Premium" are renamed at lookup
+  // (i18n/tierName.js, applied in i18n/core.js to every string not overridden here); the capability ids keep their names.
   'picker.year': 'Year',
   'picker.course': 'Course'
 });

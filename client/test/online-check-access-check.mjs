@@ -124,8 +124,10 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
 {
   const kinds = Object.values(CHECK_REFUSAL);
   // The eleventh is the free day's cap (#537): the server refused to issue the
-  // question that a check would have bound, so nothing was marked.
-  eq(kinds.length, 11, 'eleven reasons are named');
+  // question that a check would have bound, so nothing was marked. The twelfth is the
+  // server's own fault (a 500), named in Prithagoras (owner walk-through, 19 Nov 2026):
+  // not "check your connection", the working is kept and trying again is safe.
+  eq(kinds.length, 12, 'twelve reasons are named');
   const used = new Set(['check.needsAccount', 'check.signInAction', 'check.signInAgainAction', 'check.sessionEnded', 'check.signInActionPlain', 'check.draftNotice', 'check.legacyNotice', 'check.teacherNotice', 'check.draftAction', 'check.draftConfirm', 'check.draftConfirmAction', 'check.draftKeep', 'check.draftStillUnmarkable', 'check.restartAction']);
   // A timed game (Rapid Fire, Match) is refused at its start with the same reasons.
   for (const context of ['answer', 'exam', 'game', 'placement']) {

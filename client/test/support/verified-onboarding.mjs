@@ -158,7 +158,9 @@ export async function createVerifiedProfile(page, platform, {
   if (course !== 'in') {
     throw new Error(`verified onboarding: course "${course}" — V1 ships only the India course (D2) and the server issues no other bank (D15); make "${name}" a CBSE or JEE student instead`);
   }
-  const classOf = JEE_TRACKS.has(track) ? Math.max(11, Math.min(12, Number(year) || 12)) : Math.max(7, Math.min(12, Number(year) || 9));
+  // owner decision, 19 Nov 2026: Prithagoras offers Years 11 and 12 only, so an earlier class asks for Year 11 there.
+  const earliest = process.env.PRI_EDITION === 'prithagoras' ? 11 : 7;
+  const classOf = JEE_TRACKS.has(track) ? Math.max(11, Math.min(12, Number(year) || 12)) : Math.max(earliest, Math.min(12, Number(year) || 9));
   if (role === 'teacher') return createTeacherProfile(page, platform, { name, year: classOf, email, language, note });
 
   const address = (email || freshEmail()).toLowerCase();

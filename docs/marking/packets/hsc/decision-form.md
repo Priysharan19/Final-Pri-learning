@@ -7,7 +7,7 @@ Complete one form per examiner. Return the signed original as the README says; t
 ```text
 Jurisdiction:                    nsw-hsc
 Syllabus version(s):             nsw-mathematics-advanced-11-12-2024@2024, nsw-mathematics-extension1-11-12-2024@2024, nsw-mathematics-extension2-11-12-2024@2024, nsw-mathematics-k-10-2022@2022, nsw-mathematics-standard-11-12-2024@2024
-Dossier digest reviewed:         994eaa14fcbe8f6d3cd2539b5c506d95b8e83fde05006d5a5a54b6b0a3d8bae3
+Dossier digest reviewed:         ee3f12b4f8c86fd435ab17ea9340c384c21439119b8425f38f9aed1ea3e2ccca
 Repository commit reviewed:      ________________________________________
 Examiner full name:              ________________________________________
 Qualification:                   ________________________________________

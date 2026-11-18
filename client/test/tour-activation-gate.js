@@ -51,6 +51,8 @@ const gateStatus = page => page.locator(GATE).getAttribute('data-activation-stat
 
 /** The parent, on their own device: a separate context, no profile, no session. */
 // A child needs a parent under 18 in India, under 15 in Prithagoras (guardianConsent.learnerIsChild).
+// owner decision, 19 Nov 2026: Prithagoras offers Years 11 and 12 only, so its sign-up walks use Year 11 or 12 where India's use an earlier class.
+const AU_OFFER = process.env.PRI_EDITION === 'prithagoras';
 const CHILD_AGE = process.env.PRI_EDITION === 'prithagoras' ? 13 : 15;
 
 async function approveAsParent(ctx, base, platform, parentEmail, childName) {
@@ -133,7 +135,7 @@ export const flow = {
     await page.getByTestId('signup-agree').check();
     await page.getByTestId('signup-age-next').click();
     await page.locator(`${CARD}[data-signup-step="class"]`).waitFor({ timeout: 20000 });
-    await page.getByTestId('signup-class-10').click();
+    await page.getByTestId(AU_OFFER ? 'signup-class-12' : 'signup-class-10').click();
     // The exam-track choice is the India edition's (SignUpFlow: `!au`).
     if (process.env.PRI_EDITION !== 'prithagoras') await check('JEE is not offered below Class 11', await page.getByTestId('signup-track-jee-main').isDisabled());
     else await check('Prithagoras offers no India exam track at sign-up (no JEE or CBSE choice)', await page.locator('[data-testid^="signup-track-"]').count() === 0 && !/\b(JEE|CBSE)\b/.test(await page.locator('body').innerText()));
@@ -188,7 +190,7 @@ export const flow = {
       await child.locator(`${CARD}[data-signup-step="method"]`).waitFor({ timeout: 30000 });
       await signInOnCard(child.locator(CARD), platform, { email: childEmail, name: 'Ravi Child', age: CHILD_AGE });
       await child.locator(`${CARD}[data-signup-step="class"]`).waitFor({ timeout: 20000 });
-      await child.getByTestId('signup-class-9').click();
+      await child.getByTestId(AU_OFFER ? 'signup-class-11' : 'signup-class-9').click();
       await child.getByTestId('signup-class-next').click();
       await child.locator(`${CARD}[data-signup-step="parent"]`).waitFor({ timeout: 20000 });
       const minor = accountRow(platform, childEmail);
@@ -228,7 +230,7 @@ export const flow = {
       await child.locator(`${CARD}[data-signup-step="method"]`).waitFor({ timeout: 30000 });
       await signInOnCard(child.locator(CARD), platform, { email: childEmail });
       await child.locator(`${CARD}[data-signup-step="class"]`).waitFor({ timeout: 20000 });
-      await child.getByTestId('signup-class-9').click();
+      await child.getByTestId(AU_OFFER ? 'signup-class-11' : 'signup-class-9').click();
       await child.getByTestId('signup-class-next').click();
       await child.locator(`${CARD}[data-signup-step="parent"], ${CARD}[data-signup-step="parent-wait"]`).first().waitFor({ timeout: 20000 });
       await check('after a reload mid-onboarding the same email comes back to the parent step: one account, nothing opened',
@@ -276,7 +278,7 @@ export const flow = {
     await page.locator('.auth-card .btn-primary').click();
     await page.waitForSelector('[data-onboarding-step="2"]', { timeout: 15000 });
     // India's class/track select, or the Prithagoras year select (plan E6).
-    await page.locator('#signup-track, #signup-year').first().selectOption('8');
+    await page.locator('#signup-track, #signup-year').first().selectOption(AU_OFFER ? '11' : '8');
     await page.locator('.auth-card .btn-primary').click();
     await page.waitForSelector('[data-onboarding-step="3"]', { timeout: 15000 });
     await page.locator('#signup-name').fill('Kabir Child');
@@ -483,7 +485,7 @@ export const flow = {
         await staleCtx.clock.install({ time: new Date() });
         const stale = await staleCtx.newPage();
         await stale.goto(`${base}/`, { waitUntil: 'domcontentloaded' });
-        await createVerifiedProfile(stale, platform, { name: 'Ravi Stale', year: 10, email: freshEmail('stale'), note });
+        await createVerifiedProfile(stale, platform, { name: 'Ravi Stale', year: AU_OFFER ? 12 : 10, email: freshEmail('stale'), note });
         await stale.locator('.shell').waitFor({ timeout: 60000 });
         if (await check('a second adult\'s device is inside, with the service worker in charge', await workerInCharge(stale))) {
           await staleCtx.clock.setSystemTime(new Date(Date.now() + 73 * 60 * 60 * 1000));

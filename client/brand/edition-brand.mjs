@@ -79,6 +79,7 @@ export function brandIndexHtml(html, id) {
   const hi = e.languages.includes('hi') && e.identity.brandHi ? escapeHtml(e.identity.brandHi) : null;
   const values = {
     PRI_EDITION: e.id,
+    PRI_THEME_DEFAULT: e.themeDefault || 'system',
     PRI_BRAND: escapeHtml(e.brand),
     PRI_BRAND_HI: hi || escapeHtml(e.brand),
     PRI_DESCRIPTION: escapeHtml(e.identity.description),

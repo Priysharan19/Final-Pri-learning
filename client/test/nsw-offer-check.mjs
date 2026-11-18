@@ -55,6 +55,13 @@ const { pickNext } = await import('../src/engine/adaptive.js');
 const { NSW_BANK_LEDGER, nswCell, nswCurriculumResponse } = await import('../../server/platform/nswBanks.js');
 const { render } = await import('../../tools/nsw-issued-cells.mjs');
 const { readFileSync } = await import('node:fs');
+// Owner decision, 19 Nov 2026: Prithagoras offers Years 11 and 12, Advanced and Extension 1 only. The whole
+// catalogue is still listed, agreed with the server's ledger and kept generable below ("CATALOGUE"); only the
+// OFFERED part is asked for through the product, and a Prithagoras server refuses the hidden part by name.
+const { editionOf } = await import('../edition.config.mjs');
+const { subtopicOfferedIn } = await import('../src/engine/offeringRules.js');
+const OFFERING = editionOf('prithagoras').offering;
+const offeredNow = id => subtopicOfferedIn(OFFERING, id);
 await loadAllBanks();
 
 let pass = 0;
@@ -74,7 +81,7 @@ const keyOf = q => { const a = q.answer || {}; switch (q.answerType) {
   case 'ratio': return `${a.a}:${a.b}`;
   default: return null; } };
 
-let offeredCells = 0, marked = 0, unissuedAsked = 0;
+let offeredCells = 0, marked = 0, unissuedAsked = 0, hiddenRefused = 0, catalogueGenerated = 0;
 try {
   // ── ONE TRUTH ──────────────────────────────────────────────────────────────
   const ledger = Object.fromEntries(NSW_BANK_LEDGER.filter(e => e.issued).map(e => [e.generator, e.cells.filter(c => c.issued).map(c => c.difficulty)]));
@@ -136,6 +143,7 @@ try {
 
     // OFFERED ⇒ ISSUED AND MARKED: every selectable cell, once across the suite.
     for (const s of subtopics) for (const d of s.requestable) {
+      if (!offeredNow(s.id)) continue;          // hidden: see HIDDEN ⇒ REFUSED
       if (done.has(`${s.id}|${d}`)) continue;
       done.add(`${s.id}|${d}`);
       offeredCells++;
@@ -157,6 +165,19 @@ try {
       else marked++;
     }
 
+    // HIDDEN ⇒ REFUSED (owner decision, 19 Nov 2026): a Prithagoras server refuses a subtopic of a year or course it does
+    // not offer, by name, with a clear code, before anything is issued, escrowed or counted.
+    for (const s of subtopics) for (const d of s.requestable) {
+      if (offeredNow(s.id) || done.has(`h${s.id}|${d}`)) continue;
+      done.add(`h${s.id}|${d}`);
+      hiddenRefused++;
+      authority.resetRateLimits?.();
+      const before = (await idb.all('questions')).length;
+      const error = await refusal(() => POST('/practice/next', { mode: 'topic', subtopic: s.id, difficulty: d }));
+      if (error?.code !== 'COURSE_NOT_OFFERED') failures.push(`${s.id} D${d} is hidden but asking for it gave ${error ? error.code : 'a question'}, not COURSE_NOT_OFFERED`);
+      if ((await idb.all('questions')).length !== before) failures.push(`${s.id} D${d}: a refused hidden request left a question row`);
+    }
+
     // NOT ISSUED ⇒ NEVER SERVED: asking by name is refused and leaves nothing behind.
     for (const s of subtopics) for (const d of LEVELS) {
       if (nswCell(s.id, d) || done.has(`x${s.id}|${d}`)) continue;
@@ -175,11 +196,28 @@ try {
 
     // Smart practice, and a topic with no level named, only ever issue.
     authority.resetRateLimits?.();
-    const smart = [];
-    for (let i = 0; i < 6; i++) smart.push((await POST('/practice/next', { mode: 'smart' })).question);
-    ok(`${tag}: smart practice is always issued, never a draft`, smart.every(q => q.checkState === 'issued' && nswCell(q.subtopic, q.difficulty)), smart.map(q => `${q.subtopic} D${q.difficulty} ${q.checkState}`).join(', '));
+    // (Only where every subtopic in scope is offered: this Node suite's client is the default build, which does not
+    // hide a year the way a Prithagoras build does, so the revision year below Year 11 would name a hidden subtopic.)
+    if (year === 12 && pathway && OFFERING.pathways.includes(pathway)) {
+      const smart = [];
+      for (let i = 0; i < 6; i++) smart.push((await POST('/practice/next', { mode: 'smart' })).question);
+      ok(`${tag}: smart practice is always issued, never a draft`, smart.every(q => q.checkState === 'issued' && nswCell(q.subtopic, q.difficulty)), smart.map(q => `${q.subtopic} D${q.difficulty} ${q.checkState}`).join(', '));
+    }
   }
-  ok(`every offered cell was asked for (${offeredCells}) and they are all the server's cells`, offeredCells === Object.values(ledger).reduce((n, l) => n + l.length, 0), `${offeredCells}`);
+  ok(`every OFFERED cell was asked for (${offeredCells}) and they are all the server's cells`, offeredCells === Object.entries(ledger).filter(([id]) => offeredNow(id)).reduce((n, [, l]) => n + l.length, 0), `${offeredCells}`);
+  ok(`every HIDDEN cell, asked for by name, was refused with COURSE_NOT_OFFERED (${hiddenRefused})`, hiddenRefused === Object.entries(ledger).filter(([id]) => !offeredNow(id)).reduce((n, [, l]) => n + l.length, 0), `${hiddenRefused}`);
+
+  // ── CATALOGUE: hidden content stays whole (it is hidden, not deleted) ──────
+  // Every issued cell of the catalogue, offered or hidden, still generates a question with an answer key, so hidden
+  // content cannot rot while it waits to be offered. (Not "offered": nothing here is shown to a student.)
+  const { generateQuestion } = await import('../src/engine/generators/index.js');
+  for (const [id, levels] of Object.entries(ledger)) for (const d of levels) {
+    const q = generateQuestion(id, d, 7);
+    if (!q || !q.answer || !q.prompt) failures.push(`catalogue: ${id} D${d} no longer generates a question with an answer`);
+    else catalogueGenerated++;
+  }
+  ok(`catalogue: every issued cell generates, hidden ones included (${catalogueGenerated})`, catalogueGenerated === Object.values(ledger).reduce((n, l) => n + l.length, 0));
+  ok('catalogue: the hidden part is real (Years 7 to 10, Standard and Extension 2 still hold issued cells)', Object.keys(ledger).some(id => !offeredNow(id)));
   ok(`every one was issued and marked correct on its stored answer (${marked})`, marked === offeredCells);
   ok(`every unissued cell in scope was asked for and refused (${unissuedAsked})`, unissuedAsked >= 2);
 
@@ -206,4 +244,4 @@ if (failures.length) {
   console.log(`NSW OFFER: FAIL — ${failures.length} of ${total} checks failed\n  · ${failures.slice(0, 40).join('\n  · ')}`);
   process.exit(1);
 }
-console.log(`NSW OFFER: PASS — ${pass}/${total} checks — ${offeredCells} offered cells issued and marked by a Prithagoras server, ${unissuedAsked} unissued cells refused with no draft; the app offers exactly the server's issued cells. [SYNTHETIC]`);
+console.log(`NSW OFFER: PASS — ${pass}/${total} checks — ${offeredCells} offered cells issued and marked by a Prithagoras server, ${hiddenRefused} hidden cells refused, ${catalogueGenerated} catalogue cells generated, ${unissuedAsked} unissued cells refused with no draft; the app offers exactly the server's issued cells. [SYNTHETIC]`);
