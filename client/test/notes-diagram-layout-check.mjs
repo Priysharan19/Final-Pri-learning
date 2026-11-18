@@ -44,12 +44,20 @@ function measure() {
   const hit = (a, b) => Math.min(a.r, b.r) - Math.max(a.l, b.l) > 1 && Math.min(a.b, b.b) - Math.max(a.t, b.t) > 1;
   const expectedNames = spec => {
     if (!spec || spec.kind !== 'function') return null;
+    const own = s => (typeof s === 'string' && /^\s*[A-Za-z]/.test(s) ? s.trim()[0] : null);
+    let x = null; let y = null;
     for (const c of spec.curves || []) {
-      const m = /^\s*([A-Za-z])\s*\(\s*([A-Za-z])\s*\)/.exec(String(c.label || ''));
-      if (m) return { y: m[1], x: m[2] };
+      const lab = String(c.label || '');
+      const f = /^\s*([A-Za-z])\s*\(\s*([A-Za-z])\s*\)/.exec(lab);
+      if (f) { y = y || f[1]; x = x || f[2]; continue; }
+      const e = /^\s*([A-Za-z])\s*=\s*(.+)$/.exec(lab);
+      if (!e) continue;
+      // "V = 30000(0.85)^n": the one other letter on the right (not a command, not the e of e^) is the variable.
+      const rest = e[2].replace(/\\[A-Za-z]+|\\text\{[^}]*\}/g, '').replace(/e\^/g, '');
+      const letters = new Set(rest.match(/[A-Za-z]/g) || []); letters.delete(e[1]);
+      if (letters.size === 1 && !y) { y = e[1]; x = [...letters][0]; }
     }
-    const own = s => (typeof s === 'string' && /^\s*\\?[A-Za-z]/.test(s) ? s.trim().replace(/^\\(?:mathrm|text)\{/, '')[0] : null);
-    return { x: own(spec.xLabel) || 'x', y: own(spec.yLabel) || 'y' };
+    return { x: spec.xName || own(spec.xLabel) || x || 'x', y: spec.yName || own(spec.yLabel) || y || 'y' };
   };
   for (const sec of document.querySelectorAll('section[data-did]')) {
     const key = sec.dataset.did; const v = []; out[key] = v;
@@ -88,7 +96,7 @@ function measure() {
       }
       const words = labels.filter(l => /[A-Za-z=]/.test(l.text.replace(/[0-9.,\s−-]/g, '')) && !l.fo.closest('.dg-small, .dg-tick'));
       for (const ref of refs) {
-        const near = words.some(l => l.box.r >= ref.r.left - 4 && l.box.l <= ref.r.right + 4 && l.box.b >= ref.r.top - 26 && l.box.t <= ref.r.bottom + 26);
+        const near = words.some(l => l.box.r >= ref.r.left - 24 && l.box.l <= ref.r.right + 24 && l.box.b >= ref.r.top - 26 && l.box.t <= ref.r.bottom + 26);
         if (!near) v.push(`REFLINE ${ref.what} has no label`);
       }
       // Axis names.

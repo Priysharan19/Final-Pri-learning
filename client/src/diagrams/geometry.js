@@ -205,9 +205,69 @@ export function placeLabels(items, obstacles, frame, h = 20) {
   });
 }
 
+// ── Axis names, reference lines and one label layout ─────────────────────────
+const FN_LABEL = /^\s*([A-Za-z])\s*\(\s*([A-Za-z])\s*\)/;
+const LHS_LABEL = /^\s*([A-Za-z])\s*=\s*(.+)$/;
+/**
+ * The names a graph's axes carry, from the function's own variables: g(t) is drawn against t and g,
+ * V = ... n against n and V; x and y only when nothing else is named. A spec may say so itself with
+ * xLabel / yLabel (TeX) or xName / yName with xUnit / yUnit (plain words, set as "t (hours)").
+ */
+export function graphVariables(spec = {}) {
+  let x = null; let y = null;
+  for (const c of spec.curves || []) {
+    const lab = String(c.label || '');
+    const f = FN_LABEL.exec(lab);
+    if (f) { y = y || f[1]; x = x || f[2]; continue; }
+    const e = LHS_LABEL.exec(lab);
+    if (e && e[1] !== 'y' || (e && /[A-Za-z]/.test(e[2].replace(/\\[A-Za-z]+|\\text\{[^}]*\}/g, '').replace(/e\^/g, '')))) {
+      const letters = new Set(e[2].replace(/\\[A-Za-z]+|\\text\{[^}]*\}/g, '').replace(/e\^/g, '').match(/[A-Za-z]/g) || []);
+      letters.delete(e[1]);
+      if (letters.size === 1 && !y) { y = e[1]; x = [...letters][0]; }
+    }
+  }
+  const lead = t => { const m = typeof t === 'string' ? /^\s*(?:\\(?:mathrm|text|mathit)\{)?([A-Za-z])/.exec(t) : null; return m ? m[1] : null; };
+  x = spec.xName || lead(spec.xLabel) || x || 'x';
+  y = spec.yName || lead(spec.yLabel) || y || 'y';
+  const title = (name, unit, tex) => tex || (unit ? `${name}\\ (\\text{${unit}})` : name);
+  return { x, y, xTex: title(x, spec.xUnit, spec.xLabel), yTex: title(y, spec.yUnit, spec.yLabel), xUnit: spec.xUnit || null, yUnit: spec.yUnit || null };
+}
+
+/** A close estimate of a label's drawn width in px (commands print nothing). */
+export const textW = tex => Math.ceil(7.4 * String(tex).replace(/\\(left|right|,|;|!|quad| |text|mathrm|dfrac|tfrac|frac)|[{}\\^_]/g, '').length) + 4;
+
+/**
+ * Put labels where they touch nothing: no other label, tick number, curve, dot or axis. Each item lists its
+ * candidate spots best-first ({ anchor, x, y } for a label of width w, height h centred on y); the first spot
+ * with no collision wins, else the cheapest. `fixed` are boxes already taken (tick numbers, axis names).
+ */
+export function layoutLabels(items, { fixed = [], lines = [], dots = [], bounds }) {
+  const segs = [];
+  for (const line of lines) for (let i = 1; i < line.pts.length; i++) segs.push({ a: line.pts[i - 1], b: line.pts[i], weight: line.weight });
+  const pts = [];
+  for (const sg of segs) { const n = Math.max(1, Math.ceil(Math.hypot(sg.b[0] - sg.a[0], sg.b[1] - sg.a[1]) / 3)); for (let k = 0; k <= n; k++) pts.push([sg.a[0] + ((sg.b[0] - sg.a[0]) * k) / n, sg.a[1] + ((sg.b[1] - sg.a[1]) * k) / n, sg.weight]); }
+  const taken = [...fixed];
+  const boxOf = (c, w, h) => { const l = c.anchor === 'start' ? c.x : c.anchor === 'end' ? c.x - w : c.x - w / 2; return { l, r: l + w, t: c.y - h / 2, b: c.y + h / 2 }; };
+  const meet = (a, b, pad = 0) => a.r + pad > b.l && a.l - pad < b.r && a.b + pad > b.t && a.t - pad < b.b;
+  return items.map(it => {
+    const w = it.w; const h = it.h || 14; let best = null;
+    (it.cands.length ? it.cands : [{ anchor: 'middle', x: 0, y: 0 }]).forEach((c, i) => {
+      const box = boxOf(c, w, h); let cost = i * 0.05;
+      if (!it.free && (box.l < bounds.left + 1 || box.r > bounds.right - 1 || box.t < bounds.top + 1 || box.b > bounds.bottom - 1)) cost += 100;
+      cost += taken.filter(q => meet(box, q, 1)).length * 60;
+      const hit = pts.filter(([x, y]) => x >= box.l - 2 && x <= box.r + 2 && y >= box.t - 2 && y <= box.b + 2);
+      cost += hit.reduce((n, q) => n + q[2], 0) / 2;
+      cost += dots.filter(([x, y]) => x >= box.l - 4 && x <= box.r + 4 && y >= box.t - 4 && y <= box.b + 4 && !(it.at && x === it.at[0] && y === it.at[1])).length * 30;
+      if (!best || cost < best.cost) best = { cost, c, box };
+    });
+    taken.push(best.box);
+    return { x: r3(best.c.x, 2), y: r3(best.c.y, 2), anchor: best.c.anchor, w, h: 20, box: best.box, cost: best.cost };
+  });
+}
+
 export function functionGraphModel(spec) {
   const { xmin = -5, xmax = 5, ymin = -5, ymax = 5, width, height } = spec;
-  const frame = makeFrame({ xmin, xmax, ymin, ymax, width, height });
+  const frame = makeFrame({ xmin, xmax, ymin, ymax, width, height, pad: spec.xUnit ? { b: 48 } : {} });
   const curves = (spec.curves || []).map((c, i) => {
     const expr = curveExpr(c);
     const f = compile(expr);
@@ -231,24 +291,89 @@ export function functionGraphModel(spec) {
     model.f = f;
     return model;
   });
+  const names = graphVariables(spec);
   const asymptotes = (spec.asymptotes || []).map(a => (isNum(a.x)
     ? { axis: 'x', value: a.x, label: a.label ?? null, px: [[frame.sx(a.x), frame.top], [frame.sx(a.x), frame.bottom]] }
     : { axis: 'y', value: a.y, label: a.label ?? null, px: [[frame.left, frame.sy(a.y)], [frame.right, frame.sy(a.y)]] }));
   const points = (spec.points || []).map(p => ({ x: p.x, y: p.y, label: p.label ?? null, px: [frame.sx(p.x), frame.sy(p.y)] }));
   const xt = spec.xTicks || niceTicks(frame.xmin, frame.xmax, 8);
   const yt = spec.yTicks || niceTicks(frame.ymin, frame.ymax, 6);
-  // Labels for every named point and every intercept, placed clear of the curves, the axes and each other.
-  const icepts = curves.flatMap(c => [c.yIntercept, ...(c.xIntercepts || [])].filter(Boolean));
+  const ax0 = frame.sy(clamp(0, frame.ymin, frame.ymax)); const ay0 = frame.sx(clamp(0, frame.xmin, frame.xmax));
+  // A constant curve is a reference line: it is named by its own label, else "d=6" in the graph's own variable.
+  curves.forEach((c, i) => {
+    const vals = [0.13, 0.41, 0.77].map(t => c.f(frame.xmin + (frame.xmax - frame.xmin) * t));
+    if (vals.every(v => isNum(v) && Math.abs(v - vals[0]) < 1e-9)) { c.constant = r3(vals[0], 4); c.tone = c.tone === 'primary' ? 'primary' : c.tone; }
+  });
+  for (const a of asymptotes) a.refLabel = a.label ?? `${a.axis === 'x' ? names.x : names.y}=${r3(a.value, 4)}`;
+  for (const c of curves) if (c.constant !== undefined) c.refLabel = c.label ?? `${names.y}=${c.constant}`;
   // One label per spot: an intercept sitting on a named point (or on an earlier intercept) is not labelled twice.
+  const icepts = curves.flatMap(c => [c.yIntercept, ...(c.xIntercepts || [])].filter(Boolean));
   const seen = new Set(points.filter(p => p.label).map(p => `${p.px[0].toFixed(1)},${p.px[1].toFixed(1)}`));
   const uniq = icepts.filter(p => { const k = `${p.px[0].toFixed(1)},${p.px[1].toFixed(1)}`; if (seen.has(k)) { p.noLabel = true; return false; } seen.add(k); return true; });
-  const labelled = [...points.filter(p => p.label).map(p => ({ ref: p, tex: p.label })), ...uniq.map(p => ({ ref: p, tex: `(${p.x},\\,${p.y})` }))];
-  const axisLines = [[[frame.left, frame.sy(clamp(0, frame.ymin, frame.ymax))], [frame.right, frame.sy(clamp(0, frame.ymin, frame.ymax))]], [[frame.sx(clamp(0, frame.xmin, frame.xmax)), frame.top], [frame.sx(clamp(0, frame.xmin, frame.xmax)), frame.bottom]]];
-  const spots = placeLabels(labelled.map(l => ({ px: l.ref.px, tex: l.tex })), [...curves.flatMap(c => c.segments), ...axisLines], frame);
-  labelled.forEach((l, i) => { l.ref.place = spots[i]; });
+  // Everything already fixed on the page: tick numbers, the origin and the axis names.
+  const H = 14;
+  const fixed = [];
+  const addBox = (anchor, x, y, w) => fixed.push({ l: anchor === 'start' ? x : anchor === 'end' ? x - w : x - w / 2, r: anchor === 'start' ? x + w : anchor === 'end' ? x : x + w / 2, t: y - H / 2, b: y + H / 2 });
+  for (const v of xt) if (v !== 0) addBox('middle', frame.sx(v), ax0 + 14, textW(String(v)));
+  for (const v of yt) if (v !== 0) addBox('end', ay0 - 6, frame.sy(v), textW(String(v)));
+  const originShown = frame.xmin <= 0 && frame.xmax >= 0 && frame.ymin <= 0 && frame.ymax >= 0;
+  const origin = originShown ? { x: ay0 - 6, y: ax0 + 14, anchor: 'end', tex: '0' } : null;
+  if (origin) addBox('end', origin.x, origin.y, 8);
+  // Axis names sit past the arrow tips, outside the plot, so no curve can reach them.
+  const xw = textW(names.xTex); const yw = textW(names.yTex);
+  const xName = names.xUnit || xw > frame.width - frame.right - 6
+    ? { x: frame.right, y: ax0 + 30, anchor: 'end', w: xw, tex: names.xTex }
+    : { x: frame.right + 5, y: ax0, anchor: 'start', w: xw, tex: names.xTex };
+  const yName = { x: ay0 + 8, y: frame.top - 8, anchor: 'start', w: yw, tex: names.yTex };
+  addBox(xName.anchor, xName.x, xName.y, xName.w); addBox(yName.anchor, yName.x, yName.y, yName.w);
+  // Lines labels must keep off: curves, the axes and the reference lines (lighter).
+  const lines = [
+    ...curves.flatMap(c => c.segments.map(pts => ({ pts, weight: c.constant !== undefined ? 3 : 16 }))),
+    { pts: [[frame.left, ax0], [frame.right, ax0]], weight: 6 }, { pts: [[ay0, frame.top], [ay0, frame.bottom]], weight: 6 },
+    ...asymptotes.map(a => ({ pts: a.px, weight: 3 }))
+  ];
+  const dots = [...points, ...uniq].map(p => p.px);
+  const bounds = { left: frame.left, right: frame.right, top: frame.top, bottom: frame.bottom };
+  const items = [];
+  const ring = (px, w) => {
+    const [x, y] = px; const out = [];
+    for (const [dy, dx] of [[-13, 8], [-13, -8], [13, 8], [13, -8], [0, 12], [0, -12], [-28, 6], [-28, -6], [29, 6], [29, -6], [-44, 4], [-44, -4], [45, 4], [45, -4]]) out.push({ anchor: dx > 0 ? 'start' : 'end', x: x + dx, y: y + dy });
+    out.push({ anchor: 'middle', x, y: y - 20 }, { anchor: 'middle', x, y: y + 34 });
+    return out;
+  };
+  for (const p of [...points.filter(q => q.label), ...uniq]) { p.labelTex = p.label ?? `(${p.x},\\,${p.y})`; items.push({ ref: p, w: textW(p.labelTex), at: p.px, cands: ring(p.px, 0), tex: p.labelTex }); }
+  // Reference lines: a spot along the line, above it, from the right end in.
+  const refs = [...asymptotes.map(a => ({ ref: a, line: a.px, vertical: a.axis === 'x', tex: a.refLabel })), ...curves.filter(c => c.constant !== undefined).map(c => ({ ref: c, line: [[frame.left, frame.sy(c.constant)], [frame.right, frame.sy(c.constant)]], vertical: false, tex: c.refLabel }))];
+  for (const r of refs) {
+    const w = textW(r.tex); const cands = [];
+    if (r.vertical) { const x = r.line[0][0]; for (const f of [0.1, 0.3, 0.5, 0.7, 0.9]) for (const side of [1, -1]) cands.push({ anchor: side > 0 ? 'start' : 'end', x: x + side * 5, y: frame.top + (frame.bottom - frame.top) * f }); }
+    else { const y = r.line[0][1]; for (const f of [0.97, 0.85, 0.7, 0.5, 0.3, 0.12]) for (const side of [-1, 1]) cands.push({ anchor: 'end', x: frame.left + (frame.right - frame.left) * f, y: y + side * 10 }); }
+    r.ref.place = null; items.push({ ref: r.ref, w, cands, tex: r.tex, key: 'ref' });
+  }
+  // Curve names: along the curve, clear of its stroke on either side, from the right end back.
+  for (const c of curves) {
+    if (!c.label || c.constant !== undefined) continue;
+    const seg = c.segments.slice().sort((p, q) => q.length - p.length)[0] || [];
+    const w = textW(c.label); const cands = [];
+    for (const f of [1, 0.92, 0.84, 0.74, 0.62, 0.5, 0.36, 0.22, 0.08]) {
+      if (seg.length < 2) break;
+      const k = Math.max(1, Math.min(seg.length - 1, Math.round(f * (seg.length - 1))));
+      const [x1, y1] = seg[k - 1]; const [x2, y2] = seg[k]; const tx = x2 - x1; const ty = y2 - y1; const L = Math.hypot(tx, ty) || 1;
+      for (const sgn of [1, -1]) {
+        let nx = (ty / L) * sgn; let ny = (-tx / L) * sgn;
+        if (ny > 0.2 && sgn === 1) { nx = -nx; ny = -ny; }
+        const d = Math.abs(nx) * w / 2 + Math.abs(ny) * 7 + 6;
+        cands.push({ anchor: 'middle', x: x2 + nx * d, y: y2 + ny * d });
+      }
+    }
+    c.labelPlace = null; items.push({ ref: c, w, cands, tex: c.label, key: 'curve' });
+  }
+  const spots = layoutLabels(items, { fixed, lines, dots, bounds });
+  items.forEach((it, i) => { if (it.key === 'ref') it.ref.place = spots[i]; else if (it.key === 'curve') it.ref.labelPlace = spots[i]; else it.ref.place = spots[i]; });
   return {
-    frame,
-    axes: { x: [[frame.left, frame.sy(clamp(0, frame.ymin, frame.ymax))], [frame.right, frame.sy(clamp(0, frame.ymin, frame.ymax))]], y: [[frame.sx(clamp(0, frame.xmin, frame.xmax)), frame.top], [frame.sx(clamp(0, frame.xmin, frame.xmax)), frame.bottom]] },
+    frame, names, origin,
+    axisNames: { x: xName, y: yName },
+    axes: { x: [[frame.left, ax0], [frame.right, ax0]], y: [[ay0, frame.top], [ay0, frame.bottom]] },
     xTicks: xt.map(v => ({ value: v, px: frame.sx(v) })),
     yTicks: yt.map(v => ({ value: v, px: frame.sy(v) })),
     curves, asymptotes, points
