@@ -23,6 +23,7 @@
 @keyframes signup-in-forward { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
 @keyframes signup-in-back { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: none; } }
 
+.signup-title:focus, .signup-title:focus-visible { outline: none; }
 .signup-title { font-size: 24px; line-height: 1.25; font-weight: 650; letter-spacing: -0.01em; margin: 0 0 var(--space-2); outline: none; }
 .signup-lead { color: var(--ink-2); margin: 0 0 var(--space-5); line-height: 1.5; }
 .signup-sublabel { color: var(--ink-2); font-size: 13.5px; margin: var(--space-5) 0 var(--space-2); }
@@ -112,6 +113,7 @@
    own, so the work around it stays the subject. */
 .signin-landing { width: 100%; max-width: 440px; margin-top: var(--space-6); padding: var(--space-6); text-align: left; }
 .signup-inline { max-width: 420px; margin: 0; }
+.signup-gate { max-width: none; margin: 0; }
 .signup-inline .signup-title { font-size: 19px; }
 .signup-inline .signup-lead { margin-bottom: var(--space-4); font-size: 14px; }
 .signup-inline .signup-top { margin-bottom: var(--space-3); justify-content: flex-end; }
@@ -131,7 +133,8 @@
    said plainly, and the sign-in card or the guardian form inside it. */
 .activation-gate { width: 100%; max-width: 480px; margin: var(--space-5) auto 0; text-align: left; }
 .activation-gate .card { margin-top: var(--space-4); padding: var(--space-5); }
-.activation-gate .signup-flow { margin-top: var(--space-3); }
+.activation-gate .signup-flow { margin-top: var(--space-5); }
+.activation-gate .activation-lead { margin: 0; }
 .activation-status { margin: var(--space-3) 0 0; color: var(--ink-2); font-size: 14px; line-height: 1.5; }
 .activation-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-4); align-items: center; }
 .activation-foot { margin-top: var(--space-5); text-align: center; font-size: 12.5px; }
