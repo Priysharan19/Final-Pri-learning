@@ -256,7 +256,7 @@ export default function LivingFormula({ spec }) {
             return (
               <li key={`${f.kind}${i}`} className={`lf-row${isHot(f) ? ' is-hot' : ''}`}
                 onPointerEnter={e => { if (e.pointerType === 'mouse') setRowKind(f.kind); }} onPointerLeave={e => { if (e.pointerType === 'mouse') setRowKind(null); }}
-                onClick={() => setRowKind(k => (k === f.kind ? null : f.kind))}>
+                onPointerDown={e => { if (e.pointerType !== 'mouse') setRowKind(k => (k === f.kind ? null : f.kind)); }}>
                 <FeatureIcon kind={f.kind} />
                 <span className="lf-row-label">{label}</span>
                 <span className="lf-row-val">{value}</span>
