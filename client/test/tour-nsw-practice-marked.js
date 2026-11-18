@@ -179,5 +179,5 @@ if (failures.length) {
   console.log(`NSW PRACTICE MARKED TOUR: FAIL — ${failures.length} of ${total} checks failed\n  · ${failures.join('\n  · ')}`);
   process.exit(1);
 }
-console.log(`NSW PRACTICE MARKED TOUR: PASS — ${pass}/${total} checks — a Prithagoras NSW Year 10 student is issued a question by the server, Submit is offered, and the server marks the answer`);
+console.log(`NSW PRACTICE MARKED TOUR: PASS — ${pass}/${total} checks — a Prithagoras NSW Year 11 student is issued a question by the server, Submit is offered, and the server marks the answer`);
 process.exit(0);
