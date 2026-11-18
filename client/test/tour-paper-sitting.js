@@ -221,7 +221,11 @@ try {
 
   // ── Layout and names ────────────────────────────────────────────────────────
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-  const wide = overflow > 0 ? await page.evaluate(() => [...document.querySelectorAll('.pp-page *')].filter(el => !el.closest('.katex-mathml') && el.getBoundingClientRect().right > window.innerWidth + 1).filter(el => el.classList.contains('katex-base') || el.tagName === 'path').slice(0, 6).map(el => `${el.tagName.toLowerCase()}.${String(el.className).slice(0, 40)}@${Math.round(el.getBoundingClientRect().right)}<${el.closest('[class^=pp-],[class*=" pp-"]')?.className?.toString().slice(0, 30)}`)) : [];
+  const wide = overflow > 0 ? await page.evaluate(() => {
+    const clipped = el => { for (let n = el.parentElement; n && n !== document.body; n = n.parentElement) { const o = getComputedStyle(n).overflowX; if (o === 'auto' || o === 'hidden' || o === 'scroll' || o === 'clip') return true; } return false; };
+    return [...document.querySelectorAll('body *')].filter(el => !clipped(el) && el.getBoundingClientRect().right > window.innerWidth + 1)
+      .slice(0, 6).map(el => `${el.tagName.toLowerCase()}.${String(el.className?.baseVal ?? el.className).slice(0, 40)}@${Math.round(el.getBoundingClientRect().right)}`);
+  }) : [];
   check('at 390 px the page does not scroll sideways', overflow <= 0, `overflow ${overflow}px ${JSON.stringify(wide)}`);
   check('ACCESSIBILITY: every control has a name', (await unnamedControls(page)).length === 0, JSON.stringify(await unnamedControls(page)));
   await page.setViewportSize({ width: 1180, height: 820 });
