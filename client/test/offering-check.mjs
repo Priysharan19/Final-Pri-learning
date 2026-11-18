@@ -16,6 +16,7 @@ import { markWeightAfter, ladderEvidence, HINT_RUNGS } from '../src/engine/hintL
 import { editionRecord } from '../src/platform/edition-record.js';
 import { brandIndexHtml } from '../brand/edition-brand.mjs';
 import { AU_STRINGS } from '../src/i18n/strings.au.js';
+import { renameTier } from '../src/i18n/tierName.js';
 import en from '../src/i18n/strings.en.js';
 import { hintsAreFree, editionOffering } from '../../server/platform/edition.js';
 
@@ -69,11 +70,20 @@ ok(AU.hints.free === true && IN.hints.free === false, 'the table says so');
 eq([AU.games, IN.games], [false, true], 'Rapid Fire and Match are hidden in Prithagoras only');
 
 // 5 · HSC Pass
+// The paid tier's name is renamed at lookup in a Prithagoras build (i18n/tierName.js, applied in i18n/core.js), so the shared
+// catalogue and India's copy keep "Premium" and no second 70-sentence catalogue has to be kept in step.
 const premiumKeys = Object.entries(en).filter(([, v]) => /\bPremium\b/.test(typeof v === 'string' ? v : JSON.stringify(v))).map(([k]) => k);
-const NOT_REACHED = new Set(['paywall.from.jeeAdvanced', 'msg.ent.jeeAdvanced']);   // the JEE Advanced gate, reachable only on India's JEE track
-eq(premiumKeys.filter(k => !NOT_REACHED.has(k) && !Object.hasOwn(AU_STRINGS, k)), [], 'every Prithagoras string that says Premium is overridden');
-eq(Object.entries(AU_STRINGS).filter(([, v]) => /\bPremium\b/.test(typeof v === 'string' ? v : JSON.stringify(v))).map(([k]) => k), [], 'and none of the overrides says Premium');
-ok(/HSC Pass/.test(AU_STRINGS['paywall.title']) && AU_STRINGS['paywall.premiumTitle'] === 'HSC Pass', 'the paywall names it HSC Pass');
+ok(premiumKeys.length > 50, 'the shared catalogue names the paid tier "Premium" in many strings');
+eq(premiumKeys.filter(k => /\bPremium\b/.test(JSON.stringify(renameTier(en[k])))), [], 'and a Prithagoras lookup renames every one of them');
+eq(renameTier('Premium removes the daily limit.'), 'HSC Pass removes the daily limit.', 'a sentence');
+eq(renameTier('part of {brand} Premium.'), 'part of {brand} HSC Pass.', 'a sentence with a slot');
+eq(renameTier({ one: 'Restored {n} item and refreshed Premium.', other: 'Restored {n} items and refreshed Premium.' }), { one: 'Restored {n} item and refreshed HSC Pass.', other: 'Restored {n} items and refreshed HSC Pass.' }, 'counted strings value by value');
+eq(renameTier('Nothing to rename.'), 'Nothing to rename.', 'a string that names no tier is the same string');
+eq(renameTier('Premiumize'), 'Premiumize', 'only the word');
+eq(Object.entries(AU_STRINGS).filter(([, v]) => /\bPremium\b/.test(typeof v === 'string' ? v : JSON.stringify(v))).map(([k]) => k), [], 'and no en-AU override says Premium');
+const core = read('../src/i18n/core.js');
+ok(/const au = EDITION_ID === 'prithagoras' && language === 'en';/.test(core) && /if \(au && !overridden && entry !== undefined\) entry = renameTier\(entry\);/.test(core), 'only a Prithagoras English lookup renames; India and Hindi never do');
+ok(/HSC Pass/.test(AU_STRINGS['settings.premiumAdds']) && /HSC Pass/.test(AU_STRINGS['upgrade.jeeAdvanced']), 'the overrides written by hand already say HSC Pass');
 ok(!/−\{percent\}|−10|−20|−30|% of marks/.test(AU_STRINGS['verdict.rungLabelFree']), 'the free rung label states no deduction');
 
 // 7 · words, not codes

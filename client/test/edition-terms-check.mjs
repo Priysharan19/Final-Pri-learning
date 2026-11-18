@@ -79,7 +79,8 @@ check('Priyabhata keeps Class and NCERT: the shared catalogue is unchanged', () 
 });
 check('the override applies only to a Prithagoras build in English', () => {
   const idx = readFileSync(fileURLToPath(new URL('../src/i18n/core.js', here)), 'utf8');
-  assert.match(idx, /EDITION_ID === 'prithagoras' && language === 'en' && Object\.hasOwn\(AU_STRINGS, key\)/);
+  // owner decision, 19 Nov 2026: the same condition, now named once (`au`) because the paid tier's rename uses it too.
+  assert.match(idx, /const au = EDITION_ID === 'prithagoras' && language === 'en';\s+const overridden = au && Object\.hasOwn\(AU_STRINGS, key\);/);
 });
 check('every year selector and tab goes through common.classNumber (Year N in Prithagoras), never a literal "Class N" in a screen', () => {
   const walk = d => readdirSync(d).flatMap(n => { const p = `${d}/${n}`; return statSync(p).isDirectory() ? walk(p) : [p]; });
