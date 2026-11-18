@@ -23,7 +23,7 @@ import {
 } from './practiceRecovery.js';
 import { READER_PERMISSION, readerPermission } from '../ink/readerPermission.js';
 import { cloudReadingEnabled, forgetCloudReads, setReadingQuestion, INK_READER_STATE, noteReaderRefusal, readerBlock, readPhotoWithCloud, resumeReaderNow, takeCloudReadingNotice } from '../ink/cloudReader.js';
-import { retryClock } from '../ink/readerFailure.js';
+import { retryClock, retryWhen } from '../ink/readerFailure.js';
 import { preparePhoto } from '../ink/photoRaster.js';
 import { buildTranscript, editLine, includeAll, includedLines, reviveTranscript, setLineExcluded, unreadablePage, workingOf } from '../photo/transcript.js';
 import { proposeFinalAnswer, readsAsWritten } from '../photo/finalAnswer.js';
@@ -2773,7 +2773,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                              photoOCR.phase === 'unavailable' && photoOCR.blockedKey === 'verdict.photoReadingSignIn' && sessionEnded
                                ? <span className="verdict-body" data-photo-session-ended>{t('check.sessionEnded')}</span>
                                : <span className="verdict-body" data-photo-reading-problem={photoOCR.block?.kind || (photoOCR.unreadable ? 'unreadable' : 'failed')}>
-                                   {photoOCR.blockedKey ? t(photoOCR.blockedKey, { time: retryClock(photoOCR.block?.retryAt, language, user) }) : photoOCR.error}
+                                   {photoOCR.blockedKey ? t(photoOCR.blockedKey, { time: retryClock(photoOCR.block?.retryAt, language, user), when: retryWhen(photoOCR.block?.retryAt, language, user) }) : photoOCR.error}
                                  </span>
                            )}
                           {/* A reading problem is never a verdict: it comes with a retry
@@ -3176,7 +3176,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 <div data-reader-block={state.res.readerBlock.kind}>
                   <div className="verdict-title">{t('verdict.readerNotCheckedTitle')}</div>
                   <div className="verdict-body">
-                    {t(state.res.viaInk ? state.res.readerBlock.inkKey : state.res.readerBlock.key, { time: retryClock(state.res.readerBlock.retryAt, language, user) })}{' '}
+                    {t(state.res.viaInk ? state.res.readerBlock.inkKey : state.res.readerBlock.key, { time: retryClock(state.res.readerBlock.retryAt, language, user), when: retryWhen(state.res.readerBlock.retryAt, language, user) })}{' '}
                     <span className="muted">{t('verdict.readerNotCheckedNote')}</span>
                   </div>
                   <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>

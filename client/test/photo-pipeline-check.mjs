@@ -528,7 +528,7 @@ for (const [failure, kind, action, autoRetry, manualRetry, photoKey, inkKey, tim
   eq(got.retryAt, timed ? IN_AN_HOUR : null, `${label}: the time it lifts is the server's, or none`);
   for (const key of [photoKey, inkKey]) {
     ok(typeof en[key] === 'string' && typeof hi[key] === 'string', `${key} is in the catalogue in English and Hindi`);
-    ok(/Until$/.test(key) === /\{time\}/.test(String(en[key])) && /Until$/.test(key) === /\{time\}/.test(String(hi[key])), `${key} names a time exactly when it has one`);
+    ok(/Until$/.test(key) === /\{(time|when)\}/.test(String(en[key])) && /Until$/.test(key) === /\{(time|when)\}/.test(String(hi[key])), `${key} names a time exactly when it has one`);
     ok(!/on.device|on your device|डिवाइस पर पढ़/i.test(String(en[key]) + String(hi[key])), `${key} never claims the page is read on the device`);
   }
   // Only a reader that did not answer is retried without being asked.

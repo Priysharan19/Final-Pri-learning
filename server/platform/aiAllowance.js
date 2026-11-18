@@ -22,7 +22,12 @@ import { READ_ALLOWANCE } from '../../client/src/engine/practiceAllowance.js';
 // RATE_BUCKET_MAX_WINDOW_MS); a longer window here would need that raised too.
 export const AI_WINDOW_MS = 24 * 60 * 60 * 1000;
 export const AI_KINDS = Object.freeze(['handwriting', 'working', 'question-photo']);
-// The unit is one REQUEST the student asked for (one "read my writing" of the
+// Handwriting (the `handwriting` kind): the unit is one ANSWER, not one read
+// (owner decision, 18 November 2026). The first paid read of an issued
+// question's answer in the day spends the unit; re-reads of the same answer
+// are free, up to ANSWER_READ_CAP, counted by the server on the server-issued
+// question id (see chargeForRead). A read with no valid issued id is one unit.
+// For the other kinds, the unit is one REQUEST the student asked for (one "read my writing" of the
 // page or of a photo of it, one "Practise this" photo, one working check), not
 // one provider call: a request that escalates to the fallback model still
 // costs one unit, and a kept or in-flight read reused by Submit costs nothing
@@ -115,7 +120,16 @@ export async function refundAiAllowance(db, verdict) {
   await asStore(db).run('UPDATE rate_limits SET count = count - 1 WHERE bucket = ? AND window_start = ? AND count > 0', [verdict.bucket, verdict.windowStart]);
 }
 
-const WHAT = Object.freeze({ handwriting: 'readings of your writing', 'question-photo': 'question photos', working: 'working checks' });
+const WHAT = Object.freeze({ handwriting: 'handwritten answers', 'question-photo': 'question photos', working: 'working checks' });
+
+/** "in about 23 hours" / "in about 40 minutes": how long until a window renews. */
+export function renewsIn(resetAt, now = Date.now()) {
+  const ms = Math.max(0, Number(resetAt) - now);
+  const minutes = Math.max(1, Math.ceil(ms / 60_000));
+  if (minutes < 60) return `in about ${minutes} minute${minutes === 1 ? '' : 's'}`;
+  const hours = Math.round(ms / 3_600_000);
+  return `in about ${hours} hour${hours === 1 ? '' : 's'}`;
+}
 
 export function refuseAiAllowance(res, verdict) {
   res.set('RateLimit-Remaining', '0');
@@ -129,7 +143,9 @@ export function refuseAiAllowance(res, verdict) {
   return res.status(429).json({
     error: {
       code: 'AI_ALLOWANCE_EXHAUSTED',
-      message: `You have used today's ${verdict.limit} ${what}. They come back within 24 hours; you can type your answer meanwhile.${more}`,
+      // The server does not know the student's timezone, so it says how long
+      // (never a bare clock time that could read as "already passed").
+      message: `You have used today's ${verdict.limit} ${what}. They renew ${renewsIn(verdict.resetAt)}; you can type your answer meanwhile.${more}`,
       plan: verdict.plan,
       kind: verdict.kind || null,
       limit: verdict.limit,
@@ -140,4 +156,47 @@ export function refuseAiAllowance(res, verdict) {
       window: 'day'
     }
   });
+}
+
+/** The most paid reads of ONE answer (one issued question) in the rolling day.
+ * The client's own AUTO_READ_MAX (12) is a courtesy; this is the enforcement. */
+export const ANSWER_READ_CAP = 12;
+
+/**
+ * Charge a handwriting read. `answerKey` is the id of a question the SERVER
+ * issued to this account (the route verifies that before passing it; it is
+ * never a free-form client value). With one, the first paid read of that
+ * answer in the window spends a unit and re-reads are free up to
+ * ANSWER_READ_CAP; past the cap the read is refused (`cap`). Without one it is
+ * one unit per read, as before. Returns the allowance verdict (allowed, or
+ * the refusal) plus `charged` (a unit was spent) and a `counter` to undo.
+ */
+export async function chargeForRead(db, { accountId, answerKey = null, env = process.env, now = Date.now() }) {
+  db = asStore(db);
+  if (!answerKey) {
+    const unit = await consumeAiAllowance(db, { accountId, kind: 'handwriting', env, now });
+    return { ...unit, charged: unit.allowed, counter: null };
+  }
+  const counter = { bucket: `hw-answer:${sha256(`${accountId}:${answerKey}`).slice(0, 32)}`, windowStart: null };
+  const seen = await consumeRateLimit(db, counter.bucket, { limit: ANSWER_READ_CAP, windowMs: AI_WINDOW_MS }, now);
+  if (!seen.allowed) return { allowed: false, cap: true, kind: 'handwriting', resetAt: seen.resetAt, charged: false, counter: null };
+  counter.windowStart = seen.resetAt - AI_WINDOW_MS;
+  // The first read in this answer's window is the one that costs a unit.
+  const first = seen.remaining === ANSWER_READ_CAP - 1;
+  if (!first) return { allowed: true, free: true, kind: 'handwriting', charged: false, counter, bucket: null };
+  const unit = await consumeAiAllowance(db, { accountId, kind: 'handwriting', env, now });
+  if (!unit.allowed) {
+    await asStore(db).run('UPDATE rate_limits SET count = count - 1 WHERE bucket = ? AND window_start = ? AND count > 0', [counter.bucket, counter.windowStart]);
+    return { ...unit, charged: false, counter: null };
+  }
+  return { ...unit, charged: true, counter };
+}
+
+/** Undo a charge when the read delivered nothing and cost nothing (refund paths). */
+export async function refundRead(db, verdict) {
+  if (!verdict) return;
+  if (verdict.charged) await refundAiAllowance(db, verdict);
+  if (verdict.counter?.windowStart != null) {
+    await asStore(db).run('UPDATE rate_limits SET count = count - 1 WHERE bucket = ? AND window_start = ? AND count > 0', [verdict.counter.bucket, verdict.counter.windowStart]);
+  }
 }

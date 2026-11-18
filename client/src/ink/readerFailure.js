@@ -137,3 +137,28 @@ export function retryClock(retryAt, language = 'en', profile = null) {
     return new Intl.DateTimeFormat(hindi ? 'hi-IN' : 'en-IN', { hour: 'numeric', minute: '2-digit' }).format(new Date(Number(retryAt)));
   } catch { return ''; }
 }
+
+/**
+ * WHEN a limit lifts, unambiguously: "in about 20 minutes", "today at about
+ * 4:35 pm" or "tomorrow at about 7:50 pm". A bare clock time read a minute
+ * after that time on the previous day looks like "already passed" (owner,
+ * 18 November 2026), so a limit that lifts on another calendar day says
+ * "tomorrow". Same locale and timezone rules as retryClock; '' when there is
+ * no time to give.
+ */
+export function retryWhen(retryAt, language = 'en', profile = null, now = Date.now()) {
+  const clock = retryClock(retryAt, language, profile);
+  if (!clock) return '';
+  const hindi = String(language || 'en').toLowerCase().startsWith('hi');
+  const at = Number(retryAt);
+  const minutes = Math.max(1, Math.ceil((at - now) / 60_000));
+  if (at - now < 60 * 60_000) return hindi ? `लगभग ${minutes} मिनट में` : `in about ${minutes} minute${minutes === 1 ? '' : 's'}`;
+  const regional = hindi ? null : limitClock(profile);
+  let sameDay = false;
+  try {
+    const day = ms => new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', ...(regional?.timeZone ? { timeZone: regional.timeZone } : {}) }).format(new Date(ms));
+    sameDay = day(at) === day(now);
+  } catch { sameDay = false; }
+  if (hindi) return `${sameDay ? 'आज' : 'कल'} लगभग ${clock} बजे`;
+  return `${sameDay ? 'today' : 'tomorrow'} at about ${clock}`;
+}
