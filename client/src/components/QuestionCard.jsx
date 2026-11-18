@@ -2815,7 +2815,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                               {/* The one place the reading's provenance is said, quietly. */}
                               <details className="pf-how" data-photo-how>
                                 <summary>{t('photo.how.title')}</summary>
-                                <p>{String(photoOCR.engine || '').startsWith('cloud') ? t('photo.how.server') : t('verdict.decodedOnDevice')} {t('photo.how.where')}</p>
+                                <p>{String(photoOCR.engine || '').startsWith('cloud') ? t('photo.how.server') : t('verdict.decodedOnDevice')} {t('verdict.photoReadOnServerNotice')}</p>
                               </details>
                             </>
                           )}
