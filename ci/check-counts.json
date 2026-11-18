@@ -377,7 +377,7 @@
       "job": "platform-contracts",
       "log": "region-isolation.log",
       "pins": [
-        {"has":"REGION ISOLATION (H2): PASS — 543 checks (sqlite)","note":"423 → 429 (plan F6a): the check walks the route inventory, which now lists the two public catalogue routes. 429 → 467 (plan F3, re-derived by running): the 17 publishing routes and the two new tables; +3 Step15 authenticated sync ownership route assertions."}
+        {"has":"REGION ISOLATION (H2): PASS — 549 checks (sqlite)","note":"423 → 429 (plan F6a): the check walks the route inventory, which now lists the two public catalogue routes. 429 → 467 (plan F3, re-derived by running): the 17 publishing routes and the two new tables; +3 Step15 authenticated sync ownership route assertions."}
       ]
     },
     "platform/practice-http.log": {
@@ -478,6 +478,14 @@
         {"has":"STATIC CACHING: PASS — 55/55 checks"}
       ]
     },
+    "platform/guest-trial.log": {
+      "job": "platform-contracts",
+      "log": "guest-trial.log",
+      "pins": [
+        {"has":"✓ guest-trial-check.mjs (103 checks)","note":"ADR-0003, the guest trial over real HTTP (re-derived by running)."},
+        {"has":"✓ guest-menu-issuable-check.mjs (3704 checks)","note":"Everything the guest picker lists, in both editions, is a request the edition's server issues (3704, re-derived by running; it follows the number of listed chapter-and-level cells)."}
+      ]
+    },
     "platform/secret-shapes.log": {
       "job": "platform-contracts",
       "log": "secret-shapes.log",
@@ -544,7 +552,7 @@
       "pins": [
         {"has":"✓ hot-path-budget-check.mjs"},
         {"has":"✓ region-isolation-check.mjs","note":"plan H2: two regions share nothing; the database binding, on Postgres."},
-        {"has":"PLATFORM ON POSTGRES: PASS — 101/101 suites","note":"94 → 95 (standard #08): original-work-check on Postgres (RLS, migration 18). 59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too. 61 → 62: a parent who approves by email code is sent the withdrawal credential. 85 → 86 (plan F1): the shared resource library on Postgres. 86 → 87 (plan F4a): the Exam Desk on Postgres (RLS, migration 16). 87 → 88 (plan G3, train editions-3): Prithagoras NSW practice on Postgres. 88 → 89 (plan E5): billing provider per edition on Postgres. 89 → 90 (plan H7): edition-ai-budgets-check on Postgres. 90 → 91 (plan G4): NSW HSC-style papers on Postgres. 92 → 93 (plan F2): saved library resources (resource-bookmark sync) on Postgres."},
+        {"has":"PLATFORM ON POSTGRES: PASS — 102/102 suites","note":"101 → 102 (ADR-0003): guest-trial-check on Postgres (the guest trial's keyed day counters). 94 → 95 (standard #08): original-work-check on Postgres (RLS, migration 18). 59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too. 61 → 62: a parent who approves by email code is sent the withdrawal credential. 85 → 86 (plan F1): the shared resource library on Postgres. 86 → 87 (plan F4a): the Exam Desk on Postgres (RLS, migration 16). 87 → 88 (plan G3, train editions-3): Prithagoras NSW practice on Postgres. 88 → 89 (plan E5): billing provider per edition on Postgres. 89 → 90 (plan H7): edition-ai-budgets-check on Postgres. 90 → 91 (plan G4): NSW HSC-style papers on Postgres. 92 → 93 (plan F2): saved library resources (resource-bookmark sync) on Postgres."},
         {"has":"✓ nsw-practice-check.mjs"},
         {"has":"✓ nsw-exam-check.mjs"},
         {"has":"✓ paper-generator-check.mjs"},
@@ -721,7 +729,8 @@
         {"has":"E2E SUITE PASSED — 209/209 checks across 1 flows","note":"Chromium's interface-quality tour runs exactly 209 checks. Practice shows a pinned written question (seeded test server), so its Type → Write → Type switch is timed in all four cases (phone 390×844 and tablet 820×1180, light and dark) and is never skipped. The old 196/196 escape, a Practice screen with nothing to time, is gone (#684). The sentinel prints only when all four cases timed both presses inside MAX_INPUT_MS (100, unchanged). The separate ink-canvas 200/200 invariant remains enforced above."},
         {"has":"PRACTICE INPUT TIMING: PASS — 4/4 cases (390×844 and 820×1180, light and dark), 12/12 answer-mode presses (the selected tab included) inside 100 ms"},
         {"has":"E2E SUITE PASSED — 129/129 checks across 1 flows"},
-        {"has":"NSW PRACTICE MARKED TOUR: PASS — 9/9 checks","note":"A Prithagoras NSW Year 10 student is issued a question by the server and the server marks it (the device names the profile own course)."}
+        {"has":"NSW PRACTICE MARKED TOUR: PASS — 9/9 checks","note":"A Prithagoras NSW Year 10 student is issued a question by the server and the server marks it (the device names the profile own course)."},
+        {"has":"GUEST TRIAL TOUR: PASS - 98 checks (priyabhata, prithagoras)","note":"ADR-0003: both editions, a visitor with no account, five server-marked questions, the sign-up prompt, Hindi where offered, and the same picker as the signed-in Home quick start (98 = 49 Priyabhata + 49 Prithagoras, re-derived by running)."}
       ]
     },
     "build/brand-build.log": {

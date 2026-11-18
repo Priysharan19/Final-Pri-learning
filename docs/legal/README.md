@@ -180,8 +180,10 @@ The privacy notice describes real behaviour, and these are the facts it rests
 on. If the code changes, the notice is wrong until it is changed too.
 
 - Grading is online-only and server-authoritative (ADR-0001). An account and a
-  connection are needed for any answer to be marked; signed out or offline the
-  work waits on the device. The deterministic engine on the server decides every
+  connection are needed for any answer to be marked; offline the work waits on
+  the device, and signed out the only marking is the guest trial (ADR-0003: five
+  typed or multiple-choice questions a day, marked by the server for an
+  anonymous sealed token, nothing recorded). The deterministic engine on the server decides every
   mark; the copy on the device only displays notation and old results.
 - Handwriting strokes stay on the device. A picture rasterised from them, or a
   photo of paper working, is sent through the server to OpenAI to be read. That
