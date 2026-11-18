@@ -24,7 +24,7 @@ No route accepts a plan, status or capability from a client. Clients cannot push
 | Capability | What it unlocks | Enforced at | Class |
 |---|---|---|---|
 | `unlimited-practice` | more than 20 practice questions/day | **server** (`server/platform/practiceAllowance.js` in `POST /v1/practice/issue`, `POST /v1/practice/:id/repeat` and `POST /v1/practice/notebook/:attemptId/twin`, #537, D19); the local backend (`client/src/local/entitlementGate.js`) keeps a courtesy pre-check | **server-issued question** |
-| `premium-exams` | more than 1 exam simulation / 30 days | **server** (`server/platform/exams.js` counts the account's sealed papers in `POST /v1/exams`); local backend pre-check | **server-issued paper** |
+| `premium-exams` | more than 1 exam simulation / 30 days; the Prithagoras Extension 1 practice-paper PDFs (any entry flagged `sample` in the manifest is free; none today) | **server** (`server/platform/exams.js` counts the account's sealed papers in `POST /v1/exams`); local backend pre-check; `server/platform/papers.js` (`GET /v1/papers/:id/:kind`, from the account's own entitlement row) | **server-issued paper; server-streamed PDF** |
 | `jee-advanced-content` | the JEE Advanced track | **server** for what is the track's own: its papers (`exams.js`) and its own question banks (`jee-advanced-*`, `pyq-jee-advanced-*`; `practiceAllowance.js` at issue, bind, repeat and twin, D19). Local backend for the track as a whole, on the resolved track | **server-issued paper / question**, plus the device's track gate |
 | `advanced-pri-explain` | adaptive teaching plan / checkpoints | client (`PriExplainV5`) | offline, bundled logic |
 | `advanced-analytics` | progress priorities, knowledge map, teacher export | client | offline, derived from local data |

@@ -47,6 +47,11 @@ export function printPage() {
 export function saveBase64File(base64, filename, mimeType = 'application/pdf') {
   let bytes;
   try { bytes = Uint8Array.from(atob(String(base64)), ch => ch.charCodeAt(0)); } catch { return Promise.resolve({ completed: false }); }
+  return saveBinaryFile(bytes, filename, mimeType);
+}
+
+/** Save or share bytes already in hand (a PDF the server sent). Same route as saveBase64File. */
+export function saveBinaryFile(bytes, filename, mimeType = 'application/pdf') {
   if (priNative.share.available() && priNative.share.binary()) {
     return priNative.share.file({ filename, mimeType, bytes }).catch(error => {
       if (['UNSUPPORTED', 'UNAVAILABLE', 'TOO_LARGE'].includes(error?.code)) return downloadBytes(bytes, filename, mimeType);

@@ -449,6 +449,69 @@ export async function cloudRequest(path, {
   }
 }
 
+// ── A file the server sends (the Extension 1 practice papers) ────────────────
+//
+// GET a path and read the body as bytes, for a PDF attachment. Web only: the
+// native bridges carry text, so inside a shell it answers CLOUD_WEB_ONLY, as a
+// query string does. Same path rule, cookie, edition declaration, redirect and
+// cache discipline as cloudRequest; bounded in bytes and time. A refusal is
+// JSON and is thrown with the same code, status and capability.
+const MAX_FILE_BYTES = 8 * 1024 * 1024;
+
+export async function cloudDownload(path, { timeoutMs = 60_000, signal = null } = {}) {
+  if (!PATH.test(String(path || '')) || String(path).includes('..')) throw new Error('Cloud path is not allowed');
+  if (nativeCloudAvailable()) {
+    const err = new Error('This needs Pri in a web browser for now.');
+    err.code = 'CLOUD_WEB_ONLY';
+    throw err;
+  }
+  if (!normalizeCloudOrigin() && Date.now() - lastRediscovery > 4000) {
+    lastRediscovery = Date.now();
+    await discoverCloudOrigin({ timeoutMs: 1500 });
+  }
+  const origin = normalizeCloudOrigin();
+  if (!origin) {
+    const err = new Error('Pri\'s server cannot be reached from this device right now.');
+    err.code = 'CLOUD_DISABLED';
+    throw err;
+  }
+  const rid = requestId();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new DOMException('Timed out', 'TimeoutError')), Math.max(1000, Math.min(120_000, Number(timeoutMs) || 60_000)));
+  const abort = () => controller.abort(signal?.reason || new DOMException('Aborted', 'AbortError'));
+  if (signal) {
+    if (signal.aborted) abort();
+    else signal.addEventListener('abort', abort, { once: true });
+  }
+  try {
+    const response = await fetch(`${origin}${path}`, {
+      method: 'GET',
+      headers: { Accept: 'application/pdf, application/json', 'X-Pri-Request-Id': rid, 'X-Pri-Client': 'web-v1', [EDITION_HEADER]: EDITION },
+      credentials: 'include',
+      cache: 'no-store',
+      redirect: 'error',
+      signal: controller.signal
+    });
+    if (!response.ok) {
+      const data = parseJson(await response.text());
+      const err = new Error(data?.error?.message || `Cloud request failed (${response.status})`);
+      err.status = response.status;
+      err.code = data?.error?.code || 'CLOUD_REQUEST_FAILED';
+      if (typeof data?.error?.capability === 'string') err.capability = data.error.capability.slice(0, 60);
+      editionRefusal(err, data);
+      err.requestId = response.headers.get('x-pri-request-id') || rid;
+      throw err;
+    }
+    if (!/^application\/pdf\b/i.test(response.headers.get('content-type') || '')) throw new Error('Cloud returned an unexpected file type');
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    if (bytes.length > MAX_FILE_BYTES) throw new Error('Cloud response exceeded safety limit');
+    return bytes;
+  } finally {
+    clearTimeout(timer);
+    if (signal) signal.removeEventListener('abort', abort);
+  }
+}
+
 // ── The tutor's streamed turn ────────────────────────────────────────────────
 //
 // The one streamed request this boundary makes: POST /v1/tutor/stream answers
