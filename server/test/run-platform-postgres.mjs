@@ -204,6 +204,8 @@ export const ENGINE_SUITES = [
   'recognition-dedupe-check.mjs',
   'security-acceptance-check.mjs',
   'abuse-limits-check.mjs',
+  // The guest trial's keyed day counters (ADR-0003) must hold on real Postgres too.
+  'guest-trial-check.mjs',
   // CodeQL #461: the same account-keyed quota must serialize on real Postgres.
   'pr618-recognition-rate-concurrency-check.mjs',
   // Staff second factor, identity sign-in age declaration, and the hardening

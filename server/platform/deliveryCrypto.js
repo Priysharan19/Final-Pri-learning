@@ -19,6 +19,17 @@ export function practiceContentKey() {
   return createHmac('sha256', deliveryKey()).update('pri-practice-content-v1').digest();
 }
 
+/**
+ * Keys for the guest trial (ADR-0003), derived from the delivery key like the
+ * OTP and content keys, so every instance of a deployment agrees and no second
+ * secret is needed: 'csrf' signs the guest CSRF value, 'bucket' scrambles the
+ * names of the counters (token, address, question) so a database copy alone
+ * cannot be searched for an address or reversed into one.
+ */
+export function guestKey(purpose) {
+  return createHmac('sha256', deliveryKey()).update(`pri-guest-${String(purpose)}-v1`).digest();
+}
+
 function decodeConfiguredKey(raw) {
   const value = String(raw || '').trim();
   if (!value) return null;

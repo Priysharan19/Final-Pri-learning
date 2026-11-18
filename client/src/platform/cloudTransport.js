@@ -342,7 +342,7 @@ const proofList = list => list.filter(kind => typeof kind === 'string' && PROOF_
 
 export async function cloudRequest(path, {
   method = 'GET', body = undefined, idempotencyKey = null, timeoutMs = DEFAULT_TIMEOUT_MS, signal = null,
-  query = null, csv = false, keepalive = false
+  query = null, csv = false, guestCsrf = null, keepalive = false
 } = {}) {
   if (!PATH.test(String(path || '')) || String(path).includes('..')) throw new Error('Cloud path is not allowed');
   const verb = String(method || 'GET').toUpperCase();
@@ -414,6 +414,9 @@ export async function cloudRequest(path, {
   const headers = { Accept: csv ? 'text/csv, application/json' : 'application/json', 'X-Pri-Request-Id': rid, 'X-Pri-Client': 'web-v1', [EDITION_HEADER]: EDITION };
   const csrf = cookie('pri_csrf');
   if (csrf && verb !== 'GET') headers['X-Pri-CSRF'] = csrf;
+  // The guest trial's own CSRF value (server/platform/guestTrial.js), given by
+  // the session reply and held in memory by platform/guestTrial.js.
+  if (typeof guestCsrf === 'string' && /^[A-Za-z0-9_-]{20,80}$/.test(guestCsrf)) headers['X-Pri-Guest-CSRF'] = guestCsrf;
   if (idempotencyKey) headers['Idempotency-Key'] = String(idempotencyKey).slice(0, 160);
   if (payload !== undefined) headers['Content-Type'] = 'application/json';
 
@@ -681,6 +684,11 @@ export const cloud = Object.freeze({
   issuePractice: body => cloudRequest('/v1/practice/issue', { method: 'POST', body }),
   // Needs no session: the question a signed-out student may start working on.
   preparePractice: body => cloudRequest('/v1/practice/prepare', { method: 'POST', body }),
+  // The guest trial (ADR-0003): web only. A visitor with no account; the server
+  // issues and marks, the device holds no key. Never reaches a paid reader.
+  guestStart: () => cloudRequest('/v1/guest/session', { method: 'POST', body: {} }),
+  guestQuestion: (body, guestCsrf) => cloudRequest('/v1/guest/question', { method: 'POST', body, guestCsrf }),
+  guestAnswer: (body, guestCsrf) => cloudRequest('/v1/guest/answer', { method: 'POST', body, guestCsrf }),
   gradePractice: (questionId, body) => cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/submit', {
     method: 'POST', body, idempotencyKey: body.submissionId,
     // A submission that carries its picture is read by the server before it

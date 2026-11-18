@@ -91,6 +91,69 @@
     },
     {
       "method": "POST",
+      "path": "/v1/guest/session",
+      "auth": "none",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": false,
+      "ownership": "public; starts or resumes the guest trial (ADR-0003): mints a sealed anonymous token (random id, issue and expiry times) in an HttpOnly SameSite=Strict cookie scoped to /v1/guest and returns the CSRF value bound to it; takes no fields; no account, session, child-data or learning row exists; tokens minted per address per day are capped inside the handler (guest-mint:<hashed address bucket>)",
+      "rateLimits": [
+        {
+          "key": "guest-route",
+          "limit": 120,
+          "windowMs": 3600000,
+          "identity": "ip"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/guest/question",
+      "auth": "none",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": false,
+      "ownership": "public, guest token; issues one typed or multiple-choice question of this edition's free banks under the token (no premium, archive, handwriting or photo content); the CSRF header must equal the HMAC of the cookie's own token; the issued reply carries the public question fields only and an encrypted ticket, never an answer key; the per-token daily count (5), the per-address daily count and the process-wide daily ceiling are decided inside the handler against hashed rate_limits rows; no account data is read or written",
+      "rateLimits": [
+        {
+          "key": "guest-route",
+          "limit": 120,
+          "windowMs": 3600000,
+          "identity": "ip"
+        }
+      ],
+      "csrf": "guest-token-hmac",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/guest/answer",
+      "auth": "none",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": false,
+      "ownership": "public, guest token; marks one answer to a ticket the same token was issued, with the deterministic engine in the marker pool (never a model, never the device); the CSRF header must equal the HMAC of the cookie's own token; one verdict per question, a minimum think time, and a few tries at an unreadable entry; the correct answer is released only with the verdict; no attempt, mark, mastery or event is recorded",
+      "rateLimits": [
+        {
+          "key": "guest-route",
+          "limit": 120,
+          "windowMs": 3600000,
+          "identity": "ip"
+        }
+      ],
+      "csrf": "guest-token-hmac",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
       "path": "/v1/account/register",
       "auth": "none",
       "roles": null,
