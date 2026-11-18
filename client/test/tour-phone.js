@@ -18,6 +18,15 @@ import { pathToFileURL } from 'node:url';
 const PHONE = { width: 390, height: 844 };   // iPhone 12/13/14
 const SMALL = { width: 360, height: 800 };   // a common Android width
 
+// Which elements poke out of the viewport (the widest first): printed with an overflow failure so the cause is in the log.
+const wideCulprits = page => page.evaluate(() => {
+  const vw = document.documentElement.clientWidth;
+  return [...document.querySelectorAll('body *')].map(el => ({ el, r: el.getBoundingClientRect() }))
+    .filter(({ r }) => r.width > 0 && r.right > vw + 1)
+    .sort((a, b) => b.r.right - a.r.right).slice(0, 4)
+    .map(({ el, r }) => `${el.tagName.toLowerCase()}.${String(el.className).slice(0, 40)} right=${Math.round(r.right)} w=${Math.round(r.width)} "${(el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 60)}"`).join(' | ');
+});
+
 export const flow = {
   id: 'phone',
   name: 'Phone · every destination reachable at 390px',
@@ -131,7 +140,7 @@ export const flow = {
         await page.waitForTimeout(900);
         const over = await page.evaluate(() =>
           document.documentElement.scrollWidth - document.documentElement.clientWidth);
-        await check(`${path} does not scroll sideways at ${label}`, over <= 1, `${over}px of horizontal overflow`);
+        await check(`${path} does not scroll sideways at ${label}`, over <= 1, over > 1 ? `${over}px of horizontal overflow; ${await wideCulprits(page)}` : `${over}px of horizontal overflow`);
       }
     }
 

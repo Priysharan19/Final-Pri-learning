@@ -23,6 +23,16 @@ export const VIEWPORTS = [
   { id: 'tablet-landscape', width: 1180, height: 820, ff: 'expanded' },
   { id: 'short', width: 844, height: 390, ff: 'expanded', short: true },
 ];
+
+// Which elements poke out of the viewport (the widest first): printed with an overflow failure so the cause is in the log.
+const wideCulprits = page => page.evaluate(() => {
+  const vw = document.documentElement.clientWidth;
+  return [...document.querySelectorAll('body *')].map(el => ({ el, r: el.getBoundingClientRect() }))
+    .filter(({ r }) => r.width > 0 && r.right > vw + 1)
+    .sort((a, b) => b.r.right - a.r.right).slice(0, 4)
+    .map(({ el, r }) => `${el.tagName.toLowerCase()}.${String(el.className).slice(0, 40)} right=${Math.round(r.right)} w=${Math.round(r.width)} "${(el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 60)}"`).join(' | ');
+});
+
 const ROUTES = ['/', '/practice', '/progress', '/exams', '/tasks', '/settings', '/review', '/plan'];
 // The writing area every non-short window had before CP-03; EXPANDED keeps it.
 const BASE_INK_HEIGHT = 380;
@@ -94,7 +104,7 @@ export const flow = {
         await goto(route);
         await page.waitForTimeout(700);
         const over = await overflowOf(page);
-        await check(`${tag}: ${route} has no horizontal overflow`, over <= 1, `${over}px`);
+        await check(`${tag}: ${route} has no horizontal overflow`, over <= 1, over > 1 ? `${over}px; ${await wideCulprits(page)}` : `${over}px`);
       }
 
       // ── 2 · form factor and navigation ───────────────────────────────────
