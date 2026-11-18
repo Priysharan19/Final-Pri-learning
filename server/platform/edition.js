@@ -27,6 +27,9 @@ export function serverEdition(env = process.env) {
 
 /** What this deployment's edition offers of the curriculum (owner decision, 19 Nov 2026), or null for everything. */
 export function editionOffering(env = process.env) {
+  // The catalogue suites (the ones that prove hidden content still works) lift the offering in a TEST process only,
+  // like fixed seeds (practice.js fixedSeedsAllowed): never in production, whatever the variable says.
+  if (env.NODE_ENV === 'test' && env.PRI_OFFERING === 'catalogue') return null;
   return EDITIONS[resolveEdition(env)].offering ?? null;
 }
 
