@@ -458,7 +458,9 @@ export async function cloudRequest(path, {
 // JSON and is thrown with the same code, status and capability.
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
 
-export async function cloudDownload(path, { timeoutMs = 60_000, signal = null } = {}) {
+// `type`: the one media type that is accepted (a paper's PDF, or a paper's diagram as an SVG).
+export async function cloudDownload(path, { timeoutMs = 60_000, signal = null, type = 'application/pdf' } = {}) {
+  if (!['application/pdf', 'image/svg+xml'].includes(type)) throw new Error('Cloud download type is not allowed');
   if (!PATH.test(String(path || '')) || String(path).includes('..')) throw new Error('Cloud path is not allowed');
   if (nativeCloudAvailable()) {
     const err = new Error('This needs Pri in a web browser for now.');
@@ -486,7 +488,7 @@ export async function cloudDownload(path, { timeoutMs = 60_000, signal = null } 
   try {
     const response = await fetch(`${origin}${path}`, {
       method: 'GET',
-      headers: { Accept: 'application/pdf, application/json', 'X-Pri-Request-Id': rid, 'X-Pri-Client': 'web-v1', [EDITION_HEADER]: EDITION },
+      headers: { Accept: `${type}, application/json`, 'X-Pri-Request-Id': rid, 'X-Pri-Client': 'web-v1', [EDITION_HEADER]: EDITION },
       credentials: 'include',
       cache: 'no-store',
       redirect: 'error',
@@ -502,7 +504,7 @@ export async function cloudDownload(path, { timeoutMs = 60_000, signal = null } 
       err.requestId = response.headers.get('x-pri-request-id') || rid;
       throw err;
     }
-    if (!/^application\/pdf\b/i.test(response.headers.get('content-type') || '')) throw new Error('Cloud returned an unexpected file type');
+    if (!(response.headers.get('content-type') || '').toLowerCase().startsWith(type)) throw new Error('Cloud returned an unexpected file type');
     const bytes = new Uint8Array(await response.arrayBuffer());
     if (bytes.length > MAX_FILE_BYTES) throw new Error('Cloud response exceeded safety limit');
     return bytes;

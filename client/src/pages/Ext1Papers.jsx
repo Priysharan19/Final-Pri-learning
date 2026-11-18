@@ -6,15 +6,20 @@
 // exist, which are unlocked for this account (Premium, or the free sample) and
 // whether a download is allowed. This card only shows that and asks.
 // It is offered to a Year 11–12 profile on the NSW Extension 1 pathway.
-// Nothing here marks anything: printed papers are marked by the student or
-// their teacher with the marking guidelines.
+// Nothing here marks anything. A printed paper is marked by the student or their
+// teacher with the marking guidelines; a paper sat in the app ("Sit this paper
+// in the app", client/src/paper/) is marked by the server's deterministic engine
+// where it can be, and checked by the student against the sample answer where it
+// cannot.
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import PageLink from '../components/PageLink.jsx';
 import Working from '../instrument/Working.jsx';
 import { useT } from '../i18n/index.js';
 import { cloudDownload, cloudRequest } from '../platform/cloudTransport.js';
 import { saveBinaryFile } from '../lib/files.js';
+import { startSitting } from '../paper/paperApi.js';
 
 const ID = /^[a-z0-9-]{3,60}$/;
 
@@ -27,6 +32,7 @@ const fileName = (title, kind) => `Prithagoras-Ext1-${title.replace(/[^A-Za-z0-9
 
 export default function Ext1Papers() {
   const t = useT();
+  const nav = useNavigate();
   const [list, setList] = useState(null);
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState('');
@@ -55,6 +61,21 @@ export default function Ext1Papers() {
     } finally { setBusy(''); }
   }
 
+  // Sit the paper in the app: the server issues (or resumes) the sitting, then the page opens it.
+  async function sit(paper) {
+    if (!ID.test(paper.id)) return;
+    const key = `${paper.id}:sit`;
+    setBusy(key);
+    setMessage(null);
+    try {
+      const r = await startSitting(paper.id);
+      nav(`/papers/sit/${r.attempt.id}`);
+    } catch (err) {
+      if (err?.code === 'PREMIUM_REQUIRED') setList(l => (l ? { ...l, papers: l.papers.map(p => (p.id === paper.id ? { ...p, locked: true } : p)) } : l));
+      setMessage({ key: 'papers.ext1.sitFailed' });
+    } finally { setBusy(''); }
+  }
+
   return (
     <section className="card" style={{ gridColumn: '1 / -1' }} data-ext1-papers aria-labelledby="ext1-papers-title">
       <h2 className="card-title" id="ext1-papers-title">{t('papers.ext1.heading')}</h2>
@@ -71,7 +92,11 @@ export default function Ext1Papers() {
                 {t('papers.ext1.locked')} <PageLink to="/premium" state={{ from: 'exams' }}>{t('papers.ext1.seePremium')}</PageLink>
               </p>
               : <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
-                <button type="button" className="btn btn-primary btn-sm" disabled={busy !== ''} aria-label={t('papers.ext1.paperLabel', { title: p.title })}
+                {p.inApp && <button type="button" className="btn btn-primary btn-sm" disabled={busy !== ''} aria-label={t('papers.ext1.sitLabel', { title: p.title })}
+                  onClick={() => sit(p)} data-ext1-sit={p.id}>
+                  {busy === `${p.id}:sit` ? t('papers.ext1.sitting') : t('papers.ext1.sit')}
+                </button>}
+                <button type="button" className={`btn ${p.inApp ? 'btn-ghost' : 'btn-primary'} btn-sm`} disabled={busy !== ''} aria-label={t('papers.ext1.paperLabel', { title: p.title })}
                   onClick={() => download(p, 'paper')} data-ext1-download={`${p.id}:paper`}>
                   {busy === `${p.id}:paper` ? t('papers.ext1.saving') : t('papers.ext1.paper')}
                 </button>

@@ -311,10 +311,22 @@ try {
   c.deq([hwSub.status, hwSub.data.attempt.result.parts.q11a.verdict, hwSub.data.attempt.result.parts.q11a.mode, hwSub.data.attempt.result.totals.total], [200, 'correct', 'ink', 15], 'the confirmed reading is marked by the engine; the part says it was handwritten');
   c.ok(!provider.bodies.join('\n').includes(inkBytes.toString('base64').slice(0, 40)), 'the reader never received the strokes');
 
+  // ── Exam-style questions for a practice subtopic ────────────────────────────
+  const es = await get(hAu, free, '/v1/papers/exam-style/me11-poly');
+  c.eq(es.status, 200, 'exam-style questions are listed for an Extension 1 subtopic');
+  c.ok(es.data.questions.length >= 3, 'with several multi-part questions (polynomials)');
+  c.ok(es.data.questions.every(q => q.paperId && q.question >= 11 && q.marks > 0 && Array.isArray(q.matchingParts)), 'each names its paper, question, marks and matching parts');
+  c.ok(es.data.questions[0].locked === false && es.data.questions.some(q => q.paperId === P01) && es.data.questions.filter(q => q.paperId !== P01).every(q => q.locked === true), 'for a free account the sample is open and the rest are locked');
+  c.deq((await get(hAu, paid, '/v1/papers/exam-style/me11-poly')).data.questions.filter(q => q.locked), [], 'for Premium none is locked');
+  c.deq((await get(hAu, free, '/v1/papers/exam-style/not-a-subtopic')).data.questions, [], 'an unknown subtopic: an empty list');
+  c.deq(leaks(es.data), [], 'the list carries no paper content');
+  const one = await post(hAu, free, `/v1/papers/${P01}/attempts`, { question: es.data.questions.find(q => q.paperId === P01).question, fresh: true });
+  c.eq(one.status, 201, 'pressing one sits just that question');
+
   // ── 2 · India ───────────────────────────────────────────────────────────────
   const inFree = await student(hIn, null);
   for (const [method, path] of [['POST', `/v1/papers/${P01}/attempts`], ['GET', '/v1/papers/attempts'], ['GET', `/v1/papers/attempts/${A.id}`], ['POST', `/v1/papers/attempts/${A.id}/answers`],
-    ['POST', `/v1/papers/attempts/${A.id}/submit`], ['GET', `/v1/papers/attempts/${A.id}/parts/q1/solution`], ['GET', `/v1/papers/attempts/${A.id}/figures/figdodec`]]) {
+    ['POST', `/v1/papers/attempts/${A.id}/submit`], ['GET', `/v1/papers/attempts/${A.id}/parts/q1/solution`], ['GET', `/v1/papers/attempts/${A.id}/figures/figdodec`], ['GET', '/v1/papers/exam-style/me11-poly']]) {
     const r = await hIn.request(path, { method, jar: inFree.jar, body: method === 'GET' ? undefined : {} });
     c.deq([r.status, r.data?.error?.code], [404, 'PAPERS_NOT_AVAILABLE'], `India: ${method} ${path.replace(A.id, ':id')} is 404`);
   }

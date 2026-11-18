@@ -3,6 +3,7 @@
 //
 //   POST /v1/papers/:id/attempts                 issue a sitting (resume the open one)
 //   GET  /v1/papers/attempts                     this account's sittings
+//   GET  /v1/papers/exam-style/:subtopic         exam-style questions for a practice subtopic (Paper, Question, marks)
 //   GET  /v1/papers/attempts/:attemptId          the sitting: paper as issued + saved answers (+ result once submitted)
 //   POST /v1/papers/attempts/:attemptId/answers  autosave typed answers / timer choice (POST: the client transport has no PUT)
 //   POST /v1/papers/attempts/:attemptId/parts/:partId/original
@@ -61,6 +62,13 @@ import { transcribeHandwriting, validateImage, HandwritingProviderError } from '
 import { engineQuestion, howMarked, publicPaper, schemeApproved, scopedLeaves, statedTime } from './paperContent.js';
 
 const DAY = 24 * 60 * 60 * 1000;
+// Practice subtopic (client/src/engine/curriculum.js, Extension 1) → the syllabus outcomes the guideline's mapping grid names.
+export const SUBTOPIC_OUTCOMES = Object.freeze({
+  'me11-functions': ['ME1-11-01'], 'me11-poly': ['ME1-11-02'], 'me11-trigid': ['ME1-11-03'], 'me12-trigeq': ['ME1-11-03'],
+  'me11-comb': ['ME1-11-04'], 'me11-binomial': ['ME1-11-05'], 'me12-induction': ['ME1-12-01'], 'me12-vectors': ['ME1-12-02'],
+  'me11-inversetrig': ['ME1-12-03'], 'me12-calc': ['ME1-12-04'], 'me11-rates': ['ME1-12-05'], 'me12-binomial': ['ME1-12-06']
+});
+const leafPartsOf = question => { const out = []; const walk = ps => ps.forEach(p => (p.parts ? walk(p.parts) : out.push(p))); walk(question.parts); return out; };
 const KEEP = 400 * DAY;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const KEY = /^[A-Za-z0-9_-]{8,80}$/;
@@ -161,6 +169,32 @@ export function mountPaperAttempts(router, db, ctx) {
     const s = await sitting(req, res);
     if (!s) return undefined;
     return res.status(out.resumed ? 200 : 201).json({ attempt: view(s), resumed: out.resumed });
+  });
+
+  // ── Exam-style questions for a practice subtopic ───────────────────────────
+  // The guideline's mapping grid names each part's syllabus outcome; a subtopic
+  // of the Extension 1 pathway is offered the multi-part Section II questions
+  // whose parts carry one of its outcomes. Which are open to this account is
+  // the server's decision (a sample is free, the rest Premium).
+  router.get('/exam-style/:subtopic', rateLimit(db, 'paper-exam-style', { limit: 600, windowMs: 3600000 }), async (req, res) => {
+    noStore(res);
+    if (!offered) return refuse(res, 404, 'PAPERS_NOT_AVAILABLE', 'No practice papers are offered here.');
+    const subtopic = String(req.params.subtopic || '');
+    const outcomes = SUBTOPIC_OUTCOMES[subtopic];
+    if (!outcomes) return res.json({ subtopic, questions: [] });
+    const premium = await ctx.isPremium(req.platformSession.account_id);
+    const out = [];
+    for (const doc of docs.values()) {
+      const entry = byId.get(doc.id);
+      for (const q of doc.sections.find(sec => sec.id === 'II')?.questions || []) {
+        const hit = leafPartsOf(q).filter(p => (p.classification?.outcomes || []).some(o => outcomes.includes(o)));
+        if (!hit.length) continue;
+        out.push({ paperId: doc.id, paperNumber: doc.paperNumber, title: doc.title, question: q.number, marks: q.marks, matchingParts: hit.map(p => p.id),
+          locked: !(premium || entry?.sample === true) });
+      }
+    }
+    out.sort((a, b) => Number(a.locked) - Number(b.locked) || a.paperNumber - b.paperNumber || a.question - b.question);
+    return res.json({ subtopic, questions: out.slice(0, 12) });
   });
 
   // ── List ───────────────────────────────────────────────────────────────────
