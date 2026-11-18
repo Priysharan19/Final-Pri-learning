@@ -41,7 +41,7 @@
 .qp .qp-choice { position: relative; }
 .qp .qp-choice:has(input:checked) { font-weight: 600; }
 /* The input covers the whole choice, so the hit area is the choice (44px), and the checked state is the choice's own border and fill. */
-.qp .qp-choice input { position: absolute; inset: -1px; width: calc(100% + 2px); height: calc(100% + 2px); margin: 0; opacity: 0; cursor: pointer; }
+.qp .qp-choice input { position: absolute; inset: -1px; width: calc(100% + 2px); height: calc(100% + 2px); margin: 0; appearance: none; -webkit-appearance: none; background: transparent; border: 0; border-radius: inherit; cursor: pointer; }
 .qp-start { justify-self: start; min-width: 160px; min-height: 44px; box-sizing: border-box; }
 
 @media (max-width: 480px) {
