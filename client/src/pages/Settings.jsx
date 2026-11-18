@@ -13,6 +13,7 @@ import { BrandMark } from '../components/BrandMark.jsx';
 import { CUT } from '../brand/edition.js';
 import { HANDS, readHand, writeHand } from '../lib/writingHand.js';
 import { autoReadEnabled, setAutoRead } from '../lib/autoRead.js';
+import { soundsEnabled, setSoundsEnabled, playSound } from '../lib/sound.js';
 
 // The content-operations and admin console is for support and admin accounts
 // only, and the server enforces that on every call it makes. A student never
@@ -103,6 +104,23 @@ function AutoRead() {
   );
 }
 
+// Quiet interface sounds (off by default). Kept on this device.
+function Sounds() {
+  const t = useT();
+  const [on, setOn] = useState(soundsEnabled);
+  return (
+    <div className="card" data-sounds style={{ marginTop: 18 }}>
+      <h2 style={{ marginBottom: 8 }}>{t('sounds.title')}</h2>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+        <button type="button" role="switch" aria-checked={on} aria-label={t('sounds.label')} className={`btn ${on ? 'btn-primary' : 'btn-ghost'}`}
+          style={{ minHeight: 44, minWidth: 64 }} data-sounds-switch onClick={() => { const next = setSoundsEnabled(!on); setOn(next); if (next) playSound('tick'); }}>{on ? t('sounds.on') : t('sounds.off')}</button>
+        <span>{t('sounds.label')}</span>
+      </div>
+      <p className="muted" style={{ margin: '8px 0 0' }}>{t('sounds.note')}</p>
+    </div>
+  );
+}
+
 export default function Settings() {
   const { user } = useApp();
   // The classroom product is outside public V1 (PRI_V1_RELEASE_SCOPE §11): a
@@ -119,6 +137,7 @@ export default function Settings() {
       {classroom && <ClassroomPanel />}
       <WritingHand />
       <AutoRead />
+      <Sounds />
       <AboutEdition />
       <StaffOperations />
     </>
