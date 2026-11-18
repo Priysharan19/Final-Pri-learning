@@ -140,7 +140,7 @@ async function student(h, state) {
   return { jar: r.jar, id: r.account.id };
 }
 const post = (h, who, path, body) => h.request(path, { method: 'POST', jar: who.jar, body });
-const put = (h, who, path, body) => h.request(path, { method: 'PUT', jar: who.jar, body });
+const put = (h, who, path, body) => h.request(path, { method: 'POST', jar: who.jar, body });
 const get = (h, who, path, headers) => h.request(path, { jar: who?.jar || {}, headers });
 
 try {
@@ -313,7 +313,7 @@ try {
 
   // ── 2 · India ───────────────────────────────────────────────────────────────
   const inFree = await student(hIn, null);
-  for (const [method, path] of [['POST', `/v1/papers/${P01}/attempts`], ['GET', '/v1/papers/attempts'], ['GET', `/v1/papers/attempts/${A.id}`], ['PUT', `/v1/papers/attempts/${A.id}/answers`],
+  for (const [method, path] of [['POST', `/v1/papers/${P01}/attempts`], ['GET', '/v1/papers/attempts'], ['GET', `/v1/papers/attempts/${A.id}`], ['POST', `/v1/papers/attempts/${A.id}/answers`],
     ['POST', `/v1/papers/attempts/${A.id}/submit`], ['GET', `/v1/papers/attempts/${A.id}/parts/q1/solution`], ['GET', `/v1/papers/attempts/${A.id}/figures/figdodec`]]) {
     const r = await hIn.request(path, { method, jar: inFree.jar, body: method === 'GET' ? undefined : {} });
     c.deq([r.status, r.data?.error?.code], [404, 'PAPERS_NOT_AVAILABLE'], `India: ${method} ${path.replace(A.id, ':id')} is 404`);

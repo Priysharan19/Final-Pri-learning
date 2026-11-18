@@ -4,7 +4,7 @@
 //   POST /v1/papers/:id/attempts                 issue a sitting (resume the open one)
 //   GET  /v1/papers/attempts                     this account's sittings
 //   GET  /v1/papers/attempts/:attemptId          the sitting: paper as issued + saved answers (+ result once submitted)
-//   PUT  /v1/papers/attempts/:attemptId/answers  autosave typed answers / timer choice
+//   POST /v1/papers/attempts/:attemptId/answers  autosave typed answers / timer choice (POST: the client transport has no PUT)
 //   POST /v1/papers/attempts/:attemptId/parts/:partId/original
 //                                                keep one handwritten or photographed part (original + reading)
 //   POST /v1/papers/attempts/:attemptId/submit   "Submit all": mark every part the engine can, once
@@ -120,7 +120,7 @@ export function mountPaperAttempts(router, db, ctx) {
   const view = ({ id, sit, doc, result, saved }) => ({
     id, paperId: sit.paperId, title: doc.title, scope: sit.scope || null, state: result ? 'submitted' : 'open',
     issuedAt: sit.issuedAt, timer: { mode: saved.timer || sit.timer, readingMs: statedTime(doc.readingTime), workingMs: statedTime(doc.workingTime) },
-    answers: Object.fromEntries(Object.entries(saved.answers).map(([k, a]) => [k, { mode: a.mode, text: a.text, kept: !!a.originalId }])),
+    answers: Object.fromEntries(Object.entries(saved.answers).map(([k, a]) => [k, { mode: a.mode, text: a.text, ...(a.working ? { working: a.working } : {}), kept: !!a.originalId }])),
     savedAt: saved.savedAt, ms: saved.ms || 0,
     paper: publicPaper(doc, sit.scope || null),
     ...(result ? { result } : {})
@@ -185,7 +185,7 @@ export function mountPaperAttempts(router, db, ctx) {
   });
 
   // ── Autosave ───────────────────────────────────────────────────────────────
-  router.put('/attempts/:attemptId/answers', rateLimit(db, 'paper-autosave', { limit: 3000, windowMs: 3600000 }), async (req, res) => {
+  router.post('/attempts/:attemptId/answers', rateLimit(db, 'paper-autosave', { limit: 3000, windowMs: 3600000 }), async (req, res) => {
     const s = await sitting(req, res, { allowSubmitted: false });
     if (!s) return undefined;
     const body = req.body;
@@ -200,14 +200,16 @@ export function mountPaperAttempts(router, db, ctx) {
     const next = { ...s.saved.answers };
     for (const [partId, a] of Object.entries(incoming)) {
       if (!leafIds.has(partId)) return refuse(res, 400, 'PAPER_ANSWERS_INVALID', `${partId} is not a part of this sitting.`);
-      if (!plain(a) || unknownKeys(a, ['mode', 'text']).length || !MODES.includes(a.mode) || typeof a.text !== 'string' || a.text.length > MAX_TEXT) {
-        return refuse(res, 400, 'PAPER_ANSWERS_INVALID', `${partId}: an answer is { mode, text } of at most ${MAX_TEXT} characters.`);
+      if (!plain(a) || unknownKeys(a, ['mode', 'text', 'working']).length || !MODES.includes(a.mode) || typeof a.text !== 'string' || a.text.length > MAX_TEXT ||
+          (a.working !== undefined && (typeof a.working !== 'string' || a.working.length > MAX_TEXT))) {
+        return refuse(res, 400, 'PAPER_ANSWERS_INVALID', `${partId}: an answer is { mode, text, working? } of at most ${MAX_TEXT} characters each.`);
       }
       const before = next[partId];
-      if (!a.text.trim()) { delete next[partId]; continue; }
+      const working = typeof a.working === 'string' && a.working.trim() ? a.working : undefined;
+      if (!a.text.trim() && !working) { delete next[partId]; continue; }
       // A kept original belongs to the reading it was kept with: edit the text and it must be kept again.
       const keep = before?.originalId && before.mode === a.mode && before.text === a.text;
-      next[partId] = keep ? before : { mode: a.mode, text: a.text };
+      next[partId] = keep ? { ...before, ...(working ? { working } : {}) } : { mode: a.mode, text: a.text, ...(working ? { working } : {}) };
     }
     const snapshot = { answers: next, savedAt: s.now, ms: body.ms ?? s.saved.ms ?? 0, ...(body.timer ? { timer: body.timer } : s.saved.timer ? { timer: s.saved.timer } : {}) };
     await db.transaction(async () => {
@@ -225,8 +227,9 @@ export function mountPaperAttempts(router, db, ctx) {
     const leaf = scopedLeaves(s.doc, s.sit.scope).find(l => l.part.id === partId);
     const body = req.body;
     if (!leaf || !PART_ID.test(partId)) return refuse(res, 404, 'PAPER_PART_NOT_FOUND', 'No such part in this sitting.');
-    if (!plain(body) || unknownKeys(body, ['mode', 'text', 'image', 'original']).length || !['ink', 'photo'].includes(body.mode) ||
-        typeof body.text !== 'string' || !body.text.trim() || body.text.length > MAX_TEXT || typeof body.image !== 'string') {
+    if (!plain(body) || unknownKeys(body, ['mode', 'text', 'working', 'image', 'original']).length || !['ink', 'photo'].includes(body.mode) ||
+        typeof body.text !== 'string' || !body.text.trim() || body.text.length > MAX_TEXT || typeof body.image !== 'string' ||
+        (body.working !== undefined && (typeof body.working !== 'string' || body.working.length > MAX_TEXT))) {
       return refuse(res, 400, 'PAPER_ORIGINAL_INVALID', 'Send mode (ink or photo), the confirmed reading text, the picture that was read and its original.');
     }
     try { validateImage(body.image); } catch (error) { return refuse(res, error.status || 400, error.code || 'RECOGNITION_IMAGE_INVALID', error.message || 'Invalid image.'); }
@@ -257,7 +260,7 @@ export function mountPaperAttempts(router, db, ctx) {
         parsed, reading: { read: readText || null, confirmed: body.text, corrected, receipt: null }, now });
       if (!kept.saved) return { status: kept.reason === 'quota' ? 413 : 409, code: kept.reason === 'quota' ? 'ORIGINAL_QUOTA' : 'ORIGINAL_CONFLICT' };
       const saved = (await readRow(db, s.accountId, 'paper-answers', s.id, now)) || { answers: {} };
-      saved.answers[partId] = { mode: body.mode, text: body.text, originalId: kept.row.id, sha256: parsed.sha256, readText: readText || null };
+      saved.answers[partId] = { mode: body.mode, text: body.text, ...(body.working?.trim() ? { working: body.working } : {}), originalId: kept.row.id, sha256: parsed.sha256, readText: readText || null };
       saved.savedAt = now;
       await db.run(UPSERT, [s.accountId, 'paper-answers', s.id, JSON.stringify(saved), digest(saved), now, now + KEEP]);
       return { status: 200, proof: originalProof(kept.row) };
