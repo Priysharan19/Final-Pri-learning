@@ -157,7 +157,20 @@ function labelOf(raw, fn) {
 const shown = v => String(Math.round(v * 1e6) / 1e6);
 
 /** Check working line by line. Returns the same report shape as stepCheck. */
-export function stepCheckValueChain(meta, workingText) {
+/**
+ * Does the question restrict the domain (an interval, an inequality, "between", a stated domain)? The max / min / amplitude /
+ * midline claims are checked against the function over the whole line, so on a restricted domain a true restricted maximum would
+ * be crossed: the check cannot know it, so it abstains. Anything that looks like a restriction counts; over-abstaining is safe.
+ */
+export function domainRestricted(meta, prompt) {
+  if (meta && (meta.domain || meta.interval || meta.restricted || meta.fn?.domain || meta.fn?.interval)) return true;
+  // A half-line lower bound ("for t ≥ 0", "t > 0") leaves a periodic function every value it takes, so it is not a restriction.
+  const text = String(prompt || '').replace(/[A-Za-z]\s*(?:≥|>|\\ge(?:q)?\b|\\gt\b)\s*-?\d+(?:\.\d+)?(?![\d.]*\s*(?:≤|<|\\le|\\lt))/gi, ' ');
+  return /[≤≥<>]|\\(?:le|leq|ge|geq|lt|gt)\b|\bdomain\b|\binterval\b|\bbetween\b|\brestrict|\\in\s*[\[(]|\bfrom\s+\$?(?:[a-z]\s*=\s*)?-?\d[^.?]*\bto\s+\$?(?:[a-z]\s*=\s*)?-?\d|\bfirst\s+\d|\bduring\b|\bwithin\b|\buntil\b/i.test(text);
+}
+
+export function stepCheckValueChain(meta, workingText, options = null) {
+  const restricted = domainRestricted(meta, options?.prompt);
   const fn = valueChainMeta(meta);
   const raw = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
   const out = [];
@@ -224,6 +237,7 @@ export function stepCheckValueChain(meta, workingText) {
     }
     let truth, name;
     if (label.type === 'quantity') {
+      if (restricted && label.key !== 'period') return note(line, 'Not verified: this question restricts the values, and Pri checks this quantity over the whole function, so it is not marked.');
       truth = trueQuantity(fn, label.key);
       name = QUANTITY_NAMES[label.key];
     } else {

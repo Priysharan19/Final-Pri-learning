@@ -139,6 +139,22 @@ const withMeta = issued.filter(q => q.stepcheck?.kind === 'value-chain');
 ok(withMeta.length > 400, `the trig-model family carries the value-chain meta (${withMeta.length} of ${issued.length})`);
 ok(withMeta.every(q => stepMetaFor(q) === q.stepcheck), 'the server uses it as the question\'s step meta');
 
+// a restricted domain: the max / min / amplitude / midline are checked against the whole function, so a true restricted extreme must never be crossed
+{
+  const run = (prompt, lines) => stepCheck(META, lines.join('\n'), { prompt }).lines.map(l => l.status).join();
+  const RP = 'A buoy rises and falls with $h(t) = 22 + 5\\sin\\left(\\dfrac{\\pi t}{6}\\right)$ for $0 \\le t \\le 2$. Find the maximum value of $h$.';
+  ok(run(RP, ['max = 22 + 5\\sin(\\pi/3)']) !== 'break' && run(RP, ['max = 26.33']) !== 'break', 'a restricted-domain maximum is never crossed');
+  ok(run(RP, ['max = 22 + 5 sin(pi/3)']) === 'note', 'on a restricted domain the true restricted maximum abstains (note)');
+  ok(run(RP, ['max = 27']) === 'note' && run(RP, ['min = 17']) === 'note', 'the global value is not ticked on a restricted domain either');
+  ok(run('Find the maximum of $h(t)$ for $t$ in the interval $[0, 2]$.', ['max = 26.5']) === 'note', 'an interval in words or brackets abstains');
+  ok(run('Find the minimum of $h$ between $t = 0$ and $t = 2$.', ['min = 22']) === 'note', '"between" abstains');
+  ok(stepCheck({ ...META, domain: [0, 2] }, 'max = 22').lines[0].status === 'note', 'a meta that carries a domain abstains with no prompt');
+  const GP = 'A buoy is modelled by $h(t) = 22 + 5\\sin\\left(\\dfrac{\\pi t}{6}\\right)$ for $t \\ge 0$. What is the maximum value of $h$?';
+  ok(run(GP, ['max = 22 + 5', '= 27']) === 'ok,ok', 'a half-line "t ≥ 0" leaves the periodic maximum global: still ticked');
+  ok(run(GP, ['max = 28']) === 'break', '...and a false global maximum is still crossed');
+  ok(run(RP, ['period = 12']) === 'ok', 'the period is not changed by a restricted domain');
+}
+
 // ── Part 2 · the sweep against independent computation ───────────────────────
 const TEX = /h\(t\) = (\d+) \+ (\d+)\\(sin|cos)\\left\(\\dfrac\{\\pi t\}\{(\d+)\}\\right\)/;
 const params = withMeta.map(q => { const m = TEX.exec(q.prompt); return m ? { c: +m[1], a: +m[2], fn: m[3], m: +m[4], expr: q.stepcheck.fn.expr, q } : null; });

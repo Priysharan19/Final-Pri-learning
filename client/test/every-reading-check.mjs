@@ -94,6 +94,52 @@ ok(status(EXP, EP, ['x^3+6x^2+11x+7'])[0] === 'break', 'a wrong full expansion i
   ok(methodMarks({ meta: eq([-2, 2]), working: 'x^2=4\nx=2 or x=-2', marks: 3 }).awarded >= 1, 'while the complete working earns its progress mark (the control)');
 }
 
+// ── Review follow-ups (R4): a formula in the student's own labels, unbracketed arguments, asked derivatives of other letters ─────
+{
+  const QM = { kind: 'expression', canonical: '((x-3)*2*x-(x^2+1))/(x-3)^2' }, QP = 'Differentiate $y = \\dfrac{x^2+1}{x-3}$.';
+  const PM = { kind: 'expression', canonical: '3x^2*sin(x)+x^3*cos(x)' }, PP = 'Differentiate $y = x^3\\sin x$.';
+  const notBreak = (m, p, lines, what) => ok(!status(m, p, lines).includes('break'), what);
+  // 1. a formula in u, v labels is a formula: abstain with a note, never a tick, unless it is false after the student's own definitions
+  for (const f of ['dy/dx = (v du/dx - u dv/dx)/v^2', 'dy/dx = (v*du/dx - u*dv/dx)/v^2', 'dy/dx = (v du/dx - u dv/dx)/(v^2)']) {
+    ok(status(QM, QP, ['u = x^2+1', 'v = x-3', f]).at(-1) === 'note', `the quotient rule in du/dx layout is a note, not a cross: ${f}`);
+    ok(status(QM, QP, [f]).at(-1) === 'note', `...also with no definitions above it: ${f}`);
+  }
+  for (const f of ['dy/dx = u dv/dx + v du/dx', 'dy/dx = u*dv/dx + v*du/dx', "dy/dx = u'v + uv'"]) {
+    ok(status(PM, PP, ['u = x^3', 'v = sin x', f]).at(-1) === 'note', `the product rule on its own question is a note: ${f}`);
+    ok(status(PM, PP, [f]).at(-1) === 'note', `...with no definitions it abstains: ${f}`);
+  }
+  ok(status(PM, PP, ['u = x^3', 'v = sin x', 'dy/dx = u dv/dx - v du/dx'])[2] === 'break', 'the product rule with the wrong sign is crossed once the student\'s own u, v make it false');
+  ok(status(QM, QP, ['u = x^2+1', 'v = x-3', 'dy/dx = (u dv/dx - v du/dx)/v^2'])[2] === 'break', 'the quotient rule with u and v swapped is crossed from the student\'s own definitions');
+  ok(status(QM, QP, ['u = x^2+1', 'v = x-3', 'dy/dx = (u dv/dx - v du/dx)/v^2'])[2] !== 'ok', '...and never ticked');
+  ok(status(D.meta, D.prompt, ['y = (3x + 5)^5', 'dy/dx = 6v'])[1] === 'break', 'a free letter with no derivative layout (6v) is still crossed');
+  // 2. an unbracketed argument has two readings: crossed only when false under both, never ticked on one reading
+  const S2 = { kind: 'expression', canonical: '2cos(2x)' }, S2P = 'Differentiate $y = \\sin 2x$.';
+  for (const f of ['dy/dx = 2cos 2x', 'dy/dx = 2cos2x', 'dy/dx = 2 cos 2x', "y' = 2cos 2x"]) ok(status(S2, S2P, [f])[0] === 'note', `an unbracketed true argument abstains: ${f}`);
+  ok(status(S2, S2P, ['dy/dx = 2cos(2x)'])[0] === 'ok', 'the bracketed form still ticks');
+  for (const f of ['dy/dx = 3cos 2x', 'dy/dx = 2cos 3x', 'dy/dx = 2sin 2x']) ok(status(S2, S2P, [f])[0] === 'break', `false under every reading is still crossed: ${f}`);
+  ok(status({ kind: 'expression', canonical: '2sec(2x)^2' }, 'Differentiate $y = \\tan 2x$.', ['dy/dx = 2sec^2 2x'])[0] !== 'break', 'tan: 2sec^2 2x is not crossed');
+  ok(status({ kind: 'expression', canonical: '2/(2x+1)' }, 'Differentiate $y = \\ln(2x+1)$.', ['dy/dx = 2/(2x+1)'])[0] === 'ok', 'ln: the bracketed true line still ticks');
+  ok(status({ kind: 'expression', canonical: '2/x' }, 'Differentiate $y = \\ln x^2$.', ['dy/dx = 2/x'])[0] !== 'break', 'ln: a true line is not crossed');
+  ok(status({ kind: 'expression', canonical: '2e^(2x)' }, 'Differentiate $y = e^{2x}$.', ['dy/dx = 2e^2x'])[0] !== 'break', 'e^: e^2x is not crossed');
+  ok(status({ kind: 'expression', canonical: '3cos(3x)' }, 'Differentiate $y = \\sin 3x$.', ['dy/dx = 3cos 3x'])[0] !== 'break', 'sin: 3cos 3x is not crossed');
+  // 3. an asked derivative of other letters, defined by the prompt itself
+  const A = { kind: 'expression', canonical: '2*pi*r' }, T = { kind: 'expression', canonical: '3t^2' };
+  for (const p of ['Find $\\dfrac{dA}{dr}$ where $A = \\pi r^2$.', 'Find dA/dr if A = πr^2.', 'The area of a circle is $A = \\pi r^2$. Find $\\dfrac{dA}{dr}$.']) {
+    ok(status(A, p, ['dA/dr = 3πr'])[0] === 'break', `a wrong asked derivative of A is crossed: ${p}`);
+    ok(status(A, p, ['dA/dr = 2πr'])[0] === 'ok', `and the true one ticks: ${p}`);
+    ok(status(A, p, ['A = πr^2', 'dA/dr = 2πr']).at(-1) !== 'break', `a definition above it does not cross the true line: ${p}`);
+  }
+  ok(status(T, 'Find ds/dt if s = t^3.', ['ds/dt = 5t^2'])[0] === 'break', 'ds/dt = 5t^2 is crossed when the prompt defines s = t^3');
+  ok(status(T, 'Find ds/dt if s = t^3.', ['ds/dt = 3t^2'])[0] === 'ok', 'ds/dt = 3t^2 ticks');
+  ok(status(T, 'Find ds/dt if s = t^3.', ['s = t^3', 'ds/dt = 3t^2']).every(x => x !== 'break'), 'the definition then the derivative: never crossed');
+  notBreak(A, 'Find $\\dfrac{dA}{dr}$ where $A = \\pi r^2$.', ['A = πr^2', 'let u = r^2', 'du/dr = 2r'], 'a definition and a side derivative in the same question are never crossed');
+  // 4. d/dx (x^2+1)^3 has two readings (the derivative of the whole power, or (d/dx(x^2+1))^3): not crossed, not ticked
+  const CHM = { kind: 'expression', canonical: '6x(x^2+1)^2' }, CHP = 'Differentiate $y = (x^2+1)^3$.';
+  ok(status(CHM, CHP, ['d/dx (x^2+1)^3 = 3(x^2+1)^2 * 2x'])[0] === 'note', 'unbracketed d/dx (x^2+1)^3: true under one reading, so a note, never crossed or ticked');
+  ok(status(CHM, CHP, ['d/dx[(x^2+1)^3] = 3(x^2+1)^2 * 2x'])[0] === 'ok', 'the bracketed d/dx[...] still ticks');
+  ok(status(CHM, CHP, ['d/dx[(x^2+1)^3] = 3(x^2+1)^2 * 3x'])[0] !== 'ok', 'and a false right side after the bracketed operator is never ticked');
+}
+
 // A wrong line is never ticked, whichever reading is tried.
 for (const wrong of ['= 5(3x + 5)^4', '= 3x + 5', '= 20(3x + 5)^4']) ok(status(D.meta, D.prompt, ['y = (3x + 5)^5', wrong])[1] !== 'ok', `derivative: ${wrong} is never ticked`);
 for (const wrong of ['= 14e^(2x)', '= 7e^(2x) * 4', '= 28e^(2x)']) ok(status(I.meta, I.prompt, ['∫14e^(2x)dx', wrong])[1] !== 'ok', `integral: ${wrong} is never ticked`);

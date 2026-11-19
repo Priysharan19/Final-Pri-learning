@@ -146,7 +146,6 @@ sample('me11-poly', 4, (q, id) => {
   if ((m = q.prompt.match(/^\$P\(x\) = (\d?)x\^3 \+ ax\^2 \+ bx ([+-]) (\d+)\$ has \$\(x ([+-]) (\d+)\)\$ and \$\(x ([+-]) (\d+)\)\$ as factors/))) {
     bump('poly-ab');
     const lead = m[1] === '' ? 1 : Number(m[1]), C = (m[2] === '-' ? -1 : 1) * Number(m[3]);
-    const r2 = -(m[6] === '-' ? -1 : 1) * Number(m[7]) * -1;
     // (x - r) factor: the prompt prints (x + k) for root -k, (x - k) for root k
     const root = (sgn, k) => (sgn === '-' ? k : -k);
     const ra = root(m[4], Number(m[5])), rb = root(m[6], Number(m[7]));

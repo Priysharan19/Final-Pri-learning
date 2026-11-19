@@ -25,7 +25,7 @@
 // "Not quite, one more go" for written working, and Redo is the same question again. Typed answers keep two tries.
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
-import { handwrite, markWorking, readingIsNotShown, readLines, turnOnServerReading } from './fakeServerReader.js';
+import { handwrite, markWorking, readingIsNotShown, turnOnServerReading } from './fakeServerReader.js';
 import { SYNTHETIC_EVIDENCE } from './support/online-session.mjs';
 import { inkLineVerdicts, workingEvidence, workingEvidenceCopy } from '../src/components/attemptEvidence.js';
 import EN from '../src/i18n/strings.en.js';

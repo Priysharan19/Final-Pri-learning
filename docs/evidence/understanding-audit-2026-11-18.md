@@ -227,7 +227,7 @@ The engine's own stated reason for silence (digits normalised to `#`):
 | 2 | Not checked — this question’s check covers the lines that lead to the answer. | 898 | `x = 197 - 8 × 22 = 21` |
 | 3 | This line is about another letter. Pri has nothing in this question to check it against, so it is neither marked wrong nor counted. | 442 | `x^2 - 2x + 26 = 0` |
 | 4 | Skipped — I couldn’t read the solution list safely. | 283 | `A = {8, 9, 11, 12}` |
-| 5 | This defines something the method uses, so it is not checked against the answer. | 258 | `u = 5x^2` |
+| 5 | This defines something the method uses, so it is not checked against the answer. | 254 | `u = 5x^2` |
 | 6 | Not verified: Pri does not check lines with this label. | 59 | `T = 2π÷(π)/6 = 12` |
 | 7 | True — differentiating this line gives the integrand. It differs from the final answer by a constant, or is not yet simplified. | 39 | `6/5 e^(5x^2) + C` |
 | 8 | True whatever the letters stand for — it says nothing about this question. | 35 | `(k+1)^3 + 5(k+1) = k^3 + 3k^2 + 3k + 1 + 5k + 5` |
