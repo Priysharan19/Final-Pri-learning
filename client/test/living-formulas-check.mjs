@@ -59,6 +59,17 @@ const nowD = (f) => f.locator('.lf-now').first().getAttribute('d');
 
 const browser = await chromium.launch();
 try {
+  // Warm the dev server first. On a fresh install its first request triggers dependency optimisation, which can reload or
+  // 404 a pre-bundled chunk (".vite/deps/react-dom-…js does not exist") while the first page is loading. Load the gallery
+  // until a figure renders, so every case below meets a settled server. (CI, a11y-boot: the first page timed out at 30 s.)
+  {
+    const warm = await (await browser.newContext()).newPage();
+    for (let attempt = 0; attempt < 4; attempt++) {
+      await warm.goto(url('nsw', '/notes/mav-11-03', 'light'), { waitUntil: 'networkidle' }).catch(() => {});
+      if (await warm.waitForSelector('[data-nn-section="living"] .lf', { timeout: 20000 }).then(() => true, () => false)) break;
+    }
+    await warm.context().close();
+  }
   for (const theme of ['light', 'dark']) {
     for (const [size, viewport] of [['phone', { width: 375, height: 812 }], ['desktop', { width: 1280, height: 900 }]]) {
       const context = await browser.newContext({ viewport, deviceScaleFactor: 2, colorScheme: theme, reducedMotion: size === 'phone' ? 'reduce' : 'no-preference' });
