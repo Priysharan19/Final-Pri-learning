@@ -135,14 +135,14 @@ export function buildAnnotatedWorking({ lines, stepReport, receipt = null, solut
  */
 function buildValueChainModel({ report: reportIn, stepReport, receipt, source, attempt }) {
   let report = reportIn;
-  const STATUS = { given: 'checked', verified: 'checked', condition: 'condition', wrong: 'first-error', unverified: 'not-verified', unread: 'unread', incomplete: 'incomplete' };
+  const STATUS = { given: 'checked', verified: 'checked', arithmetic: 'checked', condition: 'condition', wrong: 'first-error', unverified: 'not-verified', unread: 'unread', incomplete: 'incomplete' };
   // (a milestone tick added after the check carries no state: read it from its status)
   report = report.map(l => ({ ...l, state: l?.state === 'unverified' && l.status === 'ok' ? 'verified' : l?.state || (l?.status === 'ok' ? 'verified' : l?.status === 'break' ? 'wrong' : 'unverified') }));
   const firstBreak = report.findIndex(l => l?.state === 'wrong');
   const cards = report.map((l, i) => ({
     n: i + 1, line: i, status: STATUS[l?.state] || 'not-verified', valueChain: l?.state || 'unverified',
     start: false, startSide: null, rules: [], more: false, same: false, unnamed: false, followsFrom: null,
-    diagnosis: l?.state === 'wrong' ? (l.diagnosis || null) : null, note: l?.state === 'wrong' || l?.state === 'given' || l?.state === 'incomplete' ? (l.note || null) : null,
+    diagnosis: l?.state === 'wrong' ? (l.diagnosis || null) : null, note: l?.state === 'wrong' || l?.state === 'given' || l?.state === 'incomplete' || l?.state === 'arithmetic' || l?.state === 'verified' ? (l.note || null) : null,
     previousText: null, text: String(l?.text ?? '')
   }));
   const summaryOf = stepReport.summary || {};

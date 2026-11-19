@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `4179cfddd414f62b00454fcdca8599c15c5441713bb6b631e4e90c68a07cd957` (`docs/marking/order14-examiner-certification-dossier.md`).
+Dossier digest: `e3a84df92c43d197fc7917810a0d06a066d1ecf6e54ba5acd9a4f2c082958ee2` (`docs/marking/order14-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -1080,6 +1080,26 @@ partial:
 ```text
 (working with the right method, ending in a wrong value)
 Final answer: -3, -2, 2, 4
+```
+</details>
+
+## `cbse-bank:me12-vectors/D1` — seed 24766
+
+> Given $\\underset{\\sim}{a} = \\begin{pmatrix} 1 \\\\ 6 \\end{pmatrix}$ and $\\underset{\\sim}{b} = \\begin{pmatrix} -3 \\\\ -1 \\end{pmatrix}$, find $\\left\|4\\underset{\\sim}{a} + 4\\underset{\\sim}{b}\\right\|$, correct to 2 decimal places.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `1077/50` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `1077/50` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `1127/50` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `1127/50` | no | 0/1 | 0/1 | The step check is an vector-chain check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: 1127/50
 ```
 </details>
 

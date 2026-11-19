@@ -33,7 +33,8 @@ const firstSentence = text => { const clean = String(text || '').replace(/\s+/g,
 function whyOf(card, t) {
   if (card.status === 'condition') return t('mp.why.condition');
   if (card.valueChain === 'given') return t('mp.why.given');
-  if (card.valueChain === 'verified') return '';
+  if (card.valueChain === 'verified') return card.note || '';
+  if (card.valueChain === 'arithmetic') return card.note || t('mp.why.arithmetic');
   if (card.start) return t('mp.why.start');
   if (card.same) return t('mp.why.same', { n: card.n - 1 });
   if (Array.isArray(card.rules) && card.rules.length) return card.rules.map(r => ruleLabel(r, t)).join(', ');

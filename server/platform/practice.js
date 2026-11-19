@@ -10,7 +10,7 @@
 // unapproved production Postgres DDL. Old clients are not authorised to treat
 // their offline grades as server grades. The client transport integration is
 // a separate mandatory release gate.
-import { interpretAfterStepCheck } from './lineInterpreter/overlay.js';
+import { interpretAfterStepCheck, reportWithInterpretation } from './lineInterpreter/overlay.js';
 import { createHash, randomInt, randomUUID } from 'node:crypto';
 import { asyncRouter, asyncHandler } from './asyncRouter.js';
 import { asStore } from './store.js';
@@ -1632,7 +1632,9 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         ...(q._repeat === true ? { repeat: true } : {}), ...(q._repeatEvidence ? { repeatEvidence: q._repeatEvidence } : {}),
         // An entry that is not an attempt costs nothing, so it may not return
         // line-by-line verdicts either: they would be a free answer oracle.
-        stepReport: invalid ? null : stepReport, partial: invalid ? null : partial,
+        // What the marked page draws: the engine's report with the interpreter's line verdicts folded in (feedback only;
+        // `partial` and every mark above were computed from the engine's report alone).
+        stepReport: invalid ? null : reportWithInterpretation({ stepReport, lineInterpretation, working }), partial: invalid ? null : partial,
         ...(resolved && !invalid && lineInterpretation ? { lineInterpretation } : {}), ...(resolved ? {
           solution: solutionFor(q),
           // Supplemental aggregate marking: no per-step allocations are invented.
