@@ -56,6 +56,7 @@ for (const s of TOUR_STEPS) {
 }
 ok(/Escape/.test(tour) && /data-tour-skip/.test(tour), 'Escape and Skip close it');
 ok(/noteRef\.current\?\.focus/.test(tour) && /back\?\.focus/.test(tour), 'focus moves to the note and returns to the control');
+ok(/String\(a\.value \|\| ''\) !== ''/.test(base), 'the focused empty answer box does not suppress the tour; typed text does');
 ok(!/aria-modal|role="dialog"/.test(tour), 'not a modal');
 const css = read('../src/workspace.css');
 const noteCss = (css.match(/\.pr-tour \{[^}]*\}/) || [''])[0];

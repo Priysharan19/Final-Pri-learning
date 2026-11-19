@@ -83,9 +83,11 @@ function ProfilePractice() {
   useEffect(() => {
     if (!tourReady || tourSeen(user.id)) return undefined;
     const timer = setTimeout(() => {
-      // Never interrupt someone already typing or writing an answer.
+      // Never interrupt someone who has already started an answer. (The empty
+      // answer box is focused on arrival, so focus alone says nothing.)
       const a = document.activeElement;
-      if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.isContentEditable)) return;
+      if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA') && String(a.value || '') !== '') return;
+      if (a?.isContentEditable && String(a.textContent || '').trim() !== '') return;
       setTourOn(true);
     }, 600);
     return () => clearTimeout(timer);
