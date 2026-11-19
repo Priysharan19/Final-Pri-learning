@@ -277,7 +277,7 @@ const SECTIONS_ALL = [
   ['data', '⇅', 'settings.secData'],
   ['help', '?', 'settings.secHelp'],
 ];
-const SECTIONS_BASE = SECTIONS_ALL.filter(([k]) => k !== 'language' || offeredLanguages(LANGUAGES).length > 1);
+const SECTIONS_BASE = offeredLanguages(LANGUAGES).length > 1 ? SECTIONS_ALL : SECTIONS_ALL.filter(([k]) => k !== 'language');
 
 function SecuritySection({ toast }) {
   const { user, setUser } = useApp();
