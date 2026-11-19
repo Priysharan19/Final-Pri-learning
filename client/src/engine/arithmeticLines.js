@@ -40,6 +40,9 @@ const NOTE = 'Not checked: this line has no arithmetic Pri can check on its own.
 const UNREAD = 'This line could not be read as maths, so it is not checked.';
 const SOFT_NOTE = 'Not checked: this line may use a rounded value, so it is not marked.';
 const MISREAD_NOTE = 'Not checked: this line may have been misread, so it is not marked.';
+// `y' = e^x(x^2) + e^x(2x) = e^x(x^2 + 2x)`: a derivative mark in front of a worked chain labels the chain like `Area =` does.
+// What is judged is the chain after it (a tick says those sides are equal, never that the label is the right derivative).
+const DERIVATIVE_LABEL = /^(?:[A-Za-z]['′]{1,2}(?:\(\s*[a-z]\s*\))?|d(?:\^?2|²)?[a-z]?\/d[a-z](?:\^?2|²)?)\s*=\s*(?=[^=]*=\s*\S)/;
 const FUNCTION_WORDS = /\b(?:sin|cos|tan|sec|cosec|csc|cot|ln|log|asin|acos|atan|arcsin|arccos|arctan)\b/i;
 
 // `Ans = 72` under the working: ticked when it equals the line above, never crossed (it may answer something else).
@@ -192,6 +195,171 @@ function bracketFunctions(text) {
     // (not when a fraction follows: ln 1/2 is ln(1/2) to the student and ln(1)/2 to a parser, so it stays unread;
     //  ln 3 / ln 10, a quotient of two logarithms, is read)
     .replace(/(?<![A-Za-z])(ln|log)\s*(\d+(?:\.\d+)?)(?!\s*[A-Za-z0-9^(.!])(?!\s*\/(?!\s*(?:ln|log)))/g, '$1($2)');
+}
+
+// ── e^x(…): the exponent and the bracket after it ────────────────────────────────────────────────────────────────────
+// Owner, 19 November 2026: `e^x(2x - 4)` is e^x times (2x - 4), whatever the exponent is when it is ONE letter, a
+// number, or a bracketed group and a bracket follows it. A bare `e^2x` stays ambiguous (e^(2x) or e^2 times x) and is
+// never judged. The only other reading of `e^2(3)` is e^(2·3); a line that is true under that reading is never crossed.
+const EXPONENT_LETTER_BRACKET = /(?<=e)\^\s*(-?\s*[A-Za-z])(?=\s*\()/g;
+const EXPONENT_THEN_BRACKET = /(?<![A-Za-z])e\s*\^\s*(-?\s*(?:\d+(?:\.\d+)?|[A-Za-z]|\([^()]*\)))\s*\(/g;
+/** The side read with the exponent taking the bracket after it (e^2(3) as e^(2·3)); null when no exponent is followed by one. */
+function exponentTakesBracket(side) {
+  let out = '', from = 0, changed = false;
+  EXPONENT_THEN_BRACKET.lastIndex = 0;
+  for (let m; (m = EXPONENT_THEN_BRACKET.exec(side)); ) {
+    const open = m.index + m[0].length - 1;
+    let depth = 0, end = -1;
+    for (let k = open; k < side.length; k++) { if (side[k] === '(') depth++; else if (side[k] === ')' && --depth === 0) { end = k; break; } }
+    if (end < 0) return null;
+    out += `${side.slice(from, m.index)}e^((${m[1].replace(/\s+/g, '')})*${side.slice(open, end + 1)})`;
+    from = end + 1; changed = true;
+    EXPONENT_THEN_BRACKET.lastIndex = from;
+  }
+  return changed ? out + side.slice(from) : null;
+}
+/** True when some choice of reading (product, or the exponent taking its bracket) makes every side agree. */
+function trueUnderExponentReading(sides, values) {
+  const alts = sides.map(s => { const a = exponentTakesBracket(s); return a === null ? null : valueOf(a); });
+  if (alts.every(a => a === null)) return false;
+  const choices = sides.map((_, i) => (alts[i] === null ? [values[i]] : [values[i], alts[i]]));
+  const walk = (i, picked) => (i === choices.length ? picked.every(x => close(x, picked[0])) : choices[i].some(c => walk(i + 1, [...picked, c])));
+  return walk(0, []);
+}
+
+// ── Degrees, and the name of a trigonometric step ─────────────────────────────────────────────────────────────────
+// A number followed by ° is an angle in degrees. A line that uses one is read in radians (30° is 30π/180) and is TICK ONLY:
+// never crossed, and a letter in it must stand inside a trigonometric function, so that a degree and a radian can never be
+// mixed on one side of a sum (sin(180° - θ) = sin θ, sin 30° = 1/2). A degree sign after a letter is not read.
+const DEGREE_SIGN = /(\d+(?:\.\d+)?)\s*°/g;
+const TRIG_CALLS = /(?<![A-Za-z])(?:sin|cos|tan|sec|cosec|csc|cot)\(/g;
+function lettersOnlyInTrig(t) {
+  let s = t;
+  for (let guard = 0; guard < 8; guard++) {
+    TRIG_CALLS.lastIndex = 0;
+    const calls = [...s.matchAll(TRIG_CALLS)];
+    if (!calls.length) break;
+    const m = calls[calls.length - 1];   // the last call opened is the innermost one to close first
+    const open = m.index + m[0].length - 1;
+    let depth = 0, end = -1;
+    for (let k = open; k < s.length; k++) { if (s[k] === '(') depth++; else if (s[k] === ')' && --depth === 0) { end = k; break; } }
+    if (end < 0) return false;
+    s = `${s.slice(0, m.index)}#${s.slice(end + 1)}`;
+  }
+  return !/[A-Za-zθαβφ]/.test(s.replace(/#/g, '').replace(/(?<![A-Za-z])(?:pi|e)(?![A-Za-z])/g, ''));
+}
+const TRIG_FN = new Set(['sin', 'cos', 'tan']);
+const trigCall = n => {   // { fn, arg } for ±fn(arg), else null
+  n = unwrap(n);
+  while (n && n.t === 'neg') n = unwrap(n.v);
+  return n && n.t === 'call' && !Array.isArray(n.args) && TRIG_FN.has(n.fn) ? { fn: n.fn, arg: unwrap(n.arg) } : null;
+};
+const hasPi = n => !!n && typeof n === 'object' && ((n.t === 'const' && n.v === 'pi') || (n.t === 'var' && n.v === 'pi') || ['l', 'r', 'v', 'arg'].some(k => hasPi(n[k])));
+const hasCall = n => !!n && typeof n === 'object' && ((n.t === 'call' && n.fn !== 'sqrt' && n.fn !== 'cbrt') || ['l', 'r', 'v', 'arg'].some(k => hasCall(n[k])));   // a function: a root is a number
+const constantOf = n => { try { const y = evaluate(n, {}); return typeof y === 'number' && Number.isFinite(y) ? y : null; } catch { return null; } };
+const nearly = (a, b) => Math.abs(a - b) <= 1e-9;
+const TRIG_POINTS = [-2.7, -1.3, -0.4, 0.6, 1.9, 3.1];
+/**
+ * 'a related angle' or 'an exact value' for the step from one side to the next, or ''. Said only for the direction that
+ * happened, and only about a line already proved true:
+ *   related angle  sin(π - x) = sin x, cos(π + x) = -cos x, tan(2π - x) = -tan x, sin 150° = sin 30°: the first side
+ *                  is the function of π ± the second side's angle (2π only as 2π - x), the second carries no π, and
+ *                  for numbers the second angle is the acute one;
+ *   exact value    sin 30° = 1/2, cos(π/4) = 1/√2, tan 60° = √3: a function of 0, 30°, 45°, 60° or 90° set equal
+ *                  to a number with no function in it.
+ * Anything else, and the same lines the other way round (1/2 = sin 30°, sin x = sin(π - x)), is named nothing.
+ */
+function trigStepName(fromText, toText) {
+  let a, b;
+  try { a = parse(normalize(fromText)); b = parse(normalize(toText)); } catch { return ''; }
+  if (!a || !b || a.t === 'equation' || b.t === 'equation') return '';
+  const ca = trigCall(a), cb = trigCall(b);
+  if (ca && !hasCall(b)) {
+    const angle = constantOf(ca.arg), value = constantOf(b);
+    if (angle === null || value === null || variablesOf(b).size) return '';
+    if ([0, Math.PI / 6, Math.PI / 4, Math.PI / 3, Math.PI / 2].some(x => nearly(angle, x))) return 'an exact value';
+    return '';
+  }
+  if (!ca || !cb || ca.fn !== cb.fn) return '';
+  const numericA = constantOf(ca.arg), numericB = constantOf(cb.arg);
+  if (numericA !== null && numericB !== null) {
+    if (!(numericB > 1e-9 && numericB <= Math.PI / 2 + 1e-9) || nearly(numericA, numericB)) return '';
+    return [[Math.PI, 1], [Math.PI, -1], [2 * Math.PI, -1]].some(([c, s]) => nearly(numericA, c + s * numericB)) ? 'a related angle' : '';
+  }
+  if (numericA !== null || numericB !== null || !hasPi(ca.arg) || hasPi(cb.arg)) return '';
+  const vars = [...variablesOf(ca.arg)];
+  if (!vars.length || vars.join() !== [...variablesOf(cb.arg)].join()) return '';
+  const at = (n, x) => { try { const y = evaluate(n, Object.fromEntries(vars.map((v, k) => [v, x + 0.37 * k]))); return typeof y === 'number' && Number.isFinite(y) ? y : null; } catch { return null; } };
+  return [[Math.PI, 1], [Math.PI, -1], [2 * Math.PI, -1]].some(([c, s]) => TRIG_POINTS.every(x => { const p = at(ca.arg, x), q = at(cb.arg, x); return p !== null && q !== null && nearly(p, c + s * q); })) ? 'a related angle' : '';
+}
+
+// ── Like terms left uncollected in the last line ────────────────────────────────────────────────────────────────────
+// 2x + 3x as the last side of a ticked line: said once as a note, "This simplifies to 5x." Read by shape alone, from the
+// parsed sum: every term a whole-number multiple of one product of letters (powers by whole numbers), two or more terms
+// with the same letters, and the collected sum equal to the written one at points of both signs. Decimals, units
+// (a letter next to a letter, a space between a number and a letter), roots, quotients and functions are never read.
+function collectLikeTerms(side) {
+  const text = String(side).replace(/[−–—]/g, '-');
+  // (a letter that may be a unit, m s g h or a capital, is not read either: 2m + 3m may be metres)
+  if (/[A-Za-z]{2,}|\d\s+[A-Za-z]|[.\/√()πθ]|\^\s*-|[A-Zmsgh]/.test(text.replace(/\^\s*\d+/g, '^'))) return '';
+  let ast;
+  try { ast = parse(normalize(text)); } catch { return ''; }
+  const flat = (n, sign, out) => {
+    n = unwrap(n);
+    if (n.t === 'bin' && (n.op === '+' || n.op === '-')) { flat(n.l, sign, out); flat(n.r, n.op === '-' ? -sign : sign, out); return out; }
+    if (n.t === 'neg') return flat(n.v, -sign, out);
+    out.push([n, sign]);
+    return out;
+  };
+  const monomial = n => {   // { coef, powers: Map letter → exponent } or null
+    n = unwrap(n);
+    if (n.t === 'num') return Number.isInteger(n.v) ? { coef: n.v, powers: new Map() } : null;
+    if (n.t === 'var') return n.v === 'e' ? null : { coef: 1, powers: new Map([[n.v, 1]]) };
+    if (n.t === 'neg') { const m = monomial(n.v); return m && { coef: -m.coef, powers: m.powers }; }
+    if (n.t === 'bin' && n.op === '*') {
+      const l = monomial(n.l), r = monomial(n.r);
+      if (!l || !r) return null;
+      const powers = new Map(l.powers);
+      for (const [k, v] of r.powers) powers.set(k, (powers.get(k) || 0) + v);
+      return { coef: l.coef * r.coef, powers };
+    }
+    if (n.t === 'bin' && n.op === '^') {
+      const base = monomial(n.l), p = unwrap(n.r);
+      if (!base || base.coef !== 1 || p.t !== 'num' || !Number.isInteger(p.v) || p.v < 2 || p.v > 6) return null;
+      return { coef: 1, powers: new Map([...base.powers].map(([k, v]) => [k, v * p.v])) };
+    }
+    return null;
+  };
+  const written = flat(ast, 1, []);
+  if (written.length < 2 || written.length > 8) return '';
+  const groups = new Map();
+  for (const [n, sign] of written) {
+    const m = monomial(n);
+    if (!m) return '';
+    const key = [...m.powers].sort(([p], [q]) => (p < q ? -1 : 1)).map(([k, v]) => `${k}^${v}`).join('*');
+    const g = groups.get(key) || { coef: 0, powers: m.powers };
+    g.coef += sign * m.coef;
+    groups.set(key, g);
+  }
+  if (groups.size >= written.length) return '';   // nothing to collect
+  const parts = [...groups.values()].filter(g => g.coef !== 0).map(g => {
+    const letters = [...g.powers].sort(([p], [q]) => (p < q ? -1 : 1)).map(([k, v]) => (v === 1 ? k : `${k}^${v}`)).join('');
+    const mag = Math.abs(g.coef);
+    return { sign: g.coef < 0 ? '-' : '+', body: letters ? `${mag === 1 ? '' : mag}${letters}` : String(mag) };
+  });
+  const collected = parts.length ? parts.map((p, k) => (k === 0 ? (p.sign === '-' ? '-' : '') : ` ${p.sign} `) + p.body).join('') : '0';
+  // The same function at points of both signs, or it is not offered.
+  // (compared over the letters of both, so 5x - 5x + z and z are the same function of x and z)
+  let b;
+  try { b = parse(normalize(collected)); } catch { return ''; }
+  const letters = [...new Set([...variablesOf(ast), ...variablesOf(b)])].filter(v => v !== 'e');
+  for (const x of [-2.7, -1.3, -0.4, 0.6, 1.9, 3.1, 4.3]) {
+    const env = Object.fromEntries(letters.map((v, k) => [v, x + 0.37 * k]));
+    let p, q;
+    try { p = evaluate(ast, env); q = evaluate(b, env); } catch { return ''; }
+    if (typeof p !== 'number' || typeof q !== 'number' || !closeLoose(p, q)) return '';
+  }
+  return collected;
 }
 
 // The comment on a tick may name the step, but only as something the two
@@ -639,7 +807,7 @@ function stepCheckArithmeticWithinBudget(workingText) {
     // A label is set aside: `Numerator:`, `LHS =` in front, `= RHS` behind, an end mark. What such a line leaves for
     // the `=` line below is tick only, like a line of letters.
     // (a word in front of `=`, such as `Area = …`, labels the line like `Area: …`; a full stop or semicolon may end it)
-    const src0 = line.replace(/\s*[;.]\s*$/, '').replace(/^(?!(?:sin|cos|tan|sec|cosec|csc|cot|ln|log|sqrt|exp|abs|pi|ans|answer|lhs|rhs)\b)[A-Za-z]{3,14}\s*=\s*(?=\S)/i, '').replace(/^[A-Za-z][A-Za-z ]{1,24}:\s*(?=\S)/, '').replace(/^(?:LHS|RHS|L\.H\.S\.?|R\.H\.S\.?)\s*=\s*(?=\S)/i, '')
+    const src0 = line.replace(/\s*[;.]\s*$/, '').replace(/^(?!(?:sin|cos|tan|sec|cosec|csc|cot|ln|log|sqrt|exp|abs|pi|ans|answer|lhs|rhs)\b)[A-Za-z]{3,14}\s*=\s*(?=\S)/i, '').replace(/^[A-Za-z][A-Za-z ]{1,24}:\s*(?=\S)/, '').replace(/^(?:LHS|RHS|L\.H\.S\.?|R\.H\.S\.?)\s*=\s*(?=\S)/i, '').replace(DERIVATIVE_LABEL, '')
       .replace(/\s*(?:\/\/|∎|□)\s*$/, '').replace(/\s*=\s*(?:LHS|RHS|L\.H\.S\.?|R\.H\.S\.?)\s*$/i, '');
     // Owner, 19 November 2026 (a sign slip a competitor caught: `a(2) = (4 - 8 + 2)e^(-2) = 2e^(-2) > 0 so …`):
     //   · a value of a function in front of a worked chain (`a(2) = … = …`) is a label for the chain;
@@ -670,7 +838,11 @@ function stepCheckArithmeticWithinBudget(workingText) {
     if (/(?:√|sqrt)\s*\[/i.test(src)) return note(line, NOTE);
     const calc = /∫|\]_/.test(text0) ? workOutCalculus(text0) : { text: text0, used: false };
     if (!calc) return note(line, NOT_PROVED);
-    const text = bracketFunctions(calc.text);
+    // Degrees (30°): read as radians, tick only, letters only inside a trigonometric function. See "Degrees" above.
+    const degrees = DEGREE_SIGN.test(calc.text);
+    DEGREE_SIGN.lastIndex = 0;
+    const text = bracketFunctions(degrees ? calc.text.replace(DEGREE_SIGN, '($1*pi/180)').replace(/(?<![A-Za-z])(sin|cos|tan|sec|cosec|csc|cot)\s+\(/g, '$1(') : calc.text);
+    if (degrees && (/°/.test(text) || !lettersOnlyInTrig(text))) return note(line, NOTE);
     // Independent review, round 1. None of these is arithmetic Pri can read one way only, so none is judged:
     //   a line label or a trailing equation number (`1. 2+3 = 5`, `(2) 2+3 = 5`, `2 + 3 = 5 (2)`), which would be multiplied in;
     //   a comma (two statements on a line, or a decimal comma); a line that starts with an operator and so carries the
@@ -683,7 +855,7 @@ function stepCheckArithmeticWithinBudget(workingText) {
     // The constants e and π are numbers; a digit on each side of e (3e2) is not read.
     const CONSTANT = /(?<![A-Za-z])(?:e|pi|π)(?![A-Za-z])/g;
     if (/\de\s*[-+]?\s*\d/.test(text)) return note(line, NOTE);   // 3e2, and 2e + 3 (which reads as 2000)
-    if (calc.used || /[A-Za-zπθ]/.test(text.replace(/sqrt/gi, '').replace(/(\d)\s*[CP]\s*(?=\d)/g, '$1').replace(CONSTANT, '').replace(/(?<![A-Za-z])(?:ln|log)(?=\()/g, ''))) {
+    if (calc.used || degrees || /[A-Za-zπθ]/.test(text.replace(/sqrt/gi, '').replace(/(\d)\s*[CP]\s*(?=\d)/g, '$1').replace(CONSTANT, '').replace(/(?<![A-Za-z])(?:ln|log)(?=\()/g, ''))) {
       if (signClaim) return note(line, NOT_PROVED);
       // True as written, or a note: never a cross (see "Lines that are true as written").
       if (/≈|≃|~/.test(text)) return note(line, NOT_PROVED);
@@ -700,7 +872,8 @@ function stepCheckArithmeticWithinBudget(workingText) {
       // A division or a power followed by a number-and-letter or two letters (1/2x, x^2x, 1/xy) groups two ways too.
       const NAMED = /(?<![A-Za-z])(?:sqrt|arcsin|arccos|arctan|asin|acos|atan|cosec|sin|cos|tan|sec|csc|cot|ln|log|exp|abs)(?![A-Za-z])/gi;
       if (/#(?!\()/.test(text.replace(NAMED, '#'))) return note(line, NOT_PROVED);
-      const bare = text.replace(NAMED, '#');
+      // e^x(…): the exponent is one letter and a bracket follows it, so it is read as e^x times the bracket (see above).
+      const bare = text.replace(NAMED, '#').replace(EXPONENT_LETTER_BRACKET, '^($1)');
       for (const m of bare.matchAll(/([A-Za-zπθ])\s*\(/g)) {
         let depth = 0, end = -1;
         for (let k = m.index + m[0].length - 1; k < bare.length; k++) { if (bare[k] === '(') depth++; else if (bare[k] === ')' && --depth === 0) { end = k; break; } }
@@ -725,7 +898,8 @@ function stepCheckArithmeticWithinBudget(workingText) {
           : cont && carried ? 'This is the line above, written another way.' : 'Both sides are the same expression, written two ways.';
       // The step is named from the first two sides that differ in writing (the line above and this one, or this line's own sides).
       const texts = cont && carried ? [carried.text, ...written] : written;
-      const named = !calc.used && !number ? nameOfRule(texts[0], texts[1]) : '';
+      let named = !calc.used && !number ? nameOfRule(texts[0], texts[1]) : '';
+      if (!calc.used && !named) named = trigStepName(texts[0], texts[1]);
       if (!calc.used) lastSides.set(out.length, written[written.length - 1]);
       out.push({ text: line, status: 'ok', state: 'arithmetic', note: named ? `${why} It matches ${named}.` : why, valueChain: { rule: 'true-as-written' } });
       return;
@@ -744,7 +918,12 @@ function stepCheckArithmeticWithinBudget(workingText) {
     // agrees and is otherwise a note: the value above came from limits or letters that may have been misread.
     if (continuation && carried && !before) {
       const agrees = carried.value !== undefined && values.every(v => closeLoose(v, carried.value));
-      if (agrees) { prev = { ...prev, calculus: true }; lastSides.set(out.length, sides[sides.length - 1]); out.push({ text: line, status: 'ok', state: 'arithmetic', note: `This equals the line above: ${shown(carried.value)}.`, valueChain: { rule: 'true-as-written' } }); return; }
+      if (agrees) {
+        prev = { ...prev, calculus: true }; lastSides.set(out.length, sides[sides.length - 1]);
+        const trig = carried.text ? trigStepName(carried.text, sides[0]) : '';   // sin 30° then = 1/2
+        out.push({ text: line, status: 'ok', state: 'arithmetic', note: `This equals the line above: ${shown(carried.value)}.${trig ? ` It matches ${trig}.` : ''}`, valueChain: { rule: 'true-as-written' } });
+        return;
+      }
       return note(line, NOT_PROVED);
     }
     const allSides = continuation && before ? [before.text, ...sides] : sides;
@@ -772,7 +951,8 @@ function stepCheckArithmeticWithinBudget(workingText) {
       if (k0 > 0 && allSides.some(hasLog) && !(hasLog(allSides[0]) && hasLog(allSides[k0]))) return note(line, SOFT_NOTE); }
     if (allValues.every(v => close(v, allValues[0]))) {
       if (signClaim && !(signClaim === '>' ? allValues[0] > 0 : allValues[0] < 0)) return note(line, NOTE);
-      const why = continuation && before ? `This equals the line above: ${shown(allValues[0])}.` : `Both sides come to ${shown(allValues[0])}.`;
+      const trig = continuation && before && before.text ? trigStepName(before.text, sides[0]) : '';   // sin 30° then = 1/2
+      const why = (continuation && before ? `This equals the line above: ${shown(allValues[0])}.` : `Both sides come to ${shown(allValues[0])}.`) + (trig ? ` It matches ${trig}.` : '');
       lastSides.set(out.length, allSides[allSides.length - 1]);
       out.push({ text: line, status: 'ok', state: 'arithmetic', note: why, valueChain: { rule: 'arithmetic' } });
       return;
@@ -804,7 +984,7 @@ function stepCheckArithmeticWithinBudget(workingText) {
         return note(line, MISREAD_NOTE);
       }
     }
-    if (trueUnderAnotherReading(allSides, allValues)) return note(line, MISREAD_NOTE);
+    if (trueUnderAnotherReading(allSides, allValues) || trueUnderExponentReading(allSides, allValues)) return note(line, MISREAD_NOTE);
     const k = allValues.findIndex(v => !close(v, allValues[0]));
     const message = logFalseInBoth ? `${mathSpan(allSides[0])} does not equal ${mathSpan(allSides[k])}, whether log means base 10 or base e.`
       : continuation && before && k >= 1 && allValues.slice(1, k).every(v => close(v, allValues[0]))
@@ -834,7 +1014,13 @@ function stepCheckArithmeticWithinBudget(workingText) {
     while (k >= 0 && !(out[k].status === 'ok' && out[k].state === 'arithmetic')) k--;
     if (k >= 0 && lastSides.has(k)) {
       let more = '';
-      try { more = simplifiesTo(lastSides.get(k), out[k].note); } catch { more = ''; }
+      try {
+        more = simplifiesTo(lastSides.get(k), out[k].note);
+        // Like terms left uncollected: the last line only (a middle line may be mid-working), and only where the plain-number note had nothing to say.
+        // Not when the collected form is already written on the page (2x = x + x): the student has said it.
+        const written = new Set(raw.flatMap(l => l.split('=')).map(x => x.replace(/[\s−–—]/g, m => (/\s/.test(m) ? '' : '-'))));
+        if (!more && k === out.length - 1) { const collected = collectLikeTerms(lastSides.get(k)); if (collected && !written.has(collected.replace(/\s/g, ''))) more = out[k].note.includes(mathSpan(collected)) ? ' Give the final answer in that simplified form.' : ` This simplifies to ${mathSpan(collected)}.`; }
+      } catch { more = ''; }
       if (more) out[k] = { ...out[k], note: out[k].note + more };
     }
   }

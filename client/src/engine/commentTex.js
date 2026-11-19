@@ -14,11 +14,60 @@ import { answerToTex, expressionTex } from './answerTex.js';
 
 const SPAN = /^\$(.+)\$$/s;
 
+// ── Derivative marks ─────────────────────────────────────────────────────────
+// y', f'(x), u', f''(2), dy/dx, d/dx, d²y/dx²: the notation a student writes for a derivative. answerToTex reads `dy/dx`
+// as a quotient of products (d·y over d·x), which is wrong, and leaves a prime as plain text. These are set here, by shape
+// alone: nothing is evaluated, and an apostrophe inside an ordinary English word is never a prime.
+const PRIMES = "['′]";
+const SQUARE = '(?:\\^?2|²)';
+const ONE_MARK = new RegExp(`^([A-Za-z])(${PRIMES}{1,3})(?:\\(\\s*(-?\\d+(?:\\.\\d+)?|[A-Za-z])\\s*\\))?$`);
+const ONE_LEIBNIZ = new RegExp(`^d(${SQUARE})?([a-z])?/d([a-z])(${SQUARE})?$`);
+const OF_EXPRESSION = /^d\/d([a-z])\s*\((.+)\)$/;
+
+/** TeX for text that is exactly one derivative mark (y', f'(x), dy/dx, d/dx, d²y/dx², d/dx(…)); null otherwise. */
+export function derivativeMarkTex(text) {
+  const raw = String(text ?? '').trim();
+  if (!raw || raw.includes('$')) return null;
+  let m = ONE_MARK.exec(raw);
+  if (m) return `${m[1]}${"'".repeat(m[2].length)}${m[3] ? `(${m[3]})` : ''}`;
+  m = ONE_LEIBNIZ.exec(raw);
+  if (m) {
+    if (Boolean(m[1]) !== Boolean(m[4])) return null;   // d²y/dx is not a derivative mark
+    const sq = m[1] ? '^{2}' : '';
+    return `\\frac{d${sq}${m[2] || ''}}{d${m[3]}${sq}}`;
+  }
+  m = OF_EXPRESSION.exec(raw);
+  if (m) { const inner = fragmentTex(m[2]); return inner === null ? null : `\\frac{d}{d${m[1]}}\\left(${inner}\\right)`; }
+  return null;
+}
+
+// In a sentence: one letter, then primes, then an optional (argument). The letter must not belong to a word
+// ("isn't", "Pri's", "students'") or sit in quotation marks ('y'), and the prime must not lead into a word ("I'm").
+const IN_PROSE = new RegExp(
+  `(?<![A-Za-z0-9'’‘"“′])([A-Za-z])(${PRIMES}{1,3})(?:\\(\\s*(-?\\d+(?:\\.\\d+)?|[A-Za-z])\\s*\\))?(?![A-Za-z0-9'’])` +
+  `|(?<![A-Za-z0-9_])d${SQUARE}?[a-z]?/d[a-z]${SQUARE}?(?![A-Za-z0-9])`, 'g');
+const MATH_SPAN_IN_TEXT = /(?<!\\)\$(?:\\\$|[^$])+?(?<!\\)\$/g;
+
+/**
+ * An engine sentence with every derivative mark in its prose set as maths ($y'$, $\frac{dy}{dx}$). Maths already
+ * between dollars is left exactly as it is. Presentation only: the words and the verdict are untouched.
+ */
+export function typesetDerivativeMarks(text) {
+  const s = String(text ?? '');
+  if (!/['′]|\/d/.test(s)) return s;
+  const prose = chunk => chunk.replace(IN_PROSE, found => { const tex = derivativeMarkTex(found); return tex === null ? found : `$${tex}$`; });
+  let out = '', last = 0;
+  for (const m of s.matchAll(MATH_SPAN_IN_TEXT)) { out += prose(s.slice(last, m.index)) + m[0]; last = m.index + m[0].length; }
+  return out + prose(s.slice(last));
+}
+
 /** TeX (without the dollars) for one expression the student wrote, or null when it cannot be read as one. */
 export function fragmentTex(text) {
   const raw = String(text ?? '').trim().replace(/[−–]/g, '-');
   if (!raw || raw.includes('$')) return null;
   if (/^-?\d+(?:\.\d+)?$/.test(raw)) return raw;
+  const mark = derivativeMarkTex(raw);
+  if (mark !== null) return mark;
   // Arithmetic on numbers alone: answerToTex leaves such text for a list of numbers, this is one expression.
   if (/^[\d\s.+\-*/^()]+$/.test(raw)) return /\d\s+\d/.test(raw) ? null : expressionTex(raw);
   const out = answerToTex(raw);
@@ -65,7 +114,8 @@ export function plainComment(text) {
   if (!s.includes('$')) return s;
   s = s.replace(/(?<!\\)\$((?:\\\$|[^$])+?)(?<!\\)\$/g, (_, tex) => {
     const unit = x => (/^[\w.√π]+(?:\([^()]*\))?$/.test(x) ? x : `(${x})`);
-    let t = tex.replace(/\\[ ,;]/g, ' ').replace(/\\(?:left|right)/g, '').replace(/\\operatorname\{([a-z]+)\}/g, '$1')
+    let t = tex.replace(/\\frac\{d\^\{2\}([a-z]?)\}\{d([a-z])\^\{2\}\}/g, 'd²$1/d$2²')   // a second derivative: d²y/dx²
+      .replace(/\\[ ,;]/g, ' ').replace(/\\(?:left|right)/g, '').replace(/\\operatorname\{([a-z]+)\}/g, '$1')
       .replace(/\\sqrt\{([^{}]*)\}/g, (_, x) => (/^[\w.]+$/.test(x) ? `√${x}` : `√(${x})`))
       .replace(/\\pi\s*/g, 'π').replace(/\\times\s*/g, '×').replace(/\\cdot\s*/g, '·').replace(/\\(?!frac)([a-z]+)\s*/gi, '$1');
     for (let i = 0; i < 6; i++) t = t.replace(/\\frac\{([^{}]*)\}\{([^{}]*)\}/g, (__, a, b) => `${unit(a)}/${unit(b)}`);

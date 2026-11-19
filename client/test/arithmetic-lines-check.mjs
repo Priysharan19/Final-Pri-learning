@@ -13,7 +13,7 @@
 //         it reaches no mark, and the result card never calls it "consistent
 //         with the correct solution".
 import { stepCheckArithmetic, exactForm } from '../src/engine/arithmeticLines.js';
-import { plainComment, dollarsBalanced } from '../src/engine/commentTex.js';
+import { plainComment, dollarsBalanced, mathSpan, fragmentTex, derivativeMarkTex, typesetDerivativeMarks } from '../src/engine/commentTex.js';
 import { fullyVerifiedWorking } from '../src/engine/misconceptions.js';
 import { workingEvidence, workingEvidenceCopy } from '../src/components/attemptEvidence.js';
 import { buildAnnotatedWorking } from '../src/components/annotatedWorkingModel.js';
@@ -378,8 +378,10 @@ ok(model?.cards?.length === 2 && model.cards.every(c => c.status === 'checked' &
   // a function defined with another letter's value put in is not named (the page shows u^3, not the expansion)
   ok(!/rule/.test(plain(run(['u = x^2 + 1', 'y = u^3', "y' = 6x(x^2+1)^2"]).lines.map(l => l.note).join(' '))), 'y = u^3 is not named from the function it expands to');
 
-  // 5.5 A.3 supplementary and exact-value trig steps are named only where justifyStep names them: it names neither
-  for (const page of [['cos(π - x) = -cos(x)'], ['sin(π - x) = sin(x)'], ['sin(π/6) = 1/2'], ['cos(π/3) = sin(π/6)']]) {
+  // 5.5 A.3 a supplementary or exact-value step. justifyStep names neither, so this module names them itself (owner, 19 November
+  // 2026), and only for a line already proved true, in the direction the step went (see "Degrees, and the name of a trigonometric step" in the engine). A step between two
+  // functions that are not one of these (cos(π/3) = sin(π/6), a cofunction) is named nothing.
+  for (const page of [['cos(π/3) = sin(π/6)']]) {
     const r = run(page);
     ok(r.lines.every(l => !/It matches/.test(l.note || '')), `no supplementary or exact-value rule is invented: ${page[0]}`);
   }
@@ -515,6 +517,96 @@ ok(model?.cards?.length === 2 && model.cards.every(c => c.status === 'checked' &
     let spans = 0, bad = [];
     for (const c of mine) for (const m of c.matchAll(/(?<!\\)\$((?:\\\$|[^$])+?)(?<!\\)\$/g)) { spans++; try { katex.renderToString(m[1], { throwOnError: true, strict: 'error' }); } catch (e) { bad.push(`${m[1]} (${e.message})`); } }
     ok(mine.length >= 60 && mine.every(dollarsBalanced) && mine.every(c => !/[—–]/.test(c) && !/\byou\b/i.test(c)) && spans >= 20 && bad.length === 0, `${mine.length} new comments, ${spans} maths spans: balanced, render, no dash, no "you" (${bad.join(' | ')})`); }
+}
+
+// ── Part 6 · e^x(…), degrees and trig step names, derivative marks, like terms ───────────────────────────────────────
+// Owner, 19 November 2026. A true line is never crossed, a wrong line is never ticked, and when unsure a line is a note.
+{
+  const one = line => run([line]).lines[0];
+  const noteOf = line => plain(one(line).note || '');
+  const katex = (await import('katex')).default;
+  const renders = text => [...text.matchAll(/(?<!\\)\$((?:\\\$|[^$])+?)(?<!\\)\$/g)].every(m => { try { katex.renderToString(m[1], { throwOnError: true, strict: 'error' }); return true; } catch { return false; } });
+
+  // 6.1 e^x(…): the exponent is one letter, a number or a bracketed group and a bracket follows: e^x TIMES the bracket
+  const product = ['e^x(2x-4) = 2xe^x - 4e^x', 'e^x(2x - 4) = 2x e^x - 4e^x', 'e^x(x + 1) = xe^x + e^x', 'e^(2x)(x+1) = xe^(2x) + e^(2x)', '2e^x(x - 1) = 2xe^x - 2e^x',
+    'e^-x(1 - x) = e^-x - xe^-x', 'e^2(x + 1) = xe^2 + e^2', 'e^x(3) = 3e^x', "y' = e^x(x^2) + e^x(2x) = e^x(x^2 + 2x)", "y' = e^x(x^2) + e^x(2x) = e^x(x^2 + 2x) = xe^x(x + 2)"];
+  for (const f of product) ok(one(f).status === 'ok' && one(f).state === 'arithmetic', `e^x times the bracket is ticked: ${f} (${one(f).status})`);
+  ok(noteOf('e^x(2x-4) = 2xe^x - 4e^x') === 'Both sides are the same expression, written two ways. It matches expanding brackets.', 'e^x(2x-4) is named expanding brackets');
+  ok(noteOf("y' = e^x(x^2) + e^x(2x) = e^x(x^2 + 2x)") === 'Both sides are the same expression, written two ways. It matches factorising.', "a derivative mark in front of the chain labels it, and the chain is judged");
+  // false under the product reading: a note, never a cross, never a tick
+  for (const f of ['e^x(2x-4) = 2xe^x + 4e^x', 'e^x(x+1) = xe^x + 1', '2e^x(x - 1) = 2xe^x - 1', 'e^-x(1 - x) = e^-x + xe^-x', 'e^(2x)(x+1) = xe^(2x) - e^(2x)', 'e^x(3) = e^(3x)', "y' = e^x(x^2) + e^x(2x) = e^x(x^2 + 2x) + 1"]) {
+    ok(one(f).status === 'note', `false under the product reading is a note, never crossed or ticked: ${f} (${one(f).status})`);
+  }
+  // ambiguous: e^2x is e^(2x) or e^2 times x. True under one reading, false under the other: never crossed, never ticked
+  for (const f of ['e^2x = 2e^x', 'e^2x = e^(2x)', 'e^2x = xe^2', 'e^3x = xe^3', 'e^2x(x+1) = 2xe^x + e^x']) ok(one(f).status === 'note', `e^2x is not judged: ${f} (${one(f).status})`);
+  // numbers only: e^2(3) is e^2 times 3, or e^(2·3). A line true under either reading is never crossed
+  ok(one('e^2(3) = e^6').status === 'note' && one('e^2(3) = 3e^2').status === 'ok', 'e^2(3) = e^6 is a note (true if the exponent takes the bracket); e^2(3) = 3e^2 is ticked');
+  ok(one('e^2(3) = e^2(4)').status === 'break' && one('e^1(2) = 2e').status === 'ok', 'a line false under both readings is crossed (e^2(3) = e^2(4)); a true one is ticked');
+  ok(one('e^(1+1)(3) = e^6').status === 'note', 'a bracketed exponent followed by a bracket: true under the other reading, so a note');
+  // a derivative mark in front of a single equation is still not a chain: nothing is judged
+  ok(one("y' = 2x").status === 'note' && one("f'(x) = 2x = 2x").status === 'ok' && one("dy/dx = 2x(x+1) = 2x^2 + 2x").status === 'ok', 'a derivative label is set aside only in front of a worked chain');
+  ok(one("y' = 2x = 3x").status === 'note', 'a derivative label does not make a false chain true');
+
+  // 6.2 degrees: read as radians, tick only
+  const degreeTicks = [['sin 30° = 1/2', 'Both sides come to 1/2. It matches an exact value.'], ['sin 30° = 0.5', null], ['cos 60° = 1/2', 'Both sides come to 1/2. It matches an exact value.'], ['tan 60° = √3', 'Both sides come to √3. It matches an exact value.'],
+    ['sin 45° = 1/√2', 'Both sides come to √2/2. It matches an exact value. Give the final answer in that simplified form.'], ['sin 150° = sin 30°', 'Both sides come to 1/2. It matches a related angle. Give the final answer in that simplified form.'],
+    ['30° = π/6', 'Both sides come to π/6.'], ['sin(180° - θ) = sin θ', 'Both sides are the same expression, written two ways. It matches a related angle.']];
+  for (const [f, want] of degreeTicks) ok(one(f).status === 'ok' && (want === null || noteOf(f) === want), `degrees: ${f} (${noteOf(f)})`);
+  for (const f of ['sin 31° = 1/2', 'cos 150° = cos 30°', 'tan 45° = 2', '30° + 60° = 80°', 'sin 30° = √3', 'x + 30° = 30° + x', 'sin 30° = 1/2 = cos 30°', 'x° = 30°', 'sin 90° = 1/2']) ok(one(f).status === 'note', `a false or unread degree line is a note, never crossed: ${f} (${one(f).status})`);
+  ok(run(['sin 30° = 1/2', 'cos 60° = 1/2', 'tan 45° = 1']).firstBreak === -1 && run(['sin 30° = 1/3']).firstBreak === -1, 'a degree line never starts a break');
+
+  // 6.3 the name of a step: "a related angle" and "an exact value"
+  const named = [['sin(180° - θ) = sin θ', 'a related angle'], ['sin(180° - θ) = sin(θ)', 'a related angle'], ['sin(π - x) = sin x', 'a related angle'], ['cos(π - x) = -cos x', 'a related angle'], ['cos(π - x) = -cos(x)', 'a related angle'], ['tan(π + x) = tan x', 'a related angle'],
+    ['sin(π + x) = -sin x', 'a related angle'], ['sin(2π - x) = -sin x', 'a related angle'], ['sin 150° = sin 30°', 'a related angle'], ['sin 210° = -sin 30°', 'a related angle'], ['cos 300° = cos 60°', 'a related angle'], ['cos(5π/6) = -cos(π/6)', 'a related angle'],
+    ['sin 30° = 1/2', 'an exact value'], ['cos(π/4) = 1/√2', 'an exact value'], ['tan 60° = √3', 'an exact value'], ['sin(π/6) = 1/2', 'an exact value'], ['cos 0° = 1', 'an exact value'], ['sin 90° = 1', 'an exact value'], ['tan 45° = 1', 'an exact value'], ['cos(π/3) = 1/2', 'an exact value']];
+  for (const [f, name] of named) ok(one(f).status === 'ok' && noteOf(f).includes(`It matches ${name}.`), `named ${name}: ${f} (${noteOf(f)})`);
+  // near misses: ticked where true, but named nothing (a name is never claimed for a step that did not happen)
+  const unnamed = ['sin θ = sin(180° - θ)', 'sin x = sin(π - x)', '1/2 = sin 30°', '1/√2 = cos(π/4)', 'sin 30° = cos 60°', 'cos(π/3) = sin(π/6)', 'sin(x + 360°) = sin x', 'sin(x + 2π) = sin x', 'sin(θ - 180°) = -sin θ', 'sin 150° = 1/2',
+    'sin 30° = sin 30°', 'sin(π/5) = sin(4π/5)', 'sin 30° + cos 60° = 1', 'sin(2x) = 2sin(x)cos(x)'];
+  for (const f of unnamed) { const r = one(f); ok(!/a related angle|an exact value/.test(noteOf(f)), `not named: ${f} (${noteOf(f)})`); if (/^sin 150° = 1\/2|^sin 30° = cos|^cos\(π\/3\) = sin/.test(f)) ok(r.status === 'ok', `still ticked: ${f}`); }
+  ok(noteOf('sin(2x) = 2sin(x)cos(x)').includes('double-angle'), 'the double-angle step keeps its own name');
+  for (const f of ['cos(π - x) = cos x', 'sin(π - x) = -sin x', 'cos 150° = cos 30°', 'sin 30° = 1/3', 'tan(2π + x) = -tan x']) ok(one(f).status === 'note' && !/It matches/.test(noteOf(f)), `a false step is never named: ${f}`);
+  // a continuation: the value under the function
+  { const r = run(['sin 30°', '= 1/2']); ok(r.lines[1].status === 'ok' && plain(r.lines[1].note) === 'This equals the line above: 1/2. It matches an exact value.', `sin 30° then = 1/2 (${plain(r.lines[1].note)})`); }
+  { const r = run(['1/2', '= sin 30°']); ok(!/It matches/.test(plain(r.lines[1].note || '')), '= sin 30° under 1/2 is the step the other way: named nothing'); }
+  { const r = run(['sin 150°', '= sin 30°', '= 1/2']); ok(/It matches a related angle/.test(plain(r.lines[1].note)) && r.lines[2].status === 'ok', `a chain of related angle then value (${r.lines.map(l => plain(l.note || ''))})`); }
+  ok(renders([one('sin 30° = 1/2').note, one('tan 60° = √3').note, one('sin(180° - θ) = sin θ').note].join(' ')) && !/[—–]/.test(degreeTicks.map(([f]) => noteOf(f)).join(' ')), 'the new comments typeset and carry no dash');
+
+  // 6.4 derivative marks typeset (commentTex)
+  const marks = [["y'", "y'"], ["f'(x)", "f'(x)"], ["u'", "u'"], ["f''(x)", "f''(x)"], ["f'(2)", "f'(2)"], ["y''", "y''"], ['dy/dx', '\\frac{dy}{dx}'], ['d/dx', '\\frac{d}{dx}'], ['du/dx', '\\frac{du}{dx}'], ['d²y/dx²', '\\frac{d^{2}y}{dx^{2}}'], ['d^2y/dx^2', '\\frac{d^{2}y}{dx^{2}}'], ['d/dx(x^2)', '\\frac{d}{dx}\\left(x^{2}\\right)']];
+  for (const [src, tex] of marks) ok(derivativeMarkTex(src) === tex && fragmentTex(src) === tex, `derivative mark ${src} is ${tex} (${derivativeMarkTex(src)})`);
+  for (const bad of ['d²y/dx', 'dy/d', 'y', "ab'", 'dy/dxy', 'y^\'', "'y'"]) ok(derivativeMarkTex(bad) === null, `not a derivative mark: ${bad}`);
+  ok(mathSpan("y' = 2x") === "$y' = 2x$" && mathSpan('dy/dx = 2x') === '$\\frac{dy}{dx} = 2x$' && mathSpan("f'(x) = 3x^2") === "$f'(x) = 3x^{2}$" && mathSpan("u' = 2x - 4") === "$u' = 2x - 4$", 'an equation with a derivative mark is one typeset span');
+  ok(!/\\frac\{dy\}\{d\}/.test(mathSpan('dy/dx = 2x')), 'dy/dx is no longer read as d times y over d times x');
+  const prose = [["This is y' and f'(x) and dy/dx and d/dx.", "This is $y'$ and $f'(x)$ and $\\frac{dy}{dx}$ and $\\frac{d}{dx}$."],
+    ["Take d²y/dx² of it, f''(x) too.", "Take $\\frac{d^{2}y}{dx^{2}}$ of it, $f''(x)$ too."], ["u' = $2x$ and v'.", "$u'$ = $2x$ and $v'$."], ['The derivative $f\'(x)$ is not y\'.', 'The derivative $f\'(x)$ is not $y\'$.']];
+  for (const [src, want] of prose) ok(typesetDerivativeMarks(src) === want && dollarsBalanced(want) && renders(want), `derivative marks in prose: ${src}`);
+  // an apostrophe in ordinary English is never a prime
+  for (const s of ["It isn't a slip, and Pri's check didn't cross it.", "The students' working, the line's value, it's fine, I'm sure.", "Call the 'y' axis and the 'x' axis.", "don't, can't, won't, y's, x's", "Pri’s page and the slip’s line", 'and/or, a/d, mid/dx and 1/dx']) ok(typesetDerivativeMarks(s) === s, `no prime from an apostrophe: ${s}`);
+  ok(typesetDerivativeMarks("a \\$5 note, y'") === "a \\$5 note, $y'$" && typesetDerivativeMarks('') === '' && typesetDerivativeMarks(null) === '', 'an escaped dollar stays literal; empty text stays empty');
+  ok(typesetDerivativeMarks("$y' = 2x$ so y' is 2x") === "$y' = 2x$ so $y'$ is 2x", 'maths already between dollars is left exactly as it is');
+  ok(plainComment(typesetDerivativeMarks("This is y' and dy/dx and d²y/dx²")) === "This is y' and dy/dx and d²y/dx²", 'plainComment turns the marks back into what a student writes');
+  { const r = run(['u = x^2 - 4x + 1', "u' = 2x - 4"]); const m = plain(r.lines[1].note); ok(r.lines[1].status === 'ok' && /^This is the derivative of u = x\^2 - 4x \+ 1/.test(m) && renders(r.lines[1].note) && dollarsBalanced(typesetDerivativeMarks(r.lines[1].note)), `a derivative comment typesets (${m})`); }
+
+  // 6.5 the last line: like terms left uncollected (a note, never a cross or a change of tick)
+  const collect = [[['2x + 3x = 2x + 3x'], 'Both sides are the same expression, written two ways. This simplifies to $5x$.'], [['3x + 2x + x = 2x + 3x + x'], 'Both sides are the same expression, written two ways. This simplifies to $6x$.'],
+    [['x^2 + 3x^2 + 1 = 3x^2 + x^2 + 1'], 'Both sides are the same expression, written two ways. This simplifies to $4x^{2} + 1$.'], [['4x - x + 2 = 4x - x + 2'], 'Both sides are the same expression, written two ways. This simplifies to $3x + 2$.'],
+    [['5x - 5x + z = 5x + z - 5x'], 'Both sides are the same expression, written two ways. This simplifies to $z$.'], [['4xy + xy = 4xy + xy'], null]];
+  for (const [page, want] of collect) { const r = run(page); if (want !== null) ok(r.lines[0].status === 'ok' && r.lines[0].note === want && renders(want), `like terms: ${page[0]} (${r.lines[0].note})`); }
+  { const r = run(['2x + 3x = 3x + 2x', '= 2x + 3x']); ok(r.lines.map(l => l.status).join() === 'ok,ok' && !/simplifies/.test(r.lines[0].note) && /simplifies to \$5x\$/.test(r.lines[1].note), `only the last line carries the note (${r.lines.map(l => l.note)})`); }
+  { const r = run(['2x + 3x = 3x + 2x', '= 5x']); ok(r.lines.every(l => !/simplifies|simplified/.test(l.note || '')), 'collected already: no note'); }
+  // no note where nothing is left to collect, or where the line is not read this way
+  for (const f of ['5x = 5x', '2x + 3y = 3y + 2x', 'x^2 + x = x + x^2', '2x = x + x', '2x + 3x = 5x', 'x + x = 2x', '0.5x + 1.5x = 1.5x + 0.5x', '5 cm + 3 cm = 3 cm + 5 cm', '2m + 3m = 3m + 2m', '2h + 3h = 3h + 2h', '2A + 3A = 3A + 2A', '2x + 3 = 3 + 2x', 'x(x + 1) = x^2 + x', '2x + 3x = (5)x']) {
+    ok(!/simplifies|simplified/.test(noteOf(f)), `no like-terms note: ${f} (${noteOf(f)})`);
+  }
+  // improper trig value and unrationalised denominator in the last line (the plain-number note, now for these lines too)
+  ok(noteOf('cos(π/4) = 1/√2') === 'Both sides come to √2/2. It matches an exact value. Give the final answer in that simplified form.', 'an unrationalised denominator: the rationalised form is stated and asked for');
+  ok(noteOf('sin(π/6) = sin(π/6)') === 'Both sides come to 1/2. Give the final answer in that simplified form.', 'a trig value left as sin(π/6) when it is exact');
+  ok(/simplifies to \$1\$|simplified form/.test(noteOf('sin(π/2) = cos(0)')), 'sin(π/2) = cos 0 asks for the value 1');
+  ok(noteOf('tan 60° = √3') === 'Both sides come to √3. It matches an exact value.' && noteOf('sin 30° = 1/2') === 'Both sides come to 1/2. It matches an exact value.', 'already simplest: no note');
+  ok(!/simplif/.test(noteOf('1/√2 = 0.7071')) && !/simplif/.test(noteOf('cos(π/4) = 0.7071')), 'a decimal answer gets no note');
+  ok(run(['2x + 3x = 2x + 3x', 'x = 4']).lines.every(l => !/simplifies/.test(l.note || '')), 'a line after it moves the last line: no note on the earlier one');
+  ok(run(['2x + 3x = 2x + 3x']).firstBreak === -1 && run(['2x + 3x = 2x + 3x']).lines[0].state === 'arithmetic', 'the note never changes the tick');
 }
 
 console.log(`ARITHMETIC LINES: ${fail ? 'FAIL' : 'PASS'} — ${pass}/${pass + fail} checks — false arithmetic crossed, true arithmetic ticked as arithmetic only, no mark from it`);
