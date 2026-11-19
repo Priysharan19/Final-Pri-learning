@@ -59,7 +59,7 @@ const NOTE_FALLBACK = 'Pri could not check this line against the question.';
 
 export function reportWithInterpretation({ stepReport, lineInterpretation, working }) {
   if (!lineInterpretation || !Array.isArray(lineInterpretation.lines)) return stepReport || null;
-  if (stepReport && stepReport.source !== 'value-chain') return stepReport;
+  if (stepReport && (stepReport.source !== 'value-chain' || stepReport.folded === true)) return stepReport;
   const texts = nonBlankLines(working);
   if (!texts.length || lineInterpretation.lines.length !== texts.length) return stepReport || null;
   const base = Array.isArray(stepReport?.lines) ? stepReport.lines : [];

@@ -82,7 +82,7 @@ export function workingEvidence({ res, submitted } = {}) {
   // reported as "consistent with the solution".
   if (report.arithmetic === true) return { kind: 'arithmetic', ok, total, checked: report.lines.flatMap((l, i) => (l.state === 'arithmetic' ? [i + 1] : [])) };
   // A report that judges each statement on its own says which lines were checked, never "consistent with the solution".
-  if (ok === total && report.interpreted === true) return { kind: 'some', ok, total, which: { checked: report.lines.map((_, i) => i + 1), unread: [], rest: [] } };
+  if (ok === total && (report.interpreted === true || report.folded === true)) return { kind: 'some', ok, total, which: { checked: report.lines.map((_, i) => i + 1), unread: [], rest: [] } };
   if (ok === total) return { kind: 'all', total };
   // A value-chain report (engine/valueChain.js) judges each line on its own, so
   // the card can say WHICH lines were checked and which could not be read.

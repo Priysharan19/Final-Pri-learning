@@ -2458,6 +2458,92 @@ export function stepCheck(meta, workingText, options = null) {
   return withEvaluationBudget(EVALUATION_BUDGET, () => nameChangedTerm(stepCheckWithinBudget(meta, workingText, options)));
 }
 
+// ── A definition, a label or a margin number is not a claim (owner, 20 November 2026) ────────────────────────────
+// FEEDBACK LAYER ONLY. `stepCheck` above is what every mark, correctness decision, method mark and board tick reads, and it
+// is unchanged. This is applied to the report that is DISPLAYED, after all marks are computed (markerOps.stepEvidence).
+// Live: on `Find ∫20x^4 dx` the line `y = 2x(4 - x)` (the student's own name for the curve) was crossed by the
+// antiderivative check, and a margin number `16/3` on its own line was crossed. Owner's rule: a definition or side
+// formula is never crossed; a bare number is not a claim. A topic checker's CROSS on such a line is therefore a note,
+// and the page is judged again as if that line were not there, so the line does not become the one the next is compared
+// with. Only a line the checker CROSSED is touched, so a page with no such line is exactly the report it always was.
+//   A  `name = expr`, `name(v) = expr`, `name' = expr`, or a word label (`Area = expr`), where the name is not one the
+//      question uses (a letter in the prompt's maths, or the meta's own unknown or function name). `x = 5` for an
+//      equation in x, and `y = 3x^2` as the answer to "differentiate y = x^3", stay judged.
+//   B  a bare number, fraction or surd with no relation sign and no leading `=`.
+const A_NOTE = 'Not checked: this line defines or labels something; Pri did not check it against this question.';
+const B_NOTE = 'Not checked: a number on its own is not a claim; Pri did not check it against this question.';
+const BARE_NUMBER = /^-?(?:\d+(?:\.\d+)?(?:\s*\/\s*\d+(?:\.\d+)?)?|\d*\s*√\s*\d+)$/;
+const NOT_LABELS = /^(?:ans|answer|solution|sol|result|final|value|so|hence|therefore)$/i;
+function namesOfQuestion(meta, prompt) {
+  const names = new Set();
+  // every letter the check itself uses: its keys (givens), its labels, its expressions
+  const walk = (o, depth) => {
+    if (o === null || depth > 6) return;
+    if (typeof o === 'string') { for (const m of o.replace(/\\[A-Za-z]+/g, ' ').matchAll(/(?<![A-Za-z])([A-Za-z])(?![A-Za-z])/g)) names.add(m[1]); return; }
+    if (typeof o !== 'object') return;
+    for (const [k, v] of Object.entries(o)) { if (/^[A-Za-z]$/.test(k)) names.add(k); walk(v, depth + 1); }
+  };
+  walk(meta, 0);
+  for (const span of String(prompt).matchAll(/\$+([^$]+)\$+/g)) {
+    const t = span[1].replace(/\\[A-Za-z]+/g, ' ');
+    for (const m of t.matchAll(/(?<![A-Za-z])([A-Za-z])(?![A-Za-z])/g)) names.add(m[1]);
+  }
+  return names;
+}
+function notAClaim(text, names, words) {
+  const t = String(text).trim().replace(/[−–—]/g, '-').replace(/\s*\.\s*$/, '');
+  if (BARE_NUMBER.test(t)) return B_NOTE;
+  const m = /^([A-Za-z][A-Za-z ]{0,24}?)(?:\(\s*[a-z]\s*\))?('{0,2})\s*=\s*([^=]+)$/.exec(t);
+  if (!m || !m[3].trim()) return null;
+  const head = m[1].trim();
+  if (head.length === 1) return names ? (names.has(head) ? null : A_NOTE) : null;
+  // a word label (`Area = …`) is the student's own unless the question or its check uses that word (`max = 17`, `period = …`)
+  return /^[A-Za-z]+$/.test(head) && !NOT_LABELS.test(head) && head.length >= 3 && !(words && words.test(head)) ? A_NOTE : null;
+}
+/** The displayed report: the topic report with its crossed definitions, labels and bare numbers as notes. One evaluation budget. */
+export function claimFreeReport(meta, workingText, options, report) {
+  try {
+    return withEvaluationBudget(EVALUATION_BUDGET, () => notClaims(meta, workingText, options, report, text => nameChangedTerm(stepCheckWithinBudget(meta, text, options))));
+  } catch { return report; }
+}
+function notClaims(meta, workingText, options, report, run) {
+  if (!report || !Array.isArray(report.lines) || report.lines.every(l => l?.status !== 'break')) return report;
+  const original = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
+  const same = (rep, texts) => rep && Array.isArray(rep.lines) && rep.lines.length === texts.length && rep.lines.every((l, i) => String(l?.text ?? '').trim() === texts[i]);
+  if (!same(report, original)) return report;
+  const names = typeof options?.prompt === 'string' ? namesOfQuestion(meta, options.prompt) : null;
+  // the words the question and its check use: a label in one of them is the question's, whatever the kind
+  const vocabulary = new Set(`${typeof options?.prompt === 'string' ? options.prompt : ''} ${JSON.stringify(meta || {})}`.toLowerCase().match(/[a-z]{3,}/g) || []);
+  const usedWords = { test: w => vocabulary.has(String(w).toLowerCase()) || ['value-chain', 'vector-chain', 'plan'].includes(meta?.kind) };
+  const removed = new Map();   // original index → note
+  let current = report, keep = original.map((_, i) => i);
+  for (let round = 0; round < original.length; round++) {
+    const at = current.lines.findIndex(l => l?.status === 'break');
+    if (at < 0) break;
+    const why = notAClaim(current.lines[at].text, names, usedWords);
+    if (!why) break;
+    removed.set(keep[at], why);
+    keep = keep.filter((_, k) => k !== at);
+    const next = run(keep.map(i => original[i]).join('\n'));
+    if (!same(next, keep.map(i => original[i]))) return report;
+    current = next;
+  }
+  if (!removed.size) return report;
+  const lines = original.map((text, i) => ({ text, status: 'note', note: removed.get(i), unverified: true, ...(current.source === 'value-chain' ? { state: 'unverified' } : {}) }));
+  keep.forEach((orig, k) => { lines[orig] = current.lines[k]; });
+  const firstBreak = lines.findIndex(l => l.status === 'break');
+  const out = { ...current, lines, firstBreak };
+  if (current.summary && typeof current.summary === 'object') {
+    const remap = arr => (Array.isArray(arr) ? arr.map(n => (Number.isInteger(n) ? keep[n - 1] + 1 : n)) : arr);
+    const sm = { ...current.summary };
+    for (const k of ['given', 'verified', 'arithmetic', 'conditions', 'wrong', 'unverified', 'unread']) if (k in sm) sm[k] = remap(sm[k]);
+    if ('total' in sm) sm.total = lines.length;
+    if (Array.isArray(sm.unverified)) { sm.unverified = [...sm.unverified, ...removed.keys()].map(n => (removed.has(n) ? n + 1 : n)).sort((a, b) => a - b); sm.unverified = [...new Set(sm.unverified)]; }
+    out.summary = sm;
+  }
+  return out;
+}
+
 /**
  * A break the diagnoser could not name gets the one term that changed since
  * the line above, when exactly one did (audit #10). Feedback only: the
