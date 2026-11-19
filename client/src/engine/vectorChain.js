@@ -271,7 +271,8 @@ export function stepCheckVectorChain(meta, workingText) {
     const first = segs.find(s => s.symbolic);
     // a. the question fixes this line's value; b. or the chain above does
     // A continuation is held to the chain even when it names a vector itself: `= |a| + |b|` is not |4a+3b|.
-    const truth = continuation && chain ? chain : first ? { value: first.value, inner: first.inner } : null;
+    // A `=` line with no chain above it claims to equal something Pri does not know: it is never ticked, whatever it names.
+    const truth = continuation ? chain : first ? { value: first.value, inner: first.inner } : null;
     if (truth) {
       const results = segs.map(s => { const got = compare(s, truth); return got === 'wrong' && soft(s) ? 'unsure' : got; });
       const bad = results.indexOf('wrong');

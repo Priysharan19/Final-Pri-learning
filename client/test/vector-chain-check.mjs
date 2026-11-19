@@ -68,6 +68,7 @@ ok(st(['|4a+3b| = 27']) === 'break', 'a whole number stated exactly equal is sti
 ok(st(['|4a+3b| = 27.21']) === 'note' && st(['|4a+3b| = 35.5']) === 'note' && st(['|4a+3b| = 27.2']) === 'ok' && st(['|4a+3b| = 27.203']) === 'ok', 'a correctly rounded decimal is accepted; a near miss is a note');
 ok(st(['196+64=250', '196', '+64', 'x = 3', 'a.b = 6', 'a·b = 6', 'let c = 4a']) === 'note,note,note,note,note,note,note', 'side arithmetic, other letters and dot products are not judged');
 ok(st(['= [14,8]']) === 'note', 'a continuation of nothing is not judged');
+ok(st(['|4a+3b|', '2+3', '= 5', '= |a|']) === 'ok,note,note,note' && st(['= |a|']) === 'note' && st(['x = 3', '= 4a']) === 'note,note', 'even when it names a given vector (independent review: `2+3`, `= 5`, `= |a|` was ticked)');
 ok(st(['4a = (-20,-4)', '196', '= (14,8)']) === 'ok,note,note', 'an unverified line that does not continue the chain ends it');
 ok(st(['|4a+3b|', '= |4[-5,-1]+3[-2,4]', '= |[-26,8]|']) === 'ok,note,ok', 'an unread `=` line does not end the chain');
 ok(st(['|4a+3b| > 20', '4a ≠ 3b']) === 'note,note', 'inequalities are not judged');
