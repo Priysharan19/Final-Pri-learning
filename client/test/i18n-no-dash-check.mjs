@@ -13,6 +13,9 @@
 //
 // Usage: node client/test/i18n-no-dash-check.mjs
 // ───────────────────────────────────────────────────────────
+import { readFileSync, readdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { parseAst } from 'vite';
 import en from '../src/i18n/strings.en.js';
 import hi from '../src/i18n/strings.hi.js';
 import { AU_STRINGS } from '../src/i18n/strings.au.js';
@@ -50,8 +53,40 @@ for (const [name, table] of Object.entries(catalogues)) {
 ok(total > 4000, `the check reached the catalogues (${total} strings)`);
 ok(ALLOWLIST.size === 0 || [...ALLOWLIST.values()].every(r => typeof r === 'string' && r.length > 20), 'every allowlist entry carries a reason');
 
+// ── Messages the server sends a person (server/platform/*.js) ─────────────────────────────────────────────────────────
+// A string literal or template fragment in the platform that carries an em dash is copy a student, parent or teacher can
+// read, so it follows the same rule. Comments are not scanned. Each entry says why a dash stays; the match is by file and
+// by a fragment of the text, never by file alone unless the whole file is a prompt that is never shown.
+const SERVER_ALLOW = [
+  ['authDelivery.js', 'account is confirmed — keep this email', 'an email subject that tools/deployment-contract.test.mjs and tools/staging-journey-mail.mjs classify by its exact text (linkKindOfSubject); the matcher and the subject change together in a mail-copy change'],
+  ['resourceCatalog.js', '100-Mark Practice Examination', 'the title of a third-party paper, the identity that server/test/resources-check.mjs and the desk import fixture match on'],
+  ['experiments.js', 'changed after it was frozen', 'a developer message from the experiment registry lock check, never shown to a learner'],
+  ['pdfLite.js', '—', 'the empty-cell glyph in a generated PDF table, not a sentence'],
+  ['questionPhotoProvider.js', '', 'instructions to the reading model and its catalogue listing, never shown to a person'],
+  ['tutorProvider.js', '', 'instructions to the tutor model, never shown to a person'],
+  ['workingProvider.js', '', 'instructions to the working-check model, never shown to a person']
+];
+const platformDir = fileURLToPath(new URL('../../server/platform/', import.meta.url));
+const walk = (n, f) => { if (!n || typeof n !== 'object') return; if (Array.isArray(n)) { n.forEach(x => walk(x, f)); return; } if (n.type) f(n); for (const k in n) if (k !== 'parent') walk(n[k], f); };
+let serverScanned = 0;
+for (const name of readdirSync(platformDir).filter(f => f.endsWith('.js'))) {
+  const src = readFileSync(platformDir + name, 'utf8');
+  if (!src.includes(EM)) { serverScanned++; continue; }
+  const ast = parseAst(src, { lang: 'js' });
+  walk(ast, n => {
+    if ((n.type !== 'Literal' && n.type !== 'TemplateElement') || n.regex) return;
+    const text = src.slice(n.start, n.end);
+    if (!text.includes(EM)) return;
+    const allowed = SERVER_ALLOW.some(([file, needle]) => file === name && text.includes(needle));
+    ok(allowed, `server/platform/${name}:${src.slice(0, n.start).split('\n').length} sends text with an em dash: ${text.replace(/\s+/g, ' ').slice(0, 90)}`);
+  });
+  serverScanned++;
+}
+ok(serverScanned > 40, `the server scan reached the platform files (${serverScanned})`);
+ok(SERVER_ALLOW.every(([, , why]) => why.length > 25), 'every server allowlist entry carries a reason');
+
 if (failures.length) {
   console.error(`I18N NO DASH: FAIL — ${failures.length} problem(s)\n${failures.slice(0, 40).map(f => '  ' + f).join('\n')}`);
   process.exit(1);
 }
-console.log(`I18N NO DASH: PASS — ${pass}/${pass} checks — ${total} interface strings across English, Hindi and Prithagoras carry no em dash and no sentence en dash; the allowlist is ${ALLOWLIST.size === 0 ? 'empty' : ALLOWLIST.size + ' long'}.`);
+console.log(`I18N NO DASH: PASS — ${pass}/${pass} checks — ${total} interface strings across English, Hindi and Prithagoras carry no em dash and no sentence en dash; the catalogue allowlist is ${ALLOWLIST.size === 0 ? 'empty' : ALLOWLIST.size + ' long'}; ${serverScanned} server platform files send no em dash outside ${SERVER_ALLOW.length} reasoned entries.`);

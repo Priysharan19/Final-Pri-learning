@@ -42,7 +42,7 @@ export const AU_STRINGS = Object.freeze({
   'board.sentenceFull': '{awarded}/{total}. Full marks, and the working would earn them in an exam.',
   'board.sentenceMethod': '{awarded}/{total}. The answer is not right, but the method is, and an examiner may award marks for that.',
   'teach.newClassPlaceholder': 'New class name (e.g. Year 10 A)',
-  'teach.rosterHelp': 'Roster files: one student per line. {format}. Names already on this device join; new names get a student profile.',
+  'teach.rosterHelp': 'Roster files: one student per line, written as {format}. Names already on this device join; new names get a student profile.',
   'scn.hand.eyebrow': 'Year 11 · Advanced · Quadratics',
   'signup.parentLead': "Because you are under 15, a parent or guardian approves your account once, by email. Until they do, you can read questions, write and keep drafts on this device, but answers cannot be checked and nothing syncs.",
   'signup.noticeWhat': "Prithagoras stores the student’s name, year, contact details, answers and progress on its servers. The privacy policy names where and by whom.",

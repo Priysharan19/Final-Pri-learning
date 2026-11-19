@@ -342,7 +342,7 @@ export function parentReportLines(report) {
   if (report.enoughData) {
     const a = report.accuracy;
     const trend = { up: 'higher than the weeks before', down: 'lower than the weeks before', steady: 'about the same as the weeks before', 'not-enough-data': 'not enough earlier weeks to compare' }[a.direction];
-    lines.push(['Marks earned', `${pct(a.thisWeek)} of available marks — ${trend}.`]);
+    lines.push(['Marks earned', `${pct(a.thisWeek)} of available marks, ${trend}.`]);
     const t = report.topics;
     lines.push(['Going well', t.strong.length ? t.strong.map(x => `${x.name} (${pct(x.accuracy)})`).join(', ') : (t.measured ? 'No chapter reached 80% this week.' : 'No chapter had enough answers to say yet.')]);
     lines.push(['Needs another look', t.weak.length ? t.weak.map(x => `${x.name} (${pct(x.accuracy)})`).join(', ') : (t.measured ? 'None this week.' : 'No chapter had enough answers to say yet.')]);
