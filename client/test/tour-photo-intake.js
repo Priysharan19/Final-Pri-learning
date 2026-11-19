@@ -116,7 +116,7 @@ export const photoIntakeFlow = {
     const pdfState = await page.locator('[data-photo-answer]').getAttribute('data-photo-state');
     await check('a PDF dropped on the card is taken through the PDF door (held, rendered, or named — never silently ignored)',
       r.drop === true && ['attached', 'failed', 'reading', 'read'].includes(pdfState), pdfState);
-    r = await dropOn(page, '.editor-shell', [{ name: 'notes.zip', type: 'application/zip', b64: b64(Buffer.from('PK')) }]);
+    await dropOn(page, '.editor-shell', [{ name: 'notes.zip', type: 'application/zip', b64: b64(Buffer.from('PK')) }]);
     await page.locator('[data-photo-failed]').waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
     const failed = (await page.locator('[data-photo-failed]').innerText().catch(() => '')).replace(/\s+/g, ' ');
     await check('an unsupported file fails inside the same frame, says why, and offers "Choose another photo" and "Type your answer instead" as buttons',

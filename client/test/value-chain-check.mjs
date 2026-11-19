@@ -28,7 +28,7 @@ let pass = 0, fail = 0;
 const ok = (c, m) => { if (c) pass++; else { fail++; console.error('FAIL:', m); } };
 const verdicts = (meta, lines) => stepCheck(meta, lines.join('\n')).lines.map(l => l.status);
 const META = { kind: 'value-chain', fn: { name: 'h', variable: 't', expr: '22+5*sin(pi*t/6)' },
-  quantities: { max: 27, min: 17, amplitude: 5, midline: 22, period: 12 } };
+  quantities: { max: 27, min: 17, amplitude: 5, midline: 22, period: 12 }, fullDomain: true };   // as the generator issues it (fullDomain: the prompt states the model for every time)
 
 // ── Part 1 · the rules ───────────────────────────────────────────────────────
 let r = stepCheck(META, ['22 + 5sin(πt/6)', 'max = 22 + 5', '= 27'].join('\n'));
@@ -105,7 +105,7 @@ ok(!/27/.test(r.lines[0].note), 'the break note does not give the answer away');
 ok(T(['@@@', 'max = 27']) === 'note,ok' && T(['', 'max = 27']) === 'ok', 'junk before a good line does not block it');
 
 // a degenerate or hostile meta abstains rather than ticking
-const bad = { kind: 'value-chain', fn: { name: 'h', variable: 't', expr: '22+5*sin(pi*t/6)' }, quantities: { max: 30, min: 17, amplitude: 5, midline: 22, period: 6 } };
+const bad = { kind: 'value-chain', fn: { name: 'h', variable: 't', expr: '22+5*sin(pi*t/6)' }, quantities: { max: 30, min: 17, amplitude: 5, midline: 22, period: 6 }, fullDomain: true };
 ok(verdicts(bad, ['max = 30']).join() === 'note', 'a quantity the function does not bear out (max 30) is never used, even for the line that matches it');
 ok(verdicts(bad, ['period = 6']).join() === 'note', 'a period the function does not repeat at (6, half the true one) is not used');
 ok(verdicts(bad, ['min = 17']).join() === 'ok', 'a quantity that is borne out still works');
@@ -138,6 +138,51 @@ for (let seed = 1; seed <= 900; seed++) for (const diff of [1, 2, 3, 4]) {
 const withMeta = issued.filter(q => q.stepcheck?.kind === 'value-chain');
 ok(withMeta.length > 400, `the trig-model family carries the value-chain meta (${withMeta.length} of ${issued.length})`);
 ok(withMeta.every(q => stepMetaFor(q) === q.stepcheck), 'the server uses it as the question\'s step meta');
+
+// a restricted domain: the max / min / amplitude / midline are checked against the whole function, so a true restricted extreme must never be crossed
+{
+  const run = (prompt, lines) => stepCheck(META, lines.join('\n'), { prompt }).lines.map(l => l.status).join();
+  const RP = 'A buoy rises and falls with $h(t) = 22 + 5\\sin\\left(\\dfrac{\\pi t}{6}\\right)$ for $0 \\le t \\le 2$. Find the maximum value of $h$.';
+  ok(run(RP, ['max = 22 + 5\\sin(\\pi/3)']) !== 'break' && run(RP, ['max = 26.33']) !== 'break', 'a restricted-domain maximum is never crossed');
+  ok(run(RP, ['max = 22 + 5 sin(pi/3)']) === 'note', 'on a restricted domain the true restricted maximum abstains (note)');
+  ok(run(RP, ['max = 27']) === 'note' && run(RP, ['min = 17']) === 'note', 'the global value is not ticked on a restricted domain either');
+  ok(run('Find the maximum of $h(t)$ for $t$ in the interval $[0, 2]$.', ['max = 26.5']) === 'note', 'an interval in words or brackets abstains');
+  ok(run('Find the minimum of $h$ between $t = 0$ and $t = 2$.', ['min = 22']) === 'note', '"between" abstains');
+  ok(stepCheck({ ...META, domain: [0, 2] }, 'max = 22').lines[0].status === 'note', 'a meta that carries a domain abstains with no prompt');
+  const GP = 'A buoy is modelled by $h(t) = 22 + 5\\sin\\left(\\dfrac{\\pi t}{6}\\right)$ for $t \\ge 0$. What is the maximum value of $h$?';
+  ok(run(GP, ['max = 22 + 5', '= 27']) === 'ok,ok', 'a half-line "t ≥ 0" leaves the periodic maximum global: still ticked');
+  ok(run(GP, ['max = 28']) === 'break', '...and a false global maximum is still crossed');
+  ok(run(RP, ['period = 12']) === 'ok', 'the period is not changed by a restricted domain');
+}
+
+// safe by default: the extremes are held to a line only when the question is KNOWN to be unrestricted
+{
+  const { fullDomain, ...unknown } = META;
+  const run2 = (meta, prompt, lines) => stepCheck(meta, lines.join('\n'), { prompt }).lines.map(l => l.status).join();
+  ok(run2(unknown, '', ['max = 28']) === 'note' && run2(unknown, '', ['max = 22 + 5']) === 'note', 'a meta that does not say the domain is full never crosses (or ticks) an extreme');
+  ok(run2(unknown, '', ['period = 12']) === 'ok' && run2(unknown, '', ['h(3) = 27']) === 'ok', '...but the period and a value at a point are still checked');
+  const MAXQ = '$h(t) = 22 + 5\\sin\\left(\\dfrac{\\pi t}{6}\\right)$. What is the maximum value of $h$?';
+  for (const when of ['Over the first two hours,', 'Over the first 2 hours,', 'For 0 to 2 hours,', 'For $t$ in $[0, 2]$,', 'In the first hour,', 'For $t = 0, 1, 2$,', 'During the first minute,', 'For $0 \\le t \\le 2$,', 'On the interval $[0,2]$,', 'Between $t=0$ and $t=2$,']) {
+    ok(run2(META, `${when} ${MAXQ}`, ['max = 22 + 5\\sin(\\pi/3)']) === 'note', `a restricted prompt never crosses a true restricted maximum: ${when}`);
+    ok(run2(META, `${when} ${MAXQ}`, ['max = 28']) === 'note', `...and a restricted prompt does not cross a different value either: ${when}`);
+  }
+  ok(run2(META, MAXQ, ['max = 28']) === 'break', 'a false max = 28 on a known-unrestricted question is still crossed');
+  ok(run2(META, MAXQ, ['min = 17']) === 'ok', 'and a true min is ticked there');
+  const generated = issuedForSafe();
+  ok(generated.checked >= generated.total * 0.9 && generated.total > 400, `the generated trig-model prompts are still checked: ${generated.checked} of ${generated.total} carry fullDomain and no restriction in the prompt`);
+  function issuedForSafe() {
+    let total = 0, checked = 0;
+    for (let seed = 1; seed <= 300; seed++) for (const diff of [1, 2, 3, 4]) {
+      let s = (seed * 7 + diff) | 0; const rng = () => { s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+      const q = year12Nsw['y12-trig-model'](rng, diff);
+      if (q.stepcheck?.kind !== 'value-chain') continue;
+      total++;
+      const r = stepCheck(q.stepcheck, `max = ${q.stepcheck.quantities.max}`, { prompt: q.prompt }).lines[0];
+      if (r.status === 'ok') checked++;
+    }
+    return { total, checked };
+  }
+}
 
 // ── Part 2 · the sweep against independent computation ───────────────────────
 const TEX = /h\(t\) = (\d+) \+ (\d+)\\(sin|cos)\\left\(\\dfrac\{\\pi t\}\{(\d+)\}\\right\)/;

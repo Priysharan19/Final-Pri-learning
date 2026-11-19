@@ -157,7 +157,20 @@ function labelOf(raw, fn) {
 const shown = v => String(Math.round(v * 1e6) / 1e6);
 
 /** Check working line by line. Returns the same report shape as stepCheck. */
-export function stepCheckValueChain(meta, workingText) {
+/**
+ * Does the question restrict the domain (an interval, an inequality, "between", a stated domain)? The max / min / amplitude /
+ * midline claims are checked against the function over the whole line, so on a restricted domain a true restricted maximum would
+ * be crossed: the check cannot know it, so it abstains. Anything that looks like a restriction counts; over-abstaining is safe.
+ */
+export function domainRestricted(meta, prompt) {
+  if (meta && (meta.domain || meta.interval || meta.restricted || meta.fn?.domain || meta.fn?.interval)) return true;
+  // A half-line lower bound ("for t ≥ 0", "t > 0") leaves a periodic function every value it takes, so it is not a restriction.
+  const text = String(prompt || '').replace(/[A-Za-z]\s*(?:≥|>|\\ge(?:q)?\b|\\gt\b)\s*-?\d+(?:\.\d+)?(?![\d.]*\s*(?:≤|<|\\le|\\lt))/gi, ' ');
+  return /\b(?:first|next|last|initial)\s+(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|hour|minute|second|day|week|month|year)\b|\b(?:over|for|in|during|within|until|up to)\s+(?:the\s+)?(?:first|next|last|initial)\b|\b(?:for|from|over)\s+\$?(?:[a-z]\s*=\s*)?-?\d+(?:\.\d+)?\s*(?:to|-|–)\s*-?\d|\b[a-z]\$?\s*(?:in|∈)\s*\$?\s*[\[(]|[a-z]\s*=\s*-?\d+(?:\.\d+)?\s*[,;]\s*-?\d|\bat\s+(?:the\s+)?times?\b|\bonly\b|[≤≥<>]|\\(?:le|leq|ge|geq|lt|gt)\b|\bdomain\b|\binterval\b|\bbetween\b|\brestrict|\\in\s*[\[(]|\bfrom\s+\$?(?:[a-z]\s*=\s*)?-?\d[^.?]*\bto\s+\$?(?:[a-z]\s*=\s*)?-?\d|\bfirst\s+\d|\bduring\b|\bwithin\b|\buntil\b/i.test(text);
+}
+
+export function stepCheckValueChain(meta, workingText, options = null) {
+  const restricted = domainRestricted(meta, options?.prompt);
   const fn = valueChainMeta(meta);
   const raw = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
   const out = [];
@@ -224,6 +237,9 @@ export function stepCheckValueChain(meta, workingText) {
     }
     let truth, name;
     if (label.type === 'quantity') {
+      // Safe by default: the max / min / amplitude / midline are the function's global values, so they are held to the line only when
+      // the question is positively known to be unrestricted (the generator's meta says fullDomain) and its prompt shows no restriction.
+      if ((restricted || meta.fullDomain !== true) && label.key !== 'period') return note(line, 'Not verified: Pri cannot tell that this question covers every value of the function, and the maximum or minimum on part of it can differ, so this line is not marked.');
       truth = trueQuantity(fn, label.key);
       name = QUANTITY_NAMES[label.key];
     } else {

@@ -8,7 +8,7 @@ const STATIONARY = {
 const BUOY = {
   prompt: 'The height of a buoy above the seabed, in metres, $t$ seconds after a reading starts, is modelled by $h(t) = 22 + 5\\sin\\left(\\dfrac{\\pi t}{6}\\right)$. What is the maximum value of $h$?',
   answerType: 'numeric', answer: { value: 27 },
-  stepcheck: { kind: 'value-chain', fn: { name: 'h', variable: 't', expr: '22+5*sin(pi*t/6)' }, quantities: { max: 27, min: 17, amplitude: 5, midline: 22, period: 12 } }
+  stepcheck: { kind: 'value-chain', fn: { name: 'h', variable: 't', expr: '22+5*sin(pi*t/6)' }, quantities: { max: 27, min: 17, amplitude: 5, midline: 22, period: 12 }, fullDomain: true }
 };
 const T = (style, rows) => ({ style, lines: rows.map(([text, truth]) => ({ text, truth })) });
 const OWNER = ['y=2x³+9x²', "y'=6x²+18x", "for stat points y'=0", '0=6x²+18x', '0=6x[x+3]', 'x=0 or x=-3'];

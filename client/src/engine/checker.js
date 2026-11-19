@@ -11,7 +11,7 @@ import { normalize, parse, evaluate, exprEquivalent, numsClose, variablesOf, wit
 // working is checked comes out of this — see "What an evaluation may cost" in expr.js.
 const EVALUATION_BUDGET = 50000;
 import { diagnoseStep } from './diagnose.js';
-import { assessCalculusLine, calculusContext, lineProvenFalse, refineDerivativeLine, sideLine } from './calculusSteps.js';
+import { assessCalculusLine, calculusContext, lineProvenFalse, refineDerivativeLine, sideLine, unbracketedReadings } from './calculusSteps.js';
 import { diagnoseTopicLine } from './misconceptions/topics/index.js';
 import { answerTooLong } from './checker-core.js';
 import { changedTerm } from './slips.js';
@@ -1591,7 +1591,23 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
         // antiderivative is verified by differentiating it, and a slip is
         // named. A line it cannot read falls through to the old rule below.
         const side = sideLine(line, calculus, out.map(l => String(l.text)));
-        const assessed = side ? { status: side.status, note: side.note, side: true } : assessCalculusLine(line, calculus, meta, calculusStage);
+        let assessed = side ? { status: side.status, note: side.note, side: true } : assessCalculusLine(line, calculus, meta, calculusStage);
+        // Every-reading rule for an exponent written as an unbracketed fraction (x^-1/2 is x^(-1/2) or (x^-1)/2) and for a decimal
+        // approximation of an exact constant (6.28r for 2πr): neither is provably false, so the line abstains.
+        if (assessed && assessed.status === 'break' && !assessed.side && calculus) {
+          const unbracketedFractionExponent = /\^\s*-?\s*\d+(?:\.\d+)?\s*\/\s*[\d(a-z]/i.test(String(line));
+          const roundedConstant = /(?:π|\bpi\b|\\pi)/i.test(String(meta.canonical || '') + ' ' + String(prompt || '')) && /\d\.\d/.test(String(line));
+          if (unbracketedFractionExponent) assessed = { status: 'note', note: 'This exponent can be read two ways (x^-1/2 is x^(-1/2) or x^-1 over 2), so it is not marked wrong. Put the exponent in brackets.' };
+          else if (roundedConstant) assessed = { status: 'note', note: 'This uses a rounded value of π, so it is not marked wrong. Keep π exact or say the rounding.' };
+        }
+        // Every-reading rule for an unbracketed function argument ("2cos 2x" is 2cos(2x) or 2cos(2)·x): the line is crossed only when it
+        // is false under every reading; true under either, it abstains.
+        if (assessed && assessed.status === 'break' && !assessed.side && calculus) {
+          const readings = unbracketedReadings(line);
+          if (readings && readings.some(r => { const a = assessCalculusLine(r, calculus, meta, { ...calculusStage }); return !a || a.status !== 'break'; })) {
+            assessed = { status: 'note', note: 'This function argument can be read two ways (cos 2x is cos(2x) or cos(2)·x), so it is not marked wrong. Put the argument in brackets.' };
+          }
+        }
         // Every-reading rule (CTO ruling): a bare or "= …" line, or a line "∫f dx = F", is crossed only when the engine proves it
         // false under every plausible reading; otherwise it abstains below. A definition of the method (u = …, du = …) never is.
         const squashed = proseClean.replace(/\s+/g, '');
@@ -2486,7 +2502,7 @@ function stepCheckWithinBudget(meta, workingText, options = null) {
   meta = numericSolutions(meta);
   if (meta?.kind === 'plan') return stepCheckPlan(meta, workingText);
   // A function and one number asked of it (valueChain.js): its own verdicts, no equation to solve.
-  if (meta?.kind === 'value-chain') return stepCheckValueChain(meta, workingText);
+  if (meta?.kind === 'value-chain') return stepCheckValueChain(meta, workingText, options);
   const prompt = typeof options?.prompt === 'string' ? options.prompt : '';
   let calculus = null;
   try { calculus = calculusContext(meta, prompt); } catch { calculus = null; }

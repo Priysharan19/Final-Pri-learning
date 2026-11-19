@@ -138,7 +138,6 @@ try {
         const sec = document.querySelector('[data-marked-page]');
         const rows = [...sec.querySelectorAll('.mp-row')].map(r => ({ h: r.getBoundingClientRect().height, text: r.innerText.replace(/\s+/g, ' ').trim() }));
         const fe = sec.querySelector('[data-mp-status="first-error"]'); const feBox = fe && fe.getBoundingClientRect();
-        const sheet = sec.querySelector('.mp-sheet-in').getBoundingClientRect();
         const tags = [...sec.querySelectorAll('.mp-tag')].map(t => { const tr = t.getBoundingClientRect(); const b = t.parentElement.getBoundingClientRect(); return { outside: tr.right <= b.left + 1, inSheet: tr.left >= sec.querySelector('.mp-sheet').getBoundingClientRect().left - 1 }; });
         return { rows, feBottom: feBox ? feBox.bottom : null, tags, quiet: sec.querySelector('.mp-mark-quiet')?.innerText || null, loud: !!sec.querySelector('p.mp-mark'), filler: /true for the question|Valid step \(checked\)/.test(sec.innerText) };
       });
@@ -191,7 +190,7 @@ try {
         return [...new Set(bad)].concat(/—/.test(sec.innerText) ? ['em dash'] : []).concat(/\p{Extended_Pictographic}/u.test(sec.innerText) ? ['emoji'] : []);
       });
       ok(banned.length === 0, `${where}: banned styles or copy present: ${banned}`);
-      if (shots && ['stationary', 'buoy'].includes(c) && edition === 'prithagoras' && !(source === 'photo' && c === 'buoy' && false)) {
+      if (shots && ['stationary', 'buoy'].includes(c) && edition === 'prithagoras') {
         await page.screenshot({ path: `${shots}/${c}-${source}-${edition}-${theme}-${size}.png`, fullPage: true });
       }
       if (shots && edition === 'priyabhata' && c === 'stationary' && theme === 'light') await page.screenshot({ path: `${shots}/${c}-${source}-${edition}-${theme}-${size}.png`, fullPage: true });
