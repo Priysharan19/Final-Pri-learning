@@ -156,7 +156,7 @@
     "test:marker:solution-sets": "node client/test/marker-solution-sets-check.mjs",
     "test:method-marks:drafts": "node tools/method-marks-drafts.mjs --check && node tools/method-marks-drafts.test.mjs",
     "test:marker:parse-fixes": "node client/test/marker-parse-fixes-check.mjs",
-    "test:every:reading": "node client/test/every-reading-check.mjs && node client/test/value-chain-check.mjs && node client/test/value-chain-curve-check.mjs && node client/test/vector-chain-check.mjs",
+    "test:every:reading": "node client/test/every-reading-check.mjs && node client/test/value-chain-check.mjs && node client/test/value-chain-curve-check.mjs && node client/test/vector-chain-check.mjs && node client/test/arithmetic-lines-check.mjs",
     "test:reading:floor": "node server/test/reading-floor-check.mjs",
     "test:marked:page": "node client/test/marked-page-check.mjs",
     "test:line-interpreter": "node server/test/line-interpreter-check.mjs && node server/test/line-interpreter-overlay-check.mjs",

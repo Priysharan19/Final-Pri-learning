@@ -37,6 +37,12 @@ ok(r.source === 'value-chain' && r.summary.wrong.join() === '4', 'the report has
 const ev = workingEvidence({ res: { stepReport: r }, submitted: { hasWorking: true, lines: PAGE } });
 ok(ev?.kind === 'break' && ev.line === 4, `the result card reports a break at line 4 (${JSON.stringify(ev)})`);
 
+// the same page as the reader returned it a second time: the margin sum read in the middle of the chain
+r = run(['|4a+3b|', '= |4[-5;-1]+3[-2;4]|', '= |[-20 -6; -4 +12]|', '196 +64 / 260', '= |[14; 8]| = sqrt(14^2 + 8^2)', '= sqrt(260)']);
+ok(r.lines.map(l => l.status).join() === 'ok,ok,ok,note,break,note', `a margin sum in the middle does not hide the slip (${r.lines.map(l => l.status)})`);
+ok(st(['|4a+3b|', '196', '+64', '= 260']) === 'ok,note,note,note', 'a `=` line of plain numbers after a margin sum is never held to the chain');
+ok(st(['|4a+3b|', 'Hamilton paths', '= |[14;8]|']) === 'ok,note,note', 'words end the chain for good');
+ok(st(['|4a+3b|', '196 + 64', '= |[-26;8]|', '= sqrt(740)']) === 'ok,note,ok,ok', 'and a true vector line after a margin sum is ticked');
 // the same page written correctly, and read correctly
 ok(st(['|4a+3b|', '= |4[-5,-1]+3[-2,4]|', '= |[-20-6,-4+12]|', '= |[-26,8]| = √(26^2+8^2)', '= √740', '≈ 27.20']) === 'ok,ok,ok,ok,ok,ok', 'correct working: every line ticked');
 ok(st(['4a = (-20,-4)', '3b = (-6,12)', '4a+3b = (-26,8)', '|4a+3b| = √(676+64)', '= 27.2']) === 'ok,ok,ok,ok,ok', 'labelled working with round brackets: every line ticked');
@@ -68,7 +74,8 @@ ok(st(['|4a+3b| = 27']) === 'break', 'a whole number stated exactly equal is sti
 ok(st(['|4a+3b| = 27.21']) === 'note' && st(['|4a+3b| = 35.5']) === 'note' && st(['|4a+3b| = 27.2']) === 'ok' && st(['|4a+3b| = 27.203']) === 'ok', 'a correctly rounded decimal is accepted; a near miss is a note');
 ok(st(['196+64=250', '196', '+64', 'x = 3', 'a.b = 6', 'a·b = 6', 'let c = 4a']) === 'note,note,note,note,note,note,note', 'side arithmetic, other letters and dot products are not judged');
 ok(st(['= [14,8]']) === 'note', 'a continuation of nothing is not judged');
-ok(st(['4a = (-20,-4)', '196', '= (14,8)']) === 'ok,note,note', 'an unverified line that does not continue the chain ends it');
+ok(st(['4a = (-20,-4)', 'x = 3', '= (14,8)']) === 'ok,note,note', 'an unverified line that does not continue the chain ends it');
+ok(st(['4a = (-20,-4)', '196', '= (14,8)']) === 'ok,note,break', 'a margin number does not: the vector line after it still continues the vector chain');
 ok(st(['|4a+3b|', '= |4[-5,-1]+3[-2,4]', '= |[-26,8]|']) === 'ok,note,ok', 'an unread `=` line does not end the chain');
 ok(st(['|4a+3b| > 20', '4a ≠ 3b']) === 'note,note', 'inequalities are not judged');
 ok(st(['4a = (-20,-4,0)']) === 'note', 'a vector of another dimension is not judged');

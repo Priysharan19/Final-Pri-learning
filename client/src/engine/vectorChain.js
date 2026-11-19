@@ -235,6 +235,11 @@ export function stepCheckVectorChain(meta, workingText) {
   let firstBreak = -1;
   let diagnosis = null;
   let chain = null;    // { value, inner } the value the chain above is known to have
+  // A sum worked in the margin (196, +64, 260) is read in among the lines of the chain. The chain it
+  // interrupted is held, and only a `=` line with a vector in it, which cannot continue a sum of plain
+  // numbers, is checked against it.
+  let held = null;
+  const SIDE_SUM = /^[\d\s+\-*/().^=]+$/;
 
   const note = (text, why, { keep = false, ...extra } = {}) => { out.push({ text, status: 'note', note: why, unverified: true, ...extra }); if (!keep) chain = null; };
   const tick = (text, rule, extra = {}) => out.push({ text, status: 'ok', valueChain: { rule }, ...extra });
@@ -255,6 +260,7 @@ export function stepCheckVectorChain(meta, workingText) {
     const text = line.replace(/[−–—]/g, '-').replace(/[×·]/g, '*').replace(/≈/g, '=').replace(/√/g, ' sqrt ').replace(/²/g, '^2').replace(/³/g, '^3').replace(/([A-Za-z])[~̰]/g, '$1')
       .replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore|thus)\s+/i, '');
     const continuation = /^\s*=/.test(text);
+    if (!continuation) held = SIDE_SUM.test(text) ? (chain || held) : null;
     // "about equal", or a decimal inside a line, may be a rounded value: such a line is never crossed.
     const approx = /≈/.test(line);
     const soft = seg => approx || seg.hasDecimal;
@@ -270,6 +276,7 @@ export function stepCheckVectorChain(meta, workingText) {
 
     const first = segs.find(s => s.symbolic);
     // a. the question fixes this line's value; b. or the chain above does
+    if (continuation && !chain && held && segs.some(s => isVec(s.value) || s.inner)) chain = held;
     // A continuation is held to the chain even when it names a vector itself: `= |a| + |b|` is not |4a+3b|.
     const truth = continuation && chain ? chain : first ? { value: first.value, inner: first.inner } : null;
     if (truth) {

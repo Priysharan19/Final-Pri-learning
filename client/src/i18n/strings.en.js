@@ -530,6 +530,7 @@ export default {
   // as a check of the working.
   'verdict.workingNotChecked': 'Your final answer was checked. Your working was not verified.',
   'verdict.workingAllChecked': { one: 'Your working was checked: the {n} line you submitted is consistent with the correct solution.', other: 'Your working was checked: all {n} lines you submitted are consistent with the correct solution.' },
+  'verdict.workingArithmetic': { one: 'The arithmetic on line {checked} of your working is right. Pri has not checked that your lines are the right steps for this question.', other: 'The arithmetic on lines {checked} of your working is right. Pri has not checked that your lines are the right steps for this question.' },
   'verdict.workingSomeChecked': '{ok} of the {total} lines of your working were checked and are consistent with the correct solution. The rest were not verified.',
   'verdict.workingWhichUnread': 'Lines checked: {checked}. Could not be read as maths: {unread}.',
   'verdict.workingWhichRest': 'Lines checked: {checked}. Not verified: {rest}.',
@@ -4328,6 +4329,7 @@ export default {
   "aw.status.condition": "Stated condition",
   "aw.body.given": "This is the function from the question.",
   "aw.body.valueVerified": "Checked: this is true for the question.",
+  "aw.body.arithmetic": "The arithmetic on this line is right. Pri has not checked that it is the right step for this question.",
   "aw.body.condition": "A condition you stated; there is nothing to check in it.",
   "aw.eval.provenanceSome": "The lines marked checked were checked by Pri’s engine. The other lines were not verified.",
   "aw.eval.provenanceSomeInk": "Your handwriting was read by AI; what Pri read is shown with each line. The lines marked checked were checked by Pri’s engine, not by AI. The other lines were not verified.",
@@ -4357,6 +4359,7 @@ export default {
   "mp.mark.finalWrong": { "one": "Final answer not correct: {earned} of {possible} mark. This question is marked on the final answer.", "other": "Final answer not correct: {earned} of {possible} marks. This question is marked on the final answer." },
   "mp.marked": "Marked",
   "mp.why.given": "From the question",
+  "mp.why.arithmetic": "Arithmetic is right",
   "mp.why.start": "Where the working starts",
   "mp.why.same": "Same as line {n}",
   "mp.why.follows": "Follows from line {n}",

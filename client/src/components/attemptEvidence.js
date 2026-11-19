@@ -59,6 +59,7 @@ export function reportForLines(report, lines) {
  *   { kind: 'all', total }            — every submitted line was checked and holds
  *   { kind: 'some', ok, total }       — some lines hold, the rest were not checked
  *                                       (`which`: the line numbers, for a value-chain report)
+ *   { kind: 'arithmetic', ok, total, checked } — only the arithmetic on some lines was checked
  *   { kind: 'break', line, ok, total }— a line was checked and does not hold
  *
  * `ok` means what the engine means by it: the line is consistent with the
@@ -77,6 +78,9 @@ export function workingEvidence({ res, submitted } = {}) {
   const firstBreak = report.lines.findIndex(l => l.status === 'break');
   if (firstBreak >= 0) return { kind: 'break', line: firstBreak + 1, ok, total };
   if (ok === 0) return { kind: 'none' };
+  // The arithmetic check (engine/arithmeticLines.js) proves only that stated numbers are equal: it is never
+  // reported as "consistent with the solution".
+  if (report.arithmetic === true) return { kind: 'arithmetic', ok, total, checked: report.lines.flatMap((l, i) => (l.status === 'ok' ? [i + 1] : [])) };
   if (ok === total) return { kind: 'all', total };
   // A value-chain report (engine/valueChain.js) judges each line on its own, so
   // the card can say WHICH lines were checked and which could not be read.
@@ -95,6 +99,7 @@ export function workingEvidence({ res, submitted } = {}) {
 export function workingEvidenceCopy(evidence, { correct } = {}) {
   if (!evidence) return null;
   if (evidence.kind === 'none') return { key: 'verdict.workingNotChecked', vars: {} };
+  if (evidence.kind === 'arithmetic') return { key: 'verdict.workingArithmetic', vars: { checked: evidence.checked.join(', '), count: evidence.ok, n: evidence.ok } };
   if (evidence.kind === 'all') return { key: 'verdict.workingAllChecked', vars: { count: evidence.total, n: evidence.total } };
   if (evidence.kind === 'some' && evidence.which) {
     const { checked, unread, rest } = evidence.which;

@@ -24,6 +24,7 @@ import { checkProof } from '../../client/src/engine/proofSteps.js';
 // The policy is plain data the pool puts into every operation (D12). This
 // module reads no environment itself: markingPolicy.js imports nothing.
 import { policyOf } from './markingPolicy.js';
+import { stepCheckArithmetic } from '../../client/src/engine/arithmeticLines.js';
 import { annotateMilestones } from '../../client/src/engine/milestones.js';
 import { awardBoardScheme, matchBoardPoints } from '../../client/src/engine/boardScheme.js';
 import { answerForm, effectiveSymbols, firstFinalAttempt, planGivens, readClaimForm } from './finalAttempt.js';
@@ -88,6 +89,13 @@ export function stepEvidence(q, answer, steps, result) {
     // The prompt lets a true line about another unknown of the question be
     // verified against the system it gives, instead of being left unjudged.
     try { report = stepCheck(meta, steps, { prompt: q.prompt }); } catch { report = null; }
+  }
+  // No Step Check for this question: the arithmetic on each line is still checked (engine/arithmeticLines.js).
+  // That report proves only that stated numbers are equal; it reaches no mark below (meta is null there).
+  if (!meta && steps && !report && typeof steps === 'string' && !OBJECTIVE.has(q.answerType) && !Array.isArray(q.boardScheme)) {
+    try { report = stepCheckArithmetic(steps); } catch { report = null; }
+    // Nothing judged (no line was arithmetic): the reply says nothing about the lines, as before.
+    if (report && !report.lines.some(l => l.status === 'ok' || l.status === 'break')) report = null;
   }
   let partial = null;
   // A blank final-answer box may still carry verified mathematical method

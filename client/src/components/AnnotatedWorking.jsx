@@ -67,6 +67,7 @@ export function CardBody({ card, model, t, renderBreakDetail }) {
   if (card.status === 'unread') return <p>{t('aw.body.unread')}</p>;
   if (card.valueChain === 'given') return <p>{t('aw.body.given')}</p>;
   if (card.valueChain === 'verified') return <p>{t('aw.body.valueVerified')}</p>;
+  if (card.valueChain === 'arithmetic') return <p>{t('aw.body.arithmetic')}</p>;
   if (card.status === 'incomplete') return <p>{card.note}</p>;
   if (card.status === 'condition') return <p>{t('aw.body.condition')}</p>;
   // The lines of a value-chain report that were not verified share one reason, said once below the cards.
