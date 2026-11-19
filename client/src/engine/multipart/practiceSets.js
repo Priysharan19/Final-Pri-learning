@@ -9,7 +9,7 @@
 // offers which set (by syllabus outcome), and who is offered them.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Practice chapter -> the syllabus outcomes whose parts it offers (codes of client/src/engine/curriculum-nsw/crosswalk.js). */
+/** Practice chapter -> the syllabus outcomes whose parts it offers (NESA outcome codes, written out here; this file imports nothing). */
 export const PRACTICE_SET_SUBTOPICS = Object.freeze({
   'y11-trigfunc': ['MAV-11-04'],
   'y11-trig-ident': ['MAV-11-05'],

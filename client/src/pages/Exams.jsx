@@ -20,7 +20,7 @@ import Working from '../instrument/Working.jsx';
 import { generatedPapersFor } from '../local/generatedPaperBackend.js';
 import Ext1Papers, { ext1PapersFor } from './Ext1Papers.jsx';
 import PracticeSets from '../paper/PracticeSets.jsx';
-import { practiceSetsFor } from '../paper/practiceSets.js';
+import { practiceSetsFor } from '../engine/multipart/practiceSets.js';
 import { offeredYears, yearOffered, defaultOffering } from '../platform/edition.js';
 
 const CLAIM_KEYS = {

@@ -41,7 +41,7 @@ import { serverEntitlementCapabilities } from './entitlements.js';
 import { EDITION_IDS } from '../../client/edition.config.mjs';
 import { mountPaperAttempts } from './paperAttempts.js';
 import { loadApprovals, loadStructuredPapers } from './paperContent.js';
-import { PRACTICE_SET_SUBTOPICS } from '../../client/src/paper/practiceSets.js';
+import { PRACTICE_SET_SUBTOPICS } from '../../client/src/engine/multipart/practiceSets.js';
 
 export const PAPERS_CAPABILITY = 'premium-exams';
 export const PAPERS_EDITION = 'prithagoras';

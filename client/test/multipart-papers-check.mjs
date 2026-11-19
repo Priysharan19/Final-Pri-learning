@@ -20,7 +20,7 @@ import { engineQuestion, givenFor, leafParts, loadStructuredPapers, schemeApprov
 import { examAnswerStage } from '../../server/platform/markerOps.js';
 import { PRACTICE_DIR, PAPERS_DIR } from '../../server/platform/papers.js';
 import { NSW_CROSSWALK } from '../src/engine/curriculum-nsw/crosswalk.js';
-import { PRACTICE_SET_CHAPTERS, PRACTICE_SET_SUBTOPICS, practiceSetsFor } from '../src/paper/practiceSets.js';
+import { PRACTICE_SET_CHAPTERS, PRACTICE_SET_SUBTOPICS, practiceSetsFor } from '../src/engine/multipart/practiceSets.js';
 import { SET_OUTCOMES, SEEDS, buildDocument, generated, PRACTICE_PREFIX } from '../../tools/build-multipart-papers.mjs';
 import { multipartIds } from '../src/engine/multipart/sets-nsw.js';
 

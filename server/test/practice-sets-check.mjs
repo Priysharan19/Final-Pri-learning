@@ -12,7 +12,7 @@ import './support/hermetic.mjs';
 import { checks, registerAccount, startApp, verifyEmail } from './support/app-harness.mjs';
 import { PAPERS_DIR, PRACTICE_DIR } from '../platform/papers.js';
 import { loadStructuredPapers, leafParts } from '../platform/paperContent.js';
-import { PRACTICE_SET_SUBTOPICS } from '../../client/src/paper/practiceSets.js';
+import { PRACTICE_SET_SUBTOPICS } from '../../client/src/engine/multipart/practiceSets.js';
 
 const c = checks();
 const docs = loadStructuredPapers(PRACTICE_DIR);
