@@ -38,6 +38,7 @@
 // value written without π (sin 90) might be degrees, so a mismatch there is a
 // note, not a break. Nothing here awards a method mark.
 import { parse, normalize, evaluate, variablesOf, exprEquivalent } from './expr.js';
+import { assignSpan } from './commentTex.js';
 
 export const VALUE_CHAIN = 'value-chain';
 
@@ -154,7 +155,9 @@ function labelOf(raw, fn) {
   return null;
 }
 
-const shown = v => String(Math.round(v * 1e6) / 1e6);
+const shownPlain = v => String(Math.round(v * 1e6) / 1e6);
+// A value in a comment is a `$…$` span the client typesets.
+const shown = v => `$${shownPlain(v)}$`;
 
 /** Check working line by line. Returns the same report shape as stepCheck. */
 /**
@@ -244,7 +247,7 @@ export function stepCheckValueChain(meta, workingText, options = null) {
       name = QUANTITY_NAMES[label.key];
     } else {
       truth = fnAt(fn, label.x);
-      name = `${fn.name}(${shown(label.x)})`;
+      name = `$${fn.name}(${shownPlain(label.x)})$`;
     }
     if (truth === null) return note(line, GENERIC_NOTE);
     const nums = asts.map(a => (freeVars(a).length ? null : evaluate(a, {})));
@@ -293,7 +296,7 @@ function curveLine(fn, text, original) {
   const { curve, variable, name } = fn;
   const num = (ast, x) => { try { return evaluate(ast, { [variable]: x }); } catch { return NaN; } };
   const at = x => num(fn.ast, x);
-  const fmt = v => shown(v);
+  const fmt = v => shownPlain(v);   // the number inside a `$…$` span
   const compact = text.replace(/\s+/g, '');
   // A stated condition (prose or a bare "y' = 0"): accepted as what it says, never "not verified".
   if (STATIONARY_CONDITION.test(text) && !text.replace(STATIONARY_CONDITION, '').includes('=')) {
@@ -306,7 +309,7 @@ function curveLine(fn, text, original) {
     const asts = rhs.map(parseSafe);
     if (asts.some(a => !a || freeVars(a).some(v => v !== variable))) return null;
     if (asts.every(a => exprEquivalent(a, curve.dast) === true)) return { status: 'ok', state: 'verified', valueChain: { rule: 'derivative' } };
-    return { status: 'break', code: 'derivative-not-true', note: `This is not the derivative of the curve ${name} = ${fn.expr.replace(/\*/g, '')}.` };
+    return { status: 'break', code: 'derivative-not-true', note: `This is not the derivative of the curve ${assignSpan(name, fn.expr.replace(/\*/g, ''))}.` };
   }
   // A choice between the stationary points: "smaller: (0,0)", "smaller x = -3"
   const choice = text.match(/^(smaller|smallest|lower|lowest|least|larger|largest|bigger|greater|greatest|higher|highest)(?:\s+x(?:\s*-?\s*(?:value|coordinate))?)?\s*[:=-]?\s*(.+)$/i);
@@ -317,12 +320,12 @@ function curveLine(fn, text, original) {
     const a = constantValue(pt ? pt[1] : body);
     const b = pt ? constantValue(pt[2]) : null;
     if (a === null || (pt && b === null)) return null;
-    if (pt && Math.abs(b - at(a)) > 1e-9 * Math.max(1, Math.abs(b))) return { status: 'break', code: 'point-not-on-curve', note: `The point (${fmt(a)}, ${fmt(b)}) is not on the curve.` };
-    if (!curve.stationary.some(x => sameNum(x, a))) return { status: 'break', code: 'not-stationary', note: `x = ${fmt(a)} is not a stationary point.` };
+    if (pt && Math.abs(b - at(a)) > 1e-9 * Math.max(1, Math.abs(b))) return { status: 'break', code: 'point-not-on-curve', note: `The point $(${fmt(a)},\\ ${fmt(b)})$ is not on the curve.` };
+    if (!curve.stationary.some(x => sameNum(x, a))) return { status: 'break', code: 'not-stationary', note: `$x = ${fmt(a)}$ is not a stationary point.` };
     const target = which === 'smaller' ? curve.stationary[0] : curve.stationary[curve.stationary.length - 1];
     if (!sameNum(target, a)) {
       const other = which === 'smaller' ? 'smaller' : 'larger';
-      return { status: 'break', code: 'wrong-stationary-point', note: `x = ${fmt(target)} is ${other} than x = ${fmt(a)}, so use x = ${fmt(target)}: ${name}(${fmt(target)}) = ${fmt(at(target))}.` };
+      return { status: 'break', code: 'wrong-stationary-point', note: `$x = ${fmt(target)}$ is ${other} than $x = ${fmt(a)}$, so use $x = ${fmt(target)}$: $${name}(${fmt(target)}) = ${fmt(at(target))}$.` };
     }
     return { status: 'ok', state: 'verified', valueChain: { rule: 'choice' } };
   }
@@ -333,7 +336,7 @@ function curveLine(fn, text, original) {
     if (vals.every(v => v !== null)) {
       const extra = vals.find(v => !curve.stationary.some(x => sameNum(x, v)));
       if (pieces.length > 1) {
-        if (extra !== undefined) return { status: 'break', code: 'extra-stationary-value', note: `${variable} = ${fmt(extra)} does not make the derivative 0.` };
+        if (extra !== undefined) return { status: 'break', code: 'extra-stationary-value', note: `$${variable} = ${fmt(extra)}$ does not make the derivative 0.` };
         const complete = curve.stationary.every(x => vals.some(v => sameNum(x, v)));
         return complete ? { status: 'ok', state: 'verified', valueChain: { rule: 'stationary-values' } } : { status: 'note', state: 'unverified', note: 'True, but the derivative is 0 at more values than these.' };
       }

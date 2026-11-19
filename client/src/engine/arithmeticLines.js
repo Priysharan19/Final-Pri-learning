@@ -27,6 +27,7 @@
 //     12 = 0.5 is 1/2 with the bar lost. The reader, not the student, may
 //     have made that slip.
 import { parse, normalize, evaluate, variablesOf, exprEquivalent, withEvaluationBudget } from './expr.js';
+import { mathSpan, assignSpan } from './commentTex.js';
 
 // Everything this module evaluates for one page of working is charged to ONE budget (expr.js, "What an evaluation may
 // cost"): what a page costs to check must not depend on what is written on it. When the budget is spent the rest
@@ -43,15 +44,42 @@ const FUNCTION_WORDS = /\b(?:sin|cos|tan|sec|cosec|csc|cot|ln|log|asin|acos|atan
 // `Ans = 72` under the working: ticked when it equals the line above, never crossed (it may answer something else).
 const ANS_LABEL = /^(?:ans|answer)\.?\s*(?==)/i;
 const close = (a, b) => Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b));
-// A value is shown the way a student writes it: a whole number, a simple fraction (64/3, not 21.333333), or four
-// decimal places.
-const shown = v => {
-  const minus = s => String(s).replace(/-/g, '−');
-  if (Number.isInteger(v)) return minus(Object.is(v, -0) ? 0 : v);
-  for (let d = 2; d <= 12; d++) { const n = Math.round(v * d); if (Math.abs(v * d - n) < 1e-9 && Math.abs(n) < 100000) return minus(`${n}/${d}`); }
-  const r = Math.round(v * 1e4) / 1e4;
-  return minus(Object.is(r, -0) ? 0 : r);
-};
+const gcd = (a, b) => (b ? gcd(b, a % b) : Math.abs(a));
+/**
+ * A value in the exact form a student would write it, as { plain, tex }: an integer; a simple fraction n/d (d <= 12);
+ * a surd k√n or (k√n)/d (n square-free, 1 < n <= 50); a rational multiple of π (kπ/d, d <= 12); otherwise four decimal
+ * places. An exact form is used only when it reproduces the value to 1e-9. Nothing is guessed.
+ */
+export function exactForm(v) {
+  const done = (plain, tex) => ({ plain: plain.replace(/^-/, '−'), tex });
+  if (!Number.isFinite(v)) return { plain: String(v), tex: String(v) };
+  if (Number.isInteger(v)) { const s = String(Object.is(v, -0) ? 0 : v); return done(s, s); }
+  // A whole number carrying float noise (72.00000000000001 from 2[32 - 64/3] × …) is that whole number, not 144/2.
+  { const whole = Math.round(v); if (Math.abs(v - whole) <= 1e-9 * Math.max(1, Math.abs(whole))) { const s = String(Object.is(whole, -0) ? 0 : whole); return done(s, s); } }
+  const sign = v < 0 ? '-' : '', a = Math.abs(v);
+  const reproduces = x => Math.abs(x - a) <= 1e-9 * Math.max(1, a);
+  for (let d = 2; d <= 12; d++) { const n = Math.round(a * d); if (Math.abs(a * d - n) < 1e-9 && n < 100000) return done(`${sign}${n}/${d}`, `${sign}\\frac{${n}}{${d}}`); }
+  // A surd: (a·d)² is a whole number m = k²·n with n square-free; the smallest d gives the reduced form.
+  for (let d = 1; d <= 12; d++) {
+    const m = Math.round((a * d) ** 2);
+    if (m < 2 || m > 50 * 400 || Math.abs((a * d) ** 2 - m) > 1e-7) continue;
+    let k = 1; for (let c = 2; c * c <= m; c++) if (m % (c * c) === 0) k = c;   // the largest square factor c² of m
+    const n = m / (k * k);
+    if (n < 2 || n > 50 || k > 20 || !reproduces((k * Math.sqrt(n)) / d)) continue;
+    const root = `${k === 1 ? '' : k}\\sqrt{${n}}`, rootPlain = `${k === 1 ? '' : k}√${n}`;
+    return d === 1 ? done(`${sign}${rootPlain}`, `${sign}${root}`) : done(`${sign}${rootPlain}/${d}`, `${sign}\\frac{${root}}{${d}}`);
+  }
+  for (let d = 1; d <= 12; d++) {
+    const n = Math.round((a * d) / Math.PI);
+    if (n < 1 || n > 60 || !reproduces((n * Math.PI) / d)) continue;
+    const g = gcd(n, d), p = n / g, q = d / g;
+    return q === 1 ? done(`${sign}${p === 1 ? '' : p}π`, `${sign}${p === 1 ? '' : p}\\pi`) : done(`${sign}${p === 1 ? '' : p}π/${q}`, `${sign}\\frac{${p === 1 ? '' : p}\\pi}{${q}}`);
+  }
+  const r = Math.round(v * 1e4) / 1e4, s = String(Object.is(r, -0) ? 0 : r);
+  return done(s, s);
+}
+// In a comment a value is a `$…$` span the client typesets (the plain form is exactForm(v).plain).
+const shown = v => `$${exactForm(v).tex}$`;
 
 /** The value of one side when it is plain arithmetic on numbers; null otherwise. */
 function valueOf(side) {
@@ -349,9 +377,9 @@ function pageDefinitions(raw, out, firstBreak) {
             if (Math.abs(slope - c) <= 1e-5 * Math.max(1, Math.abs(slope), Math.abs(c))) agree++;
             else if (Math.abs(slope - c) > 1e-2 * Math.max(1, Math.abs(slope), Math.abs(c))) differ++;
           }
-          if (tried >= 3 && agree === tried) { carry = { text: claim.text, variable }; ticks.push(`This is the derivative of ${m[1]} = ${d.shown}.`); facts.push([`${m[1]}'`, { expr: parts[1], shown: parts[1], variable: m[2] || d.variable || null, line: i }]); return; }
+          if (tried >= 3 && agree === tried) { carry = { text: claim.text, variable }; ticks.push(`This is the derivative of ${assignSpan(m[1], d.shown)}.`); facts.push([`${m[1]}'`, { expr: parts[1], shown: parts[1], variable: m[2] || d.variable || null, line: i }]); return; }
           // A number on the right is the gradient at a point (y' = 3√2/2), not a wrong derivative: never crossed.
-          if (tried >= 3 && differ === tried && !decimal && lettersOf(claim.text).includes(variable)) { cross = `The derivative of ${m[1]} = ${d.shown} is not ${parts[1]}.`; return; }
+          if (tried >= 3 && differ === tried && !decimal && lettersOf(claim.text).includes(variable)) { cross = `The derivative of ${assignSpan(m[1], d.shown)} is not ${mathSpan(parts[1])}.`; return; }
         }
         return;
       }
@@ -362,7 +390,7 @@ function pageDefinitions(raw, out, firstBreak) {
       if (m && !m[2] && sides.length === 1 && equation && equation.variable === m[1]) {
         const value = putIn(sides[0], defs, null), v = value && numberOf(value.text);
         const L = v !== null && v !== undefined ? fnOf(equation.left, m[1]) : null, R = L ? fnOf(equation.right, m[1]) : null;
-        if (L && R) { const a = L(v), b = R(v); if (a !== null && b !== null && close(a, b)) ticks.push(`${m[1]} = ${sides[0]} satisfies the equation before it.`); }
+        if (L && R) { const a = L(v), b = R(v); if (a !== null && b !== null && close(a, b)) ticks.push(`${assignSpan(m[1], sides[0])} satisfies the equation before it.`); }
       }
       // C. sides that become plain numbers, or one function of one letter, once the definitions are in
       if (sides.length >= 2) {
@@ -374,7 +402,7 @@ function pageDefinitions(raw, out, firstBreak) {
           if (infos.every(Boolean)) {
             const numbers = infos.every(x => x.value !== undefined);
             const same = infos.every(x => sameAsWritten(x, infos[0]));
-            const from = used.map(k => `${k} = ${defs[k].shown}`).join(', ');
+            const from = used.map(k => assignSpan(k, defs[k].shown)).join(', ');
             if (same && used.length) ticks.push(numbers ? `With ${from} from above, each side comes to ${shown(infos[0].value)}.` : `With ${from} from above, the sides are the same expression.`);
             // Crossed only in a worked chain under a name (A = 12e^(4k) = 12e^(ln(3)/4)): there the two sides are stated
             // equal. Two sides on their own (x^2 = 9 after x = 2) may be a new equation to solve, so that is a note.
@@ -382,7 +410,7 @@ function pageDefinitions(raw, out, firstBreak) {
             // another part of the question (independent review).
             else if (!same && numbers && m && used.length && !decimal && used.every(k => !defs[k].variable && defs[k].line >= i - 1)) {
               const k = infos.findIndex(x => !close(x.value, infos[0].value));
-              cross = `With ${from} from above, ${sides[0]} comes to ${shown(infos[0].value)}, but this line gives ${shown(infos[k].value)}.`;
+              cross = `With ${from} from above, ${mathSpan(sides[0])} comes to ${shown(infos[0].value)}, but this line gives ${shown(infos[k].value)}.`;
               return;
             }
             // E. the same equation as the one before it, rearranged (the difference of the sides is a constant multiple)
@@ -539,7 +567,7 @@ function stepCheckArithmeticWithinBudget(workingText) {
       if (all.length < 2 || !all.every(x => sameAsWritten(x, all[0]))) return note(line, NOT_PROVED);
       const number = all.find(x => x.value !== undefined);
       const why = calc.used ? (number ? `Worked out, each side comes to ${shown(number.value)}.` : 'Worked out at the limits, the sides agree.')
-        : number ? `This is ${shown(number.value)} for every value of the letters.`
+        : number ? (cont && carried ? `This equals the line above: ${shown(number.value)}.` : `Both sides come to ${shown(number.value)}.`)
           : cont && carried ? 'This is the line above, written another way.' : 'Both sides are the same expression, written two ways.';
       // The step is named from the first two sides that differ in writing (the line above and this one, or this line's own sides).
       const texts = cont && carried ? [carried.text, ...written] : written;
@@ -613,7 +641,7 @@ function stepCheckArithmeticWithinBudget(workingText) {
       if (rest.every(v => close(v, rest[0])) && !close(allValues[0], rest[0])) {
         if (carried && carried.value !== undefined && closeLoose(rest[0], carried.value)) {
           prev = { value: rest[0], text: sides[sides.length - 1], calculus: true };
-          out.push({ text: line, status: 'ok', state: 'arithmetic', note: `This equals the line above: ${shown(rest[0])}. The ${allSides[0].trim()} in front of it was not read as part of the line.`, valueChain: { rule: 'true-as-written' } });
+          out.push({ text: line, status: 'ok', state: 'arithmetic', note: `This equals the line above: ${shown(rest[0])}. The ${mathSpan(allSides[0])} in front of it was not read as part of the line.`, valueChain: { rule: 'true-as-written' } });
           return;
         }
         return note(line, MISREAD_NOTE);
@@ -621,10 +649,10 @@ function stepCheckArithmeticWithinBudget(workingText) {
     }
     if (trueUnderAnotherReading(allSides, allValues)) return note(line, MISREAD_NOTE);
     const k = allValues.findIndex(v => !close(v, allValues[0]));
-    const message = logFalseInBoth ? `${allSides[0].trim()} does not equal ${allSides[k].trim()}, whether log means base 10 or base e.`
+    const message = logFalseInBoth ? `${mathSpan(allSides[0])} does not equal ${mathSpan(allSides[k])}, whether log means base 10 or base e.`
       : continuation && before && k >= 1 && allValues.slice(1, k).every(v => close(v, allValues[0]))
       ? `The line above comes to ${shown(allValues[0])}, but this line gives ${shown(allValues[k])}.`
-      : `${allSides[0].trim()} comes to ${shown(allValues[0])}, but this line gives ${shown(allValues[k])}.`;
+      : `${mathSpan(allSides[0])} comes to ${shown(allValues[0])}, but this line gives ${shown(allValues[k])}.`;
     diagnosis = { code: 'arithmetic-not-equal', title: 'The two sides of this line are not equal', message, fix: 'Work this line out again, one operation at a time.', confidence: 'high' };
     firstBreak = i;
     out.push({ text: line, status: 'break', note: message, diagnosis });

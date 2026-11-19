@@ -12,7 +12,8 @@
 // Part 3  Wiring: the server uses it only where a question has no Step Check,
 //         it reaches no mark, and the result card never calls it "consistent
 //         with the correct solution".
-import { stepCheckArithmetic } from '../src/engine/arithmeticLines.js';
+import { stepCheckArithmetic, exactForm } from '../src/engine/arithmeticLines.js';
+import { plainComment, dollarsBalanced } from '../src/engine/commentTex.js';
 import { fullyVerifiedWorking } from '../src/engine/misconceptions.js';
 import { workingEvidence, workingEvidenceCopy } from '../src/components/attemptEvidence.js';
 import { buildAnnotatedWorking } from '../src/components/annotatedWorkingModel.js';
@@ -22,7 +23,12 @@ import hi from '../src/i18n/strings.hi.js';
 
 let pass = 0, fail = 0;
 const ok = (c, m) => { if (c) pass++; else { fail++; console.error('FAIL:', m); } };
-const run = lines => stepCheckArithmetic(lines.join('\n'));
+// Every comment any test page below produces, kept for the typesetting checks at the end.
+const comments = new Set();
+const keep = report => { for (const l of report.lines || []) if (l.note) comments.add(l.note); if (report.diagnosis?.message) comments.add(report.diagnosis.message); return report; };
+const run = lines => keep(stepCheckArithmetic(lines.join('\n')));
+// A comment's maths is TeX between dollars; the assertions below read it as the plain sentence it stands for.
+const plain = plainComment;
 const st = lines => run(lines).lines.map(l => l.status).join();
 
 // ── Part 1 · the rules ───────────────────────────────────────────────────────
@@ -35,8 +41,8 @@ ok(r.lines[10].state === 'arithmetic' && r.arithmetic === true && r.source === '
 ok(r.lines.slice(0, 5).every(l => l.status === 'note'), `vectors, words and a column sum are not judged (${r.lines.slice(0, 5).map(l => l.status)})`);
 
 r = run(['-20 - 6 = 14']);
-ok(r.lines[0].status === 'break' && /−26/.test(r.diagnosis.message) && /14/.test(r.diagnosis.message), `false arithmetic is crossed with both values (${r.diagnosis?.message})`);
-ok(st(['3 × 4', '= 12', '= 13']) === 'note,ok,break' && /line above comes to 12/.test(run(['3 × 4', '= 12', '= 13']).diagnosis.message), 'a continuation is held to the line above');
+ok(r.lines[0].status === 'break' && /−26/.test(plain(r.diagnosis.message)) && /14/.test(plain(r.diagnosis.message)), `false arithmetic is crossed with both values (${r.diagnosis?.message})`);
+ok(st(['3 × 4', '= 12', '= 13']) === 'note,ok,break' && /line above comes to 12/.test(plain(run(['3 × 4', '= 12', '= 13']).diagnosis.message)), 'a continuation is held to the line above');
 ok(st(['196 + 64 = 260', '1/2 + 1/3 = 5/6', '5! = 120', '(-3)^2 = 9', '-3^2 = -9', '√16 = 4', '2(3+4) = 14', '6[4^2 - 2^2] = 72', '7 = 7']) === 'ok,ok,ok,ok,ok,ok,ok,ok,ok', 'true arithmetic is ticked');
 for (const f of ['1/2 + 1/3 = 2/5', '(-3)^2 = -9', '2 + 2 = 4 = 5', '6(16 - 4) = 62', 'sqrt(16) = 5', '7 × 8 = 54', '100 - 37 = 73']) ok(st([f]) === 'break', `false arithmetic is crossed: ${f}`);
 ok(st(['2 + 2 = 5', '3 + 3 = 6']) === 'break,note', 'lines after the slip are not judged');
@@ -66,7 +72,7 @@ ok(st(['500 = 340', '6000 = 18']) === 'note,note' && st(['3 × 4 = 12', '= 13'])
   const PROOF = ['LHS = (secθ - cosθ)/(cosecθ - sinθ)', 'Numerator: secθ - cosθ', '= 1/cosθ - cosθ', '= (1 - cos^2θ)/cosθ', '= sin^2θ/cosθ = sinθ tanθ', 'Denominator: cosecθ - sinθ', '= 1/sinθ - sinθ', '= (1 - sin^2θ)/sinθ', '= cos^2θ/sinθ = cosθ/tanθ', 'LHS = sinθ tanθ / (cosθ/tanθ)', '= tan^2θ × tanθ', '= tan^3θ = RHS //'];
   const p = run(PROOF);
   ok(p.lines.map(l => l.status).join() === 'note,note,ok,ok,ok,note,ok,ok,ok,note,ok,ok', `the trig proof: every step is ticked, the lines that only set up are notes (${p.lines.map(l => l.status)})`);
-  ok(/reciprocal identity sec θ = 1\/cos θ/.test(p.lines[2].note) && /common denominator/.test(p.lines[3].note) && /Pythagorean identity/.test(p.lines[4].note) && /reciprocal identity cosec θ = 1\/sin θ/.test(p.lines[6].note), `each tick names the step it matches (${p.lines[2].note} | ${p.lines[6].note})`);
+  ok(/reciprocal identity sec θ = 1\/cos θ/.test(plain(p.lines[2].note)) && /common denominator/.test(plain(p.lines[3].note)) && /Pythagorean identity/.test(plain(p.lines[4].note)) && /reciprocal identity cosec θ = 1\/sin θ/.test(plain(p.lines[6].note)), `each tick names the step it matches (${p.lines[2].note} | ${p.lines[6].note})`);
   ok(p.firstBreak === -1 && p.lines.every(l => l.status !== 'break'), 'and nothing is crossed');
 }
 ok(st(['sin θ cos θ = cos θ sin θ', 'sin 2θ = 2 sin θ cos θ', 'cos^2 x = 1 - sin^2 x', 'tan x = sin x / cos x', '1 + tan^2 A = sec^2 A', 'ln x + ln x = 2 ln x', '2sin(x)cos(x) = sin(2x)', 'cot θ = cos θ/sin θ']) === 'ok,ok,ok,ok,ok,ok,ok,ok', 'unbracketed functions of one letter are read');
@@ -83,11 +89,11 @@ ok(st(['(x+1)^2 = x^2 + 2x + 1']) === 'ok' && /expanding the brackets/.test(run(
 // what the page itself defines (owner, 19 November: side by side with a competitor on his own pages)
 {
   const slip = run(['e^(8k) = 3 so k = ln(3)/8', 'A = 12e^(4k) = 12e^(ln(3)/4)', 'A = 12 x 3^(1/4) grams']);
-  ok(slip.lines.map(l => l.status).join() === 'ok,break,note' && /With k = ln\(3\)\/8 from above/.test(slip.diagnosis.message) && /20\.78/.test(slip.diagnosis.message), `a value carried from the line above is held to: the slip is crossed with the reason (${slip.lines.map(l => l.status)} · ${slip.diagnosis?.message})`);
+  ok(slip.lines.map(l => l.status).join() === 'ok,break,note' && /With k = ln\(3\)\/8 from above/.test(plain(slip.diagnosis.message)) && /12√3/.test(plain(slip.diagnosis.message)) && Math.abs(12 * Math.sqrt(3) - 20.7846) < 1e-4, `a value carried from the line above is held to: the slip is crossed with the reason (${slip.lines.map(l => l.status)} · ${slip.diagnosis?.message})`);
   ok(st(['e^(8k) = 3 so k = ln(3)/8', 'A = 12e^(4k) = 12e^(ln(3)/2)', '= 12 sqrt(3)']) === 'ok,ok,ok', 'the same working without the slip is ticked on every line');
   const quot = run(['f(x) = (x^2 - 4x + 1)/e^x', 'u = x^2 - 4x + 1', 'v = e^x', "u' = 2x - 4", "v' = e^x", "f'(x) = (vu' - uv')/v^2", '-x^2 + 6x - 5 = 0', '(x - 5)(x - 1) = 0', 'x = 5', 'x = 1']);
   ok(quot.lines.map(l => l.status).join() === 'note,note,note,ok,ok,ok,note,ok,ok,ok', `definitions, their derivatives, the quotient rule line, an equation rearranged and its roots (${quot.lines.map(l => l.status)})`);
-  ok(/derivative of u = x\^2 - 4x \+ 1/.test(quot.lines[3].note) && /same equation/.test(quot.lines[7].note) && /satisfies the equation/.test(quot.lines[8].note), 'each of those ticks says what was checked');
+  ok(/derivative of u = x\^2 - 4x \+ 1/.test(plain(quot.lines[3].note)) && /same equation/.test(plain(quot.lines[7].note)) && /satisfies the equation/.test(plain(quot.lines[8].note)), 'each of those ticks says what was checked');
   ok(st(['u = x^2 - 4x + 1', "u' = 2x - 5"]) === 'note,break' && st(['y = sin(3x)', "y' = 3cos(3x)"]) === 'note,ok' && st(['y = sin(3x)', "y' = cos(3x)"]) === 'note,break', 'a wrong derivative of something the page defined is crossed');
   for (const page of [['y = sin(3x)', "y' = (3√(2))/2"], ['y = x^2', "y' = 6"], ['u = x^2', "u' = 2.0x + 0.1"], ['k = 2', 'k = 3', '2k = 6'], ['x = 2', 'x^2 = 9'], ['k = 2', 'A = k + 1 = 3.5'], ['a = 3', 'b = 4', 'c^2 = a^2 + b^2', 'c = 5'], ['x^2 = 9', 'x = 4'], ['2x + 1 = 7', '2x = 8'], ['n = 5', 'n! = 100 + 20'], ['t = 5', '3t + 5 = 21']]) ok(!/break/.test(st(page)), `not crossed: ${page.join(' | ')} (${st(page)})`);
   ok(st(['k = 2', 'A = 3k + 1 = 8']) === 'note,break' && st(['k = 2', '3k + 1 = 8']) === 'note,note' && st(['k = 2', '3k + 1 = 7']) === 'note,ok' && st(['k = 2', 'k = 3', '2k = 6']) === 'note,note,ok', 'a worked chain under a name is held to the latest value of a letter; two sides on their own may be a new equation and are never crossed');
@@ -100,7 +106,7 @@ ok(st(['x^2 - 4 = 0 so (x-2)(x+2) = 0', 'x = 2']) === 'ok,ok' && st(['2x = 4 so 
 // e and π as numbers; a function value in front of a worked chain; a sign claim after it (owner, 19 November)
 {
   const sign = run(['b)(ii) a(2) = (4 - 8 + 2)e^(-2) = 2e^(-2) > 0 so the displacement is a maximum']);
-  ok(sign.lines[0].status === 'break' && /−0\.27/.test(sign.diagnosis.message), `the sign slip a competitor caught is crossed with both values (${sign.lines[0].status} · ${sign.diagnosis?.message})`);
+  ok(sign.lines[0].status === 'break' && /−0\.27/.test(plain(sign.diagnosis.message)), `the sign slip a competitor caught is crossed with both values (${sign.lines[0].status} · ${sign.diagnosis?.message})`);
   ok(st(['a(2) = (4 - 8 + 2)e^(-2) = -2e^(-2) < 0 so the displacement is a maximum']) === 'ok', 'the same line without the slip is ticked');
   ok(st(['a(2) = (4 - 8 + 2)e^(-2) = -2e^(-2) > 0 so it is a minimum']) === 'note', 'a true chain with a false sign claim after it is not ticked');
   ok(st(['e^0 = 1', 'π/2 + π/2 = π', '2π/2 = π', 'e^2 e^3 = e^5', 'f(2) = 3 + 4 = 7']) === 'ok,ok,ok,ok,ok', 'exact lines with e and π are ticked');
@@ -111,7 +117,7 @@ ok(st(['x^2 - 4 = 0 so (x-2)(x+2) = 0', 'x = 2']) === 'ok,ok' && st(['2x = 4 so 
 // a handwriting test a competitor marked line by line)
 {
   const page = run(['1/x + 1/y + 1/z = log 3 + log 2 + log 5', '= log (3 + 2 + 5) = log 10 = 1', 'so 10^1 = 10']);
-  ok(page.lines.map(l => l.status).join() === 'note,break,note' && /whether log means base 10 or base e/.test(page.diagnosis.message), `the wrong log law is crossed with the reason (${page.lines.map(l => l.status)} · ${page.diagnosis?.message})`);
+  ok(page.lines.map(l => l.status).join() === 'note,break,note' && /whether log means base 10 or base e/.test(plain(page.diagnosis.message)), `the wrong log law is crossed with the reason (${page.lines.map(l => l.status)} · ${page.diagnosis?.message})`);
   ok(st(['log 3 + log 2 + log 5 = log 30', 'ln 8 = 3 ln 2', 'log 8 = 3 log 2', 'ln 3 + ln 4 = ln 12', 'log (2 × 5) = log 2 + log 5']) === 'ok,ok,ok,ok,ok', 'log laws true in either base are ticked');
   ok(st(['ln 8 = 2 ln 3']) === 'break' && st(['log 2 + log 5 = log 7']) === 'break' && st(['ln 3 + ln 4 = ln 7']) === 'break', 'and false in either base are crossed');
   for (const f of ['log 100 = 2', 'log 2 + log 5 = 1', 'ln 100 = 2', 'log 10 = 1', 'log e = 1', 'log x = 2', 'log 2x = log 2 + log x', 'log 3.0 + log 2 = log 7', 'log_2 8 = 4', 'log 3^2 = 2 log 3', 'log 3! = log 5', 'ln 2 = 0.69', '2 log 3 = log 6']) ok(st([f]) !== 'break' || f === '2 log 3 = log 6', `true in one base only, or not read one way: never crossed: ${f} (${st([f])})`);
@@ -127,7 +133,7 @@ ok(st(['x^2 - 4 = 0 so (x-2)(x+2) = 0', 'x = 2']) === 'ok,ok' && st(['2x = 4 so 
   const LIVE = ['8 y = 2x(4 - x).', 'Area = ∫_0^4 2x(4 - x) dx ;', '= 2∫_0^4 4x - x^2 dx', '= 2[4x^2/2 - x^3/3]_0^4', '= 2[2x^2 - x^3/3]_0^4', '16/3 = 2[2(4)^2 - 4^3/3] = 2[32 - 64/3]', '= 64/3'];
   const live = run(LIVE);
   ok(live.firstBreak === -1 && live.lines.map(l => l.status).join() === 'note,note,ok,ok,ok,ok,ok', `nothing on the page is crossed and every worked line is ticked (${live.lines.map(l => l.status)})`);
-  ok(/64\/3/.test(live.lines[5].note) && /16\/3 in front of it was not read as part of the line/.test(live.lines[5].note) && !/21\.3/.test(JSON.stringify(live.lines)), `the tick says what was left out, and values are written as fractions (${live.lines[5].note})`);
+  ok(/64\/3/.test(plain(live.lines[5].note)) && /16\/3 in front of it was not read as part of the line/.test(plain(live.lines[5].note)) && !/21\.3/.test(JSON.stringify(live.lines)), `the tick says what was left out, and values are written as fractions (${live.lines[5].note})`);
   ok(st(['16/3 = 2[32 - 64/3]']) === 'note' && st(['14 = -20 - 6']) === 'note' && st(['7 = 5 + 1 = 6']) === 'note' && st(['5 = 2 + 3']) === 'ok', 'a bare number in front of worked expressions is never crossed; a true one is still ticked');
   ok(st(['-20 - 6 = 14']) === 'break' && st(['2 + 3 = 6']) === 'break' && st(['2[32 - 64/3] = 16/3']) === 'break', 'a worked expression set equal to a wrong value is still crossed');
   ok(st(['Area = 3 × 4', '= 12']) === 'note,ok' && st(['Volume = 2 + 2 = 5']) === 'break' && st(['Area = 12']) === 'note', 'a word in front of `=` is a label');
@@ -143,6 +149,8 @@ ok(st(['x^2 - 4 = 0 so (x-2)(x+2) = 0', 'x = 2']) === 'ok,ok' && st(['2x = 4 so 
   const he = stepEvidence(QH, '7', heavy.join('\n'), { correct: false });
   ok(Date.now() - at < 600 && he.partial === null, `and the same page through the server's evidence path, with the missing-steps pass (${Date.now() - at} ms)`);
 }
+// independent review of the typesetting: a whole number with float noise is printed as that whole number
+ok(!/144/.test(JSON.stringify(run(['6[4^2 - 2^2] = 6(16 - 4)', '= 72']).lines)) && !/\\frac\{\d+\}\{2\}\$\./.test(run(['0.1 + 0.2 + 71.7 = 72']).lines[0].note || ''), 'no value is printed as an unreduced fraction of a whole number');
 // never crossed
 for (const f of ['3x + 2 = 11', 'x = 3', 'n = 5', 'P(A) = 3', 'sin(30) = 2', 'log(100) = 3', 'ln 5 = 2', 'pi = 3', 'e^2 = 7', '50% of 80 = 30', '90° = 2', '5 cm + 3 cm = 9 cm', '2 1/2 = 5/2', '1 000 = 1000', '3 < 2', '4 ≠ 4', 'the answer is 5', '', '= 5', '6/0 = 3', '(((', '2 + = 4']) ok(!/break|ok/.test(st([f])), `not judged: "${f}" (${st([f])})`);
 for (const f of ['0.5 + 0.25 = 0.8', '1000(1.05)^3 = 1157', '10/3 = 3.3', '22/7 ≈ 3', '√2 ≈ 1', '740^0.5 = 27']) ok(st([f]) === 'note', `a line that may be a rounding is not crossed: ${f}`);
@@ -193,7 +201,7 @@ ok(stepEvidence(WITH, '4', '2x = 8\nx = 4', { correct: true }).stepReport?.arith
 { // a tick must not sit on the line that ends at the student's own wrong answer
   const QW = { answerType: 'numeric', answer: { value: 30 }, prompt: 'Find the value.', steps: [] };
   const wrong = stepEvidence(QW, '10', '2 + 3 = 5\nso 10^1 = 10', { correct: false }).stepReport;
-  ok(wrong.lines.map(l => l.status).join() === 'ok,note' && /was not accepted as the answer/.test(wrong.lines[1].note), `the line that ends at the wrong answer is a note that says so (${wrong.lines.map(l => l.status)})`);
+  ok(wrong.lines.map(l => l.status).join() === 'ok,note' && /was not accepted as the answer/.test(plain(wrong.lines[1].note)), `the line that ends at the wrong answer is a note that says so (${wrong.lines.map(l => l.status)})`);
   const right = stepEvidence(QW, '30', '5 × 6 = 30', { correct: true }).stepReport;
   ok(right.lines[0].status === 'ok', 'a line that ends at the right answer keeps its tick');
   // the typed answer is never parsed or evaluated for this note (CI's cost-of-marking guard caught an earlier version)
@@ -215,6 +223,48 @@ ok(!/consistent with the correct solution/.test(JSON.stringify(en[copy.key])) &&
 ok(typeof en['aw.body.arithmetic'] === 'string' && typeof hi['aw.body.arithmetic'] === 'string' && typeof en['mp.why.arithmetic'] === 'string' && typeof hi['mp.why.arithmetic'] === 'string' && hi['verdict.workingArithmetic'], 'the wording exists in both languages');
 const model = buildAnnotatedWorking({ stepReport: run(lines), lines });
 ok(model?.cards?.length === 2 && model.cards.every(c => c.status === 'checked' && c.valueChain === 'arithmetic'), `the marked page shows them as arithmetic ticks (${JSON.stringify(model?.cards?.map(c => [c.status, c.valueChain]))})`);
+
+// ── Part 4 · values in exact form, and comments as maths ─────────────────────
+{
+  const plainOf = v => exactForm(v).plain, texOf = v => exactForm(v).tex;
+  const cases = [[21.333333333333332, '64/3', '\\frac{64}{3}'], [-Math.sqrt(3), '−√3', '-\\sqrt{3}'], [Math.sqrt(3) / 2, '√3/2', '\\frac{\\sqrt{3}}{2}'],
+    [Math.PI / 3, 'π/3', '\\frac{\\pi}{3}'], [2 * Math.PI / 3, '2π/3', '\\frac{2\\pi}{3}'], [12 * Math.sqrt(3), '12√3', '12\\sqrt{3}'],
+    [-1.7320508, '−1.7321', '-1.7321'], [20.78461, '20.7846', '20.7846'], [7, '7', '7'], [-0, '0', '0'], [0.5, '1/2', '\\frac{1}{2}'], [-5 / 12, '−5/12', '-\\frac{5}{12}'],
+    [3 * Math.sqrt(2) / 2, '3√2/2', '\\frac{3\\sqrt{2}}{2}'], [Math.PI, 'π', '\\pi'], [-Math.PI / 2, '−π/2', '-\\frac{\\pi}{2}'], [Math.sqrt(2), '√2', '\\sqrt{2}'],
+    [Math.sqrt(0.5), '√2/2', '\\frac{\\sqrt{2}}{2}'], [1.4142, '1.4142', '1.4142'], [Math.sqrt(53), '7.2801', '7.2801'], [1 / 13, '0.0769', '0.0769']];
+  for (const [v, plainWant, texWant] of cases) ok(plainOf(v) === plainWant && texOf(v) === texWant, `exact form of ${v}: ${plainOf(v)} · ${texOf(v)}`);
+  // an exact form is only ever used when it reproduces the value
+  let wrongForm = 0;
+  for (let k = 0; k < 4000; k++) {
+    const v = (Math.sin(k * 12.9898) * 43758.5453 % 1) * 40 + (k % 7 ? 0 : 1) * k / 13;
+    const f = exactForm(v).plain.replace('−', '-');
+    const m = f.match(/^(-?)(\d*)(√(\d+)|π)?(?:\/(\d+))?$/);
+    if (!m) continue;
+    const num = m[3] ? (m[2] === '' ? 1 : +m[2]) * (m[3] === 'π' ? Math.PI : Math.sqrt(+m[4])) : +m[2];
+    const got = (m[1] ? -1 : 1) * num / (m[5] ? +m[5] : 1);
+    if (Math.abs(got - v) > 1e-4 * Math.max(1, Math.abs(v)) && !/\./.test(f)) wrongForm++;
+  }
+  ok(wrongForm === 0, `an exact form always reproduces its value (${wrongForm} wrong)`);
+  // a line of constants says what the plain-number path says
+  ok(plain(run(['2 + 3 = 5']).lines[0].note) === 'Both sides come to 5.', 'a line of constants: both sides come to the value');
+  const con = run(['3 × 4', '= 12', '= 12']);
+  ok(con.lines.every(l => !/for every value of the letters/.test(l.note || '')), 'no comment says "for every value of the letters" about constants');
+  ok(/^This equals the line above: 12\.$/.test(plain(con.lines[2].note || '')) , `a continuation of constants: this equals the line above (${con.lines[2].note})`);
+  const live = run(['16/3 = 2[2(4)^2 - 4^3/3]', '= 2[32 - 64/3]', '= 64/3']);
+  ok(live.lines.some(l => /\$\\frac\{\d+\}\{\d+\}\$/.test(l.note || '')), `a fraction in a comment is a stacked fraction in TeX (${live.lines.map(l => l.note)})`);
+  // every comment: dollars pair up, the TeX renders, and nothing is left as an engine's plain notation
+  const all = [...comments];
+  ok(all.length >= 30, `the test pages produced ${all.length} distinct comments`);
+  ok(all.every(dollarsBalanced), `every comment has balanced dollars (${all.filter(c => !dollarsBalanced(c)).join(' | ')})`);
+  const katex = (await import('katex')).default;
+  let spans = 0, bad = [];
+  for (const c of all) for (const m of c.matchAll(/(?<!\\)\$((?:\\\$|[^$])+?)(?<!\\)\$/g)) {
+    spans++;
+    try { katex.renderToString(m[1], { throwOnError: true, strict: 'error' }); } catch (e) { bad.push(`${m[1]} (${e.message})`); }
+  }
+  ok(spans >= 20 && bad.length === 0, `${spans} maths spans in comments all render in KaTeX (${bad.join(' | ')})`);
+  ok(all.every(c => !/[—–]/.test(c)), 'no comment contains a dash');
+}
 
 console.log(`ARITHMETIC LINES: ${fail ? 'FAIL' : 'PASS'} — ${pass}/${pass + fail} checks — false arithmetic crossed, true arithmetic ticked as arithmetic only, no mark from it`);
 if (fail) process.exit(1);

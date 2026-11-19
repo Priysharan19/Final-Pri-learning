@@ -48,8 +48,9 @@ const close = (a, b) => Number.isFinite(a) && Number.isFinite(b) && Math.abs(a -
 const isVec = v => Array.isArray(v);
 const vecClose = (a, b) => a.length === b.length && a.every((x, i) => close(x, b[i]));
 const norm = v => Math.hypot(...v);
-const shownNum = v => { const r = Math.round(v * 1e6) / 1e6; return String(Object.is(r, -0) ? 0 : r).replace(/-/g, '−'); };
-const shown = v => (isVec(v) ? `(${v.map(shownNum).join(', ')})` : shownNum(v));
+const shownNum = v => { const r = Math.round(v * 1e6) / 1e6; return String(Object.is(r, -0) ? 0 : r); };
+// A value or a vector in a comment is a `$…$` span the client typesets.
+const shown = v => `$${isVec(v) ? `(${v.map(shownNum).join(',\\ ')})` : shownNum(v)}$`;
 
 class Unreadable extends Error {}
 

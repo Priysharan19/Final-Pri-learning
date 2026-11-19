@@ -12,6 +12,7 @@
 import React, { useEffect, useMemo } from 'react';
 import { MathText } from '../lib/latex.jsx';
 import Icon from './Icon.jsx';
+import { EngineComment } from './EngineComment.jsx';
 import { useT } from '../i18n/index.js';
 import { buildAnnotatedWorking, lineRange } from './annotatedWorkingModel.js';
 import './AnnotatedWorking.css';
@@ -66,9 +67,9 @@ function RuleLine({ rule, t }) {
 export function CardBody({ card, model, t, renderBreakDetail }) {
   if (card.status === 'unread') return <p>{t('aw.body.unread')}</p>;
   if (card.valueChain === 'given') return <p>{t('aw.body.given')}</p>;
-  if (card.valueChain === 'verified') return <p>{t('aw.body.valueVerified')}{card.note ? ` ${card.note}` : ''}</p>;
-  if (card.valueChain === 'arithmetic') return <p>{card.note ? `${card.note} ` : ''}{t('aw.body.arithmetic')}</p>;
-  if (card.status === 'incomplete') return <p>{card.note}</p>;
+  if (card.valueChain === 'verified') return <p>{t('aw.body.valueVerified')}{card.note ? <> <EngineComment text={card.note} /></> : ''}</p>;
+  if (card.valueChain === 'arithmetic') return <p>{card.note ? <><EngineComment text={card.note} />{' '}</> : ''}{t('aw.body.arithmetic')}</p>;
+  if (card.status === 'incomplete') return <p><EngineComment text={card.note} /></p>;
   if (card.status === 'condition') return <p>{t('aw.body.condition')}</p>;
   // The lines of a value-chain report that were not verified share one reason, said once below the cards.
   if (card.status === 'not-verified' && model.unverified) return null;
@@ -77,8 +78,8 @@ export function CardBody({ card, model, t, renderBreakDetail }) {
     return (
       <>
         <p>{card.n > 1 ? t('aw.body.firstError', { n: card.n - 1 }) : t('aw.body.firstErrorStart')}</p>
-        {card.diagnosis?.title && <p className="aw-diag"><b>{card.diagnosis.title}</b>{card.diagnosis.message ? <>: {card.diagnosis.message}</> : null}</p>}
-        {!card.diagnosis && card.note && <p className="aw-diag">{card.note}</p>}
+        {card.diagnosis?.title && <p className="aw-diag"><b>{card.diagnosis.title}</b>{card.diagnosis.message ? <>: <EngineComment text={card.diagnosis.message} /></> : null}</p>}
+        {!card.diagnosis && card.note && <p className="aw-diag"><EngineComment text={card.note} /></p>}
         {card.diagnosis?.fix && <p className="aw-fix">{card.diagnosis.fix}</p>}
         {renderBreakDetail && card.previousText ? renderBreakDetail(card.previousText, card.text) : null}
       </>

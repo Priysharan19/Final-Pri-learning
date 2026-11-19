@@ -47,6 +47,8 @@ import { inkCanvasHeight, useFormFactor } from '../platform/formFactor.js';
 import { useLanguage, useT } from '../i18n/index.js';
 import MarginMarks, { stampDelay, sweepSpan } from '../instrument/MarginMarks.jsx';
 import Icon from '../components/Icon.jsx';
+import { EngineComment } from '../components/EngineComment.jsx';
+import { plainComment } from '../engine/commentTex.js';
 import './InkAnswer.css';
 import { priNative } from '../platform/native/index.js';
 import { strokeSignature, createStrokeSignature } from './strokeSignature.js';
@@ -737,14 +739,14 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
                     ))}
                     <span className={`ink-verdict ${good ? 'good' : 'bad'}`}
                       style={{ top: b.y + b.h / 2 - 14, left: b.x + b.w + 16, ...at }}
-                      title={v.note || (good ? t('ink.lineOk') : t('ink.lineBreaks'))}>{good ? <Icon name="check" size={18} /> : <Icon name="correction" size={18} />}</span>
+                      title={plainComment(v.note) || (good ? t('ink.lineOk') : t('ink.lineBreaks'))}>{good ? <Icon name="check" size={18} /> : <Icon name="correction" size={18} />}</span>
                     {bad && boxes.map((gb, gi) => (
                       <span key={`underline-${gi}`} className="ink-underline"
                         style={{ left: gb.x + 3, top: gb.y + gb.h - 3, width: Math.max(0, gb.w - 6), ...at }} />
                     ))}
                     {showNote && (
                       <span className="ink-note" style={{ left: Math.max(4, b.x - 2), top: b.y + b.h + 16 }}>
-                        <b>{t('ink.mistakeHere')}</b>{v.note ? <> — {v.note}</> : null}
+                        <b>{t('ink.mistakeHere')}</b>{v.note ? <> — <EngineComment text={v.note} /></> : null}
                       </span>
                     )}
                   </React.Fragment>
@@ -883,7 +885,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
               })()}
               <span className="ink-line-math">{(() => { const segs = line.corrected === true ? null : segmentsFor(line); return segs ? <Typeset text={line.text} texOf={x => exprToLatex(x) || '\\;'} segments={segs} /> : <MathText text={`$${exprToLatex(line.text) || '\\;'}$`} />; })()}</span>
               {lineVerdicts && lineVerdicts[li] && ['break', 'wrong'].includes(lineVerdicts[li].status) && lineVerdicts[li].note && (
-                <span className="sc-note" style={{ fontSize: 12.5 }}>— {lineVerdicts[li].note}</span>
+                <span className="sc-note" style={{ fontSize: 12.5 }}>— <EngineComment text={lineVerdicts[li].note} /></span>
               )}
               {line.corrected === true && (
                 <span className="ink-line-corrected" role="status"><Icon name="check" size={13} /> {t('ink.correctedSr', { n: li + 1 })}</span>

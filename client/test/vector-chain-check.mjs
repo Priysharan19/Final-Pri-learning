@@ -18,6 +18,7 @@ import { forms } from '../src/engine/generators/au-forms-ext1-b-nsw.js';
 import { vectorChainMeta } from '../src/engine/vectorChain.js';
 import { workingEvidence } from '../src/components/attemptEvidence.js';
 import { stepMetaFor } from '../../server/platform/markerOps.js';
+import { plainComment } from '../src/engine/commentTex.js';
 
 let pass = 0, fail = 0;
 const ok = (c, m) => { if (c) pass++; else { fail++; console.error('FAIL:', m); } };
@@ -30,7 +31,7 @@ const PAGE = ['|4a+3b|', '= |4[-5,-1]+3[-2,4]|', '= |[-20,-4]-[-6,+12]|', '= [14
 let r = run(PAGE);
 ok(r.lines.map(l => l.status).join() === 'ok,ok,note,break,note,note,note,note', `the owner's page: two ticks, the slip crossed (${r.lines.map(l => l.status)})`);
 ok(r.firstBreak === 3 && r.lines[3].state === 'wrong', 'the cross is on the line where -20 - 6 became 14');
-ok(/\(−26, 8\)/.test(r.diagnosis?.message || '') && /\(14, 8\)/.test(r.diagnosis?.message || ''), `the reason names both vectors (${r.diagnosis?.message})`);
+ok(/\(−26, 8\)/.test(plainComment(r.diagnosis?.message || '')) && /\(14, 8\)/.test(plainComment(r.diagnosis?.message || '')), `the reason names both vectors (${r.diagnosis?.message})`);
 ok(r.lines[0].state === 'given' && r.lines[1].state === 'verified', 'the restated question is "given", the substitution is verified');
 ok(r.lines[2].status === 'note', 'the stacked sum that was misread as [-6,+12] is a note, never a cross');
 ok(r.source === 'value-chain' && r.summary.wrong.join() === '4', 'the report has the value-chain shape');
