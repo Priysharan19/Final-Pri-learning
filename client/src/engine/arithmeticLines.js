@@ -147,7 +147,9 @@ function bracketFunctions(text) {
     .replace(LOG_BARE, (_, fn, arg) => `${fn}(${arg})`)
     // a logarithm of one plain number (log 3, ln 10), and a space before its bracket (log (3 + 2))
     .replace(/(?<![A-Za-z])(ln|log)\s+\(/g, '$1(')
-    .replace(/(?<![A-Za-z])(ln|log)\s*(\d+(?:\.\d+)?)(?!\s*[A-Za-z0-9^(.!])/g, '$1($2)');
+    // (not when a fraction follows: ln 1/2 is ln(1/2) to the student and ln(1)/2 to a parser, so it stays unread;
+    //  ln 3 / ln 10, a quotient of two logarithms, is read)
+    .replace(/(?<![A-Za-z])(ln|log)\s*(\d+(?:\.\d+)?)(?!\s*[A-Za-z0-9^(.!])(?!\s*\/(?!\s*(?:ln|log)))/g, '$1($2)');
 }
 
 // The comment on a tick may name the step, but only as something the two
@@ -454,6 +456,9 @@ export function stepCheckArithmetic(workingText) {
     // a line of letters whose LAST side is a worked expression of plain numbers. The `=` line below it rewrites that
     // expression, so it is held to it. A bare number left by such a line (`t = 5` then `= 20`) stays tick only.
     const before = carried && carried.value !== undefined && (!carried.calculus || carried.compound) && !afterLabel ? carried : null;
+    // Only the first rewrite is held this way. What it leaves for the line after it is tick only again: `d = 3^2 + 4^2`,
+    // `= 25`, `= 5` drops a square root without writing it, and the last line is not a claim that 25 is 5.
+    const underLetters = !!(carried && carried.calculus);
     prev = null;
     if (i >= LIMITS.lines || line.length > LIMITS.chars) return note(line, 'Not checked: this line is too long or too far down the working to check.');
     if (firstBreak !== -1) return note(line, 'Follows from the earlier slip.');
@@ -533,7 +538,7 @@ export function stepCheckArithmetic(workingText) {
     const values = sides.map(valueOf);
     // The last side carries to a `= …` line below, whether or not this line states anything.
     const last = values[values.length - 1];
-    if (last !== null) prev = { value: last, text: sides[sides.length - 1] };
+    if (last !== null) prev = { value: last, text: sides[sides.length - 1], ...(underLetters ? { calculus: true } : {}) };
     if (values.some(v => v === null)) return note(line, NOTE);
     // After a line worked out numerically (an integral) or a line of letters, a `=` line of numbers is ticked when it
     // agrees and is otherwise a note: the value above came from limits or letters that may have been misread.

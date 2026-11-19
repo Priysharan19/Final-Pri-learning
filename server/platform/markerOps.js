@@ -134,7 +134,8 @@ export function stepEvidence(q, answer, steps, result) {
   // An arithmetic report keeps to arithmetic: no milestone tick is added to it, so its wording stays true of every tick.
   try { if (report && report.arithmetic !== true) report = annotateMilestones(q, report); } catch { /* the report stands */ }
   // A true-as-written tick on a line that ends at the student's own WRONG answer (`so 10^1 = 10` when the answer is 30)
-  // reads as "this is right". The arithmetic is; the value is not the answer. Such a tick becomes a note that says so.
+  // reads as "this is right". The arithmetic is; the value was not accepted (it may be wrong, or right in a form or unit
+  // the question did not accept: the note claims only what is true in both cases). Such a tick becomes that note.
   try {
     const given = typeof answer === 'string' ? arithmeticInfo(answer.trim()) : null;
     if (report && result.correct === false && given && given.value !== undefined && Array.isArray(report.lines)) {
@@ -146,7 +147,7 @@ export function stepEvidence(q, answer, steps, result) {
         try { last = arithmeticInfo(cleanStatement(sides[sides.length - 1] || '')); } catch { last = null; }
         if (!last || last.value === undefined || Math.abs(last.value - given.value) > 1e-9 * Math.max(1, Math.abs(given.value))) return l;
         changed = true;
-        return { text: l.text, status: 'note', state: 'unverified', unverified: true, note: 'The arithmetic on this line is right, but this value is not the answer to the question.' };
+        return { text: l.text, status: 'note', state: 'unverified', unverified: true, note: 'The arithmetic on this line is right, but this value was not accepted as the answer.' };
       });
       if (changed) report = { ...report, lines };
     }

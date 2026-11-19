@@ -116,6 +116,10 @@ ok(st(['x^2 - 4 = 0 so (x-2)(x+2) = 0', 'x = 2']) === 'ok,ok' && st(['2x = 4 so 
   ok(st(['ln 8 = 2 ln 3']) === 'break' && st(['log 2 + log 5 = log 7']) === 'break' && st(['ln 3 + ln 4 = ln 7']) === 'break', 'and false in either base are crossed');
   for (const f of ['log 100 = 2', 'log 2 + log 5 = 1', 'ln 100 = 2', 'log 10 = 1', 'log e = 1', 'log x = 2', 'log 2x = log 2 + log x', 'log 3.0 + log 2 = log 7', 'log_2 8 = 4', 'log 3^2 = 2 log 3', 'log 3! = log 5', 'ln 2 = 0.69', '2 log 3 = log 6']) ok(st([f]) !== 'break' || f === '2 log 3 = log 6', `true in one base only, or not read one way: never crossed: ${f} (${st([f])})`);
   ok(st(['2 log 3 = log 6']) === 'break' && st(['2 log 3 = log 9']) === 'ok', 'a coefficient on a log is read');
+  // independent review: a fraction after ln or log is ln(a/b) to the student
+  for (const f of ['ln 1/2 = -ln 2', 'ln 1/3 = -ln 3', 'log 1/2 = -log 2', 'ln 3/2 = ln 3 - ln 2', 'ln 2/3 = ln 2 - ln 3', 'log 2/3 = log 2 - log 3', 'ln 9/2 = ln 3']) ok(st([f]) === 'note', `a fraction after a logarithm is not read: ${f} (${st([f])})`);
+  ok(st(['ln 8 / ln 2 = 3', 'log 8 / log 2 = ln 8 / ln 2']) === 'ok,ok', 'a quotient of two logarithms is read');
+  ok(st(['d = 3^2 + 4^2', '= 25', '= 5']) === 'note,ok,note' && st(['d = 3^2 + 4^2', '= 24', '= 5']) === 'note,break,note', 'only the first rewrite under a worked expression is held to it; a line after that is never crossed');
   ok(st(['t = 5', '= 20']) === 'note,note' && st(['v = 3(4) + 5', '= 20']) === 'note,break' && st(['v = 3(4) + 5', '= 17']) === 'note,ok' && st(['Total: 3 + 4', '= 8']) === 'note,note', 'a rewrite is held to a worked expression above it; a bare number or a labelled line above stays tick only');
 }
 // never crossed
@@ -168,7 +172,7 @@ ok(stepEvidence(WITH, '4', '2x = 8\nx = 4', { correct: true }).stepReport?.arith
 { // a tick must not sit on the line that ends at the student's own wrong answer
   const QW = { answerType: 'numeric', answer: { value: 30 }, prompt: 'Find the value.', steps: [] };
   const wrong = stepEvidence(QW, '10', '2 + 3 = 5\nso 10^1 = 10', { correct: false }).stepReport;
-  ok(wrong.lines.map(l => l.status).join() === 'ok,note' && /not the answer to the question/.test(wrong.lines[1].note), `the line that ends at the wrong answer is a note that says so (${wrong.lines.map(l => l.status)})`);
+  ok(wrong.lines.map(l => l.status).join() === 'ok,note' && /was not accepted as the answer/.test(wrong.lines[1].note), `the line that ends at the wrong answer is a note that says so (${wrong.lines.map(l => l.status)})`);
   const right = stepEvidence(QW, '30', '5 × 6 = 30', { correct: true }).stepReport;
   ok(right.lines[0].status === 'ok', 'a line that ends at the right answer keeps its tick');
   const other = stepEvidence(QW, '10', '2 + 3 = 5', { correct: false }).stepReport;
