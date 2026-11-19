@@ -22,6 +22,8 @@ import { fileURLToPath } from 'node:url';
 
 let pass = 0;
 const failures = [];
+// Every regular-expression metacharacter of a label is escaped.
+const rx = s => s.replace(/[.*+?^${}()|[\]\\\/-]/g, '\\$&');
 const ok = (cond, label) => { if (cond) pass++; else failures.push(label); };
 const root = fileURLToPath(new URL('..', import.meta.url));
 const read = rel => readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8');
@@ -66,7 +68,7 @@ try {
     const html = draw(h(Sketch, props()));
     for (const k of ['sketch.xIntercepts', 'sketch.yIntercept', 'sketch.turning']) {
       const label = t(k);
-      ok(new RegExp(`<label[^>]*for="[^"]+"[^>]*>${label.replace(/[-]/g, '\\-')}</label>|<legend[^>]*>${label.replace(/[-]/g, '\\-')}</legend>`).test(html), `${lang}: the "${label}" field has its label`);
+      ok(new RegExp(`<label[^>]*for="[^"]+"[^>]*>${rx(label)}</label>|<legend[^>]*>${rx(label)}</legend>`).test(html), `${lang}: the "${label}" field has its label`);
     }
     ok(/<input[^>]*data-sketch-xs/.test(html) && /<input[^>]*data-sketch-y\b/.test(html) && /<select[^>]*data-sketch-tk/.test(html), `${lang}: a field for each asked feature, and a type choice for the turning point`);
     ok(html.includes(`aria-label="${t('sketch.turning.row', { n: 1 })}"`), `${lang}: each turning point row is a named group`);
