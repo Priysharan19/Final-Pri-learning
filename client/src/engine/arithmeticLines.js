@@ -54,8 +54,9 @@ const gcd = (a, b) => (b ? gcd(b, a % b) : Math.abs(a));
 export function exactForm(v) {
   const done = (plain, tex) => ({ plain: plain.replace(/^-/, '−'), tex });
   if (!Number.isFinite(v)) return { plain: String(v), tex: String(v) };
-  // a whole number the arithmetic reached with rounding noise (√2 × √2 is 2.0000000000000004) is that whole number
-  if (Math.abs(v - Math.round(v)) <= 1e-9 * Math.max(1, Math.abs(v))) { const r = Math.round(v), s = String(Object.is(r, -0) || r === 0 ? 0 : r); return done(s, s); }
+  if (Number.isInteger(v)) { const s = String(Object.is(v, -0) ? 0 : v); return done(s, s); }
+  // A whole number carrying float noise (72.00000000000001, or √2 × √2 = 2.0000000000000004) is that whole number.
+  { const whole = Math.round(v); if (Math.abs(v - whole) <= 1e-9 * Math.max(1, Math.abs(whole))) { const s = String(Object.is(whole, -0) ? 0 : whole); return done(s, s); } }
   const sign = v < 0 ? '-' : '', a = Math.abs(v);
   const reproduces = x => Math.abs(x - a) <= 1e-9 * Math.max(1, a);
   for (let d = 2; d <= 12; d++) { const n = Math.round(a * d); if (Math.abs(a * d - n) < 1e-9 && n < 100000) return done(`${sign}${n}/${d}`, `${sign}\\frac{${n}}{${d}}`); }
