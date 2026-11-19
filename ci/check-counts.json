@@ -732,7 +732,7 @@
         {"has":"PRACTICE INPUT TIMING: PASS — 4/4 cases (390×844 and 820×1180, light and dark), 12/12 answer-mode presses (the selected tab included) inside 100 ms"},
         {"has":"E2E SUITE PASSED — 129/129 checks across 1 flows"},
         {"has":"NSW PRACTICE MARKED TOUR: PASS — 9/9 checks","note":"A Prithagoras NSW Year 10 student is issued a question by the server and the server marks it (the device names the profile own course)."},
-        {"has":"GUEST TRIAL TOUR: PASS - 98 checks (priyabhata, prithagoras)","note":"ADR-0003: both editions, a visitor with no account, five server-marked questions, the sign-up prompt, Hindi where offered, and the same picker as the signed-in Home quick start (98 = 49 Priyabhata + 49 Prithagoras, re-derived by running)."}
+        {"has":"GUEST TRIAL TOUR: PASS - 129 checks (priyabhata, prithagoras)","note":"ADR-0003: both editions, a visitor with no account, five server-marked questions, the sign-up prompt, Hindi where offered, and the same picker as the signed-in Home quick start (129, re-derived by running the tour on the merged tree)."}
       ]
     },
     "build/brand-build.log": {
