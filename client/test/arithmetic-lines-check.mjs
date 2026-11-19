@@ -132,6 +132,17 @@ ok(st(['x^2 - 4 = 0 so (x-2)(x+2) = 0', 'x = 2']) === 'ok,ok' && st(['2x = 4 so 
   ok(st(['-20 - 6 = 14']) === 'break' && st(['2 + 3 = 6']) === 'break' && st(['2[32 - 64/3] = 16/3']) === 'break', 'a worked expression set equal to a wrong value is still crossed');
   ok(st(['Area = 3 × 4', '= 12']) === 'note,ok' && st(['Volume = 2 + 2 = 5']) === 'break' && st(['Area = 12']) === 'note', 'a word in front of `=` is a label');
 }
+// what a page costs to check does not depend on what is written on it (CI's cost guards caught two earlier versions)
+{
+  const heavy = Array.from({ length: 16 }, () => 'sum(sum(sum(k;k;1;300);j;1;300);i;1;300) = 5');
+  let at = Date.now();
+  const hr = run(heavy);
+  ok(Date.now() - at < 400 && hr.lines.every(l => l.status === 'note'), `sixteen lines of nested sums are checked in a bounded time and judged nowhere (${Date.now() - at} ms)`);
+  at = Date.now();
+  const QH = { answerType: 'numeric', answer: { value: 30 }, prompt: 'Find the value.', steps: [{ h: 'a', d: '$x = 30$' }, { h: 'b', d: '$y = 12$' }] };
+  const he = stepEvidence(QH, '7', heavy.join('\n'), { correct: false });
+  ok(Date.now() - at < 600 && he.partial === null, `and the same page through the server's evidence path, with the missing-steps pass (${Date.now() - at} ms)`);
+}
 // never crossed
 for (const f of ['3x + 2 = 11', 'x = 3', 'n = 5', 'P(A) = 3', 'sin(30) = 2', 'log(100) = 3', 'ln 5 = 2', 'pi = 3', 'e^2 = 7', '50% of 80 = 30', '90° = 2', '5 cm + 3 cm = 9 cm', '2 1/2 = 5/2', '1 000 = 1000', '3 < 2', '4 ≠ 4', 'the answer is 5', '', '= 5', '6/0 = 3', '(((', '2 + = 4']) ok(!/break|ok/.test(st([f])), `not judged: "${f}" (${st([f])})`);
 for (const f of ['0.5 + 0.25 = 0.8', '1000(1.05)^3 = 1157', '10/3 = 3.3', '22/7 ≈ 3', '√2 ≈ 1', '740^0.5 = 27']) ok(st([f]) === 'note', `a line that may be a rounding is not crossed: ${f}`);

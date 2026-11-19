@@ -26,7 +26,12 @@
 //     handwriting: 23 = 8 is 2^3 = 8 with the index read on the line, and
 //     12 = 0.5 is 1/2 with the bar lost. The reader, not the student, may
 //     have made that slip.
-import { parse, normalize, evaluate, variablesOf, exprEquivalent } from './expr.js';
+import { parse, normalize, evaluate, variablesOf, exprEquivalent, withEvaluationBudget } from './expr.js';
+
+// Everything this module evaluates for one page of working is charged to ONE budget (expr.js, "What an evaluation may
+// cost"): what a page costs to check must not depend on what is written on it. When the budget is spent the rest
+// evaluates to NaN, which is a note, never a tick or a cross.
+const PAGE_BUDGET = 200000;
 
 const LIMITS = { lines: 20, chars: 160 };
 const NOTE = 'Not checked: this line has no arithmetic Pri can check on its own.';
@@ -435,6 +440,9 @@ function pageDefinitions(raw, out, firstBreak) {
 }
 
 export function stepCheckArithmetic(workingText) {
+  return withEvaluationBudget(PAGE_BUDGET, () => stepCheckArithmeticWithinBudget(workingText));
+}
+function stepCheckArithmeticWithinBudget(workingText) {
   const raw = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
   const out = [];
   let firstBreak = -1;

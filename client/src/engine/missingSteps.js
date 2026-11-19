@@ -14,6 +14,7 @@
 // that rounds to it, or the same expression). A step with no value this can
 // read (words only, vectors, sets) is never reported.
 import { plainTex } from './checker.js';
+import { withEvaluationBudget } from './expr.js';
 import { infoOf, sameAsWritten, cleanStatement } from './arithmeticLines.js';
 
 const TEX_SPAN = /\$([^$]+)\$/g;
@@ -65,6 +66,10 @@ function matches(a, b) {
  * can be said (no steps, no readable values, no working).
  */
 export function missingSteps(q, working) {
+  // One budget for the whole page (see arithmeticLines.js PAGE_BUDGET): a page of nested sums costs what any page costs.
+  return withEvaluationBudget(200000, () => missingStepsWithinBudget(q, working));
+}
+function missingStepsWithinBudget(q, working) {
   const steps = Array.isArray(q?.steps) ? q.steps.slice(0, LIMITS.steps) : [];
   // (a line longer than the line check itself reads is not read here either)
   const lines = String(working || '').split('\n').map(l => l.trim()).filter(l => l && l.length <= 160).slice(0, LIMITS.lines);
