@@ -1,0 +1,53 @@
+/* The graph-sketch answer form. Tokens only: ink, hairline, correction, good. */
+.sk { display: grid; gap: 16px; }
+.sk-lede { margin: 0; font-size: 14px; }
+.sk-form { display: grid; gap: 16px; }
+.sk-field { display: grid; gap: 6px; border: 0; margin: 0; padding: 0; min-width: 0; }
+.sk-field .sc-label { margin: 0; }
+.sk-field .answer-input { width: 100%; min-width: 0; }
+.sk-help { font-size: 13px; line-height: 1.4; }
+.sk-error { font-size: 13.5px; color: var(--correction); }
+.sk-turning { gap: 10px; }
+.sk-turning legend { padding: 0; margin-bottom: 4px; }
+
+.sk-tp { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+.sk-tp-n { width: 18px; padding-bottom: 12px; font-size: 13px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.sk-tp-f { display: grid; gap: 4px; font-size: 13px; color: var(--ink-3); }
+.sk-tp-f .answer-input { width: 92px; min-width: 0; }
+.sk-tp-kind select { min-width: 132px; }
+.sk-add { justify-self: start; }
+.sk-none { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.sk-none input { width: 18px; height: 18px; accent-color: var(--ink-2); }
+
+.sk-figure { margin: 0; display: grid; gap: 8px; }
+.sk-subhead { margin: 0; }
+.sk-plot { display: block; width: 100%; max-width: 440px; height: auto; border: 1px solid var(--hairline); border-radius: 6px; background: var(--paper); }
+.sk-grid line { stroke: var(--hairline-faint); stroke-width: 1; }
+.sk-axes line { stroke: var(--ink-3); stroke-width: 1.25; }
+.sk-ticks text { fill: var(--ink-3); font-size: 10.5px; font-variant-numeric: tabular-nums; }
+.sk-curve { fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.sk-points circle { fill: var(--ink); }
+.sk-points text { fill: var(--ink-2); font-size: 10.5px; font-variant-numeric: tabular-nums; paint-order: stroke; stroke: var(--paper); stroke-width: 3px; }
+.sk-marked .sk-points circle { fill: var(--good); }
+.sk-rings circle { fill: none; stroke: var(--correction); stroke-width: 1.5; }
+.sk-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font-size: 13px; }
+.sk-sum { font-variant-numeric: tabular-nums; color: var(--ink-2); }
+.sk-key { display: inline-block; width: 12px; height: 12px; margin-right: -8px; border-radius: 50%; }
+.sk-key-curve { height: 0; width: 18px; border-radius: 0; border-top: 2px solid var(--ink); margin-right: -8px; }
+.sk-key-true { background: var(--good); }
+.sk-key-yours { border: 1.5px solid var(--correction); }
+
+.sk-summary { margin: 0; font-size: 14px; color: var(--ink-2); }
+.sk-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.sk-row { display: grid; grid-template-columns: 20px 1fr; gap: 6px; align-items: start; font-size: 14.5px; }
+.sk-row-mark { color: var(--good); padding-top: 2px; }
+.sk-row.is-off .sk-row-mark { color: var(--correction); }
+.sk-row-body { display: grid; gap: 2px; }
+.sk-row-state { color: var(--ink-2); }
+.sk-row.is-off .sk-row-state { color: var(--correction); }
+.sk-row-value { font-variant-numeric: tabular-nums; color: var(--ink-2); }
+
+@media (max-width: 520px) {
+  .sk-tp-f .answer-input { width: 78px; }
+  .sk-tp-kind select { min-width: 112px; }
+}

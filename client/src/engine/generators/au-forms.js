@@ -7,8 +7,8 @@ export const AU_OVERLAYS = {
   year8: () => Promise.all([import('./au-forms-y78-a-nsw.js'), import('./au-forms-y78-b-nsw.js'), import('./au-forms-topup-nsw.js'), import('./au-forms-gaps-a-nsw.js')]),
   year9: () => Promise.all([import('./au-forms-y910-a-nsw.js'), import('./au-forms-y910-b-nsw.js'), import('./au-forms-y910-c-nsw.js'), import('./au-forms-topup-nsw.js')]),
   year10: () => Promise.all([import('./au-forms-y910-a-nsw.js'), import('./au-forms-y910-b-nsw.js'), import('./au-forms-y910-c-nsw.js'), import('./au-forms-topup-nsw.js')]),
-  year11: () => Promise.all([import('./au-forms-adv11-a-nsw.js'), import('./au-forms-adv11-b-nsw.js'), import('./au-forms-gaps-i-nsw.js')]),
-  year12: () => Promise.all([import('./au-forms-adv12-a-nsw.js'), import('./au-forms-adv12-b-nsw.js'), import('./au-forms-adv12-core-nsw.js'), import('./au-forms-gaps-b-nsw.js'), import('./au-forms-gaps-e-nsw.js')])
+  year11: () => Promise.all([import('./au-forms-adv11-a-nsw.js'), import('./au-forms-adv11-b-nsw.js'), import('./au-forms-gaps-i-nsw.js'), import('./au-forms-sketch-nsw.js')]),
+  year12: () => Promise.all([import('./au-forms-adv12-a-nsw.js'), import('./au-forms-adv12-b-nsw.js'), import('./au-forms-adv12-core-nsw.js'), import('./au-forms-gaps-b-nsw.js'), import('./au-forms-gaps-e-nsw.js'), import('./au-forms-sketch-nsw.js')])
 };
 
 export async function loadAuForms(bank) {

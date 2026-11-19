@@ -68,6 +68,9 @@
 // 2026.11.43 — The every-reading rule for bare and "= …" lines (y12-integration's derived step check is back on; the landing demo is
 //              judged with its question), merged with 2026.11.42's NSW content gaps. Served questions are unchanged except where the
 //              merge changed them; the digests are regenerated on the merged tree.
+// 2026.11.44 — Graph-sketch forms: y11-quadfunc D2 and y12-appdiff D2/D3 gain five forms in which the student states a graph's
+//              intercepts and turning points (answerType 'graph-sketch'). Adding forms to those cells changes which question a
+//              given seed draws (612 of 900 sampled draws), so every seed in them is a different question from 2026.11.43's.
 // 2026.11.42 — Past-paper keys carry the paper's own published acceptance band (answer.officialRange) in the served payload, so the
 //              marker's exact-value and uncalled-for-band rules leave that band alone (16 JEE Advanced chapter digests).
 // 2026.11.41 — Walk-through maths fixes: a grouped-data mode question has one modal class; a numeric key is judged
@@ -81,7 +84,14 @@
 // of rational solutions prints as fractions; a previous-year question keeps the exam's published band; the key-format
 // repairs (a constant key, a plain percentage box, a plain value box) and the wider parameter ranges change what
 // those generators serve.
-export const CONTENT_VERSION = '2026.11.43';
+export const CONTENT_VERSION = '2026.11.44';
+/**
+ * A sealed token that re-generates a question from (generator, difficulty, seed) (a prepared practice question, a guest
+ * ticket) carries the content version it was minted under (`c`). A token with no `c` was minted before that field existed,
+ * under this version or an earlier one: it is read as this version, so it binds only while it is still in force and is
+ * stale after any later bump. Never change this value when bumping CONTENT_VERSION.
+ */
+export const UNVERSIONED_TOKEN_CONTENT_VERSION = '2026.11.43';
 export const LEGACY_CONTENT_VERSION = 'legacy-unversioned';
 
 /** FNV-1a over a string, two lanes, as 16 hex characters. */
