@@ -436,7 +436,6 @@ export default {
   'practice.clearFilters': 'Clear filters — back to smart practice',
   'practice.clearShort': 'Clear filter',
   'practice.sessionScore': ' · {correct} of {answered} right this session',
-  'practice.dotpointMeta': ' · dot point {n}',
   'practice.nextUp': ' · next up: {name}',
 
   // ── Verdict and feedback chrome ────────────────────────────────────────────
@@ -5011,4 +5010,12 @@ export default {
   'sketch.detail.wrongKind': 'Check which is the maximum and which is the minimum.',
   'sketch.detail.wrong': 'Not right.',
   'sketch.detail.unreadable': 'This could not be read.',
+  // Syllabus dot point picker on the practice page.
+  'practice.dotpointLabel': 'Syllabus dot point',
+  'practice.dotpointAll': 'All dot points',
+  'practice.dotpointChip': 'Dot point: {text}',
+  'practice.dotpointRemove': 'Remove the dot point filter: {text}',
+  'practice.dotpointAnnounce': 'Practising dot point: {text}.',
+  'practice.dotpointAnnounceAll': 'Practising all dot points.',
+  'practice.dotpointNone': 'This dot point has no questions yet.',
 };

@@ -309,3 +309,14 @@ html[data-edition=prithagoras] .qpage.ws .verdict{scroll-margin-bottom:148px}
 .pr-tour-step { font-size: 12px; }
 .pr-tour-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .pr-tour-actions .btn { pointer-events: auto; }
+
+/* The syllabus dot point control: one labelled select and, when a dot point is
+   chosen, its chip on the same line, so choosing never changes the row's height. */
+.dp-pick { display: grid; gap: 4px; min-width: 0; }
+.dp-pick .label { margin: 0 0 0 1px; }
+.dp-pick-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.dp-pick-row select { flex: 1 1 0; min-width: 0; min-height: 44px; text-overflow: ellipsis; }
+.dp-chip { flex: 0 1 auto; min-width: 0; max-width: 48%; min-height: 44px; box-sizing: border-box; }
+.dp-chip-text { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.dp-chip .chip-x { min-width: 28px; min-height: 28px; padding: 0; display: inline-grid; place-items: center; flex: none; }
+.dp-none { margin: 0; }
