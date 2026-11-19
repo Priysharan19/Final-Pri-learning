@@ -79,12 +79,23 @@ function ProfilePractice() {
   const [serve, setServe] = useState(null);
   // First visit: the four-note tour, for a signed-in account that has not seen it.
   const [tourOn, setTourOn] = useState(false);
+  const penDown = useRef(false);
+  useEffect(() => {
+    const down = e => { if (e.target?.closest?.('.ink-wrap')) penDown.current = true; };
+    const up = () => { penDown.current = false; };
+    document.addEventListener('pointerdown', down, true);
+    document.addEventListener('pointerup', up, true);
+    document.addEventListener('pointercancel', up, true);
+    return () => { document.removeEventListener('pointerdown', down, true); document.removeEventListener('pointerup', up, true); document.removeEventListener('pointercancel', up, true); };
+  }, []);
   const tourReady = !!serve && !assignmentMode && user?.cloudLinked === true;
   useEffect(() => {
     if (!tourReady || tourSeen(user.id)) return undefined;
     const timer = setTimeout(() => {
-      // Never interrupt someone who has already started an answer. (The empty
-      // answer box is focused on arrival, so focus alone says nothing.)
+      // Never interrupt someone who has started an answer: typed text, ink on the
+      // page, a pen stroke in progress, or a photo attached. (The empty answer
+      // box is focused on arrival, so focus alone says nothing.)
+      if (document.querySelector('.qpage[data-has-work="true"]') || penDown.current) return;
       const a = document.activeElement;
       if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA') && String(a.value || '') !== '') return;
       if (a?.isContentEditable && String(a.textContent || '').trim() !== '') return;

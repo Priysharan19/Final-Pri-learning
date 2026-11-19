@@ -2683,7 +2683,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   );
 
   return (
-    <div className={`qpage ws ${split ? 'ws-split' : 'ws-single'}`} data-phase={state.phase} data-mode={isMcq ? 'mcq' : mode} data-question-id={question.id}>
+    <div className={`qpage ws ${split ? 'ws-split' : 'ws-single'}`} data-phase={state.phase} data-has-work={hasWork ? 'true' : undefined} data-mode={isMcq ? 'mcq' : mode} data-question-id={question.id}>
       {/* ── The question: the page's reference object ── */}
       <section className="ws-context" aria-label={t('verdict.questionRegion')}>
         <div className="q-topmeta">

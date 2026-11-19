@@ -58,7 +58,11 @@ for (const s of TOUR_STEPS) {
 ok(/Escape/.test(tour) && /data-tour-skip/.test(tour), 'Escape and Skip close it');
 ok(/noteRef\.current\?\.focus/.test(tour) && /back\?\.focus/.test(tour), 'focus moves to the note and returns to the control');
 ok(/String\(a\.value \|\| ''\) !== ''/.test(base), 'the focused empty answer box does not suppress the tour; typed text does');
-ok(!/aria-modal|role="dialog"/.test(tour), 'not a modal');
+ok(!/<div[^>]*(aria-modal|role="dialog")/.test(tour), 'not a modal');
+ok(/Escape/.test(tour) && !/stopPropagation/.test(tour) && /noteRef\.current\?\.contains\(document\.activeElement\)/.test(tour), 'Escape never swallows the key and acts only from the note or when nothing else is open');
+ok(/data-has-work=\{hasWork/.test(read('../src/components/QuestionCard.jsx')) && /penDown\.current/.test(base) && /data-has-work="true"/.test(base), 'the tour waits for typed text, ink, a pen stroke or a photo');
+const recentSrc = read('../src/components/RecentAttempts.jsx');
+ok(/aria-label=\{t\('recent\.openLabel'/.test(recentSrc) && /aria-label=\{t\('recent\.tryAgainLabel'/.test(recentSrc) && keyIn(en, 'recent.openLabel') && keyIn(hi, 'recent.tryAgainLabel'), 'row actions name their attempt');
 const css = read('../src/workspace.css');
 const noteCss = (css.match(/\.pr-tour \{[^}]*\}/) || [''])[0];
 ok(/pointer-events:\s*none/.test(noteCss) && /\.pr-tour-actions \.btn \{ pointer-events: auto/.test(css), 'the note lets pointer events through except on its own buttons');

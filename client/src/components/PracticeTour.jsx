@@ -41,6 +41,9 @@ export default function PracticeTour({ onClose }) {
     let top = step.side === 'above' ? r.top - h - GAP : r.bottom + GAP;
     if (top < EDGE) top = r.bottom + GAP;
     if (top + h > window.innerHeight - EDGE) top = Math.max(EDGE, r.top - h - GAP);
+    // Narrow screens: under the question text, never over it (and clear of the action bar).
+    const avoid = step.avoid && window.innerWidth < 900 && document.querySelector(step.avoid);
+    if (avoid) top = Math.min(avoid.getBoundingClientRect().bottom + GAP, window.innerHeight - h - 110);
     setBox({ left, top, width: w });
   }, [step]);
 
@@ -66,10 +69,17 @@ export default function PracticeTour({ onClose }) {
     setTimeout(() => back?.focus?.({ preventScroll: true }), 0);
   }, [onClose, step]);
 
+  // Escape closes the tour only when focus is in the note, or nothing else is
+  // open; it is never stopped, so the report form or any other overlay still closes.
   useEffect(() => {
-    const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
-    document.addEventListener('keydown', onKey, true);
-    return () => document.removeEventListener('keydown', onKey, true);
+    const onKey = e => {
+      if (e.key !== 'Escape') return;
+      const inNote = noteRef.current?.contains(document.activeElement);
+      const otherOpen = document.querySelector('[data-question-report], [role="dialog"], [aria-modal="true"]');
+      if (inNote || !otherOpen) close();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
   }, [close]);
 
   if (!step) return null;

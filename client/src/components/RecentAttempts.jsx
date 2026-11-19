@@ -58,7 +58,10 @@ export default function RecentAttempts({ subtopic, onServe }) {
         {open && rows && rows.length === 0 && <p className="muted" data-recent-empty>{t('recent.empty')}</p>}
         {open && rows && rows.length > 0 && (
           <ul className="q-recent-list">
-            {rows.map(item => (
+            {rows.map(item => {
+              const when = formatDate(item.answeredAt, user);
+              const result = item.correct ? t('app.correct') : item.correct === false ? t('app.incorrect') : t('history.notMarked');
+              return (
               <li key={item.id} className="q-recent-row" data-recent-id={item.id}>
                 <time className="muted" dateTime={item.answeredAt}>{formatDate(item.answeredAt, user)}</time>
                 <span className="q-recent-result">
@@ -68,15 +71,16 @@ export default function RecentAttempts({ subtopic, onServe }) {
                   </span>
                 </span>
                 <span className="q-recent-actions">
-                  <button type="button" className="btn btn-ghost btn-sm" data-recent-open
+                  <button type="button" className="btn btn-ghost btn-sm" data-recent-open aria-label={t('recent.openLabel', { date: when, result })}
                     onClick={() => nav(`/history?subtopic=${encodeURIComponent(subtopic)}&open=${encodeURIComponent(item.id)}`)}>{t('recent.open')}</button>
                   {item.canRetry && (
-                    <button type="button" className="btn btn-ghost btn-sm" data-recent-same title={t('history.retrySameTitle')}
+                    <button type="button" className="btn btn-ghost btn-sm" data-recent-same aria-label={t('recent.tryAgainLabel', { date: when, result })} title={t('history.retrySameTitle')}
                       onClick={() => again(item.id, 'same')}>{t('recent.tryAgain')}</button>
                   )}
                 </span>
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </div>
