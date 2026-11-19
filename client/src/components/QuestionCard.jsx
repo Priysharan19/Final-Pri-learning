@@ -2028,7 +2028,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       status: v.status,
       note: v.noteKind === 'conclude' && res?.solution?.answerText
         ? `this line should conclude ${String(res.solution.answerText)}`
-        : 'this line doesn’t reach the right answer — rework it'
+        : 'this line doesn’t reach the right answer. Rework it'
     } : v));
   }, [verdictOutcome, state.res, judged, inkResult, judgedLive, isWorking, res]);
 
@@ -3779,7 +3779,7 @@ function StepReport({ report, instrument = false, correctAnswer = null }) {
         {l.status === 'break' && <b style={{ fontFamily: 'var(--font)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{t(i === first ? 'verdict.mistakeIsHere' : 'verdict.alsoWrong')}</b>}
         {l.secondBreak === true && l.status !== 'break' && <b style={{ fontFamily: 'var(--font)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{t('verdict.alsoWrong')}</b>}
         {l.status === 'ok' && l.ecf === true && <b style={{ fontFamily: 'var(--font)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{t('verdict.carriedForward')}</b>}
-        {l.note && !l.diagnosis && <span style={{ fontFamily: 'var(--font)', fontWeight: 400, fontSize: 12.5 }}> — <EngineComment text={l.note} /></span>}
+        {l.note && !l.diagnosis && <span style={{ fontFamily: 'var(--font)', fontWeight: 400, fontSize: 12.5 }}>: <EngineComment text={l.note} /></span>}
       </div>
       {l.diagnosis && <Diagnosis d={l.diagnosis} line={i + 1} />}
       {i === first && typeof beforeFirst === 'string' && typeof l.text === 'string' && (

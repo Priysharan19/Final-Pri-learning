@@ -34,6 +34,15 @@ try {
   const render = (el) => renderToStaticMarkup(el);
   const mathNodes = html => [...html.matchAll(/<span class="pri-math[^"]*" role="math" aria-label="([^"]*)"([^>]*)>/g)].map(m => ({ name: m[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&'), rest: m[2] }));
 
+  // Escapes in the PROSE of a question (outside $…$): a percent, a dollar and a TeX thin space read as themselves, never
+  // with their backslash (Financial maths: "(1.5\% per month)" and "\$10\,000" showed the backslash on the page).
+  {
+    const prose = render(h(MathText, { text: 'Interest is 1.5\\% per month on \\$10\\,000 and \\$20,700.' }));
+    ok(!/\\/.test(prose), `an escaped percent, dollar or thin space in prose shows no backslash: ${prose}`);
+    ok(prose.includes('1.5% per month on $10 000 and $20,700.'), `the prose reads 1.5% per month on $10 000 and $20,700: ${prose}`);
+    const mixed = render(h(MathText, { text: 'An AFL player converts $52\\%$ of shots; the fee is \\$40 and the rate 1.5\\% a month.' }));
+    ok(!/(?<!<annotation[^>]*>[^<]*)\\%/.test(mixed.replace(/<annotation[^>]*>[^<]*<\/annotation>/g, '')), 'a percent inside a formula and a percent outside it both render without a visible backslash');
+  }
   const samples = ['The roots of $x^2-2x-3=0$ are $-1$ and $3$.', 'Area $=\\int_1^3 (6x^2-4x+5)\\,dx=46$', '$\\frac{64}{3}\\approx 21.33$', 'No maths here, only *words* and **bold**.', 'Cost \\$4 and $5\\%$ off'];
   for (const text of samples) {
     const html = render(h(MathText, { text }));

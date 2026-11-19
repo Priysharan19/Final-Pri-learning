@@ -101,7 +101,7 @@ What the budget's enforcement points are, and what the student sees at each:
 | Time since the page settled | Server | Student |
 |---|---|---|
 | 0 s | the read is sent; nothing but the picture of the ink | "Reading your handwriting…" (`ink.serverReading`) |
-| 5 s | — | the note changes to "Still reading your handwriting — this can take a little longer. Keep going; nothing is lost." (`ink.serverStillReading`, `STILL_READING_MS` in `client/src/ink/InkAnswer.jsx`); the ink stays on the page |
+| 5 s | — | the note changes to "Still reading your handwriting: this can take a little longer. Keep going; nothing is lost." (`ink.serverStillReading`, `STILL_READING_MS` in `client/src/ink/InkAnswer.jsx`); the ink stays on the page |
 | 27 s (60% of the 45 s budget, `PRIMARY_TIMEOUT_SHARE`) | the primary model is abandoned and the fallback model is tried once inside what is left | unchanged |
 | 45 s (`PRI_HANDWRITING_TIMEOUT_MS`, default 45 s, capped at 60 s) | `HANDWRITING_TIMEOUT` (504, retryable), counted as a failed provider call with that code | "Pri's handwriting reader isn't answering right now. Your working is saved and will be tried again shortly — or type your answer now." (`ink.waitingServiceDown`); the page is retried by itself with the back-off in `cloudReader.js` (20 s doubling to 5 minutes) |
 

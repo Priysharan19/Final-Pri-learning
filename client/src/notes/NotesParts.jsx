@@ -272,7 +272,7 @@ export function Flashcards({ chapter, points, onClose }) {
           <>
             <p className="nt-sr" aria-live="polite">{t('notes.cardProgress', { n: i + 1, total: points.length })}</p>
             <button type="button" key={i} className={`nt-card${flipped ? ' is-flipped' : ''}`} data-testid="notes-card"
-              aria-label={`${t('notes.flip')} — ${t('notes.cardProgress', { n: i + 1, total: points.length })}`}
+              aria-label={`${t('notes.flip')}, ${t('notes.cardProgress', { n: i + 1, total: points.length })}`}
               onClick={() => setFlipped(f => !f)}>
               <span className="nt-card-inner">
                 <span className="nt-card-face nt-card-front" aria-hidden={flipped}>

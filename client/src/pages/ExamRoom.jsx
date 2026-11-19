@@ -824,7 +824,7 @@ export default function ExamRoom() {
               <span className="tag tag-brand">{t('examRoom.structured')}</span>
               <span className="tag" style={{ color: d.awarded === d.marks ? 'var(--good)' : d.awarded > 0 ? 'var(--warn)' : 'var(--bad)' }}>
                 {t('examRoom.awardedMarks', { awarded: d.awarded, n: d.marks })}
-                <span className="sr-only"> — {t(d.awarded === d.marks ? 'examRoom.allEarned' : d.awarded > 0 ? 'examRoom.partlyEarned' : 'examRoom.noneEarned')}</span>
+                <span className="sr-only">, {t(d.awarded === d.marks ? 'examRoom.allEarned' : d.awarded > 0 ? 'examRoom.partlyEarned' : 'examRoom.noneEarned')}</span>
               </span>
             </div>
             <div lang="en"><MathText block className="q-prompt" style={{ fontSize: 16 }} text={d.stem} /></div>

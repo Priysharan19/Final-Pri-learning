@@ -64,6 +64,24 @@ function quoteClosers(chunk) {
   return closers;
 }
 
+/** The d/dx(…) marks in a chunk of prose: [from, to, tex] for each one whose brackets balance and whose argument can be set as maths. */
+function ofExpressionSpans(chunk) {
+  const spans = [];
+  const open = /(?<![A-Za-z0-9_])d\/d[a-z]\s*\(/g;
+  let m;
+  while ((m = open.exec(chunk)) !== null) {
+    let depth = 0, end = -1;
+    for (let i = m.index + m[0].length - 1; i < chunk.length; i++) {
+      if (chunk[i] === '(') depth++;
+      else if (chunk[i] === ')' && --depth === 0) { end = i + 1; break; }
+    }
+    if (end < 0) continue;
+    const tex = derivativeMarkTex(chunk.slice(m.index, end));
+    if (tex !== null) { spans.push([m.index, end, tex]); open.lastIndex = end; }
+  }
+  return spans;
+}
+
 /**
  * An engine sentence with every derivative mark in its prose set as maths ($y'$, $\frac{dy}{dx}$). Maths already
  * between dollars is left exactly as it is. Presentation only: the words and the verdict are untouched.
@@ -71,13 +89,19 @@ function quoteClosers(chunk) {
 export function typesetDerivativeMarks(text) {
   const s = String(text ?? '');
   if (!/['′]|\/d/.test(s)) return s;
-  const prose = chunk => {
+  const plainProse = chunk => {
     const closers = quoteClosers(chunk);
     return chunk.replace(IN_PROSE, (found, letter, primes, arg, at) => {
       if (primes && closers.has(at + 1)) return found;
       const tex = derivativeMarkTex(found);
       return tex === null ? found : `$${tex}$`;
     });
+  };
+  // d/dx(…) takes its whole argument, brackets inside it and all: d/dx(f(x)) is one span, never "$d/dx$(f(x))".
+  const prose = chunk => {
+    let out = '', last = 0;
+    for (const [from, to, tex] of ofExpressionSpans(chunk)) { out += plainProse(chunk.slice(last, from)) + `$${tex}$`; last = to; }
+    return out + plainProse(chunk.slice(last));
   };
   let out = '', last = 0;
   for (const m of s.matchAll(MATH_SPAN_IN_TEXT)) { out += prose(s.slice(last, m.index)) + m[0]; last = m.index + m[0].length; }

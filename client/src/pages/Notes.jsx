@@ -374,7 +374,7 @@ function SearchResults({ query }) {
 function snippetFor(notes, terms) {
   if (!notes) return '';
   const fields = [
-    ...(notes.definitions || []).map(d => `${d.term} — ${d.meaning}`),
+    ...(notes.definitions || []).map(d => `${d.term}: ${d.meaning}`),
     ...(notes.formulas || []).map(f => f.label),
     ...(notes.points || []).map(p => p.back),
     ...(notes.concepts || []).map(c => c.body),

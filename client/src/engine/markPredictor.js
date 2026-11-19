@@ -184,7 +184,7 @@ export function predictionSentence(prediction) {
   if (!prediction) return null;
   if (!prediction.show) {
     return prediction.coveredMarks === 0
-      ? `No prediction yet — you haven't answered anything from this paper's ${prediction.totalMarks} marks.`
+      ? `No prediction yet: you haven't answered anything from this paper's ${prediction.totalMarks} marks.`
       : `Not enough yet to predict a mark: you have practised ${prediction.coveredMarks} of the paper's ${prediction.totalMarks} marks. Cover more of it and this becomes meaningful.`;
   }
   return `On the ${prediction.coveredMarks} of ${prediction.totalMarks} marks you have practised, you would score around ${prediction.expected} (${prediction.low}–${prediction.high}). The other ${prediction.unseenMarks} marks are untouched, so they are not in this number.`;

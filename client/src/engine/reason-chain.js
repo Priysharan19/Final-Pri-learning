@@ -546,7 +546,7 @@ export function assessFormulaLine({ text, meta = null, chain = null } = {}) {
   const authored = forms.map(form => ({ letters: form.letters || [], ast: astOf(form.expr) }));
   let sawLetters = false, ecf = false, wrong = null;
   for (const seg of read.segments) {
-    if (!seg.ast || seg.ast.t === 'equation' || seg.ambiguous) return { status: 'note', trusted: false, note: 'Skipped — I couldn’t read this formula safely.' };
+    if (!seg.ast || seg.ast.t === 'equation' || seg.ambiguous) return { status: 'note', trusted: false, note: 'Skipped: I couldn’t read this formula safely.' };
     // `35/0`, `sqrt(-4)`: a value that does not exist is not judged, never ticked.
     if ((seg.letters || []).every(v => Object.hasOwn(givens, v) || Object.hasOwn(carried, v)) && valueUnder(seg.ast, { ...givens, ...carried }) === null) {
       return { status: 'note', trusted: false, note: 'Part of this line has no value, so Pri has not judged it.' };
@@ -562,7 +562,7 @@ export function assessFormulaLine({ text, meta = null, chain = null } = {}) {
     if (free.every(v => letters.includes(v))) { wrong = seg; break; }
     return { status: 'note', trusted: false, note: 'This uses a letter the formula does not, so Pri has not judged it.' };
   }
-  if (!sawLetters) return { status: 'note', trusted: false, note: 'Numbers only here — judged as a substitution, not as the formula.' };
+  if (!sawLetters) return { status: 'note', trusted: false, note: 'Numbers only here: judged as a substitution, not as the formula.' };
   // What the right formula is worth on this question (null when a letter has no given).
   const trueValue = authored.map(form => valueUnder(form.ast, givens)).find(v => v !== null) ?? null;
   const inWorking = walkChain(read.segments, working);
