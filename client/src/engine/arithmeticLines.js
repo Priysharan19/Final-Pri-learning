@@ -388,10 +388,14 @@ function pageDefinitions(raw, out, firstBreak) {
     const verdicts = [];
     for (const stmt of src.split(STATEMENT_SPLIT).map(x => x && x.trim()).filter(Boolean)) {
       const before = ticks.length;
+      const equationBefore = equation;
       judgeOne(stmt);
       if (cross) break;
       if (ticks.length > before) { verdicts.push('tick'); continue; }
       const sides = cleanStatement(stmt).split('=').map(x => x.trim());
+      // `x = 3` straight after an equation in x that 3 does not satisfy is a false statement, not a premise.
+      const setsUnknown = sides.length === 2 && equationBefore && sides[0] === equationBefore.variable && numberOf(sides[1]) !== null;
+      if (setsUnknown) { verdicts.push('bad'); continue; }
       const plain = sides.length >= 2 && sides.every(x => x && !lettersOf(x).length);
       const values = plain ? sides.map(numberOf) : [];
       verdicts.push(plain && !(values.every(v => v !== null) && values.every(v => close(v, values[0]))) ? 'bad' : 'premise');
