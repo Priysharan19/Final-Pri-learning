@@ -320,3 +320,11 @@ html[data-edition=prithagoras] .qpage.ws .verdict{scroll-margin-bottom:148px}
 .dp-chip-text { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .dp-chip .chip-x { min-width: 28px; min-height: 28px; padding: 0; display: inline-grid; place-items: center; flex: none; }
 .dp-none { margin: 0; }
+/* On a phone the chip sits on the "Clear filter" line, in the row that is already there, so the select
+   keeps the full width and the line count never changes. */
+.dp-chip-phone { display: none; }
+@media (max-width: 760px) {
+  .dp-pick-row .dp-chip-wide { display: none; }
+  .ws-filter-inline .dp-chip-phone { display: inline-flex; flex: 0 1 auto; max-width: calc(100% - 120px); min-height: 32px; margin-left: 8px; padding: 2px 8px; font-size: 13px; }
+  .ws-filter-inline { flex-wrap: nowrap; align-items: center; }
+}

@@ -96,7 +96,7 @@ try {
     const options = await select.locator('option').allTextContents();
     check(`${label}: it lists All dot points and exactly the topic's issued dot points`,
       JSON.stringify(options) === JSON.stringify(['All dot points', ...expected.map(d => d.text)]), JSON.stringify(options).slice(0, 200));
-    check(`${label}: nothing is chosen and no chip shows`, await select.inputValue() === '' && await page.locator('[data-dotpoint-chip]').count() === 0);
+    check(`${label}: nothing is chosen and no chip shows`, await select.inputValue() === '' && await page.locator('[data-dotpoint-chip]:visible').count() === 0);
     await page.waitForTimeout(900);   // the page's own entrance settles before anything is measured
     const before = await metrics();
     check(`${label}: the page does not scroll sideways`, before.scrollX <= 0, String(before.scrollX));
@@ -112,11 +112,11 @@ try {
     await nextQuestion(was);
     check(`${label}: the URL carries dotpoint=${ordinal}`, new URL(page.url()).searchParams.get('dotpoint') === String(ordinal) && new URL(page.url()).searchParams.get('subtopic') === CHAPTER, page.url());
     check(`${label}: the server was asked for that dot point (issue or prepare request names it)`, issued.some(b => b?.dotpoint === target.id), JSON.stringify(issued.map(b => b?.dotpoint)));
-    const chip = page.locator('[data-dotpoint-chip]');
+    const chip = page.locator('[data-dotpoint-chip]:visible');
     check(`${label}: the chip names it`, await chip.count() === 1 && (await chip.innerText()).includes('Dot point:'), await chip.allInnerTexts().then(x => x.join('|')));
     check(`${label}: the question header names it`, await page.locator('[data-served-dotpoint]').count() === 1 && (await page.locator('[data-served-dotpoint]').innerText()).includes(target.text.slice(0, 20)));
-    await page.waitForFunction(() => (document.querySelector('[data-dotpoint-picker] [data-shell-announce]')?.textContent || '').length > 0, null, { timeout: 5000 }).catch(() => {});
-    const live = await page.locator('[data-dotpoint-picker] [data-shell-announce]').textContent();
+    await page.waitForFunction(() => (document.querySelector('[data-dotpoint-picker] ~ [data-shell-announce]')?.textContent || '').length > 0, null, { timeout: 5000 }).catch(() => {});
+    const live = await page.locator('[data-dotpoint-picker] ~ [data-shell-announce]').textContent();
     check(`${label}: the change was announced`, live.includes(target.text.slice(0, 20)), live);
     await page.waitForTimeout(900);
     const during = await metrics();
@@ -125,14 +125,14 @@ try {
     await shot(`dotpoint-${label}-3-active.png`);
 
     stage = `${label}: clear the chip`;
-    await page.locator('[data-dotpoint-clear]').click();
+    await page.locator('[data-dotpoint-clear]:visible').click();
     // The question on the desk is unfinished work and stays: All dot points resumes it, it is never discarded.
-    await page.waitForFunction(() => !new URL(location.href).searchParams.has('dotpoint') && !document.querySelector('[data-dotpoint-chip]'), null, { timeout: 30000 });
+    await page.waitForFunction(() => !new URL(location.href).searchParams.has('dotpoint') && ![...document.querySelectorAll('[data-dotpoint-chip]')].some(e => e.getClientRects().length), null, { timeout: 30000 });
     await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
     await online.settled();
     await page.waitForTimeout(900);
     check(`${label}: the chip's clear button removes dotpoint from the URL`, !new URL(page.url()).searchParams.has('dotpoint') && new URL(page.url()).searchParams.get('subtopic') === CHAPTER, page.url());
-    check(`${label}: the control is back on All dot points`, await select.inputValue() === '' && await page.locator('[data-dotpoint-chip]').count() === 0);
+    check(`${label}: the control is back on All dot points`, await select.inputValue() === '' && await page.locator('[data-dotpoint-chip]:visible').count() === 0);
     const after = await metrics();
     check(`${label}: clearing did not move the control`, JSON.stringify(after.pick) === JSON.stringify(before.pick));
 
@@ -141,7 +141,7 @@ try {
     await page.waitForSelector('[data-dotpoint-none]', { timeout: 30000 });
     check(`${label}: it says so in one plain sentence and offers All dot points`,
       /no questions yet/.test(await page.locator('[data-dotpoint-none]').innerText()) && await page.locator('[data-dotpoint-none] [data-dotpoint-all]').count() === 1);
-    check(`${label}: no chip claims a dot point it cannot issue`, await page.locator('[data-dotpoint-chip]').count() === 0);
+    check(`${label}: no chip claims a dot point it cannot issue`, await page.locator('[data-dotpoint-chip]:visible').count() === 0);
     await page.locator('[data-dotpoint-none] [data-dotpoint-all]').click();
     await page.waitForFunction(() => !new URL(location.href).searchParams.has('dotpoint'));
     check(`${label}: All dot points clears the link's dot point`, !new URL(page.url()).searchParams.has('dotpoint'));

@@ -28,8 +28,9 @@ import { shouldReloadPracticeOnCloudSignIn } from './practiceCloudRecovery.js';
 import { BRAND } from '../brand/edition.js';
 import Working from '../instrument/Working.jsx';
 import { difficultyPair } from '../lib/difficultyText.js';
-import DotpointPicker from '../components/DotpointPicker.jsx';
-import { chapterRowOf, readDotpointParam, withDotpoint } from '../lib/practiceDotpoints.js';
+import DotpointPicker, { DotpointChip } from '../components/DotpointPicker.jsx';
+import { useAnnounce } from '../examShell/useAnnounce.js';
+import { chapterRowOf, dotpointChoices, readDotpointParam, withDotpoint } from '../lib/practiceDotpoints.js';
 
 // Reuse the existing verified account flow; never create a parallel practice login.
 const PracticeAccountRecovery = React.lazy(() => import('../components/CloudAccountPanel.jsx'));
@@ -484,7 +485,14 @@ function ProfilePractice() {
   const activeDotpoint = dotpointRead?.choice || null;
   const servedDotpoint = activeDotpoint && serve && (serve.dotpoint === activeDotpoint.id || serve.question?.dotpoint === activeDotpoint.id)
     ? activeDotpoint : null;
-  const allDotpoints = () => setParams(withDotpoint(params, null));
+  const { announce: announceDotpoint, region: dotpointRegion } = useAnnounce();
+  // One way to change the dot point: write the URL (every other filter kept) and say it aloud.
+  const chooseDotpoint = ordinal => {
+    setParams(withDotpoint(params, ordinal));
+    const next = ordinal == null ? null : dotpointChoices(chapterRow).find(c => c.ordinal === ordinal);
+    announceDotpoint(next ? t('practice.dotpointAnnounce', { text: next.text }) : t('practice.dotpointAnnounceAll'));
+  };
+  const allDotpoints = () => chooseDotpoint(null);
   const showAllDotpoints = dotpoint != null && !taskId && !assignmentMode;
 
   const exitBar = (
@@ -549,7 +557,10 @@ function ProfilePractice() {
 
       <div className="ws-notices">
         {subtopic && !taskId && !assignmentMode && chapterRow && (
-          <DotpointPicker row={chapterRow} value={dotpoint} onChange={ordinal => setParams(withDotpoint(params, ordinal))} />
+          <>
+            <DotpointPicker row={chapterRow} value={dotpoint} onChange={chooseDotpoint} />
+            {dotpointRegion}
+          </>
         )}
         {assignmentContext && <div className="card ws-assignment">
           <div className="spread" style={{ gap: 12, alignItems: 'flex-start' }}>
@@ -597,6 +608,7 @@ function ProfilePractice() {
             {(subtopic || taskId || difficulty || pyqOnly || assignmentMode) && (
               <button type="button" className="icon-btn" data-testid="ws-filter-inline-clear" title={t(assignmentMode ? 'assignment.leaveShort' : 'practice.clearFilters')} onClick={() => setParams({})}><Icon name="close" />{t(assignmentMode ? 'assignment.leaveShort' : 'practice.clearShort')}</button>
             )}
+            {subtopic && !taskId && !assignmentMode && <DotpointChip phone active={activeDotpoint} onClear={allDotpoints} />}
           </div>
         )}
         {pyqOnly && <p className="muted">{t('practice.pyqOnlyNote')}</p>}
