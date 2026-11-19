@@ -68,7 +68,7 @@ const INTEGRAL = new RegExp(`∫_${LIM}\\^${LIM}\\s*(.+?)\\s*d([a-z])(?![a-z])`,
 const closeLoose = (a, b) => Math.abs(a - b) <= 1e-7 * Math.max(1, Math.abs(a), Math.abs(b));
 
 /** A side as a number, or as a function of its letters; null when it cannot be read. */
-function infoOf(side) {
+export function infoOf(side) {
   let ast;
   try { ast = parse(normalize(side)); } catch { return null; }
   if (!ast || ast.t === 'equation') return null;
@@ -105,7 +105,7 @@ function workOutCalculus(text) {
 }
 
 /** The same number, or the same function of the same letters at every point tried. */
-function sameAsWritten(a, b) {
+export function sameAsWritten(a, b) {
   if (a.value !== undefined && b.value !== undefined) return closeLoose(a.value, b.value);
   // Two functions must be of the same letters; a function and a number (sin²x + cos²x = 1) are compared at every point.
   const vars = a.vars || b.vars;
@@ -240,7 +240,7 @@ const KEEP = /^(?:sqrt|arcsin|arccos|arctan|asin|acos|atan|cosec|sin|cos|tan|sec
 const STATEMENT_SPLIT = /\s+(?:so|and|hence|therefore|then|thus|giving|gives)\s+|\s*(?:⇒|=>|∴)\s*/i;
 const POINTS = [-2.3, -1.1, 0.7, 1.6, 2.9];
 
-function cleanStatement(text) {
+export function cleanStatement(text) {
   return bracketFunctions(text.replace(/\s*\.\s*$/, '').replace(/[−–—]/g, '-').replace(/[×·]/g, '*').replace(/÷/g, '/')
     .replace(/(\d|\))\s+x\s+(?=\d|\()/gi, '$1*').replace(/\[([^\[\],;_]*)\](?![_^])/g, '($1)'));
 }

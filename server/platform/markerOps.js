@@ -25,6 +25,7 @@ import { checkProof } from '../../client/src/engine/proofSteps.js';
 // module reads no environment itself: markingPolicy.js imports nothing.
 import { policyOf } from './markingPolicy.js';
 import { stepCheckArithmetic } from '../../client/src/engine/arithmeticLines.js';
+import { missingSteps } from '../../client/src/engine/missingSteps.js';
 import { annotateMilestones } from '../../client/src/engine/milestones.js';
 import { awardBoardScheme, matchBoardPoints } from '../../client/src/engine/boardScheme.js';
 import { answerForm, effectiveSymbols, firstFinalAttempt, planGivens, readClaimForm } from './finalAttempt.js';
@@ -131,6 +132,9 @@ export function stepEvidence(q, answer, steps, result) {
   const board = Array.isArray(q.boardScheme) ? boardAward(q, meta, report, result.correct === true) : null;
   // An arithmetic report keeps to arithmetic: no milestone tick is added to it, so its wording stays true of every tick.
   try { if (report && report.arithmetic !== true) report = annotateMilestones(q, report); } catch { /* the report stands */ }
+  // Feedback only, for an answer that is not right: the steps of the worked solution whose values are nowhere on the
+  // page (engine/missingSteps.js). Computed after every mark above; nothing reads it but the result card.
+  try { if (report && result.correct !== true && typeof steps === 'string') { const gap = missingSteps(q, steps); if (gap) report = { ...report, missing: gap.missing, stepsFound: gap.found, stepsReadable: gap.total }; } } catch { /* the report stands */ }
   return board ? { stepReport: report, partial, board } : { stepReport: report, partial };
 }
 
