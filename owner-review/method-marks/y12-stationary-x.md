@@ -80,7 +80,7 @@ Award: **2 of 3**. Criteria earned: derivative (1), zero (1).
 |---:|---|---|---|---|
 | 1 | `dy/dx = 7x^2 - 294` | no verdict (This line is about another letter. the checker has nothing in this question to check it against, so it is neither marked wrong nor counted.) | wrong here | nothing |
 | 2 | `Let dy/dx = 0` | no verdict (This line is about another letter. the checker has nothing in this question to check it against, so it is neither marked wrong nor counted.) | from the question | nothing |
-| 3 | `7x^2 - 294 = 0` | wrong here (Put x = -7 ,  the answer to the original ,  into this line and it reads 49 = 0, which is false.) | follows from the earlier mistake | nothing |
+| 3 | `7x^2 - 294 = 0` | wrong here (Put a solution of the original equation in for x (try it yourself) and this line reads 49 = 0, which is false: a correct step keeps every solution.) | follows from the earlier mistake | nothing |
 | 4 | `x = -6 or x = 8` | no verdict (Follows from the earlier slip.) | follows from the earlier mistake | nothing |
 
 Award: **0 of 3**. Criteria earned: none.
@@ -93,7 +93,7 @@ Transcript with an earlier slip, on the same question:
 |---:|---|---|---|---|
 | 1 | `dy/dx = 7x^2 - 294` | no verdict (This line is about another letter. the checker has nothing in this question to check it against, so it is neither marked wrong nor counted.) | wrong here | nothing |
 | 2 | `Let dy/dx = 0` | no verdict (This line is about another letter. the checker has nothing in this question to check it against, so it is neither marked wrong nor counted.) | from the question | nothing |
-| 3 | `7x^2 - 294 = 0` | wrong here (Put x = -7 ,  the answer to the original ,  into this line and it reads 49 = 0, which is false.) | follows from the earlier mistake | nothing |
+| 3 | `7x^2 - 294 = 0` | wrong here (Put a solution of the original equation in for x (try it yourself) and this line reads 49 = 0, which is false: a correct step keeps every solution.) | follows from the earlier mistake | nothing |
 | 4 | `x = -6.48 or x = 6.48` | no verdict (Follows from the earlier slip.) | follows from the earlier mistake | nothing |
 
 Award: **0 of 3**. Criteria earned: none.

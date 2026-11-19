@@ -12,14 +12,14 @@ Generator families: `y12-appdiff`.
 
 ## Sample questions
 
-1. Find the equation of the **tangent** to $y = x^2 - 5x + 6$ at the point where $x = 3$. Answer in the form $y = mx + c$.
-   Key: 1x + -3
+1. Find the equation of the **tangent** to $y = x^2 - 5x + 6$ at the point where $x = 1$. Answer in the form $y = mx + c$.
+   Key: -3x + 5
 
-2. Find the equation of the **tangent** to $y = x^2 - 2x - 3$ at the point where $x = 3$. Answer in the form $y = mx + c$.
-   Key: 4x + -12
+2. Find the equation of the **tangent** to $y = x^2 - 2x - 1$ at the point where $x = 2$. Answer in the form $y = mx + c$.
+   Key: 2x + -5
 
-3. Find the equation of the **tangent** to $y = x^2 - 5x - 1$ at the point where $x = -3$. Answer in the form $y = mx + c$.
-   Key: -11x + -10
+3. Find the equation of the **tangent** to $y = x^2 - 5x + 2$ at the point where $x = -1$. Answer in the form $y = mx + c$.
+   Key: -7x + 1
 
 ## Criteria
 
@@ -50,15 +50,15 @@ Rule used in every award below: a line earns a criterion only if the engine or i
 
 ## Worked awards
 
-These come from running the engine on built transcripts for the first sample question: Find the equation of the **tangent** to $y = x^2 - 5x + 6$ at the point where $x = 3$. Answer in the form $y = mx + c$.
+These come from running the engine on built transcripts for the first sample question: Find the equation of the **tangent** to $y = x^2 - 5x + 6$ at the point where $x = 1$. Answer in the form $y = mx + c$.
 
 ### Full marks
 
 | # | What the student wrote | Engine says | Interpreter says | Counts toward |
 |---:|---|---|---|---|
 | 1 | `dy/dx = 2x - 5` | no verdict (Not checked ,  the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | checked | derivative |
-| 2 | `y(3) = 0` | no verdict (Not checked ,  the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | checked | ypoint |
-| 3 | `y = x - 3` | true line | could not verify (this is an equation about the unknown, or a rearrangement the checker cannot confirm) | answer |
+| 2 | `y(1) = 2` | no verdict (Not checked ,  the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | checked | ypoint |
+| 3 | `y = -3x + 5` | true line | could not verify (this is an equation about the unknown, or a rearrangement the checker cannot confirm) | answer |
 
 Award: **3 of 3**. Criteria earned: derivative (1), ypoint (1), answer (1).
 Final answer check: correct.
@@ -68,8 +68,8 @@ Final answer check: correct.
 | # | What the student wrote | Engine says | Interpreter says | Counts toward |
 |---:|---|---|---|---|
 | 1 | `dy/dx = 2x - 5` | no verdict (Not checked ,  the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | checked | derivative |
-| 2 | `y(3) = 0` | no verdict (Not checked ,  the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | checked | ypoint |
-| 3 | `y = 2x - 6` | no verdict (Not checked ,  the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | could not verify (this is an equation about the unknown, or a rearrangement the checker cannot confirm) | nothing |
+| 2 | `y(1) = 2` | no verdict (Not checked ,  the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | checked | ypoint |
+| 3 | `y = -2x + 4` | no verdict (Not checked ,  the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | could not verify (this is an equation about the unknown, or a rearrangement the checker cannot confirm) | nothing |
 
 Award: **2 of 3**. Criteria earned: derivative (1), ypoint (1).
 Final answer check: not correct.
@@ -79,8 +79,8 @@ Final answer check: not correct.
 | # | What the student wrote | Engine says | Interpreter says | Counts toward |
 |---:|---|---|---|---|
 | 1 | `dy/dx = 3x - 5` | no verdict (Not checked ,  the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | wrong here | nothing |
-| 2 | `y(3) = 1` | no verdict (Not checked ,  the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | follows from the earlier mistake | nothing |
-| 3 | `y = 2x - 3` | no verdict (Not checked ,  the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | could not verify (this is an equation about the unknown, or a rearrangement the checker cannot confirm) | nothing |
+| 2 | `y(1) = 3` | no verdict (Not checked ,  the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | follows from the earlier mistake | nothing |
+| 3 | `y = -2x + 5` | no verdict (Not checked ,  the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | could not verify (this is an equation about the unknown, or a rearrangement the checker cannot confirm) | nothing |
 
 Award: **0 of 3**. Criteria earned: none.
 Final answer check: not correct.
@@ -92,8 +92,8 @@ Transcript with an earlier slip, on the same question:
 | # | What the student wrote | Engine says | Interpreter says | Counts toward |
 |---:|---|---|---|---|
 | 1 | `dy/dx = 3x - 5` | no verdict (Not checked ,  the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | wrong here | nothing |
-| 2 | `y(3) = 0` | no verdict (Not checked ,  the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | checked | nothing |
-| 3 | `y = 4x - 12` | no verdict (Not checked ,  the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | could not verify (this is an equation about the unknown, or a rearrangement the checker cannot confirm) | nothing |
+| 2 | `y(1) = 2` | no verdict (Not checked ,  the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | checked | nothing |
+| 3 | `y = -2x + 4` | no verdict (Not checked ,  the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | could not verify (this is an equation about the unknown, or a rearrangement the checker cannot confirm) | nothing |
 
 Award: **0 of 3**. Criteria earned: none.
 Final answer check: not correct.
@@ -110,4 +110,4 @@ To be filled in by the author (the tutor). Leave blank until reviewed.
 - Note: 
 - Name: 
 - Date: 
-- Scheme digest: `ee21e20640a95084b3dcd13510f7d56255d726bbcbbf39a5aaa3ec68d4209d43`
+- Scheme digest: `e1c1adc9b2320ae1bbcf230f0ece79e186d7d3fee189ad041f33db9cece9cffe`
