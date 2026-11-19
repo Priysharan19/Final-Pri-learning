@@ -137,8 +137,11 @@ export function stepEvidence(q, answer, steps, result) {
   // reads as "this is right". The arithmetic is; the value was not accepted (it may be wrong, or right in a form or unit
   // the question did not accept: the note claims only what is true in both cases). Such a tick becomes that note.
   try {
-    const given = typeof answer === 'string' ? arithmeticInfo(answer.trim()) : null;
-    if (report && result.correct === false && given && given.value !== undefined && Array.isArray(report.lines)) {
+    // The submitted answer is read only when it is a plain number: nothing a student types into the answer box is
+    // parsed or evaluated here (what an answer costs to mark must not depend on what is written in it).
+    const typed = typeof answer === 'string' ? answer.trim() : '';
+    const given = /^-?\d{1,15}(?:\.\d{1,10})?$/.test(typed) ? { value: Number(typed) } : null;
+    if (report && result.correct === false && given && Array.isArray(report.lines)) {
       let changed = false;
       const lines = report.lines.map(l => {
         if (l?.status !== 'ok' || l.state !== 'arithmetic') return l;

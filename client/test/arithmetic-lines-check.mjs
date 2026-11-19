@@ -175,6 +175,12 @@ ok(stepEvidence(WITH, '4', '2x = 8\nx = 4', { correct: true }).stepReport?.arith
   ok(wrong.lines.map(l => l.status).join() === 'ok,note' && /was not accepted as the answer/.test(wrong.lines[1].note), `the line that ends at the wrong answer is a note that says so (${wrong.lines.map(l => l.status)})`);
   const right = stepEvidence(QW, '30', '5 × 6 = 30', { correct: true }).stepReport;
   ok(right.lines[0].status === 'ok', 'a line that ends at the right answer keeps its tick');
+  // the typed answer is never parsed or evaluated for this note (CI's cost-of-marking guard caught an earlier version)
+  let term = '170!'; while (term.length < 11800) term += '+170!';
+  const at = Date.now();
+  const huge = stepEvidence(QW, `sum(${term};k;1;10000)`, '2 + 3 = 5\nso 10^1 = 10', { correct: false }).stepReport;
+  ok(Date.now() - at < 400 && huge.lines.map(l => l.status).join() === 'ok,ok', `a twelve-thousand-character answer costs nothing extra and changes no tick (${Date.now() - at} ms)`);
+  ok(stepEvidence(QW, 'x = 10', 'so 10^1 = 10', { correct: false }).stepReport.lines[0].status === 'ok', 'an answer that is not a plain number is not read for this note');
   const other = stepEvidence(QW, '10', '2 + 3 = 5', { correct: false }).stepReport;
   ok(other.lines[0].status === 'ok', 'a true line that does not end at the wrong answer keeps its tick');
 }

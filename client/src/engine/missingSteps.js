@@ -66,7 +66,8 @@ function matches(a, b) {
  */
 export function missingSteps(q, working) {
   const steps = Array.isArray(q?.steps) ? q.steps.slice(0, LIMITS.steps) : [];
-  const lines = String(working || '').split('\n').map(l => l.trim()).filter(Boolean).slice(0, LIMITS.lines);
+  // (a line longer than the line check itself reads is not read here either)
+  const lines = String(working || '').split('\n').map(l => l.trim()).filter(l => l && l.length <= 160).slice(0, LIMITS.lines);
   if (!steps.length || !lines.length) return null;
   const page = [];
   for (const line of lines) {
