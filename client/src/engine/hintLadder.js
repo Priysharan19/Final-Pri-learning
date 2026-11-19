@@ -261,5 +261,5 @@ export function workingHint(report) {
   const good = lines.slice(0, at).filter(l => l?.status === 'ok').length;
   const fix = text(lines[at]?.diagnosis?.fix);
   const lead = good === 0 ? '' : good === 1 ? 'Your first line checks out. ' : `Your first ${good} lines check out. `;
-  return `${lead}Look again at line ${at + 1}${fix ? `: ${fix}` : ' — compare it carefully with the line above.'}`;
+  return `${lead}Look again at line ${at + 1}${fix ? `: ${fix}` : ': compare it carefully with the line above.'}`;
 }

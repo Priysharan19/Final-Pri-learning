@@ -150,7 +150,7 @@ export function WhatTeacherSees({ mine }) {
                       <li key={`${m.questionKey}:${m.criterion}:${i}`}>
                         <span className="tw-teacher-tag">{t('tw.teacherMark')}</span>{' '}
                         {t('tw.student.markLine', { q: m.order, criterion: t(CRITERION_WORD[m.criterion] || 'tw.criterion.method'), words: markWords(t, m) })}
-                        {m.teacherMark?.comment ? <span className="muted"> — {m.teacherMark.comment}</span> : null}
+                        {m.teacherMark?.comment ? <span className="muted">: {m.teacherMark.comment}</span> : null}
                       </li>
                     ))}
                   </ul>

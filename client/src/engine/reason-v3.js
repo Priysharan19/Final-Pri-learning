@@ -87,7 +87,7 @@ export function assessEvaluationLine({ text, meta = null } = {}) {
     return { status: 'note', trusted: false, note: 'This line lists several values; Pri reads one value at a time, so it is not judged.' };
   }
   const parts = clause.split('=').map(part => part.trim()).filter(Boolean);
-  if (!parts.length) return { status: 'note', trusted: false, note: 'Skipped — I couldn’t read this substitution safely.' };
+  if (!parts.length) return { status: 'note', trusted: false, note: 'Skipped: I couldn’t read this substitution safely.' };
 
   // An equation such as x = 2 belongs to an equation-solving stage, not a y/m
   // evaluation stage. Refuse to reinterpret its result as the next operation.
@@ -97,14 +97,14 @@ export function assessEvaluationLine({ text, meta = null } = {}) {
 
   const candidateAst = astFor(parts[parts.length - 1]);
   if (!candidateAst || candidateAst.t === 'equation') {
-    return { status: 'note', trusted: false, note: 'Skipped — I couldn’t read the evaluated value safely.' };
+    return { status: 'note', trusted: false, note: 'Skipped: I couldn’t read the evaluated value safely.' };
   }
   const free = variablesOf(candidateAst);
   if (free && free.size) {
     return { status: 'note', trusted: false, note: 'The substitution has not yet produced a numerical value.' };
   }
   const got = finiteValue(candidateAst, {});
-  if (got === null) return { status: 'note', trusted: false, note: 'Skipped — I couldn’t evaluate this line safely.' };
+  if (got === null) return { status: 'note', trusted: false, note: 'Skipped: I couldn’t evaluate this line safely.' };
 
   // If an equality chain contains readable arithmetic before the final value,
   // each readable segment must agree. An unreadable prefix is only allowed when
@@ -161,10 +161,10 @@ export function assessPointLine({ text, meta = null } = {}) {
     return { status: 'note', trusted: false, note: 'Pri needs exact authored coordinates before it can verify a point.' };
   }
   const matches = coordinatePairs(cleanText(text));
-  if (!matches.length) return { status: 'note', trusted: false, note: 'Skipped — I couldn’t read a coordinate pair on this line.' };
+  if (!matches.length) return { status: 'note', trusted: false, note: 'Skipped: I couldn’t read a coordinate pair on this line.' };
   const [xText, yText] = matches[matches.length - 1];
   const x = finiteValue(astFor(xText), {}), y = finiteValue(astFor(yText), {});
-  if (x === null || y === null) return { status: 'note', trusted: false, note: 'Skipped — I couldn’t evaluate both coordinates safely.' };
+  if (x === null || y === null) return { status: 'note', trusted: false, note: 'Skipped: I couldn’t evaluate both coordinates safely.' };
   if (numsClose(x, ex, 1e-9) && numsClose(y, ey, 1e-9)) return { status: 'ok', trusted: true, point: { x, y } };
   const diagnosis = pointDiagnosis({ x: ex, y: ey }, { x, y });
   return { status: 'break', trusted: false, point: { x, y }, note: diagnosis.message, diagnosis };

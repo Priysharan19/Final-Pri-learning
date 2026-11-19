@@ -82,13 +82,13 @@ export function involvesPowers(q) {
 
 /** Open attempt: the kind, never a value. */
 export const SLIP_FEEDBACK = Object.freeze({
-  'early-step': 'That is the value of an earlier step of the method — you may have stopped one step early.',
-  sign: 'Right size, wrong sign — check the step where a minus sign was handled.',
-  reciprocal: 'Your answer is upside down — check which quantity goes on top.',
-  'power-of-ten': 'Right digits, but out by a power of 10 — check the units or the decimal point.',
-  complement: 'That is the chance it does not happen — check which event the question asks about.',
-  square: 'That looks like the square of the answer — check whether a square root was missed.',
-  root: 'That looks like the square root of the answer — check whether something should have been squared.'
+  'early-step': 'That is the value of an earlier step of the method. You may have stopped one step early.',
+  sign: 'Right size, wrong sign. Check the step where a minus sign was handled.',
+  reciprocal: 'Your answer is upside down. Check which quantity goes on top.',
+  'power-of-ten': 'Right digits, but out by a power of 10. Check the units or the decimal point.',
+  complement: 'That is the chance it does not happen. Check which event the question asks about.',
+  square: 'That looks like the square of the answer. Check whether a square root was missed.',
+  root: 'That looks like the square root of the answer. Check whether something should have been squared.'
 });
 
 export function slipFeedback(value, answer, q = null) {

@@ -451,7 +451,7 @@ function constraintDroppedDiagnosis() {
 }
 
 export function assessEquationLine({ ast, previousAst = null, previousTrusted = false, meta = null } = {}) {
-  if (!ast || ast.t !== 'equation') return { status: 'note', trusted: false, note: 'Skipped — this is not an equation.' };
+  if (!ast || ast.t !== 'equation') return { status: 'note', trusted: false, note: 'Skipped: this is not an equation.' };
 
   // A line with no unknown left in it is the student checking their answer,
   // not an equation that lost its constraint. V1 owns that verdict so the two
@@ -688,7 +688,7 @@ function sameRegion(a, b) {
 
 export function assessRelationLine({ text, previous = null, previousTrusted = false, meta = null } = {}) {
   const rel = typeof text === 'string' ? parseRelation(text) : text;
-  if (!rel) return { status: 'note', trusted: false, relation: null, note: 'Skipped — I couldn’t parse this inequality safely.' };
+  if (!rel) return { status: 'note', trusted: false, relation: null, note: 'Skipped: I couldn’t parse this inequality safely.' };
 
   if (meta?.source) {
     const source = parseRelation(meta.source);
@@ -722,7 +722,7 @@ export function assessRelationLine({ text, previous = null, previousTrusted = fa
         : { status: 'note', trusted: false, relation: rel, note: 'This follows from the previous inequality, but the starting line was not independently verified.' };
     }
     if (same === false && previousTrusted) {
-      const fault = { code: 'inequality-step-false', title: 'This step changes the solutions', message: 'This line does not have the same solutions as the line above it — check the arithmetic and the sign of each coefficient when collecting terms.', fix: 'Redo this step from the line above, keeping the sign of every term.', confidence: 'high' };
+      const fault = { code: 'inequality-step-false', title: 'This step changes the solutions', message: 'This line does not have the same solutions as the line above it. Check the arithmetic and the sign of each coefficient when collecting terms.', fix: 'Redo this step from the line above, keeping the sign of every term.', confidence: 'high' };
       return { status: 'break', trusted: false, relation: rel, note: fault.message, diagnosis: fault };
     }
   }
@@ -853,7 +853,7 @@ export function assessDerivativeLine({ text, meta = null } = {}) {
   if (!expected) return { status: 'note', trusted: false, note: 'This derivative uses a rule outside Pri’s verified calculus vocabulary.' };
 
   const candidate = extractDerivativeCandidate(text);
-  if (!candidate || candidate.t === 'equation') return { status: 'note', trusted: false, note: 'Skipped — I couldn’t read this derivative line safely.' };
+  if (!candidate || candidate.t === 'equation') return { status: 'note', trusted: false, note: 'Skipped: I couldn’t read this derivative line safely.' };
   if (sameExpressionClaim(expected, candidate)) return { status: 'ok', trusted: true };
 
   const counter = expressionCounterexample(expected, candidate, variable);

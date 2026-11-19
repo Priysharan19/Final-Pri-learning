@@ -1115,7 +1115,7 @@ function criteriaFor(q, marks, grid) {
   if (!key.length) return [{ mark: marks, text: 'Correct final answer' }];
   return key.map((s, i) => ({
     mark: i === key.length - 1 ? marks - (key.length - 1) : 1,
-    text: i === key.length - 1 ? `${s.h} — leading to the correct answer` : s.h
+    text: i === key.length - 1 ? `${s.h}, leading to the correct answer` : s.h
   }));
 }
 
@@ -2249,10 +2249,10 @@ export function createExamRouter(db, { transcribe = transcribeHandwriting, env =
       const responses = readResponses(body, paper);
       if (!responses) return { status: 400, code: 'EXAM_ANSWERS_INVALID', message: 'Send the current answers, working and times for this paper only.' };
       if (await db.get("SELECT key FROM idempotency_keys WHERE account_id=? AND scope='exam-result' AND key=?", [accountId, id])) {
-        return { status: 409, code: 'EXAM_FINALISED', message: 'This paper has been submitted — it can no longer change.' };
+        return { status: 409, code: 'EXAM_FINALISED', message: 'This paper has been submitted. It can no longer change.' };
       }
       if (now > paper.deadline + FINISH_GRACE_MS) {
-        return { status: 409, code: 'EXAM_DEADLINE_PASSED', message: 'Time is up on this paper — nothing more can be saved to it.' };
+        return { status: 409, code: 'EXAM_DEADLINE_PASSED', message: 'Time is up on this paper. Nothing more can be saved to it.' };
       }
       // Reading time: the paper may be read, nothing may be written to it.
       if (paper.readingEndsAt && now < paper.readingEndsAt) return READING_TIME;

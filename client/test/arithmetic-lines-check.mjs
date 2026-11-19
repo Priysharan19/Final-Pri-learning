@@ -622,6 +622,15 @@ ok(model?.cards?.length === 2 && model.cards.every(c => c.status === 'checked' &
   ok(typesetDerivativeMarks("A' and B'(x) stay as written") === "A' and B'(x) stay as written", 'a capital letter with a prime in a sentence is not a derivative mark');
   ok(typesetDerivativeMarks('Take d/dx(x^2) now') === 'Take $\\frac{d}{dx}(x^{2})$ now' && renders(typesetDerivativeMarks('Take d/dx(x^2) now')), 'd/dx(x^2) in prose is one span with its argument');
   ok(mathSpan('d/dx(x^2) = 2x') === '$\\frac{d}{dx}(x^{2}) = 2x$' && fragmentTex('d/dx(x^2)') === '\\frac{d}{dx}(x^{2})', 'd/dx(x^2) is one span with its argument');
+  // d/dx(…) with brackets inside its argument: the whole argument is typeset, never "$\frac{d}{dx}$(f(x))" (display only)
+  for (const [src, want] of [["Take d/dx(f(x)) now", 'Take $\\frac{d}{dx}(f\\left(x\\right))$ now'], ['Then d/dx(sin(2x)) and d/dx((x+1)^2).', 'Then $\\frac{d}{dx}(\\sin\\left(2x\\right))$ and $\\frac{d}{dx}(\\left(x + 1\\right)^{2})$.'],
+    ["Use d/dx(f(x)) = f'(x).", "Use $\\frac{d}{dx}(f\\left(x\\right))$ = $f'(x)$."], ['d/dx(x^2) + d/dx(f(g(x)))', '$\\frac{d}{dx}(x^{2})$ + $\\frac{d}{dx}(f\\left(g\\left(x\\right)\\right))$']]) {
+    const got = typesetDerivativeMarks(src);
+    ok(got === want && dollarsBalanced(got) && renders(got) && !/\$\\frac\{d\}\{dx\}\$\(/.test(got), `d/dx with nested brackets is one typeset span: ${src} (${got})`);
+  }
+  ok(derivativeMarkTex('d/dx(f(x))') === '\\frac{d}{dx}(f\\left(x\\right))' && mathSpan('d/dx(f(x)) = f\'(x)') === "$\\frac{d}{dx}(f\\left(x\\right)) = f'(x)$", 'a whole-line d/dx(f(x)) keeps its nested brackets inside the span');
+  ok(plainComment(typesetDerivativeMarks('Take d/dx(f(x)) now')) === 'Take d/dx(f(x)) now', 'plainComment turns the nested span back into what the student wrote');
+  ok(typesetDerivativeMarks('Odd d/dx(f(x) is left alone where its bracket never closes').includes('(f(x)'), 'an unbalanced d/dx( never swallows the rest of the sentence');
   for (const f of ['3dy/dx = 6x', '(dy/dx)/(dx/dt) = dy/dt', 'dy/dx / 2 = x', 'dy/dx + 1 = 2x', '2dy/dx', 'd/dx(x^2) + 1 = 2x + 1']) {
     const m = mathSpan(f);
     ok(!/\\frac\{dy\}\{d\}/.test(m) && !/\\cdot x/.test(m) && (m === f || renders(m)), `dy/dx inside a larger expression is never a quotient of products: ${f} (${m})`);

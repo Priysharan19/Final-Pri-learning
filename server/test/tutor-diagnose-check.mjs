@@ -180,7 +180,7 @@ ok(/आपके हल में पहली गलती पंक्ति 2
 {
   const silentCheck = { ...resolvedReq, studentWork: { ...resolvedReq.studentWork, firstBreak: -1, verifiedLines: 0, lineStatus: ['unknown', 'unknown'], unchecked: true } };
   const du = deterministicDiagnosis(silentCheck);
-  eq(du.wentWrong, 'Couldn’t check your working this time — try again.', 'a Step Check that did not run is said plainly');
+  eq(du.wentWrong, 'Couldn’t check your working this time. Try again.', 'a Step Check that did not run is said plainly');
   ok(!/not placed a break/.test(du.wentWrong), 'and is never presented as "no break found"');
 }
 
@@ -194,7 +194,7 @@ ok(/आपके हल में पहली गलती पंक्ति 2
   ok(broken.status === 'break' && /line 2/.test(broken.message), 'a broken line is named by the engine');
   const unplaced = lineCheckReply(QUESTION, ['something'], { firstBreak: -1, verifiedLines: 0 }, 'en');
   ok(unplaced.status === 'unplaced' && !/match/.test(unplaced.message), 'lines the engine did not verify are never called a match');
-  eq(lineCheckReply(QUESTION, LINES, { firstBreak: -1, verifiedLines: 0, unchecked: true }).message, 'Couldn’t check your working this time — try again.', 'a cooled-down or timed-out check says so plainly');
+  eq(lineCheckReply(QUESTION, LINES, { firstBreak: -1, verifiedLines: 0, unchecked: true }).message, 'Couldn’t check your working this time. Try again.', 'a cooled-down or timed-out check says so plainly');
   for (const r of [partial, broken, unplaced]) ok(!/[0-9]{2}|56|65|12\/13|4\/5/.test(r.message.replace(/line \d+/, '')), `no value in "${r.message}"`);
   const valued = { ...QUESTION, steps: [{ h: 'Get $\\cos A = \\frac{12}{13}$', d: steps[0].d }, steps[1], steps[2]] };
   ok(!/12/.test(lineCheckReply(valued, [LINES[0]], { firstBreak: -1, verifiedLines: 1 }).message), 'a step heading that carries a value is never shown');

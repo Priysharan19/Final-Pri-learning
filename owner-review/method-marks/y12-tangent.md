@@ -56,8 +56,8 @@ These come from running the engine on built transcripts for the first sample que
 
 | # | What the student wrote | Engine says | Interpreter says | Counts toward |
 |---:|---|---|---|---|
-| 1 | `dy/dx = 2x - 5` | no verdict (Not checked ,  the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | checked | derivative |
-| 2 | `y(1) = 2` | no verdict (Not checked ,  the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | checked | ypoint |
+| 1 | `dy/dx = 2x - 5` | no verdict (Not checked: the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | checked | derivative |
+| 2 | `y(1) = 2` | no verdict (Not checked: the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | checked | ypoint |
 | 3 | `y = -3x + 5` | true line | could not verify (this is an equation about the unknown, or a rearrangement the checker cannot confirm) | answer |
 
 Award: **3 of 3**. Criteria earned: derivative (1), ypoint (1), answer (1).
@@ -67,9 +67,9 @@ Final answer check: correct.
 
 | # | What the student wrote | Engine says | Interpreter says | Counts toward |
 |---:|---|---|---|---|
-| 1 | `dy/dx = 2x - 5` | no verdict (Not checked ,  the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | checked | derivative |
-| 2 | `y(1) = 2` | no verdict (Not checked ,  the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | checked | ypoint |
-| 3 | `y = -2x + 4` | no verdict (Not checked ,  the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | could not verify (this is an equation about the unknown, or a rearrangement the checker cannot confirm) | nothing |
+| 1 | `dy/dx = 2x - 5` | no verdict (Not checked: the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | checked | derivative |
+| 2 | `y(1) = 2` | no verdict (Not checked: the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | checked | ypoint |
+| 3 | `y = -2x + 4` | no verdict (Not checked: the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | could not verify (this is an equation about the unknown, or a rearrangement the checker cannot confirm) | nothing |
 
 Award: **2 of 3**. Criteria earned: derivative (1), ypoint (1).
 Final answer check: not correct.
@@ -78,9 +78,9 @@ Final answer check: not correct.
 
 | # | What the student wrote | Engine says | Interpreter says | Counts toward |
 |---:|---|---|---|---|
-| 1 | `dy/dx = 3x - 5` | no verdict (Not checked ,  the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | wrong here | nothing |
-| 2 | `y(1) = 3` | no verdict (Not checked ,  the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | follows from the earlier mistake | nothing |
-| 3 | `y = -2x + 5` | no verdict (Not checked ,  the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | could not verify (this is an equation about the unknown, or a rearrangement the checker cannot confirm) | nothing |
+| 1 | `dy/dx = 3x - 5` | no verdict (Not checked: the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | wrong here | nothing |
+| 2 | `y(1) = 3` | no verdict (Not checked: the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | follows from the earlier mistake | nothing |
+| 3 | `y = -2x + 5` | no verdict (Not checked: the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | could not verify (this is an equation about the unknown, or a rearrangement the checker cannot confirm) | nothing |
 
 Award: **0 of 3**. Criteria earned: none.
 Final answer check: not correct.
@@ -91,9 +91,9 @@ Transcript with an earlier slip, on the same question:
 
 | # | What the student wrote | Engine says | Interpreter says | Counts toward |
 |---:|---|---|---|---|
-| 1 | `dy/dx = 3x - 5` | no verdict (Not checked ,  the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | wrong here | nothing |
-| 2 | `y(1) = 2` | no verdict (Not checked ,  the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | checked | nothing |
-| 3 | `y = -2x + 4` | no verdict (Not checked ,  the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | could not verify (this is an equation about the unknown, or a rearrangement the checker cannot confirm) | nothing |
+| 1 | `dy/dx = 3x - 5` | no verdict (Not checked: the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | wrong here | nothing |
+| 2 | `y(1) = 2` | no verdict (Not checked: the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | checked | nothing |
+| 3 | `y = -2x + 4` | no verdict (Not checked: the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | could not verify (this is an equation about the unknown, or a rearrangement the checker cannot confirm) | nothing |
 
 Award: **0 of 3**. Criteria earned: none.
 Final answer check: not correct.

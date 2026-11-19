@@ -64,7 +64,7 @@ Final answer check: correct.
 | # | What the student wrote | Engine says | Interpreter says | Counts toward |
 |---:|---|---|---|---|
 | 1 | `dy/dx = 9*e^(9*x+9)` | true line | could not verify (the question gives no single function to differentiate) | derivative |
-| 2 | `dy/dx = 10*e^(9*x+9)` | no verdict (Not checked ,  the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | could not verify (the question gives no single function to differentiate) | nothing |
+| 2 | `dy/dx = 10*e^(9*x+9)` | no verdict (Not checked: the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | could not verify (the question gives no single function to differentiate) | nothing |
 
 Award: **1 of 2**. Criteria earned: derivative (1).
 Final answer check: not correct.
@@ -73,7 +73,7 @@ Final answer check: not correct.
 
 | # | What the student wrote | Engine says | Interpreter says | Counts toward |
 |---:|---|---|---|---|
-| 1 | `dy/dx = 10*e^(9*x+9)` | no verdict (Not checked ,  the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | could not verify (the question gives no single function to differentiate) | nothing |
+| 1 | `dy/dx = 10*e^(9*x+9)` | no verdict (Not checked: the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | could not verify (the question gives no single function to differentiate) | nothing |
 
 Award: **0 of 2**. Criteria earned: none.
 Final answer check: not correct.
@@ -84,8 +84,8 @@ Transcript with an earlier slip, on the same question:
 
 | # | What the student wrote | Engine says | Interpreter says | Counts toward |
 |---:|---|---|---|---|
-| 1 | `dy/dx = 10*e^(9*x+9)` | no verdict (Not checked ,  the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | could not verify (the question gives no single function to differentiate) | nothing |
-| 2 | `= 10*e^(9*x+9)` | no verdict (Not checked ,  the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | could not verify (depends on the line above, which could not be verified) | nothing |
+| 1 | `dy/dx = 10*e^(9*x+9)` | no verdict (Not checked: the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | could not verify (the question gives no single function to differentiate) | nothing |
+| 2 | `= 10*e^(9*x+9)` | no verdict (Not checked: the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | could not verify (depends on the line above, which could not be verified) | nothing |
 
 Award: **0 of 2**. Criteria earned: none.
 Final answer check: not correct.

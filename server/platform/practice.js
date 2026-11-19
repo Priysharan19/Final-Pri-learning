@@ -282,7 +282,7 @@ function solutionFor(q, sketch = null) {
     ? [{ mark: marks, text: 'Correct final answer' }]
     : keySteps.length
       ? keySteps.map((step, i) => ({ mark: 1, text: i === keySteps.length - 1
-        ? step.h + ' — leading to the correct answer' : step.h }))
+        ? step.h + ', leading to the correct answer' : step.h }))
       : [{ mark: 1, text: 'Correct final answer' }];
   return { steps, answerText: answerTextFor(q), criteria, solutionText: q.solutionText,
     // A sketch question: the function the graph is of (the prompt states it) and, once the student has answered, the marker's

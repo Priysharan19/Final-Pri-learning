@@ -75,6 +75,10 @@ export function MathText({ text, block = false, display = false, className }) {
         if (lead) rest = rest.slice(lead[0].length);
         out += breaksToHtml(rest
           .replace(/\\\$/g, '$')
+          // Outside a formula an escaped percent is a percent and a TeX thin space is a thin space: a prompt written
+          // "1.5\% a month" or "\$10\,000" must not show its backslashes. Inside $…$ KaTeX reads both itself.
+          .replace(/\\%/g, '%')
+          .replace(/\\,/g, ' ')
           .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
           .replace(/\*([^*]+)\*/g, '<em>$1</em>'));
       }

@@ -65,7 +65,7 @@ try {
     ok(unmarked.every(text => text.includes(lang === 'hi' ? 'अंक नहीं देता' : 'not marked by Pri')), `${lang}: the three states below an issued examination say plainly that Pri does not mark them`);
   }
   await i18n.setLanguage('en');
-  ok(i18n.translate('library.cert.uploaded') === 'Paper to read — not marked by Pri', 'the CTO wording for an uploaded paper, exactly');
+  ok(i18n.translate('library.cert.uploaded') === 'Paper to read: not marked by Pri', 'the CTO wording for an uploaded paper, exactly');
 
   // Search and filters.
   const rows = [sent, { ...sent, id: 'b-notes', type: 'notes', title: 'Calculus notes', subtitle: null, description: 'Limits 50% faster.', tags: [], year: 2026, course: 'in', subject: 'Mathematics' }];

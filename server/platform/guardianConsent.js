@@ -350,7 +350,7 @@ export function requireGuardianConsent(db) {
     }
     if (blocker === 'GUARDIAN_CONSENT_PENDING') {
       return refuse(res, blocker,
-        'A parent or guardian needs to confirm this account. Until they do, your work stays on this device — nothing is lost.');
+        'A parent or guardian needs to confirm this account. Until they do, your work stays on this device. Nothing is lost.');
     }
     if (blocker === 'GUARDIAN_CONSENT_WITHDRAWN') {
       return refuse(res, blocker,

@@ -1736,7 +1736,7 @@ async function run() {
     setLineCheckTransportForTests(async body => { lcCalls.push(body); return lcReply; });
     const lcQ = await answerableQuestion({ mode: 'topic', subtopic: topicId });
     const lcId = lcQ.question.id;
-    lcReply = { lineCheck: { status: 'unchecked', message: 'Couldn’t check your working this time — try again.' } };
+    lcReply = { lineCheck: { status: 'unchecked', message: 'Couldn’t check your working this time. Try again.' } };
     const lcSilent = await POST(`/practice/${lcId}/tutor/line-check`, { lines: ['x = 1'] });
     eq('a line check that did not run says so and charges nothing', [lcSilent.lineCheck?.status, (await idb.get('questions', lcId)).tutorLevel || 0], ['unchecked', 0]);
     lcReply = { lineCheck: { status: 'ok', message: 'Your lines match the method so far. Next: Substitute.' } };

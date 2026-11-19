@@ -176,7 +176,7 @@ try {
     assert.deepEqual(paper.omittedOutcomes.map(o => o.code), release.omittedOutcomes);
     assert.ok(paper.omittedOutcomes.every(o => o.name && o.name !== o.code), 'omitted outcomes are named');
     if (paper.partial) {
-      assert.ok(paper.title.includes(`Practice paper — ${paper.year12.covered} of ${paper.year12.total} Year 12 outcomes`) && !/HSC|trial/i.test(paper.title), `${paper.id}: ${paper.title}`);
+      assert.ok(paper.title.includes(`Practice paper: ${paper.year12.covered} of ${paper.year12.total} Year 12 outcomes`) && !/HSC|trial/i.test(paper.title), `${paper.id}: ${paper.title}`);
       assert.ok(paper.totalMarks === release.marks && paper.totalMarks < paper.design.totalMarks && paper.workingMin < paper.design.workingMin, 'marks and time scaled to what it examines');
     }
     if (!paper.released) assert.ok(paper.missingOutcomes.length + paper.thinOutcomes.length > 0, `${paper.id} says what it lacks`);
@@ -252,7 +252,7 @@ try {
   c.deq([exam.kind, exam.readingMin, exam.reading, exam.readingEndsAt - exam.startedAt, exam.deadline - exam.startedAt],
     ['nsw', 1, true, 60000, (1 + testRelease.workingMin) * 60000], 'reading time leads, and the deadline is reading plus working time, on the server clock');
   c.deq([exam.nsw.label, exam.nsw.markingScope, exam.nsw.test, exam.nsw.partial, exam.title],
-    [NSW_EXAM_LABEL, 'final-answer-only', true, !testRelease.full, testRelease.full ? `${NSW_TEST_BLUEPRINT.label} · ${NSW_EXAM_LABEL}` : `${NSW_TEST_BLUEPRINT.label} · Practice paper — ${testRelease.year12.covered} of ${testRelease.year12.total} Year 12 outcomes`],
+    [NSW_EXAM_LABEL, 'final-answer-only', true, !testRelease.full, testRelease.full ? `${NSW_TEST_BLUEPRINT.label} · ${NSW_EXAM_LABEL}` : `${NSW_TEST_BLUEPRINT.label} · Practice paper: ${testRelease.year12.covered} of ${testRelease.year12.total} Year 12 outcomes`],
     'the paper says what it is and how it is marked; its title is the server\'s, and a partial paper says how much it covers');
   c.deq(exam.nsw.omittedOutcomes.map(o => o.code), testRelease.omittedOutcomes, 'it names exactly the outcomes it leaves out (none, once every slot has approved forms)');
   c.deq(leaks(started.data), [], 'no answer, step, criterion, plan, seed or sealed identity leaves at the start');

@@ -136,21 +136,21 @@ export const GENERIC_HELP = Object.freeze({
 export const DIAGNOSIS_TEXT = Object.freeze({
   en: Object.freeze({
     rightLines: 'Your working checks out up to {line}.',
-    rightNone: 'You set out to work towards the answer — the checker could not verify a line yet.',
+    rightNone: 'You set out to work towards the answer. The checker could not verify a line yet.',
     wrongAt: 'Your working first goes wrong at line {n}: {line}. It does not follow from the line before it.',
     wrongFinal: 'Each line the checker could judge holds, but your final answer does not match.',
     wrongUnplaced: 'The checker has not placed a break in these lines.',
-    unchecked: 'Couldn’t check your working this time — try again.',
+    unchecked: 'Couldn’t check your working this time. Try again.',
     nextStep: 'Next: {step}.',
     nextGeneric: 'Next: go back to the last line that checks out and redo the step after it.'
   }),
   hi: Object.freeze({
     rightLines: 'आपका हल {line} तक सही है।',
-    rightNone: 'आपने उत्तर की ओर काम शुरू किया — जाँचकर्ता अभी कोई पंक्ति सत्यापित नहीं कर सका।',
+    rightNone: 'आपने उत्तर की ओर काम शुरू किया। जाँचकर्ता अभी कोई पंक्ति सत्यापित नहीं कर सका।',
     wrongAt: 'आपके हल में पहली गलती पंक्ति {n} में है: {line}। यह पिछली पंक्ति से नहीं निकलती।',
     wrongFinal: 'जाँची गई हर पंक्ति सही है, पर आपका अंतिम उत्तर मेल नहीं खाता।',
     wrongUnplaced: 'जाँचकर्ता ने इन पंक्तियों में कोई गलती चिह्नित नहीं की है।',
-    unchecked: 'इस बार आपका हल जाँचा नहीं जा सका — फिर से कोशिश करें।',
+    unchecked: 'इस बार आपका हल जाँचा नहीं जा सका, फिर से कोशिश करें।',
     nextStep: 'अगला क़दम: {step}।',
     nextGeneric: 'अगला क़दम: आख़िरी सही पंक्ति पर लौटें और उसके बाद का क़दम फिर से करें।'
   })
@@ -274,7 +274,7 @@ function validateQuestion(q, { authored = false } = {}) {
   if (qUnknown.length) return invalid(`Unexpected question field: ${qUnknown.join(', ')}.`);
   if (!isText(q.prompt, LIMITS.prompt, { required: true })) return invalid('question.prompt is required and bounded.');
   if (!Array.isArray(q.steps) || !q.steps.length || q.steps.length > LIMITS.steps) {
-    return invalid(`question.steps must hold 1 to ${LIMITS.steps} verified steps — help is only given against a verified solution.`, 'TUTOR_UNGROUNDED');
+    return invalid(`question.steps must hold 1 to ${LIMITS.steps} verified steps. Help is only given against a verified solution.`, 'TUTOR_UNGROUNDED');
   }
   for (const step of q.steps) {
     if (!plain(step) || closed(step, ['h', 'd']).length || !isText(step.h, LIMITS.stepHeading) || !isText(step.d, LIMITS.stepDetail)) {
@@ -560,7 +560,7 @@ export function deterministicDiagnosis(request) {
   let nextStep = copy.nextGeneric;
   let referencesStepIndex = -1;
   if (request.resolved) {
-    const text = [step.h, step.d].filter(Boolean).join(' — ');
+    const text = [step.h, step.d].filter(Boolean).join(': ');
     if (text) { nextStep = fill(copy.nextStep, { step: text }); referencesStepIndex = index; }
   } else if (step.h) {
     const guard = buildGuard(request.question, { studentLines: lines, verifiedLines: request.studentWork.verifiedLines });
@@ -604,14 +604,14 @@ export const LINE_CHECK_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 export const LINE_CHECK_TEXT = Object.freeze({
   en: Object.freeze({
     ok: 'Your lines match the method so far.', unplaced: 'The checker could not place these lines against the method.', next: 'Next: {step}.', nextGeneric: 'Keep going with the next step of the method.',
-    breakAt: 'First break at line {n} — this line should reach: {step}.', breakGeneric: 'First break at line {n} — redo the step from the line before.',
-    unchecked: 'Couldn’t check your working this time — try again.',
+    breakAt: 'First break at line {n}. This line should reach: {step}.', breakGeneric: 'First break at line {n}. Redo the step from the line before.',
+    unchecked: 'Couldn’t check your working this time. Try again.',
     final: 'Press Check to mark your answer.'
   }),
   hi: Object.freeze({
     ok: 'अब तक आपकी पंक्तियाँ विधि से मेल खाती हैं।', unplaced: 'जाँचकर्ता इन पंक्तियों को विधि से नहीं मिला सका।', next: 'अगला क़दम: {step}।', nextGeneric: 'विधि के अगले क़दम के साथ आगे बढ़ें।',
-    breakAt: 'पहली गलती पंक्ति {n} में — इस पंक्ति को यहाँ पहुँचना चाहिए: {step}।', breakGeneric: 'पहली गलती पंक्ति {n} में — पिछली पंक्ति से यह क़दम फिर करें।',
-    unchecked: 'इस बार आपका हल जाँचा नहीं जा सका — फिर से कोशिश करें।',
+    breakAt: 'पहली गलती पंक्ति {n} में है। इस पंक्ति को यहाँ पहुँचना चाहिए: {step}।', breakGeneric: 'पहली गलती पंक्ति {n} में है। पिछली पंक्ति से यह क़दम फिर करें।',
+    unchecked: 'इस बार आपका हल जाँचा नहीं जा सका, फिर से कोशिश करें।',
     final: 'अपना उत्तर जँचवाने के लिए Check दबाएँ।'
   })
 });
@@ -747,7 +747,7 @@ export function whyFallback(request) {
   const lead = request.locale === 'hi' ? 'यह क़दम' : 'This step';
   return {
     level: TUTOR_WHY_LEVEL, stepIndex: request.stepIndex, referencesStepIndex: request.stepIndex,
-    message: `${lead}: ${[step.h, step.d].filter(Boolean).join(' — ')}`.slice(0, 1200),
+    message: `${lead}: ${[step.h, step.d].filter(Boolean).join(', ')}`.slice(0, 1200),
     source: 'fallback', guarded: true, model: null
   };
 }

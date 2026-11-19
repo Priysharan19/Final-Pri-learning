@@ -133,8 +133,8 @@ function withConfidence(diagnosis) {
 /** The one-line verdict for a broken line, hedged when the diagnosis is not certain. */
 export function diagnosisVerdict(diagnosis, lineNumber) {
   const d = withConfidence(diagnosis);
-  if (!d || d.code === 'counterexample') return 'There’s a slip in your working — Step Check has marked the line where it breaks.';
-  const where = lineNumber ? ` — line ${lineNumber} is marked below.` : '.';
+  if (!d || d.code === 'counterexample') return 'There’s a slip in your working. Step Check has marked the line where it breaks.';
+  const where = lineNumber ? `: line ${lineNumber} is marked below.` : '.';
   return d.confidence === 'high' ? `${d.title}${where}` : `This looks like: ${d.title}${where}`;
 }
 
@@ -148,7 +148,7 @@ function systemDiagnosis(vars, sol, L, R) {
   return {
     code: 'system-line-false',
     title: 'This line is not true for the solution of the system',
-    message: `With ${vars.map(v => `${v} = ${fmt(sol[v])}`).join(' and ')} — the solution of the pair — this line reads ${fmt(L)} = ${fmt(R)}, which is false.`,
+    message: `With ${vars.map(v => `${v} = ${fmt(sol[v])}`).join(' and ')}, the solution of the pair, this line reads ${fmt(L)} = ${fmt(R)}, which is false.`,
     fix: 'Compare it term by term with the line above: a term or a sign changed on the way, or the substitution was made into the wrong equation.',
     confidence: 'high'
   };
@@ -163,7 +163,7 @@ export function assessSystemLine({ text, meta = null } = {}) {
   const env = {};
   for (const v of vars) env[v] = Number(sol[v]);
   const src = String(text || '').trim().replace(/[−–—]/g, '-').replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore)\s+/i, '');
-  if (!src) return { status: 'note', trusted: false, note: 'Skipped — an empty line.' };
+  if (!src) return { status: 'note', trusted: false, note: 'Skipped: an empty line.' };
 
   const holds = ast => {
     const L = evaluate(ast.l, env), R = evaluate(ast.r, env);
@@ -176,17 +176,17 @@ export function assessSystemLine({ text, meta = null } = {}) {
     const assessed = assessPointLine({ text: src, meta: { kind: 'point', x: env[vars[0]], y: env[vars[1]] } });
     if (assessed.status !== 'note') return assessed;
   }
-  if (!src.includes('=')) return { status: 'note', trusted: false, note: 'Not checked — this line makes no claim this question’s check can test.' };
+  if (!src.includes('=')) return { status: 'note', trusted: false, note: 'Not checked: this line makes no claim this question’s check can test.' };
 
   // "x = 2, y = 3" / "x = 2 and y = 3" — every part must hold
   const parts = src.split(/,|;|\band\b/i).map(p => p.trim()).filter(Boolean);
-  if (!parts.length) return { status: 'note', trusted: false, note: 'Skipped — I couldn’t read this line safely.' };
+  if (!parts.length) return { status: 'note', trusted: false, note: 'Skipped: I couldn’t read this line safely.' };
   for (const part of parts) {
     let ast;
-    try { ast = parse(normalize(part)); } catch { return { status: 'note', trusted: false, note: 'Not checked — this question’s check covers the lines that lead to the answer.' }; }
-    if (ast.t !== 'equation') return { status: 'note', trusted: false, note: 'Skipped — this is not an equation.' };
+    try { ast = parse(normalize(part)); } catch { return { status: 'note', trusted: false, note: 'Not checked: this question’s check covers the lines that lead to the answer.' }; }
+    if (ast.t !== 'equation') return { status: 'note', trusted: false, note: 'Skipped: this is not an equation.' };
     const h = holds(ast);
-    if (!h) return { status: 'note', trusted: false, note: 'Skipped — this line could not be evaluated at the solution.' };
+    if (!h) return { status: 'note', trusted: false, note: 'Skipped: this line could not be evaluated at the solution.' };
     if (!h.same) {
       const diagnosis = systemDiagnosis(vars, sol, h.L, h.R);
       return { status: 'break', trusted: false, note: diagnosis.message, diagnosis };
@@ -250,7 +250,7 @@ function statedSide(candidate, meta) {
   if (!m || !hasSides(meta)) return candidate;
   return m[1].toLowerCase() === 'l' ? meta.sides.lhs : meta.sides.rhs;
 }
-const PROOF_SLIP = 'This line is no longer equal to the expression you started with — the slip is here.';
+const PROOF_SLIP = 'This line is no longer equal to the expression you started with: the slip is here.';
 function proofLine(text, cleaned, previousText, meta) {
   const body = cleaned.replace(/^\s*(to\s+prove\s*:?|hence|so|thus|therefore|∴)\s*/i, '').replace(/^\s*=\s*/, '');
   const segments = body.split('=').map(x => x.trim());
@@ -285,13 +285,13 @@ function checkWorkingWithinBudget(q, workingText) {
   const meta = ans.stepMeta;
   let report;
   try { report = stepCheck(meta, workingText); }
-  catch { return { correct: false, feedback: 'I couldn’t read that working — write one step per line.', stepReport: null, validLines: 0 }; }
+  catch { return { correct: false, feedback: 'I couldn’t read that working. Write one step per line.', stepReport: null, validLines: 0 }; }
 
   const okLines = report.lines.filter(l => l.status === 'ok');
   const parsed = report.lines.filter(l => l.status !== 'note');
   const minLines = ans.minLines || 2;
   if (parsed.length < minLines) {
-    return { correct: false, feedback: `Show at least ${minLines} lines of mathematical working — I could only verify ${parsed.length}.`, stepReport: report, validLines: okLines.length };
+    return { correct: false, feedback: `Show at least ${minLines} lines of mathematical working. I could only verify ${parsed.length}.`, stepReport: report, validLines: okLines.length };
   }
   if (report.firstBreak !== -1) {
     return { correct: false, feedback: diagnosisVerdict(report.diagnosis, report.firstBreak + 1), stepReport: report, validLines: okLines.length };
@@ -343,7 +343,7 @@ function checkWorkingWithinBudget(q, workingText) {
     reached = true;
   }
   if (!reached) {
-    return { correct: false, feedback: 'Your verified steps do not yet end with the complete result — state every solution or the requested simplified expression on the final line.', stepReport: report, validLines: okLines.length };
+    return { correct: false, feedback: 'Your verified steps do not yet end with the complete result. State every solution or the requested simplified expression on the final line.', stepReport: report, validLines: okLines.length };
   }
   return { correct: true, stepReport: report, validLines: okLines.length };
 }
@@ -589,7 +589,7 @@ function holdsForEveryValue(ast) {
 /** The verdict on an equation line that carries a letter the question's equation does not. */
 function assessOtherUnknownLine(ast, system) {
   if (holdsForEveryValue(ast)) {
-    return { status: 'note', note: 'True whatever the letters stand for — it says nothing about this question.' };
+    return { status: 'note', note: 'True whatever the letters stand for. It says nothing about this question.' };
   }
   const known = system && [...variablesOf(ast)].every(name => name in system.solution);
   if (!known) {
@@ -598,7 +598,7 @@ function assessOtherUnknownLine(ast, system) {
   let L, R;
   try { L = evaluate(ast.l, system.solution); R = evaluate(ast.r, system.solution); } catch { L = R = NaN; }
   if (!Number.isFinite(L) || !Number.isFinite(R)) {
-    return { status: 'note', note: 'Skipped — this line could not be evaluated at the solution.' };
+    return { status: 'note', note: 'Skipped: this line could not be evaluated at the solution.' };
   }
   if (holdsWithin(L, R)) return { status: 'ok' };
   const diagnosis = systemDiagnosis(system.variables, system.solution, L, R);
@@ -647,8 +647,8 @@ function namesAValue(text, meta) {
 // explicit, retryable outcome, never a silently smaller mark.
 export const WORKING_LIMITS = Object.freeze({ lineChars: 200, lines: 100, work: 600000 });
 const UNREAD = {
-  long: `Not checked — this line is longer than ${WORKING_LIMITS.lineChars} characters. Write one step per line.`,
-  many: 'Not checked — this is more working than can be checked. Keep to the steps of your method.'
+  long: `Not checked: this line is longer than ${WORKING_LIMITS.lineChars} characters. Write one step per line.`,
+  many: 'Not checked: this is more working than can be checked. Keep to the steps of your method.'
 };
 
 /** For each line of working, null when it is to be read, or the note saying why it is not. */
@@ -729,7 +729,7 @@ function checkLinesAfterBreakAgainstPrevious(out, firstBreak, meta) {
       // status, and the marks policy is unchanged (one slip costs one mark).
       row.secondBreak = true;
       row.independent = true;
-      row.note = (diagnosis && diagnosis.message) || 'This line does not follow from the line above it — a second slip.';
+      row.note = (diagnosis && diagnosis.message) || 'This line does not follow from the line above it: a second slip.';
       if (diagnosis) row.diagnosis = withConfidence(diagnosis); else delete row.diagnosis;
     }
   }
@@ -924,7 +924,7 @@ function judgeExpressionLine(cleaned, meta, { reference = null, promptSpans = []
   // A leading "=" continues the line above: `= -12` means `<reference> = -12`.
   const continued = parts[0] === '' && parts.length > 1;
   if (continued) parts[0] = reference || '';
-  const unread = { status: 'note', note: 'Not checked — Pri cannot place this line on the way to the answer, so it is not marked right or wrong.' };
+  const unread = { status: 'note', note: 'Not checked: Pri cannot place this line on the way to the answer, so it is not marked right or wrong.' };
   // "= RHS" where the question states no sides concludes with a name that is not an expression (pinned by step-justify-check).
   if (/^(?:RHS|LHS)$/i.test(parts[parts.length - 1]) && !same(parts[parts.length - 1], meta.canonical)) return { status: 'break', note: 'RHS is not an expression you have shown: the question does not give a right-hand side to reach.' };
   // "= 2x⁸" on its own, written as the answer: it is the answer (the same tick the line gets with its '=' dropped).
@@ -962,7 +962,7 @@ function judgeExpressionLine(cleaned, meta, { reference = null, promptSpans = []
   if (continued && reference && sameKind && same(tail, reference)) return unread;
   if (rest.length && reference && sameKind && parseExpr(rest[0]) && parseExpr(tail) && same(rest[0], reference)
       && (continued || [...variablesOf(parseExpr(tail))].every(v => allowed.has(v)))) {
-    return { status: 'break', note: 'This line is no longer equivalent to the expression you started with — the slip is here.' };
+    return { status: 'break', note: 'This line is no longer equivalent to the expression you started with: the slip is here.' };
   }
   // A bare line in the answer's own letters that is not the answer: the working is a chain of one
   // expression, so this is the slip. (A line in other letters, or with no letter, is a side
@@ -979,7 +979,7 @@ function judgeExpressionLine(cleaned, meta, { reference = null, promptSpans = []
       if (promptSpans.some(span => isPartialProduct(tail, span) || isPartOf(tail, span))) return unread;
       // A line that only restates something the question writes is not a claim about the answer.
       if (promptSpans.some(span => { try { return same(tail, span); } catch { return false; } })) return unread;
-      return { status: 'break', note: 'This line is no longer equivalent to the expression you started with — the slip is here.' };
+      return { status: 'break', note: 'This line is no longer equivalent to the expression you started with: the slip is here.' };
     }
   }
   return unread;
@@ -1101,7 +1101,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
         const wanted = uniqueNumeric(meta.solutions);
         if (listed.invalid || !listed.values.length) {
           status = 'note';
-          note = 'Skipped — I couldn’t read the solution list safely.';
+          note = 'Skipped: I couldn’t read the solution list safely.';
         } else {
           const extra = listed.values.find(v => !wanted.some(sol => numsClose(v, sol)));
           const missing = wanted.filter(sol => !listed.values.some(v => numsClose(v, sol)));
@@ -1233,7 +1233,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
           const allNamedAreRoots = named.every(v => v !== null && Number.isFinite(v) && wanted.some(sol => numsClose(v, sol)));
           // A ± line that does not state `letter = number` (cosθ = ±√3/2) cannot be judged against the roots: a note.
           if (!ok && named.some(v => v === null)) {
-            out.push({ text: line, status: 'note', note: 'Not checked — Pri cannot tell which values this line gives, so it is not marked right or wrong.' });
+            out.push({ text: line, status: 'note', note: 'Not checked: Pri cannot tell which values this line gives, so it is not marked right or wrong.' });
             return;
           }
           if (!ok && allNamedAreRoots) {
@@ -1241,7 +1241,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
             return;
           }
           status = ok ? 'ok' : 'break';
-          note = ok ? undefined : 'The ± branches do not reproduce the complete solution set — check the signs or the missing branch.';
+          note = ok ? undefined : 'The ± branches do not reproduce the complete solution set. Check the signs or the missing branch.';
           if (!ok) lineDiagnosis = lostRootDiagnosis(meta.variable, covered.join(' or ') || 'this branch', wanted.length);
           if (status === 'break' && firstBreak === -1) firstBreak = i;
           // An accepted ± line has already been proved to reproduce every root.
@@ -1463,7 +1463,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
                 code: 'counterexample',
                 title: 'This line is no longer true',
                 message: `${meta.variable} = ${shownRoot(r)} makes line ${from.index + 1} true; put it into this line${reads}.`,
-                fix: 'Compare it term by term with the line above — the change between them is where to look.',
+                fix: 'Compare it term by term with the line above: the change between them is where to look.',
                 confidence: 'high'
               };
               note = lineDiagnosis.message;
@@ -1545,7 +1545,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
                   !previousEquationTrusted && typeof meta.source !== 'string' &&
                   solutionsSatisfying(ast, meta).length === uniqueNumeric(meta.solutions).length) {
                 status = 'note';
-                note = `True for the answer. It would also allow another value of ${meta.variable}, which the question's conditions rule out — check each value against the question.`;
+                note = `True for the answer. It would also allow another value of ${meta.variable}, which the question's conditions rule out. Check each value against the question.`;
                 lineDiagnosis = null;
               }
               if (assessed.check) {
@@ -1640,7 +1640,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
       }
     } catch {
       status = 'note';
-      note = 'Not checked — this question’s check covers the lines that lead to the answer.';
+      note = 'Not checked: this question’s check covers the lines that lead to the answer.';
     }
 
     // `e^2x` is e^(2x) or (e^2)x: a mismatch under one reading is not a mistake under the other.
@@ -1694,7 +1694,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
     const complete = wanted.every(sol => stated.some(v => numsClose(v, sol)));
     if (values.length && !complete) {
       const last = values[values.length - 1];
-      out[last.index].note = `True for ${meta.variable} = ${stated.map(shownRoot).join(' or ')} — the equation has ${wanted.length} solutions, and the other is still to find.`;
+      out[last.index].note = `True for ${meta.variable} = ${stated.map(shownRoot).join(' or ')}; the equation has ${wanted.length} solutions, and the other is still to find.`;
     }
   }
 
@@ -1947,7 +1947,7 @@ function assessEvaluationStage(stage, line, ctx) {
       // reach it (`T_9 = 9 × 3 + 6`) — the line is still true.
       if (stage.evidence === 'substitution' && !substitutionShown(chain, variant.stage)) {
         return { ...v, ecf: variant.ecf, credit: false, trusted: false,
-          note: 'True — but the substitution into the formula is not shown on this line, so it is not the method step.' };
+          note: 'True, but the substitution into the formula is not shown on this line, so it is not the method step.' };
       }
       return { ...v, ecf: variant.ecf };
     }
@@ -1979,7 +1979,7 @@ function assessPlanStage(stage, line, ctx = null) {
     });
   }
   if (derivativeSourceLine(stage, line)) {
-    return { status: 'note', trusted: false, note: 'Starting function recognised — differentiate it on the next line.' };
+    return { status: 'note', trusted: false, note: 'Starting function recognised: differentiate it on the next line.' };
   }
   // `0, 0` lists values; a derivative is one expression. Not judged, never a
   // mistake — as the evaluation stage abstains on a list (reason-v3.js).
@@ -2242,7 +2242,7 @@ function stepCheckPlan(meta, workingText) {
       if (ch?.continuation) {
         if (!chain) { out.push({ text: line, status: 'note', note: 'This continues a line Pri could not read.' }); continue; }
         const ev = evaluateChain(ch, env);
-        if (!ev.evaluable) { out.push({ text: line, status: 'note', note: 'Skipped — a letter on this line has no value yet.' }); chain = null; continue; }
+        if (!ev.evaluable) { out.push({ text: line, status: 'note', note: 'Skipped: a letter on this line has no value yet.' }); chain = null; continue; }
         let prev = chain, ecf = false, broke = null;
         for (let k = 0; k < ch.segments.length; k++) {
           const seg = ch.segments[k], v = ev.values[k];
@@ -2272,7 +2272,7 @@ function stepCheckPlan(meta, workingText) {
       }
       // ── A value alone states, it derives nothing ──────────────────────────
       if (ch && ch.label === null && bareNumbers(ch)) {
-        out.push({ text: line, status: 'note', note: 'A value stated, not derived — Pri checks the steps that reach it.' });
+        out.push({ text: line, status: 'note', note: 'A value stated, not derived. Pri checks the steps that reach it.' });
         chain = null;
         continue;
       }
@@ -3984,7 +3984,7 @@ function methodMarksWithinBudget({ meta, working, marks, prompt = '', report = n
   const awarded = Math.min(cap, progress);
   const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
   const note = awarded > 0
-    ? `${plural(awarded, 'mark')} for correct working — the final answer was wrong, but ${plural(progress, 'line')} of your working moved the solution on.`
+    ? `${plural(awarded, 'mark')} for correct working: the final answer was wrong, but ${plural(progress, 'line')} of your working moved the solution on.`
     : restated
       ? 'No method marks: the lines that check out only restate the question. Marks come from steps that move the solution on.'
       : 'No method marks: correct working earns marks only when it moves the solution on, and this question carries a single mark for the answer.';

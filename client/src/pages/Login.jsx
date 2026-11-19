@@ -204,7 +204,7 @@ export function PasswordMeter({ verdict }) {
     <div style={{ marginTop: 10 }}>
       <div className="meter" aria-hidden="true"><i style={{ width: `${pct}%`, background: tone }} /></div>
       <p className="muted" role="status" style={{ marginTop: 6, fontSize: 12.5 }}>
-        {verdict.labelKey && <><b style={{ color: tone }}>{t(verdict.labelKey)}</b> — </>}{t(verdict.noteKey, verdict.noteVars)}
+        {verdict.labelKey && <><b style={{ color: tone }}>{t(verdict.labelKey)}</b>: </>}{t(verdict.noteKey, verdict.noteVars)}
       </p>
     </div>
   );

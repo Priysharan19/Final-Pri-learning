@@ -746,7 +746,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
                     ))}
                     {showNote && (
                       <span className="ink-note" style={{ left: Math.max(4, b.x - 2), top: b.y + b.h + 16 }}>
-                        <b>{t('ink.mistakeHere')}</b>{v.note ? <> — <EngineComment text={v.note} /></> : null}
+                        <b>{t('ink.mistakeHere')}</b>{v.note ? <>: <EngineComment text={v.note} /></> : null}
                       </span>
                     )}
                   </React.Fragment>
@@ -885,7 +885,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
               })()}
               <span className="ink-line-math">{(() => { const segs = line.corrected === true ? null : segmentsFor(line); return segs ? <Typeset text={line.text} texOf={x => exprToLatex(x) || '\\;'} segments={segs} /> : <MathText text={`$${exprToLatex(line.text) || '\\;'}$`} />; })()}</span>
               {lineVerdicts && lineVerdicts[li] && ['break', 'wrong'].includes(lineVerdicts[li].status) && lineVerdicts[li].note && (
-                <span className="sc-note" style={{ fontSize: 12.5 }}>— <EngineComment text={lineVerdicts[li].note} /></span>
+                <span className="sc-note" style={{ fontSize: 12.5 }}><EngineComment text={lineVerdicts[li].note} /></span>
               )}
               {line.corrected === true && (
                 <span className="ink-line-corrected" role="status"><Icon name="check" size={13} /> {t('ink.correctedSr', { n: li + 1 })}</span>
