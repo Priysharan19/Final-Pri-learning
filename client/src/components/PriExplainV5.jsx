@@ -473,7 +473,9 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
                     {current.concept && current.concept !== 'generic' && <em>{CONCEPT_KEYS[current.concept] ? t(CONCEPT_KEYS[current.concept]) : current.concept}</em>}
                     {keyTeachingStep && <span className="pri-explain-key-badge">{t('explain.keyStep')}</span>}
                   </div>
-                  <h3><MathText text={headingOf(current)} /></h3>
+                  {/* A heading taken from the worked solution is content, in the content's language; lang tells a Hindi
+                      screen reader to switch voice (and the Hindi tour that it is not an untranslated label). */}
+                  <h3 lang={current?.headingKey ? undefined : 'en'}><MathText text={headingOf(current)} /></h3>
                   {tutorCaptions[current.id] && (
                     <div className="pri-explain-tutor-caption-wrap">
                       <AiLabel labelKey={'tutor.fromTutor'} />
@@ -552,7 +554,7 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
                     aria-current={sceneIndex === index ? 'step' : undefined}
                     onClick={() => { goScene(sceneIndex, true); setPlaying(false); }}>
                     <span>{sceneIndex < index ? '✓' : sceneIndex + 1}</span>
-                    <div><b>{(() => {
+                    <div><b lang={scene.kind === 'diagnosis' || scene.headingKey || sceneIndex === teaching.importantSceneIndex ? undefined : 'en'}>{(() => {
                       const name = scene.kind === 'diagnosis' ? t('explain.yourAttempt') : headingOf(scene);
                       return sceneIndex === teaching.importantSceneIndex ? t('explain.railKeyed', { heading: name }) : name;
                     })()}</b><small>{scene.visuals?.map(visual => visualName(visual.kind === 'figure' ? visual.mode : visual.kind)).join(' · ') || t('explain.reasoning')}</small></div>
