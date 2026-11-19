@@ -7,6 +7,8 @@
 // Display only: nothing here is read by marking.
 // ─────────────────────────────────────────────────────────────────────────────
 const SUP = '⁰¹²³⁴⁵⁶⁷⁸⁹';
+const SUB = '₀₁₂₃₄₅₆₇₈₉';
+const SYMBOL = { pi: 'π', theta: 'θ', alpha: 'α', beta: 'β', times: '×', cdot: '·', div: '÷', le: '≤', leq: '≤', ge: '≥', geq: '≥', ne: '≠', neq: '≠', infty: '∞', pm: '±', approx: '≈', to: '→', rightarrow: '→', degree: '°', circ: '°' };
 
 /** TeX inside one $…$ span as plain text. */
 export function plainMath(tex) {
@@ -15,6 +17,15 @@ export function plainMath(tex) {
     s = s.replace(/\\[dt]?frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, '($1)/($2)');
   }
   return s
+    // An integral keeps its sign and limits; thin spaces are spaces; named functions and symbols keep their names
+    // (the bar used to show "0¹ (x² - 2x)\\,dx" for a definite integral and drop sin, ln and π: live site, 20 Nov 2026).
+    .replace(/\\int\s*_\s*(?:\{([^{}]*)\}|(-?\w))\s*\^\s*(?:\{([^{}]*)\}|(-?\w))/g, (_, a1, a2, b1, b2) => `∫ from ${(a1 ?? a2).trim()} to ${(b1 ?? b2).trim()} of `)
+    .replace(/\\int(?![a-zA-Z])/g, '∫ ')
+    .replace(/\^\s*(?:\{\s*\\circ\s*\}|\\circ(?![a-zA-Z]))/g, '°')
+    .replace(/\\log\s*_\s*(?:\{(\d+)\}|(\d))/g, (_, a1, a2) => `log${(a1 ?? a2).replace(/\d/g, d => SUB[d])} `)
+    .replace(/\\[,;:! ]/g, ' ')
+    .replace(/\\(sin|cos|tan|sec|cosec|csc|cot|ln|log|exp|lim|arcsin|arccos|arctan)(?![a-zA-Z])/g, '$1 ')
+    .replace(/\\(pi|theta|alpha|beta|times|cdot|div|le|leq|ge|geq|ne|neq|infty|pm|approx|to|rightarrow|degree|circ)(?![a-zA-Z])/g, (_, k) => SYMBOL[k])
     .replace(/\\sqrt\s*\{([^{}]*)\}/g, '√($1)')
     .replace(/\^\s*(?:\{([^{}]*)\}|(\w))/g, (_, a, b) => { const p = (a ?? b).trim(); return /^\d+$/.test(p) ? p.replace(/\d/g, d => SUP[d]) : `^(${p})`; })
     .replace(/\\[a-zA-Z]+/g, ' ').replace(/[{}_]/g, '').replace(/\s+/g, ' ').trim();
