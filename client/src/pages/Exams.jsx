@@ -19,6 +19,8 @@ import { omittedNames } from '../local/nswExamBackend.js';
 import Working from '../instrument/Working.jsx';
 import { generatedPapersFor } from '../local/generatedPaperBackend.js';
 import Ext1Papers, { ext1PapersFor } from './Ext1Papers.jsx';
+import PracticeSets from '../paper/PracticeSets.jsx';
+import { practiceSetsFor } from '../paper/practiceSets.js';
 import { offeredYears, yearOffered, defaultOffering } from '../platform/edition.js';
 
 const CLAIM_KEYS = {
@@ -116,6 +118,7 @@ export default function Exams() {
       {generatedPapersFor(user) && <GeneratorEntry nav={nav} />}
       {user.course === 'nsw' && featureEnabled('nswExams') && <NswPapers busy={busy} start={start} />}
       {ext1PapersFor(user) && <Ext1Papers />}
+      {practiceSetsFor(user) && <PracticeSets />}
       {hscCoursesFor(user).length > 0 && (
         <div className="card" data-hsc-link>
           <div className="card-title">{t('hsc.examsCardTitle')}</div>

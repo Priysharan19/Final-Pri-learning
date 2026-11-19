@@ -14,6 +14,7 @@ import { BRAND } from '../brand/edition.js';
 import { useApp } from '../App.jsx';
 import { useT } from '../i18n/index.js';
 import { ext1PapersFor } from '../pages/Ext1Papers.jsx';
+import { practiceSetsFor } from './practiceSets.js';
 import { examStyleFor, startSitting } from './paperApi.js';
 
 export default function ExamStyleQuestions({ chapter }) {
@@ -23,7 +24,7 @@ export default function ExamStyleQuestions({ chapter }) {
   const [items, setItems] = useState([]);
   const [busy, setBusy] = useState('');
   const [failed, setFailed] = useState(false);
-  const eligible = ext1PapersFor(user);
+  const eligible = ext1PapersFor(user) || practiceSetsFor(user);
   useEffect(() => {
     if (!eligible) return undefined;
     let live = true;
@@ -42,14 +43,14 @@ export default function ExamStyleQuestions({ chapter }) {
   return (
     <section className="card" aria-labelledby="exam-style-h" data-exam-style={chapter} style={{ marginBottom: 16 }}>
       <h2 className="card-title" id="exam-style-h" style={{ textTransform: 'none', letterSpacing: 0 }}>{t('paper.examStyle.heading')}</h2>
-      <p className="sub" style={{ marginBottom: 12 }}>{t('paper.examStyle.note', { brand: BRAND })}</p>
+      <p className="sub" style={{ marginBottom: 12 }}>{t(items.every(i => i.generated) ? 'paper.examStyle.noteSets' : 'paper.examStyle.note', { brand: BRAND })}</p>
       <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 12 }}>
         {items.map(item => {
           const key = `${item.paperId}:${item.question}`;
           return (
             <li key={key} data-exam-style-item={key} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, justifyContent: 'space-between' }}>
               <span>
-                {t('paper.examStyle.item', { paper: item.title, n: item.question })}
+                {t(item.generated ? 'paper.examStyle.itemSet' : 'paper.examStyle.item', { paper: item.title, n: item.question })}
                 <span className="muted"> · {t('paper.examStyle.meta', { marks: item.marks })}</span>
               </span>
               {item.locked

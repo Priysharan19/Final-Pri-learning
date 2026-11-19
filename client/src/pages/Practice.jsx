@@ -5,6 +5,7 @@ import { NCERT_CLASS8_3_13_IDS } from '../engine/ncert/class8-chapters-3-13-syll
 import { NCERT_CLASS9_SYLLABUS } from '../engine/ncert/class9-syllabus.js';
 const NotOffered = React.lazy(() => import('../components/NotOffered.jsx'));  // on demand: a link to something hidden is rare
 import { subtopicOffered } from '../engine/offering.js';
+import { PRACTICE_SET_CHAPTERS } from '../paper/practiceSets.js';
 
 // Practice is one of the heaviest product surfaces: handwriting, the maths
 // workspace and source-audited curriculum shells are irrelevant to Home/Login/
@@ -78,7 +79,7 @@ export default function Practice() {
       {CLASS9_IDS.includes(chapter) && (
         <OptionalSection key={chapter}><NcertClass9ChapterSection chapterId={chapter} /></OptionalSection>
       )}
-      {/^me1[12]-/.test(chapter || '') && <OptionalSection key={`es-${chapter}`}><ExamStyleQuestions chapter={chapter} /></OptionalSection>}
+      {(/^me1[12]-/.test(chapter || '') || PRACTICE_SET_CHAPTERS.includes(chapter)) && <OptionalSection key={`es-${chapter}`}><ExamStyleQuestions chapter={chapter} /></OptionalSection>}
       <PracticeBase />
     </React.Suspense>
   );
