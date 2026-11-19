@@ -147,6 +147,9 @@ const L = (text, latex) => ({ text, latex });
   ok(stays.stepReport?.lines?.[0]?.status === 'ok', 'stepEvidence: a true line stays true');
   ok(JSON.stringify(stepEvidence(q, '7', line, { correct: false }, null)) === JSON.stringify(flat), 'stepEvidence: no TeX, same reply');
 }
+// 0^0 is never read (no tick can come from it); 10^0 and 0^1 are ordinary.
+ok(texToPlain('0^0 = 1') === null && texToPlain('0^{0} = 1') === null && texToPlain('2 + 0^{0} = 3') === null, '0^0 converts to null');
+ok(texToPlain('10^0 = 1') !== null && texToPlain('0^{1} = 0') !== null && texToPlain('2^{0} = 1') !== null, '10^0, 0^1 and 2^0 still convert');
 // The reader is answer-blind: the prompt it is given names no answer, solution, mark or expected working.
 {
   const src = readFileSync(new URL('../../server/platform/handwritingProvider.js', import.meta.url), 'utf8');

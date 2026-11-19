@@ -219,6 +219,8 @@ export function texToPlain(latex) {
   try {
     const out = convert(src);
     if (!out || out.length > MAX_OUT || /[+\-*\/=^≈]$|^[*\/^]|<=$|>=$|!=$|\($/.test(out)) return null;
+    // 0^0 has no agreed value; a line is never ticked on it (independent review, 20 November).
+    if (/(^|[^\d.])0\^\(?0(?![\d.])/.test(out)) return null;
     if (/[{}\\]/.test(out.replace(/∫_\{[^{}]*\}\^\{[^{}]*\}|\]_\{[^{}]*\}\^\{[^{}]*\}/g, ''))) return null;
     return out;
   } catch (e) {
