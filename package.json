@@ -245,7 +245,7 @@
     "test:map": "node client/test/map-layout-check.mjs && node client/test/edition-terms-check.mjs && node client/test/au-no-india-surface-check.mjs && node client/test/empty-content-hidden-check.mjs",
     "test:exports": "node client/test/export-file-check.mjs && node client/test/progress-export-check.mjs",
     "test:insights": "node client/test/insights-view-check.mjs",
-    "test:error-reports": "node client/test/error-report-check.mjs && node client/test/practice-ux-check.mjs",
+    "test:error-reports": "node client/test/error-report-check.mjs && node client/test/practice-ux-check.mjs && node client/test/practice-dotpoint-check.mjs",
     "test:photo:cloud": "node client/test/cloud-photo-client-check.mjs && node client/test/photo-account-recovery-check.mjs",
     "test:photo:practise": "node client/test/question-photo-client-check.mjs",
     "test:photo:intake:tour": "node client/test/tour-photo-intake.js",

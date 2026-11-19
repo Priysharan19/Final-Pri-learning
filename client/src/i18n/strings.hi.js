@@ -496,7 +496,6 @@ export default {
   'practice.clearFilters': 'फ़िल्टर हटाएँ: स्मार्ट अभ्यास पर लौटें',
   'practice.clearShort': 'फ़िल्टर हटाएँ',
   'practice.sessionScore': ' · इस सत्र में {answered} में से {correct}',
-  'practice.dotpointMeta': ' · बिंदु {n}',
   'practice.nextUp': ' · आगे: {name}',
 
   // ── मूल्यांकन और प्रतिक्रिया ────────────────────────────────────────────────
@@ -5059,4 +5058,12 @@ export default {
   'sketch.detail.wrongKind': 'देखिए कौन अधिकतम है और कौन न्यूनतम।',
   'sketch.detail.wrong': 'सही नहीं।',
   'sketch.detail.unreadable': 'इसे पढ़ा नहीं जा सका।',
+  // अभ्यास पृष्ठ पर पाठ्यक्रम बिंदु चुनने वाला नियंत्रण।
+  'practice.dotpointLabel': 'पाठ्यक्रम बिंदु',
+  'practice.dotpointAll': 'सभी बिंदु',
+  'practice.dotpointChip': 'बिंदु: {text}',
+  'practice.dotpointRemove': 'बिंदु फ़िल्टर हटाएँ: {text}',
+  'practice.dotpointAnnounce': 'इस बिंदु का अभ्यास: {text}।',
+  'practice.dotpointAnnounceAll': 'सभी बिंदुओं का अभ्यास।',
+  'practice.dotpointNone': 'इस बिंदु पर अभी कोई प्रश्न नहीं है।',
 };

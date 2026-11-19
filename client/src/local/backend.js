@@ -6243,6 +6243,7 @@ async function resumableQuestion(profile, body = {}) {
     ? Math.min(4, Math.max(1, Number(body.difficulty))) : null;
 
   const scope = { track: body.track, pyqOnly: body.pyqOnly === true, explicit: !!subtopic };
+  const askedDotpoint = subtopic && body.dotpoint != null && body.dotpoint !== '' ? dotpointOf(subtopic, body.dotpoint) : null;
   const candidates = rows.filter(r => {
     if (!r || r.answered || r.discardedAt || r.examId || r.mode === 'rush' || r.mode === 'match') return false;
     if (!atNamedLevel(r)) return false;
@@ -6253,6 +6254,9 @@ async function resumableQuestion(profile, body = {}) {
     const actual = r.india?.chapterId || r.payload?.subtopic || r.subtopic;
     if (String(actual || '') !== subtopic) return false;
     if (difficulty !== null && Number(r.difficulty) !== difficulty) return false;
+    // A request that names a dot point resumes only a question that belongs to it, so choosing
+    // a dot point on the practice page is answered with one from that dot point.
+    if (askedDotpoint && !r.india && !dotpointsCredited(r.payload).includes(askedDotpoint.id)) return false;
     return true;
   }).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
