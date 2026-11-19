@@ -77,6 +77,18 @@ export function boxesFromPhoto(lines) {
 }
 
 /**
+ * A photo's marker for one line: a short bar at the left edge of the reader's box, centred on the box's vertical middle.
+ * The reader's box is its own estimate (it can sit about a line's height off the writing), so a photo is never drawn with a
+ * tight outline; it is marked where the line is believed to start. Ink keeps its measured boxes.
+ */
+export const MARKER_HEIGHT = 0.03;
+export function markerOf(box) {
+  const cy = box.y + box.h / 2;
+  const h = Math.min(MARKER_HEIGHT, 1);
+  return { x: box.x, y: clamp01(Math.min(cy - h / 2, 1 - h)), w: 0, h };
+}
+
+/**
  * Where each comment sits. `cards` are { id, y (the line's centre, 0 to 1 of the page), h (px) }.
  * A card is level with its line and never closer than `gap` to the card above; a run of
  * cards that would run off the bottom is pulled up together, but never above its own line's

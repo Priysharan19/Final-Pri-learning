@@ -20,7 +20,7 @@ import { Typeset } from './Typeset.jsx';
 import { EngineComment } from './EngineComment.jsx';
 import { dollarsBalanced, lineTex } from '../engine/commentTex.js';
 import { strokePath } from './originalWorkModel.js';
-import { STATE, alignCards, boxesFromInk, boxesFromPhoto, buildMarkedPage, commentItems, listOf } from './markedPageModel.js';
+import { STATE, alignCards, boxesFromInk, boxesFromPhoto, buildMarkedPage, commentItems, listOf, markerOf } from './markedPageModel.js';
 import { criteriaView } from './criteriaTableModel.js';
 import './MarkedPage.css';
 
@@ -46,7 +46,7 @@ function whyOf(card, t) {
 }
 /** True when the reason whyOf() returns is the engine's own sentence (maths marked with `$…$`), not an interface string. */
 const whyIsEngine = card => (card.valueChain === 'verified' || card.valueChain === 'arithmetic') && !!card.note;
-function Header({ page, t, hasTable }) {
+function Header({ page, t, hasTable, scoreShown }) {
   const { parts, mark } = page.header;
   // The mark is the server's, said truthfully and in proportion: a right answer shows it prominently; a wrong final answer
   // never headlines "0 of 1" beside a page of correct lines. No partial mark is invented here (method marks are the
@@ -56,8 +56,10 @@ function Header({ page, t, hasTable }) {
   return (
     <header className="mp-head">
       <p className="mp-sentence" data-mp-sentence role="status">{parts.map(p => t(p.key, p.vars)).join(' ')}</p>
-      {mark && full && <p className="mp-mark" data-mp-mark={`${mark.awarded}/${mark.possible}`}>{t('mp.mark', { earned: mark.awarded, possible: mark.possible })}</p>}
-      {mark && !full && (
+      {/* The host's score card already shows the figure: it is not printed a second time, only what it does not say. */}
+      {mark && scoreShown && finalWrong && <p className="mp-mark-quiet" data-mp-mark-note>{t('mp.mark.finalWrongNote')}</p>}
+      {mark && !scoreShown && full && <p className="mp-mark" data-mp-mark={`${mark.awarded}/${mark.possible}`}>{t('mp.mark', { earned: mark.awarded, possible: mark.possible })}</p>}
+      {mark && !scoreShown && !full && (
         <p className="mp-mark-quiet" data-mp-mark={`${mark.awarded}/${mark.possible}`}>
           {t(finalWrong ? 'mp.mark.finalWrong' : 'mp.mark.quiet', { earned: mark.awarded, possible: mark.possible, count: mark.possible })}
         </p>
@@ -69,9 +71,17 @@ function Header({ page, t, hasTable }) {
 /** The page: ink drawn through its own samples, or the photo, with one outline per judged line. */
 // Display only, deterministic: a gentle lift of the paper white and an even-out of soft shadow. The stored original is never altered.
 const CLEAN_FILTER = 'brightness(1.08) contrast(1.06) saturate(0.85)';
+/** The inline position of an outline: the box itself for ink, the left-edge marker for a photo. */
+const approxMarker = (box, approx) => {
+  const b = approx ? markerOf(box) : box;
+  return { left: `${b.x * 100}%`, top: `${b.y * 100}%`, width: `${b.w * 100}%`, height: `${b.h * 100}%` };
+};
 function Sheet({ source, geometry, page, active, setActive, t, cleaned }) {
   const view = geometry?.view || null;
   const outlines = page.aligned && geometry ? page.lines : [];
+  // The reader's box on a photo is its own estimate of where a line is, not a measurement: it can sit a line's height off. So a photo
+  // gets a marker at the line's left edge and vertical centre, never a tight outline that would claim more than the reader knows.
+  const approx = source.kind === 'photo';
   return (
     <div className="mp-sheet" data-mp-sheet={source.kind}>
      <div className="mp-sheet-in" style={view ? { '--mp-ar': view.w / view.h } : undefined}>
@@ -85,8 +95,8 @@ function Sheet({ source, geometry, page, active, setActive, t, cleaned }) {
         </svg>
       )}
       {outlines.map(l => l.box && (
-        <span key={l.n} className={`mp-box is-${l.status}${active === l.n ? ' is-active' : ''}${l.collapsed ? ' is-quiet' : ''}`} data-mp-box={l.n} data-mp-status={l.status}
-          style={{ left: `${l.box.x * 100}%`, top: `${l.box.y * 100}%`, width: `${l.box.w * 100}%`, height: `${l.box.h * 100}%` }}
+        <span key={l.n} className={`mp-box is-${l.status}${active === l.n ? ' is-active' : ''}${l.collapsed ? ' is-quiet' : ''}${approx ? ' is-approx' : ''}`} data-mp-box={l.n} data-mp-status={l.status}
+          style={approxMarker(l.box, approx)}
           aria-hidden="true" onMouseEnter={() => setActive(l.n)} onMouseLeave={() => setActive(null)} onClick={() => setActive(l.n)}>
           <span className="mp-tag"><Icon name={STATE[l.status].icon} size={12} />{l.n}</span>
         </span>
@@ -100,7 +110,7 @@ function Sheet({ source, geometry, page, active, setActive, t, cleaned }) {
  * source: { kind: 'ink', strokes } or { kind: 'photo', src, lines } where `lines` are the judged
  * lines in order (each may carry the reader's normalised `box`). The geometry is worked out here.
  */
-export default function MarkedPage({ input, source, texOf = s => s, markReady = true, criteria = null, approved, reading = null, onCorrect = null }) {
+export default function MarkedPage({ input, source, texOf = s => s, markReady = true, scoreShown = false, criteria = null, approved, reading = null, onCorrect = null }) {
   const t = useT();
   const uid = useId();
   // A read line is shown as maths: stacked fractions and proper powers where it parses, else the reader's own text via texOf.
@@ -192,7 +202,7 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
   return (
     <section className="mp" aria-labelledby={`${uid}-h`} data-marked-page data-mp-source={source.kind} data-mp-aligned={page.aligned ? 'true' : 'false'} data-mp-level={level ? 'true' : undefined}>
       <h3 className="sr-only" id={`${uid}-h`}>{t('mp.title')}</h3>
-      <Header page={page} t={t} hasTable={!!table} />
+      <Header page={page} t={t} hasTable={!!table} scoreShown={scoreShown} />
       {reading && (
         <p className="mp-read-all">
           <button type="button" className="mp-link" data-mp-see-page aria-expanded={showAll} onClick={() => setShowAll(v => !v)}>{t(showAll ? 'mp.hidePage' : 'mp.seePage')}</button>
@@ -205,6 +215,7 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
             <figcaption className="mp-photo-note">
               <button type="button" className="mp-link" data-mp-photo-toggle aria-pressed={!cleaned} onClick={() => setCleaned(v => !v)}>{t(cleaned ? 'mp.showOriginal' : 'mp.showCleaned')}</button>
               {cleaned && <span> {t('mp.cleanedNote')}</span>}
+              {page.aligned && <span data-mp-approx-note> {t('mp.photoNote')}</span>}
             </figcaption>
           )}
         </figure>

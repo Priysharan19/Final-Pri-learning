@@ -326,11 +326,23 @@ export const year12 = {
         answerType: 'numeric', answer: { value: r3(val), tol: 0.002 },
         traps: [{ value: r3(a * hi * hi + b * hi), why: 'Integrate first (raise powers), *then* substitute the limits — don’t just plug the limit into the original.' }].filter(t => Math.abs(t.value - r3(val)) > 0.01),
         hints: ['Find the antiderivative first.', `$F(x) = \\frac{${a}}{3}x^3 + \\frac{${b}}{2}x^2$.`, `Compute $F(${hi}) - F(${lo})$.`],
-        steps: [
-          { h: 'Antiderivative', d: `$F(x) = \\dfrac{${a}}{3}x^3 ${b >= 0 ? '+' : '-'} \\dfrac{${Math.abs(b)}}{2}x^2$` },
-          { h: 'Evaluate at the limits', d: `$F(${hi}) = ${r3(F(hi))}, \\quad F(${lo}) = ${r3(F(lo))}$` },
-          { h: 'Subtract', d: `$${r3(F(hi))} - ${r3(F(lo))} = ${r3(val)}$` }
-        ]
+        // Display only: coefficients in lowest terms and the exact value beside its rounding. The key, tolerance and traps are untouched.
+        steps: (() => {
+          const dtex = f => f.latex().replace('\\frac', '\\dfrac');
+          const term = (f, pow, lead) => {
+            const mag = new Frac(Math.abs(f.n), f.d);
+            const body = (mag.isInt && mag.n === 1 ? '' : dtex(mag)) + `x^${pow}`;
+            return lead ? `${f.n < 0 ? '-' : ''}${body}` : ` ${f.n < 0 ? '-' : '+'} ${body}`;
+          };
+          const exact = x => new Frac(a * x * x * x, 3).add(new Frac(b * x * x, 2));
+          const shown = f => (f.isInt ? dtex(f) : `${dtex(f)} ${Math.abs(r3(f.value) - f.value) < 1e-9 ? '=' : '\\approx'} ${r3(f.value)}`);
+          const eHi = exact(hi), eLo = exact(lo);
+          return [
+            { h: 'Antiderivative', d: `$F(x) = ${term(new Frac(a, 3), 3, true)}${term(new Frac(b, 2), 2, false)}$` },
+            { h: 'Evaluate at the limits', d: `$F(${hi}) = ${shown(eHi)}, \\quad F(${lo}) = ${shown(eLo)}$` },
+            { h: 'Subtract', d: `$${dtex(eHi)} - ${dtex(eLo)} = ${shown(eHi.sub(eLo))}$` }
+          ];
+        })()
       };
     }
     if (diff === 3) {
