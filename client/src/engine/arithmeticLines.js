@@ -54,6 +54,8 @@ export function exactForm(v) {
   const done = (plain, tex) => ({ plain: plain.replace(/^-/, '−'), tex });
   if (!Number.isFinite(v)) return { plain: String(v), tex: String(v) };
   if (Number.isInteger(v)) { const s = String(Object.is(v, -0) ? 0 : v); return done(s, s); }
+  // A whole number carrying float noise (72.00000000000001 from 2[32 - 64/3] × …) is that whole number, not 144/2.
+  { const whole = Math.round(v); if (Math.abs(v - whole) <= 1e-9 * Math.max(1, Math.abs(whole))) { const s = String(Object.is(whole, -0) ? 0 : whole); return done(s, s); } }
   const sign = v < 0 ? '-' : '', a = Math.abs(v);
   const reproduces = x => Math.abs(x - a) <= 1e-9 * Math.max(1, a);
   for (let d = 2; d <= 12; d++) { const n = Math.round(a * d); if (Math.abs(a * d - n) < 1e-9 && n < 100000) return done(`${sign}${n}/${d}`, `${sign}\\frac{${n}}{${d}}`); }
