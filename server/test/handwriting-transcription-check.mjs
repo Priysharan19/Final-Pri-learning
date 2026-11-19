@@ -23,7 +23,7 @@ import cookieParser from 'cookie-parser';
 import { createPlatformDb } from '../platform/db.js';
 import { createHandwritingRouter, validateRequestBody, FORBIDDEN_FIELDS } from '../platform/handwriting.js';
 import {
-  SYSTEM_INSTRUCTIONS, TRANSCRIPTION_SCHEMA, normalizeResult, normalizeLeadConnective, providerConfig,
+  SYSTEM_INSTRUCTIONS, TRANSCRIPTION_SCHEMA, normalizeResult, normalizeLeadConnective, normalizeSegments, providerConfig,
   providerStaticStatus, probeHandwritingProvider, transcribeHandwriting,
   validateImage, HandwritingProviderError
 } from '../platform/handwritingProvider.js';
@@ -153,7 +153,14 @@ ok(!clean.needsConfirmation && clean.confidence >= 0.9, 'a confident single line
   eq([legacy.lines[0].uncertain, legacy.lines[0].doubt, legacy.lines[0].gapBefore, legacy.needsConfirmation], [true, null, false, true],
     'a line missing its required `uncertain` flag is a doubt to confirm, never "no doubt"');
   const line = TRANSCRIPTION_SCHEMA.properties.lines.items;
-  eq([...line.required].sort(), ['confidence', 'doubt', 'gap_before', 'latex', 'text', 'uncertain'], 'the strict schema requires every per-line field');
+  eq([...line.required].sort(), ['box', 'confidence', 'doubt', 'gap_before', 'latex', 'segments', 'text', 'uncertain'], 'the strict schema requires every per-line field');
+  {
+    // The line box is layout only: four fractions inside the picture or null; anything else is dropped.
+    const { normalizeBox } = await import('../platform/handwritingProvider.js');
+    eq(normalizeBox({ x: 0.1, y: 0.2, w: 0.5, h: 0.1 }), { x: 0.1, y: 0.2, w: 0.5, h: 0.1 }, 'a box inside the picture is kept');
+    eq([normalizeBox(null), normalizeBox({ x: 0.9, y: 0.2, w: 0.5, h: 0.1 }), normalizeBox({ x: 'a', y: 0, w: 1, h: 1 }), normalizeBox({ x: -0.1, y: 0, w: 0.2, h: 0.1 }), normalizeBox({ x: 0, y: 0, w: 0, h: 0.1 })], [null, null, null, null, null], 'a missing, out-of-picture, non-numeric, negative or empty box is null');
+    ok(line.properties.box.anyOf.some(a => a.type === 'null'), 'the schema allows null where the reader is not sure');
+  }
   ok(line.additionalProperties === false && line.properties.uncertain.type === 'boolean' && line.properties.doubt.maxLength === 120 && line.properties.gap_before.type === 'boolean', 'and nothing beyond them');
   ok(/bar under it/.test(SYSTEM_INSTRUCTIONS) && /x and n/.test(SYSTEM_INSTRUCTIONS) && /do not settle it silently/.test(SYSTEM_INSTRUCTIONS), 'the instruction reads relation and look-alike symbols from their strokes and reports a doubt');
   ok(/Never choose a symbol because it would make the mathematics true/.test(SYSTEM_INSTRUCTIONS) && /You do not know the question/.test(SYSTEM_INSTRUCTIONS), 'and never decides a symbol by what would be mathematically right');
@@ -440,7 +447,8 @@ eq(timedOut?.code, 'HANDWRITING_TIMEOUT', 'provider timeout is distinct from can
 // that succeeded on the automatic retry) ──────────────────────────────────────
 eq(providerConfig({ PRI_HANDWRITING_API_KEY: 'k' }).timeoutMs, 45000, 'the default reading budget is 45 s');
 eq(providerConfig({ PRI_HANDWRITING_API_KEY: 'k', PRI_HANDWRITING_TIMEOUT_MS: '90000' }).timeoutMs, 60000, 'and it is capped at 60 s');
-eq(providerConfig({ PRI_HANDWRITING_API_KEY: 'k' }).reasoningEffort, 'low', 'reasoning effort stays low unless a deployment opts in');
+eq(providerConfig({ PRI_HANDWRITING_API_KEY: 'k' }).reasoningEffort, 'none', "reasoning effort defaults to 'none' (measured, 2026-11-18); a deployment may opt into 'low' or 'medium'");
+eq(providerConfig({ PRI_HANDWRITING_API_KEY: 'k', PRI_HANDWRITING_REASONING_EFFORT: 'low' }).reasoningEffort, 'low', "and 'low' can still be set");
 eq(providerConfig({ PRI_HANDWRITING_API_KEY: 'k', PRI_HANDWRITING_REASONING_EFFORT: 'minimal' }).reasoningEffort, 'minimal', 'minimal reasoning effort can be opted into');
 ok(providerStaticStatus({ PRI_HANDWRITING_API_KEY: 'k', PRI_HANDWRITING_REASONING_EFFORT: 'turbo' }).problems.includes('reasoning-effort-invalid'),
   'an unknown reasoning effort is a configuration problem, not silently sent');
@@ -843,7 +851,7 @@ try {
     eq(Object.keys(json?.transcription || {}).sort(),
       ['confidence', 'confidenceFloor', 'engine', 'escalated', 'fallbackAttempted', 'fallbackFailureCode', 'latencyMs', 'lines', 'needsConfirmation', 'providerNeedsConfirmation', 'text'],
       'the route answers with the closed transcription shape, whatever extra the model returned');
-    eq(Object.keys(json?.transcription?.lines?.[0] || {}).sort(), ['confidence', 'doubt', 'gapBefore', 'latex', 'text', 'uncertain'],
+    eq(Object.keys(json?.transcription?.lines?.[0] || {}).sort(), ['box', 'confidence', 'doubt', 'gapBefore', 'latex', 'segments', 'text', 'uncertain'],
       'and every line is the closed line shape');
     eq(Object.keys(json || {}).sort(), ['receipt', 'reused', 'transcription'], 'nothing beside the transcription, the receipt and the reuse flag');
     const wireReply = JSON.stringify(json);
@@ -884,9 +892,98 @@ try {
       eq([r.status, r.json?.transcription?.needsConfirmation], [200, true], `through the route, a reply with ${label} is a reading to confirm, never a confident one`);
     }
     scripted = null;
+
+    // The public-stem vocabulary hint (owner decision 18 Nov 2026), end to end:
+    // derived by the route from the issued question's PROMPT only.
+    const QID2 = '7a2b9c4d-1e3f-4a5b-8c6d-9e0f1a2b3c4d';
+    db.prepare(`INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at)
+      VALUES (?,?,?,?,?,?,?)`).run('acct-boundary', 'practice-question', QID2, JSON.stringify({
+      prompt: 'A pendulum has height $h = 5\\sin(\\pi t)$. Find $h$ when $t = 2$ s.',
+      answer: { value: 'CANARY_ANSWER_71' }, steps: [{ h: 'CANARY_STEP_H', d: 'CANARY_STEP_D 4242' }], hints: ['CANARY_HINT_9'], expected: 'CANARY_EXPECTED_5'
+    }), null, now, now + 86400000);
+    bodies.length = 0;
+    const hinted = await fetch(`${boundaryBase}/handwriting/transcribe`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: `${SESSION_COOKIE}=raw-acct-boundary` },
+      body: JSON.stringify({ image: PNG + Buffer.from('hint-page-0002').toString('base64'), questionId: QID2 })
+    });
+    eq(hinted.status, 200, 'a read for an issued question with symbols is answered');
+    const hintedBody = JSON.parse(bodies[0] || '{}');
+    const hintedText = hintedBody.input?.[1]?.content?.[0]?.text || '';
+    ok(/appear on the page: h, sin, t, π\./.test(hintedText), 'the reader receives the stem\'s symbols (h, sin, t, π) as a bare list');
+    ok(!/CANARY|4242|pendulum/.test(JSON.stringify(hintedBody)) && !/\d/.test(hintedText), 'and nothing else of the question: no words, numbers, answer, steps or hints');
+    eq(hintedBody.input?.[1]?.content?.map(p => p.type), ['input_text', 'input_image'], 'the user turn is still only the sentence and the picture');
+    // A question that is not this account's gets no hint: the hint is never taken from the request.
+    bodies.length = 0;
+    const foreign = await fetch(`${boundaryBase}/handwriting/transcribe`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: `${SESSION_COOKIE}=raw-acct-boundary` },
+      body: JSON.stringify({ image: PNG + Buffer.from('hint-page-0003').toString('base64'), questionId: '11111111-2222-4333-8444-555555555555', symbols: ['z'] })
+    });
+    eq(foreign.status, 400, 'a client-supplied `symbols` field is refused: the device cannot forge a hint');
+    eq(bodies.length, 0, 'and nothing was sent to the reader');
   } finally {
     await new Promise(resolve => boundaryServer.close(resolve));
   }
+}
+
+
+// ── Reader speed + accuracy (2026-11-18): words versus mathematics, primes ────
+{
+  const lineSchema = TRANSCRIPTION_SCHEMA.properties.lines.items;
+  ok(lineSchema.required.includes('segments') && lineSchema.properties.segments.type === 'array', 'each line carries `segments` in the strict schema');
+  eq(lineSchema.properties.segments.items.properties.kind.enum, ['text', 'math'], 'a segment is either words or mathematics');
+  eq(lineSchema.properties.segments.items.required, ['kind', 'value'], 'and nothing else');
+  ok(Object.keys(lineSchema.properties).every(k => lineSchema.required.includes(k)), 'strict mode: every line property is required');
+  ok(/y′/.test(SYSTEM_INSTRUCTIONS) && /never a superscript 1/.test(SYSTEM_INSTRUCTIONS) && /f′′\(x\)/.test(SYSTEM_INSTRUCTIONS), 'the reader is told a raised stroke is a prime, never a superscript 1');
+  ok(/π is a horizontal bar/.test(SYSTEM_INSTRUCTIONS), 'and how π differs from n');
+  ok(/kind "text"/.test(SYSTEM_INSTRUCTIONS) && /"x = 0 or x = -3"/.test(SYSTEM_INSTRUCTIONS) && /never put inside a math piece/.test(SYSTEM_INSTRUCTIONS), 'and that words stay out of mathematics (the "or" example)');
+  ok(!/expected|answer key|solution|rubric|marks? scheme/i.test(SYSTEM_INSTRUCTIONS), 'the instruction names no answer, solution or rubric');
+  ok(/vocabulary hint/.test(SYSTEM_INSTRUCTIONS) && /never to add, remove or change anything the student wrote/.test(SYSTEM_INSTRUCTIONS), 'the hint, when sent, is a vocabulary aid that may not change what was written');
+
+  const orSegs = [{ kind: 'math', value: 'x = 0' }, { kind: 'text', value: 'or' }, { kind: 'math', value: 'x = -3' }];
+  eq(normalizeSegments(orSegs, 'x = 0 or x = -3'), orSegs, 'segments that restate the line are kept');
+  eq(normalizeSegments(orSegs, 'x=0orx=-3'), orSegs, 'whatever spacing the line used');
+  eq(normalizeSegments(orSegs, 'x = 0 or x = -4'), null, 'segments that differ from the text are dropped, never shown in its place');
+  eq(normalizeSegments([{ kind: 'word', value: 'x' }], 'x'), null, 'an unknown kind is dropped');
+  eq(normalizeSegments(undefined, 'x'), null, 'a reply without segments (older reader, custom endpoint) gives null');
+  eq(normalizeSegments([], 'x'), null, 'an empty list gives null');
+  eq(normalizeSegments([{ kind: 'math', value: 'x'.repeat(201) }], 'x'.repeat(201)), null, 'an over-long segment is dropped');
+
+  const line = (text, extra = {}) => ({ text, latex: '', confidence: 0.97, uncertain: false, doubt: '', gap_before: false, ...extra });
+  const read = (lines) => normalizeResult({ lines, confidence: 0.97, needs_confirmation: false }, { model: 'm', confidenceFloor: 0.82 });
+  const withSegs = read([line('x = 0 or x = -3', { segments: orSegs })]);
+  eq(withSegs.lines[0].segments, orSegs, 'normalizeResult passes verified segments through');
+  eq(withSegs.text, 'x = 0 or x = -3', 'and the line text — what is checked — is unchanged by them');
+  eq(read([line('x = 4')]).lines[0].segments, null, 'a line with no segments reads as before, with segments null (backward compatible)');
+  const bad = read([line('x = 4', { segments: [{ kind: 'math', value: 'x = 5' }] })]);
+  eq([bad.lines[0].segments, bad.lines[0].text, bad.needsConfirmation], [null, 'x = 4', false], 'bad segments never fail a read or alter its text');
+  // The reader's characters are passed on as read: a prime stays a prime and a
+  // misread is not repaired here (AI proposes; nothing in this module re-reads).
+  eq(read([line("y′ = 6x^2 + 18x")]).text, "y′ = 6x^2 + 18x", 'a prime is passed on as a prime');
+  eq(read([line('f′′(x) = 6x')]).text, 'f′′(x) = 6x', 'and so is a double prime');
+  eq(read([line('y¹ = 6x')]).text, 'y¹ = 6x', 'a reading is never rewritten by this module (no re-reading toward a nicer line)');
+}
+
+// ── Request shape: effort, image detail, and nothing but the picture ──────────
+{
+  eq(providerConfig({ PRI_HANDWRITING_API_KEY: 'k', PRI_HANDWRITING_REASONING_EFFORT: 'none' }).reasoningEffort, 'none', "'none' reasoning effort can be set (gpt-5.6 models reject 'minimal')");
+  eq(providerConfig({ PRI_HANDWRITING_API_KEY: 'k' }).imageDetail, 'high', 'image detail defaults to high');
+  eq(providerConfig({ PRI_HANDWRITING_API_KEY: 'k', PRI_HANDWRITING_IMAGE_DETAIL: 'auto' }).imageDetail, 'auto', 'and can be set to auto');
+  ok(providerStaticStatus({ PRI_HANDWRITING_API_KEY: 'k', PRI_HANDWRITING_IMAGE_DETAIL: 'ultra' }).problems.includes('image-detail-invalid'), 'an unknown image detail is a configuration problem');
+  eq(providerConfig({ PRI_HANDWRITING_API_KEY: 'k' }).confidenceFloor, 0.82, 'the confidence floor default is untouched');
+  const bodies = [];
+  const fetchImpl = async (_u, init) => {
+    bodies.push(JSON.parse(init.body));
+    return { ok: true, status: 200, json: async () => ({ output_text: JSON.stringify({ lines: [{ text: 'x', segments: [{ kind: 'math', value: 'x' }], latex: '', confidence: 0.97, uncertain: false, doubt: '', gap_before: false }], confidence: 0.97, needs_confirmation: false }) }) };
+  };
+  const e2 = { PRI_HANDWRITING_API_KEY: 'k', PRI_HANDWRITING_REASONING_EFFORT: 'none', PRI_HANDWRITING_IMAGE_DETAIL: 'auto' };
+  await transcribeHandwriting(PNG, { env: e2, fetchImpl });
+  const b = bodies[0];
+  eq([b.reasoning, b.input[1].content[1].detail], [{ effort: 'none' }, 'auto'], 'the configured effort and detail are what is sent');
+  eq(Object.keys(b).sort(), ['input', 'model', 'reasoning', 'store', 'text'], 'the request has only the model, the instructions, the picture and the schema');
+  eq(b.input[1].content.map(p => p.type), ['input_text', 'input_image'], 'the user turn is one fixed sentence and the picture');
+  eq(b.input[1].content[0].text, 'Transcribe every line of handwriting in this image. Do not solve it.', 'with no hint the sentence is constant: no question text or symbol list rides with it');
 }
 
 console.log(failures.length

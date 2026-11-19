@@ -12,7 +12,8 @@
 //
 //   · an authored `tol` stays when the question names a precision ("correct to
 //     2 decimal places", "to the nearest dollar"), asks for an estimate or a
-//     rounded value, or declares a published `rounding` rule;
+//     rounded value, or declares a published `rounding` rule or the paper's own
+//     `officialRange` (a past-paper key);
 //   · otherwise, on a key that is itself exact to two decimal places or fewer
 //     (7, 2.4, 661.25), the band is dropped: the key is the answer, and the
 //     marker's own default band (a whole key exact, a decimal key within half a

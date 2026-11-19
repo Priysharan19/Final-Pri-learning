@@ -164,9 +164,12 @@ function throughStepCheck(meta, working) {
   const quad = { kind: 'equation', variable: 'x', solutions: [3, 5], source: 'x^2-8x+15=0' };
   const branch = throughStepCheck(quad, 'x^2-8x+15=0\n(x-3)(x-5)=0\nx-3=0\nx=3\nx-5=0\nx=6');
   ok(branch.first === 5 && branch.view === null, 'real Step Check: one branch of a factorisation is never compared as if it were the whole equation');
-  const dropped = throughStepCheck(quad, 'x^2-8x+15=0\n(x-3)(x-5)=0\nx=3\nx=6');
-  ok(dropped.first === 2 && dropped.view?.message.key === 'mistake.graph.equationLost' && dropped.view.point.x === 5,
-    'real Step Check: writing only x = 3 under (x−3)(x−5) = 0 shows the solution it lost, x = 5');
+  // Owner decision 7 (18 Nov 2026): a TRUE root written alone under a product that promised both is INCOMPLETE, never a break,
+  // so there is no mistake to draw for it; the lost-root graph appears only for a line that is actually wrong.
+  const dropped = throughStepCheck(quad, 'x^2-8x+15=0\n(x-3)(x-5)=0\nx=3');
+  ok(dropped.first === -1 && dropped.view === null, 'real Step Check: writing only x = 3 under (x-3)(x-5) = 0 is incomplete, not a mistake');
+  const lostThenWrong = throughStepCheck(quad, 'x^2-8x+15=0\n(x-3)(x-5)=0\nx=3\nx=6');
+  ok(lostThenWrong.first === 3 && lostThenWrong.view === null, 'real Step Check: the first mistake is the line that is wrong (x = 6), and an incomplete line above it is not compared as the line before');
   const chain = throughStepCheck({ kind: 'expression', canonical: 'x^2+2x+1' }, '(x+1)^2 = x^2+x+x+1\n(x+1)^2 = x^2+1');
   ok(chain.first === 1 && chain.view?.kind === 'expression' && chain.view.rhs === true, 'real Step Check: a chain of equals is drawn by its right-hand sides, not as an equation');
   const slip = throughStepCheck({ kind: 'equation', variable: 'x', solutions: [-7], source: '5(x+2)-2=2x-13' }, '5(x+2)-2=2x-13\n5x+2-2=2x-13\n3x=-13');

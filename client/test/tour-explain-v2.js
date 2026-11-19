@@ -40,6 +40,7 @@ export const flow = {
       const typeTab = page.getByRole('button', { name: 'Answer by typing' });
       if (await typeTab.count()) await typeTab.click();
       await settle();
+      await answerBox.first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
       if (await linearTyped()) { served = true; break; }
       const leaving = await page.locator('.qpage[data-question-id]').first().getAttribute('data-question-id');
       await page.locator('.ctx-next').click();
@@ -48,6 +49,7 @@ export const flow = {
         return el && el.getAttribute('data-question-id') !== id && el.querySelector('.q-prompt');
       }, leaving, { timeout: 30000 });
     }
+    if (!served) { await answerBox.first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {}); served = await linearTyped(); }
     if (!await check('a typed linear-equation question was served', served,
       JSON.stringify(await online.issuedShown()))) return;
 

@@ -14,6 +14,7 @@
 // This file imports the engine only (client/src/engine, which the production
 // image ships — see Dockerfile and production-runtime-image-check.mjs). It
 // must never import a server module: the worker has no store and no secrets.
+import { derivedMetaOff } from '../../client/src/engine/derivedMetaOff.js';
 import { checkAnswer, stepCheck, methodMarks } from '../../client/src/engine/checker.js';
 import { markObjective, markMultiCorrect } from '../../client/src/engine/indiaExams.js';
 import { markMatrixMatch } from '../../client/src/engine/matrixMatch.js';
@@ -31,6 +32,7 @@ import { answerForm, effectiveSymbols, firstFinalAttempt, planGivens, readClaimF
 // questions, answer keys and stage meta remain server-private.
 export function stepMetaFor(q) {
   if (q.stepcheck) return q.stepcheck;
+  if (derivedMetaOff(q)) return null;   // answer only until the family has a structured meta
   const a = q.answer;
   if (!a) return null;
   if (q.answerType === 'expression' && a.expr) return { kind: 'expression', canonical: a.expr };
@@ -54,7 +56,10 @@ export function stepMetaFor(q) {
     }
   }
   if (q.answerType === 'set' && Array.isArray(a.values) && a.values.length) {
-    return { kind: 'equation', variable: 'x', solutions: a.values };
+    // The letter the question asks for ("Find all values of $k$ ..."), not a guessed x: working in another letter is a side
+    // calculation, never a claim about this answer.
+    const asked = String(q.prompt || '').match(/\b(?:values?|solutions?|roots?)\s+of\s+\$([A-Za-z])\$/i);
+    return { kind: 'equation', variable: asked ? asked[1] : 'x', solutions: a.values };
   }
   return null;
 }

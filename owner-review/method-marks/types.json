@@ -1,0 +1,393 @@
+{
+  "status": "draft: not approved",
+  "types": [
+    {
+      "id": "y12-diff-rules",
+      "title": "Differentiate using the chain, product or quotient rule",
+      "course": "Year 12 Mathematics Advanced",
+      "year": 12,
+      "families": [
+        "y12-diff"
+      ],
+      "file": "y12-diff-rules.md",
+      "totalMarks": 2,
+      "criteria": [
+        {
+          "key": "derivative",
+          "text": "Writes a correct derivative of the given function (any equivalent form).",
+          "marks": 1,
+          "decidedBy": "interpreter"
+        },
+        {
+          "key": "answer",
+          "text": "Gives the final answer correctly, in the form the question asks.",
+          "marks": 1,
+          "decidedBy": "answer checker"
+        }
+      ],
+      "digest": "cf7cfc7d6d8ffaa4ccd53b8a7f335c138190ea80ea333817ff6aecb847083e42"
+    },
+    {
+      "id": "y12-diff-gradient",
+      "title": "Differentiate, then find the gradient at a point",
+      "course": "Year 12 Mathematics Advanced",
+      "year": 12,
+      "families": [
+        "y12-diff"
+      ],
+      "file": "y12-diff-gradient.md",
+      "totalMarks": 2,
+      "criteria": [
+        {
+          "key": "derivative",
+          "text": "Differentiates the given function correctly.",
+          "marks": 1,
+          "decidedBy": "interpreter"
+        },
+        {
+          "key": "answer",
+          "text": "Substitutes the x-value and states the gradient correctly.",
+          "marks": 1,
+          "decidedBy": "answer checker"
+        }
+      ],
+      "digest": "6835749f95f2fedd805686d2a870c25df14f2e5260fffb596e0fa42c02352344"
+    },
+    {
+      "id": "y12-stationary-x",
+      "title": "Find the x-coordinates of the stationary points",
+      "course": "Year 12 Mathematics Advanced",
+      "year": 12,
+      "families": [
+        "y12-appdiff"
+      ],
+      "file": "y12-stationary-x.md",
+      "totalMarks": 3,
+      "criteria": [
+        {
+          "key": "derivative",
+          "text": "Differentiates the function correctly.",
+          "marks": 1,
+          "decidedBy": "interpreter"
+        },
+        {
+          "key": "zero",
+          "text": "Sets the derivative equal to zero.",
+          "marks": 1,
+          "decidedBy": "interpreter"
+        },
+        {
+          "key": "solve",
+          "text": "Solves to find the x-coordinates.",
+          "marks": 1,
+          "decidedBy": "interpreter"
+        }
+      ],
+      "digest": "18d08c2aee3dfccd6e2ec1f9e04ee9e1ef7eed4100f2ad14321dad22f540d857"
+    },
+    {
+      "id": "y12-tangent",
+      "title": "Find the equation of a tangent",
+      "course": "Year 12 Mathematics Advanced",
+      "year": 12,
+      "families": [
+        "y12-appdiff"
+      ],
+      "file": "y12-tangent.md",
+      "totalMarks": 3,
+      "criteria": [
+        {
+          "key": "derivative",
+          "text": "Differentiates the function correctly.",
+          "marks": 1,
+          "decidedBy": "interpreter"
+        },
+        {
+          "key": "ypoint",
+          "text": "Finds the y-value of the point of contact.",
+          "marks": 1,
+          "decidedBy": "interpreter"
+        },
+        {
+          "key": "answer",
+          "text": "Gives the correct equation of the tangent.",
+          "marks": 1,
+          "decidedBy": "answer checker"
+        }
+      ],
+      "digest": "e1c1adc9b2320ae1bbcf230f0ece79e186d7d3fee189ad041f33db9cece9cffe"
+    },
+    {
+      "id": "y12-trig-extreme",
+      "title": "Maximum or minimum of a sine or cosine model",
+      "course": "Year 12 Mathematics Advanced",
+      "year": 12,
+      "families": [
+        "y12-trig-model"
+      ],
+      "file": "y12-trig-extreme.md",
+      "totalMarks": 3,
+      "criteria": [
+        {
+          "key": "amplitude",
+          "text": "States the amplitude correctly.",
+          "marks": 1,
+          "decidedBy": "interpreter"
+        },
+        {
+          "key": "midline",
+          "text": "States the midline (centre value) correctly.",
+          "marks": 1,
+          "decidedBy": "interpreter"
+        },
+        {
+          "key": "extreme",
+          "text": "States the maximum or minimum value asked for, correctly.",
+          "marks": 1,
+          "decidedBy": "interpreter"
+        }
+      ],
+      "digest": "9c183521d681ab80092b6659812e28b7e6d7df7b0ea53398d020befc8d633c73"
+    },
+    {
+      "id": "y12-trig-evaluate",
+      "title": "Find the value of a sine or cosine model at a time",
+      "course": "Year 12 Mathematics Advanced",
+      "year": 12,
+      "families": [
+        "y12-trig-model"
+      ],
+      "file": "y12-trig-evaluate.md",
+      "totalMarks": 2,
+      "criteria": [
+        {
+          "key": "substitute",
+          "text": "Substitutes the value of t into the model correctly.",
+          "marks": 1,
+          "decidedBy": "interpreter"
+        },
+        {
+          "key": "answer",
+          "text": "States the value correctly.",
+          "marks": 1,
+          "decidedBy": "answer checker"
+        }
+      ],
+      "digest": "c23cfa56a7b5dacd7bf40237d288a64a48e3e1df428d5fb40a9255f3c2474e2e"
+    },
+    {
+      "id": "y12-diff-explog",
+      "title": "Differentiate an exponential or logarithmic function",
+      "course": "Year 12 Mathematics Advanced",
+      "year": 12,
+      "families": [
+        "y12-explogcalc"
+      ],
+      "file": "y12-diff-explog.md",
+      "totalMarks": 2,
+      "criteria": [
+        {
+          "key": "derivative",
+          "text": "Writes a correct derivative (any equivalent form).",
+          "marks": 1,
+          "decidedBy": "engine"
+        },
+        {
+          "key": "answer",
+          "text": "Gives the final answer correctly, in the form the question asks.",
+          "marks": 1,
+          "decidedBy": "answer checker"
+        }
+      ],
+      "digest": "f58e0aa8654e1cbe8a0760730c56be3459ffb874c9606969ff9f1b0d2eee6f10"
+    },
+    {
+      "id": "y11-poly-evaluate",
+      "title": "Evaluate a polynomial or find a remainder by substitution",
+      "course": "Year 11 Mathematics Advanced",
+      "year": 11,
+      "families": [
+        "y11-polynomials"
+      ],
+      "file": "y11-poly-evaluate.md",
+      "totalMarks": 2,
+      "criteria": [
+        {
+          "key": "substitute",
+          "text": "Substitutes the correct value into P(x).",
+          "marks": 1,
+          "decidedBy": "interpreter"
+        },
+        {
+          "key": "answer",
+          "text": "Evaluates correctly to give the value or remainder.",
+          "marks": 1,
+          "decidedBy": "answer checker"
+        }
+      ],
+      "digest": "07b48f570fbcc9411b66b74850ce495858ceb31a707c9cceaf9054e15c7ea8a4"
+    },
+    {
+      "id": "y11-diff-gradient-plan",
+      "title": "Gradient of a tangent: differentiate, then substitute",
+      "course": "Year 11 Mathematics Advanced",
+      "year": 11,
+      "families": [
+        "y11-diff"
+      ],
+      "file": "y11-diff-gradient-plan.md",
+      "totalMarks": 2,
+      "criteria": [
+        {
+          "key": "derivative",
+          "text": "Differentiates the function correctly (stage 1 of the plan).",
+          "marks": 1,
+          "decidedBy": "engine plan stage"
+        },
+        {
+          "key": "gradient",
+          "text": "Substitutes the x-value and finds the gradient (stage 2 of the plan).",
+          "marks": 1,
+          "decidedBy": "engine plan stage"
+        }
+      ],
+      "digest": "8c8eba64e50f941ad2501bbc99131020303fd6bf1180dae9fe36088ffbd6fb70"
+    },
+    {
+      "id": "y11-diff-power-rule",
+      "title": "Differentiate a polynomial by the power rule",
+      "course": "Year 11 Mathematics Advanced",
+      "year": 11,
+      "families": [
+        "y11-diff"
+      ],
+      "file": "y11-diff-power-rule.md",
+      "totalMarks": 2,
+      "criteria": [
+        {
+          "key": "derivative",
+          "text": "Writes a correct derivative.",
+          "marks": 1,
+          "decidedBy": "engine"
+        },
+        {
+          "key": "answer",
+          "text": "Gives the final answer correctly.",
+          "marks": 1,
+          "decidedBy": "answer checker"
+        }
+      ],
+      "digest": "9c576f1338d510d4ae084bb8db6d86fb50f528359b149d21ee65940ce8b95e7d"
+    }
+  ],
+  "notProvable": [
+    {
+      "id": "y12-integrals",
+      "title": "Definite integrals and areas under a curve",
+      "course": "Year 12 Mathematics Advanced",
+      "families": [
+        "y12-integration",
+        "y12-integral-calc"
+      ],
+      "reason": "The engine cannot read an antiderivative or an integral line, so \"integrates correctly\" and \"substitutes the limits\" cannot be decided; only the final value is checked."
+    },
+    {
+      "id": "y12-integrals-indefinite",
+      "title": "Indefinite integrals and the reverse chain rule",
+      "course": "Year 12 Mathematics Advanced",
+      "families": [
+        "y12-integration",
+        "y12-integral-calc",
+        "y12-trigcalc"
+      ],
+      "reason": "The engine cannot read an antiderivative line, so no stage of the method can be decided apart from the final expression."
+    },
+    {
+      "id": "y12-stationary-nature",
+      "title": "Nature of a stationary point",
+      "course": "Year 12 Mathematics Advanced",
+      "families": [
+        "y12-appdiff"
+      ],
+      "reason": "The nature question is multiple choice, and the second derivative is not a line the interpreter can read, so \"determines the nature\" cannot be decided from the lines."
+    },
+    {
+      "id": "y12-optimisation",
+      "title": "Applications of differentiation: greatest or least value (rates and optimisation)",
+      "course": "Year 12 Mathematics Advanced",
+      "families": [
+        "y12-appdiff"
+      ],
+      "reason": "The derivative of a function named P (or any capital-letter name) is not read, and the line that sets it to zero is not recognised, so the calculus steps cannot be decided."
+    },
+    {
+      "id": "y12-explog-models",
+      "title": "Exponential growth and decay models, and logarithmic equations",
+      "course": "Year 12 Mathematics Advanced",
+      "families": [
+        "y12-explogcalc",
+        "y12-func-model",
+        "y11-explog"
+      ],
+      "reason": "The lines that set up and solve the model equation (taking logarithms, finding k) are not read, so no method criterion can be decided."
+    },
+    {
+      "id": "y12-series",
+      "title": "Arithmetic and geometric sequences and series",
+      "course": "Year 12 Mathematics Advanced",
+      "families": [
+        "y12-series"
+      ],
+      "reason": "The formula line and the substitution line are not read, and the question has no engine plan, so only the final value can be checked."
+    },
+    {
+      "id": "y12-financial",
+      "title": "Financial mathematics: compound interest, annuities and loans",
+      "course": "Year 12 Mathematics Advanced",
+      "families": [
+        "y12-financial",
+        "y12-fin-exact"
+      ],
+      "reason": "Only the final amount is checked. The formula and the substitution lines are not read, so no method criterion can be decided."
+    },
+    {
+      "id": "y12-probability-normal",
+      "title": "Probability, random variables and the normal distribution",
+      "course": "Year 12 Mathematics Advanced",
+      "families": [
+        "y12-stats",
+        "y12-random-var"
+      ],
+      "reason": "The formula line (z-score, E(X), Var(X)) is not read, and a substitution line is checked only as arithmetic, not as the right substitution into the right formula, so \"uses the correct formula\" cannot be decided."
+    },
+    {
+      "id": "me12-trig-equations",
+      "title": "Trigonometric equations over a stated interval (Extension 1)",
+      "course": "Year 12 Mathematics Extension 1",
+      "families": [
+        "me12-trigeq"
+      ],
+      "reason": "The line that reduces the equation and the lines that list the angles are not read, so \"reduces to a basic equation\" and \"finds all the solutions in range\" cannot be decided."
+    },
+    {
+      "id": "me12-binomial",
+      "title": "Binomial probability (Extension 1)",
+      "course": "Year 12 Mathematics Extension 1",
+      "families": [
+        "me12-binomial",
+        "me12-binomial-forms"
+      ],
+      "reason": "There is no step plan for this form and the formula and substitution lines are not read, so only the final value can be checked."
+    },
+    {
+      "id": "me12-integration-substitution",
+      "title": "Integration by substitution (Extension 1)",
+      "course": "Year 12 Mathematics Extension 1",
+      "families": [
+        "me12-calc",
+        "mex-integration"
+      ],
+      "reason": "A substitution line \"u = ...\" is a choice of notation and the transformed integral is not read, so no stage can be decided."
+    }
+  ]
+}

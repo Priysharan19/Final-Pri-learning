@@ -22,7 +22,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
 import { TEMPLATES } from '../src/ink/templates.js';
-import { pressRead, readLines, turnOnServerReading } from './fakeServerReader.js';
+import { pressRead, turnOnServerReading } from './fakeServerReader.js';
 import { SYNTHETIC_EVIDENCE } from './support/online-session.mjs';
 
 const GLYPH_W = 58;
@@ -50,7 +50,9 @@ async function handwrite(page, box, text, { x = 40, y = 34 } = {}) {
 // brings a stand-in reader and the panel shows what it returned.
 const reading = async (page) => {
   await page.waitForSelector('.ink-line', { timeout: 15000 }).catch(() => {});
-  return readLines(page);
+  // The exam room is a surface that still shows its reading (fakeServerReader.pressRead): the lines are the .ink-line list here.
+  // (The shared readLines helper now reads the practice marked page, owner decision, 19 Nov 2026.)
+  return page.locator('.ink-line').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-text') || ''));
 };
 
 const secondsOn = (text) => {

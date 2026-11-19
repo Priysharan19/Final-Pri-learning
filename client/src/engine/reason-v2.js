@@ -443,9 +443,9 @@ export function sameEquationClaim(a, b, variable = null) {
 function constraintDroppedDiagnosis() {
   return {
     code: 'constraint-dropped',
-    title: 'The equation lost its constraint',
-    message: 'This line is an identity on its allowed domain, so it no longer carries the restriction from the equation above.',
-    fix: 'Keep an equation that restricts the unknown to exactly the same solution set.',
+    title: 'This line is true for every value',
+    message: 'This line is true for every value of the letter, so it can no longer tell you which values solve the equation.',
+    fix: 'Keep an equation that is true only for the answers.',
     confidence: 'high'
   };
 }

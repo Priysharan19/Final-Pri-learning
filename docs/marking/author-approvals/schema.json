@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pri-learning/author-approval-record/v1",
+  "title": "Pri Learning, author approval of one method-marks scheme",
+  "description": "One file per question type, named <type-id>.json. Written by the author after reading owner-review/method-marks/<type-id>.md. Valid only while digest equals the type's current digest in owner-review/method-marks/types.json. Verified by tools/author-approvals.mjs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "typeId", "digest", "verdict", "note", "approvedBy", "role", "date"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "fixture": { "description": "Test fixtures only. A record carrying this field is always refused.", "type": "boolean" },
+    "typeId": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "verdict": { "enum": ["approved", "changes-needed"] },
+    "note": { "type": "string" },
+    "approvedBy": { "type": "string", "minLength": 2 },
+    "role": { "const": "author (tutor)" },
+    "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" }
+  }
+}

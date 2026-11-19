@@ -342,7 +342,7 @@ const proofList = list => list.filter(kind => typeof kind === 'string' && PROOF_
 
 export async function cloudRequest(path, {
   method = 'GET', body = undefined, idempotencyKey = null, timeoutMs = DEFAULT_TIMEOUT_MS, signal = null,
-  query = null, csv = false, guestCsrf = null, keepalive = false
+  query = null, csv = false, superseded = false, guestCsrf = null, keepalive = false
 } = {}) {
   if (!PATH.test(String(path || '')) || String(path).includes('..')) throw new Error('Cloud path is not allowed');
   const verb = String(method || 'GET').toUpperCase();
@@ -418,6 +418,8 @@ export async function cloudRequest(path, {
   // the session reply and held in memory by platform/guestTrial.js.
   if (typeof guestCsrf === 'string' && /^[A-Za-z0-9_-]{20,80}$/.test(guestCsrf)) headers['X-Pri-Guest-CSRF'] = guestCsrf;
   if (idempotencyKey) headers['Idempotency-Key'] = String(idempotencyKey).slice(0, 160);
+  // An automatic read the pen has outrun may be cancelled, and not billed, when this request is dropped.
+  if (superseded === true) headers['X-Pri-Read-Superseded'] = 'ok';
   if (payload !== undefined) headers['Content-Type'] = 'application/json';
 
   const controller = new AbortController();
@@ -806,8 +808,8 @@ export const cloud = Object.freeze({
   // `questionId` (the server's id of the issued question) only lets the
   // server bind its read receipt to that question; the reader is sent the
   // picture alone.
-  transcribeHandwriting: (image, { signal = null, timeoutMs = 55000, questionId = null } = {}) =>
-    cloudRequest('/v1/handwriting/transcribe', { method: 'POST', body: { image, ...(questionId ? { questionId } : {}) }, signal, timeoutMs }),
+  transcribeHandwriting: (image, { signal = null, timeoutMs = 55000, questionId = null, superseded = false } = {}) =>
+    cloudRequest('/v1/handwriting/transcribe', { method: 'POST', body: { image, ...(questionId ? { questionId } : {}) }, signal, timeoutMs, superseded }),
   workingStatus: () => cloudRequest('/v1/working/status'),
   // The question is sent; the expected answer never is, and the route refuses
   // a body that carries one.

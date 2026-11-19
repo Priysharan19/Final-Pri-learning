@@ -115,13 +115,48 @@ export async function turnOnServerReading(page, base) {
   return (await toggle.getAttribute('aria-pressed')) === 'true';
 }
 
-/** The lines the reading panel shows, as the reader returned them. */
-export const readLines = (page) => page.locator('.ink-line').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-text') || ''));
+/**
+ * Owner decision, 19 Nov 2026 (ADR-0001 amendment): the typed reading is NOT shown before marking, so there is no reading
+ * panel to read lines from. What Pri read is available on demand from the marked page.
+ *
+ * Open "See how Pri read your page" and return the reading of each line, in page order (empty strings for lines that
+ * are not shown). Needs a marked page.
+ */
+export async function readLines(page) {
+  const link = page.locator('[data-mp-see-page]');
+  if (await link.count() && (await link.getAttribute('aria-expanded')) !== 'true') await link.click();
+  return page.locator('[data-mp-reading]').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-text') || ''));
+}
+
+/** The one press: "Mark my working". True when the button was there and was pressed. */
+export async function markWorking(page, { timeout = 8000 } = {}) {
+  const button = page.getByRole('button', { name: /^Mark my working/ }).first();
+  const there = await button.waitFor({ state: 'visible', timeout }).then(() => true, () => false);
+  if (!there || await button.isDisabled()) return false;
+  await button.click();
+  return true;
+}
 
 /**
- * Press "Read my answer" (or "Read again"). Reading is the student's own act:
- * nothing is read because ink was drawn. Returns false when the button is not
- * offered (signed out, offline, a limit, or a reading already current).
+ * No typed reading is on screen before marking: no reading list, no per-line chips, no confirmation panel, no
+ * "Read my answer", and none of the given reading texts anywhere in what the student can see.
+ */
+export async function readingIsNotShown(page, texts = []) {
+  return page.evaluate(wanted => {
+    const visible = el => { const s = getComputedStyle(el); const r = el.getBoundingClientRect(); return s.display !== 'none' && s.visibility !== 'hidden' && r.width > 0 && r.height > 0; };
+    const structure = ['.ink-preview', '.ink-line', '.in-read-layer', '[data-read-chip]', '[data-confirm-reading]', '.ws-confirm', '[data-ink-read]', '.reading-review', '.rr-lines', '[data-mp-reading]']
+      .filter(sel => [...document.querySelectorAll(sel)].some(visible));
+    // Every visible text node outside the typed answer field and the question; the hidden ink data attributes do not count.
+    const text = document.body.innerText || '';
+    const leaked = wanted.filter(w => w && text.includes(w));
+    return { structure, leaked };
+  }, texts);
+}
+
+/**
+ * Press "Read my answer" (or "Read again"). Practice no longer has this button (19 Nov 2026: one press of Mark my
+ * working reads and marks); a surface that still shows its reading (the exam room) does. Returns false when the button
+ * is not offered.
  */
 export async function pressRead(page, { timeout = 8000 } = {}) {
   const button = page.locator('[data-ink-read]').first();

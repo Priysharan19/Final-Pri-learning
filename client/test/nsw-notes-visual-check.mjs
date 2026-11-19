@@ -28,6 +28,7 @@
 //
 //   node client/test/nsw-notes-visual-check.mjs [--shots]
 // ─────────────────────────────────────────────────────────────────────────────
+import { livingIdsNsw } from '../src/living/placement.nsw.js';
 import { chromium } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -45,7 +46,7 @@ const ok = (cond, label) => { if (cond) pass++; else failures.push(label); };
 const written = {};
 for (const [stage, course] of [[4, null], [5, null], [6, 'advanced'], [6, 'standard'], [6, 'ext1'], [6, 'ext2']]) Object.assign(written, (await loadNswNotesForStage(stage, course)) || {});
 const topics = NSW_NOTES_TOPICS.filter(t => Object.hasOwn(written, t.id));
-const ORDER = ['objective', 'prerequisites', 'intuition', 'ideas', 'definitions', 'formulas', 'diagram', 'examples', 'examiners', 'mistakes', 'check', 'practice'];
+const ORDER = ['objective', 'prerequisites', 'intuition', 'ideas', 'definitions', 'formulas', 'living', 'diagram', 'examples', 'examiners', 'mistakes', 'check', 'practice'];
 // The sections a chapter may leave out, and when: exactly when it has nothing to put in them.
 const present = n => ({
   objective: !!n.objective, prerequisites: (n.prereqs || []).some(p => NSW_NOTES_TOPICS.some(x => x.id === p)), intuition: !!n.intuition,
@@ -108,7 +109,9 @@ try {
         let text = '';
         for (let n = walker.nextNode(); n; n = walker.nextNode()) {
           const s = n.nodeValue.trim(); if (!s) continue;
-          const el = n.parentElement; if (el.closest('[hidden]') || el.closest('.dg-sr, .katex-mathml')) continue;
+          // The living-formula block is an interactive instrument with its own readouts (tabular mono, unicode powers); its type and
+          // sections are pinned by the living-formula suites, not by the notes' reading-text rules.
+          const el = n.parentElement; if (el.closest('[hidden]') || el.closest('.dg-sr, .katex-mathml') || el.closest('[data-nn-section="living"]')) continue;
           text += `${s} `;
           const fam = getComputedStyle(el).fontFamily.split(',')[0].replace(/["']/g, '').trim();
           families.set(fam, (families.get(fam) || 0) + 1);
@@ -141,7 +144,7 @@ try {
       ok(r.katexCount > 10, `${where}: the maths is drawn by KaTeX (${r.katexCount} elements)`);
       ok(r.plainLabels === 0, `${where}: a diagram label is not KaTeX`);
       const has = present(written[t.id]);
-      const expected = ORDER.filter(s => !(s in has) || has[s]);
+      const expected = ORDER.filter(s => (s === 'living' ? livingIdsNsw(t.id).length > 0 : (!(s in has) || has[s])));
       ok(JSON.stringify(r.sections) === JSON.stringify(expected), `${where}: sections out of order or missing (${r.sections.join(', ')}; expected ${expected.join(', ')})`);
       ok(r.headingsInOrder, `${where}: the sheet's headings skip a level`);
       ok(r.sections.includes('diagram') === (written[t.id].diagrams?.length > 0), `${where}: the diagram section does not match the chapter's diagrams`);

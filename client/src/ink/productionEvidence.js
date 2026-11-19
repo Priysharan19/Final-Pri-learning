@@ -10,6 +10,7 @@
 // 2026-10-02 (default D16, 2026-11-01). The on-device readers are retired and
 // a reading from one of them can never be production evidence.
 
+import { readsAsMaths as readsAsMathsShared } from './readingShape.js';
 export const CONFIRM_CONF = 0.55;
 export const CONFIRM_MARGIN = 0.15;
 export const SPLIT_ALGORITHM = 'fnv1a32-v1:70/10/10/10';
@@ -52,20 +53,7 @@ export function assignedEvidenceSplit(writerId) {
   return bucket < 70 ? 'train' : bucket < 80 ? 'validation' : bucket < 90 ? 'test' : 'final-holdout';
 }
 
-export function readsAsMaths(text) {
-  const t = String(text || '').replace(/\s+/g, '');
-  if (!t) return true;
-  if (t.includes('?')) return false;
-  let depth = 0;
-  for (const ch of t) {
-    if (ch === '(') depth++;
-    else if (ch === ')' && --depth < 0) return false;
-  }
-  if (depth !== 0) return false;
-  if (/[+\-*/=<>^.]$/.test(t)) return false;
-  if (/^[+*/=<>^]/.test(t) || /^\.(?!\d)/.test(t)) return false;
-  return !/[+\-*/=<>^]{2,}/.test(t.replace(/<=|>=|!=|=-|\(-/g, 'A'));
-}
+export function readsAsMaths(text, opts) { return readsAsMathsShared(text, opts); }
 
 function readingLines(reading) {
   if (Array.isArray(reading?.lines)) {
@@ -105,7 +93,7 @@ export function productionAuthorityOf(reading, { nativeAvailable = false } = {})
   if (!productionReady) return { authority: 'abstain', productionReady: false, reason: 'non-production-path' };
   if (!text) return { authority: 'abstain', productionReady: true, reason: 'no-reading' };
   if (reading?.needsConfirmation === true) return { authority: 'confirm', productionReady: true, reason: 'server-doubt' };
-  if (!readingLines(reading).every(readsAsMaths)) return { authority: 'confirm', productionReady: true, reason: 'shape' };
+  if (!readingLines(reading).every((l, i) => readsAsMaths(l, { continuation: i > 0 }))) return { authority: 'confirm', productionReady: true, reason: 'shape' };
   const configuredFloor = Number(reading?.confidenceFloor);
   const floor = Number.isFinite(configuredFloor) && configuredFloor > 0 && configuredFloor <= 1 ? configuredFloor : CONFIRM_CONF;
   if (typeof reading?.minConf === 'number' && reading.minConf < floor) return { authority: 'confirm', productionReady: true, reason: 'confidence' };

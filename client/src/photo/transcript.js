@@ -207,6 +207,38 @@ export function unreadablePage(transcription) {
  * `transcription` is the server's reply ({ lines: [{ text, confidence,
  * uncertain, doubt, gapBefore }], confidenceFloor }); `question` is public.
  */
+/**
+ * The reader's own split of a line into words ("text") and maths ("math"), kept
+ * for display only. Anything that is not a short list of well-formed pieces is
+ * dropped, and the line is then set by the heuristic split instead.
+ */
+export function cleanSegments(raw) {
+  if (!Array.isArray(raw) || !raw.length || raw.length > 24) return null;
+  const out = [];
+  for (const piece of raw) {
+    if (!piece || (piece.kind !== 'text' && piece.kind !== 'math') || typeof piece.value !== 'string') return null;
+    const value = piece.value.trim().slice(0, 200);
+    if (value) out.push({ kind: piece.kind, value });
+  }
+  return out.length ? out : null;
+}
+
+/** A line's rectangle on the photo as fractions of its width and height, or null. Layout only. */
+export function cleanBox(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const [x, y, w, h] = [raw.x, raw.y, raw.w, raw.h].map(Number);
+  if (![x, y, w, h].every(Number.isFinite) || x < 0 || y < 0 || w <= 0 || h <= 0 || x + w > 1.001 || y + h > 1.001) return null;
+  return { x, y, w: Math.min(w, 1 - x), h: Math.min(h, 1 - y) };
+}
+
+/** The pieces to set a line in: the reader's, when they still restate the line as shown; else null. */
+export function segmentsFor(line) {
+  const segs = cleanSegments(line?.segments);
+  if (!segs || line?.edited) return null;
+  const flat = s => String(s ?? '').replace(/\s+/g, '');
+  return flat(segs.map(p => p.value).join('')) === flat(line.text) ? segs : null;
+}
+
 export function buildTranscript(transcription, question = {}) {
   const floor = Number(transcription?.confidenceFloor);
   const source = Array.isArray(transcription?.lines) && transcription.lines.length
@@ -218,7 +250,9 @@ export function buildTranscript(transcription, question = {}) {
       confidence: Number.isFinite(Number(line?.confidence)) ? Number(line.confidence) : null,
       uncertain: line?.uncertain === true,
       doubt: typeof line?.doubt === 'string' && line.doubt.trim() ? line.doubt.trim().slice(0, 120) : null,
-      gapBefore: line?.gapBefore === true
+      gapBefore: line?.gapBefore === true,
+      segments: cleanSegments(line?.segments),
+      box: cleanBox(line?.box)
     }))
     .filter(line => line.text)
     .slice(0, MAX_LINES);
@@ -234,6 +268,8 @@ export function buildTranscript(transcription, question = {}) {
       check: line.uncertain || below || !!letter,
       doubt: line.doubt || (letter ? `${letter.question} or ${letter.read}` : null),
       gapBefore: line.gapBefore,
+      ...(line.segments ? { segments: line.segments } : {}),
+      ...(line.box ? { box: line.box } : {}),
       excluded: !!out,
       why: out ? out.why : null,
       edited: false
@@ -279,6 +315,8 @@ export function reviveTranscript(value) {
     check: l?.check === true,
     doubt: typeof l?.doubt === 'string' ? l.doubt.slice(0, 120) : null,
     gapBefore: l?.gapBefore === true,
+    ...(cleanSegments(l?.segments) ? { segments: cleanSegments(l.segments) } : {}),
+    ...(cleanBox(l?.box) ? { box: cleanBox(l.box) } : {}),
     excluded: l?.excluded === true,
     why: ['before-question', 'after-break', 'student'].includes(l?.why) ? l.why : null,
     edited: l?.edited === true,

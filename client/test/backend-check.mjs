@@ -1753,7 +1753,11 @@ async function run() {
     // the build and on the server unless each turns it on; then forwarded to the
     // server's own issued question, charging nothing on the device.
     {
-      const hpQ = await answerableQuestion({ mode: 'topic', subtopic: topicId });
+      // A chapter this suite has not practised before. The plan's first choice depends on the student's history in the chapter
+      // ("faded" support after earlier attempts), and the draw of earlier questions in topicId is the server's own, not seedable from
+      // the device: on topicId the history, and so the plan, differed from run to run. A fresh chapter has no history, so the
+      // plan for its first help request is fixed: the smallest hint rung, a nudge, charged.
+      const hpQ = await answerableQuestion({ mode: 'topic', subtopic: 'y10-surds', difficulty: 2 });
       const priorOverrides = globalThis.__PRI_FEATURE_OVERRIDES__;
       await rejects('the help plan is dark unless the build turns it on', POST(`/practice/${hpQ.question.id}/help-plan`, { helpRequested: true }), { status: 404 });
       globalThis.__PRI_FEATURE_OVERRIDES__ = { ...(priorOverrides || {}), tutorPolicy: true };

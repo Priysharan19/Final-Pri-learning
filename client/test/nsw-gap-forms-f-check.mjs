@@ -28,7 +28,6 @@ const fails = [];
 const fail = (cell, seed, msg, q) => { failures++; if (fails.length < 40) fails.push(`${cell} seed ${seed}: ${msg}${q ? `\n    ${String(q.prompt).slice(0, 220)}` : ''}`); };
 const hasBad = o => /undefined|NaN|\[object|Infinity/.test(JSON.stringify(o));
 const skeleton = p => String(p).replace(/-?\d+(\.\d+)?/g, '#').replace(/\s+/g, ' ');
-const esc = f => f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const sorted = a => [...a].sort((x, y) => x - y);
 const sameSet = (a, b) => a.length === b.length && sorted(a).every((v, i) => Math.abs(v - sorted(b)[i]) < 1e-9);
 

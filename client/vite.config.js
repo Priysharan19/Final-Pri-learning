@@ -158,6 +158,14 @@ export const ON_DEMAND = [
   // shows, and pdfPage.js reports that case by name.
   [/(^|\/)pdf(\.worker)?-[^/]*\.(js|mjs)$/, 'PDF renderer'],
 
+  // ~3 MB of libheif (asm.js, LGPL-3.0, unmodified) that turns an iPhone's HEIC
+  // photo into pixels on browsers that cannot open one. Fetched only when a
+  // HEIC file is chosen on such a browser (ink/photoIntake.js); Safari never
+  // asks. Choosing a HEIC for the first time with no signal is the one case
+  // this shows, and photoIntake names it ("decoder-unavailable") and leaves
+  // the file chosen, so the student can try again when connected.
+  [/(^|\/)heicDecoder-[^/]*\.js$/, 'HEIC photo converter'],
+
   // The handwriting recogniser and its 799 kB of weights — a third of the old
   // install, for the one input mode a phone without a stylus is least likely to
   // use. It is already behind an import(), so nothing on the first screen wants

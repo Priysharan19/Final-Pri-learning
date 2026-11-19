@@ -2369,7 +2369,7 @@ html { background-color: var(--page); }
   /* The status under the primary action: each statement on one line of its
      own instead of two narrow columns that each wrap. */
   .ws-actions .status-line { flex-wrap: wrap; column-gap: 12px; row-gap: 2px; line-height: 1.35; }
-  .ws-actions .status-line > .ws-read-by { margin-left: 0; white-space: nowrap; }
+  .ws-actions .status-line > .ws-read-by { margin-left: 0; white-space: normal; overflow-wrap: anywhere; min-width: 0; }
 
   .photo-pick { width: 100%; padding-left: 16px; padding-right: 16px; }
 

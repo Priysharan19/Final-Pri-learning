@@ -23,6 +23,13 @@ const dollars = v => String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 /** The same amount inside $…$: KaTeX would space a bare comma, so brace it. */
 const dm = v => dollars(v).replace(/,/g, '{,}');
 
+/** The structured function of a sinusoidal model, for the value-chain step check (engine/valueChain.js). */
+const trigModelMeta = (c, a, fn, m) => ({
+  kind: 'value-chain',
+  fn: { name: 'h', variable: 't', expr: `${c}+${a}*${fn}(pi*t/${m})` },
+  quantities: { max: c + a, min: c - a, amplitude: a, midline: c, period: 2 * m }
+});
+
 const raw = {
   // ── Integral calculus ──────────────────────────────────────────────────────
   'y12-integral-calc': (rng, diff) => {
@@ -446,7 +453,7 @@ const raw = {
       const mx = form === 'max';
       return {
         formTag: 'direct', prompt: `${cx.thing.charAt(0).toUpperCase() + cx.thing.slice(1)}, $t$ ${cx.t}, is modelled by $h(t) = ${model(m)}$. What is the ${mx ? 'maximum' : 'minimum'} value of $h$?`,
-        answerType: 'numeric', answer: { value: mx ? a + c : c - a },
+        answerType: 'numeric', answer: { value: mx ? a + c : c - a }, stepcheck: trigModelMeta(c, a, fn, m),
         traps: [{ value: mx ? a : -a, why: 'The vertical shift moves the whole graph: combine it with the amplitude.' }],
         hints: [`$-1 \\le \\${fn}\\theta \\le 1$.`, `The amplitude is $${a}$ and the midline is $${c}$.`, 'The period does not change the extreme values.'],
         steps: [{ h: 'Range of the function', d: `$${c - a} \\le h \\le ${c + a}$` }, { h: mx ? 'Maximum' : 'Minimum', d: `$${mx ? a + c : c - a}$` }]
@@ -457,7 +464,7 @@ const raw = {
       if (form === 'range') {
         return {
           formTag: 'direct', prompt: `${cx.thing.charAt(0).toUpperCase() + cx.thing.slice(1)}, $t$ ${cx.t}, is modelled by $h(t) = ${model(m)}$. By how much does $h$ change from its lowest to its highest value?`,
-          answerType: 'numeric', answer: { value: 2 * a },
+          answerType: 'numeric', answer: { value: 2 * a }, stepcheck: trigModelMeta(c, a, fn, m),
           traps: [{ value: a, why: 'The amplitude is the distance from the midline to a peak; the full swing is twice that.' }],
           hints: ['Find the maximum and the minimum.', `They are $${mx}$ and $${mn}$.`, 'Subtract.'],
           steps: [{ h: 'Swing', d: `$${mx} - ${mn} = ${2 * a}$` }]
@@ -475,7 +482,7 @@ const raw = {
     if (form === 'period') {
       return {
         formTag: 'direct', prompt: `${cx.thing.charAt(0).toUpperCase() + cx.thing.slice(1)}, $t$ ${cx.t}, is modelled by $h(t) = ${model(m)}$. Find the period of the model.`,
-        answerType: 'numeric', answer: { value: 2 * m },
+        answerType: 'numeric', answer: { value: 2 * m }, stepcheck: trigModelMeta(c, a, fn, m),
         traps: [{ value: m, why: 'The period is $\\dfrac{2\\pi}{b}$ with $b = \\dfrac{\\pi}{' + m + '}$, which is $2\\times' + m + '$.' }],
         hints: ['For $a\\' + fn + '(bt) + c$ the period is $\\dfrac{2\\pi}{b}$.', `Here $b = \\dfrac{\\pi}{${m}}$.`, 'Amplitude and midline do not affect the period.'],
         steps: [{ h: 'Period formula', d: `$T = 2\\pi\\div\\dfrac{\\pi}{${m}} = ${2 * m}$` }]
@@ -492,7 +499,7 @@ const raw = {
         const t2 = mm * (frac === 1 ? 1 : 5) / 3;
         return {
           formTag: 'direct', prompt: `${cx.thing.charAt(0).toUpperCase() + cx.thing.slice(1)}, $t$ ${cx.t}, is modelled by $h(t) = ${c} + ${a}\\cos\\left(\\dfrac{\\pi t}{${mm}}\\right)$. Find $h(${t2})$. (Use $\\cos\\dfrac{\\pi}{3} = \\dfrac12$ and $\\cos\\dfrac{5\\pi}{3} = \\dfrac12$.)`,
-          answerType: 'numeric', answer: { value: val },
+          answerType: 'numeric', answer: { value: val }, stepcheck: trigModelMeta(c, a, fn, mm),
           traps: [{ value: c + a, why: `At $t = ${t2}$ the angle is not $0$, so the cosine is $\\dfrac12$, not 1.` }],
           hints: [`The angle is $\\dfrac{\\pi\\times ${t2}}{${mm}}$.`, 'It is a standard angle whose cosine is $\\dfrac12$.', `$${c} + ${a}\\times\\dfrac12$.`],
           steps: [{ h: 'The angle', d: `$\\dfrac{\\pi\\times ${t2}}{${mm}} = ${frac === 1 ? '\\dfrac{\\pi}{3}' : '\\dfrac{5\\pi}{3}'}$` }, { h: 'Evaluate', d: `$h = ${c} + ${a}\\times\\dfrac12 = ${val}$` }]
@@ -500,7 +507,7 @@ const raw = {
       }
       return {
         formTag: 'direct', prompt: `${cx.thing.charAt(0).toUpperCase() + cx.thing.slice(1)}, $t$ ${cx.t}, is modelled by $h(t) = ${c} + ${a}\\sin\\left(\\dfrac{\\pi t}{${mm}}\\right)$. Find $h(${t})$. (Use $\\sin\\dfrac{\\pi}{6} = \\sin\\dfrac{5\\pi}{6} = \\dfrac12$.)`,
-        answerType: 'numeric', answer: { value: val },
+        answerType: 'numeric', answer: { value: val }, stepcheck: trigModelMeta(c, a, fn, mm),
         traps: [{ value: c + a, why: `At $t = ${t}$ the angle is $${angTex}$, not $\\dfrac{\\pi}{2}$, so the sine is $\\dfrac12$, not 1.` }],
         hints: [`Substitute $t = ${t}$ into the angle $\\dfrac{\\pi t}{${mm}}$.`, `The angle is $${angTex}$ and its sine is $\\dfrac12$.`, `$${c} + ${a}\\times\\dfrac12$.`],
         steps: [{ h: 'The angle', d: `$\\dfrac{\\pi\\times ${t}}{${mm}} = ${angTex}$` }, { h: 'Evaluate', d: `$h = ${c} + ${a}\\times\\dfrac12 = ${val}$` }]
@@ -511,7 +518,7 @@ const raw = {
       const ans = isCos ? (wantMin ? mm : 2 * mm) : (wantMin ? 3 * mm / 2 : mm / 2);
       return {
         formTag: 'reverse', prompt: `${cx.thing.charAt(0).toUpperCase() + cx.thing.slice(1)}, $t$ ${cx.t}, is modelled by $h(t) = ${c} + ${a}\\${fn}\\left(\\dfrac{\\pi t}{${mm}}\\right)$ for $t \\ge 0$. ${isCos ? (wantMin ? 'At what time $t$ is $h$ first at its minimum value?' : 'At what time $t > 0$ is $h$ next at its maximum value?') : (wantMin ? 'At what time $t$ is $h$ first at its minimum value?' : 'At what time $t$ is $h$ first at its maximum value?')}`,
-        answerType: 'numeric', answer: { value: ans },
+        answerType: 'numeric', answer: { value: ans }, stepcheck: trigModelMeta(c, a, fn, mm),
         traps: [{ value: isCos ? mm / 2 : mm, why: 'Find where the angle $\\dfrac{\\pi t}{' + mm + '}$ reaches the value that makes the function extreme.' }].filter(t => t.value !== ans),
         hints: [isCos ? '$\\cos\\theta = 1$ at $\\theta = 0, 2\\pi$ and $-1$ at $\\pi$.' : '$\\sin\\theta = 1$ at $\\theta = \\dfrac{\\pi}{2}$ and $-1$ at $\\dfrac{3\\pi}{2}$.', 'Set $\\dfrac{\\pi t}{' + mm + '}$ equal to that angle.', 'Solve for $t$.'],
         steps: [{ h: 'Angle at the extreme', d: `$\\dfrac{\\pi t}{${mm}} = ${isCos ? (wantMin ? '\\pi' : '2\\pi') : (wantMin ? '\\dfrac{3\\pi}{2}' : '\\dfrac{\\pi}{2}')}$` }, { h: 'Solve', d: `$t = ${ans}$` }]
@@ -521,7 +528,7 @@ const raw = {
       const isCos = fn === 'cos', ans = isCos ? mm / 3 : mm / 6;
       return {
         formTag: 'multi-step', prompt: `${cx.thing.charAt(0).toUpperCase() + cx.thing.slice(1)}, $t$ ${cx.t}, is modelled by $h(t) = ${c} + ${a}\\${fn}\\left(\\dfrac{\\pi t}{${mm}}\\right)$. What is the first time $t > 0$ at which $h(t) = ${c + a / 2}$?`,
-        answerType: 'numeric', answer: { value: ans },
+        answerType: 'numeric', answer: { value: ans }, stepcheck: trigModelMeta(c, a, fn, mm),
         traps: [{ value: mm / 2, why: `Solve ${isCos ? '$\\cos' : '$\\sin'}\\dfrac{\\pi t}{${mm}} = \\dfrac12$ for the smallest positive angle, not $\\dfrac{\\pi}{2}$.` }],
         hints: [`Subtract ${c} and divide by ${a}.`, `${isCos ? '$\\cos' : '$\\sin'}\\dfrac{\\pi t}{${mm}} = \\dfrac12$.`, 'Take the smallest positive angle.'],
         steps: [{ h: 'Isolate', d: `${isCos ? '$\\cos' : '$\\sin'}\\dfrac{\\pi t}{${mm}} = \\dfrac12$` }, { h: 'Smallest angle', d: `$\\dfrac{\\pi t}{${mm}} = ${isCos ? '\\dfrac{\\pi}{3}' : '\\dfrac{\\pi}{6}'}$, so $t = ${ans}$` }]

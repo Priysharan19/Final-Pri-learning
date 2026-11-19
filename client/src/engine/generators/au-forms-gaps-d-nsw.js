@@ -7,7 +7,7 @@
 // of pi (typed as e.g. 2pi/15), areas are whole numbers or exact fractions a/b.
 // All questions are original. SYNTHETIC: no student or examiner evidence.
 // ─────────────────────────────────────────────────────────────────────────────
-import { ri, rc } from '../qhelpers.js';
+import { ri } from '../qhelpers.js';
 
 const REJ = Symbol('reject');
 const rej = cond => { if (cond) throw REJ; };

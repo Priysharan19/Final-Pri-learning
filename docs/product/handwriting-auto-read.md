@@ -6,12 +6,12 @@
 
 ## What it is
 
-Where the student has already agreed to the reader (D17), is signed in and is online, the page they are writing is read on its own once the pen has rested for about 1.3 seconds (`AUTO_READ_IDLE_MS`). The reading appears under each line as it arrives. **Read my answer** stays as the manual fallback.
+Where the student has already agreed to the reader (D17), is signed in and is online, the page they are writing is read on its own once the pen has rested for about 1.3 seconds (`AUTO_READ_IDLE_MS`). The reading is kept quietly and is not shown (19 Nov 2026); it is available on demand from the marked page ("See how Pri read this line"). **Read my answer** is no longer a step the student takes.
 
 ## What did not change
 
 - **Answer-blind.** The reader receives the picture and nothing else, exactly as for a press of Read my answer. No expected answer, solution or mark ever reaches it.
-- **A read never marks.** Marking is asked for only by **Confirm and mark**, on a fully confirmed reading ("Check what Pri read", #999 / #1016). An automatic reading raises the confirmation panel and nothing else.
+- **A read never marks.** Marking is asked for only by **Mark my working**. **Superseded 19 Nov 2026 (owner decision, ADR-0001 amendment):** the student no longer confirms the reading ("Check what Pri read", #999 / #1016, is removed) and the reading is no longer shown before marking. The automatic reading runs silently; one press marks the page; a line the reader was not sure of is never judged (reading floor) and is shown as not checked.
 - **Consent first.** An automatic read never opens the permission prompt; only a press of Read my answer can. Until the student has said yes, nothing is sent.
 - **Exam room.** It does not ask for automatic reading. Exam reads follow the exam rules (taken at submission, nothing shown before).
 - **Writing is never slowed.** The read is a network request off the canvas path; the ink surface does no work for it.

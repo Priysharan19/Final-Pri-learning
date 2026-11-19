@@ -112,10 +112,10 @@ try {
   ];
   for (const spec of INDIA) await sweep(`India Class ${spec.year} ${spec.indiaTrack}`, { ...spec, course: 'in' }, indiaGenerator);
 
-  // The named case: Year 12 Financial Maths & Annuities has no question at any
-  // level (its D2-D4 forms are held back by the marking-tolerance gate, D1 has
-  // no authored form), so it is hidden; its sibling Financial Mathematics:
-  // Practice, which has questions, stays.
+  // The named case was Year 12 Financial Maths & Annuities, hidden while no level of
+  // it was issued. The marking release issues its D2-D4 forms (engine/nswIssuedCells.js),
+  // so it is now listed, with levels the server really serves; a chapter is hidden only
+  // while it has none (Combinatorics and Further Calculus, asserted below).
   const y12 = (await POST('/profiles', { name: 'Fin', year: 12, course: 'nsw', pathway: 'advanced' })).user;
   await POST('/profiles/select', { id: y12.id });
   const cur = await GET('/curriculum');

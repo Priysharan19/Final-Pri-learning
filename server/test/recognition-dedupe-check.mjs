@@ -292,9 +292,9 @@ try {
 
   // ── 8 · Slow provider, the client gives up, then retries ───────────────────
   {
-    const rawPost = (jar, image, signal) => fetch(`${h.origin}/v1/handwriting/transcribe`, {
+    const rawPost = (jar, image, signal, extra = {}) => fetch(`${h.origin}/v1/handwriting/transcribe`, {
       method: 'POST', signal,
-      headers: { 'content-type': 'application/json', accept: 'application/json', cookie: cookieHeader(jar), 'x-pri-csrf': jar.pri_csrf },
+      headers: { 'content-type': 'application/json', accept: 'application/json', cookie: cookieHeader(jar), 'x-pri-csrf': jar.pri_csrf, ...extra },
       body: JSON.stringify({ image })
     });
     // (a) the retry arrives while the abandoned read is still running
@@ -327,6 +327,43 @@ try {
     c.deq([served.status, served.data.reused, served.data.transcription.text], [200, true, 'abandoned then kept'], 'the result of an abandoned read is kept for the retry');
     c.eq(callsFor('abandoned then kept'), 1, 'slow provider + client abort + retry afterwards → one provider call');
     c.deq(await paid(), before, 'and the retry cost nothing');
+  }
+
+  // ── 8c · A device that says the picture is superseded may cancel the provider call ──
+  {
+    const rawPost = (jar, image, signal, extra = {}) => fetch(`${h.origin}/v1/handwriting/transcribe`, {
+      method: 'POST', signal,
+      headers: { 'content-type': 'application/json', accept: 'application/json', cookie: cookieHeader(jar), 'x-pri-csrf': jar.pri_csrf, ...extra },
+      body: JSON.stringify({ image })
+    });
+    const superseded = { 'x-pri-read-superseded': 'ok' };
+    // (a) only waiter, opted in: dropping the request ends the provider call
+    const lone = picture('superseded alone', 'hold');
+    const abortLone = new AbortController();
+    const goneLone = rawPost(a.jar, lone, abortLone.signal, superseded).then(() => 'answered', error => error.name);
+    await arrived('superseded alone');
+    const cancelledBefore = ops.stats().cancelled;
+    abortLone.abort();
+    c.eq(await goneLone, 'AbortError', 'the device drops a superseded automatic read');
+    await until(() => ops.stats().inFlight === 0, 'the superseded read to be cancelled');
+    c.eq(ops.stats().cancelled, cancelledBefore + 1, 'the provider call is cancelled once nobody is waiting');
+    c.eq(callsFor('superseded alone'), 1, 'it had been sent once, and is not sent again');
+    release('superseded alone');
+    // (b) a second waiter that did not opt in keeps the read alive
+    const shared = picture('superseded but wanted', 'hold');
+    const abortShared = new AbortController();
+    const first = rawPost(a.jar, shared, abortShared.signal, superseded).then(() => 'answered', error => error.name);
+    await arrived('superseded but wanted');
+    const wanted = transcribe(a.jar, shared);
+    await new Promise(resolve => setTimeout(resolve, 100));
+    abortShared.abort();
+    await first;
+    await new Promise(resolve => setTimeout(resolve, 100));
+    c.eq(ops.stats().inFlight, 1, 'a read someone else still waits for is not cancelled');
+    release('superseded but wanted');
+    const got = await wanted;
+    c.deq([got.status, got.data.transcription.text], [200, 'superseded but wanted'], 'and that waiter receives it');
+    c.eq(callsFor('superseded but wanted'), 1, 'from the one provider call');
   }
 
   // ── 9 · A failure is never kept ────────────────────────────────────────────

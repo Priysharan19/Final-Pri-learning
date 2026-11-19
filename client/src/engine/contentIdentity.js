@@ -65,6 +65,11 @@
 // 2026.11.40 — Train editions-25 CI fix: Some Applications of Trigonometry (c10-trig-applications) draws only
 // figure-bearing heights-and-distances forms (the right-triangle ratio, the ladder and two new ones, a kite string
 // and an angle of depression); the table and identity expressions stay in the Trigonometry chapter.
+// 2026.11.43 — The every-reading rule for bare and "= …" lines (y12-integration's derived step check is back on; the landing demo is
+//              judged with its question), merged with 2026.11.42's NSW content gaps. Served questions are unchanged except where the
+//              merge changed them; the digests are regenerated on the merged tree.
+// 2026.11.42 — Past-paper keys carry the paper's own published acceptance band (answer.officialRange) in the served payload, so the
+//              marker's exact-value and uncalled-for-band rules leave that band alone (16 JEE Advanced chapter digests).
 // 2026.11.41 — Walk-through maths fixes: a grouped-data mode question has one modal class; a numeric key is judged
 // by the band its wording asks for (an exact key carries none, a key to three decimals says so, "exactly" is exact,
 // "to the nearest degree" names its place, a list of solutions is bounded by the precision named); a negative number
@@ -76,7 +81,7 @@
 // of rational solutions prints as fractions; a previous-year question keeps the exam's published band; the key-format
 // repairs (a constant key, a plain percentage box, a plain value box) and the wider parameter ranges change what
 // those generators serve.
-export const CONTENT_VERSION = '2026.11.42';
+export const CONTENT_VERSION = '2026.11.43';
 export const LEGACY_CONTENT_VERSION = 'legacy-unversioned';
 
 /** FNV-1a over a string, two lanes, as 16 hex characters. */

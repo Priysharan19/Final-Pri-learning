@@ -6,10 +6,11 @@
 // inherits everything already built there: hashed sessions, the origin guard,
 // double-submit CSRF, per-account rate limits and the audit log.
 //
-// What crosses the wire is one image of the student's own ink and nothing else.
-// The route refuses any request carrying question text, an expected answer or a
-// profile, because a transcriber that can see the answer will drift toward it,
-// and because none of that is needed to read handwriting.
+// What crosses the wire is one image of the student's own ink and, for an
+// issued question, a bare list of the single symbols its PUBLIC stem prints
+// (ADR-0001 §6, 18 November 2026), which this route derives itself. The route
+// refuses any request carrying question text, symbols, an expected answer or a
+// profile, because a transcriber that can see the answer will drift toward it.
 //
 // Reading is billed per request, so it is rate limited per account and requires
 // a verified email. It is never anonymous.
@@ -20,6 +21,7 @@ import { rateLimit, requireSession, requireVerifiedEmail, consumeRateLimit, sha2
 import { spendCeilingMissing } from './spendCeiling.js';
 import { recognitionOpsFor, sendRecognitionRefusal } from './recognitionOps.js';
 import { issueReadReceipt } from './readReceipt.js';
+import { stemSymbols } from './stemSymbols.js';
 import { cachedServerReleaseIdentity } from './releaseIdentity.js';
 import { recordProviderCall } from './metrics.js';
 import { logEvent } from './observability.js';
@@ -55,7 +57,8 @@ export function validateRequestBody(body) {
   }
   // `questionId` names the issued question the read is for, so the read
   // receipt can be bound to it (readReceipt.js). It is never sent to the
-  // reader: the provider request is the picture alone.
+  // reader. The provider request is the picture plus, at most, the
+  // server-derived symbol list (stemSymbols.js).
   const allowed = new Set(['image', 'requestId', 'questionId']);
   const unknown = Object.keys(body).filter(key => !allowed.has(key));
   if (unknown.length) {
@@ -192,11 +195,39 @@ export function createHandwritingRouter(db, {
       // the deployment ceiling are counted there, after the request has been
       // shown to be a real one and before anything is sent — and not at all
       // when this account's same picture has just been read or is being read.
+      // The public-stem vocabulary hint (handwritingProvider.js rule 2): derived
+      // HERE, from the PROMPT field of the question this account was issued, so
+      // a device can neither forge a hint nor smuggle anything else in beside
+      // the picture. Only `prompt` is read from the stored question.
+      let symbols = [];
+      let answerKey = null;
+      if (capQuestion) {
+        try {
+          const issued = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=? AND expires_at>?",
+            [req.platformSession.account_id, capQuestion, Date.now()]);
+          if (issued) {
+            symbols = stemSymbols(String(JSON.parse(issued.response_json)?.prompt ?? ''));
+            // The allowance unit is one ANSWER, keyed on the id the server issued to this account.
+            answerKey = capQuestion;
+          }
+        } catch { symbols = []; answerKey = null; }
+      }
       const started = Date.now();
       let reused = false;
+      // Abandoned reads normally RUN ON: the allowance is counted before the
+      // provider is called, and the finished transcript is kept so a retry of
+      // the same picture is free (recognition-dedupe-check §8). A device that
+      // knows the picture is about to be replaced (an automatic read the pen
+      // has outrun) may say so with `X-Pri-Read-Superseded: ok`; only then does
+      // dropping the request also cancel the provider call, once no other
+      // waiter needs it. Allowance accounting is unchanged either way.
+      const gone = new AbortController();
+      const supersedable = String(req.get('x-pri-read-superseded') || '').trim().toLowerCase() === 'ok';
+      if (supersedable) res.on('close', () => { if (!res.writableFinished) gone.abort(); });
       try {
         const read = await recognitionOpsFor(db).read({
-          db, accountId: req.platformSession.account_id, image: req.body.image, env, transcribe, requestId: req.requestId
+          db, accountId: req.platformSession.account_id, image: req.body.image, env, transcribe, requestId: req.requestId,
+          signal: supersedable ? gone.signal : null, symbols, answerKey
         });
         if (read.refusal) return sendRecognitionRefusal(res, read.refusal);
         const result = read.result;

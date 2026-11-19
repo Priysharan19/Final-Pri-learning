@@ -243,3 +243,22 @@ The kept read above lasts 15 minutes and is a cost guard only. Submit does not d
 At Submit the device sends the picture, the receipt and the text it was shown. If the server no longer holds the kept read it verifies the receipt — signature, same account, same question, same picture, same reader configuration, same text, issued within 7 days — and then proceeds exactly as for a kept read: its own receipt row, the student's corrections recorded as corrections through the confirm route, the deterministic engine deciding, and every eligibility, consent and idempotency check unchanged. A missing, forged, cross-account, cross-question, mismatched or expired receipt is answered `409 RECOGNITION_READ_EXPIRED`; the card then asks the student to press **Read again** and keeps the ink or photo, the transcript and the typed answer. No schema change: nothing is stored for a receipt.
 
 Tested in `server/test/recognition-dedupe-check.mjs` (§12) and `client/test/tour-read-cost.js` (scenario 9).
+
+## 18 November 2026: the unit is one handwritten answer; reader re-measured
+
+**Rule (owner decision, 18 November 2026).** One unit of the daily `handwriting` allowance is spent per *answer* (one server-issued question id per account), the first time a paid read of it is made in the rolling day. Further reads of the same answer are free of allowance, up to **12 paid reads per answer per day**, counted by the server (`aiAllowance.js` `chargeForRead`, bucket `hw-answer:…`), after which the reply says to submit or type. A read with no server-issued id (an id the account was not issued, or none) is one unit per read, so rotating ids mints nothing. The deployment ceiling (`PRI_PAID_CALLS_PER_HOUR` / `_PER_DAY`) still counts every provider call. A read the ceiling refuses, or that never reached the provider, is refunded: the unit and the answer count. Free 5 and Premium 25 (the `READ_ALLOWANCE` figures in `client/src/engine/practiceAllowance.js`) are now *answers* a day. Question photos (`/v1/question-photo`) have no issued id before they are read and stay one unit per photo.
+
+**Measured per-read cost (new reader prompt, `gpt-5.6-terra`, reasoning `none`, image detail `high`).** Mean 1,849 input and 112 output tokens over 13 reads of the synthetic set (n is small; `docs/evidence/reader-speed-accuracy-2026-11-18.md`). At the UNVERIFIED terra prices above ($2.00 / $12.00 per 1M) that is **$0.0050 a read**, about the same as the $0.0050 mean recorded in October. A fallback call (`gpt-5.6-sol`, $4.00 / $20.00) with the same tokens is about $0.0096.
+
+| Per answer | Reads | Cost (MODELLED) |
+| --- | ---: | ---: |
+| Typical: reads as the pen rests, about 4 | 4 | $0.020 |
+| Hard cap: 12 reads, every one on terra | 12 | $0.060 |
+| Hard cap with every read also escalated to sol | 12 | $0.175 |
+
+| Per student-month (30 days, every allowed answer used) | Typical (4 reads) | Hard cap (12 reads, terra) |
+| --- | ---: | ---: |
+| Free, 5 answers a day (150 answers) | $3.00 | $9.00 |
+| Premium, 50 answers a day (1,500 answers) | $30.00 | $90.00 |
+
+These are ceilings per account, not forecasts: most students will not use every answer, and a student who does is bounded by the deployment ceiling regardless. They scale linearly with the unverified prices and with how often the client re-reads (`AUTO_READ_MAX` 12, rest `AUTO_READ_IDLE_MS`).

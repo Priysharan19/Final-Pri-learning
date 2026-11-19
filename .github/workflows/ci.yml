@@ -393,6 +393,10 @@ jobs:
           # deleted with the account and expired after the edition's retention.
           node server/test/original-work-check.mjs 2>&1 | tee original-work.log
           node tools/ci-check-counts.mjs verify platform/original-work.log
+          # The reading floor on the submit route (owner decision 19 Nov 2026, ADR-0001 amendment): a below-floor or
+          # uncertain line is never judged, an unreadable final answer records nothing, the exclusions are exported.
+          node server/test/reading-floor-http-check.mjs 2>&1 | tee reading-floor-http.log
+          node tools/ci-check-counts.mjs verify platform/reading-floor-http.log
           # The anonymous public resource catalogue (plan F6a): off by default,
           # published rows of this server's edition only, no cookie, CORS only
           # for a listed origin, rate-limited; the signed-in library stays signed in.
@@ -1029,6 +1033,12 @@ jobs:
             # Every NSW notes chapter in light and dark: no KaTeX error, one section order, CMU Serif
             # for reading, no stripe, gradient, emoji or overflow at phone width.
             node client/test/nsw-notes-visual-check.mjs 2>&1 | tee -a browser.log
+            # The living formulas (drag a number, the graph redraws) in light and dark, phone and desktop (needs Chromium, so here
+            # and not in the suites shards; the arithmetic is test:living in the shards).
+            node client/test/living-formulas-check.mjs 2>&1 | tee -a browser.log
+            # The marked page (owner's two cases and a mixed page, ink and photo, both editions, light and dark, desktop and 390 px):
+            # a real browser, so here and not in the suites shards.
+            node client/test/tour-marked-page.mjs 2>&1 | tee -a browser.log
             # Plan E5: a built Prithagoras client on a Prithagoras server shows
             # no price, plan or purchase control and reaches no store.
             node client/test/tour-paywall-edition.js 2>&1 | tee -a browser.log
@@ -1090,7 +1100,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: failure-screens-${{ matrix.group }}
-          path: /tmp/pri-e2e-shots-*/*FAIL*.png
+          path: /tmp/pri-e2e-shots-*/*FAIL*
           if-no-files-found: ignore
           retention-days: 14
 
