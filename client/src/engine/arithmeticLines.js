@@ -701,12 +701,14 @@ function pageDefinitions(raw, out, firstBreak) {
     if (equation && out[i].status === 'note') {
       const list = rootList(src);
       if (list && list.letter === equation.variable) {
+        // only the latest equation line counts: a line with an `=` between it and this one means the list may refer to something else
+        const latest = equation.line !== undefined && !raw.slice(equation.line + 1, i).some(l => /=/.test(l));
         const L = fnOf(equation.left, list.letter), R = fnOf(equation.right, list.letter);
         const values = list.items.map(x => numberOf(cleanStatement(x.value)));
-        if (L && R && values.every(v => v !== null && v !== undefined)) {
+        if (latest && L && R && values.every(v => v !== null && v !== undefined)) {
           const fails = list.items.filter((_, k) => { const a = L(values[k]), b = R(values[k]); return a === null || b === null || !close(a, b); });
-          if (!fails.length) out[i] = { text: out[i].text, status: 'ok', state: 'arithmetic', note: `${list.items.map(x => assignSpan(list.letter, x.value)).join(', ')} each satisfy the equation before it. This does not say these are all the solutions.`, valueChain: { rule: 'page-definitions' } };
-          else out[i] = { ...out[i], note: `Not ticked: ${fails.map(x => assignSpan(list.letter, x.value)).join(', ')} ${fails.length > 1 ? 'do' : 'does'} not satisfy the equation before it.` };
+          if (!fails.length) out[i] = { text: out[i].text, status: 'ok', state: 'arithmetic', note: `${list.items.map(x => assignSpan(list.letter, x.value)).join(', ')} each satisfy ${mathSpan(equation.shown)} above. This does not say these are all the solutions.`, valueChain: { rule: 'page-definitions' } };
+          else out[i] = { ...out[i], note: `Not ticked: ${fails.map(x => assignSpan(list.letter, x.value)).join(', ')} ${fails.length > 1 ? 'do' : 'does'} not satisfy ${mathSpan(equation.shown)} above.` };
         }
         delete defs[list.letter]; carry = null;
         continue;
@@ -744,7 +746,7 @@ function pageDefinitions(raw, out, firstBreak) {
         const a = claim && infoOf(claim.text), b = base && infoOf(base.text);
         if (a && b && a.vars && b.vars && a.vars.join() === zeroFor.variable && sameAsWritten(a, b)) {
           const left = putIn(parts[0], defs, zeroFor.variable), right = putIn(parts[1], defs, zeroFor.variable);
-          if (left && right) equation = { left: left.text, right: right.text, variable: zeroFor.variable };
+          if (left && right) equation = { left: left.text, right: right.text, variable: zeroFor.variable, line: i, shown: `${parts[0]} = ${parts[1]}` };
           ticks.push('This sets the derivative above to zero.');
           return;
         }
@@ -814,7 +816,7 @@ function pageDefinitions(raw, out, firstBreak) {
                 for (const x of POINTS) { const a = L(x), b = R(x), c = L0 && L0(x), d = R0 && R0(x); if ([a, b, c, d].some(z => z === null || z === undefined)) return; const p1 = a - b, p0 = c - d; if (Math.abs(p0) < 1e-9 || Math.abs(p1) < 1e-9) return; tried++; const r = p1 / p0; if (ratio === null) ratio = r; if (Math.abs(r - ratio) <= 1e-7 * Math.max(1, Math.abs(ratio))) okRatio++; }
                 if (tried >= 3 && okRatio === tried) ticks.push('The same equation as the one before it, rearranged.');
               }
-              if (L && R && !same) equation = { left: put[0].text, right: put[1].text, variable: free };
+              if (L && R && !same) equation = { left: put[0].text, right: put[1].text, variable: free, line: i, shown: text };
             }
           }
         }
@@ -987,18 +989,22 @@ function normaliseInk(line) {
 }
 
 // ── A column sum written down the page ───────────────────────────────────────────────────────────────────────────────
-//     196          one block: a bare number, one or more lines that start with + or -, an optional rule of dashes,
-//     + 64         and a bare number. The block is true or false as 196 + 64 = 260; only the LAST line carries the
-//     260          verdict. The other lines of the block are notes, and the block never reaches the line below it.
-const COLUMN_NUMBER = /^-?\d+(?:\.\d+)?$/;
-const COLUMN_OP = /^([+\-−–])\s*(\d+(?:\.\d+)?)$/;
-const COLUMN_RULE = /^(?:[-–—−_=]\s*){2,}$|^[–—]$/;
+//     196          one block: a bare non-negative number; one or more lines that start with + , or with - and a space (a bare -3
+//     + 64         is a negative number, not an operation); an optional rule of dashes; and a bare number. TICK ONLY: the last
+//     260          line is ticked when the sum is exactly right. A column that does not add up is a note, never a cross: a list
+//     of numbers (a table of values) is not a sum. The block never reaches the line below it.
+const COLUMN_FIRST = /^\d+(?:\.\d+)?$/;
+const COLUMN_OP = /^(\+|[-−–](?=\s))\s*(\d+(?:\.\d+)?)$/;
+const COLUMN_RULE = /^(?:[-–—−_]\s*){2,}$|^[–—]$/;
+const significantDigits = n => String(n).replace('.', '').replace(/^0+(?=\d)/, '').length;
+/** A plain number as a whole count of 10^-places, so that a column of decimals adds exactly. */
+function scaled(n, places) { const [w, f = ''] = String(n).replace('-', '').split('.'); const v = BigInt(w + f.padEnd(places, '0')); return String(n).startsWith('-') ? -v : v; }
 function findColumns(raw) {
-  const blocks = new Map();   // index of the last line → { members, expression, sum, final, whole }
+  const blocks = new Map();   // index of the last line → { members, expression, last, adds }
   const limit = Math.min(raw.length, LIMITS.lines);
   for (let i = 0; i < limit; i++) {
-    const first = raw[i].replace(/[−–—]/g, '-').trim();
-    if (!COLUMN_NUMBER.test(first) || raw[i].length > LIMITS.chars) continue;
+    const first = raw[i].trim();
+    if (!COLUMN_FIRST.test(first) || raw[i].length > LIMITS.chars) continue;
     let j = i + 1;
     const ops = [];
     while (j < limit && COLUMN_OP.test(raw[j].trim())) { const m = raw[j].trim().match(COLUMN_OP); ops.push([m[1] === '+' ? 1 : -1, m[2]]); j++; }
@@ -1007,11 +1013,16 @@ function findColumns(raw) {
     while (j < limit && COLUMN_RULE.test(raw[j].trim())) { ruled = true; j++; }
     if (j >= limit) continue;
     const last = raw[j].replace(/[−–—]/g, '-').trim();
-    if (!COLUMN_NUMBER.test(last) || (last.startsWith('-') && !ruled)) continue;
+    if (!/^-?\d+(?:\.\d+)?$/.test(last) || (last.startsWith('-') && !ruled)) continue;
     const members = []; for (let k = i; k <= j; k++) members.push(k);
     const numbers = [first, ...ops.map(([, n]) => n), last];
-    const sum = ops.reduce((acc, [sign, n]) => acc + sign * Number(n), Number(first));
-    blocks.set(j, { members, expression: first + ops.map(([sign, n]) => ` ${sign > 0 ? '+' : '-'} ${n}`).join(''), sum, final: Number(last), last, whole: numbers.every(n => /^-?\d+$/.test(n)) });
+    // more than 15 significant digits is beyond what a number here holds exactly: not judged
+    let adds = false;
+    if (numbers.every(n => significantDigits(n.replace('-', '')) <= 15)) {
+      const places = Math.max(...numbers.map(n => (n.split('.')[1] || '').length));
+      adds = ops.reduce((acc, [sign, n]) => acc + BigInt(sign) * scaled(n, places), scaled(first, places)) === scaled(last, places);
+    }
+    blocks.set(j, { members, expression: first + ops.map(([sign, n]) => ` ${sign > 0 ? '+' : '-'} ${n}`).join(''), last, adds });
     i = j;
   }
   return blocks;
@@ -1115,20 +1126,14 @@ function stepCheckArithmeticWithinBudget(workingText) {
       prev = carried ? { ...carried, calculus: true, compound: false } : null; labelled = false;
       const block = columns.get(i);
       if (!block) return note(line, NOTE);
-      const sums = block.sum, final = block.final;
-      if (closeLoose(sums, final)) {
+      if (block.adds) {
         out.push({ text: line, status: 'ok', state: 'arithmetic', note: `This column adds up: ${mathSpan(`${block.expression} = ${block.last}`)}.`, valueChain: { rule: 'true-as-written' } });
         return;
       }
-      // False: crossed only when every line is a plain whole number and no other reading of the digits makes it true.
-      if (!block.whole || trueUnderAnotherReading([block.expression, block.last], [sums, final])) return note(line, block.whole ? MISREAD_NOTE : SOFT_NOTE);
-      const message = `${mathSpan(block.expression)} comes to ${shown(sums)}, but this line gives ${shown(final)}.`;
-      diagnosis = { code: 'arithmetic-not-equal', title: 'The two sides of this line are not equal', message, fix: 'Work this line out again, one operation at a time.', confidence: 'high' };
-      firstBreak = i;
-      out.push({ text: line, status: 'break', note: message, diagnosis });
-      prev = null;
-      return;
+      return note(line, 'Not checked: Pri does not mark a column of numbers that does not add up as written, so this line is not marked.');
     }
+    // A number with more than 15 significant digits is beyond what is held exactly here: the line is not judged.
+    if ((src.match(/\d+(?:\.\d+)?/g) || []).some(n => significantDigits(n) > 15)) return note(line, NOTE);
     // Numeric column vectors (see vectorSide): tick only.
     if (VECTOR_BRACKET.test(src)) {
       const body = src.replace(/\s*\.\s*$/, '');
@@ -1331,9 +1336,16 @@ function stepCheckArithmeticWithinBudget(workingText) {
       if (v === null) continue;
       let j = k - 1;
       while (j >= 0 && !columnMembers.has(j) && BARE.test(bareText(j)) && !(out[j].status === 'ok' && lastValue.has(j))) j--;
-      if (j < 0 || columnMembers.has(j) || out[j].status !== 'ok' || !lastValue.has(j) || !closeLoose(v, lastValue.get(j))) continue;
-      out[k] = { text: out[k].text, status: 'ok', state: 'arithmetic', note: `This is the value of the working above: ${shown(v)}.`, valueChain: { rule: 'true-as-written' } };
-      lastValue.set(k, v);
+      if (j < 0 || columnMembers.has(j) || out[j].status !== 'ok' || !lastValue.has(j)) continue;
+      const chain = lastValue.get(j);
+      // Exactly the value of the working above, or (written with 2 or more decimal places, the working being a value
+      // that never ends as a decimal) that value rounded to the places written. A later digit that differs is a note.
+      const places = (bareText(k).split('.')[1] || '').length;
+      const ends = [...Array(10).keys()].some(d => Math.abs(chain * 10 ** d - Math.round(chain * 10 ** d)) <= 1e-7);
+      const rounded = !close(v, chain) && places >= 2 && /^-?\d+\.\d+$/.test(bareText(k)) && !ends && Math.abs(Math.round(chain * 10 ** places) / 10 ** places - v) <= 1e-12 * Math.max(1, Math.abs(v));
+      if (!close(v, chain) && !rounded) continue;
+      out[k] = { text: out[k].text, status: 'ok', state: 'arithmetic', note: rounded ? `This is the working above, rounded: ${bareText(k)}.` : `This is the value of the working above: ${shown(v)}.`, valueChain: { rule: 'true-as-written' } };
+      lastValue.set(k, rounded ? chain : v);
     }
   }
   // The second pass: what the page itself defines (see pageDefinitions).

@@ -665,6 +665,12 @@ ok(model?.cards?.length === 2 && model.cards.every(c => c.status === 'checked' &
   }
   for (const bad of ['x = 0 or x = 3', 'x = 1, x = -3', 'x = 3 and x = 4', 'x = ±2']) { const r = run(PAGE_A.map((l, k) => (k === 5 ? bad : l))); ok(r.lines[5].status === 'note' && r.firstBreak === -1 && /does not satisfy|do not satisfy/.test(r.lines[5].note), `a list with a value that is not a root is a note that says so: ${bad} (${r.lines[5].note})`); }
   ok(stat(['x^2 = 4', 'x = ±2']) === '.T' && stat(['x^2 = 4', 'x = ±3']) === '..', 'x = ±a is a pair of values');
+  // independent review: a derivative with no definition of y cannot be judged against another statement of it
+  ok(stat(["y′ = 2x", "y′ = 2x + 1"]) === '..' && stat(["y' = 2x", "y' = 2x + 1"]) === '..' && stat(["y′ = 2x", "y′ = 2x + 1", "y′ = 2x"]) === '...', 'two different statements for y\' with no y = … above are notes, never crossed');
+  // independent review: a root list names the equation it refers to, and only the latest equation line counts
+  { const r = run(['x^2 = 9', 'x^2 = 4', 'x = 2 or x = -2']);
+    ok(stat(['x^2 = 9', 'x^2 = 4', 'x = 2 or x = -2']) === '..T' && /satisfy \$x\^\{?2\}?\s*=\s*4\$ above/.test(r.lines[2].note) && r.lines[1].status === 'note', `the tick says which equation it refers to, and does not endorse the step before it (${r.lines[2].note})`);
+    ok(stat(['x^2 = 9', 'x^2 = 4', 'x = 3 or x = -3']) === '...' && stat(['x^2 = 4', 'x = 5', 'x = 2 or x = -2']) === '...', 'roots of an older equation are not ticked'); }
   ok(stat(['x = 0 or x = -3']) === '.', 'with no equation above, a list of values is not ticked');
   ok(run(PAGE_A).lines[6].status === 'ok', 'y(-3) and y(0) style lines still work');
   ok(stat(['y = 2x^3 + 9x^2', "y' = 6x^2 + 18x", "y' = 0", '0 = 6x^2 + 18x', '0 = 6x(x + 3)', 'x = 0 or x = -3', 'y(-3) = 27']) === '.T.TTTT', 'y(-3) = 27 is ticked');
@@ -676,6 +682,8 @@ ok(model?.cards?.length === 2 && model.cards.every(c => c.status === 'checked' &
     ok(!/Give the final answer|simplifies to/.test(r.lines[5].note), `line 6 does not ask for the simplified form: line 8 states it (${r.lines[5].note})`);
     ok(/Give the final answer in that simplified form/.test(run(PAGE_B.slice(0, 6)).lines[5].note), 'with no line stating it, line 6 still carries the note');
     ok(stat(['3 × 4', '= 12', '12']) === '.TT' && stat(['3 × 4', '= 12', '12.']) === '.TT' && stat(['3 × 4', '= 12', '13']) === '.T.' && stat(['3 × 4', '= 12', '13', '12']) === '.T.T', 'a bare value equal to the chain is ticked; one that is not stays a note, never a cross');
+    ok(stat(['500 + 500 = 1000', '1000.0001']) === 'T.' && stat(['500 + 500 = 1000', '1000']) === 'TT' && stat(['2 × 1 = 2', '2.0000001']) === 'T.', 'a bare value ticks only when it equals the working exactly');
+    ok(run(['√260 = √260', '16.12']).lines[1].note === 'This is the working above, rounded: 16.12.' && stat(['√260 = √260', '16.12']) === 'TT' && stat(['√260 = √260', '16.13']) === 'T.' && stat(['√260 = √260', '16.1']) === 'T.' && stat(['2.5 × 1 = 2.5', '2.4']) === 'T.' && stat(['1/8 + 1/8 = 1/4', '0.3']) === 'T.', 'a rounding to 2 or more places of a value that never ends is ticked as a rounding; a later digit that differs is a note');
     ok(stat(['3 × 4 = 13', '13']) === 'X.', 'after a cross nothing is ticked');
     ok(stat(['1/2 + 1/3', '= 5/6', '5/6']) === '.TT' && stat(['1/2 + 1/3', '= 5/6', '5/7']) === '.T.', 'fractions too');
     ok(stat(['2 + 3 = 5.', '= 5.', '5.', 'y = 2x(4 - x).']) === 'TTT.', 'a full stop at the end of a line is punctuation, never a decimal point or a product');
@@ -690,7 +698,13 @@ ok(model?.cards?.length === 2 && model.cards.every(c => c.status === 'checked' &
     ok(stat(PAGE_D) === 'T..TT' && r.firstBreak === -1, `page D: the column's last line is ticked, the others are notes, and = √260 follows the chain above (${stat(PAGE_D)})`);
     ok(/196 \+ 64 = 260/.test(plain(r.lines[3].note)), `the tick says the sum (${plain(r.lines[3].note)})`);
     ok(stat(['196', '+ 64', '260']) === '..T' && stat(['196', '+ 64', '---', '260']) === '...T' && stat(['300', '- 40', '+ 5', '265']) === '...T' && stat(['3', '- 8', '-----', '-5']) === '...T', 'a true column, with or without a rule line, plus and minus');
-    ok(stat(['196', '+ 64', '270']) === '..X' && /260/.test(plain(run(['196', '+ 64', '270']).diagnosis.message)) && /270/.test(plain(run(['196', '+ 64', '270']).diagnosis.message)), 'a false column of whole numbers is crossed on its last line, with the usual message');
+    ok(stat(['196', '+ 64', '270']) === '...' && stat(['196', '+ 64', '250']) === '...' && !run(['196', '+ 64', '250']).diagnosis, 'a column that does not add up is a note: a column sum is never crossed');
+    ok(/^Not checked/.test(run(['196', '+ 64', '250']).lines[2].note), 'and the note says it is not checked');
+    // independent review: lists of numbers are not sums (a table of x-values, three numbers in a row)
+    for (const page of [['-2', '-1', '0', '1', '2'], ['4', '-2', '7'], ['0', '-3', '5'], ['3', '-1', '5'], ['10', '-3', '8'], ['3', '+ 4', '8'], ['1', '-1', '0'], ['0', '1', '2', '3'], ['-1', '+ 2', '1'], ['2', '-', '3']]) ok(stat(page) === '.'.repeat(page.length), `not a sum, so nothing ticked or crossed: ${page.join(' | ')} (${stat(page)})`);
+    ok(stat(['12', '- 5', '7']) === '..T' && stat(['196', '+ 64', '260']) === '..T' && stat(['12', '- 5', '8']) === '...', 'a minus needs a space after it to be an operation');
+    ok(stat(['99999999999999999', '+ 1', '100000000000000001']) === '...' && stat(['123456789012345', '+ 1', '123456789012346']) === '..T', 'a number beyond 15 significant digits is not judged');
+    ok(stat(['99999999999999999 + 1 = 100000000000000001', '9007199254740993 - 1 = 9007199254740992', '123456789012345 + 1 = 123456789012346']) === '..T', 'the same for a sum written on one line');
     ok(stat(['1.5', '+ 0.5', '3']) === '...' && stat(['1.5', '+ 0.5', '2']) === '..T' && stat(['0.5', '+ 0.25', '0.8']) === '...', 'a decimal column is ticked when true and a note when false');
     ok(stat(['196', '260']) === '..' && stat(['196', '+ 64']) === '..' && stat(['196', '+ 64', '+ 5']) === '...', 'two numbers, or a column with no total, are not a sum');
     ok(stat(['196', '+ 64', '260', '5']) === '..T.', 'a number under the total is not part of the column');
