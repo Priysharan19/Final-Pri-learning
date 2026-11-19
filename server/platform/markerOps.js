@@ -18,7 +18,7 @@ import { derivedMetaOff } from '../../client/src/engine/derivedMetaOff.js';
 import { checkAnswer, stepCheck, methodMarks } from '../../client/src/engine/checker.js';
 import { markObjective, markMultiCorrect } from '../../client/src/engine/indiaExams.js';
 import { markMatrixMatch } from '../../client/src/engine/matrixMatch.js';
-import { markGraphSketch, readFeatureSet, sketchMethodCredit } from '../../client/src/engine/graphFeatures.js';
+import { markGraphSketch, readFeatureSet, sketchMethodCredit, sketchVerdicts } from '../../client/src/engine/graphFeatures.js';
 import { markGeometry } from '../../client/src/engine/geometryFacts.js';
 import { checkProof } from '../../client/src/engine/proofSteps.js';
 // The policy is plain data the pool puts into every operation (D12). This
@@ -342,6 +342,20 @@ export function reviewEvidence(q, lines) {
   } catch { return silent; }
 }
 
+/**
+ * A sketch answer's per-feature verdicts for the reply that RESOLVES the question (graphFeatures.sketchVerdicts), carried on
+ * the result as `sketch`. Display only: the mark is `result.correct` from the marker. The reply for an open try never reads it.
+ */
+function sketchReport(q, answer, result) {
+  const g = q?.answerType === 'graph-sketch' ? q.answer?.graph : null;
+  const set = g?.spec && g?.scheme ? readFeatureSet(answer) : null;
+  if (!set) return result;
+  try {
+    const r = sketchVerdicts(g.spec, set, g.scheme, { resolved: true, tol: g.tol });
+    return { ...result, sketch: { awarded: r.awarded, possible: r.possible, verdicts: r.verdicts.map(({ feature, verdict, detail, wentWrong, correct }) => ({ feature, verdict, ...(detail ? { detail } : {}), ...(wentWrong ? { wentWrong } : {}), ...(correct ? { correct } : {}) })) } };
+  } catch { return result; }
+}
+
 // ── The operations a worker serves ──────────────────────────────────────────
 // Each takes its plain-data arguments and `emit`, which reports a completed
 // stage to the request thread BEFORE the next stage starts. If the deadline
@@ -366,7 +380,7 @@ export const MARKER_OPS = Object.freeze({
    * was not computed. Blank working costs nothing, so it is always "computed".
    */
   practice({ q, answer, working, evidenceIfWrong, policy }, emit) {
-    const result = checkAnswer(q, answer);
+    const result = sketchReport(q, answer, checkAnswer(q, answer));
     emit({ result });
     const wanted = result.correct || evidenceIfWrong || !String(working || '').trim();
     if (!wanted) return { result, evidence: null };

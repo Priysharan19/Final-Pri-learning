@@ -1950,6 +1950,12 @@ function safeLostMarks(list) {
   }).filter(Boolean);
 }
 
+const SKETCH_ASK = ['xIntercepts', 'yIntercept', 'turning', 'vertical', 'horizontal'];
+/** The features a sketch form asks for, from the closed list the form knows how to take. */
+function safeSketchAsk(list) {
+  return (Array.isArray(list) ? list : []).filter((k, i, all) => SKETCH_ASK.includes(k) && all.indexOf(k) === i);
+}
+
 function sanitize(q, row) {
   if (q.multipart) {
     return {
@@ -1977,6 +1983,8 @@ function sanitize(q, row) {
     dotpointIndex: inChapter ? inDp : (dp ? dp.ordinal : null),
     difficulty: q.difficulty, diffLabel: diffLabelOf(q.difficulty) || 'Custom',
     prompt: q.prompt, answerType: q.answerType, mcqOptions: q.mcqOptions,
+    // Which features a graph-sketch answer form asks for: names only, never values.
+    ...(q.answerType === 'graph-sketch' ? { sketchAsk: safeSketchAsk(q.sketchAsk) } : {}),
     figure: safeFigure(q.figure), code: s?.code || null,
     // A previous-year question carries its sitting and its sources with it, so
     // the card can say "JEE Advanced 2025 · Paper 1 · Q12" and mean it.
@@ -2673,6 +2681,7 @@ function safePayload(src) {
   if (ref.contentId) { out.contentId = ref.contentId; out.contentVersion = ref.contentVersion; }
   if (ref.contentHash) out.contentHash = ref.contentHash;
   out.figure = safeFigure(src.figure);
+  if (src.answerType === 'graph-sketch') out.sketchAsk = safeSketchAsk(src.sketchAsk);
   out.mcqOptions = src.mcqOptions === undefined ? undefined : safeOptions(src.mcqOptions);
   out.steps = safeSteps(src.steps);
   out.hints = (Array.isArray(src.hints) ? src.hints : []).slice(0, 8).map(h => sanitizeText(h, 500));

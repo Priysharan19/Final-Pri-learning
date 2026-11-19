@@ -324,6 +324,9 @@ for (const { form, marks } of sweepForms.values()) {
     let q;
     try { q = generateQuestion(form.generator, form.difficulty, s * 7919 + form.difficulty * 31); } catch { continue; }
     if (!nswIssuable(q, form.generator)) continue;
+    // An NSW paper never sets a sketch: its marks go feature by feature, which is not final-answer marking
+    // (server/platform/exams.js nswFinalAnswerOnly refuses it), so the paper sweep has no sketch to mark.
+    if (q.answerType === 'graph-sketch') continue;
     sweep.questions++;
     const key = keyInput(q);
     const id = `${form.generator}|${form.difficulty} seed ${s * 7919 + form.difficulty * 31}`;

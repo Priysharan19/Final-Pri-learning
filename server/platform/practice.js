@@ -264,11 +264,13 @@ function answerTextFor(q) {
     case 'matrix': return Array.isArray(a.rows) ? formatMatrix(a.rows) : '';
     case 'vector': return Array.isArray(a.components) ? formatVector(a.components) : '';
     case 'complex': return Number.isFinite(Number(a.re)) && Number.isFinite(Number(a.im)) ? formatComplex({ re: Number(a.re), im: Number(a.im) }) : '';
+    // The authored sentence for the features a sketch states (graph-sketch forms write it from the numbers shown).
+    case 'graph-sketch': return typeof a.text === 'string' ? a.text : '';
     default: return '';
   }
 }
 
-function solutionFor(q) {
+function solutionFor(q, sketch = null) {
   const steps = q.steps || [];
   const marks = marksPossibleFor(q);
   const keySteps = steps.filter(s => !/^(check|note|bonus)/i.test(s.h)).slice(0, marks);
@@ -280,7 +282,10 @@ function solutionFor(q) {
       ? keySteps.map((step, i) => ({ mark: 1, text: i === keySteps.length - 1
         ? step.h + ' — leading to the correct answer' : step.h }))
       : [{ mark: 1, text: 'Correct final answer' }];
-  return { steps, answerText: answerTextFor(q), criteria, solutionText: q.solutionText };
+  return { steps, answerText: answerTextFor(q), criteria, solutionText: q.solutionText,
+    // A sketch question: the function the graph is of (the prompt states it) and, once the student has answered, the marker's
+    // verdict on each feature (graphFeatures.sketchVerdicts). Only a resolved reply reaches here.
+    ...(q.answerType === 'graph-sketch' && q.answer?.graph?.spec ? { sketch: { spec: q.answer.graph.spec, ...(sketch || {}) } } : {}) };
 }
 
 /**
@@ -491,6 +496,8 @@ function* seekQuestion(request, { draw, tries, batches, admits = null }) {
       // A form this edition does not issue (editionBanks.js `admits`) is never
       // served, fresh or as a fallback: the seek passes over it.
       if (admits && !admits(q, generator)) continue;
+      // Rush and Match answer in one line of their own: a sketch is a form of features, so neither is ever dealt one.
+      if (q.answerType === 'graph-sketch' && (request.mode === 'rush' || request.mode === 'match')) continue;
       const hash = opaqueContentHash(q.contentHash);
       const avoided = avoid.has(hash);
       const done = resolved?.[i] === true;
@@ -1636,7 +1643,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         // `partial` and every mark above were computed from the engine's report alone).
         stepReport: invalid ? null : reportWithInterpretation({ stepReport, lineInterpretation, working }), partial: invalid ? null : partial,
         ...(resolved && !invalid && lineInterpretation ? { lineInterpretation } : {}), ...(resolved ? {
-          solution: solutionFor(q),
+          solution: solutionFor(q, result.sketch),
           // Supplemental aggregate marking: no per-step allocations are invented.
           ...(!invalid ? { markRows: finalAnswerRows(q, markRowsFor(q, {
             marksEarned, marksPossible, creditedMarks, attemptId, submissionId,

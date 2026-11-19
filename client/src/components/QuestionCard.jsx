@@ -65,6 +65,7 @@ import { useFormFactor } from '../platform/formFactor.js';
 import Icon from './Icon.jsx';
 import Working from '../instrument/Working.jsx';
 import TypedAnswerFields from './TypedAnswerFields.jsx';
+import SketchAnswer from './SketchAnswer.jsx';
 import VerifiedMarkBreakdown from './VerifiedMarkBreakdown.jsx';
 import { finalAnswerGuidance, moveToWorking, workingAreaMode } from './typedAnswerGuide.js';
 import '../workspace.css';
@@ -384,7 +385,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [restoredReading, setRestoredReading] = useState(null);
   const restoredAnswerRef = useRef(null);
   const inkExtrasRef = useRef({});
-  const [mode, setMode] = useState(() => preferMode());       // 'type' | 'write' | 'photo'
+  // A graph-sketch answer is a form of features, never ink or a photo: it is always the typed surface.
+  const [mode, setMode] = useState(() => (question.answerType === 'graph-sketch' ? 'type' : preferMode()));       // 'type' | 'write' | 'photo'
   const [inkResult, setInkResult] = useState(null);
   // The ink surface owns the truth about whether recognition was attempted.
   // A blocker before the reader runs must never be labelled bad handwriting.
@@ -602,6 +604,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // Whether this copy of the question can ever be marked (checkAccess.js).
   const unmarkable = useMemo(() => (diagnostic ? null : unmarkableNotice(question)), [diagnostic, question.checkState, question.subtopic]);
   const isWorking = question.answerType === 'working';
+  const isSketch = question.answerType === 'graph-sketch';
   const totalMarks = question.criteria?.length || 1;
   // A question that carries method marks keeps its working area open, so
   // working typed there is always part of the submission.
@@ -2551,7 +2554,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           </div>
         ))}
       </div>
-      {res.solution.answerText && (
+      {res.solution.answerText && !isSketch && (
         <div className="final-answer">
           <div className="sc-label" style={{ marginBottom: 8 }}>{t('verdict.finalAnswer')}</div>
           <MathText text={answerToTex(res.solution.answerText)} />
@@ -2769,7 +2772,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         </div>
 
         <div className="ws-tools no-print" ref={toolsRef}>
-          {!isMcq && (
+          {!isMcq && !isSketch && (
             <div className="mode-tabs seg" role="group" aria-label={t('verdict.answerModes')}>
               <button type="button" className={`mode-tab ${mode === 'type' ? 'on' : ''}`} aria-pressed={mode === 'type'} title={t('verdict.modeTypeTitle')}
                 aria-label={t('verdict.modeTypeLabel')} onClick={() => flipMode('type')}><Icon name="type" size={16} />{t('verdict.modeType')}</button>
@@ -2829,6 +2832,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 </button>
               );
             })}
+          </div>
+        ) : isSketch ? (
+          <div className={`editor-shell${resolved ? ' ink-disabled' : ''}`} data-sketch-shell>
+            <SketchAnswer question={question} value={answer} onChange={editAnswer} onSubmit={submit} disabled={resolved}
+              result={resolved ? res?.solution?.sketch || null : null} inputRef={inputRef} />
           </div>
         ) : mode !== 'write' ? (
           <div className={`editor-shell ${resolved ? 'ink-disabled' : ''}${drop.dragging ? ' is-dropping' : ''}`} data-photo-drop={mode === 'photo' ? (drop.dragging ? 'active' : 'ready') : undefined} {...drop.bind}>
@@ -3439,7 +3447,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 {workEvidenceCopy && (
                   <div data-working-evidence={workEvidence.kind}>{t(workEvidenceCopy.key, workEvidenceCopy.vars)}</div>
                 )}
-                {!verdictGood && res.solution && (
+                {!verdictGood && res.solution && !isSketch && (
                   <div className="eval-expected">{t('verdict.expected')} <b><MathText text={answerToTex(res.solution.answerText)} /></b></div>
                 )}
                 {awInput && (
