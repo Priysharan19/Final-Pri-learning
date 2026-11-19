@@ -34,7 +34,10 @@ const CASES = {
   stationary: { meta: STAT, lines: [...OWNER, 'y(0)=0', 'smallest: (0,0)'], receipt: { awarded: 0, possible: 3 } },
   mixed: { meta: STAT, lines: ['y=2x³+9x²', '@@@', "y'=6x²+18x", 'foo', '0=6x[x+3]', 'x=0 or x=-3'], receipt: { awarded: 0, possible: 3 } }
 };
-const c = CASES[which] || CASES.buoy;
+// A test may hand the page its own picture and reader boxes (window.__markedPageFixture = { src, lines: [{ text, box }] }),
+// to check where the outlines fall on that picture. Nothing in the real build reads this.
+const FIXTURE_PAGE = typeof window !== 'undefined' && window.__markedPageFixture && source === 'photo' ? window.__markedPageFixture : null;
+const c = FIXTURE_PAGE ? { ...CASES.buoy, lines: FIXTURE_PAGE.lines.map(l => l.text) } : (CASES[which] || CASES.buoy);
 const stepReport = stepCheck(c.meta, c.lines.join('\n'));
 const input = { lines: c.lines, stepReport, solution: null, source: source === 'ink' ? 'handwriting' : 'typed', receipt: { ...c.receipt, id: 'synthetic-0000' }, attempt: 1 };
 
@@ -71,6 +74,7 @@ function photoPage(lines) {
 
 const props = source === 'ink'
   ? { source: { kind: 'ink', strokes: inkPage(c.lines) } }
+  : FIXTURE_PAGE ? { source: { kind: 'photo', src: FIXTURE_PAGE.src, lines: FIXTURE_PAGE.lines } }
   : (() => { const p = photoPage(c.lines); return { source: { kind: 'photo', src: p.src, lines: c.lines.map((text, i) => ({ text, box: p.boxes[i] })) } }; })();
 
 // A FIXTURE approval, test only: the real build has no approved type. ?criteria=1 shows the table it would draw.
@@ -82,7 +86,8 @@ const FIXTURE = q.get('criteria') === '1' && which === 'buoy' ? {
 } : {};
 
 createRoot(document.getElementById('root')).render(
-  <div style={{ padding: '16px', maxWidth: 1100, margin: '0 auto' }} data-gallery-case={`${which}/${source}/${edition}`}>
-    <MarkedPage input={input} texOf={s => exprToLatex(s) || '\\;'} {...props} {...FIXTURE} {...(q.get('reading') === '1' ? { reading: { lines: c.lines }, onCorrect: () => {} } : {})} />
+  <div style={{ padding: '16px', maxWidth: 1100, margin: '0 auto' }} data-gallery-case={`${which}/${source}/${edition}`}
+    data-gallery-boxes={props.source.kind === 'photo' ? JSON.stringify(props.source.lines.map(l => l.box)) : undefined}>
+    <MarkedPage input={input} texOf={s => exprToLatex(s) || '\\;'} {...props} {...FIXTURE} {...(q.get('score') === '1' ? { scoreShown: true } : {})} {...(q.get('reading') === '1' ? { reading: { lines: c.lines }, onCorrect: () => {} } : {})} />
   </div>
 );

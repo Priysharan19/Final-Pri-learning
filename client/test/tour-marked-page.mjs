@@ -38,6 +38,11 @@ const browser0 = await chromium.launch();
   const ctx = await browser0.newContext({ viewport: { width: 1280, height: 900 } }); const pg = await ctx.newPage();
   await pg.goto(`${url('buoy', 'ink', 'prithagoras', 'light')}`, { waitUntil: 'networkidle' }); await pg.waitForSelector('[data-marked-page]');
   ok(await pg.locator('[data-mp-criteria]').count() === 0, 'an unapproved type shows no criteria table, empty or greyed');
+  // Where the host's score card already shows the figure, the page does not print the marks a second time.
+  for (const [c, note] of [['buoy', 0], ['stationary', 1]]) {
+    await pg.goto(`${url(c, 'photo', 'prithagoras', 'light')}&score=1`, { waitUntil: 'networkidle' }); await pg.waitForSelector('[data-marked-page]');
+    ok(await pg.locator('[data-mp-mark]').count() === 0 && await pg.locator('[data-mp-mark-note]').count() === note && !/\d+ of \d+ marks?/.test(await pg.locator('.mp-head').innerText()), `${c}: with the score card shown the page prints no marks (the final-answer note only where it applies)`);
+  }
   await pg.goto(`${url('buoy', 'ink', 'prithagoras', 'light')}&criteria=1`, { waitUntil: 'networkidle' }); await pg.waitForSelector('[data-marked-page]');
   const rows = await pg.locator('[data-mp-criterion]').evaluateAll(es => es.map(e => [e.getAttribute('data-mp-criterion'), e.getAttribute('data-awarded')]));
   ok(JSON.stringify(rows) === JSON.stringify([['max', 'yes'], ['value', 'yes']]), `a fixture-approved type shows its criteria ${JSON.stringify(rows)}`);
@@ -122,6 +127,24 @@ try {
       const inside = got.boxes.every(b => b.r.left >= got.sheet.left - 1 && b.r.right <= got.sheet.right + 1 && b.r.top >= got.sheet.top - 1 && b.r.bottom <= got.sheet.bottom + 1);
       ok(inside, `${where}: every outline lies on the page`);
       ok(got.boxes.every((b, i, a) => i === 0 || b.r.top + b.r.height / 2 > a[i - 1].r.top + a[i - 1].r.height / 2), `${where}: outlines run top to bottom`);
+      if (source === 'photo') {
+        // The drawing is exact: each marker stands at the left edge and vertical centre of the reader's box on the PICTURE
+        // (the rendered image's own rectangle), whatever the page width. Owner's live page, 20 Nov 2026: outlines looked low.
+        const geo = await page.evaluate(() => {
+          const img = document.querySelector('.mp-img').getBoundingClientRect();
+          const want = JSON.parse(document.querySelector('[data-gallery-boxes]').getAttribute('data-gallery-boxes'));
+          return { img: img.toJSON(), want, boxes: [...document.querySelectorAll('[data-mp-box]')].map(b => b.getBoundingClientRect().toJSON()) };
+        });
+        const worst = geo.boxes.reduce((m, r, i) => {
+          const w = geo.want[i];
+          const dx = Math.abs(r.left - (geo.img.left + w.x * geo.img.width));
+          const dy = Math.abs((r.top + r.height / 2) - (geo.img.top + (w.y + w.h / 2) * geo.img.height));
+          return Math.max(m, dx, dy);
+        }, 0);
+        ok(geo.boxes.length === geo.want.length && worst <= 1.5, `${where}: every photo marker stands on the reader's box centre and left edge, within ${worst.toFixed(2)} px`);
+        ok(geo.boxes.every(r => r.width <= 3), `${where}: a photo is marked with a bar, never a tight outline`);
+        ok(await page.locator('[data-mp-approx-note]').count() === 1, `${where}: the page says the markers are approximate`);
+      }
       if (size === 'desktop') {
         ok(got.level === 'true', `${where}: comments are level with their lines on a wide screen`);
         // each line's comment is level with its outline (within a card's height), and no two overlap

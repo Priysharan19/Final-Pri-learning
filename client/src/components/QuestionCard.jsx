@@ -11,6 +11,7 @@ import { readingJudgement } from '../ink/readingFloor.js';
 import { carryPageIntoQuestion, clearMarkOnArrival, markOnArrivalPending } from '../ink/redoCarry.js';
 import { applyLineCorrection } from '../ink/readingCorrection.js';
 import { photoDraftPayload } from '../local/photoDrafts.js';
+import { missingStepsPhrase } from './missingStepsCopy.js';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api.js';
 import { answerToTex } from '../engine/answerTex.js';
@@ -2990,7 +2991,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               )}
               {photoPageOn && (
                 <React.Suspense fallback={null}>
-                  <MarkedPage input={awInput} source={{ kind: 'photo', src: photo, lines: photoPageLines }} texOf={texOf} criteria={res?.methodCriteria} reading={pageReading} onCorrect={onRedo ? correctReadLine : null} />
+                  <MarkedPage input={awInput} source={{ kind: 'photo', src: photo, lines: photoPageLines }} texOf={texOf} scoreShown={instrumentScore} criteria={res?.methodCriteria} reading={pageReading} onCorrect={onRedo ? correctReadLine : null} />
                 </React.Suspense>
               )}
               {photoSignInOpen && photoOCR.blockedKey === 'verdict.photoReadingSignIn' && (
@@ -3041,7 +3042,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           <>
           {inkPageOn && (
             <React.Suspense fallback={null}>
-              <MarkedPage input={awInput} source={{ kind: 'ink', strokes: latestInk.current || restoredInk || [] }} texOf={texOf} criteria={res?.methodCriteria} reading={pageReading} onCorrect={onRedo ? correctReadLine : null} />
+              <MarkedPage input={awInput} source={{ kind: 'ink', strokes: latestInk.current || restoredInk || [] }} texOf={texOf} scoreShown={instrumentScore} criteria={res?.methodCriteria} reading={pageReading} onCorrect={onRedo ? correctReadLine : null} />
             </React.Suspense>
           )}
           <div className={`ink-row${awModel && !inkPageOn ? ' aw-row' : ''}`} hidden={inkPageOn || undefined}>
@@ -3465,14 +3466,14 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 )}
                 {/* Which steps of the worked solution are nowhere on the page (the server's finding; feedback only). */}
                 {workEvidence && !verdictGood && Array.isArray(res?.stepReport?.missing) && res.stepReport.missing.length > 0 && (
-                  <div data-working-missing={res.stepReport.missing.length}>{t('verdict.workingMissing', { count: res.stepReport.missing.length, n: res.stepReport.missing.length, steps: res.stepReport.missing.slice(0, 4).map(m => `${m.step}. ${m.heading}`).join('; ') })}</div>
+                  <div data-working-missing={res.stepReport.missing.length}>{t('verdict.workingMissing', { count: res.stepReport.missing.length, n: res.stepReport.missing.length, steps: missingStepsPhrase(res.stepReport.missing, t, language) })}</div>
                 )}
                 {!verdictGood && res.solution && !isSketch && (
                   <div className="eval-expected">{t('verdict.expected')} <b><MathText text={answerToTex(res.solution.answerText)} /></b></div>
                 )}
                 {awInput && (
                   <React.Suspense fallback={null}>
-                    <AnnotatedWorkingPart part={writeMode ? 'evaluation' : 'both'} input={awInput} onModel={setAwModel} />
+                    <AnnotatedWorkingPart part={writeMode || photoPageOn ? 'evaluation' : 'both'} input={awInput} onModel={setAwModel} />
                   </React.Suspense>
                 )}
                 {res.stepReport && !awModel && <StepReport report={res.stepReport} instrument={INSTRUMENT} correctAnswer={!verdictGood && !res.revealed ? res.solution?.answerText : null} />}
@@ -3603,7 +3604,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             {statusState !== 'idle' && <span className="status-mark" aria-hidden="true"><Working pending={statusState === 'working'} />{statusState !== 'working' && <span className="dot" />}</span>}
             {writeMode && shownAnswerLine && !inkStale && !cloudPending && !(resolved && !judgedShown) && saveState !== 'failed' && saveState !== 'saving'
               ? <span className="ws-answer-preview muted">{t('verdict.yourAnswerIs')} <MathText text={`$${texOf(String(shownAnswerLine).replace(/^\s*[=≈]\s*/, ''))}$`} /></span>
-              : statusText}
+              : resolved && serverAuthoritative && statusText
+                /* The verdict word is already on the page in the score card; the live region still announces it, once, to a screen reader. */
+                ? <span className="sr-only" data-verdict-announcement>{statusText}</span>
+                : statusText}
             {/* Handwriting is read only by the server reader (#316); say so where the work is submitted. */}
             {writeMode && !isMcq && (
               <span className="ws-read-by">{String(inkResult?.engine || '').startsWith('cloud') ? t('verdict.inkReadByServer') : autoReadOn ? t('ink.footerAuto') : t('verdict.inkReadByServerPending')}</span>

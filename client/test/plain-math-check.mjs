@@ -23,4 +23,10 @@ eq(plainPromptText('Solve $\\sin x = \\frac{1}{2}$ for $0 \\le x \\le 2\\pi$.'),
 eq(plainPromptText('Simplify $\\log_2 8 \\times \\sqrt{9}$ at $90^\\circ$.'), 'Simplify log₂ 8 × √(9) at 90°.', 'a log base, a times sign and a degree sign');
 eq(plainPromptText('Differentiate $e^{2x}\\ln x$.'), 'Differentiate e^(2x)ln x.', 'ln is kept');
 
+// Two older faults of the bar (independent review, 20 November 2026): a root inside a fraction read "√(2)2", and an
+// aligned block leaked the word "aligned" and a backslash.
+eq(plainPromptText('Solve $\\sin\\theta = \\frac{\\sqrt{2}}{2}$.'), 'Solve sin θ = (√(2))/(2).', 'a root inside a fraction stays inside it');
+eq(plainPromptText('Find $\\frac{1}{\\sqrt{3}}$.'), 'Find (1)/(√(3)).', 'a root in a denominator');
+eq(plainPromptText('$\\begin{aligned} y &= 2x \\\\ x &= 3 \\end{aligned}$'), 'y = 2x ; x = 3', 'an aligned block is its rows');
+
 console.log(`plain-math-check: ${pass} checks passed`);

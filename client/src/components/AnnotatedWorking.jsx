@@ -68,7 +68,8 @@ export function CardBody({ card, model, t, renderBreakDetail }) {
   if (card.status === 'unread') return <p>{t('aw.body.unread')}</p>;
   if (card.valueChain === 'given') return <p>{t('aw.body.given')}</p>;
   if (card.valueChain === 'verified') return <p>{t('aw.body.valueVerified')}{card.note ? <> <EngineComment text={card.note} /></> : ''}</p>;
-  if (card.valueChain === 'arithmetic') return <p>{card.note ? <><EngineComment text={card.note} />{' '}</> : ''}{t('aw.body.arithmetic')}</p>;
+  // The caveat (true as written, not checked to be the right step) is said ONCE for the page, in the result's summary sentence, never on every line.
+  if (card.valueChain === 'arithmetic') return <p>{card.note ? <EngineComment text={card.note} /> : t('mp.why.arithmetic')}</p>;
   if (card.status === 'incomplete') return <p><EngineComment text={card.note} /></p>;
   if (card.status === 'condition') return <p>{t('aw.body.condition')}</p>;
   // The lines of a value-chain report that were not verified share one reason, said once below the cards.
@@ -126,6 +127,8 @@ export function AnnotatedComments({ model, renderBreakDetail = null }) {
           </li>
         ))}
       </ol>
+      {/* said once for the list, not on every line */}
+      {model.cards.some(c => c.valueChain === 'arithmetic') && <p className="aw-note" data-aw-arithmetic-once>{t('aw.body.arithmetic')}</p>}
     </section>
   );
 }

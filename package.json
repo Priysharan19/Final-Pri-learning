@@ -158,7 +158,7 @@
     "test:marker:parse-fixes": "node client/test/marker-parse-fixes-check.mjs",
     "test:every:reading": "node client/test/every-reading-check.mjs && node client/test/value-chain-check.mjs && node client/test/value-chain-curve-check.mjs && node client/test/vector-chain-check.mjs && node client/test/arithmetic-lines-check.mjs && node client/test/line-marking-audit-check.mjs && node client/test/tex-safe-check.mjs && node client/test/tex-to-plain-check.mjs && node client/test/missing-steps-check.mjs",
     "test:reading:floor": "node server/test/reading-floor-check.mjs",
-    "test:marked:page": "node client/test/marked-page-check.mjs",
+    "test:marked:page": "node client/test/marked-page-check.mjs && node client/test/marked-page-honesty-check.mjs",
     "test:line-interpreter": "node server/test/line-interpreter-check.mjs && node server/test/line-interpreter-overlay-check.mjs",
     "eval:line-interpreter": "node tools/line-interpreter-eval/run.mjs",
     "test:instrument:plot": "node client/test/student-plot-check.mjs",

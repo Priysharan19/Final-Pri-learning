@@ -71,6 +71,9 @@
 // 2026.11.44 — Graph-sketch forms: y11-quadfunc D2 and y12-appdiff D2/D3 gain five forms in which the student states a graph's
 //              intercepts and turning points (answerType 'graph-sketch'). Adding forms to those cells changes which question a
 //              given seed draws (612 of 900 sampled draws), so every seed in them is a different question from 2026.11.43's.
+// 2026.11.45 — y12-integration D2 (definite integral of a quadratic from 0): the worked solution prints coefficients in lowest
+//              terms (x^2, not 2/2 x^2) and the exact value beside its rounding (F(1) = -2/3 ≈ -0.667). Display only: every seed draws the
+//              same question with the same key, tolerance and traps; only the steps text of that form changes.
 // 2026.11.42 — Past-paper keys carry the paper's own published acceptance band (answer.officialRange) in the served payload, so the
 //              marker's exact-value and uncalled-for-band rules leave that band alone (16 JEE Advanced chapter digests).
 // 2026.11.41 — Walk-through maths fixes: a grouped-data mode question has one modal class; a numeric key is judged
@@ -84,7 +87,7 @@
 // of rational solutions prints as fractions; a previous-year question keeps the exam's published band; the key-format
 // repairs (a constant key, a plain percentage box, a plain value box) and the wider parameter ranges change what
 // those generators serve.
-export const CONTENT_VERSION = '2026.11.44';
+export const CONTENT_VERSION = '2026.11.45';
 /**
  * A sealed token that re-generates a question from (generator, difficulty, seed) (a prepared practice question, a guest
  * ticket) carries the content version it was minted under (`c`). A token with no `c` was minted before that field existed,
