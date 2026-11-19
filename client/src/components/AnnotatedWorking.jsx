@@ -145,7 +145,7 @@ export function AnnotatedEvaluation({ model }) {
       </div>
       {attempt && <p className="aw-attempt" data-aw-attempt={attempt}>{t('aw.eval.markedAgain', { n: attempt })}</p>}
       {marks?.receiptId && <p className="aw-receipt">{t('aw.eval.receipt', { id: marks.receiptId })}</p>}
-      <p className="aw-provenance">{t(model.noneChecked ? (source === 'handwriting' ? 'aw.eval.provenanceNoneInk' : 'aw.eval.provenanceNone') : model.allChecked === false ? (source === 'handwriting' ? 'aw.eval.provenanceSomeInk' : 'aw.eval.provenanceSome') : (source === 'handwriting' ? 'aw.eval.provenanceInk' : 'aw.eval.provenanceTyped'))}</p>
+      <p className="aw-provenance">{t(model.onlyArithmetic ? (source === 'handwriting' ? 'aw.eval.provenanceArithmeticInk' : 'aw.eval.provenanceArithmetic') : model.noneChecked ? (source === 'handwriting' ? 'aw.eval.provenanceNoneInk' : 'aw.eval.provenanceNone') : model.allChecked === false ? (source === 'handwriting' ? 'aw.eval.provenanceSomeInk' : 'aw.eval.provenanceSome') : (source === 'handwriting' ? 'aw.eval.provenanceInk' : 'aw.eval.provenanceTyped'))}</p>
       {model.unverified && <p className="aw-unverified" data-aw-unverified={model.unverified.lines.join(',')}>{t('aw.eval.unverifiedRun', { list: listOf(model.unverified.lines), count: model.unverified.lines.length })}</p>}
       <p className="aw-summary">{t(summary.key, { ...summary.vars, count: summary.vars.rules ?? summary.vars.checked })}</p>
       {followThrough.length > 0 && <p className="aw-follow" data-aw-follow-through={followThrough.join(',')}>{t('aw.eval.followThrough', { list: lineRange(followThrough), count: followThrough.length })}</p>}

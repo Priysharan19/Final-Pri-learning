@@ -155,7 +155,10 @@ function buildValueChainModel({ report: reportIn, stepReport, receipt, source, a
   const unverified = cards.filter(c => c.status === 'not-verified' || c.status === 'unread').map(c => c.n);
   const checked = cards.filter(c => c.status === 'checked').length;
   const total = cards.length;
+  // Every tick only says the line is true as written: the headline must not say "checked" (it is not checked as the right step).
+  const onlyArithmetic = checked > 0 && firstBreak < 0 && cards.every(c => c.status === 'checked' && c.valueChain === 'arithmetic');
   const summary = firstBreak >= 0 ? { key: 'aw.summary.breaksSome', vars: { n: firstBreak + 1, checked, total } }
+    : onlyArithmetic ? { key: 'aw.summary.arithmeticAll', vars: { total, checked } }
     : checked === 0 ? { key: 'aw.summary.none', vars: { total, checked } }
     : (unverified.length || cards.some(c => c.status === 'incomplete')) ? { key: 'aw.summary.some', vars: { checked, total } }
       : { key: 'aw.summary.valueAll', vars: { checked, total } };
@@ -164,6 +167,7 @@ function buildValueChainModel({ report: reportIn, stepReport, receipt, source, a
     criteria: [], jumps: [], followThrough: [], source, attempt: Number.isInteger(attempt) && attempt > 1 ? attempt : null,
     allChecked: unverified.length === 0 && firstBreak < 0 && !cards.some(c => c.status === 'incomplete'),
     noneChecked: checked === 0 && firstBreak < 0,
+    onlyArithmetic,
     unverified: unverified.length ? { lines: unverified, reason: summaryOf.reason || null } : null
   };
 }

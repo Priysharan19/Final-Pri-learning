@@ -161,6 +161,17 @@ ok(exactShown === seen, 'every step line shows the exact value with its rounding
     ok(!/[—–]/.test(en[k]) && !/[—–]/.test(hi[k]) && !/\b0 named|named rules? (?:was|were) found/.test(en[k]), `${k}: no dash, no "0 named rules"`);
   }
   ok(/\{total\}/.test(en['aw.summary.none']) && /\{total\}/.test(hi['aw.summary.none']), 'the none sentence carries the line count');
+  // every tick only "true as written": the headline says that, never "checked"
+  const arith = buildAnnotatedWorking({ lines: ['2 + 2 = 4', '3 × 4 = 12'], stepReport: { source: 'value-chain', arithmetic: true, lines: [L('2 + 2 = 4', 'ok', { state: 'arithmetic' }), L('3 × 4 = 12', 'ok', { state: 'arithmetic' })], firstBreak: -1, summary: {} } });
+  ok(arith && arith.onlyArithmetic === true && arith.summary.key === 'aw.summary.arithmeticAll', 'only true-as-written ticks: the summary says so');
+  ok(folded && folded.onlyArithmetic === false, 'a mixed page is not "only true as written"');
+  const given = buildAnnotatedWorking({ lines: ['a', 'b'], stepReport: { source: 'value-chain', lines: [L('a', 'ok', { state: 'given' }), L('b', 'ok', { state: 'verified' })], firstBreak: -1, summary: {} } });
+  ok(given && given.onlyArithmetic === false && given.summary.key === 'aw.summary.valueAll', 'given and verified lines keep the "checked" headline');
+  ok(buildMarkedPage({ model: { ...arith, marks: null } }).header.parts[0].key === 'mp.head.arithmetic' && buildMarkedPage({ model: { ...arith, marks: null } }).header.everyLine === false, 'the marked page header does not say every line was checked');
+  for (const k of ['aw.summary.arithmeticAll', 'aw.eval.provenanceArithmetic', 'aw.eval.provenanceArithmeticInk', 'mp.head.arithmetic']) {
+    ok(typeof en[k] === 'string' && typeof hi[k] === 'string' && hi[k] !== en[k] && !/[—–]/.test(en[k] + hi[k]) && !/every (?:step|line) was checked/i.test(en[k]), `${k} in English and Hindi, no dash, no "checked" headline`);
+  }
+  ok(/true as written/.test(en['aw.summary.arithmeticAll']) && /right steps/.test(en['aw.summary.arithmeticAll']), 'the headline says what is true and what was not checked');
   const comp = read('../src/components/AnnotatedWorking.jsx');
   ok(/model\.noneChecked \? \(source === 'handwriting' \? 'aw\.eval\.provenanceNoneInk' : 'aw\.eval\.provenanceNone'\)/.test(comp), 'the provenance sentence is the none sentence when nothing was checked');
   // the score card: each figure once visually, one announcement
