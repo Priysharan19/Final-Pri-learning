@@ -274,6 +274,8 @@ function pageDefinitions(raw, out, firstBreak) {
   const limit = firstBreak === -1 ? raw.length : firstBreak;
   for (let i = 0; i < Math.min(limit, LIMITS.lines); i++) {
     if (raw[i].length > LIMITS.chars) continue;
+    // A new part of the question may give a letter a new value on the paper, not on the page: what was defined is dropped.
+    if (/^\(?(?:[a-h]|i{1,3}|iv|v|vi{0,3})[.)]\s|^\([a-h]\)|^(?:part|question|q)\s*\(?[a-h0-9]/i.test(raw[i])) { for (const k of Object.keys(defs)) delete defs[k]; equation = null; carry = null; }
     const src = raw[i].replace(/^\(?[a-h1-9ivx]{1,3}[.)]\s+/i, '').replace(/^[A-Za-z][A-Za-z ]{1,24}:\s*(?=\S)/, '');
     if (/[<>≤≥≠≈%°,;:]|==|!=|√\s*\[|∫|\]_/.test(src)) continue;
     const decimal = /\d\.\d|(?:^|[^\d])\.\d/.test(src);
@@ -295,13 +297,13 @@ function pageDefinitions(raw, out, firstBreak) {
       continue;
     }
     if (out[i].status === 'ok' && /^=/.test(src.trim()) && carried) { carry = carried; continue; }
-    for (const stmt of src.split(STATEMENT_SPLIT).map(x => x && x.trim()).filter(Boolean)) {
+    const judgeOne = stmt => {
       const text = cleanStatement(stmt);
       const parts = text.split('=').map(x => x.trim());
-      if (parts.length < 2 || parts.some(x => !x)) continue;
+      if (parts.length < 2 || parts.some(x => !x)) return;
       const head = parts[0];
       const twoWaysHere = parts.some(x => /[\/÷]/.test(x) && (/[\/÷]\s*\d+(?:\.\d+)?\s*[A-Za-z(]|[\/÷]\s*[A-Za-z]\s*[A-Za-z(]|\^\s*-?\d+(?:\.\d+)?[A-Za-z]|\^\s*[A-Za-z][A-Za-z0-9(]/.test(x)));
-      if (twoWaysHere) continue;
+      if (twoWaysHere) return;
       // B. a derivative of something the page defined: u' = …, f'(x) = …
       let m = head.match(/^([A-Za-z])'(?:\(([a-z])\))?$/);
       if (m && defs[m[1]] && parts.length === 2) {
@@ -314,17 +316,17 @@ function pageDefinitions(raw, out, firstBreak) {
           let agree = 0, differ = 0, tried = 0;
           for (const x of POINTS) {
             const h = 1e-5, a = f(x + h), b = f(x - h), c = g(x);
-            if (a === null || b === null || c === null) continue;
+            if (a === null || b === null || c === null) return;
             tried++;
             const slope = (a - b) / (2 * h);
             if (Math.abs(slope - c) <= 1e-5 * Math.max(1, Math.abs(slope), Math.abs(c))) agree++;
             else if (Math.abs(slope - c) > 1e-2 * Math.max(1, Math.abs(slope), Math.abs(c))) differ++;
           }
-          if (tried >= 3 && agree === tried) { carry = { text: claim.text, variable }; ticks.push(`This is the derivative of ${m[1]} = ${d.shown}.`); facts.push([`${m[1]}'`, { expr: parts[1], shown: parts[1], variable: m[2] || d.variable || null, line: i }]); continue; }
+          if (tried >= 3 && agree === tried) { carry = { text: claim.text, variable }; ticks.push(`This is the derivative of ${m[1]} = ${d.shown}.`); facts.push([`${m[1]}'`, { expr: parts[1], shown: parts[1], variable: m[2] || d.variable || null, line: i }]); return; }
           // A number on the right is the gradient at a point (y' = 3√2/2), not a wrong derivative: never crossed.
-          if (tried >= 3 && differ === tried && !decimal && lettersOf(claim.text).includes(variable)) { cross = `The derivative of ${m[1]} = ${d.shown} is not ${parts[1]}.`; break; }
+          if (tried >= 3 && differ === tried && !decimal && lettersOf(claim.text).includes(variable)) { cross = `The derivative of ${m[1]} = ${d.shown} is not ${parts[1]}.`; return; }
         }
-        continue;
+        return;
       }
       // A. a definition: k = …, f(x) = … (a chain after the name is judged below, then its last side is kept)
       m = head.match(/^([A-Za-z])(?:\(([a-z])\))?$/);
@@ -349,10 +351,12 @@ function pageDefinitions(raw, out, firstBreak) {
             if (same && used.length) ticks.push(numbers ? `With ${from} from above, each side comes to ${shown(infos[0].value)}.` : `With ${from} from above, the sides are the same expression.`);
             // Crossed only in a worked chain under a name (A = 12e^(4k) = 12e^(ln(3)/4)): there the two sides are stated
             // equal. Two sides on their own (x^2 = 9 after x = 2) may be a new equation to solve, so that is a note.
-            else if (!same && numbers && m && used.length && !decimal && used.every(k => !defs[k].variable)) {
+            // …and only against a value set on this line or the line straight above it: an older value may belong to
+            // another part of the question (independent review).
+            else if (!same && numbers && m && used.length && !decimal && used.every(k => !defs[k].variable && defs[k].line >= i - 1)) {
               const k = infos.findIndex(x => !close(x.value, infos[0].value));
               cross = `With ${from} from above, ${sides[0]} comes to ${shown(infos[0].value)}, but this line gives ${shown(infos[k].value)}.`;
-              break;
+              return;
             }
             // E. the same equation as the one before it, rearranged (the difference of the sides is a constant multiple)
             if (!m && sides.length === 2 && free) {
@@ -360,7 +364,7 @@ function pageDefinitions(raw, out, firstBreak) {
               if (L && R && equation && equation.variable === free && !same) {
                 const L0 = fnOf(equation.left, free), R0 = fnOf(equation.right, free);
                 let ratio = null, okRatio = 0, tried = 0;
-                for (const x of POINTS) { const a = L(x), b = R(x), c = L0 && L0(x), d = R0 && R0(x); if ([a, b, c, d].some(z => z === null || z === undefined)) continue; const p1 = a - b, p0 = c - d; if (Math.abs(p0) < 1e-9 || Math.abs(p1) < 1e-9) continue; tried++; const r = p1 / p0; if (ratio === null) ratio = r; if (Math.abs(r - ratio) <= 1e-7 * Math.max(1, Math.abs(ratio))) okRatio++; }
+                for (const x of POINTS) { const a = L(x), b = R(x), c = L0 && L0(x), d = R0 && R0(x); if ([a, b, c, d].some(z => z === null || z === undefined)) return; const p1 = a - b, p0 = c - d; if (Math.abs(p0) < 1e-9 || Math.abs(p1) < 1e-9) return; tried++; const r = p1 / p0; if (ratio === null) ratio = r; if (Math.abs(r - ratio) <= 1e-7 * Math.max(1, Math.abs(ratio))) okRatio++; }
                 if (tried >= 3 && okRatio === tried) ticks.push('The same equation as the one before it, rearranged.');
               }
               if (L && R && !same) equation = { left: put[0].text, right: put[1].text, variable: free };
@@ -377,9 +381,28 @@ function pageDefinitions(raw, out, firstBreak) {
           else if (!m[2] && infoOf(last)) facts.push([m[1], { expr: last, shown: last, variable: lettersOf(last).length === 1 ? lettersOf(last)[0] : null, line: i, open: lettersOf(last).length > 1 }]);
         }
       }
+        };
+    // A line is ticked only when its LAST statement is ticked and nothing after the first tick is left unjudged
+    // (independent review: `x = 2 so 2x = 5`). Before the first tick a statement may be a premise: words, or an
+    // equation or definition with a letter in it. A premise of plain numbers must itself be true.
+    const verdicts = [];
+    for (const stmt of src.split(STATEMENT_SPLIT).map(x => x && x.trim()).filter(Boolean)) {
+      const before = ticks.length;
+      judgeOne(stmt);
+      if (cross) break;
+      if (ticks.length > before) { verdicts.push('tick'); continue; }
+      const sides = cleanStatement(stmt).split('=').map(x => x.trim());
+      const plain = sides.length >= 2 && sides.every(x => x && !lettersOf(x).length);
+      const values = plain ? sides.map(numberOf) : [];
+      verdicts.push(plain && !(values.every(v => v !== null) && values.every(v => close(v, values[0]))) ? 'bad' : 'premise');
     }
+    const firstTick = verdicts.indexOf('tick');
+    const lineHolds = firstTick !== -1 && verdicts[verdicts.length - 1] === 'tick' && verdicts.slice(firstTick).every(v => v === 'tick') && !verdicts.includes('bad');
     if (cross) { broke = { index: i, message: cross }; break; }
     for (const [name, d] of facts) if (!d.open) defs[name] = d;
+    // A letter set on this line in a way this pass did not record (`Let x = 4`, `x = 4 now`) no longer has its old value.
+    for (const k of Object.keys(defs)) if (!facts.some(([name]) => name === k) && new RegExp(`(?<![A-Za-z])${k.replace("'", "\\'")}\\s*=`).test(src)) delete defs[k];
+    if (!lineHolds) { if (ticks.length) carry = null; continue; }
     if (ticks.length && out[i].status === 'note') out[i] = { text: out[i].text, status: 'ok', state: 'arithmetic', note: ticks.join(' '), valueChain: { rule: 'page-definitions' } };
   }
   return broke;

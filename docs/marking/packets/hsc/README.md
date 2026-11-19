@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Tracking: G6 (HSC counterpart of #499). Dossier: [`docs/marking/hsc-examiner-certification-dossier.md`](../../hsc-examiner-certification-dossier.md). Dossier digest: `4fc8caeed6b65b437cab70c1484fb7da3ad4e7915fbc99ff4e16e48b478f5ee6`.
+Tracking: G6 (HSC counterpart of #499). Dossier: [`docs/marking/hsc-examiner-certification-dossier.md`](../../hsc-examiner-certification-dossier.md). Dossier digest: `9bad3086fa362191ef30f2b3af21d2b566da3dba6e5b9fe89f9ffa27d1bc6143`.
 
 ## Cover letter
 
