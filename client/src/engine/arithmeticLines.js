@@ -45,7 +45,7 @@ function valueOf(side) {
   let ast;
   try { ast = parse(normalize(side)); } catch { return null; }
   if (!ast || ast.t === 'equation') return null;
-  if ([...variablesOf(ast)].length) return null;            // any letter at all, π and e included: not arithmetic on numbers alone
+  if ([...variablesOf(ast)].some(v => v !== 'e')) return null;   // any letter but the constants e and π: not arithmetic on numbers alone
   let v;
   try { v = evaluate(ast, {}); } catch { return null; }
   return typeof v === 'number' && Number.isFinite(v) ? v : null;
@@ -130,6 +130,62 @@ function sameAsWritten(a, b) {
   return agreed >= 3;
 }
 
+// ── Handwritten function notation, and the name of the step ──────────────────
+// Owner, 19 November 2026 (a trig proof marked by a competitor step by step):
+// students write sin θ, cos²θ, sec θ with no brackets. A named function is
+// given its bracket only where the page can be read one way: the function, an
+// optional whole-number power (not −1, which is the inverse), then ONE letter,
+// for a trig function optionally with a number in front (sin 2θ), and nothing
+// attached after it. sin x^2, sin x(x+1) and ln 2x stay unread.
+const TRIG = 'sin|cos|tan|sec|cosec|csc|cot';
+const FN_END = `(?!\\s*(?!${TRIG}|ln|log)[A-Za-z0-9^(θαβφ])`;   // nothing attached after it, across a space too (sin x y)
+const TRIG_BARE = new RegExp(`(?<![A-Za-z])(${TRIG})\\s*(?:\\^\\s*(\\d)\\s*)?(?!\\()\\s*((?:\\d+(?:\\.\\d+)?)?\\s*(?:[A-Za-z]|[θαβφ]))${FN_END}`, 'g');
+const LOG_BARE = new RegExp(`(?<![A-Za-z])(ln|log)\\s+([A-Za-z]|[θαβφ])${FN_END}`, 'g');
+function bracketFunctions(text) {
+  return text
+    .replace(TRIG_BARE, (_, fn, power, arg) => (power ? `(${fn}(${arg.replace(/\s+/g, '')}))^${power}` : `${fn}(${arg.replace(/\s+/g, '')})`))
+    .replace(LOG_BARE, (_, fn, arg) => `${fn}(${arg})`);
+}
+
+// The comment on a tick may name the step, but only as something the two
+// sides are seen to do ("It matches …"): the tick itself rests on the two
+// sides being equal, never on this description.
+function nameOfStep(fromRaw, toRaw) {
+  const a = String(fromRaw || '').toLowerCase().replace(/\s+/g, ''), b = String(toRaw || '').toLowerCase().replace(/\s+/g, '');
+  if (!a || !b) return '';
+  const v = (a.replace(/cosec/g, 'csc').match(/(?<![a-z])(?:sin|cos|tan|sec|csc|cot)(?:\^\(?\d\)?)?\(?\d*([a-zθαβφ])(?![a-z])/) || [])[1] || 'θ';
+  const has = (t, fn) => new RegExp(`(?<![a-z])${fn}(?![a-z])`).test(t.replace(/cosec/g, 'csc'));
+  const A = a.replace(/cosec/g, 'csc'), B = b.replace(/cosec/g, 'csc');
+  if (has(A, 'sec') && !has(B, 'sec') && has(B, 'cos')) return `the reciprocal identity sec ${v} = 1/cos ${v}`;
+  if (has(A, 'csc') && !has(B, 'csc') && has(B, 'sin')) return `the reciprocal identity cosec ${v} = 1/sin ${v}`;
+  if (has(A, 'cot') && !has(B, 'cot') && has(B, 'tan')) return `the reciprocal identity cot ${v} = 1/tan ${v}`;
+  if (has(A, 'cot') && !has(B, 'cot') && has(B, 'sin') && has(B, 'cos')) return `cot ${v} = cos ${v} / sin ${v}`;
+  const sq = (t, fn) => new RegExp(`${fn}\\^\\(?2|\\(${fn}\\([^)]*\\)\\)\\^\\(?2|${fn}\\([^)]*\\)\\^\\(?2`).test(t);
+  if (/1[-+]/.test(A) && ((sq(A, 'cos') && !sq(B, 'cos') && sq(B, 'sin')) || (sq(A, 'sin') && !sq(B, 'sin') && sq(B, 'cos')))) return `the Pythagorean identity sin²${v} + cos²${v} = 1`;
+  if (/1\+/.test(A) && sq(A, 'tan') && sq(B, 'sec') && !sq(A, 'sec')) return `the identity 1 + tan²${v} = sec²${v}`;
+  if (has(B, 'tan') && !has(A, 'tan') && has(A, 'sin') && has(A, 'cos')) return `tan ${v} = sin ${v} / cos ${v}`;
+  if (has(A, 'tan') && !has(B, 'tan') && has(B, 'sin') && has(B, 'cos')) return `tan ${v} = sin ${v} / cos ${v}`;
+  if (/(?:sin|cos|tan)\(?2[a-zθαβφ]/.test(A) !== /(?:sin|cos|tan)\(?2[a-zθαβφ]/.test(B)) return 'a double-angle identity';
+  if (/\+/.test(A) && sq(A, 'sin') && sq(A, 'cos') && !(sq(B, 'sin') && sq(B, 'cos'))) return `the Pythagorean identity sin²${v} + cos²${v} = 1`;
+  // Brackets that only hold a function's argument, or wrap a function for its power, are not brackets to expand.
+  const plain = t => t.replace(/(?:sqrt|sin|cos|tan|sec|csc|cot|ln|log)\(/g, '#[').replace(/#\[[^()]*\)/g, '#').replace(/\(#\)/g, '#');
+  const pa = plain(A), pb = plain(B);
+  if (/\(/.test(pa) && !/\(/.test(pb) && !/\//.test(pa)) return 'expanding the brackets';
+  if (!/\(/.test(pa) && /\)\(|\d\(|[a-zθ]\(|\)\^/.test(pb) && !/\//.test(pb)) return 'factorising';
+  const fractions = t => (t.match(/\//g) || []).length;
+  if (fractions(pa) >= 1 && /[-+]/.test(pa.replace(/\([^()]*\)/g, '')) && fractions(pb) === 1 && /^\(.*\)\/[^/]+$/.test(pb)) return 'putting the terms over a common denominator';
+  return '';
+}
+
+
+// Hoisted so that the plain-number path can use it for lines with e or π.
+const folded = side => { let t = side, last; do { last = t; t = t.replace(/\([^()]*\)/g, '#'); } while (t !== last); return t.replace(/(?:√|∛|sqrt)\s*(?:#|\d+(?:\.\d+)?|[A-Za-zθαβφπ])/gi, '#'); };   // a root is one factor too: 1/√2 x
+// Structural, not a list of cases: after a division sign comes ONE denominator (a function with its bracket, a
+// bracket, a root, a number, or one letter, with an optional power) and then an operator, a closing bracket or the
+// end of the side. Anything else attached to it, or a denominator of another shape, or a later `*`, is not read.
+const DENOMINATOR = '(?:[A-Za-z]{2,6}#|#|\\d+(?:\\.\\d+)?!?(?![\\d.!])|[A-Za-zθαβφπ](?![A-Za-z]))(?:\\^(?:#|-?\\d+(?!\\d)|[A-Za-zθαβφπ]))?';
+const twoWays = t => new RegExp(`[\\/÷]\\s*${DENOMINATOR}\\s*(?![-+=)\\/÷,^\\s]|$)`).test(t) || new RegExp(`[\\/÷](?!\\s*${DENOMINATOR})`).test(t) || /[\/÷].*\*/.test(t);
+
 /** Other ways the same ink may be read: one whole number split as a power or as a fraction. */
 function otherReadings(side) {
   const out = [];
@@ -164,41 +220,261 @@ function trueUnderAnotherReading(sides, values) {
   return false;
 }
 
+
+// ── What the page itself defines ─────────────────────────────────────────────
+// Owner, 19 November 2026 (side by side with a competitor that follows a value
+// from line to line): a second pass over the lines the first pass left unmarked.
+// It keeps what the student defined on the page and holds later lines to it:
+//
+//   k = ln(3)/8                       a definition (not judged)
+//   A = 12e^(4k) = 12e^(ln(3)/4)      crossed: with k from above, 12e^(4k) is 20.78…, not 15.79…
+//   u = x^2 - 4x + 1,  u' = 2x - 4    ticked: the derivative of u, checked numerically
+//   e^(8k) = 3 so k = ln(3)/8         ticked: k satisfies the equation before it
+//   -x^2 + 6x - 5 = 0,  (x-5)(x-1) = 0   ticked: the same equation, rearranged
+//
+// A cross needs a worked chain under a name (A = … = …) whose sides are plain
+// numbers once the definitions are put in, with no decimal written on the line; a wrong derivative is crossed only
+// when it differs clearly at every point tried. Everything else is a tick or
+// stays a note. Nothing here reads the question or the answer.
+const KEEP = /^(?:sqrt|arcsin|arccos|arctan|asin|acos|atan|cosec|sin|cos|tan|sec|csc|cot|ln|log|exp|abs|pi|e)$/i;
+const STATEMENT_SPLIT = /\s+(?:so|and|hence|therefore|then|thus|giving|gives)\s+|\s*(?:⇒|=>|∴)\s*/i;
+const POINTS = [-2.3, -1.1, 0.7, 1.6, 2.9];
+
+function cleanStatement(text) {
+  return bracketFunctions(text.replace(/\s*\.\s*$/, '').replace(/[−–—]/g, '-').replace(/[×·]/g, '*').replace(/÷/g, '/')
+    .replace(/(\d|\))\s+x\s+(?=\d|\()/gi, '$1*').replace(/\[([^\[\],;_]*)\](?![_^])/g, '($1)'));
+}
+
+/** Put the page's definitions into a side. Returns { text, used } or null when a letter stays that is neither defined nor `free`. */
+function putIn(side, defs, free) {
+  const used = new Set();
+  let bad = false;
+  // a defined function applied to an argument: M(2), f'(5)
+  let t = side.replace(/([A-Za-z])('?)\(([^()]*)\)/g, (m, name, prime, arg) => {
+    const d = defs[name + prime];
+    if (!d || !d.variable) return m;
+    used.add(name + prime);
+    return `(${d.expr.replace(new RegExp(`(?<![A-Za-z])${d.variable}(?![A-Za-z])`, 'g'), `(${arg})`)})`;
+  });
+  t = t.replace(/[A-Za-z]+'?/g, tok => {
+    const prime = tok.endsWith("'"), word = prime ? tok.slice(0, -1) : tok;
+    if (KEEP.test(word)) { if (prime) bad = true; return tok; }
+    return [...word].map((c, k) => {
+      const key = c + (prime && k === word.length - 1 ? "'" : '');
+      const d = defs[key];
+      if (d && !d.variable) { used.add(key); return `(${d.expr})`; }
+      if (d && d.variable && free === d.variable) { used.add(key); return `(${d.expr})`; }
+      if (key.endsWith("'") || (c !== free)) bad = true;
+      return c;
+    }).join('*');
+  });
+  if (bad || /'/.test(t)) return null;
+  return { text: t, used: [...used] };
+}
+const numberOf = text => { const i = infoOf(text); return i && i.value !== undefined ? i.value : null; };
+const fnOf = (text, v) => { const i = infoOf(text); if (!i) return null; if (i.value !== undefined) return () => i.value; if (i.vars.join() !== v) return null; return x => { try { const y = evaluate(i.ast, { [v]: x }); return Number.isFinite(y) ? y : null; } catch { return null; } }; };
+const lettersOf = text => [...new Set((text.replace(/[A-Za-z]+/g, w => (KEEP.test(w) ? ' ' : w)).match(/[A-Za-z]/g) || []))];
+
+function pageDefinitions(raw, out, firstBreak) {
+  const defs = {};            // 'k' → { expr, line }, 'f' → { expr, variable, line }, "u'" → …
+  let equation = null;        // the last equation in one unknown: { left, right, variable }
+  let broke = null;
+  let carry = null;           // { text, variable }: what the last line this pass ticked came to, for the `=` line below
+  const limit = firstBreak === -1 ? raw.length : firstBreak;
+  for (let i = 0; i < Math.min(limit, LIMITS.lines); i++) {
+    if (raw[i].length > LIMITS.chars) continue;
+    // A new part of the question may give a letter a new value on the paper, not on the page: what was defined is dropped.
+    if (/^\(?(?:[a-h]|i{1,3}|iv|v|vi{0,3})[.)]\s|^\([a-h]\)|^(?:part|question|q)\s*\(?[a-h0-9]/i.test(raw[i])) { for (const k of Object.keys(defs)) delete defs[k]; equation = null; carry = null; }
+    const src = raw[i].replace(/^\(?[a-h1-9ivx]{1,3}[.)]\s+/i, '').replace(/^[A-Za-z][A-Za-z ]{1,24}:\s*(?=\S)/, '');
+    if (/[<>≤≥≠≈%°,;:]|==|!=|√\s*\[|∫|\]_/.test(src)) continue;
+    const decimal = /\d\.\d|(?:^|[^\d])\.\d/.test(src);
+    const ticks = [], facts = [];
+    let cross = null;
+    const carried = carry;
+    carry = null;
+    // A `=` line under a line this pass ticked: the same expression carried on (tick only).
+    if (/^=/.test(src.trim()) && carried && out[i].status === 'note' && !STATEMENT_SPLIT.test(src)) {
+      const sides = cleanStatement(src.trim()).split('=').map(x => x.trim()).slice(1);
+      const put = sides.every(Boolean) ? sides.map(x => putIn(x, defs, carried.variable)) : [];
+      const infos = put.length && put.every(Boolean) ? put.map(x => infoOf(x.text)) : [];
+      const top = infoOf(carried.text);
+      const grouped = sides.some(x => /[\/÷]\s*\d+(?:\.\d+)?\s*[A-Za-z(]|[\/÷]\s*[A-Za-z]\s*[A-Za-z(]|\^\s*-?\d+(?:\.\d+)?[A-Za-z]|\^\s*[A-Za-z][A-Za-z0-9(]|[\/÷].*\*/.test(x));
+      if (top && infos.length && infos.every(Boolean) && !grouped && infos.every(x => sameAsWritten(x, top))) {
+        out[i] = { text: out[i].text, status: 'ok', state: 'arithmetic', note: 'This is the line above, written another way.', valueChain: { rule: 'page-definitions' } };
+        carry = { text: put[put.length - 1].text, variable: carried.variable };
+      }
+      continue;
+    }
+    if (out[i].status === 'ok' && /^=/.test(src.trim()) && carried) { carry = carried; continue; }
+    const judgeOne = stmt => {
+      const text = cleanStatement(stmt);
+      const parts = text.split('=').map(x => x.trim());
+      if (parts.length < 2 || parts.some(x => !x)) return;
+      const head = parts[0];
+      const twoWaysHere = parts.some(x => /[\/÷]/.test(x) && (/[\/÷]\s*\d+(?:\.\d+)?\s*[A-Za-z(]|[\/÷]\s*[A-Za-z]\s*[A-Za-z(]|\^\s*-?\d+(?:\.\d+)?[A-Za-z]|\^\s*[A-Za-z][A-Za-z0-9(]/.test(x)));
+      if (twoWaysHere) return;
+      // B. a derivative of something the page defined: u' = …, f'(x) = …
+      let m = head.match(/^([A-Za-z])'(?:\(([a-z])\))?$/);
+      if (m && defs[m[1]] && parts.length === 2) {
+        const d = defs[m[1]];
+        const variable = m[2] || d.variable || (lettersOf(d.expr).length === 1 ? lettersOf(d.expr)[0] : null);
+        const base = variable ? putIn(d.expr, defs, variable) : null;
+        const claim = variable ? putIn(parts[1], defs, variable) : null;
+        const f = base && fnOf(base.text, variable), g = claim && fnOf(claim.text, variable);
+        if (f && g) {
+          let agree = 0, differ = 0, tried = 0;
+          for (const x of POINTS) {
+            const h = 1e-5, a = f(x + h), b = f(x - h), c = g(x);
+            if (a === null || b === null || c === null) return;
+            tried++;
+            const slope = (a - b) / (2 * h);
+            if (Math.abs(slope - c) <= 1e-5 * Math.max(1, Math.abs(slope), Math.abs(c))) agree++;
+            else if (Math.abs(slope - c) > 1e-2 * Math.max(1, Math.abs(slope), Math.abs(c))) differ++;
+          }
+          if (tried >= 3 && agree === tried) { carry = { text: claim.text, variable }; ticks.push(`This is the derivative of ${m[1]} = ${d.shown}.`); facts.push([`${m[1]}'`, { expr: parts[1], shown: parts[1], variable: m[2] || d.variable || null, line: i }]); return; }
+          // A number on the right is the gradient at a point (y' = 3√2/2), not a wrong derivative: never crossed.
+          if (tried >= 3 && differ === tried && !decimal && lettersOf(claim.text).includes(variable)) { cross = `The derivative of ${m[1]} = ${d.shown} is not ${parts[1]}.`; return; }
+        }
+        return;
+      }
+      // A. a definition: k = …, f(x) = … (a chain after the name is judged below, then its last side is kept)
+      m = head.match(/^([A-Za-z])(?:\(([a-z])\))?$/);
+      const sides = m ? parts.slice(1) : parts;
+      // D. x = value straight after an equation in x: a root of it
+      if (m && !m[2] && sides.length === 1 && equation && equation.variable === m[1]) {
+        const value = putIn(sides[0], defs, null), v = value && numberOf(value.text);
+        const L = v !== null && v !== undefined ? fnOf(equation.left, m[1]) : null, R = L ? fnOf(equation.right, m[1]) : null;
+        if (L && R) { const a = L(v), b = R(v); if (a !== null && b !== null && close(a, b)) ticks.push(`${m[1]} = ${sides[0]} satisfies the equation before it.`); }
+      }
+      // C. sides that become plain numbers, or one function of one letter, once the definitions are in
+      if (sides.length >= 2) {
+        const free = (() => { const all = [...new Set(sides.flatMap(lettersOf))].filter(c => !defs[c] || defs[c].variable); return all.length === 1 ? all[0] : null; })();
+        const put = sides.map(x => putIn(x, defs, free));
+        if (put.every(Boolean)) {
+          const used = [...new Set(put.flatMap(x => x.used))];
+          const infos = put.map(x => infoOf(x.text));
+          if (infos.every(Boolean)) {
+            const numbers = infos.every(x => x.value !== undefined);
+            const same = infos.every(x => sameAsWritten(x, infos[0]));
+            const from = used.map(k => `${k} = ${defs[k].shown}`).join(', ');
+            if (same && used.length) ticks.push(numbers ? `With ${from} from above, each side comes to ${shown(infos[0].value)}.` : `With ${from} from above, the sides are the same expression.`);
+            // Crossed only in a worked chain under a name (A = 12e^(4k) = 12e^(ln(3)/4)): there the two sides are stated
+            // equal. Two sides on their own (x^2 = 9 after x = 2) may be a new equation to solve, so that is a note.
+            // …and only against a value set on this line or the line straight above it: an older value may belong to
+            // another part of the question (independent review).
+            else if (!same && numbers && m && used.length && !decimal && used.every(k => !defs[k].variable && defs[k].line >= i - 1)) {
+              const k = infos.findIndex(x => !close(x.value, infos[0].value));
+              cross = `With ${from} from above, ${sides[0]} comes to ${shown(infos[0].value)}, but this line gives ${shown(infos[k].value)}.`;
+              return;
+            }
+            // E. the same equation as the one before it, rearranged (the difference of the sides is a constant multiple)
+            if (!m && sides.length === 2 && free) {
+              const L = fnOf(put[0].text, free), R = fnOf(put[1].text, free);
+              if (L && R && equation && equation.variable === free && !same) {
+                const L0 = fnOf(equation.left, free), R0 = fnOf(equation.right, free);
+                let ratio = null, okRatio = 0, tried = 0;
+                for (const x of POINTS) { const a = L(x), b = R(x), c = L0 && L0(x), d = R0 && R0(x); if ([a, b, c, d].some(z => z === null || z === undefined)) return; const p1 = a - b, p0 = c - d; if (Math.abs(p0) < 1e-9 || Math.abs(p1) < 1e-9) return; tried++; const r = p1 / p0; if (ratio === null) ratio = r; if (Math.abs(r - ratio) <= 1e-7 * Math.max(1, Math.abs(ratio))) okRatio++; }
+                if (tried >= 3 && okRatio === tried) ticks.push('The same equation as the one before it, rearranged.');
+              }
+              if (L && R && !same) equation = { left: put[0].text, right: put[1].text, variable: free };
+            }
+          }
+        }
+      } else if (!m && sides.length === 1) { /* nothing stated */ }
+      if (m && !cross) {
+        const last = sides[sides.length - 1];
+        if (!new RegExp(`(?<![A-Za-z])${m[1]}(?![A-Za-z])`).test(last.replace(/[A-Za-z]+/g, w => (KEEP.test(w) ? ' ' : w)))) {
+          const variable = m[2] || null;
+          const settled = putIn(last, defs, variable);
+          if (settled && infoOf(settled.text)) facts.push([m[1], { expr: settled.text, shown: last, variable, line: i }]);
+          else if (!m[2] && infoOf(last)) facts.push([m[1], { expr: last, shown: last, variable: lettersOf(last).length === 1 ? lettersOf(last)[0] : null, line: i, open: lettersOf(last).length > 1 }]);
+        }
+      }
+        };
+    // A line is ticked only when its LAST statement is ticked and nothing after the first tick is left unjudged
+    // (independent review: `x = 2 so 2x = 5`). Before the first tick a statement may be a premise: words, or an
+    // equation or definition with a letter in it. A premise of plain numbers must itself be true.
+    const verdicts = [];
+    for (const stmt of src.split(STATEMENT_SPLIT).map(x => x && x.trim()).filter(Boolean)) {
+      const before = ticks.length;
+      const equationBefore = equation;
+      judgeOne(stmt);
+      if (cross) break;
+      if (ticks.length > before) { verdicts.push('tick'); continue; }
+      const sides = cleanStatement(stmt).split('=').map(x => x.trim());
+      // A statement about the unknown of the equation before it that this pass could not tick (`x = 3`, `2x = 5` after
+      // `2x = 4`) is not a premise: it may be false, so the line is not ticked (independent review, rounds 2 and 3).
+      if (sides.length >= 2 && equationBefore && sides.some(x => lettersOf(x).includes(equationBefore.variable))) { verdicts.push('bad'); continue; }
+      const plain = sides.length >= 2 && sides.every(x => x && !lettersOf(x).length);
+      const values = plain ? sides.map(numberOf) : [];
+      verdicts.push(plain && !(values.every(v => v !== null) && values.every(v => close(v, values[0]))) ? 'bad' : 'premise');
+    }
+    const firstTick = verdicts.indexOf('tick');
+    const lineHolds = firstTick !== -1 && verdicts[verdicts.length - 1] === 'tick' && verdicts.slice(firstTick).every(v => v === 'tick') && !verdicts.includes('bad');
+    if (cross) { broke = { index: i, message: cross }; break; }
+    for (const [name, d] of facts) if (!d.open) defs[name] = d;
+    // A letter set on this line in a way this pass did not record (`Let x = 4`, `x = 4 now`) no longer has its old value.
+    for (const k of Object.keys(defs)) if (!facts.some(([name]) => name === k) && new RegExp(`(?<![A-Za-z])${k.replace(/[^A-Za-z]/g, '\\$&')}\\s*=`).test(src)) delete defs[k];
+    if (!lineHolds) { if (ticks.length) carry = null; continue; }
+    if (ticks.length && out[i].status === 'note') out[i] = { text: out[i].text, status: 'ok', state: 'arithmetic', note: ticks.join(' '), valueChain: { rule: 'page-definitions' } };
+  }
+  return broke;
+}
+
 export function stepCheckArithmetic(workingText) {
   const raw = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
   const out = [];
   let firstBreak = -1;
   let diagnosis = null;
+  let labelled = false;
   let prev = null;   // { text, value } or { text, ast, vars }: the last side of the line above, when it could be read
 
   const note = (text, why, extra = {}) => { out.push({ text, status: 'note', note: why, unverified: true, ...extra }); };
 
   raw.forEach((line, i) => {
     const carried = prev;
-    const before = carried && carried.value !== undefined && !carried.calculus ? carried : null;   // plain arithmetic only
+    // A label is set aside: `Numerator:`, `LHS =` in front, `= RHS` behind, an end mark. What such a line leaves for
+    // the `=` line below is tick only, like a line of letters.
+    const src0 = line.replace(/^[A-Za-z][A-Za-z ]{1,24}:\s*(?=\S)/, '').replace(/^(?:LHS|RHS|L\.H\.S\.?|R\.H\.S\.?)\s*=\s*(?=\S)/i, '')
+      .replace(/\s*(?:\/\/|∎|□)\s*$/, '').replace(/\s*=\s*(?:LHS|RHS|L\.H\.S\.?|R\.H\.S\.?)\s*$/i, '');
+    // Owner, 19 November 2026 (a sign slip a competitor caught: `a(2) = (4 - 8 + 2)e^(-2) = 2e^(-2) > 0 so …`):
+    //   · a value of a function in front of a worked chain (`a(2) = … = …`) is a label for the chain;
+    //   · words after the chain are set aside; `> 0` or `< 0` after it is kept as a claim about the chain's value,
+    //     and a tick needs that claim to be true as well.
+    let src = src0.replace(/^\(?[a-h]\)(?:\s*\((?:i{1,3}|iv|v)\))?\s+(?=\S)|^\((?:i{1,3}|iv|v)\)\s+(?=\S)/i, ''), signClaim = null;
+    { const tail = src.match(/^(.*=.*?)\s*([<>])\s*0\s*(?:(?:so|hence|therefore|thus|which)\b[^=<>]*)?$/i);
+      if (tail) { src = tail[1]; signClaim = tail[2]; }
+      else { const words = src.match(/^(.*=.*?[\d)])\s+(?:so|hence|therefore|thus)\s+[A-Za-z][^=<>\d]*$/i); if (words) src = words[1]; }
+      src = src.replace(/^[A-Za-z]'{0,2}\(\s*-?\d+(?:\.\d+)?\s*\)\s*=\s*(?=[^=]+=)/, ''); }
+    const afterLabel = labelled; labelled = src !== line;
+    const before = carried && carried.value !== undefined && !carried.calculus && !afterLabel ? carried : null;   // plain arithmetic only
     prev = null;
     if (i >= LIMITS.lines || line.length > LIMITS.chars) return note(line, 'Not checked: this line is too long or too far down the working to check.');
     if (firstBreak !== -1) return note(line, 'Follows from the earlier slip.');
-    const text0 = line.replace(/\s*\.\s*$/, '').replace(/[−–—]/g, '-').replace(/[×·]/g, '*').replace(/÷/g, '/').replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore|thus)\s+/i, '')
+    const text0 = src.replace(/\s*\.\s*$/, '').replace(/[−–—]/g, '-').replace(/[×·]/g, '*').replace(/÷/g, '/').replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore|thus)\s+/i, '')
       // `Ans = 72` continues the line above; `6 x 12` between two numbers is a times sign; square brackets group.
       .replace(ANS_LABEL, '').replace(/(\d|\))\s+x\s+(?=\d|\()/gi, '$1*')
       .replace(/\[([^\[\],;_]*)\](?![_^])/g, '($1)');
-    const ansLine = ANS_LABEL.test(line.replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore|thus)\s+/i, ''));
+    const ansLine = ANS_LABEL.test(src.replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore|thus)\s+/i, ''));
     // A root with an index, √[3]{…}, is not read: its bracket is not a grouping.
-    if (/(?:√|sqrt)\s*\[/i.test(line)) return note(line, NOTE);
+    if (/(?:√|sqrt)\s*\[/i.test(src)) return note(line, NOTE);
     const calc = /∫|\]_/.test(text0) ? workOutCalculus(text0) : { text: text0, used: false };
     if (!calc) return note(line, NOT_PROVED);
-    const text = calc.text;
+    const text = bracketFunctions(calc.text);
     // Independent review, round 1. None of these is arithmetic Pri can read one way only, so none is judged:
     //   a line label or a trailing equation number (`1. 2+3 = 5`, `(2) 2+3 = 5`, `2 + 3 = 5 (2)`), which would be multiplied in;
     //   a comma (two statements on a line, or a decimal comma); a line that starts with an operator and so carries the
     //   line above forward (`- 1 = 2`); a spaced dot (`3 . 4`).
-    if (/^\(?\d{1,3}[.)](?:\s|$)|^\(\d{1,3}\)|\s\(\d{1,3}\)\s*$|[,;:]|^[+*/×÷]|^-\s|\d\s+\.\s*\d|\d\s*\.\s+\d/.test(line.replace(/[−–—]/g, '-'))) return note(line, NOTE);
+    if (/^\(?\d{1,3}[.)](?:\s|$)|^\(\d{1,3}\)|\s\(\d{1,3}\)\s*$|[,;:]|^[+*/×÷]|^-\s|\d\s+\.\s*\d|\d\s*\.\s+\d/.test(src.replace(/[−–—]/g, '-'))) return note(line, NOTE);
     // A mixed number (2 1/2) or a spaced thousand (1 000) reads as a product: two numbers side by side are not judged.
     if (/[<>≤≥≠%°]|==|!=|\d\s+\d/.test(text)) return note(line, NOTE);
     // Any letter left (a variable, π, e, a unit, a function name) and the line is not arithmetic on numbers alone.
     // nCr and nPr between two numbers, and sqrt, are arithmetic.
-    if (calc.used || /[A-Za-zπθ]/.test(text.replace(/sqrt/gi, '').replace(/(\d)\s*[CP]\s*(?=\d)/g, '$1'))) {
+    // The constants e and π are numbers; a digit on each side of e (3e2) is not read.
+    const CONSTANT = /(?<![A-Za-z])(?:e|pi|π)(?![A-Za-z])/g;
+    if (/\de\s*[-+]?\s*\d/.test(text)) return note(line, NOTE);   // 3e2, and 2e + 3 (which reads as 2000)
+    if (calc.used || /[A-Za-zπθ]/.test(text.replace(/sqrt/gi, '').replace(/(\d)\s*[CP]\s*(?=\d)/g, '$1').replace(CONSTANT, ''))) {
+      if (signClaim) return note(line, NOT_PROVED);
       // True as written, or a note: never a cross (see "Lines that are true as written").
       if (/≈|≃|~/.test(text)) return note(line, NOT_PROVED);
       const bits = text.split('=').map(s => s.trim());
@@ -222,7 +498,9 @@ export function stepCheckArithmetic(workingText) {
         if (!new RegExp(`${m[1]}(?!\\s*\\()`).test(inside)) return note(line, NOT_PROVED);
       }
       if (/\/\s*\d+(?:\.\d+)?\s*[A-Za-z(]|\/\s*[A-Za-z]\s*[A-Za-z(]|\^\s*-?\d+(?:\.\d+)?[A-Za-z]|\^\s*[A-Za-z][A-Za-z0-9(]/.test(bare)) return note(line, NOT_PROVED);
-      if (written.some(s => /[\/÷]/.test(s) && /[\/÷].*(?:\*|[\d)!]\s*\(|\)\s*\d|!\s*\d)/.test(s))) return note(line, NOT_PROVED);
+      // A division followed by a product groups two ways (6/2(1+2), 10!/3!7!, 1/cos θ tan θ, 1/2x). Every bracket is
+      // first folded to one mark, so a function's own bracket cannot hide what follows the denominator.
+      if (written.some(s => twoWays(folded(s).trim()))) return note(line, NOT_PROVED);
       const infos = written.map(infoOf);
       const lastInfo = infos[infos.length - 1];
       // What a line of letters or an integral leaves for the `=` line below is tick only (`calculus`): `t = 5` then `= 20`
@@ -235,7 +513,10 @@ export function stepCheckArithmetic(workingText) {
       const why = calc.used ? (number ? `Worked out, each side comes to ${shown(number.value)}.` : 'Worked out at the limits, the sides agree.')
         : number ? `This is ${shown(number.value)} for every value of the letters.`
           : cont && carried ? 'This is the line above, written another way.' : 'Both sides are the same expression, written two ways.';
-      out.push({ text: line, status: 'ok', state: 'arithmetic', note: why, valueChain: { rule: 'true-as-written' } });
+      // The step is named from the first two sides that differ in writing (the line above and this one, or this line's own sides).
+      const texts = cont && carried ? [carried.text, ...written] : written;
+      const named = !calc.used && !number ? nameOfStep(texts[0], texts[1]) : '';
+      out.push({ text: line, status: 'ok', state: 'arithmetic', note: named ? `${why} It matches ${named}.` : why, valueChain: { rule: 'true-as-written' } });
       return;
     }
     const approx = /≈|≃|~/.test(text);
@@ -261,13 +542,20 @@ export function stepCheckArithmetic(workingText) {
 
     // A division followed by a product (6/2(1+2), 10!/3!7!, 5·4·3/3·2·1) is read two ways by convention: not judged.
     if (allSides.some(s => /[\/÷]/.test(s) && /[\/÷].*(?:\*|[\d)!]\s*\(|\)\s*\d|!\s*\d)/.test(s))) return note(line, NOTE);
+    if (allSides.some(x => x.match(CONSTANT) && twoWays(folded(x).trim()))) return note(line, NOTE);   // 1/2π groups two ways
     const soft = approx || allSides.some(s => /\d\.\d|^\.\d|[^\d]\.\d/.test(s) || FUNCTION_WORDS.test(s));
     if (allValues.every(v => close(v, allValues[0]))) {
+      if (signClaim && !(signClaim === '>' ? allValues[0] > 0 : allValues[0] < 0)) return note(line, NOTE);
       const why = continuation && before ? `This equals the line above: ${shown(allValues[0])}.` : `Both sides come to ${shown(allValues[0])}.`;
       out.push({ text: line, status: 'ok', state: 'arithmetic', note: why, valueChain: { rule: 'arithmetic' } });
       return;
     }
     if (soft) return note(line, SOFT_NOTE);
+    // With e or π on the line a cross needs the constant on every side: `2π = 6` or `e^2 = 7` is a rounding, not a slip.
+    { const withConstant = allSides.filter(x => x.match(CONSTANT)).length; if (withConstant && withConstant !== allSides.length) return note(line, SOFT_NOTE); }
+    // e may be the student's own letter (e^2 = 4e is true when e = 4): a cross needs every e on the line to be the
+    // base of a power, e^(…), which is how Euler's number is written in working. A bare or multiplied e is a note.
+    if (allSides.some(x => /(?<![A-Za-z])e(?![A-Za-z])(?!\s*\^)/.test(x))) return note(line, NOTE);
     if (ansLine) return note(line, NOTE);
     // Two bare numbers and nothing else (`500 = 340`) is words lost in reading, not a sum someone got wrong.
     if (allSides.every(x => /^\s*-?\d+(?:\.\d+)?\s*$/.test(x)) && !(continuation && before)) return note(line, NOTE);
@@ -282,6 +570,18 @@ export function stepCheckArithmetic(workingText) {
     prev = null;
   });
 
+  // The second pass: what the page itself defines (see pageDefinitions).
+  {
+    let broke = null;
+    try { broke = pageDefinitions(raw, out, firstBreak); } catch { broke = null; }
+    if (broke) {
+      const message = broke.message;
+      diagnosis = { code: 'page-definition-not-held', title: 'This line does not agree with what you wrote above', message, fix: 'Put the value from the earlier line in again and work this line out once more.', confidence: 'high' };
+      firstBreak = broke.index;
+      out[broke.index] = { text: out[broke.index].text, status: 'break', note: message, diagnosis };
+      for (let k = broke.index + 1; k < out.length; k++) out[k] = { text: out[k].text, status: 'note', unverified: true, note: 'Follows from the earlier slip.' };
+    }
+  }
   const state = l => l.state || (l.status === 'break' ? 'wrong' : l.unreadable ? 'unread' : 'unverified');
   const lines = out.map(l => ({ ...l, state: state(l) }));
   const at = st => lines.flatMap((l, k) => (l.state === st ? [k + 1] : []));
