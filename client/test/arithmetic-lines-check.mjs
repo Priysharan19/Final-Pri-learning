@@ -80,6 +80,19 @@ ok(st(['x/√2 = √2 x/2', '1/√2 = √2/2']) === 'ok,ok', 'a root as the whol
 ok(st(['sin θ/cos θ = tan θ', '(1 - cos^2 θ)/cos θ = sin^2 θ/cos θ', 'sin θ tan θ/(cos θ/tan θ) = tan^3 θ']) === 'ok,ok,ok', 'a plain quotient is still read');
 ok(st(['LHS = 5', '= 6']) === 'note,note' && st(['Total: 3 + 4', '= 8']) === 'note,note' && st(['Total: 3 + 4', '= 7']) === 'note,ok', 'after a labelled line a `=` line is ticked when it agrees and never crossed');
 ok(st(['(x+1)^2 = x^2 + 2x + 1']) === 'ok' && /expanding the brackets/.test(run(['(x+1)^2 = x^2 + 2x + 1']).lines[0].note) && /factorising/.test(run(['x^2 - 9 = (x-3)(x+3)']).lines[0].note), 'expanding and factorising are named');
+// what the page itself defines (owner, 19 November: side by side with a competitor on his own pages)
+{
+  const slip = run(['e^(8k) = 3 so k = ln(3)/8', 'A = 12e^(4k) = 12e^(ln(3)/4)', 'A = 12 x 3^(1/4) grams']);
+  ok(slip.lines.map(l => l.status).join() === 'ok,break,note' && /With k = ln\(3\)\/8 from above/.test(slip.diagnosis.message) && /20\.78/.test(slip.diagnosis.message), `a value carried from the line above is held to: the slip is crossed with the reason (${slip.lines.map(l => l.status)} · ${slip.diagnosis?.message})`);
+  ok(st(['e^(8k) = 3 so k = ln(3)/8', 'A = 12e^(4k) = 12e^(ln(3)/2)', '= 12 sqrt(3)']) === 'ok,ok,ok', 'the same working without the slip is ticked on every line');
+  const quot = run(['f(x) = (x^2 - 4x + 1)/e^x', 'u = x^2 - 4x + 1', 'v = e^x', "u' = 2x - 4", "v' = e^x", "f'(x) = (vu' - uv')/v^2", '-x^2 + 6x - 5 = 0', '(x - 5)(x - 1) = 0', 'x = 5', 'x = 1']);
+  ok(quot.lines.map(l => l.status).join() === 'note,note,note,ok,ok,ok,note,ok,ok,ok', `definitions, their derivatives, the quotient rule line, an equation rearranged and its roots (${quot.lines.map(l => l.status)})`);
+  ok(/derivative of u = x\^2 - 4x \+ 1/.test(quot.lines[3].note) && /same equation/.test(quot.lines[7].note) && /satisfies the equation/.test(quot.lines[8].note), 'each of those ticks says what was checked');
+  ok(st(['u = x^2 - 4x + 1', "u' = 2x - 5"]) === 'note,break' && st(['y = sin(3x)', "y' = 3cos(3x)"]) === 'note,ok' && st(['y = sin(3x)', "y' = cos(3x)"]) === 'note,break', 'a wrong derivative of something the page defined is crossed');
+  for (const page of [['y = sin(3x)', "y' = (3√(2))/2"], ['y = x^2', "y' = 6"], ['u = x^2', "u' = 2.0x + 0.1"], ['k = 2', 'k = 3', '2k = 6'], ['x = 2', 'x^2 = 9'], ['k = 2', 'A = k + 1 = 3.5'], ['a = 3', 'b = 4', 'c^2 = a^2 + b^2', 'c = 5'], ['x^2 = 9', 'x = 4'], ['2x + 1 = 7', '2x = 8'], ['n = 5', 'n! = 100 + 20'], ['t = 5', '3t + 5 = 21']]) ok(!/break/.test(st(page)), `not crossed: ${page.join(' | ')} (${st(page)})`);
+  ok(st(['k = 2', 'A = 3k + 1 = 8']) === 'note,break' && st(['k = 2', '3k + 1 = 8']) === 'note,note' && st(['k = 2', '3k + 1 = 7']) === 'note,ok' && st(['k = 2', 'k = 3', '2k = 6']) === 'note,note,ok', 'a worked chain under a name is held to the latest value of a letter; two sides on their own may be a new equation and are never crossed');
+  ok(st(['x^2 - 5x + 6 = 0', '(x - 2)(x - 3) = 0', 'x = 2', 'x = 3', 'x = 4']) === 'note,ok,ok,ok,note' && st(['2x + 1 = 7', '2x = 6', 'x = 3']) === 'note,ok,ok' && st(['2x + 1 = 7', '2x = 8', 'x = 4']) === 'note,note,ok', 'an equation rearranged and its roots are ticked; a wrong rearrangement or a non-root is a note, never a cross');
+}
 // never crossed
 for (const f of ['3x + 2 = 11', 'x = 3', 'n = 5', 'P(A) = 3', 'sin(30) = 2', 'log(100) = 3', 'ln 5 = 2', 'pi = 3', 'e^2 = 7', '50% of 80 = 30', '90° = 2', '5 cm + 3 cm = 9 cm', '2 1/2 = 5/2', '1 000 = 1000', '3 < 2', '4 ≠ 4', 'the answer is 5', '', '= 5', '6/0 = 3', '(((', '2 + = 4']) ok(!/break|ok/.test(st([f])), `not judged: "${f}" (${st([f])})`);
 for (const f of ['0.5 + 0.25 = 0.8', '1000(1.05)^3 = 1157', '10/3 = 3.3', '22/7 ≈ 3', '√2 ≈ 1', '740^0.5 = 27']) ok(st([f]) === 'note', `a line that may be a rounding is not crossed: ${f}`);
@@ -120,8 +133,8 @@ ok(stepEvidence({ ...Q, boardScheme: [{ marks: 1, text: 'x' }] }, '70', '2 + 2 =
 const WITH = { answerType: 'numeric', answer: { value: 4 }, answerPrefix: 'x =', prompt: '$2x + 3 = 11$' };
 ok(stepEvidence(WITH, '4', '2x = 8\nx = 4', { correct: true }).stepReport?.arithmetic !== true, 'a question with a Step Check keeps its own report');
 { // independent review, round 1: a milestone tick must not be worded as an arithmetic check
-  const QM = { answerType: 'numeric', answer: { value: 99 }, prompt: 'Find the value.', steps: [{ h: 'a', d: '$2x = 8$' }, { h: 'b', d: '$x = 4$' }] };
-  const w = ['2+3 = 5', '2x = 8', 'x = 4'];
+  const QM = { answerType: 'numeric', answer: { value: 99 }, prompt: 'Find the value.', steps: [{ h: 'a', d: '$p = 8$' }, { h: 'b', d: '$q = 4$' }] };
+  const w = ['2+3 = 5', 'p = 8', 'q = 4'];
   const rep = stepEvidence(QM, '99', w.join('\n'), { correct: true }).stepReport;
   ok(rep.arithmetic === true && rep.lines.map(l => l.status).join() === 'ok,note,note', `no milestone tick is added to an arithmetic report (${rep.lines.map(l => l.status)})`);
   const evm = workingEvidence({ res: { stepReport: { ...rep, lines: rep.lines.map((l, i) => (i === 2 ? { ...l, status: 'ok', state: undefined } : l)) } }, submitted: { hasWorking: true, lines: w } });
