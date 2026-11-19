@@ -152,8 +152,6 @@ ok(st(['x^2 - 4 = 0 so (x-2)(x+2) = 0', 'x = 2']) === 'ok,ok' && st(['2x = 4 so 
   const he = stepEvidence(QH, '7', heavy.join('\n'), { correct: false });
   ok(Date.now() - at < 600 && he.partial === null, `and the same page through the server's evidence path, with the missing-steps pass (${Date.now() - at} ms)`);
 }
-// independent review of the typesetting: a whole number with float noise is printed as that whole number
-ok(!/144/.test(JSON.stringify(run(['6[4^2 - 2^2] = 6(16 - 4)', '= 72']).lines)) && !/\\frac\{\d+\}\{2\}\$\./.test(run(['0.1 + 0.2 + 71.7 = 72']).lines[0].note || ''), 'no value is printed as an unreduced fraction of a whole number');
 // never crossed
 for (const f of ['3x + 2 = 11', 'x = 3', 'n = 5', 'P(A) = 3', 'sin(30) = 2', 'log(100) = 3', 'ln 5 = 2', 'pi = 3', 'e^2 = 7', '50% of 80 = 30', '90° = 2', '5 cm + 3 cm = 9 cm', '2 1/2 = 5/2', '1 000 = 1000', '3 < 2', '4 ≠ 4', 'the answer is 5', '', '= 5', '6/0 = 3', '(((', '2 + = 4']) ok(!/break|ok/.test(st([f])), `not judged: "${f}" (${st([f])})`);
 for (const f of ['0.5 + 0.25 = 0.8', '1000(1.05)^3 = 1157', '10/3 = 3.3', '22/7 ≈ 3', '√2 ≈ 1', '740^0.5 = 27']) ok(st([f]) === 'note', `a line that may be a rounding is not crossed: ${f}`);
@@ -277,6 +275,9 @@ ok(model?.cards?.length === 2 && model.cards.every(c => c.status === 'checked' &
   // 5.0 no verdict moved: every page the sweeps above ran (24497 of them, every one of their lines' status and state,
   // and where the first cross fell) hashes to the value recorded BEFORE these words were added.
   ok(reportsSeen === 24497 && verdictHash.copy().digest('hex') === 'f2c42cfd16afc3e4e5cd6ab18e7dec53289d0d2e0f832cf84ffa05b7abce8ade', `no verdict changed across ${reportsSeen} pages (digest ${verdictHash.copy().digest('hex').slice(0, 12)})`);
+  // (placed after 5.0 so the pages it runs are not part of the recorded digest)
+  // independent review of the typesetting: a whole number with float noise is printed as that whole number
+  ok(!/144/.test(JSON.stringify(run(['6[4^2 - 2^2] = 6(16 - 4)', '= 72']).lines)) && !/\\frac\{\d+\}\{2\}\$\./.test(run(['0.1 + 0.2 + 71.7 = 72']).lines[0].note || ''), 'no value is printed as an unreduced fraction of a whole number');
 
   // 5.1 the phrase for each rule is the working view's own label, lower-cased
   const { RULE_PHRASES } = await import('../src/engine/arithmeticLines.js');
