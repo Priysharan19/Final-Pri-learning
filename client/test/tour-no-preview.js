@@ -129,7 +129,6 @@ export const flow = {
       await page.emulateMedia({ colorScheme: 'light' });
       if (original) await page.setViewportSize(original);
     };
-    const visible = async sel => page.locator(sel).evaluateAll(els => els.filter(el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden'; }).length);
 
     await page.goto(`${base}/practice?subtopic=${CHAPTER}`, { waitUntil: 'domcontentloaded' });
     await front().locator('.q-prompt').waitFor({ timeout: 30000 });

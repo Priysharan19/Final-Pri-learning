@@ -27,7 +27,9 @@ const dm = v => dollars(v).replace(/,/g, '{,}');
 const trigModelMeta = (c, a, fn, m) => ({
   kind: 'value-chain',
   fn: { name: 'h', variable: 't', expr: `${c}+${a}*${fn}(pi*t/${m})` },
-  quantities: { max: c + a, min: c - a, amplitude: a, midline: c, period: 2 * m }
+  quantities: { max: c + a, min: c - a, amplitude: a, midline: c, period: 2 * m },
+  // The prompts state the model for every time (or t ≥ 0, which a periodic model repeats): the extremes are the global ones.
+  fullDomain: true
 });
 
 const raw = {
