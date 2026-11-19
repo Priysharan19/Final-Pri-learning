@@ -26,7 +26,7 @@
 //     handwriting: 23 = 8 is 2^3 = 8 with the index read on the line, and
 //     12 = 0.5 is 1/2 with the bar lost. The reader, not the student, may
 //     have made that slip.
-import { parse, normalize, evaluate, variablesOf } from './expr.js';
+import { parse, normalize, evaluate, variablesOf, exprEquivalent } from './expr.js';
 
 const LIMITS = { lines: 20, chars: 160 };
 const NOTE = 'Not checked: this line has no arithmetic Pri can check on its own.';
@@ -47,6 +47,85 @@ function valueOf(side) {
   let v;
   try { v = evaluate(ast, {}); } catch { return null; }
   return typeof v === 'number' && Number.isFinite(v) ? v : null;
+}
+
+// ── Lines that are true as written, whatever the question ────────────────────
+// Owner, 19 November 2026: step marking on every Year 11 and 12 question. Two
+// more kinds of line can be proved with nothing but the line itself, and both
+// are TICK ONLY (a line of this kind is never crossed):
+//   · an identity: both sides are the same function of the same letters
+//     (12x^2/2 = 6x^2). Sides that differ may be an equation to solve, so
+//     that is a note;
+//   · a definite integral or a bracket evaluation, worked out numerically:
+//     ∫_-2^4 12x dx, [6x^2]_-2^4. Limits are small marks that are easily
+//     misread, which is the other reason such a line is never crossed.
+const NOT_PROVED = 'Not checked: Pri cannot tell from this line alone whether it is true.';
+const LIM = '(\\{[^{}]*\\}|-?\\d+(?:\\.\\d+)?|-?(?:pi|π|e))';
+const BRACKET_EVAL = new RegExp(`\\[([^\\[\\]]+)\\]_${LIM}\\^${LIM}`, 'g');
+const INTEGRAL = new RegExp(`∫_${LIM}\\^${LIM}\\s*(.+?)\\s*d([a-z])(?![a-z])`, 'g');
+const closeLoose = (a, b) => Math.abs(a - b) <= 1e-7 * Math.max(1, Math.abs(a), Math.abs(b));
+
+/** A side as a number, or as a function of its letters; null when it cannot be read. */
+function infoOf(side) {
+  let ast;
+  try { ast = parse(normalize(side)); } catch { return null; }
+  if (!ast || ast.t === 'equation') return null;
+  const vars = [...variablesOf(ast)].filter(v => v !== 'e').sort();
+  if (vars.length) return { ast, vars };
+  let v;
+  try { v = evaluate(ast, {}); } catch { return null; }
+  return typeof v === 'number' && Number.isFinite(v) ? { value: v } : null;
+}
+const at = (info, v, x) => { try { const y = info.value !== undefined ? info.value : evaluate(info.ast, { [v]: x }); return typeof y === 'number' && Number.isFinite(y) ? y : null; } catch { return null; } };
+
+/** Replace every definite integral and bracket evaluation by its value; null when one cannot be worked out. */
+function workOutCalculus(text) {
+  let failed = false, used = false;
+  const limit = raw => { const info = infoOf(raw.replace(/^\{|\}$/g, '').replace(/π/g, 'pi')); return info && info.value !== undefined ? info.value : null; };
+  const put = v => { used = true; return `(${String(Number(v.toPrecision(15)))})`; };
+  let out = text.replace(INTEGRAL, (_, lo, hi, body, v) => {
+    const a = limit(lo), b = limit(hi), f = infoOf(body);
+    if (a === null || b === null || !f || (f.vars && (f.vars.length !== 1 || f.vars[0] !== v))) { failed = true; return _; }
+    const n = 2000, h = (b - a) / n;
+    let sum = 0;
+    for (let k = 0; k <= n; k++) { const y = at(f, v, a + k * h); if (y === null) { failed = true; return _; } sum += y * (k === 0 || k === n ? 1 : k % 2 ? 4 : 2); }
+    return put(sum * h / 3);
+  });
+  out = out.replace(BRACKET_EVAL, (_, body, lo, hi) => {
+    const a = limit(lo), b = limit(hi), f = infoOf(body);
+    if (a === null || b === null || !f || (f.vars && f.vars.length !== 1)) { failed = true; return _; }
+    const v = f.vars ? f.vars[0] : 'x', top = at(f, v, b), bottom = at(f, v, a);
+    if (top === null || bottom === null) { failed = true; return _; }
+    return put(top - bottom);
+  });
+  if (failed || /∫|\]_|\]\^/.test(out)) return null;
+  return { text: out, used };
+}
+
+/** The same number, or the same function of the same letters at every point tried. */
+function sameAsWritten(a, b) {
+  if (a.value !== undefined && b.value !== undefined) return closeLoose(a.value, b.value);
+  // Two functions must be of the same letters; a function and a number (sin²x + cos²x = 1) are compared at every point.
+  const vars = a.vars || b.vars;
+  if (a.ast && b.ast) {
+    if (a.vars.join() !== b.vars.join()) return false;
+    let equal;
+    try { equal = exprEquivalent(a.ast, b.ast) === true; } catch { equal = false; }
+    if (!equal) return false;
+  }
+  // Points of both signs. Where only one side has a value the two are not the same function (ln(x^2) and 2 ln x;
+  // √(x^2) and x differ outright), so that is not an identity.
+  let agreed = 0;
+  for (const x of [-2.7, -1.3, -0.4, 0.6, 1.9, 3.1, 4.3]) {
+    const env = Object.fromEntries(vars.map((v, k) => [v, x + 0.37 * k]));
+    const val = info => { if (info.value !== undefined) return info.value; try { const y = evaluate(info.ast, env); return typeof y === 'number' && Number.isFinite(y) ? y : null; } catch { return null; } };
+    const p = val(a), q = val(b);
+    if ((p === null) !== (q === null)) return false;
+    if (p === null) continue;
+    if (!closeLoose(p, q)) return false;
+    agreed++;
+  }
+  return agreed >= 3;
 }
 
 /** Other ways the same ink may be read: one whole number split as a power or as a fraction. */
@@ -88,19 +167,23 @@ export function stepCheckArithmetic(workingText) {
   const out = [];
   let firstBreak = -1;
   let diagnosis = null;
-  let prev = null;   // { value, text } the last side of the line above, when it was plain arithmetic
+  let prev = null;   // { text, value } or { text, ast, vars }: the last side of the line above, when it could be read
 
   const note = (text, why, extra = {}) => { out.push({ text, status: 'note', note: why, unverified: true, ...extra }); };
 
   raw.forEach((line, i) => {
-    const before = prev;
+    const carried = prev;
+    const before = carried && carried.value !== undefined && !carried.calculus ? carried : null;   // plain arithmetic only
     prev = null;
     if (i >= LIMITS.lines || line.length > LIMITS.chars) return note(line, 'Not checked: this line is too long or too far down the working to check.');
     if (firstBreak !== -1) return note(line, 'Follows from the earlier slip.');
-    const text = line.replace(/[−–—]/g, '-').replace(/[×·]/g, '*').replace(/÷/g, '/').replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore|thus)\s+/i, '')
+    const text0 = line.replace(/\s*\.\s*$/, '').replace(/[−–—]/g, '-').replace(/[×·]/g, '*').replace(/÷/g, '/').replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore|thus)\s+/i, '')
       // `Ans = 72` continues the line above; `6 x 12` between two numbers is a times sign; square brackets group.
       .replace(/^(?:ans|answer)\.?\s*(?==)/i, '').replace(/(\d|\))\s+x\s+(?=\d|\()/gi, '$1*')
       .replace(/\[([^\[\],;_]*)\](?![_^])/g, '($1)');
+    const calc = /∫|\]_/.test(text0) ? workOutCalculus(text0) : { text: text0, used: false };
+    if (!calc) return note(line, NOT_PROVED);
+    const text = calc.text;
     // Independent review, round 1. None of these is arithmetic Pri can read one way only, so none is judged:
     //   a line label or a trailing equation number (`1. 2+3 = 5`, `(2) 2+3 = 5`, `2 + 3 = 5 (2)`), which would be multiplied in;
     //   a comma (two statements on a line, or a decimal comma); a line that starts with an operator and so carries the
@@ -110,7 +193,27 @@ export function stepCheckArithmetic(workingText) {
     if (/[<>≤≥≠%°]|==|!=|\d\s+\d/.test(text)) return note(line, NOTE);
     // Any letter left (a variable, π, e, a unit, a function name) and the line is not arithmetic on numbers alone.
     // nCr and nPr between two numbers, and sqrt, are arithmetic.
-    if (/[A-Za-zπθ]/.test(text.replace(/sqrt/gi, '').replace(/(\d)\s*[CP]\s*(?=\d)/g, '$1'))) return note(line, NOTE);
+    if (calc.used || /[A-Za-zπθ]/.test(text.replace(/sqrt/gi, '').replace(/(\d)\s*[CP]\s*(?=\d)/g, '$1'))) {
+      // True as written, or a note: never a cross (see "Lines that are true as written").
+      if (/≈|≃|~/.test(text)) return note(line, NOT_PROVED);
+      const bits = text.split('=').map(s => s.trim());
+      const cont = bits[0] === '' && bits.length >= 2;
+      const written = cont ? bits.slice(1) : bits;
+      if (written.some(s => !s)) return note(line, UNREAD, { unreadable: true });
+      if (written.some(s => /[\/÷]/.test(s) && /[\/÷].*(?:\*|[\d)!]\s*\(|\)\s*\d|!\s*\d)/.test(s))) return note(line, NOT_PROVED);
+      const infos = written.map(infoOf);
+      const lastInfo = infos[infos.length - 1];
+      if (lastInfo) prev = { text: written[written.length - 1], ...lastInfo, calculus: calc.used || !!carried?.calculus };
+      if (infos.some(x => !x)) return note(line, NOT_PROVED);
+      const all = cont && carried ? [carried, ...infos] : infos;
+      if (all.length < 2 || !all.every(x => sameAsWritten(x, all[0]))) return note(line, NOT_PROVED);
+      const number = all.find(x => x.value !== undefined);
+      const why = calc.used ? (number ? `Worked out, each side comes to ${shown(number.value)}.` : 'Worked out at the limits, the sides agree.')
+        : number ? `This is ${shown(number.value)} for every value of the letters.`
+          : cont && carried ? 'This is the line above, written another way.' : 'Both sides are the same expression, written two ways.';
+      out.push({ text: line, status: 'ok', state: 'arithmetic', note: why, valueChain: { rule: 'true-as-written' } });
+      return;
+    }
     const approx = /≈|≃|~/.test(text);
     const parts = text.replace(/[≈≃]/g, '=').split('=').map(s => s.trim());
     const continuation = parts[0] === '' && parts.length >= 2;
@@ -121,6 +224,13 @@ export function stepCheckArithmetic(workingText) {
     const last = values[values.length - 1];
     if (last !== null) prev = { value: last, text: sides[sides.length - 1] };
     if (values.some(v => v === null)) return note(line, NOTE);
+    // After a line worked out numerically (an integral) or a line of letters, a `=` line of numbers is ticked when it
+    // agrees and is otherwise a note: the value above came from limits or letters that may have been misread.
+    if (continuation && carried && !before) {
+      const agrees = carried.value !== undefined && values.every(v => closeLoose(v, carried.value));
+      if (agrees) { prev = { ...prev, calculus: true }; out.push({ text: line, status: 'ok', state: 'arithmetic', note: `This equals the line above: ${shown(carried.value)}.`, valueChain: { rule: 'true-as-written' } }); return; }
+      return note(line, NOT_PROVED);
+    }
     const allSides = continuation && before ? [before.text, ...sides] : sides;
     const allValues = continuation && before ? [before.value, ...values] : values;
     if (allSides.length < 2) return note(line, continuation ? 'Not checked: the line above is not arithmetic Pri can check, so this line has nothing to be compared with.' : NOTE);
@@ -129,7 +239,8 @@ export function stepCheckArithmetic(workingText) {
     if (allSides.some(s => /[\/÷]/.test(s) && /[\/÷].*(?:\*|[\d)!]\s*\(|\)\s*\d|!\s*\d)/.test(s))) return note(line, NOTE);
     const soft = approx || allSides.some(s => /\d\.\d|^\.\d|[^\d]\.\d/.test(s) || FUNCTION_WORDS.test(s));
     if (allValues.every(v => close(v, allValues[0]))) {
-      out.push({ text: line, status: 'ok', state: 'arithmetic', valueChain: { rule: 'arithmetic' } });
+      const why = continuation && before ? `This equals the line above: ${shown(allValues[0])}.` : `Both sides come to ${shown(allValues[0])}.`;
+      out.push({ text: line, status: 'ok', state: 'arithmetic', note: why, valueChain: { rule: 'arithmetic' } });
       return;
     }
     if (soft) return note(line, SOFT_NOTE);

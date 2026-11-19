@@ -81,6 +81,8 @@ export function workingEvidence({ res, submitted } = {}) {
   // The arithmetic check (engine/arithmeticLines.js) proves only that stated numbers are equal: it is never
   // reported as "consistent with the solution".
   if (report.arithmetic === true) return { kind: 'arithmetic', ok, total, checked: report.lines.flatMap((l, i) => (l.state === 'arithmetic' ? [i + 1] : [])) };
+  // A report that judges each statement on its own says which lines were checked, never "consistent with the solution".
+  if (ok === total && report.interpreted === true) return { kind: 'some', ok, total, which: { checked: report.lines.map((_, i) => i + 1), unread: [], rest: [] } };
   if (ok === total) return { kind: 'all', total };
   // A value-chain report (engine/valueChain.js) judges each line on its own, so
   // the card can say WHICH lines were checked and which could not be read.
@@ -104,6 +106,7 @@ export function workingEvidenceCopy(evidence, { correct } = {}) {
   if (evidence.kind === 'some' && evidence.which) {
     const { checked, unread, rest } = evidence.which;
     const vars = { checked: checked.join(', '), unread: unread.join(', '), rest: rest.join(', '), count: evidence.total, n: evidence.total };
+    if (!unread.length && !rest.length) return { key: 'verdict.workingWhichAll', vars };
     return { key: unread.length && rest.length ? 'verdict.workingWhichMixed' : unread.length ? 'verdict.workingWhichUnread' : 'verdict.workingWhichRest', vars };
   }
   if (evidence.kind === 'some') return { key: 'verdict.workingSomeChecked', vars: { count: evidence.total, ok: evidence.ok, total: evidence.total, n: evidence.total } };
