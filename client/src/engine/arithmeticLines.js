@@ -640,6 +640,12 @@ export function stepCheckArithmetic(workingText, opts = null) {
   });
 }
 
+/** The content of a line as an unordered bag: digit runs, single letters, and the names of functions and constants. */
+function contentSignature(text) {
+  const s = String(text).toLowerCase().replace(/√/g, 'sqrt').replace(/π/g, 'pi').replace(/θ/g, 'theta').replace(/²/g, '2').replace(/³/g, '3');
+  return (s.match(/arcsin|arccos|arctan|cosec|sqrt|cbrt|theta|sin|cos|tan|sec|csc|cot|exp|ln|log|pi|\d+|[a-z]/g) || []).sort().join(' ');
+}
+
 function withTexReading(workingText, base, pairs) {
   const raw = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
   if (base.lines.length !== raw.length) return base;
@@ -661,12 +667,17 @@ function withTexReading(workingText, base, pairs) {
   const lines = base.lines.map(l => ({ ...l }));
   let changed = false, downgraded = false;
   const trueUnderTex = i => alt[i] !== null && second.lines[i].status === 'ok' && second.lines[i].state === 'arithmetic';
+  // AGREEMENT applies to the UPGRADE to a tick only: a tick says the line is right, so the TeX must describe the same
+  // content as the text (same digits, letters and function names; a word or a different number in the text that the TeX
+  // lacks means it is another line). The DOWNGRADE of a cross to the "may have been misread" note stays permissive: any
+  // validated TeX reading that makes the line true softens the cross to a note, which claims nothing.
+  const sameContent = i => contentSignature(raw[i]) === contentSignature(alt[i]);
   // A cross that stands (the TeX does not clear that line) still governs the lines below it: nothing there is ticked.
   const standing = base.firstBreak !== -1 && !trueUnderTex(base.firstBreak) ? base.firstBreak : -1;
   base.lines.forEach((p, i) => {
     const t = second.lines[i];
     if (!trueUnderTex(i) || (standing !== -1 && i > standing)) return;
-    if (p.status === 'note') { lines[i] = { ...t, text: p.text }; changed = true; }
+    if (p.status === 'note') { if (!sameContent(i)) return; lines[i] = { ...t, text: p.text }; changed = true; }
     else if (p.status === 'break') { lines[i] = { text: p.text, status: 'note', note: MISREAD_NOTE, unverified: true }; changed = true; downgraded = true; }
   });
   if (!changed) return base;

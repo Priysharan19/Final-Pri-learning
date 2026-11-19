@@ -26,7 +26,7 @@ const MAX_OUT = 400;
 const PLAIN = /^[A-Za-z0-9+\-=.()\[\]\/!−×÷·≤≥≠≈πθ√²³]$/;
 const STARTS_OPERAND = /^[A-Za-z0-9(πθ√]/;
 
-// A fraction's parts are bracketed, except a plain number: a line that begins `(1)` reads as a numbered line to the checker.
+// A fraction's parts are bracketed, except a plain number (the whole fraction is then `(1/2)`, which no line label matches).
 const wrap = x => (/^\d+(?:\.\d+)?$/.test(x) ? x : `(${x})`);
 
 class Stop extends Error {}
@@ -97,7 +97,7 @@ function convert(src, depth = 0) {
         if (!a.trim() || !b.trim()) stop();
         times();
         mul = false;
-        out += `${wrap(a.trim())}/${wrap(b.trim())}`;
+        out += `(${wrap(a.trim())}/${wrap(b.trim())})`;   // one grouped value: 12 ÷ ¾ is 12/(3/4), (3/2)² is (3/2)^2
         mul = true;
         continue;
       }

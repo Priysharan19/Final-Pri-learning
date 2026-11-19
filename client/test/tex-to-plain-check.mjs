@@ -14,19 +14,21 @@ const ok = (c, m) => { if (c) pass++; else { fail++; console.error('FAIL:', m); 
 
 // ── Part 1 ───────────────────────────────────────────────────────────────────
 const CASES = [
-  ['\\frac{a}{b}', '(a)/(b)'], ['\\frac{1}{2}', '1/2'], ['\\frac{x+1}{x-1}', '(x+1)/(x-1)'], ['\\frac{x^{2}}{2}+1', '(x^(2))/2+1'],
-  ['\\frac{1}{2}x', '1/2*x'], ['\\frac{a}{b} c', '(a)/(b)*c'], ['\\dfrac{3}{4}', '3/4'],
-  ['\\sqrt{x}', 'sqrt(x)'], ['\\sqrt{x+1}', 'sqrt(x+1)'], ['\\sqrt[3]{x}', 'cbrt(x)'], ['3\\sqrt{2}', '3*sqrt(2)'], ['\\sqrt{\\frac{1}{4}}', 'sqrt(1/4)'],
+  ['\\frac{a}{b}', '((a)/(b))'], ['\\frac{1}{2}', '(1/2)'], ['\\frac{x+1}{x-1}', '((x+1)/(x-1))'], ['\\frac{x^{2}}{2}+1', '((x^(2))/2)+1'],
+  ['\\frac{1}{2}x', '(1/2)*x'], ['\\frac{a}{b} c', '((a)/(b))*c'], ['\\dfrac{3}{4}', '(3/4)'],
+  ['\\sqrt{x}', 'sqrt(x)'], ['\\sqrt{x+1}', 'sqrt(x+1)'], ['\\sqrt[3]{x}', 'cbrt(x)'], ['3\\sqrt{2}', '3*sqrt(2)'], ['\\sqrt{\\frac{1}{4}}', 'sqrt((1/4))'],
   ['x^{2}', 'x^(2)'], ['x^2', 'x^2'], ['e^{x}', 'e^(x)'], ['e^{x}(2x-4)', 'e^(x)*(2x-4)'], ['x^{2}y', 'x^(2)*y'], ['(x+1)^{2}', '(x+1)^(2)'], ['x^{-1}', 'x^(-1)'], ['e^{2x}+1', 'e^(2x)+1'],
   ['2\\cdot 3', '2*3'], ['2\\times 3', '2*3'], ['6\\div 2', '6/2'], ['\\left(x+1\\right)(x-1)', '(x+1)(x-1)'], ['\\left[x+1\\right]^{2}', '[x+1]^(2)'],
   ['\\sin x', 'sin(x)'], ['\\cos\\theta', 'cos(θ)'], ['\\tan 2x', 'tan(2x)'], ['\\ln x', 'ln(x)'], ['\\ln(x+1)', 'ln(x+1)'], ['\\log(2)', 'log(2)'], ['\\sin\\left(2x\\right)', 'sin(2x)'],
-  ['\\pi', 'π'], ['2\\pi r', '2π r'], ['\\pi r^{2}', 'π r^(2)'], ['\\theta', 'θ'], ['\\sin\\theta=\\frac{1}{2}', 'sin(θ)=1/2'],
+  ['\\pi', 'π'], ['2\\pi r', '2π r'], ['\\pi r^{2}', 'π r^(2)'], ['\\theta', 'θ'], ['\\sin\\theta=\\frac{1}{2}', 'sin(θ)=(1/2)'],
   ['\\int_{0}^{2} 3x^{2}\\,dx', '∫_{0}^{2}3x^(2)dx'], ['\\int_{-2}^{4} 12x\\,dx', '∫_{-2}^{4}12x dx'], ['\\left[ 6x^{2} \\right]_{-2}^{4}', '[6x^(2)]_{-2}^{4}'],
   ['x \\le 3', 'x<=3'], ['x \\geq 3', 'x>=3'], ['x \\ne 3', 'x!=3'], ['a \\leq b', 'a<=b'], ['5!', '5!'],
-  ['2x+3=7', '2x+3=7'], ['\\frac{12x^{2}}{2}=6x^{2}', '(12x^(2))/2=6x^(2)']
+  ['12 \\div \\frac{3}{4}', '12/(3/4)'], ['6 \\div \\frac{1}{2}', '6/(1/2)'], ['\\frac{3}{2}^2', '(3/2)^2'], ['\\frac{3}{2}^{2}', '(3/2)^(2)'], ['-\\frac{1}{2}^2', '-(1/2)^2'],
+  ['x^{\\frac{1}{2}}', 'x^((1/2))'], ['\\frac{1}{2x}', '(1/(2x))'], ['\\frac{1}{2}x', '(1/2)*x'], ['\\frac{1}{\\frac{1}{2}}', '(1/((1/2)))'], ['x\\frac{1}{2}', 'x*(1/2)'],
+  ['2x+3=7', '2x+3=7'], ['\\frac{12x^{2}}{2}=6x^{2}', '((12x^(2))/2)=6x^(2)']
 ];
 for (const [tex, want] of CASES) ok(texToPlain(tex) === want, `${tex} -> ${want} (got ${JSON.stringify(texToPlain(tex))})`);
-const NULLS = ['\\foo', '\\href{a}{b}', '{x}', 'x_{1}', 'x_1', '\\sin^{2}x', '\\sin xy', '\\sqrt[4]{x}', '\\sqrt[n]{x}', '2\\frac{1}{2}', '\\frac{1}{}', '\\frac{1}', '\\int_{0}^{2} 3x', '\\int 3x\\,dx',
+const NULLS = ['x^\\frac{1}{2}', '3\\frac{1}{2}', '\\frac{1}{2}3\\frac{1}{2}', '\\foo', '\\href{a}{b}', '{x}', 'x_{1}', 'x_1', '\\sin^{2}x', '\\sin xy', '\\sqrt[4]{x}', '\\sqrt[n]{x}', '2\\frac{1}{2}', '\\frac{1}{}', '\\frac{1}', '\\int_{0}^{2} 3x', '\\int 3x\\,dx',
   '\\pm 3', '\\alpha', '\\sum_{i=1}^{3} i', '\\lim x', '\\infty', '\\left|x\\right|', '\\left.x', '\\text{ cm}', '2 3', '^{2}', 'x^{', '\\sin', '', '   ', 'x \\approx', null, undefined, 12, '\\frac{\\foo}{2}', 'a|b', 'x\\\\y'];
 for (const tex of NULLS) ok(texToPlain(tex) === null || (typeof tex === 'string' && tex.trim() && texToPlain(tex) !== null && false), `not understood -> null: ${JSON.stringify(tex)} (got ${JSON.stringify(texToPlain(tex))})`);
 ok(texToPlain('x'.repeat(601)) === null, 'a too long TeX is not read');
@@ -95,6 +97,22 @@ const L = (text, latex) => ({ text, latex });
   const page = ['3 + 4 = 7', 'ex(2x-4) = e^x(2x-4)', '5 + 5 = 10'];
   const r = stepCheckArithmetic(page.join('\n'), { latex: [L(page[1], 'e^{x}(2x-4) = e^{x}(2x-4)')] });
   ok(statuses(r) === 'ok,ok,ok' && r.lines.map(l => l.text).join('|') === page.join('|'), 'a page: the middle line ticked, the others as they were');
+}
+
+// The reviewer's wrong lines under a stacked fraction are never ticked; the true counterparts are.
+{
+  const tick = (text, latex) => statuses(stepCheckArithmetic(text, { latex: [L(text, latex)] }));
+  for (const [text, latex] of [['3 2 2 = 3 4', '\\frac{3}{2}^2 = \\frac{3}{4}'], ['12 ÷ 3 4 = 1', '12 \\div \\frac{3}{4} = 1'], ['6 ÷ 1 2 = 3', '6 \\div \\frac{1}{2} = 3']]) {
+    ok(tick(text, latex) !== 'ok', `a false fraction line is not ticked: ${latex} (${tick(text, latex)})`);
+  }
+  for (const [text, latex] of [['3 2 2 = 9 4', '\\frac{3}{2}^2 = \\frac{9}{4}'], ['12 ÷ 3 4 = 16', '12 \\div \\frac{3}{4} = 16'], ['6 ÷ 1 2 = 12', '6 \\div \\frac{1}{2} = 12']]) {
+    ok(tick(text, latex) === 'ok', `a true fraction line is ticked: ${latex} (${tick(text, latex)})`);
+  }
+  // the TeX and the text must be the same line before a note is ticked
+  ok(tick('x = 2 so 2+2=5', '2+2=4') === 'note', 'words in the text that the TeX lacks: no tick');
+  ok(tick('hello = 4', '2+2=4') === 'note', 'a different line: no tick');
+  ok(tick('2+2=5', '2+2=4') === 'note', 'a cross is softened to the misread note, not ticked and not kept as a cross');
+  ok(tick('2+2=4 so', '2+2=4') === 'note' && tick('2+2=4', '2+2=4') === 'ok', 'the same content is ticked only when the plain check already could');
 }
 
 // ── Part 3 · the server path ────────────────────────────────────────────────
