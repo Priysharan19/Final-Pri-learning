@@ -718,6 +718,7 @@ function ProfilePractice() {
             onNext={() => load({ fresh: true })}
             onReplace={assignmentMode ? null : () => load({ fresh: true, replaceUnmarkable: true })}
             onRedo={redo}
+            belowWork={assignmentMode ? null : <RecentAttempts subtopic={serve.question.subtopic} onServe={setServe} />}
           />
           <PriExplain
             key={`explain-${user.id}:${serve.question.id}`}
@@ -737,7 +738,6 @@ function ProfilePractice() {
             }}
             onTrySimilar={serve.question.subtopic && serve.question.subtopic !== 'custom' ? loadSimilar : undefined}
           />
-          {!assignmentMode && <RecentAttempts subtopic={serve.question.subtopic} onServe={setServe} />}
           {tourOn && <React.Suspense fallback={null}><PracticeTour onClose={closeTour} /></React.Suspense>}
         </>
       )}

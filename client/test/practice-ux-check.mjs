@@ -31,8 +31,9 @@ ok(/\/history\?subtopic=.*&open=/.test(recent) && /params\.get\('open'\)/.test(h
 ok(/aria-expanded=\{open\}/.test(recent) && /aria-controls=\{panelId\}/.test(recent) && /hidden=\{!open\}/.test(recent), 'a collapsible, closed until asked for');
 ok(/data-recent-empty/.test(recent) && keyIn(en, 'recent.empty') && !/—|–/.test(valueOf(en, 'recent.empty')), 'one plain empty sentence');
 ok(/MarkStrip/.test(recent) && /app\.correct/.test(recent) && /app\.incorrect/.test(recent) && /history\.notMarked/.test(recent), 'results are worded as History words them');
-ok(/<RecentAttempts subtopic=\{serve\.question\.subtopic\} onServe=\{setServe\}/.test(base), 'mounted under the question, serving through the page');
-ok(base.indexOf('<RecentAttempts') > base.indexOf('<PriExplain'), 'after the question and its explain launcher, so neither moves');
+ok(base.includes('belowWork={assignmentMode ? null : <RecentAttempts subtopic={serve.question.subtopic} onServe={setServe} />}'), 'handed to the question card, serving through the page');
+const cardSrc = read('../src/components/QuestionCard.jsx');
+ok(cardSrc.indexOf('{belowWork}') > 0 && cardSrc.indexOf('{belowWork}') < cardSrc.indexOf('className="ws-actions editor-foot'), 'rendered above the action bar, so the bar stays the last thing on the page');
 ok(!/position:\s*(fixed|sticky)/.test((read('../src/workspace.css').match(/\.q-recent[^{]*\{[^}]*\}/g) || []).join('')), 'the list is in the page flow and cannot cover the Submit bar');
 ok(!/server\.|app\.(get|post)/.test(recent), 'no new server route');
 

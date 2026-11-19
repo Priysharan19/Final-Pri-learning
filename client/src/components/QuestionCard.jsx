@@ -370,7 +370,7 @@ function OpenTryReading({ t, texOf, lines, unread, onCorrect }) {
   );
 }
 
-export default function QuestionCard({ question, why, reason, reasonTag = null, onResolved, onNext, onRedo, onReplace = null, compact = false, diagnostic = null, sessionIndex = null, sessionLength = null, sessionAnswered = 0 }) {
+export default function QuestionCard({ question, why, reason, reasonTag = null, onResolved, onNext, onRedo, onReplace = null, compact = false, diagnostic = null, sessionIndex = null, sessionLength = null, sessionAnswered = 0, belowWork = null }) {
   const { celebrate, refreshUser, refreshDue, refreshRecent, toast, user } = useApp();
   const t = useT();
   const [answer, setAnswer] = useState('');
@@ -3590,6 +3590,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             </div>
           </>
         )}
+
+        {/* Page furniture the host adds under the work (Practice's recent attempts): above the action bar, so the bar stays the last thing on the page. */}
+        {belowWork}
 
         {/* ── One obvious next move; everything else stays reachable and quiet ── */}
         <div className="ws-actions editor-foot no-print">
