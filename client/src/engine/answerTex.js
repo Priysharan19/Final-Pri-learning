@@ -97,10 +97,16 @@ export function answerToTex(text) {
   const words = raw.replace(/sqrt|cbrt|sin|cos|tan|ln|log|exp|arcsin|arccos|arctan|asin|acos|atan|pi|theta/g, '');
   if (/[A-Za-z]{4,}/.test(words) || /[=<>≤≥≠:,;%]/.test(raw)) return raw;
   if (/\d\s+[A-Za-z]{2,}\b/.test(raw)) return raw;   // a number and its unit: "1.5 cm"
+  const out = expressionTex(raw);
+  return out === null ? raw : `$${out}$`;
+}
+
+/** TeX (no dollars) for text that is one expression, without the guards above, or null when it does not parse. */
+export function expressionTex(raw) {
   let ast;
-  try { ast = parse(normalize(raw.replace(/−/g, '-'))); } catch { return raw; }
+  try { ast = parse(normalize(String(raw).replace(/−/g, '-'))); } catch { return null; }
   let out;
-  try { out = tex(tidy(ast)).replace(/(\\(?:pi|theta))(?=[A-Za-z])/g, '$1 '); } catch { return raw; }
-  if (!out || /undefined|NaN|\[object/.test(out)) return raw;
-  return `$${out}$`;
+  try { out = tex(tidy(ast)).replace(/(\\(?:pi|theta))(?=[A-Za-z])/g, '$1 '); } catch { return null; }
+  if (!out || /undefined|NaN|\[object/.test(out)) return null;
+  return out;
 }

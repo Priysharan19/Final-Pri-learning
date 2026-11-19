@@ -63,6 +63,7 @@ import { blockedInkRecovery, canOpenInkSignIn, inkRecoveryWords } from './signed
 import './inkAccountRecovery.css';
 import { useFormFactor } from '../platform/formFactor.js';
 import Icon from './Icon.jsx';
+import { EngineComment } from './EngineComment.jsx';
 import Working from '../instrument/Working.jsx';
 import TypedAnswerFields from './TypedAnswerFields.jsx';
 import VerifiedMarkBreakdown from './VerifiedMarkBreakdown.jsx';
@@ -2184,10 +2185,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       if (v.status === 'ok') {
         cards.push({
           kind: 'good', line: i + 1,
-          text: v.note || (i === 0 ? t('verdict.lineValidStart') : t('verdict.lineChecksOut'))
+          text: v.note || (i === 0 ? t('verdict.lineValidStart') : t('verdict.lineChecksOut')), engine: !!v.note
         });
       } else if (v.status === 'break' || v.status === 'wrong') {
-        cards.push({ kind: 'bad', line: i + 1, text: v.note || t('verdict.lineBreaks') });
+        cards.push({ kind: 'bad', line: i + 1, text: v.note || t('verdict.lineBreaks'), engine: !!v.note });
       }
     });
     return cards.length ? cards : null;
@@ -3329,7 +3330,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           <div className="ink-comments">
             <div className="ink-comment bad">
               <div className="ic-head">{t('verdict.lookHere')}<span className="ic-line">{t('verdict.onLine', { n: firstBad.line })}</span></div>
-              {firstBad.text}
+              {firstBad.engine ? <EngineComment text={firstBad.text} /> : firstBad.text}
             </div>
             {cloudWorkingNote && (
               <div className={`ink-comment ${cloudWorkingNote.tone === 'break' ? 'bad' : 'note'}`}>
@@ -3350,7 +3351,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 {otherComments.map((c, i) => (
                   <div key={i} className={`ink-comment ${c.kind}`} style={{ marginTop: 8 }}>
                     <div className="ic-head">{t('verdict.mistake')}<span className="ic-line">{t('verdict.onLine', { n: c.line })}</span></div>
-                    {c.text}
+                    {c.engine ? <EngineComment text={c.text} /> : c.text}
                   </div>
                 ))}
               </details>
@@ -3749,7 +3750,7 @@ function StepReport({ report, instrument = false, correctAnswer = null }) {
         {l.status === 'break' && <b style={{ fontFamily: 'var(--font)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{t(i === first ? 'verdict.mistakeIsHere' : 'verdict.alsoWrong')}</b>}
         {l.secondBreak === true && l.status !== 'break' && <b style={{ fontFamily: 'var(--font)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{t('verdict.alsoWrong')}</b>}
         {l.status === 'ok' && l.ecf === true && <b style={{ fontFamily: 'var(--font)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{t('verdict.carriedForward')}</b>}
-        {l.note && !l.diagnosis && <span style={{ fontFamily: 'var(--font)', fontWeight: 400, fontSize: 12.5 }}> — {l.note}</span>}
+        {l.note && !l.diagnosis && <span style={{ fontFamily: 'var(--font)', fontWeight: 400, fontSize: 12.5 }}> — <EngineComment text={l.note} /></span>}
       </div>
       {l.diagnosis && <Diagnosis d={l.diagnosis} line={i + 1} />}
       {i === first && typeof beforeFirst === 'string' && typeof l.text === 'string' && (
@@ -3819,7 +3820,7 @@ function Diagnosis({ d, line }) {
       {nameLine
         ? <div className="diagnosis-title">{nameLine}</div>
         : <div className="diagnosis-title">{hedged && d.code !== 'counterexample' ? t('verdict.thisLooksLikeTitle', { title: d.title }) : d.title}</div>}
-      <div className="diagnosis-body">{d.message}</div>
+      <div className="diagnosis-body"><EngineComment text={d.message} /></div>
       {nameLine ? <div className="diagnosis-fix">{t(named.explain)}</div> : (d.fix && <div className="diagnosis-fix">{d.fix}</div>)}
     </div>
   );

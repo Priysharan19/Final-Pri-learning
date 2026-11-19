@@ -17,6 +17,8 @@ import { useT } from '../i18n/index.js';
 import { buildAnnotatedWorking } from './annotatedWorkingModel.js';
 import { CardBody, ruleLabel } from './AnnotatedWorking.jsx';
 import { Typeset } from './Typeset.jsx';
+import { EngineComment } from './EngineComment.jsx';
+import { dollarsBalanced, lineTex } from '../engine/commentTex.js';
 import { strokePath } from './originalWorkModel.js';
 import { STATE, alignCards, boxesFromInk, boxesFromPhoto, buildMarkedPage, commentItems, listOf } from './markedPageModel.js';
 import { criteriaView } from './criteriaTableModel.js';
@@ -28,7 +30,7 @@ const WIDE = '(min-width: 800px)';
 const wide = () => typeof window !== 'undefined' && !!window.matchMedia?.(WIDE)?.matches;
 
 /** The engine's one sentence about the first error: its first sentence only, so it is one clear line. */
-const firstSentence = text => { const clean = String(text || '').replace(/\s+/g, ' ').trim(); const m = clean.match(/^.*?[.!?](?=\s+[A-Z]|$)/); return (m ? m[0] : clean).trim(); };
+const firstSentence = text => { const clean = String(text || '').replace(/\s+/g, ' ').trim(); const m = clean.match(/^.*?[.!?](?=\s+[A-Z]|$)/); const cut = (m ? m[0] : clean).trim(); return dollarsBalanced(cut) ? cut : clean; };
 /** The specific reason a verified line is right, only where the engine has one; otherwise nothing (no filler sentence). */
 function whyOf(card, t) {
   if (card.status === 'condition') return t('mp.why.condition');
@@ -42,6 +44,8 @@ function whyOf(card, t) {
   if ((card.unnamed || card.more) && card.n > 1) return t('mp.why.follows', { n: card.n - 1 });
   return '';
 }
+/** True when the reason whyOf() returns is the engine's own sentence (maths marked with `$…$`), not an interface string. */
+const whyIsEngine = card => (card.valueChain === 'verified' || card.valueChain === 'arithmetic') && !!card.note;
 function Header({ page, t, hasTable }) {
   const { parts, mark } = page.header;
   // The mark is the server's, said truthfully and in proportion: a right answer shows it prominently; a wrong final answer
@@ -99,6 +103,9 @@ function Sheet({ source, geometry, page, active, setActive, t, cleaned }) {
 export default function MarkedPage({ input, source, texOf = s => s, markReady = true, criteria = null, approved, reading = null, onCorrect = null }) {
   const t = useT();
   const uid = useId();
+  // A read line is shown as maths: stacked fractions and proper powers where it parses, else the reader's own text via texOf.
+  // (The reader's TeX never reaches the client: the transcript keeps `text` only.)
+  const lineOf = s => lineTex(s) ?? texOf(s);
   const model = useMemo(() => { try { return input ? buildAnnotatedWorking(input) : null; } catch { return null; } }, [input]);
   const geometry = useMemo(() => {
     try {
@@ -158,7 +165,7 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
           {open && (
             <>
               {text.trim()
-                ? <p className="mp-expr" data-mp-reading={n} data-text={text} aria-label={t('mp.readingOf', { n })}><Typeset text={text} texOf={texOf} /></p>
+                ? <p className="mp-expr" data-mp-reading={n} data-text={text} aria-label={t('mp.readingOf', { n })}><Typeset text={text} texOf={lineOf} /></p>
                 : <p className="mp-text" data-mp-reading={n}>{t('mp.readingBlank')}</p>}
               {onCorrect && !isEditing && (
                 <button type="button" className="mp-link" data-mp-edit-line={n} onClick={() => setEditing({ line: n, text })}>{t('mp.edit')}</button>
@@ -229,7 +236,7 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
                 <li key={it.id} className={`mp-card mp-row is-${status}${reading ? ' has-read' : ''}${active === n ? ' is-active' : ''}`} data-mp-card={n} data-mp-status={status} tabIndex={0} style={pos} {...on(n)}>
                   <Icon name={st.icon} size={14} />
                   <span className="mp-row-n">{t('mp.line', { n })}</span>
-                  {why && <span className="mp-row-why" data-mp-why>{why}</span>}
+                  {why && <span className="mp-row-why" data-mp-why>{whyIsEngine(card) ? <EngineComment text={why} /> : why}</span>}
                   <span className="sr-only">{t(st.word)}</span>
                   {reading && readingOfLine(n)}
                 </li>
@@ -244,10 +251,10 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
                   <b>{status === 'follows' ? t('aw.status.follows', { n: card.followsFrom }) : t(st.word)}</b>
                 </p>
                 {(status === 'first-error' || status === 'follows') && card.text && (
-                  <p className="mp-expr" data-mp-expr><Typeset text={card.text} texOf={texOf} /></p>
+                  <p className="mp-expr" data-mp-expr><Typeset text={card.text} texOf={lineOf} /></p>
                 )}
                 {status === 'first-error'
-                  ? <p className="mp-text mp-sentence-1" data-mp-why-error>{sentence ? <Typeset text={sentence} texOf={texOf} /> : (n > 1 ? t('aw.body.firstError', { n: n - 1 }) : t('aw.body.firstErrorStart'))}</p>
+                  ? <p className="mp-text mp-sentence-1" data-mp-why-error>{sentence ? (sentence.includes('$') && dollarsBalanced(sentence) ? <EngineComment text={sentence} /> : <Typeset text={sentence} texOf={texOf} />) : (n > 1 ? t('aw.body.firstError', { n: n - 1 }) : t('aw.body.firstErrorStart'))}</p>
                   : <div className="mp-text"><CardBody card={card} model={model} t={t} /></div>}
                 {reading && status !== 'unread' && readingOfLine(n)}
               </li>
