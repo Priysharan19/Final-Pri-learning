@@ -685,11 +685,12 @@ function rootList(text) {
 // Owner's page, 20 November 2026: `y = 2x(4 - x)` copied from the question, and `Area = ∫_0^4 2x(4 - x) dx` setting up
 // the integral it asks for, were true lines that got only a note. The prompt's own facts (questionFacts.js, read from the
 // prompt alone) are used as follows, and only to TICK or to leave a note, never to cross:
+//   · (only definitions are facts: an equation or expression the prompt states may be false, so it is never given)
 //   · a line that restates a given definition, or is the same function of the same letters, is ticked as given;
-//   · a given equation, an asked expression or an asked integral written out again is ticked as given (same text);
 //   · a given definition is put in as the page's own, for the later lines that use it (y(2) = 8, y' = …);
 //   · `Area = ∫_a^b f dx` is ticked when f is the one curve the question gives, it is a quadratic that opens downward,
-//     a and b are its two roots, and the question asks for the area bounded by the curve and the x-axis;
+//     a and b are its two roots, and the WHOLE prompt is a plain request for the area bounded by it and the x-axis
+//     (questionFacts.js: a whitelist, so a restriction on the region never reaches here);
 //   · a line that nearly copies a given but differs (one digit or sign) stays a note saying so.
 const GIVEN_NOTE = 'This is given in the question.';
 const MISMATCH_NOTE = 'This does not match what the question gives: check you copied it correctly.';
@@ -722,7 +723,7 @@ const sameExpr = (a, b) => { const x = infoOf(cleanStatement(a)), y = infoOf(cle
 /** The prompt's facts, checked and ready to use: { byName, seeds, texts, area } or null. */
 function prepareFacts(facts) {
   if (!facts || typeof facts !== 'object') return null;
-  const byName = new Map(), texts = new Set();
+  const byName = new Map();
   for (const d of Array.isArray(facts.defs) ? facts.defs.slice(0, 20) : []) {
     if (!d || typeof d.name !== 'string' || typeof d.expr !== 'string' || !/^[A-Za-z]$/.test(d.name)) continue;
     const expr = cleanStatement(d.expr), info = infoOf(expr);
@@ -733,7 +734,6 @@ function prepareFacts(facts) {
     if (!list.some(e => e.key === textKey(expr))) list.push({ name: d.name, variable, expr, info, vars, key: textKey(expr) });
     byName.set(d.name, list);
   }
-  for (const list of [facts.equations, facts.asks, facts.integrals]) for (const e of Array.isArray(list) ? list.slice(0, 20) : []) if (e && typeof e.text === 'string' && e.text.length <= 160) texts.add(textKey(e.text));
   // The seeds: a name given once, as one function of one letter or as one number.
   const seeds = {};
   for (const [name, list] of byName) {
@@ -749,7 +749,7 @@ function prepareFacts(facts) {
     const limitsAreRoots = (Array.isArray(facts.area.limits) ? facts.area.limits : []).every(l => { const v = typeof l.value === 'string' ? numberOf(l.value) : null; return v !== null && f && f(v) !== null && Math.abs(f(v)) <= 1e-9; });
     if (f && limitsAreRoots) area = { entry: e, f, variable: e.vars[0] };
   }
-  return byName.size || texts.size ? { byName, seeds, texts, area } : null;
+  return byName.size ? { byName, seeds, area } : null;
 }
 
 /** `Area = ∫_a^b f dx` for the question's quadratic curve between its two roots, opening downward: true, so ticked. */
@@ -797,11 +797,8 @@ function givenVerdict(src, prep, afterPart) {
         if (near) return { mismatch: head[1] };
       }
     }
-    // A name set to the expression the prompt asks about (y = x^2 sin x): a definition of the question's own expression.
-    if (head && !entries && parts.length === 2 && prep.texts.has(textKey(parts[1]))) return { tick: true, carry: null };
   }
-  // The question's own equation, expression or integral written out again, in the same words.
-  if (prep.texts.has(textKey(text))) return { tick: true, carry: null };
+  // An equation, an identity or a bare expression the prompt states is never given: a prompt may state a false line.
   return null;
 }
 
@@ -868,7 +865,6 @@ function pageDefinitions(raw, out, firstBreak, prep = null) {
       const area = /^(?:area|a)\s*=\s*(∫.+)$/i.exec(cleanStatement(body));
       let line = null;
       if (area && areaLineHolds(area[1], prep)) line = 'This integral is the area bounded by the curve and the x-axis.';
-      else if (!/=/.test(body) && prep.texts.has(textKey(body))) line = GIVEN_NOTE;
       if (line) { out[i] = { text: out[i].text, status: 'ok', state: 'arithmetic', note: line, valueChain: { rule: 'question-given' } }; carry = null; continue; }
     }
     if (/[<>≤≥≠≈%°,;:]|==|!=|√\s*\[|∫|\]_/.test(src)) continue;

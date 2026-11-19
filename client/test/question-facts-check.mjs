@@ -33,28 +33,29 @@ const ok = (c, m) => { if (c) pass++; else { fail++; console.error('FAIL:', m); 
 // 2 · extraction
 {
   const f = prompt => questionFacts({ prompt });
-  let r = f('The curve $y = 2x(4 - x)$ crosses the x-axis at two points. Find the area bounded by the curve and the x-axis.');
+  let r = f('The curve $y = 2x(4 - x)$. Find the area bounded by the curve and the x-axis.');
   ok(r.defs.length === 1 && r.defs[0].name === 'y' && r.defs[0].expr === '2x(4-x)' && r.defs[0].variable === null, 'a definition y = expr');
-  ok(r.area && r.area.name === 'y' && r.area.limits.length === 0, 'the area bounded by the one curve and the x-axis');
-  r = f('Given $f(x) = x^2 - 4$ and $g(x) = 2x + 1$.');
+  ok(r.area && r.area.name === 'y', 'the area bounded by the one curve and the x-axis, as the whole prompt');
+  r = f('Given $f(x) = x^2 - 4$ and $g(x) = 2x + 1$. Find $f(2) + g(2)$.');
   ok(r.defs.map(d => `${d.name}:${d.variable}:${d.expr}`).join() === 'f:x:x^2-4,g:x:2x+1' && r.area === null, 'two functions with their variable');
-  r = f('Let $a = 3, b = 4$ and $r = 0.05$.');
-  ok(r.defs.map(d => `${d.name}=${d.expr}`).join() === 'a=3,b=4,r=0.05', 'given numbers, listed with commas, with a decimal');
-  r = f('Solve $x^2 - 5x + 6 = 0$.');
-  ok(r.equations.length === 1 && r.equations[0].left === 'x^2-5x+6' && r.defs.length === 0, 'an equation that is not a definition');
-  r = f('Evaluate $\\int_0^2 x^2\\,dx$.');
-  ok(r.integrals.length === 1 && r.integrals[0].lower === '0' && r.integrals[0].upper === '2' && r.integrals[0].body === 'x^2' && r.integrals[0].variable === 'x' && r.asks.length === 1, 'a definite integral: limits, integrand, variable; asked');
-  r = f('The area is $\\int_0^2 x^2\\,dx$ square units.');
-  ok(r.integrals.length === 1 && r.asks.length === 0, 'an integral that is not asked about is a fact but not an ask');
-  for (const verb of ['Differentiate', 'Integrate', 'Expand', 'Simplify', 'Evaluate']) ok(f(`${verb} $x^2 + 1$.`)?.asks.length === 1, `${verb}: the expression is asked about`);
-  ok(f('Show that $x^2 + 1$ is positive.') === null, 'no asking verb: a bare expression is not a fact');
-  ok(f('A principal of \\$500 earns interest at $r = 0.05$ per year.').defs[0].name === 'r', 'a dollar sign for money is not a delimiter');
+  r = f('Let $a = 3, b = 4$. Find $a^2 + b^2$.');
+  ok(r.defs.map(d => `${d.name}=${d.expr}`).join() === 'a=3,b=4', 'given numbers introduced by let, listed with commas');
+  ok(f('A principal of \\$500 earns interest with $r = 0.05$ per year.').defs[0].name === 'r', 'a dollar sign for money is not a delimiter');
+  ok(f('A principal of \\$500 earns interest at $r = 0.05$ per year.') === null, 'a number not introduced by let / where / given / with is not a fact');
+  ok(f('$a = 3$') !== null, 'a number that is the whole prompt is a fact');
+  // never facts: statements the prompt may make false
+  for (const prompt of ['Solve $x^2 - 5x + 6 = 0$.', 'Prove or disprove: $(a + b)^2 = a^2 + b^2$', 'A student writes $\\sqrt{x^2 + 9} = x + 3$. Explain the error.', 'Show that $\\sin 2x = 2\\sin x$ is not an identity.',
+    'Verify that $x = 2$ is a root of $x^2 - 4x + 3 = 0$', 'Show that $x = 1.5$ is a solution of $2x + 3 = 11$', 'Test whether $x = 5$ satisfies $2x + 3 = 11$', 'Evaluate $\\frac{1}{0}$ if possible',
+    'Differentiate $x^2 \\sin x$.', 'Evaluate $\\int_0^2 x^2\\,dx$.', 'Show that $y = 2x$ is a line.'])
+    ok(f(prompt) === null, `no fact: ${prompt.slice(0, 60)}`);
+  ok(f('Let $x = 2$. Solve $x^2 - 4x + 3 = 0$.') === null, 'a number that an equation of the prompt is about is not given');
   ok(f('The line $y = 2x$ and the curve $y = x^2$.').defs.length === 2 && f('The line $y = 2x$ and the curve $y = x^2$.').area === null, 'two definitions of y: both listed, no area form');
   ok(f('Find the area bounded by $y = 2x(4 - x)$ and the line $y = x$.')?.area === null, 'a second boundary: no area form');
-  ok(f('$$y = 2x(4 - x)$$ Find the area enclosed by the curve and the x-axis.').area?.name === 'y', 'display dollars');
-  ok(f('Find the area bounded by $y = 2x(4 - x)$ and the x-axis between $x = 1$ and $x = 3$.').area.limits.length === 2, 'limits named in the prompt are listed, to be checked against the roots');
-  ok(f('Find $y$ when $x < 3$ and $y = 2x$.').defs.length === 1, 'an inequality is not a definition');
-  ok(f('If $y = 2x$, find $y\'$.').defs.length === 1, 'a prime in another span is ignored');
+  ok(f('Find the area bounded by $y = 4 - x^2$ and the x-axis for $x \\ge 0$.')?.area === null, 'a restriction written as maths: no area form');
+  ok(f('Find the area bounded by $y = 4 - x^2$ and the x-axis in the first quadrant.')?.area === null, 'a restriction in words: no area form');
+  ok(f('Find half the area bounded by $y = 4 - x^2$ and the x-axis.')?.area === null, 'half the area: no area form');
+  ok(f('Find the area bounded by $y = 4 - x^2$ and the x-axis.')?.area?.name === 'y' && f('$$y = 4 - x^2$$ Find the area bounded by the curve and the x-axis.')?.area === null, 'the whitelist is the whole prompt: a sentence order it does not list gives none');
+  ok(f('The curve $y = 4 - x^2$ crosses the x-axis at two points. Find the area bounded by the curve and the x-axis.')?.area === null, 'another sentence: no area form');
 }
 
 // 3 · nothing guessed

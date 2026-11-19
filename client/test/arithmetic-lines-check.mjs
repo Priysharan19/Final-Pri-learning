@@ -730,7 +730,7 @@ ok(model?.cards?.length === 2 && model.cards.every(c => c.status === 'checked' &
   const noFacts = lines => code(keep(stepCheckArithmetic(lines.join('\n'))));
   const noteOf = (prompt, lines, k) => P(prompt, lines).lines[k].note;
   const GIVEN = 'This is given in the question.', MISMATCH = 'This does not match what the question gives: check you copied it correctly.';
-  const AREA = 'The curve $y = 2x(4 - x)$ crosses the x-axis at two points. Find the area bounded by the curve and the x-axis.';
+  const AREA = 'The curve $y = 2x(4 - x)$. Find the area bounded by the curve and the x-axis.';
 
   // the owner's page, line by line
   const PAGE5 = ['y = 2x(4 - x)', 'Area = ∫_0^4 2x(4 - x) dx', '= 2∫_0^4 4x - x^2 dx', '= 2[2x^2 - x^3/3]_0^4', '= 2[32 - 64/3]', '64/3'];
@@ -760,8 +760,8 @@ ok(model?.cards?.length === 2 && model.cards.every(c => c.status === 'checked' &
   ok(S('The curve $y = 2x(4 - x)$ and the line $y = x$. Find the area bounded by the curve and the x-axis.', ['Area = ∫_0^4 2x(4 - x) dx']) === '.', 'a second boundary named: no area rule');
   ok(S('The curve $y = 2x(4 - x)$. Find the area bounded by the curve, the x-axis and the line $x = 1$.', ['Area = ∫_0^4 2x(4 - x) dx']) === '.', 'a boundary line x = 1: no area rule');
   ok(S('The curve $y = 2x(4 - x)$. Find the area bounded by the curve and the x-axis from $x = 1$ to $x = 3$.', ['Area = ∫_0^4 2x(4 - x) dx']) === '.', 'limits that are not roots: no area rule');
-  ok(S('The curve $y = 2x(4 - x)$ meets the x-axis at $x = 0$ and $x = 4$. Find the area bounded by the curve and the x-axis.', ['Area = ∫_0^4 2x(4 - x) dx']) === 'T', 'limits stated in the prompt that are the roots: still ticked');
-  ok(S('Find the area enclosed by $y = 2x(4 - x)$ and the x-axis.', ['Area = ∫_0^4 2x(4 - x) dx']) === 'T', 'enclosed, with the curve stated in the same sentence');
+  ok(S('The curve $y = 2x(4 - x)$ meets the x-axis at $x = 0$ and $x = 4$. Find the area bounded by the curve and the x-axis.', ['Area = ∫_0^4 2x(4 - x) dx']) === '.', 'a second maths span of any kind: no area rule');
+  ok(S('Find the area enclosed by $y = 2x(4 - x)$ and the x-axis.', ['Area = ∫_0^4 2x(4 - x) dx']) === 'T', 'enclosed is one of the plain shapes, with the curve in the same sentence');
   ok(S('The curve $y = 2x(4 - x)$ is drawn. Find its gradient at $x = 1$.', ['Area = ∫_0^4 2x(4 - x) dx']) === '.', 'no area asked: the integral is not ticked');
 
   // later lines use the given as page definitions
@@ -787,25 +787,59 @@ ok(model?.cards?.length === 2 && model.cards.every(c => c.status === 'checked' &
   ok(S(SAME, ['y = x^2 + 1']) === '.' && noteOf(SAME, ['y = x^2 + 1'], 0) !== MISMATCH, 'the same name given twice: no near-copy note');
 
   // given numbers
-  const NUM = 'Let $a = 3$ and $b = 4$. Find $a^2 + b^2$.';
+  const NUM = 'Let $a = 3, b = 4$. Find $a^2 + b^2$.';
   ok(S(NUM, ['a = 3', 'b = 4']) === 'TT' && noteOf(NUM, ['a = 3'], 0) === GIVEN, 'given numbers copied');
   ok(S(NUM, ['a = 8']) === '.' && noteOf(NUM, ['a = 8'], 0) === MISMATCH && S(NUM, ['b = 5']) === '.', 'a given number with one digit changed: a note, not ticked');
   ok(S(NUM, ['a = 6/2']) === 'T' && S(NUM, ['a = 0']) === '.' && noteOf(NUM, ['a = 0'], 0) !== MISMATCH, 'a given number written another way; a zero is not called a miscopy');
   ok(S(NUM, ['a = 3', 'b = 4', 'a^2 + b^2 = 9 + 16']) === 'TTT' && S(NUM, ['a = 3', 'b = 4', 'a^2 + b^2 = 9 + 17']) === 'TT.', 'the given numbers are used by the lines below');
   ok(/from the question/.test(noteOf(NUM, ['a^2 = 9'], 0)) && S(NUM, ['a^2 = 9']) === 'T' && S(NUM, ['a^2 = 10']) === '.', 'a given number is put in, with the comment saying so; a wrong value is a note');
-  ok(S('A principal of \\$500 earns interest at $r = 0.05$ per year.', ['r = 0.05', 'r = 0.06']) === 'T.', 'a given decimal, after a dollar sign for money');
+  ok(S('A principal of \\$500 earns interest with $r = 0.05$ per year.', ['r = 0.05', 'r = 0.06']) === 'T.', 'a given decimal, after a dollar sign for money');
 
-  // asked expressions, equations and integrals
-  ok(S('Differentiate $x^2 \\sin x$.', ['x^2 sin x', 'y = x^2 sin x']) === 'TT', 'the asked expression written out, bare or named');
-  ok(S('Differentiate $x^2 \\sin x$.', ['x^3 sin x', 'y = x^3 sin x', 'x^2 cos x']) === '...', 'a different expression is not ticked');
-  ok(S('Simplify $\\dfrac{x^2 - 1}{x - 1}$.', ['(x^2 - 1)/(x - 1)']) === 'T' && S('Simplify $\\dfrac{x^2 - 1}{x - 1}$.', ['x + 1']) === '.', 'the asked fraction is ticked, its simplified form (the answer) is not');
-  ok(S('Expand $(x + 3)^2$.', ['(x + 3)^2', '= x^2 + 6x + 9']) === 'TT', 'the asked expression, then its expansion as the line above written another way');
-  ok(S('Expand $(x + 3)^2$.', ['x^2 + 6x + 9']) === '.', 'the expansion on its own (the answer) is not ticked as given');
-  ok(S('Evaluate $\\int_0^2 x^2\\,dx$.', ['∫_0^2 x^2 dx', '∫_0^2 x^2 dx = 8/3']) === 'TT' && S('Evaluate $\\int_0^2 x^2\\,dx$.', ['∫_0^2 x^3 dx']) === '.', 'the asked integral written out');
-  ok(S('Solve $x^2 - 5x + 6 = 0$.', ['x^2 - 5x + 6 = 0', 'x^2 - 5x + 7 = 0', '(x - 2)(x - 3) = 0']) === 'T..', 'the given equation is ticked; a changed digit and the factorised form are not');
-  ok(S('Solve $x^2 - 5x + 6 = 0$.', ['x^2 - 5x + 6 = 0', 'x = 2 or x = 3', 'x = 4 or x = 3']) === 'TT.', 'the roots are not given: they are ticked only by the existing check against the equation');
-  ok(S('Find $\\int x^2\\,dx$.', ['x^2']) === '.', 'a verb that is not one of the five: nothing asked');
-  ok(S('Find the value of $x$ when $y = 7$ in $y = 2x + 1$.', ['y = 7']) === 'T' && S('Find the value of $x$ when $y = 7$ in $y = 2x + 1$.', ['y = 8']) === '.', 'a name given twice (y = 7 and y = 2x + 1): restating is given');
+  // equations, identities and bare expressions the prompt states are never given: a prompt may state a false line
+  for (const [prompt, lines, why] of [
+    ['Prove or disprove: $(a + b)^2 = a^2 + b^2$', ['(a + b)^2 = a^2 + b^2'], 'a false identity in the prompt'],
+    ['A student writes $\\sqrt{x^2 + 9} = x + 3$. Explain the error.', ['sqrt(x^2 + 9) = x + 3'], 'a false line a student wrote'],
+    ['Show that $\\sin 2x = 2\\sin x$ is not an identity.', ['sin 2x = 2 sin x'], 'a false identity'],
+    ['Verify that $x = 2$ is a root of $x^2 - 4x + 3 = 0$', ['x = 2'], 'x = 2 is not a root'],
+    ['Show that $x = 1.5$ is a solution of $2x + 3 = 11$', ['x = 1.5'], 'x = 1.5 is not a solution'],
+    ['Test whether $x = 5$ satisfies $2x + 3 = 11$', ['x = 5'], 'x = 5 does not satisfy it'],
+    ['Evaluate $\\frac{1}{0}$ if possible', ['1/0'], 'a bare expression states nothing']
+  ]) { const r = P(prompt, lines); ok(r.lines.every(l => l.status !== 'ok' || l.note !== GIVEN) && r.lines[0].status !== 'ok', `never ticked as given: ${lines[0]} (${why})`); }
+  ok(S('Differentiate $x^2 \\sin x$.', ['x^2 sin x', 'y = x^2 sin x']) === '..', 'the asked expression, bare or named: states nothing, no tick');
+  ok(S('Simplify $\\dfrac{x^2 - 1}{x - 1}$.', ['(x^2 - 1)/(x - 1)', 'x + 1']) === '..', 'the asked fraction and its simplified form: no tick');
+  ok(S('Expand $(x + 3)^2$.', ['(x + 3)^2', '= x^2 + 6x + 9']) === '..' || S('Expand $(x + 3)^2$.', ['(x + 3)^2', '= x^2 + 6x + 9']) === '.T', 'the asked expression is not given; its expansion may tick only as an identity');
+  ok(S('Evaluate $\\int_0^2 x^2\\,dx$.', ['∫_0^2 x^2 dx']) === '.', 'a bare integral from the prompt is not given');
+  ok(S('Solve $x^2 - 5x + 6 = 0$.', ['x^2 - 5x + 6 = 0', 'x^2 - 5x + 7 = 0']) === '..', 'a conditional equation to solve: no tick when restated');
+  ok(S('Prove that $(x + 1)^2 = x^2 + 2x + 1$.', ['(x + 1)^2 = x^2 + 2x + 1']) === 'T' && noteOf('Prove that $(x + 1)^2 = x^2 + 2x + 1$.', ['(x + 1)^2 = x^2 + 2x + 1'], 0) !== GIVEN, 'a true identity still ticks, as an identity, by the existing rule');
+  ok(S('Verify that $y = 2x + 1$ passes through $(0, 1)$.', ['y = 2x + 1']) === '.', 'a definition under verify is not given');
+  ok(S('Solve $x^2 - 5x + 6 = 0$.', ['x^2 - 5x + 6 = 0', 'x = 2 or x = 3']) === '.T', 'the roots: ticked only by the existing check against the equation, as before');
+
+  // the area form is a whitelist of whole prompts: anything else about the region means no area fact
+  const REGION = '. Find the area bounded by the curve and the x-axis';
+  for (const prompt of [
+    'The curve $y = 4 - x^2$ and the x-axis for $x \\ge 0$. Find the area bounded by the curve and the x-axis.',
+    'Find the area bounded by $y = 4 - x^2$ and the x-axis where $x > 0$.',
+    'Find the area bounded by $y = 4 - x^2$ and the x-axis for $-2 \\le x \\le 0$.',
+    'Find the area bounded by $y = 4 - x^2$ and the x-axis in the first quadrant.',
+    'Find half the area bounded by $y = 4 - x^2$ and the x-axis.',
+    'Find the area bounded by $y = 4 - x^2$ and the x-axis to the right of the origin.',
+    'Find the area bounded by $y = 4 - x^2$ and the x-axis on the positive side.',
+    'The curve $y = 4 - x^2$ is reflected in the x-axis. Find the area bounded by the curve and the x-axis.',
+    'Find the area bounded by $y = 4 - x^2$ and the x-axis above the line $y = 1$.',
+    'Find the area bounded by $y = 4 - x^2$ and the x-axis, correct to 2 decimal places.'
+  ]) ok(questionFacts({ prompt })?.area === null || questionFacts({ prompt }) === null, `no area form: ${prompt.slice(0, 70)}`) && ok(S(prompt, ['Area = ∫_-2^2 (4 - x^2) dx']) === '.', `the area integral is not ticked: ${prompt.slice(0, 70)}`);
+  for (const prompt of [
+    'Find the area bounded by $y = 4 - x^2$ and the x-axis.',
+    'Calculate the area bounded by the curve $y = 4 - x^2$ and the x-axis.',
+    'Determine the exact area enclosed by the parabola $y = 4 - x^2$ and the x-axis.',
+    'Find the area bounded by the graph of $y = 4 - x^2$ and the x-axis.',
+    'Find the area bounded by the x-axis and $y = 4 - x^2$.',
+    'Find the area between $y = 4 - x^2$ and the x-axis.',
+    'The curve $y = 4 - x^2$. Find the area enclosed by the curve and the x-axis.',
+    'The parabola $y = 4 - x^2$. Calculate the area bounded by the parabola and the x-axis.',
+    'Find the area bounded by $y = 4 - x^2$ and the x-axis. Give your answer as an exact value.',
+    'The curve $y = 4 - x^2$ and the x-axis bound a region. Find its area.'
+  ]) ok(S(prompt, ['Area = ∫_-2^2 (4 - x^2) dx']) === 'T', `a plain prompt still ticks: ${prompt.slice(0, 70)}`);
 
   // prompts that cannot be read: exactly as without facts
   const SAMEAS = (prompt, lines) => JSON.stringify(stepCheckArithmetic(lines.join('\n'), { facts: questionFacts({ prompt }) })) === JSON.stringify(stepCheckArithmetic(lines.join('\n')));
