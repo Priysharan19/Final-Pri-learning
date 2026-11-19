@@ -15,8 +15,9 @@ const eq = (a, b, m) => { assert.deepEqual(a, b, m); n++; };
 
 const en = read('../src/i18n/strings.en.js');
 const hi = read('../src/i18n/strings.hi.js');
-const keyIn = (src, k) => new RegExp(`['"]${k.replace(/\./g, '\\.')}['"]\\s*:`).test(src);
-const valueOf = (src, k) => (src.match(new RegExp(`['"]${k.replace(/\./g, '\\.')}['"]\\s*:\\s*'((?:[^'\\\\]|\\\\.)*)'`)) || [])[1] || '';
+const rx = k => k.replace(/[.*+?^${}()|[\]\\\/-]/g, '\\$&');   // every regex metacharacter, backslash included
+const keyIn = (src, k) => new RegExp(`['"]${rx(k)}['"]\\s*:`).test(src);
+const valueOf = (src, k) => (src.match(new RegExp(`['"]${rx(k)}['"]\\s*:\\s*'((?:[^'\\\\]|\\\\.)*)'`)) || [])[1] || '';
 
 // ── 1. Recent attempts ─────────────────────────────────────────────────────
 const recent = read('../src/components/RecentAttempts.jsx');
