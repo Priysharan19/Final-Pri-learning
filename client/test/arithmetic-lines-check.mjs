@@ -97,6 +97,16 @@ ok(st(['(x+1)^2 = x^2 + 2x + 1']) === 'ok' && /expanding the brackets/.test(run(
 for (const page of [['2x = 4', 'x = 2 so 2x = 5'], ['x^2 - 4 = 0', 'x = 2 and x = 5'], ['2x = 4 so x = 2 so 3x = 7'], ['x^2 - 4 = 0', '(x-2)(x+2) = 0 so x = 3'], ['2x = 4', '4x = 8 so 1 = 2'], ['y = x^2', "y' = 2x so 1 = 2"], ['y = x^2', "y' = 2x ⇒ 2 + 2 = 5"], ['k = 2', '3k = 6 so k = 5'], ['2x = 4', 'x = 3 so x = 2'], ['2x = 4', 'x = 3 so 2x = 4 so x = 2'], ['2x = 4', '2x = 5 so 2x = 4 so x = 2'], ['2x = 4', 'x^2 = 5 so x^2 = 4 so x = 2']]) ok(!/ok/.test(st(page)), `a line is not ticked when a statement after the true one is left unjudged or false: ${page.join(' | ')} (${st(page)})`);
 for (const page of [['(a) x = 3', '(b) y = 2x + 1 = 9'], ['a) t = 2', 'b) v = 3t^2 = 27'], ['(a) n = 5', '(b) S = n(n+1)/2 = 21'], ['Part a: k = 2', 'Part b: A = k + 1 = 5'], ['x = 3', 'x = 4 now', 'y = x + 1 = 5'], ['x = 3', 'Now let x = 4', 'y = x + 1 = 5'], ['r = 5', 'A = πr^2 = 25π', 'r = 3 (new)', 'A = πr^2 = 9π'], ['k = 2', '2 + 2 = 4', 'A = 3k + 1 = 8']]) ok(!/break/.test(st(page)), `a letter that may have a new value is never held to its old one: ${page.join(' | ')} (${st(page)})`);
 ok(st(['x^2 - 4 = 0 so (x-2)(x+2) = 0', 'x = 2']) === 'ok,ok' && st(['2x = 4 so x = 2']) === 'ok', 'a premise before the ticked statement is allowed');
+// e and π as numbers; a function value in front of a worked chain; a sign claim after it (owner, 19 November)
+{
+  const sign = run(['b)(ii) a(2) = (4 - 8 + 2)e^(-2) = 2e^(-2) > 0 so the displacement is a maximum']);
+  ok(sign.lines[0].status === 'break' && /−0\.27/.test(sign.diagnosis.message), `the sign slip a competitor caught is crossed with both values (${sign.lines[0].status} · ${sign.diagnosis?.message})`);
+  ok(st(['a(2) = (4 - 8 + 2)e^(-2) = -2e^(-2) < 0 so the displacement is a maximum']) === 'ok', 'the same line without the slip is ticked');
+  ok(st(['a(2) = (4 - 8 + 2)e^(-2) = -2e^(-2) > 0 so it is a minimum']) === 'note', 'a true chain with a false sign claim after it is not ticked');
+  ok(st(['e^0 = 1', 'π/2 + π/2 = π', '2π/2 = π', 'e^2 e^3 = e^5', 'f(2) = 3 + 4 = 7']) === 'ok,ok,ok,ok,ok', 'exact lines with e and π are ticked');
+  ok(st(['e^2 e^3 = e^6']) === 'break' && st(['f(2) = 3 + 4 = 8']) === 'break', 'and crossed when the constant stands on every side, or under a function value');
+  for (const f of ['2π = 6', 'e^2 = 7', 'e = 3', 'π = 22/7', '2e + 3e = 5e', '2e + 3e = 6e', '3e2 = 300', '2e-3 = 1', '1/2π = π/2', '1/2e = e/2', 'f(2) = 5', 'f(x) = 3 + 4 = 8', '2πr = 10π', 'e^x = 5', 'a(2) > 0 so max', 'x(2) = 2 + 2 = 5 > 0']) ok(st([f]) === 'note' || (f === 'x(2) = 2 + 2 = 5 > 0' && st([f]) === 'break'), `not judged: ${f} (${st([f])})`);
+}
 // never crossed
 for (const f of ['3x + 2 = 11', 'x = 3', 'n = 5', 'P(A) = 3', 'sin(30) = 2', 'log(100) = 3', 'ln 5 = 2', 'pi = 3', 'e^2 = 7', '50% of 80 = 30', '90° = 2', '5 cm + 3 cm = 9 cm', '2 1/2 = 5/2', '1 000 = 1000', '3 < 2', '4 ≠ 4', 'the answer is 5', '', '= 5', '6/0 = 3', '(((', '2 + = 4']) ok(!/break|ok/.test(st([f])), `not judged: "${f}" (${st([f])})`);
 for (const f of ['0.5 + 0.25 = 0.8', '1000(1.05)^3 = 1157', '10/3 = 3.3', '22/7 ≈ 3', '√2 ≈ 1', '740^0.5 = 27']) ok(st([f]) === 'note', `a line that may be a rounding is not crossed: ${f}`);

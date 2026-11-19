@@ -45,7 +45,7 @@ function valueOf(side) {
   let ast;
   try { ast = parse(normalize(side)); } catch { return null; }
   if (!ast || ast.t === 'equation') return null;
-  if ([...variablesOf(ast)].length) return null;            // any letter at all, π and e included: not arithmetic on numbers alone
+  if ([...variablesOf(ast)].some(v => v !== 'e')) return null;   // any letter but the constants e and π: not arithmetic on numbers alone
   let v;
   try { v = evaluate(ast, {}); } catch { return null; }
   return typeof v === 'number' && Number.isFinite(v) ? v : null;
@@ -176,6 +176,15 @@ function nameOfStep(fromRaw, toRaw) {
   if (fractions(pa) >= 1 && /[-+]/.test(pa.replace(/\([^()]*\)/g, '')) && fractions(pb) === 1 && /^\(.*\)\/[^/]+$/.test(pb)) return 'putting the terms over a common denominator';
   return '';
 }
+
+
+// Hoisted so that the plain-number path can use it for lines with e or π.
+const folded = side => { let t = side, last; do { last = t; t = t.replace(/\([^()]*\)/g, '#'); } while (t !== last); return t.replace(/(?:√|∛|sqrt)\s*(?:#|\d+(?:\.\d+)?|[A-Za-zθαβφπ])/gi, '#'); };   // a root is one factor too: 1/√2 x
+// Structural, not a list of cases: after a division sign comes ONE denominator (a function with its bracket, a
+// bracket, a root, a number, or one letter, with an optional power) and then an operator, a closing bracket or the
+// end of the side. Anything else attached to it, or a denominator of another shape, or a later `*`, is not read.
+const DENOMINATOR = '(?:[A-Za-z]{2,6}#|#|\\d+(?:\\.\\d+)?!?(?![\\d.!])|[A-Za-zθαβφπ](?![A-Za-z]))(?:\\^(?:#|-?\\d+(?!\\d)|[A-Za-zθαβφπ]))?';
+const twoWays = t => new RegExp(`[\\/÷]\\s*${DENOMINATOR}\\s*(?![-+=)\\/÷,^\\s]|$)`).test(t) || new RegExp(`[\\/÷](?!\\s*${DENOMINATOR})`).test(t) || /[\/÷].*\*/.test(t);
 
 /** Other ways the same ink may be read: one whole number split as a power or as a fraction. */
 function otherReadings(side) {
@@ -426,8 +435,17 @@ export function stepCheckArithmetic(workingText) {
     const carried = prev;
     // A label is set aside: `Numerator:`, `LHS =` in front, `= RHS` behind, an end mark. What such a line leaves for
     // the `=` line below is tick only, like a line of letters.
-    const src = line.replace(/^[A-Za-z][A-Za-z ]{1,24}:\s*(?=\S)/, '').replace(/^(?:LHS|RHS|L\.H\.S\.?|R\.H\.S\.?)\s*=\s*(?=\S)/i, '')
+    const src0 = line.replace(/^[A-Za-z][A-Za-z ]{1,24}:\s*(?=\S)/, '').replace(/^(?:LHS|RHS|L\.H\.S\.?|R\.H\.S\.?)\s*=\s*(?=\S)/i, '')
       .replace(/\s*(?:\/\/|∎|□)\s*$/, '').replace(/\s*=\s*(?:LHS|RHS|L\.H\.S\.?|R\.H\.S\.?)\s*$/i, '');
+    // Owner, 19 November 2026 (a sign slip a competitor caught: `a(2) = (4 - 8 + 2)e^(-2) = 2e^(-2) > 0 so …`):
+    //   · a value of a function in front of a worked chain (`a(2) = … = …`) is a label for the chain;
+    //   · words after the chain are set aside; `> 0` or `< 0` after it is kept as a claim about the chain's value,
+    //     and a tick needs that claim to be true as well.
+    let src = src0.replace(/^\(?[a-h]\)(?:\s*\((?:i{1,3}|iv|v)\))?\s+(?=\S)|^\((?:i{1,3}|iv|v)\)\s+(?=\S)/i, ''), signClaim = null;
+    { const tail = src.match(/^(.*=.*?)\s*([<>])\s*0\s*(?:(?:so|hence|therefore|thus|which)\b[^=<>]*)?$/i);
+      if (tail) { src = tail[1]; signClaim = tail[2]; }
+      else { const words = src.match(/^(.*=.*?[\d)])\s+(?:so|hence|therefore|thus)\s+[A-Za-z][^=<>\d]*$/i); if (words) src = words[1]; }
+      src = src.replace(/^[A-Za-z]'{0,2}\(\s*-?\d+(?:\.\d+)?\s*\)\s*=\s*(?=[^=]+=)/, ''); }
     const afterLabel = labelled; labelled = src !== line;
     const before = carried && carried.value !== undefined && !carried.calculus && !afterLabel ? carried : null;   // plain arithmetic only
     prev = null;
@@ -452,7 +470,11 @@ export function stepCheckArithmetic(workingText) {
     if (/[<>≤≥≠%°]|==|!=|\d\s+\d/.test(text)) return note(line, NOTE);
     // Any letter left (a variable, π, e, a unit, a function name) and the line is not arithmetic on numbers alone.
     // nCr and nPr between two numbers, and sqrt, are arithmetic.
-    if (calc.used || /[A-Za-zπθ]/.test(text.replace(/sqrt/gi, '').replace(/(\d)\s*[CP]\s*(?=\d)/g, '$1'))) {
+    // The constants e and π are numbers; a digit on each side of e (3e2) is not read.
+    const CONSTANT = /(?<![A-Za-z])(?:e|pi|π)(?![A-Za-z])/g;
+    if (/\de\s*[-+]?\s*\d/.test(text)) return note(line, NOTE);   // 3e2, and 2e + 3 (which reads as 2000)
+    if (calc.used || /[A-Za-zπθ]/.test(text.replace(/sqrt/gi, '').replace(/(\d)\s*[CP]\s*(?=\d)/g, '$1').replace(CONSTANT, ''))) {
+      if (signClaim) return note(line, NOT_PROVED);
       // True as written, or a note: never a cross (see "Lines that are true as written").
       if (/≈|≃|~/.test(text)) return note(line, NOT_PROVED);
       const bits = text.split('=').map(s => s.trim());
@@ -478,12 +500,6 @@ export function stepCheckArithmetic(workingText) {
       if (/\/\s*\d+(?:\.\d+)?\s*[A-Za-z(]|\/\s*[A-Za-z]\s*[A-Za-z(]|\^\s*-?\d+(?:\.\d+)?[A-Za-z]|\^\s*[A-Za-z][A-Za-z0-9(]/.test(bare)) return note(line, NOT_PROVED);
       // A division followed by a product groups two ways (6/2(1+2), 10!/3!7!, 1/cos θ tan θ, 1/2x). Every bracket is
       // first folded to one mark, so a function's own bracket cannot hide what follows the denominator.
-      const folded = side => { let t = side, last; do { last = t; t = t.replace(/\([^()]*\)/g, '#'); } while (t !== last); return t.replace(/(?:√|∛|sqrt)\s*(?:#|\d+(?:\.\d+)?|[A-Za-zθαβφπ])/gi, '#'); };   // a root is one factor too: 1/√2 x
-      // Structural, not a list of cases: after a division sign comes ONE denominator (a function with its bracket, a
-      // bracket, a root, a number, or one letter, with an optional power) and then an operator, a closing bracket or the
-      // end of the side. Anything else attached to it, or a denominator of another shape, or a later `*`, is not read.
-      const DENOMINATOR = '(?:[A-Za-z]{2,6}#|#|\\d+(?:\\.\\d+)?!?(?![\\d.!])|[A-Za-zθαβφπ](?![A-Za-z]))(?:\\^(?:#|-?\\d+(?!\\d)|[A-Za-zθαβφπ]))?';
-      const twoWays = t => new RegExp(`[\\/÷]\\s*${DENOMINATOR}\\s*(?![-+=)\\/÷,^\\s]|$)`).test(t) || new RegExp(`[\\/÷](?!\\s*${DENOMINATOR})`).test(t) || /[\/÷].*\*/.test(t);
       if (written.some(s => twoWays(folded(s).trim()))) return note(line, NOT_PROVED);
       const infos = written.map(infoOf);
       const lastInfo = infos[infos.length - 1];
@@ -526,13 +542,17 @@ export function stepCheckArithmetic(workingText) {
 
     // A division followed by a product (6/2(1+2), 10!/3!7!, 5·4·3/3·2·1) is read two ways by convention: not judged.
     if (allSides.some(s => /[\/÷]/.test(s) && /[\/÷].*(?:\*|[\d)!]\s*\(|\)\s*\d|!\s*\d)/.test(s))) return note(line, NOTE);
+    if (allSides.some(x => x.match(CONSTANT) && twoWays(folded(x).trim()))) return note(line, NOTE);   // 1/2π groups two ways
     const soft = approx || allSides.some(s => /\d\.\d|^\.\d|[^\d]\.\d/.test(s) || FUNCTION_WORDS.test(s));
     if (allValues.every(v => close(v, allValues[0]))) {
+      if (signClaim && !(signClaim === '>' ? allValues[0] > 0 : allValues[0] < 0)) return note(line, NOTE);
       const why = continuation && before ? `This equals the line above: ${shown(allValues[0])}.` : `Both sides come to ${shown(allValues[0])}.`;
       out.push({ text: line, status: 'ok', state: 'arithmetic', note: why, valueChain: { rule: 'arithmetic' } });
       return;
     }
     if (soft) return note(line, SOFT_NOTE);
+    // With e or π on the line a cross needs the constant on every side: `2π = 6` or `e^2 = 7` is a rounding, not a slip.
+    { const withConstant = allSides.filter(x => x.match(CONSTANT)).length; if (withConstant && withConstant !== allSides.length) return note(line, SOFT_NOTE); }
     if (ansLine) return note(line, NOTE);
     // Two bare numbers and nothing else (`500 = 340`) is words lost in reading, not a sum someone got wrong.
     if (allSides.every(x => /^\s*-?\d+(?:\.\d+)?\s*$/.test(x)) && !(continuation && before)) return note(line, NOTE);
