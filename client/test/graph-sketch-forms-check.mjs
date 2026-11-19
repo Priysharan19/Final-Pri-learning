@@ -168,6 +168,7 @@ for (const form of FORMS) {
     ok(texts.every(t => typeof t === 'string' && t.trim() && dollarsBalanced(t)), `${where}: every text has balanced $`);
     ok(texts.every(t => !BROKEN.test(t)), `${where}: no undefined / NaN in any text`);
     ok(texts.every(t => !/—/.test(t)), `${where}: no em dash`);
+    ok(texts.every(t => !/[+-] 0\)|\(x [+-] 0\b/.test(t)), `${where}: a zero shift is printed as x, never (x + 0)`);
     ok(q.steps.length >= 3 && q.hints.length === 3, `${where}: three or more worked steps and three hints`);
     const printed = answerTextFor(q);
     ok(typeof printed === 'string' && printed.length > 8 && !BROKEN.test(printed) && !/\d\.\d{7,}/.test(printed), `${where}: the printed answer is a real sentence`);

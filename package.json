@@ -20,7 +20,7 @@
     "test:engine": "node server/test/selfcheck.mjs",
     "test:board:scheme": "node client/test/india-board-scheme-check.mjs",
     "test:nsw:curriculum": "node client/test/nsw-curriculum-check.mjs",
-    "test:nsw:banks": "node client/test/nsw-bank-quality-check.mjs && node client/test/line-system-regression-check.mjs && node tools/nsw-issued-cells.mjs --check && node client/test/nsw-offer-check.mjs && node client/test/graph-sketch-forms-check.mjs && node client/test/graph-sketch-ui-check.mjs && node server/test/graph-sketch-practice-check.mjs",
+    "test:nsw:banks": "node client/test/nsw-bank-quality-check.mjs && node client/test/line-system-regression-check.mjs && node tools/nsw-issued-cells.mjs --check && node client/test/nsw-offer-check.mjs && node client/test/graph-sketch-forms-check.mjs && node client/test/graph-sketch-ui-check.mjs && node server/test/graph-sketch-practice-check.mjs && node server/test/content-version-token-check.mjs",
     "test:nsw:exams": "node client/test/nsw-exams-check.mjs",
     "nsw:exams": "node tools/nsw-exam-releases.mjs",
     "nsw:banks": "node client/test/nsw-bank-quality-check.mjs --ledger",

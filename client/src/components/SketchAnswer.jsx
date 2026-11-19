@@ -104,9 +104,11 @@ function MarkedView({ question, sketch, answer }) {
   const rows = resultRows(sketch, ask);
   if (!model) return null;
   const marked = rows.some(r => r.verdict);
+  const right = rows.filter(r => r.verdict === 'ok').length;
   return (
     <div className="sk-marked" data-sketch-result>
       <div className="sc-label sk-subhead">{t(marked ? 'sketch.result.title' : 'sketch.result.truthTitle')}</div>
+      {marked && <p className="sk-summary" data-sketch-summary>{t('sketch.result.summary', { right, total: rows.length })}</p>}
       <figure className="sk-figure">
         <Axes win={model.win} points={model.truth} rings={marked ? model.yours : []} curve={model.curve} label={t('sketch.result.plotLabel')} describedBy={`${uid}-legend`} />
         <figcaption id={`${uid}-legend`} className="sk-legend">

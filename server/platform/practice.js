@@ -27,6 +27,7 @@ import { dueDotpoints, reviewStateFromAttempts } from '../../client/src/engine/r
 import { spacedSchedule, LADDER_DAYS, MISS_DROP } from '../../client/src/engine/spacedReview.js';
 import { buildNotebook, firstErrorOf, isMistake } from '../../client/src/engine/mistakeNotebook.js';
 import { PUBLIC_QUESTION_FIELDS } from '../../client/src/engine/publicQuestion.js';
+import { CONTENT_VERSION, UNVERSIONED_TOKEN_CONTENT_VERSION } from '../../client/src/engine/contentIdentity.js';
 import { consentState, consentBlockerCode } from './guardianConsent.js';
 import { loadAllBanks, loadBanksFor, generateQuestion } from '../../client/src/engine/generators/index.js';
 // The marker itself (checkAnswer, stepCheck, methodMarks) is never called on
@@ -590,7 +591,7 @@ export function createPracticePrepareRoute(db, { banks = bankPolicy(), env = pro
     try {
       prepared = encryptDeliveryToken(JSON.stringify({
         g: request.generator, d: request.difficulty, s: chosen.q.seed, m: request.mode,
-        ...(request.dotpoint ? { p: request.dotpoint } : {}), x: now + PREPARED_TTL, n: randomUUID()
+        ...(request.dotpoint ? { p: request.dotpoint } : {}), x: now + PREPARED_TTL, n: randomUUID(), c: CONTENT_VERSION
       }), PREPARED_CONTEXT);
     } catch { return reject(res, 503, 'PRACTICE_PREPARE_UNAVAILABLE', 'Questions cannot be prepared right now.'); }
     const question = safeQuestion(null, chosen.q);
@@ -605,7 +606,7 @@ function readPrepared(token, banks) {
   try {
     const v = JSON.parse(decryptDeliveryToken(token, PREPARED_CONTEXT));
     if (!plain(v) || !AUTHORED_BANK.test(String(v.g)) || !banks.issues(v.g) || !Number.isInteger(v.d) || !Number.isSafeInteger(v.s) ||
-        !PRACTICE_MODES.includes(v.m) || !Number.isFinite(v.x) || typeof v.n !== 'string' || !UUID.test(v.n)) return null;
+        !PRACTICE_MODES.includes(v.m) || (v.c !== undefined && typeof v.c !== 'string') || !Number.isFinite(v.x) || typeof v.n !== 'string' || !UUID.test(v.n)) return null;
     return v;
   } catch { return null; }
 }
@@ -700,6 +701,9 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       const sealed = readPrepared(body.prepared, banks);
       if (!sealed) return reject(res, 400, 'PRACTICE_PREPARED_INVALID', 'This prepared question is not valid.');
       if (sealed.x < now) return reject(res, 410, 'PRACTICE_PREPARED_EXPIRED', 'This prepared question has expired.');
+      // Prepared under other content than this server serves: the seed would draw a different question from the one the
+      // student saw, so it is refused as an expired one is and the device fetches a fresh question.
+      if ((sealed.c ?? UNVERSIONED_TOKEN_CONTENT_VERSION) !== CONTENT_VERSION) return reject(res, 410, 'PRACTICE_PREPARED_EXPIRED', 'This prepared question has expired.');
       // JEE Advanced's own questions are Premium (D19). Decided from the
       // server's entitlement record before anything is generated or written,
       // so a refused bind leaves the prepared token for an account that may.

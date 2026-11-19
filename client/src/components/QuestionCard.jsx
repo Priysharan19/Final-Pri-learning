@@ -1015,7 +1015,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // far more often than it offers, because a wrong graph teaches a wrong thing;
   // where it declines there is simply no graph.
   const plotSpec = useMemo(() => {
-    if (!res?.solution) return null;
+    // A sketch question shows its own marked sketch (SketchAnswer), not a second, generically windowed graph.
+    if (!res?.solution || question.answerType === 'graph-sketch') return null;
     try {
       return plotSpecFor({
         prompt: question.prompt,
@@ -1025,7 +1026,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         chapterId: question.chapterId
       });
     } catch { return null; }
-  }, [question.prompt, question.subtopic, question.chapterId, res]);
+  }, [question.prompt, question.subtopic, question.chapterId, question.answerType, res]);
 
   // The recogniser is only fetched once something on screen needs its LaTeX.
   // Outside write mode the only strings that reach texOf are these two.

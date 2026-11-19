@@ -37,6 +37,8 @@ const num = v => String(v);
 const fac = r => `(x ${r < 0 ? '+' : '-'} ${Math.abs(r)})`;
 /** " + 5" / " - 5" for appending a signed constant to an expression. */
 const sg = k => (k < 0 ? `- ${Math.abs(k)}` : `+ ${k}`);
+/** A factor (x - r); a zero shift is just x. */
+const fx = r => (r === 0 ? 'x' : `(x ${sg(-r)})`);
 const lead = a => (a === 1 ? '' : a === -1 ? '-' : String(a));
 const pt = (x, y) => `(${num(x)}, ${num(y)})`;
 const list = xs => xs.map(num).join(' and ');
@@ -228,7 +230,7 @@ const CUBIC_SKETCH = [
           'Use the sign of $\\dfrac{d^2y}{dx^2}$ at each point: positive is a minimum, negative is a maximum.'
         ],
         steps: [
-          { h: 'Differentiate', d: `$\\dfrac{dy}{dx} = ${poly([3 * s, 2 * B, C])}$, which factorises as $${lead(3 * s)}(x ${sg(-s1)})(x ${sg(-s2)})$.` },
+          { h: 'Differentiate', d: `$\\dfrac{dy}{dx} = ${poly([3 * s, 2 * B, C])}$, which factorises as $${lead(3 * s)}${fx(s1)}${fx(s2)}$.` },
           { h: 'The stationary points', d: `$\\dfrac{dy}{dx} = 0$ at $x = ${s1}$ and $x = ${s2}$, giving $y = ${y1}$ and $y = ${y2}$.` },
           { h: 'Their nature', d: `$\\dfrac{d^2y}{dx^2} = ${poly([6 * s, 2 * B])}$. At $x = ${s1}$ it is ${6 * s * s1 + 2 * B > 0 ? 'positive' : 'negative'}, so $${pt(s1, y1)}$ is a ${nature(k1)}; at $x = ${s2}$ it is ${6 * s * s2 + 2 * B > 0 ? 'positive' : 'negative'}, so $${pt(s2, y2)}$ is a ${nature(k2)}.` },
           { h: 'The y-intercept', d: `Put $x = 0$: $y = ${d}$.` }

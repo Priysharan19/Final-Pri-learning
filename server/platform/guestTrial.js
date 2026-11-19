@@ -48,6 +48,7 @@ import { subtopicOfferedIn } from '../../client/src/engine/offeringRules.js';
 import { editionOffering } from './edition.js';
 import { premiumCapabilityForGenerator } from '../../client/src/engine/practiceAllowance.js';
 import { ensureBanks, safeQuestion, answerTextFor } from './practice.js';
+import { CONTENT_VERSION, UNVERSIONED_TOKEN_CONTENT_VERSION } from '../../client/src/engine/contentIdentity.js';
 import { markerPool, MARKING_BUSY } from './markerPool.js';
 
 export const GUEST_COOKIE = 'pri_guest';
@@ -295,7 +296,7 @@ export function createGuestTrialRouter(db, { env = process.env, banks = bankPoli
     const mine = spent.taken[0].verdict;
 
     const nonce = randomUUID();
-    const sealed = encryptDeliveryToken(JSON.stringify({ g: generator, d: difficulty, s: q.seed, t: req.guest.id, n: nonce, i: now, x: now + L.questionTtlMs }), QUESTION_CONTEXT);
+    const sealed = encryptDeliveryToken(JSON.stringify({ g: generator, d: difficulty, s: q.seed, t: req.guest.id, n: nonce, i: now, x: now + L.questionTtlMs, c: CONTENT_VERSION }), QUESTION_CONTEXT);
     const publicQ = safeQuestion(nonce, q);
     // Only the first authored hint is ever offered to a guest.
     if (Array.isArray(publicQ.hints)) publicQ.hints = publicQ.hints.slice(0, 1);
@@ -319,6 +320,8 @@ export function createGuestTrialRouter(db, { env = process.env, banks = bankPoli
     // Bound to the device that was issued it: a question cannot be answered under another guest's token.
     if (ticket.t !== req.guest.id) return reject(res, 403, 'GUEST_QUESTION_INVALID', 'This question is not valid.');
     if (!(ticket.x > now)) return reject(res, 410, 'GUEST_QUESTION_EXPIRED', 'This question has expired. Start another.');
+    // Issued under other content than this server serves: its seed would draw a different question. Refused as an expired one is.
+    if ((typeof ticket.c === 'string' ? ticket.c : UNVERSIONED_TOKEN_CONTENT_VERSION) !== CONTENT_VERSION) return reject(res, 410, 'GUEST_QUESTION_EXPIRED', 'This question has expired. Start another.');
     if (now - ticket.i < L.minAnswerMs) return reject(res, 429, 'GUEST_TOO_FAST', 'Take a moment to read the question, then answer.', { retryAfterMs: L.minAnswerMs - (now - ticket.i) });
     if (!banks.issues(ticket.g)) return reject(res, banks.outside.status, banks.outside.code, banks.outside.message);
     // A closed question is closed; and an unreadable entry may be retried only a few times.

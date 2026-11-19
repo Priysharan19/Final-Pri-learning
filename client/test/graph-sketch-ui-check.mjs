@@ -108,6 +108,7 @@ try {
   ];
   const resolved = draw(h(Sketch, props({ value: text, disabled: true, result: { spec: q.answer.graph.spec, awarded: 1, possible: 3, verdicts } })));
   ok(resolved.includes('data-sketch-result') && resolved.includes('sk-curve') && !resolved.includes('data-sketch-preview'), 'resolved: the marked view with the true curve replaces the preview');
+  ok(resolved.includes('data-sketch-summary') && resolved.includes('1 of 3 features right'), 'resolved: the per-feature panel says how many features were right, as feedback beside the marks');
   ok(/data-sketch-feature="xIntercepts" data-verdict="ok"/.test(resolved) && /data-sketch-feature="yIntercept" data-verdict="wrong"/.test(resolved), 'resolved: each asked feature carries the marker\'s verdict');
   ok(resolved.includes(en['sketch.detail.wrongKind']) && resolved.includes(en['sketch.result.ok']), 'resolved: the verdict is said in words');
   ok(resolved.includes(en['sketch.result.should'].replace('{value}', '')) || /It should be/.test(resolved), 'resolved: a feature that is not right says what it should be');
@@ -129,6 +130,7 @@ try {
   ok(/\) : isSketch \? \(\s*<div[^>]*data-sketch-shell>\s*<SketchAnswer question=\{question\} value=\{answer\} onChange=\{editAnswer\}/.test(card), 'a sketch question is answered in the sketch form, through the card\'s ordinary answer');
   ok(/result=\{resolved \? res\?\.solution\?\.sketch \|\| null : null\}/.test(card), 'the form is given the marker\'s result only once the question is resolved');
   ok(/res\.solution\.answerText && !isSketch/.test(card) && /!verdictGood && res\.solution && !isSketch/.test(card), 'the generic "final answer" and "expected" lines are not drawn for a sketch');
+  ok(/question\.answerType === 'graph-sketch'\) return null;/.test(card), 'a sketch question draws no second, generic graph');
   const css = read('src/components/SketchAnswer.css');
   ok(!/gradient|#[0-9a-f]{3,8}\b|rgba?\(/i.test(css), 'the sketch form\'s styles use the design tokens only: no gradient and no raw colour');
   const source = read('src/components/SketchAnswer.jsx');
