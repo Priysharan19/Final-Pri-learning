@@ -393,20 +393,20 @@ ok(model?.cards?.length === 2 && model.cards.every(c => c.status === 'checked' &
     [['2/3 + 1/3 = 3/3'], '1'], [['5! = 5 × 24'], '120'], [['4 × 5 = 20', '= 2 × 10'], '20'], [['-12/8 = -3/2 = -12/8'], '−3/2'], [['√2/2 = 1/√2'], '√2/2']];
   for (const [page, x] of simp) {
     const r = run(page), ticked = r.lines.map((l, k) => (l.status === 'ok' ? k : -1)).filter(k => k >= 0), last = r.lines[ticked[ticked.length - 1]];
-    ok(r.firstBreak === -1 && plain(last.note).includes(x) && !/simplifies/.test(last.note), `the value ${x} is already stated, so it is not said again: ${page.join(' ; ')} (${plain(last ? last.note : '')})`);
-    ok(r.lines.every(l => !/simplifies/.test(l.note || '')), `no line repeats a value the comment has just stated: ${page.join(' ; ')}`);
+    ok(r.firstBreak === -1 && plain(last.note).endsWith(' Give the final answer in that simplified form.') && plain(last.note).includes(x), `the value ${x} is stated once, then the answer is asked for in that form: ${page.join(' ; ')} (${plain(last ? last.note : '')})`);
+    ok(r.lines.filter(l => /Give the final answer/.test(l.note || '')).length === 1 && r.lines.every(l => !/simplifies/.test(l.note || '')), `only the last ticked line is asked to simplify: ${page.join(' ; ')}`);
   }
   // the TeX is the exact form the formatter gives
-  ok(run(['16/3 = 2[2(4)^2 - 4^3/3]', '= 2[32 - 64/3]']).lines[1].note.endsWith('equals the line above: $\\frac{64}{3}$.'), 'a fraction is stated once, stacked');
-  ok(run(['12√3 = 12e^(ln(3)/2)']).lines[0].note.endsWith('come to $12\\sqrt{3}$.'), 'a surd is stated once, typeset');
-  ok(run(['6/4 = 6/4']).lines[0].note === 'Both sides come to $\\frac{3}{2}$.', 'a fraction not in lowest terms is stated reduced, once');
+  ok(run(['16/3 = 2[2(4)^2 - 4^3/3]', '= 2[32 - 64/3]']).lines[1].note === 'This equals the line above: $\\frac{64}{3}$. Give the final answer in that simplified form.', 'a fraction is stated once, stacked, then the prompt');
+  ok(run(['12√3 = 12e^(ln(3)/2)']).lines[0].note === 'Both sides come to $12\\sqrt{3}$. Give the final answer in that simplified form.', 'a surd is stated once, typeset, then the prompt');
+  ok(run(['6/4 = 6/4']).lines[0].note === 'Both sides come to $\\frac{3}{2}$. Give the final answer in that simplified form.', 'a fraction not in lowest terms is stated reduced, then the prompt');
   // already one value, a decimal, only a rounded decimal available, an earlier line, a page with a cross, nothing ticked: no sentence
   const single = [['2 + 3 = 5'], ['3 × 4 = 12'], ['6/4 = 3/2'], ['√12 = 2√3'], ['2√3 × 3 = 6√3'], ['3/2 = 1.5'], ['-3/4 = -0.75'], ['196 + 64 = 260', '= 260'], ['2√65 = √(4 × 65)'],
     ['5! = 120'], ['-3^2 = -9'], ['(-3)^2 = 9'], ['1/2 + 1/3 = 5/6'], ['72 = 6 × 12', '= 72'], ['12 × 6 = 6 × 12 = 73'], ['2 + 2 = 5', '3 + 3 = 6'], ['√3/2 = √3/2'], ['7 = 7'],
     ['3 × 4 = 12', '= 12'], ['2π = 2π'], ['-√3/2 = -√3/2'], ['6/3 = 2'], ['10/4 = 5/2'], ['sqrt(3)/2 = (√3)/2'], ['e^2 = e^2'], ['20.78 = 20.78']];
   for (const page of single) {
     const r = run(page);
-    ok(r.lines.every(l => !/simplifies/.test(l.note || '')), `no "simplifies" sentence: ${page.join(' ; ')} (${r.lines.map(l => plain(l.note || ''))})`);
+    ok(r.lines.every(l => !/simplifies|Give the final answer/.test(l.note || '')), `no "simplify" sentence: ${page.join(' ; ')} (${r.lines.map(l => plain(l.note || ''))})`);
   }
   // an earlier unsimplified line does not get it when a later line is ticked
   { const r = run(['72 = 6 × 12', '= 72']); ok(r.lines[0].status === 'ok' && !/simplifies/.test(r.lines[0].note), 'only the LAST ticked line speaks'); }
@@ -506,9 +506,9 @@ ok(model?.cards?.length === 2 && model.cards.every(c => c.status === 'checked' &
   ok(direction.filter(([, w]) => w === BOTH).length >= 25 && !direction.some(([l, w]) => /^\(x\+1\)\^2 - \(x-1\)\^2 = \(\(/.test(l) && /expanding/.test(w)), 'the reviewer\'s page is named nothing');
   // a continuation is held to the same direction
   { const r = run(['x(x+1)', '= x^2 + x', '= x(x+1)']); ok(/expanding brackets\.$/.test(plain(r.lines[1].note)) && /factorising\.$/.test(plain(r.lines[2].note)), `a chain: expanded then factorised (${r.lines.map(l => plain(l.note || ''))})`); }
-  // the value the comment has just stated is not stated again
-  { const r = run(['12', '= 24/2']); ok(r.lines[1].status === 'ok' && !/simplifies/.test(r.lines[1].note), `= 24/2 under = 12 (${r.lines.map(l => plain(l.note || ''))})`); }
-  ok(!/simplifies/.test(run(['2 = 4/2']).lines[0].note), '2 = 4/2 says the value once');
+  // the value the comment has just stated is not stated twice: the student is asked for the answer in that form
+  { const r = run(['12', '= 24/2']); ok(r.lines[1].status === 'ok' && plain(r.lines[1].note) === 'This equals the line above: 12. Give the final answer in that simplified form.', `= 24/2 under = 12 (${r.lines.map(l => plain(l.note || ''))})`); }
+  ok(plain(run(['2 = 4/2']).lines[0].note) === 'Both sides come to 2. Give the final answer in that simplified form.', '2 = 4/2 states the value once, then the prompt');
 
   // every comment this part produced typesets: dollars pair up, the TeX renders, no dash
   { const katex = (await import('katex')).default; const mine = [...comments].filter(c => /simplifies|rule|It matches/.test(c));

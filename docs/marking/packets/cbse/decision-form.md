@@ -7,7 +7,7 @@ Complete one form per examiner. Return the signed original as the README says; t
 ```text
 Jurisdiction:                    cbse
 Syllabus version(s):             cbse-mathematics-2026-27
-Dossier digest reviewed:         b32e5b287bef37467a256cc4a4884d2b10ee06545f1a5c18fdf27170ba2e511d
+Dossier digest reviewed:         926a38960302349daa7eb2bc6382de57319453f95bf46ddff069a89ddc92f3f2
 Repository commit reviewed:      ________________________________________
 Examiner full name:              ________________________________________
 Qualification:                   ________________________________________

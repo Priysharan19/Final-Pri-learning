@@ -372,7 +372,7 @@ function simplifiesTo(side, stated) {
   const exact = exactForm(v);
   if (/[.]|NaN|Infinity/.test(exact.plain)) return '';
   if (compact === exact.plain.replace(/−/g, '-')) return '';       // already the single value
-  if (stated && stated.includes(`$${exact.tex}$`)) return '';      // the comment has just said this value
+  if (stated && stated.includes(`$${exact.tex}$`)) return ' Give the final answer in that simplified form.';   // the value is already said: not said twice
   return ` This simplifies to $${exact.tex}$.`;
 }
 
