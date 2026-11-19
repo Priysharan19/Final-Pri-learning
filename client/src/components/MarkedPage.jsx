@@ -1,7 +1,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · the marked page
 //
-// The student's own page, ink or photo, with a quiet outline round every judged line and,
+// The student's own page, ink or photo: a quiet outline round every judged line of an ink page, a short marker at
+// the left of each line of a photo (the reader's boxes are estimates), and,
 // beside it (below it on a phone), one short comment per line, level with that line.
 // Hovering, focusing or tapping a comment lights its outline and the other way round.
 // Lines Pri could not read as maths are ONE comment, not one each.

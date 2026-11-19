@@ -13,6 +13,10 @@ const SYMBOL = { pi: 'π', theta: 'θ', alpha: 'α', beta: 'β', times: '×', cd
 /** TeX inside one $…$ span as plain text. */
 export function plainMath(tex) {
   let s = String(tex);
+  // An aligned block is its rows, one after another; a root with a simple radicand is settled before fractions so
+  // that \frac{\sqrt{2}}{2} reads (√(2))/(2) and not "√(2)2" (independent review, 20 November 2026).
+  s = s.replace(/\\(?:begin|end)\s*\{[a-zA-Z*]+\}/g, ' ').replace(/\\\\/g, '; ').replace(/&/g, ' ');
+  s = s.replace(/\\sqrt\s*\{([^{}]*)\}/g, '√($1)');
   for (let guard = 0; guard < 6 && /\\[dt]?frac/.test(s); guard += 1) {
     s = s.replace(/\\[dt]?frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, '($1)/($2)');
   }
