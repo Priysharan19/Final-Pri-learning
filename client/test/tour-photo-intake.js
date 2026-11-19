@@ -73,7 +73,7 @@ export const photoIntakeFlow = {
     // ── the empty frame ────────────────────────────────────────────────────
     await page.locator('[data-photo-empty]').waitFor({ state: 'visible', timeout: 15000 });
     await check('the empty frame says one sentence naming JPEG, PNG and HEIC, with one Choose button and a drop hint',
-      /Add a photo of your working — JPEG, PNG or HEIC/.test(await page.locator('[data-photo-empty]').innerText()) &&
+      /Add a photo of your working: JPEG, PNG or HEIC/.test(await page.locator('[data-photo-empty]').innerText()) &&
         await page.locator('[data-photo-choose]').isVisible() && (/drop a photo or PDF/i.test(await page.locator('[data-photo-empty]').innerText()) || /Take a photo/.test(await page.locator('[data-photo-empty]').innerText())), JSON.stringify(await page.locator('[data-photo-empty]').innerText()));
     await check('the typing hint bar ("Type maths the way you would say it") is not shown in Photo mode',
       await page.locator('.editor-hint, .editor-toolbar').count() === 0 && !/Type maths the way you would say it/.test(await page.locator('.qpage').first().innerText()));

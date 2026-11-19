@@ -3264,7 +3264,7 @@ export default {
   'ink.waitingAllowance': "This account has used today’s handwritten answers, so this page can’t be read right now. Type your answer to have it checked.",
   'ink.waitingAllowanceUntil': "This account has used today’s handwritten answers. They renew {when}. Type your answer to have it checked now.",
   'ink.waitingServiceStopped': "Pri’s handwriting reader still isn’t answering. It is no longer being tried by itself: press Try again when you are ready, or type your answer now.",
-  'photo.empty.lead': 'Add a photo of your working — JPEG, PNG or HEIC',
+  'photo.empty.lead': 'Add a photo of your working: JPEG, PNG or HEIC',
   'photo.choose': 'Choose a photo',
   'photo.take': 'Take a photo',
   'photo.pdfBadge': 'PDF',
