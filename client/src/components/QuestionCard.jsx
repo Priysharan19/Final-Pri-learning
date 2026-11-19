@@ -2533,8 +2533,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           <div className="step" key={i}>
             <span className="step-n">{i + 1}</span>
             <div>
-              <div className="step-h"><MathText text={s.h} /></div>
-              <div className="step-d"><MathText text={s.d} /></div>
+              {/* The worked solution is content, in the content's language, like the prompt above. */}
+              <div className="step-h" lang="en"><MathText text={s.h} /></div>
+              <div className="step-d" lang="en"><MathText text={s.d} /></div>
               {/* "Why this step?" — a grounded dialogue about this step; tutor on only, after resolution. */}
               {WhyStep && tutorEnabled && !diagnostic && resolved && (
                 <button type="button" className="btn btn-ghost btn-sm no-print" data-why-step={i} aria-expanded={whyStep === i}
