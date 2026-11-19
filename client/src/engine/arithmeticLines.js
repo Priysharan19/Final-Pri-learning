@@ -29,6 +29,8 @@
 import { parse, normalize, evaluate, variablesOf, exprEquivalent, withEvaluationBudget } from './expr.js';
 import { mathSpan, assignSpan } from './commentTex.js';
 import { justifyStep } from './stepJustify.js';
+import { cleanLatex } from './texSafe.js';
+import { texToPlain } from './texToPlain.js';
 
 // Everything this module evaluates for one page of working is charged to ONE budget (expr.js, "What an evaluation may
 // cost"): what a page costs to check must not depend on what is written on it. When the budget is spent the rest
@@ -805,8 +807,119 @@ function pageDefinitions(raw, out, firstBreak) {
   return broke;
 }
 
-export function stepCheckArithmetic(workingText) {
-  return withEvaluationBudget(PAGE_BUDGET, () => stepCheckArithmeticWithinBudget(workingText));
+/**
+ * `opts.latex`: the reader's TeX for lines of the working, as [{ text, latex }] (a line is matched by its trimmed text).
+ * It is a second reading of a line and is used ONLY to tick or to leave a note, never to cross:
+ *   · the working is checked as written, exactly as without it;
+ *   · a line that came back a note, whose TeX reading is judged true by this same checker, is ticked (its text stays
+ *     the student's);
+ *   · a cross whose line is true under the TeX reading becomes the "may have been misread" note, never a tick;
+ *   · a tick or a note is never turned into a cross.
+ * Both passes are charged to the one page budget.
+ */
+export function stepCheckArithmetic(workingText, opts = null) {
+  return withEvaluationBudget(PAGE_BUDGET, () => {
+    const base = stepCheckArithmeticWithinBudget(workingText);
+    if (!opts || !Array.isArray(opts.latex) || !opts.latex.length) return base;
+    try { return withTexReading(workingText, base, opts.latex); } catch { return base; }
+  });
+}
+
+/**
+ * The content of a line in SOURCE ORDER: each digit, each single letter, each function or constant name. Digits are
+ * single tokens so a run may split or join across a layout command (12 and \frac{1}{2}) but never reorder (21 is not).
+ */
+function contentSignature(text) {
+  const s = String(text).toLowerCase().replace(/√/g, 'sqrt').replace(/π/g, 'pi').replace(/θ/g, 'theta').replace(/²/g, '2').replace(/³/g, '3');
+  return (s.match(/arcsin|arccos|arctan|cosec|sqrt|cbrt|theta|sin|cos|tan|sec|csc|cot|exp|ln|log|pi|\d|[a-z]/g) || []).join(' ');
+}
+
+const FN_RE = 'arcsin|arccos|arctan|cosec|sqrt|cbrt|theta|sin|cos|tan|sec|csc|cot|exp|ln|log|pi';
+/** A line as an ordered run of operands (digit, letter, function name) and explicit operators; brackets and spaces are ignored. */
+function operandOperatorTokens(text) {
+  const s = String(text).toLowerCase().replace(/[−–—]/g, '-').replace(/[×·]/g, '*').replace(/÷/g, '/').replace(/≤/g, '<=').replace(/≥/g, '>=').replace(/≠/g, '!=')
+    .replace(/√/g, 'sqrt').replace(/π/g, 'pi').replace(/θ/g, 'theta').replace(/²/g, '^2').replace(/³/g, '^3');
+  return (s.match(new RegExp(`${FN_RE}|\\d|[a-z]|<=|>=|!=|[+\\-*/^=<>]`, 'g')) || []).map(t => ({ t, op: /^(?:<=|>=|!=|[+\-*/^=<>])$/.test(t) }));
+}
+/**
+ * The text's tokens must be the TeX's with operators deleted and nothing else: every operand in order, every explicit
+ * operator of the text present where it stands, and the TeX adding structure (^, /, *) only where the text has bare adjacency.
+ */
+function sameStatement(text, converted) {
+  const a = operandOperatorTokens(text), b = operandOperatorTokens(converted);
+  let j = 0;
+  for (const x of a) {
+    if (x.op) { if (!(b[j] && b[j].op && b[j].t === x.t)) return false; j++; continue; }
+    // Flattening loses a superscript, a fraction bar, a root and a multiplication dot. It never loses a sign or an equals:
+    // a + - = or comparison the text does not have at that place is another line.
+    while (j < b.length && b[j].op) { if (!/^[\^/*]$/.test(b[j].t)) return false; j++; }
+    if (!(b[j] && b[j].t === x.t)) return false;
+    j++;
+  }
+  return b.slice(j).every(y => y.op && /^[\^/*]$/.test(y.t));
+}
+/** Notes that mean "not judged as one statement" (a label, a trailing equation number, a comma, words), never upgraded. */
+function notOneStatement(text) {
+  const t = String(text).replace(/[−–—]/g, '-');
+  if (/^\(?\d{1,3}[.)](?:\s|$)|^\(\d{1,3}\)|\s\(\d{1,3}\)\s*$|[,;:]|^[+*/×÷]|^-\s|\d\s+\.\s*\d|\d\s*\.\s+\d/.test(t)) return true;
+  const known = new RegExp(`^(?:${FN_RE})$`);
+  for (const w of t.toLowerCase().match(/[a-z]+/g) || []) {
+    if (known.test(w) || w.length === 1) continue;
+    if (w.length >= 3 || /^(?:so|is|if|or|to|of|as|by|we|at|an|it|be|do|no|on)$/.test(w)) { if (!/^(?:sin|cos|tan|sec|csc|cot|exp|log|ln)/.test(w)) return true; }
+  }
+  return false;
+}
+
+function withTexReading(workingText, base, pairs) {
+  const raw = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
+  if (base.lines.length !== raw.length) return base;
+  const byText = new Map();
+  for (const pair of pairs) {
+    const key = String(pair?.text ?? '').trim(), tex = cleanLatex(pair?.latex);
+    if (!key || !tex) continue;
+    // Two lines with the same text and different TeX: neither is trusted.
+    byText.set(key, byText.has(key) && byText.get(key) !== tex ? null : tex);
+  }
+  const alt = raw.map(line => {
+    const tex = byText.get(line);
+    const plain = tex ? texToPlain(tex) : null;
+    return plain && plain.replace(/\s+/g, '') !== line.replace(/\s+/g, '') ? plain : null;
+  });
+  if (!alt.some(Boolean)) return base;
+  const second = stepCheckArithmeticWithinBudget(raw.map((line, i) => alt[i] ?? line).join('\n'));
+  if (second.lines.length !== base.lines.length) return base;
+  const lines = base.lines.map(l => ({ ...l }));
+  let changed = false, downgraded = false;
+  const trueUnderTex = i => alt[i] !== null && second.lines[i].status === 'ok' && second.lines[i].state === 'arithmetic';
+  // AGREEMENT applies to the UPGRADE to a tick only: a tick says the line is right, so the TeX must describe the same
+  // content as the text (same digits, letters and function names; a word or a different number in the text that the TeX
+  // lacks means it is another line). The DOWNGRADE of a cross to the "may have been misread" note stays permissive: any
+  // validated TeX reading that makes the line true softens the cross to a note, which claims nothing.
+  const sameContent = i => contentSignature(raw[i]) === contentSignature(alt[i]) && sameStatement(raw[i], alt[i]) && !notOneStatement(raw[i]);
+  // A cross that stands (the TeX does not clear that line) still governs the lines below it: nothing there is ticked.
+  const standing = base.firstBreak !== -1 && !trueUnderTex(base.firstBreak) ? base.firstBreak : -1;
+  base.lines.forEach((p, i) => {
+    const t = second.lines[i];
+    if (!trueUnderTex(i) || (standing !== -1 && i > standing)) return;
+    if (p.status === 'note') { if (!sameContent(i)) return; lines[i] = { ...t, text: p.text }; changed = true; }
+    else if (p.status === 'break') { lines[i] = { text: p.text, status: 'note', note: MISREAD_NOTE, unverified: true }; changed = true; downgraded = true; }
+  });
+  if (!changed) return base;
+  // The cross is gone: the lines that followed from it no longer follow from a slip.
+  if (downgraded) lines.forEach((l, i) => { if (l.status === 'note' && l.note === 'Follows from the earlier slip.') lines[i] = { ...l, note: MISREAD_NOTE }; });
+  const state = l => l.state || (l.status === 'break' ? 'wrong' : l.unreadable ? 'unread' : 'unverified');
+  const full = lines.map(l => ({ ...l, state: state(l) }));
+  const at = st => full.flatMap((l, k) => (l.state === st ? [k + 1] : []));
+  const unverified = at('unverified'), unread = at('unread');
+  const firstBreak = full.findIndex(l => l.status === 'break');
+  return {
+    ...base,
+    lines: full,
+    firstBreak,
+    diagnosis: firstBreak === -1 ? null : base.diagnosis,
+    summary: { ...base.summary, checked: full.filter(l => l.status === 'ok').length, arithmetic: at('arithmetic'), wrong: at('wrong'), unverified, unread,
+      reason: unverified.length ? base.summary.reason || 'Pri checks only the arithmetic on this question. These lines have none it can check on its own.' : null }
+  };
 }
 function stepCheckArithmeticWithinBudget(workingText) {
   const raw = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
