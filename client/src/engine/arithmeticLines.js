@@ -680,8 +680,156 @@ function rootList(text) {
   return { letter: m[1], items };
 }
 
-function pageDefinitions(raw, out, firstBreak) {
-  const defs = {};            // 'k' → { expr, line }, 'f' → { expr, variable, line }, "u'" → …
+
+// ── What the question itself gives (questionFacts.js) ────────────────────────────────────────────────────────────────
+// Owner's page, 20 November 2026: `y = 2x(4 - x)` copied from the question, and `Area = ∫_0^4 2x(4 - x) dx` setting up
+// the integral it asks for, were true lines that got only a note. The prompt's own facts (questionFacts.js, read from the
+// prompt alone) are used as follows, and only to TICK or to leave a note, never to cross:
+//   · a line that restates a given definition, or is the same function of the same letters, is ticked as given;
+//   · a given equation, an asked expression or an asked integral written out again is ticked as given (same text);
+//   · a given definition is put in as the page's own, for the later lines that use it (y(2) = 8, y' = …);
+//   · `Area = ∫_a^b f dx` is ticked when f is the one curve the question gives, it is a quadratic that opens downward,
+//     a and b are its two roots, and the question asks for the area bounded by the curve and the x-axis;
+//   · a line that nearly copies a given but differs (one digit or sign) stays a note saying so.
+const GIVEN_NOTE = 'This is given in the question.';
+const MISMATCH_NOTE = 'This does not match what the question gives: check you copied it correctly.';
+const PART_LABEL = /^\(?(?:[a-h]|i{1,3}|iv|v|vi{0,3})[.)]\s|^\([a-h]\)|^(?:part|question|q)\s*\(?[a-h0-9]/i;
+
+/** The text of a statement with spacing, products and redundant outer brackets set aside: equal keys are the same writing. */
+function textKey(s) {
+  let t = cleanStatement(String(s).replace(/\s*\.\s*$/, '')).replace(/\s+/g, '');
+  t = t.replace(/(?<!\d)\*|\*(?!\d)/g, '').replace(/([_^])\{(-?[A-Za-z0-9]+)\}/g, '$1$2');
+  for (let k = 0; k < 4 && t.startsWith('(') && t.endsWith(')'); k++) {
+    let depth = 0, whole = true;
+    for (let j = 0; j < t.length; j++) { if (t[j] === '(') depth++; else if (t[j] === ')') depth--; if (depth === 0 && j < t.length - 1) { whole = false; break; } }
+    if (!whole) break;
+    t = t.slice(1, -1);
+  }
+  return t;
+}
+function editDistance(a, b, cap) {
+  if (Math.abs(a.length - b.length) > cap) return cap + 1;
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const row = [i];
+    for (let j = 1; j <= b.length; j++) row[j] = Math.min(prev[j] + 1, row[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = row;
+  }
+  return prev[b.length];
+}
+const sameExpr = (a, b) => { const x = infoOf(cleanStatement(a)), y = infoOf(cleanStatement(b)); return !!(x && y && sameAsWritten(x, y)); };
+
+/** The prompt's facts, checked and ready to use: { byName, seeds, texts, area } or null. */
+function prepareFacts(facts) {
+  if (!facts || typeof facts !== 'object') return null;
+  const byName = new Map(), texts = new Set();
+  for (const d of Array.isArray(facts.defs) ? facts.defs.slice(0, 20) : []) {
+    if (!d || typeof d.name !== 'string' || typeof d.expr !== 'string' || !/^[A-Za-z]$/.test(d.name)) continue;
+    const expr = cleanStatement(d.expr), info = infoOf(expr);
+    if (!info || (info.value === undefined && !info.vars)) continue;
+    const vars = info.vars || [];
+    const variable = d.variable || (vars.length === 1 ? vars[0] : null);
+    const list = byName.get(d.name) || [];
+    if (!list.some(e => e.key === textKey(expr))) list.push({ name: d.name, variable, expr, info, vars, key: textKey(expr) });
+    byName.set(d.name, list);
+  }
+  for (const list of [facts.equations, facts.asks, facts.integrals]) for (const e of Array.isArray(list) ? list.slice(0, 20) : []) if (e && typeof e.text === 'string' && e.text.length <= 160) texts.add(textKey(e.text));
+  // The seeds: a name given once, as one function of one letter or as one number.
+  const seeds = {};
+  for (const [name, list] of byName) {
+    if (list.length !== 1) continue;
+    const e = list[0];
+    if (e.info.value === undefined && e.vars.length !== 1) continue;
+    seeds[name] = { expr: e.expr, shown: e.expr, variable: e.info.value !== undefined ? null : e.variable, line: -1e9, given: true };
+  }
+  // The area bounded by the one curve and the x-axis: its form is checked here, its limits when a line states them.
+  let area = null;
+  if (facts.area && typeof facts.area.name === 'string' && byName.get(facts.area.name)?.length === 1) {
+    const e = byName.get(facts.area.name)[0], f = e.vars.length === 1 ? fnOf(e.expr, e.vars[0]) : null;
+    const limitsAreRoots = (Array.isArray(facts.area.limits) ? facts.area.limits : []).every(l => { const v = typeof l.value === 'string' ? numberOf(l.value) : null; return v !== null && f && f(v) !== null && Math.abs(f(v)) <= 1e-9; });
+    if (f && limitsAreRoots) area = { entry: e, f, variable: e.vars[0] };
+  }
+  return byName.size || texts.size ? { byName, seeds, texts, area } : null;
+}
+
+/** `Area = ∫_a^b f dx` for the question's quadratic curve between its two roots, opening downward: true, so ticked. */
+function areaLineHolds(rhs, prep) {
+  if (!prep || !prep.area) return false;
+  const m = new RegExp(`^∫_${LIM}\\^${LIM}\\s*(.+?)\\s*d([a-z])$`).exec(rhs.trim());
+  if (!m) return false;
+  const limit = raw => { const info = infoOf(raw.replace(/^\{|\}$/g, '')); return info && info.value !== undefined ? info.value : null; };
+  const a = limit(m[1]), b = limit(m[2]), body = infoOf(m[3]);
+  const { f, variable, entry } = prep.area;
+  if (a === null || b === null || !(a < b) || !body || !body.vars || body.vars.join() !== variable || m[4] !== variable) return false;
+  if (!sameAsWritten(body, entry.info)) return false;
+  const at5 = [0, 1, 2, 3, 4].map(k => f(a + (b - a) * k / 4));
+  if (at5.some(v => v === null)) return false;
+  const scale = Math.max(1, ...at5.map(Math.abs));
+  const d1 = at5.slice(1).map((v, k) => v - at5[k]), d2 = d1.slice(1).map((v, k) => v - d1[k]), d3 = d2.slice(1).map((v, k) => v - d2[k]);
+  const quadratic = d3.every(v => Math.abs(v) <= 1e-9 * scale) && Math.abs(d2[0]) > 1e-6 * scale;
+  return quadratic && Math.abs(at5[0]) <= 1e-9 * scale && Math.abs(at5[4]) <= 1e-9 * scale && at5[2] > 1e-9 * scale;
+}
+
+/**
+ * What the prompt says about one line (the line without its label). { tick, carry } for a line that is given,
+ * { mismatch } for a line that nearly copies a given and differs, else null. Never a cross.
+ */
+function givenVerdict(src, prep, afterPart) {
+  const text = cleanStatement(src.replace(/^(?:so|hence|then|therefore|thus|∴)\s+/i, '').replace(/\s*\.\s*$/, ''));
+  if (!text || STATEMENT_SPLIT.test(text) || /\d\s+\d/.test(text) || /[<>≤≥≠≈%°,;]|==|!=/.test(text)) return null;
+  const parts = text.split('=').map(x => x.trim());
+  if (parts.length >= 2 && parts.every(Boolean)) {
+    const head = /^([A-Za-z])(?:\(([a-z])\))?$/.exec(parts[0]);
+    const entries = head ? prep.byName.get(head[1]) : null;
+    if (head && entries) {
+      const rhs = parts.slice(1);
+      const usable = entries.filter(e => !head[2] || e.info.value !== undefined || head[2] === e.variable);
+      if (rhs.every(p => usable.some(e => sameExpr(p, e.expr)))) {
+        const e = usable.find(x => sameExpr(rhs[rhs.length - 1], x.expr));
+        return { tick: true, carry: e.info.value === undefined && e.variable ? { text: rhs[rhs.length - 1], variable: e.variable } : null };
+      }
+      // A near copy of the one definition the prompt gives (one digit or sign changed): a note, never a cross.
+      if (!afterPart && entries.length === 1 && rhs.length === 1) {
+        const e = entries[0], k = textKey(rhs[0]), info = infoOf(rhs[0]);
+        const near = e.info.value !== undefined
+          ? info && info.value !== undefined && /^-?\d+(?:\.\d+)?$/.test(k) && !closeLoose(info.value, e.info.value) && info.value !== 0 && editDistance(k, e.key, 1) <= 1
+          : info && info.vars && info.vars.join() === e.vars.join() && k.length >= 3 && !sameAsWritten(info, e.info) && editDistance(k, e.key, 2) <= 2;
+        if (near) return { mismatch: head[1] };
+      }
+    }
+    // A name set to the expression the prompt asks about (y = x^2 sin x): a definition of the question's own expression.
+    if (head && !entries && parts.length === 2 && prep.texts.has(textKey(parts[1]))) return { tick: true, carry: null };
+  }
+  // The question's own equation, expression or integral written out again, in the same words.
+  if (prep.texts.has(textKey(text))) return { tick: true, carry: null };
+  return null;
+}
+
+/** `∫_0^4 y dx` with y given by the question: the given function put in, so the integral is worked out as written. */
+function putGivenInIntegrals(raw, prep) {
+  if (!prep || !Object.keys(prep.seeds).length) return raw;
+  const active = new Map(Object.entries(prep.seeds));
+  return raw.map(line => {
+    if (PART_LABEL.test(line)) active.clear();
+    const src = line.replace(/^\(?[a-h1-9ivx]{1,3}[.)]\s+/i, '').replace(/^[A-Za-z][A-Za-z ]{1,24}:\s*(?=\S)/, '');
+    const set = /^(?:let\s+)?([A-Za-z])(?:\(([a-z])\))?\s*=\s*(.+)$/i.exec(src.replace(/\s*\.\s*$/, ''));
+    if (set && active.has(set[1]) && !/∫/.test(set[3])) {
+      const seed = active.get(set[1]);
+      if (!set[3].split('=').every(p => sameExpr(p, seed.expr))) active.delete(set[1]);
+    }
+    if (!/∫/.test(line) || !active.size) return line;
+    return line.replace(new RegExp(INTEGRAL.source, 'g'), (whole, lo, hi, body, v) => {
+      const nm = /^([A-Za-z])(?:\(([a-z])\))?$/.exec(body.trim());
+      const seed = nm && nm[1] !== v ? active.get(nm[1]) : null;
+      if (!seed || seed.variable !== v || (nm[2] && nm[2] !== v)) return whole;
+      return `∫_${lo}^${hi}(${seed.expr})d${v}`;
+    });
+  });
+}
+
+function pageDefinitions(raw, out, firstBreak, prep = null) {
+  const defs = prep ? { ...prep.seeds } : {};   // 'k' → { expr, line }, 'f' → { expr, variable, line }, "u'" → …   (what the question gives is in from the start)
+  let afterPart = false;
   let equation = null;        // the last equation in one unknown: { left, right, variable }
   let broke = null;
   let carry = null;           // { text, variable }: what the last line this pass ticked came to, for the `=` line below
@@ -692,7 +840,7 @@ function pageDefinitions(raw, out, firstBreak) {
     const zeroFor = zeroed && zeroed.line === i - 1 ? zeroed : null;
     zeroed = null;
     // A new part of the question may give a letter a new value on the paper, not on the page: what was defined is dropped.
-    if (/^\(?(?:[a-h]|i{1,3}|iv|v|vi{0,3})[.)]\s|^\([a-h]\)|^(?:part|question|q)\s*\(?[a-h0-9]/i.test(raw[i])) { for (const k of Object.keys(defs)) delete defs[k]; equation = null; carry = null; }
+    if (/^\(?(?:[a-h]|i{1,3}|iv|v|vi{0,3})[.)]\s|^\([a-h]\)|^(?:part|question|q)\s*\(?[a-h0-9]/i.test(raw[i])) { for (const k of Object.keys(defs)) delete defs[k]; equation = null; carry = null; afterPart = true; }
     const src = raw[i].replace(/^\(?[a-h1-9ivx]{1,3}[.)]\s+/i, '').replace(/^[A-Za-z][A-Za-z ]{1,24}:\s*(?=\S)/, '');
     // `y' = 0` (with or without words before it) straight after a derivative the page set: the next line may set that derivative to zero.
     { const zm = src.replace(/\s*\.\s*$/, '').match(/^(?:[A-Za-z][A-Za-z ]*\s+)?([A-Za-z])'\s*=\s*0$/);
@@ -714,12 +862,26 @@ function pageDefinitions(raw, out, firstBreak) {
         continue;
       }
     }
+    // What the question gives (see "What the question itself gives"): an integral line, before the lines with no integral.
+    if (prep && out[i].status === 'note' && /∫/.test(src)) {
+      const body = src.replace(/\s*\.\s*$/, '').replace(/^(?:so|hence|then|therefore|thus|∴)\s+/i, '');
+      const area = /^(?:area|a)\s*=\s*(∫.+)$/i.exec(cleanStatement(body));
+      let line = null;
+      if (area && areaLineHolds(area[1], prep)) line = 'This integral is the area bounded by the curve and the x-axis.';
+      else if (!/=/.test(body) && prep.texts.has(textKey(body))) line = GIVEN_NOTE;
+      if (line) { out[i] = { text: out[i].text, status: 'ok', state: 'arithmetic', note: line, valueChain: { rule: 'question-given' } }; carry = null; continue; }
+    }
     if (/[<>≤≥≠≈%°,;:]|==|!=|√\s*\[|∫|\]_/.test(src)) continue;
     const decimal = /\d\.\d|(?:^|[^\d])\.\d/.test(src);
     const ticks = [], facts = [];
     let cross = null;
     const carried = carry;
     carry = null;
+    if (prep && out[i].status === 'note' && !/^=/.test(src.trim())) {
+      const g = givenVerdict(src, prep, afterPart);
+      if (g && g.tick) { out[i] = { text: out[i].text, status: 'ok', state: 'arithmetic', note: GIVEN_NOTE, valueChain: { rule: 'question-given' } }; carry = g.carry; }
+      else if (g && g.mismatch) { out[i] = { ...out[i], note: MISMATCH_NOTE }; delete defs[g.mismatch]; continue; }
+    }
     // A `=` line under a line this pass ticked: the same expression carried on (tick only).
     if (/^=/.test(src.trim()) && carried && out[i].status === 'note' && !STATEMENT_SPLIT.test(src)) {
       const sides = cleanStatement(src.trim()).split('=').map(x => x.trim()).slice(1);
@@ -773,7 +935,7 @@ function pageDefinitions(raw, out, firstBreak) {
           }
           if (tried >= 3 && agree === tried) { carry = { text: claim.text, variable }; ticks.push(`This is the derivative of ${assignSpan(m[1], d.shown)}${lettersOf(d.shown).every(c => c === variable) ? derivativeRuleWords(base.text, variable) : ''}.`); facts.push([`${m[1]}'`, { expr: parts[1], shown: parts[1], variable: m[2] || d.variable || null, line: i }]); return; }
           // A number on the right is the gradient at a point (y' = 3√2/2), not a wrong derivative: never crossed.
-          if (tried >= 3 && differ === tried && !decimal && lettersOf(claim.text).includes(variable)) { cross = `The derivative of ${assignSpan(m[1], d.shown)} is not ${mathSpan(parts[1])}.`; return; }
+          if (tried >= 3 && differ === tried && !decimal && !d.given && lettersOf(claim.text).includes(variable)) { cross = `The derivative of ${assignSpan(m[1], d.shown)} is not ${mathSpan(parts[1])}.`; return; }
         }
         return;
       }
@@ -797,7 +959,8 @@ function pageDefinitions(raw, out, firstBreak) {
             const numbers = infos.every(x => x.value !== undefined);
             const same = infos.every(x => sameAsWritten(x, infos[0]));
             const from = used.map(k => assignSpan(k, defs[k].shown)).join(', ');
-            if (same && used.length) ticks.push(numbers ? `With ${from} from above, each side comes to ${shown(infos[0].value)}.` : `With ${from} from above, the sides are the same expression.`);
+            const where = used.length && used.every(k => defs[k].given) ? 'from the question' : 'from above';
+            if (same && used.length) ticks.push(numbers ? `With ${from} ${where}, each side comes to ${shown(infos[0].value)}.` : `With ${from} ${where}, the sides are the same expression.`);
             // Crossed only in a worked chain under a name (A = 12e^(4k) = 12e^(ln(3)/4)): there the two sides are stated
             // equal. Two sides on their own (x^2 = 9 after x = 2) may be a new equation to solve, so that is a note.
             // …and only against a value set on this line or the line straight above it: an older value may belong to
@@ -852,7 +1015,7 @@ function pageDefinitions(raw, out, firstBreak) {
     const firstTick = verdicts.indexOf('tick');
     const lineHolds = firstTick !== -1 && verdicts[verdicts.length - 1] === 'tick' && verdicts.slice(firstTick).every(v => v === 'tick') && !verdicts.includes('bad');
     if (cross) { broke = { index: i, message: cross }; break; }
-    for (const [name, d] of facts) if (!d.open) defs[name] = d;
+    for (const [name, d] of facts) if (!d.open) { defs[name] = d; if (prep && prep.seeds[name] && !/'/.test(name) && sameExpr(d.shown, prep.seeds[name].expr)) d.given = true; }
     // A letter set on this line in a way this pass did not record (`Let x = 4`, `x = 4 now`) no longer has its old value.
     for (const k of Object.keys(defs)) if (!facts.some(([name]) => name === k) && new RegExp(`(?<![A-Za-z])${k.replace(/[^A-Za-z]/g, '\\$&')}\\s*=`).test(src)) delete defs[k];
     if (!lineHolds) { if (ticks.length) carry = null; continue; }
@@ -870,12 +1033,17 @@ function pageDefinitions(raw, out, firstBreak) {
  *   · a cross whose line is true under the TeX reading becomes the "may have been misread" note, never a tick;
  *   · a tick or a note is never turned into a cross.
  * Both passes are charged to the one page budget.
+ *
+ * `opts.facts`: what the question's prompt gives (questionFacts.js). Used only to tick or leave a note; see "What the
+ * question itself gives". Without it the check is exactly what it was.
  */
 export function stepCheckArithmetic(workingText, opts = null) {
   return withEvaluationBudget(PAGE_BUDGET, () => {
-    const base = stepCheckArithmeticWithinBudget(workingText);
+    let prep = null;
+    try { prep = opts && opts.facts ? prepareFacts(opts.facts) : null; } catch { prep = null; }
+    const base = stepCheckArithmeticWithinBudget(workingText, prep);
     if (!opts || !Array.isArray(opts.latex) || !opts.latex.length) return base;
-    try { return withTexReading(workingText, base, opts.latex); } catch { return base; }
+    try { return withTexReading(workingText, base, opts.latex, prep); } catch { return base; }
   });
 }
 
@@ -924,7 +1092,7 @@ function notOneStatement(text) {
   return false;
 }
 
-function withTexReading(workingText, base, pairs) {
+function withTexReading(workingText, base, pairs, prep = null) {
   const raw = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
   if (base.lines.length !== raw.length) return base;
   const byText = new Map();
@@ -940,7 +1108,7 @@ function withTexReading(workingText, base, pairs) {
     return plain && plain.replace(/\s+/g, '') !== line.replace(/\s+/g, '') ? plain : null;
   });
   if (!alt.some(Boolean)) return base;
-  const second = stepCheckArithmeticWithinBudget(raw.map((line, i) => alt[i] ?? line).join('\n'));
+  const second = stepCheckArithmeticWithinBudget(raw.map((line, i) => alt[i] ?? line).join('\n'), prep);
   if (second.lines.length !== base.lines.length) return base;
   const lines = base.lines.map(l => ({ ...l }));
   let changed = false, downgraded = false;
@@ -1079,9 +1247,9 @@ function vectorSide(raw) {
 const sameVectorSide = (a, b) => (a.vec && b.vec ? a.vec.length === b.vec.length && a.vec.every((x, k) => closeLoose(x, b.vec[k])) : a.num !== undefined && b.num !== undefined && closeLoose(a.num, b.num));
 const showVector = v => `(${v.map(x => String(Number(x.toPrecision(12)))).join(', ')})`;
 
-function stepCheckArithmeticWithinBudget(workingText) {
+function stepCheckArithmeticWithinBudget(workingText, prep = null) {
   const original = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
-  const raw = original.map(normaliseInk);
+  const raw = putGivenInIntegrals(original.map(normaliseInk), prep);
   const columns = findColumns(raw), columnMembers = new Set([...columns.values()].flatMap(c => c.members));
   const lastValue = new Map();   // line index → the value a ticked line came to (for a bare value written under it)
   const out = [];
@@ -1351,7 +1519,7 @@ function stepCheckArithmeticWithinBudget(workingText) {
   // The second pass: what the page itself defines (see pageDefinitions).
   {
     let broke = null;
-    try { broke = pageDefinitions(raw, out, firstBreak); } catch { broke = null; }
+    try { broke = pageDefinitions(raw, out, firstBreak, prep); } catch { broke = null; }
     if (broke) {
       const message = broke.message;
       diagnosis = { code: 'page-definition-not-held', title: 'This line does not agree with what you wrote above', message, fix: 'Put the value from the earlier line in again and work this line out once more.', confidence: 'high' };

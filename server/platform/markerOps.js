@@ -25,6 +25,7 @@ import { checkProof } from '../../client/src/engine/proofSteps.js';
 // module reads no environment itself: markingPolicy.js imports nothing.
 import { policyOf } from './markingPolicy.js';
 import { stepCheckArithmetic } from '../../client/src/engine/arithmeticLines.js';
+import { questionFacts } from '../../client/src/engine/questionFacts.js';
 import { missingSteps } from '../../client/src/engine/missingSteps.js';
 import { infoOf as arithmeticInfo, cleanStatement } from '../../client/src/engine/arithmeticLines.js';
 import { annotateMilestones } from '../../client/src/engine/milestones.js';
@@ -95,7 +96,13 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
   // No Step Check for this question: the arithmetic on each line is still checked (engine/arithmeticLines.js).
   // That report proves only that stated numbers are equal; it reaches no mark below (meta is null there).
   if (!meta && steps && !report && typeof steps === 'string' && !OBJECTIVE.has(q.answerType) && !Array.isArray(q.boardScheme)) {
-    try { report = stepCheckArithmetic(steps, opts && Array.isArray(opts.latex) ? { latex: opts.latex } : null); } catch { report = null; }
+    // What the question's own prompt gives (engine/questionFacts.js: read from `prompt` alone, never the answer or the
+    // solution) lets a line that copies it, or sets up what it asks for, be ticked. `opts.facts` overrides it (the audit
+    // measures with and without); it is never the typed final answer, which is not parsed here.
+    try {
+      const facts = opts && Object.hasOwn(opts, 'facts') ? opts.facts : questionFacts(q);
+      report = stepCheckArithmetic(steps, { latex: opts && Array.isArray(opts.latex) ? opts.latex : null, facts });
+    } catch { report = null; }
     // Nothing judged (no line was arithmetic): the reply says nothing about the lines, as before.
     if (report && !report.lines.some(l => l.status === 'ok' || l.status === 'break')) report = null;
   }

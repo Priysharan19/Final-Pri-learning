@@ -13,6 +13,7 @@
 //         it reaches no mark, and the result card never calls it "consistent
 //         with the correct solution".
 import { stepCheckArithmetic, exactForm } from '../src/engine/arithmeticLines.js';
+import { questionFacts } from '../src/engine/questionFacts.js';
 import { plainComment, dollarsBalanced, mathSpan, fragmentTex, derivativeMarkTex, typesetDerivativeMarks } from '../src/engine/commentTex.js';
 import { fullyVerifiedWorking } from '../src/engine/misconceptions.js';
 import { workingEvidence, workingEvidenceCopy } from '../src/components/attemptEvidence.js';
@@ -716,6 +717,119 @@ ok(model?.cards?.length === 2 && model.cards.every(c => c.status === 'checked' &
   ok(stat(['|[14;8]| = √(14^2 + 8^2)']) === 'T' && stat(['|[14;8]| = 16']) === '.' && stat(['|[3;4]| = 5', '= √25']) === 'TT', 'a magnitude');
   ok(stat(['[1;2;3] + [1;1;1] = [2;3;4]', '2[1;2] = [2;4]', '-[1;2] = [-1;-2]', '[1;2] - [3;5] = [-2;-3]']) === 'TTTT' && stat(['[1;2;3] + [1;1] = [2;3;4]']) === '.', 'three components, a minus, a scalar; vectors of different size are not compared');
   ok(!/X/.test(stat(['[1;2] = [2;1]', '[1;2] + [1;2] = [2;5]', '|[3;4]| = 6', '= |[3;4]|'])), 'no vector line is ever crossed');
+}
+
+// ── Part 5 · what the question itself gives (engine/questionFacts.js) ────────────────────────────────────────────────
+// Owner's page, 20 November 2026: `y = 2x(4 - x)` copied from the question and `Area = ∫_0^4 2x(4 - x) dx` setting up the
+// integral it asks for were true lines that got only a note. The question's facts are read from the PROMPT alone and used
+// to tick or leave a note, never to cross.
+{
+  const code = report => report.lines.map(l => (l.status === 'ok' ? 'T' : l.status === 'break' ? 'X' : '.')).join('');
+  const P = (prompt, lines, extra = {}) => keep(stepCheckArithmetic(lines.join('\n'), { facts: questionFacts({ prompt }), ...extra }));
+  const S = (prompt, lines) => code(P(prompt, lines));
+  const noFacts = lines => code(keep(stepCheckArithmetic(lines.join('\n'))));
+  const noteOf = (prompt, lines, k) => P(prompt, lines).lines[k].note;
+  const GIVEN = 'This is given in the question.', MISMATCH = 'This does not match what the question gives: check you copied it correctly.';
+  const AREA = 'The curve $y = 2x(4 - x)$ crosses the x-axis at two points. Find the area bounded by the curve and the x-axis.';
+
+  // the owner's page, line by line
+  const PAGE5 = ['y = 2x(4 - x)', 'Area = ∫_0^4 2x(4 - x) dx', '= 2∫_0^4 4x - x^2 dx', '= 2[2x^2 - x^3/3]_0^4', '= 2[32 - 64/3]', '64/3'];
+  ok(noFacts(PAGE5) === '..TTTT', `before: the first two lines were only notes (${noFacts(PAGE5)})`);
+  ok(S(AREA, PAGE5) === 'TTTTTT', `the owner's page: every line is ticked (${S(AREA, PAGE5)})`);
+  ok(noteOf(AREA, PAGE5, 0) === GIVEN, 'the copied curve is ticked as given in the question');
+  ok(/area bounded by the curve and the x-axis/.test(noteOf(AREA, PAGE5, 1)) && !/mark|right step|correct method/i.test(noteOf(AREA, PAGE5, 1)), 'the integral line says what the integral is, not that it is the right step');
+  ok(P(AREA, PAGE5).firstBreak === -1, 'nothing on the owner\'s page is crossed');
+  ok(S(AREA, ['y = 2x(4 - x)', 'Area = ∫_0^4 y dx', '= 64/3']) === 'TTT', 'the integral of the given y is worked out as written');
+  ok(S(AREA, ['Area = ∫_{0}^{4} 2x(4 - x) dx', 'A = ∫_0^4 2x(4 - x) dx']) === 'TT', 'braced limits and a one-letter label');
+  ok(S(AREA, ['Area = ∫_0^4 2x(4 - x) dx = 64/3']) === 'T', 'the integral with its value on one line');
+  ok(S(AREA, ['y = 2x(4 - x)', '= 8x - 2x^2', '= 2x(4 - x)']) === 'TTT', 'the given curve written another way, and back');
+  ok(S(AREA, ['y = 8x - 2x^2']) === 'T' && noteOf(AREA, ['y = 8x - 2x^2'], 0) === GIVEN, 'the given curve expanded is the same function of x: ticked');
+  ok(S(AREA, ['y = 2x(4 - x) = 8x - 2x^2']) === 'T', 'a chain of the given curve and its expansion');
+
+  // near misses: never ticked, never crossed
+  for (const [line, why] of [['y = 2x(4 + x)', 'a sign changed'], ['y = 3x(4 - x)', 'a digit changed'], ['y = 2x(5 - x)', 'a digit changed in the bracket'], ['y = 2x(4 - x) + 1', 'a term added'], ['y = 2x(4 - x)^2', 'a power added']])
+    ok(S(AREA, [line]) === '.', `not ticked: ${line} (${why})`);
+  ok(noteOf(AREA, ['y = 2x(4 + x)'], 0) === MISMATCH && noteOf(AREA, ['y = 3x(4 - x)'], 0) === MISMATCH, 'a near copy is a note that says it does not match what the question gives');
+  ok(noteOf(AREA, ['y = 2x(4 - x) + 1'], 0) !== GIVEN && !/does not match/.test(noteOf(AREA, ['y = x + 5'], 0)), 'a line that is not close to the given gets the ordinary note');
+  for (const line of ['Area = ∫_0^4 2x(4 - x)^2 dx', 'Area = ∫_0^3 2x(4 - x) dx', 'Area = ∫_1^4 2x(4 - x) dx', 'Area = ∫_0^4 2x(4 + x) dx', 'Area = ∫_0^4 x(4 - x) dx', 'Area = ∫_-4^0 2x(4 - x) dx', 'Area = ∫_4^0 2x(4 - x) dx', 'Area = ∫_0^4 2x(4 - x) dt'])
+    ok(S(AREA, [line]) === '.', `an area line that is not the question's integral is not ticked: ${line}`);
+  ok(!/X/.test(S(AREA, ['y = 2x(4 + x)', 'y(2) = 24', "y' = 8 + 4x", 'y = 0', 'Area = ∫_0^4 2x(4 + x) dx', '= 64/3'])) , 'a miscopied given crosses nothing');
+  ok(S(AREA, ['y = 2x(4 + x)', 'y(2) = 24']) === '..', 'after a miscopy the page is not read against the question\'s y either');
+  ok(S('The curve $y = x(x - 4)$ and the x-axis enclose a region. Find the area bounded by the curve and the x-axis.', ['Area = ∫_0^4 x(x - 4) dx']) === '.', 'a curve that opens upward: the integral is minus the area, so the line is not ticked');
+  ok(S('The curve $y = x^3 - x$. Find the area bounded by the curve and the x-axis between $x = -1$ and $x = 0$.', ['Area = ∫_-1^0 x^3 - x dx']) === '.', 'a cubic is not read as a quadratic: not ticked');
+  ok(S('The curve $y = 2x(4 - x)$ and the line $y = x$. Find the area bounded by the curve and the x-axis.', ['Area = ∫_0^4 2x(4 - x) dx']) === '.', 'a second boundary named: no area rule');
+  ok(S('The curve $y = 2x(4 - x)$. Find the area bounded by the curve, the x-axis and the line $x = 1$.', ['Area = ∫_0^4 2x(4 - x) dx']) === '.', 'a boundary line x = 1: no area rule');
+  ok(S('The curve $y = 2x(4 - x)$. Find the area bounded by the curve and the x-axis from $x = 1$ to $x = 3$.', ['Area = ∫_0^4 2x(4 - x) dx']) === '.', 'limits that are not roots: no area rule');
+  ok(S('The curve $y = 2x(4 - x)$ meets the x-axis at $x = 0$ and $x = 4$. Find the area bounded by the curve and the x-axis.', ['Area = ∫_0^4 2x(4 - x) dx']) === 'T', 'limits stated in the prompt that are the roots: still ticked');
+  ok(S('Find the area enclosed by $y = 2x(4 - x)$ and the x-axis.', ['Area = ∫_0^4 2x(4 - x) dx']) === 'T', 'enclosed, with the curve stated in the same sentence');
+  ok(S('The curve $y = 2x(4 - x)$ is drawn. Find its gradient at $x = 1$.', ['Area = ∫_0^4 2x(4 - x) dx']) === '.', 'no area asked: the integral is not ticked');
+
+  // later lines use the given as page definitions
+  ok(S(AREA, ['y(2) = 8']) === 'T' && S(AREA, ['y(2) = 9']) === '.', 'y(2) = 8 is ticked from the given y, y(2) = 9 is a note');
+  ok(S(AREA, ["y' = 8 - 4x"]) === 'T' && /^This is the derivative of .*y = 2x.*by the product rule\.$/.test(noteOf(AREA, ["y' = 8 - 4x"], 0)), 'the derivative of the given y');
+  ok(S(AREA, ["y' = 8 - 5x"]) === '.' && S(AREA, ['y = 2x(4 - x)', "y' = 8 - 5x"]) === 'T.', 'a wrong derivative of the given y is a note, never a cross, whether or not y is copied');
+  ok(S(AREA, ['y = 2x(4 - x)', 'y(1) = 6', 'y(1) = 7']) === 'TT.', 'a wrong value is a note');
+  ok(/from the question/.test(noteOf(AREA, ['y(2) = 8'], 0)), 'a tick that uses the given says it comes from the question');
+  ok(S(AREA, ['∫_0^4 y dx = 64/3']) === 'T' && S(AREA, ['∫_0^4 y dx = 65/3']) === '.', 'an integral of the given y is worked out: true ticked, false a note');
+  ok(S(AREA, ['(b) y = 5', 'y = 2x(4 - x)', 'y(2) = 8']) === '.TT', 'a part label drops the given; copying it again brings it back');
+
+  // two functions
+  const TWO = 'Given $f(x) = x^2 - 4$ and $g(x) = 2x + 1$. Find $f(2) + g(2)$.';
+  ok(S(TWO, ['f(x) = x^2 - 4', 'g(x) = 2x + 1', 'f(2) = 0', 'g(2) = 5']) === 'TTTT', 'two given functions, each copied and used');
+  ok(S(TWO, ['g(x) = 2x - 1']) === '.' && noteOf(TWO, ['g(x) = 2x - 1'], 0) === MISMATCH, 'a sign changed in the second function');
+  ok(S(TWO, ['f(x) = 2x + 1']) === '.', 'the second function\'s rule under the first function\'s name is not ticked');
+  ok(S(TWO, ['f(2) = 1', 'g(2) = 4']) === '..', 'wrong values of the given functions: notes');
+  ok(S(TWO, ['f(2) + g(2) = 0 + 5']) === 'T', 'a sum of the two given functions, true');
+  ok(!/X/.test(S(TWO, ['f(2) = 1', 'g(2) = 4', 'f(2) + g(2) = 5'])), 'never a cross from the given functions');
+  // the same name given twice in the prompt is ambiguous: restating either is given, nothing else is read from it
+  const SAME = 'The curve $y = x^2$ meets the line $y = 2x$. Find the points of intersection.';
+  ok(S(SAME, ['y = x^2', 'y = 2x']) === 'TT' && S(SAME, ['y(3) = 9']) === '.', 'the same name given twice: each restatement is ticked, but y(3) is not read from either');
+  ok(S(SAME, ['y = x^2 + 1']) === '.' && noteOf(SAME, ['y = x^2 + 1'], 0) !== MISMATCH, 'the same name given twice: no near-copy note');
+
+  // given numbers
+  const NUM = 'Let $a = 3$ and $b = 4$. Find $a^2 + b^2$.';
+  ok(S(NUM, ['a = 3', 'b = 4']) === 'TT' && noteOf(NUM, ['a = 3'], 0) === GIVEN, 'given numbers copied');
+  ok(S(NUM, ['a = 8']) === '.' && noteOf(NUM, ['a = 8'], 0) === MISMATCH && S(NUM, ['b = 5']) === '.', 'a given number with one digit changed: a note, not ticked');
+  ok(S(NUM, ['a = 6/2']) === 'T' && S(NUM, ['a = 0']) === '.' && noteOf(NUM, ['a = 0'], 0) !== MISMATCH, 'a given number written another way; a zero is not called a miscopy');
+  ok(S(NUM, ['a = 3', 'b = 4', 'a^2 + b^2 = 9 + 16']) === 'TTT' && S(NUM, ['a = 3', 'b = 4', 'a^2 + b^2 = 9 + 17']) === 'TT.', 'the given numbers are used by the lines below');
+  ok(/from the question/.test(noteOf(NUM, ['a^2 = 9'], 0)) && S(NUM, ['a^2 = 9']) === 'T' && S(NUM, ['a^2 = 10']) === '.', 'a given number is put in, with the comment saying so; a wrong value is a note');
+  ok(S('A principal of \\$500 earns interest at $r = 0.05$ per year.', ['r = 0.05', 'r = 0.06']) === 'T.', 'a given decimal, after a dollar sign for money');
+
+  // asked expressions, equations and integrals
+  ok(S('Differentiate $x^2 \\sin x$.', ['x^2 sin x', 'y = x^2 sin x']) === 'TT', 'the asked expression written out, bare or named');
+  ok(S('Differentiate $x^2 \\sin x$.', ['x^3 sin x', 'y = x^3 sin x', 'x^2 cos x']) === '...', 'a different expression is not ticked');
+  ok(S('Simplify $\\dfrac{x^2 - 1}{x - 1}$.', ['(x^2 - 1)/(x - 1)']) === 'T' && S('Simplify $\\dfrac{x^2 - 1}{x - 1}$.', ['x + 1']) === '.', 'the asked fraction is ticked, its simplified form (the answer) is not');
+  ok(S('Expand $(x + 3)^2$.', ['(x + 3)^2', '= x^2 + 6x + 9']) === 'TT', 'the asked expression, then its expansion as the line above written another way');
+  ok(S('Expand $(x + 3)^2$.', ['x^2 + 6x + 9']) === '.', 'the expansion on its own (the answer) is not ticked as given');
+  ok(S('Evaluate $\\int_0^2 x^2\\,dx$.', ['∫_0^2 x^2 dx', '∫_0^2 x^2 dx = 8/3']) === 'TT' && S('Evaluate $\\int_0^2 x^2\\,dx$.', ['∫_0^2 x^3 dx']) === '.', 'the asked integral written out');
+  ok(S('Solve $x^2 - 5x + 6 = 0$.', ['x^2 - 5x + 6 = 0', 'x^2 - 5x + 7 = 0', '(x - 2)(x - 3) = 0']) === 'T..', 'the given equation is ticked; a changed digit and the factorised form are not');
+  ok(S('Solve $x^2 - 5x + 6 = 0$.', ['x^2 - 5x + 6 = 0', 'x = 2 or x = 3', 'x = 4 or x = 3']) === 'TT.', 'the roots are not given: they are ticked only by the existing check against the equation');
+  ok(S('Find $\\int x^2\\,dx$.', ['x^2']) === '.', 'a verb that is not one of the five: nothing asked');
+  ok(S('Find the value of $x$ when $y = 7$ in $y = 2x + 1$.', ['y = 7']) === 'T' && S('Find the value of $x$ when $y = 7$ in $y = 2x + 1$.', ['y = 8']) === '.', 'a name given twice (y = 7 and y = 2x + 1): restating is given');
+
+  // prompts that cannot be read: exactly as without facts
+  const SAMEAS = (prompt, lines) => JSON.stringify(stepCheckArithmetic(lines.join('\n'), { facts: questionFacts({ prompt }) })) === JSON.stringify(stepCheckArithmetic(lines.join('\n')));
+  ok(questionFacts({ prompt: 'Describe the shape of $\\text{this}$ graph in words.' }) === null, 'a prompt with TeX that cannot be converted has no facts');
+  ok(SAMEAS('Show that $\\sqrt{\\text{foo}}$ is irrational.', ['y = 2x', 'y = 2x(4 - x)']), 'unreadable expression: exactly as today');
+  ok(SAMEAS('Explain why the sky is blue.', ['y = 2x(4 - x)', '2 + 2 = 4']) && questionFacts({ prompt: 'Explain why the sky is blue.' }) === null, 'a prompt with no maths: exactly as today');
+  ok(SAMEAS('Find $\\begin{pmatrix}1\\\\2\\end{pmatrix}$ plus itself', ['y = 2x']), 'a matrix in the prompt: exactly as today');
+  ok(JSON.stringify(stepCheckArithmetic('y = 2x(4 - x)', { facts: null })) === JSON.stringify(stepCheckArithmetic('y = 2x(4 - x)')) && JSON.stringify(stepCheckArithmetic('y = 2x(4 - x)', { facts: {} })) === JSON.stringify(stepCheckArithmetic('y = 2x(4 - x)')), 'null or empty facts change nothing');
+  ok(S(AREA, ['2 + 2 = 4', '3 × 4 = 13']) === 'TX', 'false arithmetic is still crossed with facts');
+  ok(JSON.stringify(stepCheckArithmetic('x', { facts: { defs: 'nonsense', equations: 5, asks: [null, 7], integrals: {} } })) === JSON.stringify(stepCheckArithmetic('x')), 'malformed facts are ignored');
+
+  // a given name reused by the student for something else after a part label
+  const REUSE = 'The curve $y = 2x(4 - x)$. (a) Find where it meets the x-axis. (b) Find the area bounded by the curve and the x-axis.';
+  ok(S(REUSE, ['(a) y = 0', '2x(4 - x) = 0', '(b) y = 5', 'y(2) = 8']) === '....', 'after a part label y is the student\'s: nothing is read from the question (no tick, no cross)');
+  ok(S(REUSE, ['y = 2x(4 - x)', '(b) y = 3x', 'y(2) = 9']) === 'T..', 'a reused name is never crossed against the question');
+  ok(S(REUSE, ['(b) y = x^2', 'y(3) = 9', 'y(3) = 10']) === '.T.', 'a reused name is held to the student\'s own page only');
+  ok(noteOf(REUSE, ['(b) y = 3x(4 - x)'], 0) !== MISMATCH, 'after a part label a near copy gets no "check you copied it" note');
+  ok(S(REUSE, ['y = 0', '8x - 2x^2 = 0']) === '..', 'y = 0 is solving, not a miscopy');
+
+  // an answer is never ticked from the question's facts
+  ok(S(AREA, ['64/3']) === '.' && S(AREA, ['Area = 64/3']) === '.', 'the answer on its own is not given by the question');
+  ok(!P(AREA, PAGE5).lines.some(l => /mark|correct method|right step/i.test(l.note || '')), 'no tick says a mark or the right step');
+  // with the reader's TeX as well
+  ok(code(keep(stepCheckArithmetic(['y = 2x(4 - x)', 'Area = ∫_0^4 2x(4 - x) dx'].join('\n'), { facts: questionFacts({ prompt: AREA }), latex: [{ text: 'y = 2x(4 - x)', latex: 'y = 2x(4 - x)' }] }))) === 'TT', 'the TeX second reading and the facts together');
 }
 
 console.log(`ARITHMETIC LINES: ${fail ? 'FAIL' : 'PASS'} — ${pass}/${pass + fail} checks — false arithmetic crossed, true arithmetic ticked as arithmetic only, no mark from it`);
