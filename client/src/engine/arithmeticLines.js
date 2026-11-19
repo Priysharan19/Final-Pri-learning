@@ -195,6 +195,13 @@ export function stepCheckArithmetic(workingText) {
     // nCr and nPr between two numbers, and sqrt, are arithmetic.
     if (calc.used || /[A-Za-zπθ]/.test(text.replace(/sqrt/gi, '').replace(/(\d)\s*[CP]\s*(?=\d)/g, '$1'))) {
       // True as written, or a note: never a cross (see "Lines that are true as written").
+      // Independent review: a letter before a bracket may be a function, and f(x+h) = f(x)+f(h) read as products is a
+      // false line that looks like an identity. Only a named function, or one of the letters that students multiply a
+      // bracket by (x, n, k, a, b, c, m, r) with more than a single term inside, is read. A division or a power followed
+      // by a number-and-letter or two letters (1/2x, x^2x, 1/xy) groups two ways and is not read either.
+      const bare = text.replace(/(?<![A-Za-z])(?:sqrt|arcsin|arccos|arctan|asin|acos|atan|cosec|sin|cos|tan|sec|csc|cot|ln|log|exp|abs)(?![A-Za-z])/gi, '#');
+      if (/[A-Za-zπθ]\s*\(/.test(bare.replace(/(?<![A-Za-z])[xnkabcmr]\s*\((?!\s*-?\s*[A-Za-z0-9.]+\s*\))/g, '#('))) return note(line, NOT_PROVED);
+      if (/\/\s*\d+(?:\.\d+)?\s*[A-Za-z(]|\/\s*[A-Za-z]\s*[A-Za-z(]|\^\s*-?\d+(?:\.\d+)?[A-Za-z]|\^\s*[A-Za-z][A-Za-z0-9(]/.test(bare)) return note(line, NOT_PROVED);
       if (/≈|≃|~/.test(text)) return note(line, NOT_PROVED);
       const bits = text.split('=').map(s => s.trim());
       const cont = bits[0] === '' && bits.length >= 2;

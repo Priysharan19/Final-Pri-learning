@@ -48,6 +48,9 @@ ok(st(['-20 - 6 = 14']) === 'break' && st(['-20 -6 = 14']) === 'break' && st(['(
 ok(st(['12x^2/2 = 6x^2', '(x+1)^2 = x^2 + 2x + 1', '2(x + 3) = 2x + 6', 'sin(x)^2 + cos(x)^2 = 1', 'x^2 - 9 = (x-3)(x+3)']) === 'ok,ok,ok,ok,ok', 'an identity is ticked');
 ok(st(['(x+1)^2', '= x^2 + 2x + 1', '= x(x + 2) + 1']) === 'note,ok,ok', 'and so is a chain of them');
 for (const f of ['(x+1)^2 = x^2 + 1', 'x^2 = 9', '2x + 3 = 11', 'sqrt(x^2) = x', 'y = x^2 + 3x', 'x = 3', 'f(x) = x^2', 'dy/dx = 2x', 'a = b', 'x^2 = 2x', 'ln(x^2) = 2ln(x)']) ok(st([f]) === 'note', `not an identity, so a note and never a cross: ${f} (${st([f])})`);
+// independent review: a letter before a bracket may be a function; these are false lines and were ticked
+for (const f of ['f(x+h) = f(x)+f(h)', 'f(a+b) = fa+fb', 'f(2x) = 2f(x)', 'f(2) = 2f', 'f(x) = fx', 'g(x) = gx', 'y(x) = yx', 'v(t) = vt', 'P(A) = PA', 'f(f(x)) = f^2x', 'd(x^2) = dx^2', 'x(t) = xt', 'a(2) = 2a', '1/2x = x/2', 'x^2x = x^3', '1/xy = y/x', 'e^2x = e^(2x)']) ok(st([f]) === 'note', `a possible function call or a line that groups two ways is not ticked: ${f} (${st([f])})`);
+ok(st(['x(x + 2) = x^2 + 2x', 'n(n+1)/2 = (n^2+n)/2', '2(x+3) = 2x+6', 'sin(2x) = 2sin(x)cos(x)', 'a(b + c) = ab + ac', '(x+1)(x-1) = x^2 - 1', 'e^(2x) = (e^x)^2']) === 'ok,ok,ok,ok,ok,ok,ok', 'a bracket multiplied by x, n or a number, and a named function, are still read');
 ok(st(['∫_0^3 x^2 dx = [x^3/3]_0^3', '= 27/3 - 0', '= 9']) === 'ok,ok,ok', 'a definite integral worked through is ticked line by line');
 ok(st(['∫_0^3 x^2 dx = 10', '[x^3/3]_0^3 = 8', '∫_0^3 x^2 dx', '= 10']) === 'note,note,note,note', 'a wrong value for an integral is a note, never a cross (the limits may have been misread)');
 ok(st(['∫_{0}^{pi} sin(x) dx = 2', '[-cos(x)]_0^π = 2', '∫_1^e 1/x dx = 1']) === 'ok,ok,ok', 'limits with π and e are read');
