@@ -414,7 +414,7 @@ function pageDefinitions(raw, out, firstBreak) {
     if (cross) { broke = { index: i, message: cross }; break; }
     for (const [name, d] of facts) if (!d.open) defs[name] = d;
     // A letter set on this line in a way this pass did not record (`Let x = 4`, `x = 4 now`) no longer has its old value.
-    for (const k of Object.keys(defs)) if (!facts.some(([name]) => name === k) && new RegExp(`(?<![A-Za-z])${k.replace("'", "\\'")}\\s*=`).test(src)) delete defs[k];
+    for (const k of Object.keys(defs)) if (!facts.some(([name]) => name === k) && new RegExp(`(?<![A-Za-z])${k.replace(/[^A-Za-z]/g, '\\$&')}\\s*=`).test(src)) delete defs[k];
     if (!lineHolds) { if (ticks.length) carry = null; continue; }
     if (ticks.length && out[i].status === 'note') out[i] = { text: out[i].text, status: 'ok', state: 'arithmetic', note: ticks.join(' '), valueChain: { rule: 'page-definitions' } };
   }
@@ -553,6 +553,9 @@ export function stepCheckArithmetic(workingText) {
     if (soft) return note(line, SOFT_NOTE);
     // With e or π on the line a cross needs the constant on every side: `2π = 6` or `e^2 = 7` is a rounding, not a slip.
     { const withConstant = allSides.filter(x => x.match(CONSTANT)).length; if (withConstant && withConstant !== allSides.length) return note(line, SOFT_NOTE); }
+    // e may be the student's own letter (e^2 = 4e is true when e = 4): a cross needs every e on the line to be the
+    // base of a power, e^(…), which is how Euler's number is written in working. A bare or multiplied e is a note.
+    if (allSides.some(x => /(?<![A-Za-z])e(?![A-Za-z])(?!\s*\^)/.test(x))) return note(line, NOTE);
     if (ansLine) return note(line, NOTE);
     // Two bare numbers and nothing else (`500 = 340`) is words lost in reading, not a sum someone got wrong.
     if (allSides.every(x => /^\s*-?\d+(?:\.\d+)?\s*$/.test(x)) && !(continuation && before)) return note(line, NOTE);

@@ -105,7 +105,7 @@ ok(st(['x^2 - 4 = 0 so (x-2)(x+2) = 0', 'x = 2']) === 'ok,ok' && st(['2x = 4 so 
   ok(st(['a(2) = (4 - 8 + 2)e^(-2) = -2e^(-2) > 0 so it is a minimum']) === 'note', 'a true chain with a false sign claim after it is not ticked');
   ok(st(['e^0 = 1', 'π/2 + π/2 = π', '2π/2 = π', 'e^2 e^3 = e^5', 'f(2) = 3 + 4 = 7']) === 'ok,ok,ok,ok,ok', 'exact lines with e and π are ticked');
   ok(st(['e^2 e^3 = e^6']) === 'break' && st(['f(2) = 3 + 4 = 8']) === 'break', 'and crossed when the constant stands on every side, or under a function value');
-  for (const f of ['2π = 6', 'e^2 = 7', 'e = 3', 'π = 22/7', '2e + 3e = 5e', '2e + 3e = 6e', '3e2 = 300', '2e-3 = 1', '1/2π = π/2', '1/2e = e/2', 'f(2) = 5', 'f(x) = 3 + 4 = 8', '2πr = 10π', 'e^x = 5', 'a(2) > 0 so max', 'x(2) = 2 + 2 = 5 > 0']) ok(st([f]) === 'note' || (f === 'x(2) = 2 + 2 = 5 > 0' && st([f]) === 'break'), `not judged: ${f} (${st([f])})`);
+  for (const f of ['e^2 = 4e', '3e = e + 6', 'e + 1 = 4 - e', '2e = e^2', 'e = e + 1', '2π = 6', 'e^2 = 7', 'e = 3', 'π = 22/7', '2e + 3e = 5e', '2e + 3e = 6e', '3e2 = 300', '2e-3 = 1', '1/2π = π/2', '1/2e = e/2', 'f(2) = 5', 'f(x) = 3 + 4 = 8', '2πr = 10π', 'e^x = 5', 'a(2) > 0 so max', 'x(2) = 2 + 2 = 5 > 0']) ok(st([f]) === 'note' || (f === 'x(2) = 2 + 2 = 5 > 0' && st([f]) === 'break'), `not judged: ${f} (${st([f])})`);
 }
 // never crossed
 for (const f of ['3x + 2 = 11', 'x = 3', 'n = 5', 'P(A) = 3', 'sin(30) = 2', 'log(100) = 3', 'ln 5 = 2', 'pi = 3', 'e^2 = 7', '50% of 80 = 30', '90° = 2', '5 cm + 3 cm = 9 cm', '2 1/2 = 5/2', '1 000 = 1000', '3 < 2', '4 ≠ 4', 'the answer is 5', '', '= 5', '6/0 = 3', '(((', '2 + = 4']) ok(!/break|ok/.test(st([f])), `not judged: "${f}" (${st([f])})`);
