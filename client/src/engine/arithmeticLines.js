@@ -665,11 +665,13 @@ function sameStatement(text, converted) {
   let j = 0;
   for (const x of a) {
     if (x.op) { if (!(b[j] && b[j].op && b[j].t === x.t)) return false; j++; continue; }
-    while (j < b.length && b[j].op) j++;
+    // Flattening loses a superscript, a fraction bar, a root and a multiplication dot. It never loses a sign or an equals:
+    // a + - = or comparison the text does not have at that place is another line.
+    while (j < b.length && b[j].op) { if (!/^[\^/*]$/.test(b[j].t)) return false; j++; }
     if (!(b[j] && b[j].t === x.t)) return false;
     j++;
   }
-  return b.slice(j).every(y => y.op);
+  return b.slice(j).every(y => y.op && /^[\^/*]$/.test(y.t));
 }
 /** Notes that mean "not judged as one statement" (a label, a trailing equation number, a comma, words), never upgraded. */
 function notOneStatement(text) {

@@ -128,6 +128,8 @@ const L = (text, latex) => ({ text, latex });
   ok(tick('2 5 = 10', '2\\cdot 5 = 10') === 'ok', '2 5 = 10 with 2 times 5: ticked');
   ok(tick('1 2 + 1 3 = 5 6', '\\frac{1}{2}+\\frac{1}{3}=\\frac{5}{6}') === 'ok', 'stacked fractions flattened: ticked');
   ok(tick('2 3 = 8 (1)', '2^3 = 8 (1)') === 'note' && tick('so 2 3 = 8', '2^3 = 8') === 'note' && tick('2 3 = 8, 3', '2^3 = 8') === 'note', 'a label, a trailing number, words or a comma are never upgraded');
+  // flattening loses ^ / and the dot, never + - or =
+  for (const [text, latex] of [['2 3 = 5', '2 + 3 = 5'], ['3 2 = 1', '3 - 2 = 1'], ['2 5 = 3', '-2 + 5 = 3'], ['(2 3) 4 = 20', '(2 + 3) \\cdot 4 = 20'], ['2 3 4 = 14', '2 + 3 \\cdot 4 = 14'], ['2 3 4 = 14', '2 \\cdot (3 + 4) = 14'], ['2 3 8', '2 = 3 = 8']]) ok(tick(text, latex) === 'note', `the TeX may not add a sign: ${text} / ${latex} (${tick(text, latex)})`);
   ok(tick('2+2=4 so', '2+2=4') === 'note' && tick('2+2=4', '2+2=4') === 'ok', 'the same content is ticked only when the plain check already could');
 }
 
