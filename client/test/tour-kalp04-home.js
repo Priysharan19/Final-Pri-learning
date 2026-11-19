@@ -185,13 +185,15 @@ export const flow = {
     await goto('/');
     await page.waitForSelector('[data-home-primary]');
     // The card is titled with the unfinished topic itself; the kind is the contract.
-    await check('unfinished Practice becomes the next action',
-      await page.locator('[data-home-primary]').getAttribute('data-kind') === 'practice-resume');
+    // A new account has answered nothing, so an unanswered question is not something it is
+    // "continuing": the card stays on the start action, which opens that same question.
+    await check('a question opened but never answered leaves a new account on the start action, not Continue',
+      await page.locator('[data-home-primary]').getAttribute('data-kind') === 'first-practice');
     await snap(page, '07-resumable-practice');
 
     await page.locator('[data-home-primary-cta]').click();
     await page.waitForSelector('.q-prompt', { timeout: 30000 });
-    await check('resume reopens the exact unfinished question',
+    await check('the start action reopens the exact unfinished question',
       (await page.locator('.q-prompt').innerText()).trim() === firstPrompt);
 
     const learned = await answerCurrentQuestion(page, online);
