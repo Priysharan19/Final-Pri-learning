@@ -130,6 +130,51 @@ function sameAsWritten(a, b) {
   return agreed >= 3;
 }
 
+// ── Handwritten function notation, and the name of the step ──────────────────
+// Owner, 19 November 2026 (a trig proof marked by a competitor step by step):
+// students write sin θ, cos²θ, sec θ with no brackets. A named function is
+// given its bracket only where the page can be read one way: the function, an
+// optional whole-number power (not −1, which is the inverse), then ONE letter,
+// for a trig function optionally with a number in front (sin 2θ), and nothing
+// attached after it. sin x^2, sin x(x+1) and ln 2x stay unread.
+const TRIG = 'sin|cos|tan|sec|cosec|csc|cot';
+const FN_END = `(?!\\s*(?!${TRIG}|ln|log)[A-Za-z0-9^(θαβφ])`;   // nothing attached after it, across a space too (sin x y)
+const TRIG_BARE = new RegExp(`(?<![A-Za-z])(${TRIG})\\s*(?:\\^\\s*(\\d)\\s*)?(?!\\()\\s*((?:\\d+(?:\\.\\d+)?)?\\s*(?:[A-Za-z]|[θαβφ]))${FN_END}`, 'g');
+const LOG_BARE = new RegExp(`(?<![A-Za-z])(ln|log)\\s+([A-Za-z]|[θαβφ])${FN_END}`, 'g');
+function bracketFunctions(text) {
+  return text
+    .replace(TRIG_BARE, (_, fn, power, arg) => (power ? `(${fn}(${arg.replace(/\s+/g, '')}))^${power}` : `${fn}(${arg.replace(/\s+/g, '')})`))
+    .replace(LOG_BARE, (_, fn, arg) => `${fn}(${arg})`);
+}
+
+// The comment on a tick may name the step, but only as something the two
+// sides are seen to do ("It matches …"): the tick itself rests on the two
+// sides being equal, never on this description.
+function nameOfStep(fromRaw, toRaw) {
+  const a = String(fromRaw || '').toLowerCase().replace(/\s+/g, ''), b = String(toRaw || '').toLowerCase().replace(/\s+/g, '');
+  if (!a || !b) return '';
+  const v = (a.replace(/cosec/g, 'csc').match(/(?<![a-z])(?:sin|cos|tan|sec|csc|cot)(?:\^\(?\d\)?)?\(?\d*([a-zθαβφ])(?![a-z])/) || [])[1] || 'θ';
+  const has = (t, fn) => new RegExp(`(?<![a-z])${fn}(?![a-z])`).test(t.replace(/cosec/g, 'csc'));
+  const A = a.replace(/cosec/g, 'csc'), B = b.replace(/cosec/g, 'csc');
+  if (has(A, 'sec') && !has(B, 'sec') && has(B, 'cos')) return `the reciprocal identity sec ${v} = 1/cos ${v}`;
+  if (has(A, 'csc') && !has(B, 'csc') && has(B, 'sin')) return `the reciprocal identity cosec ${v} = 1/sin ${v}`;
+  if (has(A, 'cot') && !has(B, 'cot') && has(B, 'tan')) return `the reciprocal identity cot ${v} = 1/tan ${v}`;
+  if (has(A, 'cot') && !has(B, 'cot') && has(B, 'sin') && has(B, 'cos')) return `cot ${v} = cos ${v} / sin ${v}`;
+  const sq = (t, fn) => new RegExp(`${fn}\\^\\(?2|\\(${fn}\\([^)]*\\)\\)\\^\\(?2|${fn}\\([^)]*\\)\\^\\(?2`).test(t);
+  if (/1[-+]/.test(A) && ((sq(A, 'cos') && !sq(B, 'cos') && sq(B, 'sin')) || (sq(A, 'sin') && !sq(B, 'sin') && sq(B, 'cos')))) return `the Pythagorean identity sin²${v} + cos²${v} = 1`;
+  if (/1\+/.test(A) && sq(A, 'tan') && sq(B, 'sec') && !sq(A, 'sec')) return `the identity 1 + tan²${v} = sec²${v}`;
+  if (has(B, 'tan') && !has(A, 'tan') && has(A, 'sin') && has(A, 'cos')) return `tan ${v} = sin ${v} / cos ${v}`;
+  if (has(A, 'tan') && !has(B, 'tan') && has(B, 'sin') && has(B, 'cos')) return `tan ${v} = sin ${v} / cos ${v}`;
+  if (/(?:sin|cos|tan)\(?2[a-zθαβφ]/.test(A) !== /(?:sin|cos|tan)\(?2[a-zθαβφ]/.test(B)) return 'a double-angle identity';
+  const plain = t => t.replace(/(?:sqrt|sin|cos|tan|sec|csc|cot|ln|log)\(/g, '#[').replace(/#\[[^()]*\)/g, '#');
+  const pa = plain(A), pb = plain(B);
+  if (/\(/.test(pa) && !/\(/.test(pb) && !/\//.test(pa)) return 'expanding the brackets';
+  if (!/\(/.test(pa) && /\)\(|\d\(|[a-zθ]\(|\)\^/.test(pb) && !/\//.test(pb)) return 'factorising';
+  const fractions = t => (t.match(/\//g) || []).length;
+  if (fractions(pa) >= 1 && /[-+]/.test(pa.replace(/\([^()]*\)/g, '')) && fractions(pb) === 1 && /^\(.*\)\/[^/]+$/.test(pb)) return 'putting the terms over a common denominator';
+  return '';
+}
+
 /** Other ways the same ink may be read: one whole number split as a power or as a fraction. */
 function otherReadings(side) {
   const out = [];
@@ -169,31 +214,37 @@ export function stepCheckArithmetic(workingText) {
   const out = [];
   let firstBreak = -1;
   let diagnosis = null;
+  let labelled = false;
   let prev = null;   // { text, value } or { text, ast, vars }: the last side of the line above, when it could be read
 
   const note = (text, why, extra = {}) => { out.push({ text, status: 'note', note: why, unverified: true, ...extra }); };
 
   raw.forEach((line, i) => {
     const carried = prev;
-    const before = carried && carried.value !== undefined && !carried.calculus ? carried : null;   // plain arithmetic only
+    // A label is set aside: `Numerator:`, `LHS =` in front, `= RHS` behind, an end mark. What such a line leaves for
+    // the `=` line below is tick only, like a line of letters.
+    const src = line.replace(/^[A-Za-z][A-Za-z ]{1,24}:\s*(?=\S)/, '').replace(/^(?:LHS|RHS|L\.H\.S\.?|R\.H\.S\.?)\s*=\s*(?=\S)/i, '')
+      .replace(/\s*(?:\/\/|∎|□)\s*$/, '').replace(/\s*=\s*(?:LHS|RHS|L\.H\.S\.?|R\.H\.S\.?)\s*$/i, '');
+    const afterLabel = labelled; labelled = src !== line;
+    const before = carried && carried.value !== undefined && !carried.calculus && !afterLabel ? carried : null;   // plain arithmetic only
     prev = null;
     if (i >= LIMITS.lines || line.length > LIMITS.chars) return note(line, 'Not checked: this line is too long or too far down the working to check.');
     if (firstBreak !== -1) return note(line, 'Follows from the earlier slip.');
-    const text0 = line.replace(/\s*\.\s*$/, '').replace(/[−–—]/g, '-').replace(/[×·]/g, '*').replace(/÷/g, '/').replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore|thus)\s+/i, '')
+    const text0 = src.replace(/\s*\.\s*$/, '').replace(/[−–—]/g, '-').replace(/[×·]/g, '*').replace(/÷/g, '/').replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore|thus)\s+/i, '')
       // `Ans = 72` continues the line above; `6 x 12` between two numbers is a times sign; square brackets group.
       .replace(ANS_LABEL, '').replace(/(\d|\))\s+x\s+(?=\d|\()/gi, '$1*')
       .replace(/\[([^\[\],;_]*)\](?![_^])/g, '($1)');
-    const ansLine = ANS_LABEL.test(line.replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore|thus)\s+/i, ''));
+    const ansLine = ANS_LABEL.test(src.replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore|thus)\s+/i, ''));
     // A root with an index, √[3]{…}, is not read: its bracket is not a grouping.
-    if (/(?:√|sqrt)\s*\[/i.test(line)) return note(line, NOTE);
+    if (/(?:√|sqrt)\s*\[/i.test(src)) return note(line, NOTE);
     const calc = /∫|\]_/.test(text0) ? workOutCalculus(text0) : { text: text0, used: false };
     if (!calc) return note(line, NOT_PROVED);
-    const text = calc.text;
+    const text = bracketFunctions(calc.text);
     // Independent review, round 1. None of these is arithmetic Pri can read one way only, so none is judged:
     //   a line label or a trailing equation number (`1. 2+3 = 5`, `(2) 2+3 = 5`, `2 + 3 = 5 (2)`), which would be multiplied in;
     //   a comma (two statements on a line, or a decimal comma); a line that starts with an operator and so carries the
     //   line above forward (`- 1 = 2`); a spaced dot (`3 . 4`).
-    if (/^\(?\d{1,3}[.)](?:\s|$)|^\(\d{1,3}\)|\s\(\d{1,3}\)\s*$|[,;:]|^[+*/×÷]|^-\s|\d\s+\.\s*\d|\d\s*\.\s+\d/.test(line.replace(/[−–—]/g, '-'))) return note(line, NOTE);
+    if (/^\(?\d{1,3}[.)](?:\s|$)|^\(\d{1,3}\)|\s\(\d{1,3}\)\s*$|[,;:]|^[+*/×÷]|^-\s|\d\s+\.\s*\d|\d\s*\.\s+\d/.test(src.replace(/[−–—]/g, '-'))) return note(line, NOTE);
     // A mixed number (2 1/2) or a spaced thousand (1 000) reads as a product: two numbers side by side are not judged.
     if (/[<>≤≥≠%°]|==|!=|\d\s+\d/.test(text)) return note(line, NOTE);
     // Any letter left (a variable, π, e, a unit, a function name) and the line is not arithmetic on numbers alone.
@@ -222,7 +273,8 @@ export function stepCheckArithmetic(workingText) {
         if (!new RegExp(`${m[1]}(?!\\s*\\()`).test(inside)) return note(line, NOT_PROVED);
       }
       if (/\/\s*\d+(?:\.\d+)?\s*[A-Za-z(]|\/\s*[A-Za-z]\s*[A-Za-z(]|\^\s*-?\d+(?:\.\d+)?[A-Za-z]|\^\s*[A-Za-z][A-Za-z0-9(]/.test(bare)) return note(line, NOT_PROVED);
-      if (written.some(s => /[\/÷]/.test(s) && /[\/÷].*(?:\*|[\d)!]\s*\(|\)\s*\d|!\s*\d)/.test(s))) return note(line, NOT_PROVED);
+      // (a product written straight after a division, 1/cos θ tan θ, groups two ways as well)
+      if (written.some(s => /[\/÷]/.test(s) && /[\/÷][^()]*(?:\*|[\d)!]\s*\(|\)\s*\d|!\s*\d|\)\s*[A-Za-zθαβφ])/.test(s.replace(/\(([^()]|\([^()]*\))*\)/g, m => m.replace(/[^()]/g, '')+')')) )) return note(line, NOT_PROVED);
       const infos = written.map(infoOf);
       const lastInfo = infos[infos.length - 1];
       // What a line of letters or an integral leaves for the `=` line below is tick only (`calculus`): `t = 5` then `= 20`
@@ -235,7 +287,10 @@ export function stepCheckArithmetic(workingText) {
       const why = calc.used ? (number ? `Worked out, each side comes to ${shown(number.value)}.` : 'Worked out at the limits, the sides agree.')
         : number ? `This is ${shown(number.value)} for every value of the letters.`
           : cont && carried ? 'This is the line above, written another way.' : 'Both sides are the same expression, written two ways.';
-      out.push({ text: line, status: 'ok', state: 'arithmetic', note: why, valueChain: { rule: 'true-as-written' } });
+      // The step is named from the first two sides that differ in writing (the line above and this one, or this line's own sides).
+      const texts = cont && carried ? [carried.text, ...written] : written;
+      const named = !calc.used && !number ? nameOfStep(texts[0], texts[1]) : '';
+      out.push({ text: line, status: 'ok', state: 'arithmetic', note: named ? `${why} It matches ${named}.` : why, valueChain: { rule: 'true-as-written' } });
       return;
     }
     const approx = /≈|≃|~/.test(text);
