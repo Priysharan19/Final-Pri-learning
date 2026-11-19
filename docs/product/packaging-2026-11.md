@@ -92,7 +92,7 @@ competitor or compares against one. The pricing page states our own facts.
 | Practice questions | 20 a day | **No daily limit** |
 | Difficulty levels | All | All |
 | Typed answers checked by the deterministic engine | Yes, step by step where the edition has step feedback | Same |
-| Marked handwriting reads (ink or a photo of working) | 5 a day | **10 a day** |
+| Marked handwritten answers (ink or a photo of working; one unit per answer since 2026-11-18, re-reads free up to 12) | 5 a day | **10 a day** |
 | "Practise this" question photos | 5 a day | **10 a day** |
 | Notes and worked examples | Yes | Yes |
 | Error log and spaced retests | Yes | Yes |

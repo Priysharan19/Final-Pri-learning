@@ -97,8 +97,23 @@ The server-side OpenAI providers already exist (`server/platform/handwritingProv
    - `.pri-os/fleet.json` keeps the principle key `deterministic_marking_fallback` (the fleet
      validator pins the key name). From this amendment it means: the deterministic engine, not a
      model, decides every mark — on the server.
-6. **Answer-blind handwriting is unchanged.** Vision transcription receives the ink image only —
-   never the question's expected answer, solution or marks.
+6. **Answer-blind handwriting is unchanged — with one narrow, recorded relaxation (18 November
+   2026).** Vision transcription receives the ink image and, at most, a *vocabulary hint*: the
+   unordered set of single symbols (variable letters, Greek letters, function names, named
+   constants) that appear in the PUBLIC question stem, e.g. `{π, t, h, sin}`. It never receives
+   the stem text, numbers or coefficients from the stem, the question's expected answer, solution
+   steps, marks or answer format, nor anything derived from them. The prompt states the hint is
+   only a list of symbols that may appear, that the student may write any other symbol, and that
+   the page is transcribed as written even when it looks wrong. The server derives the hint itself
+   from the `prompt` of the question it issued to the account (`server/platform/stemSymbols.js`);
+   a client cannot supply or alter it. Decision: owner, delegated to the CTO ("whatever you think
+   is right"), 18 November 2026, recorded here by the reader speed/accuracy mission. Guarded by
+   `provider-answer-blind-check` (section 5: every generator family) and
+   `handwriting-transcription-check`. Research basis: context may rerank perceptual hypotheses
+   under controlled rules, never the expected answer (`docs/research/HANDWRITTEN_MATH_PERCEPTION_DEEP_DIVE.md`
+   §17). Residual risk: a hint can bias a doubtful mark toward a listed symbol; the prompt limits
+   the hint to look-alike tie-breaks and the reader's own `uncertain` flag still routes doubtful
+   lines to the student for confirmation.
 7. **Secrets live only on the server.** `OPENAI_API_KEY` and Supabase service-role credentials live
    only in Railway environment variables — never in the client, the repository, CI logs or chat. The client receives only the Supabase anon key and URL, and every
    table it can reach is protected by Row-Level Security.

@@ -81,7 +81,9 @@ ok(r.firstBreak === 4, 'a value no branch above gives is still a break');
   }
   // Incomplete: the lost-root rule flags it.
   r = stepCheck(eqMeta([1, 2, 3, 4]), page('(x-1)(x-2)(x-3)(x-4)=0 | x-1=0 | x-2=0 | x=3').join('\n'));
-  ok(r.lines.some(l => l.status === 'break') && mark([1, 2, 3, 4], page('(x-1)(x-2)(x-3)(x-4)=0 | x-1=0 | x-2=0 | x=3')).correct !== true, 'a four-factor page that drops x = 4 is flagged and not credited');
+  // Owner decision 7 (18 Nov 2026, lost-root-incomplete-check.mjs): a true root is never a break; a missing root is flagged
+  // incomplete (a note naming it), never ticked, and earns no full credit.
+  ok(r.firstBreak === -1 && r.lines.some(l => l.state === 'incomplete') && mark([1, 2, 3, 4], page('(x-1)(x-2)(x-3)(x-4)=0 | x-1=0 | x-2=0 | x=3')).correct !== true, 'a four-factor page that drops x = 4 is flagged incomplete (not a wrong line) and not credited');
   r = stepCheck(eqMeta([3, -3]), 'x^2-9=0\nx=3');
   ok(r.lines[1].incomplete === true && mark([3, -3], ['x^2-9=0', 'x=3']).correct === false, 'x^2-9=0 then x=3 as the final answer: the other root is still to find, not credited');
   // Genuinely wrong: the value is no root of the original equation.

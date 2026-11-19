@@ -44,11 +44,11 @@ eq('D19: free papers are one every 30 days', [FREE_EXAM_ALLOWANCE.examsPerWindow
 eq('reads are 5 free and 50 Premium a day (owner decision 2026-11-18)', READ_ALLOWANCE, { free: 5, premium: 50 });
 eq('the server\'s read allowance defaults to the same definition, per kind', [AI_ALLOWANCE_DEFAULTS.handwriting, AI_ALLOWANCE_DEFAULTS['question-photo']].map(x => [x.free, x.premium]), [[5, 50], [5, 50]]);
 eq('the free column says exactly the free plan (active packaging value-2026-11; every difficulty is free on every packaging)', FREE_ROWS.map(row), [
-  'Practice questions with no daily limit', 'Every difficulty level, with spaced reviews of what you got wrong', 'One timed paper every 30 days', '5 reads of your writing and 5 question photos a day', 'The error notebook and its reviews'
+  'Practice questions with no daily limit', 'Every difficulty level, with spaced reviews of what you got wrong', 'One timed paper every 30 days', '5 handwritten answers and 5 question photos a day', 'The error notebook and its reviews'
 ]);
 eq('the Premium column says exactly what Premium adds', PREMIUM_ROWS.map(row), [
   'Unlimited timed papers', 'After each timed paper, where your time went, section by section',
-  'The JEE Advanced track', '50 reads of your writing and 50 question photos a day',
+  'The JEE Advanced track', '50 handwritten answers and 50 question photos a day',
   'An estimate of your mark from your own practice, with its range and how much of the paper it covers',
   'The slips you make most often, across chapters'
 ]);

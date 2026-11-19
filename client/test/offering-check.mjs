@@ -9,7 +9,7 @@
 // Every decision is one field of the edition table, so each is one switch to reverse.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { editionOf, editionProblems, EDITIONS } from '../edition.config.mjs';
+import { editionOf, editionProblems } from '../edition.config.mjs';
 import { subtopicOfferedIn, courseOfferedIn, pathwayOfSubtopic } from '../src/engine/offeringRules.js';
 import { SUBTOPICS, DIFF_WORDS, DIFF_LABELS, STREAM_CURRICULUM } from '../src/engine/curriculum.js';
 import { markWeightAfter, ladderEvidence, HINT_RUNGS } from '../src/engine/hintLadder.js';

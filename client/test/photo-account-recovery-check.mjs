@@ -31,13 +31,14 @@ has(photo, /photoOCR\.blockedKey !== 'verdict\.photoReadingSignIn'/, 'Only an au
 has(photo, /!cloudReadingEnabled\(user\)/, 'A locally stored profile is not assumed to be authorised');
 has(photo, /await readOnePage\(dataURL\)/, 'Photo recovery uses real existing cloud reader');
 has(photo, /photoReadGeneration\.current/, 'Late recognition responses are generation guarded');
-has(readFileSync(new URL('../src/components/PhotoLines.jsx', import.meta.url), 'utf8'), /data-photo-correct-transcript/, 'Recognition transcript is human editable');
+// Owner decision 19 Nov 2026: the reading is not shown or confirmed before marking; it is human editable on demand from the marked page.
+has(readFileSync(new URL('../src/components/MarkedPage.jsx', import.meta.url), 'utf8'), /data-mp-edit-line/, 'Recognition transcript is human editable (on demand, from the marked page)');
 // The transcript is edited line by line (PhotoLines.jsx). A corrected line
 // reaches the working that is submitted, and the answer field holds the
 // proposal from the kept lines — never the last line copied in as a sentence.
-has(photo, /onEdit=\{\(i, text\) => changePhotoLines\(editLine\(photoLines, i, text\)\)\}/, 'A corrected photo line reaches the card');
+has(photo, /editLine\(photoLines, at, clean\)/, 'A corrected photo line reaches the card (carried into the marked-again question)');
 has(photo, /const wk = workingOf\(next\);[\s\S]{0,200}setWorking\(wk\)/, 'Corrected working reaches method marks');
-has(photo, /proposeFinalAnswer\(includedLines\(transcript\), publicAnswerShape\)/, 'The answer field is proposed from the kept lines for the public answer type');
+has(photo, /proposeFinalAnswer\(includedLines\(\{ \.\.\.transcript, lines: \(transcript\?\.lines \|\| \[\]\)\.filter\(l => !unsure\(l\)\) \}\), publicAnswerShape\)/, 'The answer field is proposed from the lines the reader was sure of, for the public answer type');
 assert.doesNotMatch(photo, /setAnswer\(page\.markable\)|editAnswer\(lastLine\)/, 'The last recognised line is never copied into the answer field');
 count += 1;
 has(photo, /newSubmissionId\(\)/, 'Grading retains idempotent submission keys');
@@ -47,7 +48,7 @@ has(account, /mode === 'register' && !link\?\.accountId/, 'Linked profile cannot
 // The photo goes to the server reader through the single-flight sender
 // (one paid read per picture), which is the only caller of the transport.
 has(reader, /await transcribeOnce\(transport, prepared\.dataUrl, \{ signal \}\)/, 'Photo recognition remains server-authoritative');
-has(reader, /transport\.transcribeHandwriting\(image, \{ signal: controller\?\.signal \?\? null, \.\.\.\(questionId \? \{ questionId \} : \{\}\) \}\)/,
+has(reader, /transport\.transcribeHandwriting\(image, \{ signal: controller\?\.signal \?\? null, \.\.\.\(questionId \? \{ questionId \} : \{\}\), \.\.\.\(superseded \? \{ superseded: true \} : \{\}\) \}\)/,
   'and the request carries the picture, a cancel signal and — only when the card names one — the opaque id of the issued question (for the read receipt); nothing else');
 has(reader, /readingQuestion = typeof serverQuestionId === 'string' && \/\^\[0-9a-f-\]\{36\}\$\/i\.test\(serverQuestionId\) \? serverQuestionId : null/,
   'that id can only ever be a UUID: never a prompt, an answer or any text about the question');

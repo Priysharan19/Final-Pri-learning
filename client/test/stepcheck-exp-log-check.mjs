@@ -34,6 +34,16 @@ function abstains(text, hints = []) {
   ok(`abstains on ${text}: got ${JSON.stringify(got)}`, got === null);
 }
 
+
+// OWNER DECISION 7 (18 Nov 2026, confirmed on PR #1054): a value line is a break only if the value is not a root of the
+// original equation; a true root is never marked wrong; a missing root is flagged as incomplete, not as a wrong line.
+// These cases used to be pinned as breaks. They are now "incomplete" (a note naming the missing root, no credit for it);
+// a line that holds at a value that is NOT a root is still a break (see lost-root-incomplete-check.mjs).
+function incompleteAt(label, meta, lines, idx, opts) {
+  const rep = report(meta, lines, opts);
+  ok(`${label}: incomplete, never a break, got ${JSON.stringify(rep.lines.map(l => [l.status, l.state]))}`,
+    rep.firstBreak === -1 && !rep.lines.some(l => l.status === 'break') && rep.lines[idx]?.state === 'incomplete' && /is also a solution|are also a solution/.test(rep.lines[idx].note));
+}
 solves('2^(x+1)=32', [4]);
 solves('2*2^x=32', [4]);
 solves('9^x=3^(x+2)', [2]);
@@ -148,7 +158,7 @@ breaksAt('extraneous root kept in the answer', eqMeta([5]), ['ln(x)+ln(x-3)=ln(1
 breaksAt('extraneous root given as the answer', eqMeta([5]), ['ln(x)+ln(x-3)=ln(10)', 'x(x-3)=10', 'x=-2'], 2);
 breaksAt('a value the exponential allows brought in by squaring', eqMeta([2]), ['2^x=4', 'x^2=4', 'x=2'], 1, 'extraneous-solution');
 breaksAt('wrong factor beside a right one', eqMeta([0, 2]), ['2^(2x)-5*2^x+4=0', '(2^x-1)(2^x-4)=0', '(2^x-1)(2^x-8)=0'], 2, 'extraneous-solution');
-breaksAt('a branch lost', eqMeta([0, 2]), ['2^(2x)-5*2^x+4=0', '(2^x-1)(2^x-4)=0', '2^x=4', 'x=2'], 2, 'lost-root');
+incompleteAt('a branch lost', eqMeta([0, 2]), ['2^(2x)-5*2^x+4=0', '(2^x-1)(2^x-4)=0', '2^x=4', 'x=2'], 2);
 
 // Review of head df72d5348 (PR #1027): wrong algebra inside a chain that is
 // still carrying a rejected value. Each new value must be checked against the
@@ -223,7 +233,7 @@ breaksAt('a far negative root after 2^(−x) = 1/4', eqMeta([2]), ['2^(-x)=1/4',
   ok(`the same with a prompt, got ${JSON.stringify(s)}`, s.every(v => v === 'ok'));
   const rep = report(eqMeta([0, Math.log(3)]), ['e^x=3', 'x=ln(3)']);
   ok(`one root of two named alone: true, still to find, no break, got ${JSON.stringify(rep.lines.map(l => l.status))}`,
-    rep.firstBreak === -1 && rep.lines.every(l => l.status === 'ok' && /still to find/.test(l.note || '')));
+    rep.firstBreak === -1 && rep.lines.every(l => l.status === 'ok' && l.state === 'incomplete' && /still to find|also a solution/.test(l.note || '')));   // owner decision 7: incomplete, never a break
   s = statuses(eqMeta([0, 2]), ['2^x=4', '2^x=1']);
   ok(`2^x = 4 then 2^x = 1 for roots 0 and 2: both branches, got ${JSON.stringify(s)}`, s.every(v => v === 'ok'));
   s = statuses(eqMeta([1, 2]), ['e^2 x = 1e^2']);
@@ -238,18 +248,21 @@ breaksAt('a far negative root after 2^(−x) = 1/4', eqMeta([2]), ['2^(-x)=1/4',
 // Review of head 362570240: an exponential or logarithmic product that loses
 // a root is a lost-root break, as a polynomial product is; only a line with
 // one linear factor names a single root on its own.
-breaksAt('wrong factor loses a root', eqMeta([0, 2]), ['4^x-5*2^x+4=0', '(2^x-1)(2^x+3)=0', 'x=0', 'x=2'], 1);
-breaksAt('wrong factor loses a root, with source', eqMeta([0, 2], { source: '4^x-5*2^x+4=0' }), ['4^x-5*2^x+4=0', '(2^x-1)(2^x+3)=0', 'x=0', 'x=2'], 1);
-breaksAt('2^x(2^x−1) loses a root', eqMeta([0, 2]), ['4^x-5*2^x+4=0', '2^x(2^x-1)=0', 'x=0'], 1);
-breaksAt('(2^x−4)^2 loses a root', eqMeta([0, 2]), ['4^x-5*2^x+4=0', '(2^x-4)^2=0', 'x=2'], 1);
-breaksAt('(2^x−4)(2^x+1) loses a root', eqMeta([0, 2]), ['4^x-5*2^x+4=0', '(2^x-4)(2^x+1)=0', 'x=2'], 1);
+incompleteAt('wrong factor loses a root', eqMeta([0, 2]), ['4^x-5*2^x+4=0', '(2^x-1)(2^x+3)=0', 'x=0', 'x=2'], 1);
+incompleteAt('wrong factor loses a root, with source', eqMeta([0, 2], { source: '4^x-5*2^x+4=0' }), ['4^x-5*2^x+4=0', '(2^x-1)(2^x+3)=0', 'x=0', 'x=2'], 1);
+incompleteAt('2^x(2^x−1) loses a root', eqMeta([0, 2]), ['4^x-5*2^x+4=0', '2^x(2^x-1)=0', 'x=0'], 1);
+incompleteAt('(2^x−4)^2 loses a root', eqMeta([0, 2]), ['4^x-5*2^x+4=0', '(2^x-4)^2=0', 'x=2'], 1);
+incompleteAt('(2^x−4)(2^x+1) loses a root', eqMeta([0, 2]), ['4^x-5*2^x+4=0', '(2^x-4)(2^x+1)=0', 'x=2'], 1);
 {
   const rep = report(eqMeta([0, 2]), ['(2^x-1)(2^x+3)=0', 'x=0', 'x=2'], { prompt: 'Solve $4^x-5\\cdot 2^x+4=0$.' });
-  ok(`a first line that loses a root breaks, with a prompt, got ${JSON.stringify(rep.lines.map(l => l.status))}`, rep.firstBreak === 0);
+  ok(`a first line that loses a root is incomplete, not a break, with a prompt (owner decision 7, 18 Nov 2026), got ${JSON.stringify(rep.lines.map(l => l.status))}`, rep.firstBreak === -1 && rep.lines[0].state === 'incomplete');
   const rep2 = report(eqMeta([0, 2]), ['(2^x-1)(2^x-5)=0', '2^x=1', 'x=0', 'x=2']);
-  ok(`a wrong first factorisation breaks, got ${JSON.stringify(rep2.lines.map(l => l.status))}`, rep2.firstBreak === 0);
+  // (2^x-5 has a root 2^x=5 that is not a root of the question: that value is NOT a root, so this stays a break.)
+  ok(`a wrong first factorisation whose line holds at a value that is not a root is still a break, got ${JSON.stringify(rep2.lines.map(l => l.status))}`, rep2.firstBreak === 0 && rep2.lines[0].status === 'break' && !rep2.lines[0].state && /also solves the original/.test(rep2.lines[0].note) &&
+    rep2.lines.slice(1).every(l => l.status === 'note' && /Follows from the earlier slip/.test(l.note)));
   const rep3 = report(eqMeta([1, 100]), ['log(x)(log(x)-3)=0']);
-  ok(`log x (log x − 3) = 0 for roots 1 and 100 breaks, got ${JSON.stringify(rep3.lines.map(l => l.status))}`, rep3.firstBreak === 0);
+  // log x = 3 gives x = 1000, which is not a root: still a break (a).
+  ok(`log x (log x − 3) = 0 for roots 1 and 100 still breaks: x = 1000 is not a root, got ${JSON.stringify(rep3.lines.map(l => l.status))}`, rep3.firstBreak === 0);
   const s = statuses(eqMeta([1, 100]), ['log(x)(log(x)-2)=0', 'log(x)=0', 'x=1', 'log(x)=2', 'x=100']);
   ok(`log x (log x − 2) = 0 by branches: no break, branches verified, got ${JSON.stringify(s)}`, !s.includes('break') && s.slice(1).every(v => v === 'ok'));
 }

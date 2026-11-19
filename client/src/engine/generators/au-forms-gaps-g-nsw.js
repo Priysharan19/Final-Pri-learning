@@ -7,7 +7,7 @@
 // dollar named in the prompt with a tolerance under half that unit. All forms are
 // original. SYNTHETIC: no student or examiner evidence.
 // ─────────────────────────────────────────────────────────────────────────────
-import { ri, rc, mcq, r2, moneyPlain } from '../qhelpers.js';
+import { ri, rc, mcq } from '../qhelpers.js';
 
 const REJ = Symbol('reject');
 const rej = cond => { if (cond) throw REJ; };

@@ -6,7 +6,7 @@
 // numbers the prompt shows (the AI never sets a mark). All forms are original.
 // SYNTHETIC: no student or examiner evidence.
 // ─────────────────────────────────────────────────────────────────────────────
-import { ri, rc, nz, gcd, mcq, poly } from '../qhelpers.js';
+import { ri, rc, gcd } from '../qhelpers.js';
 
 const REJ = Symbol('reject');
 const rej = cond => { if (cond) throw REJ; };

@@ -455,7 +455,7 @@ function labelNamesTheAsk(text, answer, question) {
  *   { status: 'none' }                           nothing reads as an answer; ask
  *   { status: 'not-applicable' }                 this answer type has no final-answer field
  */
-export function proposeFinalAnswer(lines, question = {}) {
+function proposeFromWorking(lines, question = {}) {
   const type = question?.answerType || 'numeric';
   if (!PROPOSABLE_TYPES.includes(type)) return { status: 'not-applicable' };
   const kept = (Array.isArray(lines) ? lines : String(lines ?? '').split('\n'))
@@ -492,4 +492,90 @@ export function proposeFinalAnswer(lines, question = {}) {
     return { status: 'proposed', answer: all[0], line: source ? source.index : last.index };
   }
   return { status: 'none' };
+}
+
+// ── The asked quantity ───────────────────────────────────────────────────────
+// A final answer must not be guessed from a line that does not state what was
+// asked. Owner test, 18 Nov 2026: a question asking for a y-coordinate and an
+// unfinished page whose last line was "x = 0 or x = −3" arrived with "y = 0" in
+// the answer field and a "Not quite". Where the question names the quantity it
+// asks for, only lines that state THAT quantity are candidates: "y = 5",
+// "y(0) = 0", or a point "(0, 0)" for a y-coordinate. A line that states a
+// different variable ("x = 0") is not the answer to a question about y.
+
+/** The single letter the question asks for (answerPrefix first, then the asking words), or null. */
+export function askedVariable(question = {}) {
+  const prefix = String(question?.answerPrefix ?? '').replace(/\$/g, '').trim().match(/^([A-Za-zθ])\s*=?$/u);
+  if (prefix) return prefix[1].toLowerCase();
+  const prompt = String(question?.prompt ?? '').replace(/\$/g, ' ');
+  const asks = [...prompt.matchAll(/(?:^|[^\p{L}])([xyz])[\s-]*(?:co-?ordinate|value|intercept)s?(?![\p{L}])/giu)]
+    .map(m => ({ at: m.index, v: m[1].toLowerCase() }));
+  for (const m of prompt.matchAll(/(?:find|calculate|determine|state|work out)\s+(?:the\s+)?(?:value\s+of\s+)?([xyz])(?=[\s.,?]|$)/giu)) asks.push({ at: m.index, v: m[1].toLowerCase() });
+  for (const m of prompt.matchAll(/value\s+of\s+([xyz])(?=[\s.,?]|$)/giu)) asks.push({ at: m.index, v: m[1].toLowerCase() });
+  if (!asks.length) return null;
+  asks.sort((a, b) => a.at - b.at);
+  return asks.at(-1).v;
+}
+
+const LABEL_OF = /^\s*([^=≈<>⇒→:]{1,40}?)\s*=(?!=)/u;
+
+/** What one piece of a line says about the asked letter: { states, answer } or { other: true } or null (unlabelled). */
+function pieceAbout(piece, V) {
+  const text = stripSentence(piece);
+  const m = text.match(LABEL_OF);
+  if (!m) return null;
+  const label = m[1].trim().replace(/^(?:so|hence|thus|therefore|∴)\s+/iu, '');
+  if (STRONG_WORDS.test(label)) return null;
+  const named = label.match(/^([A-Za-zθ])(?:['′]|\s*\([^()]{0,12}\))?$/u);
+  if (!named) return null;
+  if (named[1].toLowerCase() === V && !/['′]/.test(label)) return { states: true, value: stripSentence(text.slice(m[0].length)) };
+  return { other: true };
+}
+
+/** A point written on the line, read for the asked coordinate: "smallest: (0, 0)" asks y → 0. */
+function coordinateOf(text, V) {
+  if (V !== 'x' && V !== 'y') return null;
+  const m = String(text).match(/\(\s*([-+−–]?\d+(?:\.\d+)?(?:\/\d+)?)\s*,\s*([-+−–]?\d+(?:\.\d+)?(?:\/\d+)?)\s*\)/);
+  if (!m) return null;
+  return (V === 'x' ? m[1] : m[2]).replace(/[−–]/g, '-');
+}
+
+/** Every line that states the asked letter, with the value it gives. */
+function statedLines(kept, V) {
+  const out = [];
+  for (const l of kept) {
+    if (isCheckLine(l.text)) continue;
+    const pieces = segments(stripSentence(l.text));
+    const about = pieces.map(p => pieceAbout(p, V));
+    const hit = about.map((a, i) => (a?.states && a.value ? a.value : null)).filter(Boolean);
+    if (hit.length) { out.push({ index: l.index, values: hit }); continue; }
+    if (about.some(a => a?.other)) continue;
+    const point = coordinateOf(l.text, V);
+    if (point !== null) out.push({ index: l.index, values: [point] });
+  }
+  return out;
+}
+
+export function proposeFinalAnswer(lines, question = {}) {
+  const base = proposeFromWorking(lines, question);
+  const V = askedVariable(question);
+  const type = question?.answerType || 'numeric';
+  if (!V || !['numeric', 'expression'].includes(type)) return base;
+  const kept = (Array.isArray(lines) ? lines : String(lines ?? '').split('\n'))
+    .map((text, index) => ({ text: String(text ?? '').trim(), index })).filter(l => l.text);
+  if (!kept.length) return base;
+  const lastLine = kept.at(-1);
+  const aboutLast = segments(stripSentence(lastLine.text)).map(p => pieceAbout(p, V));
+  const lastIsOther = aboutLast.length > 0 && aboutLast.every(a => a?.other);
+  if ((base.status === 'proposed' || base.status === 'ambiguous') && !lastIsOther) return base;
+  if (base.status === 'not-applicable') return base;
+  // Nothing from the last line, or the last line is about a different letter:
+  // only lines that state the asked letter are candidates.
+  const stated = statedLines(kept, V);
+  const valid = [];
+  for (const st of stated) for (const v of st.values) if (readsAsAnswer(v, question)) valid.push({ v, index: st.index });
+  const answers = distinct(valid.map(x => x.v), question);
+  if (answers.length === 1) return { status: 'proposed', answer: answers[0], line: valid.at(-1).index };
+  if (answers.length > 1) return { status: 'ambiguous', candidates: answers };
+  return { status: 'none', missing: V };
 }

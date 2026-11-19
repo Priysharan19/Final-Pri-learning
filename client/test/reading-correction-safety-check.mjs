@@ -172,10 +172,17 @@ const reading = ({
       && /api\.post\(\`\/practice\/\$\{question\.id\}\/submit\`, body\)/.test(deliverBody),
     'CASE 5: corrected ink text flows to the same deterministic practice submit endpoint as any other answer');
 
-  const gateAt = submitBody.indexOf('if (needsCheck && vouchedNow !== readingId)');
+  // Owner decision 19 Nov 2026 (ADR-0001 amendment): the confirm gate is retired. The surviving doubt is now enforced by the
+  // reading floor: a doubtful line is never judged (server, and the card never takes the final answer from one), and a reading
+  // that arrives after waiting is still sent only by the student's own press of Mark my working, never silently by the card.
+  const unreadableAt = submitBody.indexOf('setFinalUnreadable(true)');
   const deliveryAt = submitBody.indexOf('await deliver(');
-  ok(gateAt >= 0 && deliveryAt > gateAt && !/autoMarkedRef/.test(card) && !/inkResult\?\.afterWait/.test(card),
-    'CASE 6: a reading that arrives after waiting is never submitted by the card; the student\'s Submit runs the surviving-uncertainty gate before any delivery/mark');
+  const setWantedAt = card.indexOf('setMarkWanted(true)');
+  const pressAt = card.indexOf('function pressMark()');
+  ok(unreadableAt >= 0 && deliveryAt > unreadableAt && !/autoMarkedRef/.test(card) && !/inkResult\?\.afterWait/.test(card)
+      && pressAt >= 0 && setWantedAt > pressAt && card.indexOf('setMarkWanted(true)', setWantedAt + 1) > setWantedAt
+      && !/needsConfirmation\(/.test(card) && /readingJudgement\(inkResult\)/.test(card),
+    'CASE 6: a reading that arrives after waiting is sent only by the student\'s press of Mark my working; an unreadable final answer stops before any delivery; a doubtful line is left to the reading floor');
   ok(/if \(ink\.needsConfirmation === true\)/.test(card)
       && /ink\.minConf < confidenceGate/.test(card)
       && /Number\(ink\.confidenceFloor\)/.test(card),

@@ -46,6 +46,20 @@ const storedExam = (page, examId) => page.evaluate(async (examId) => {
   };
 }, examId);
 
+// The student accepted the one-time prompt (D17) in an earlier session of this profile; the record is kept on the device and nothing
+// is read until it is there (serverExam.examReadPermitted). These flows are about what happens to a page the student NEVER pressed
+// Read on, so the earlier acceptance is set at the desk by the same record the prompt writes. Owner decision, 19 Nov 2026 does not
+// touch the exam room: it keeps its Read button and its reading.
+const acceptedEarlier = (page, examId) => page.evaluate(async (examId) => {
+  const db = await new Promise((ok, no) => { const r = indexedDB.open('pri-learning'); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
+  const row = await new Promise((ok, no) => { const r = db.transaction('exams').objectStore('exams').get(examId); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
+  db.close();
+  const all = JSON.parse(localStorage.getItem('pri-reader-permission-v1') || '{}');
+  all[`p:${row.pid}`] = { choice: 'accepted', version: 1, at: new Date().toISOString() };
+  localStorage.setItem('pri-reader-permission-v1', JSON.stringify(all));
+  return row.pid;
+}, examId);
+
 export const flow = {
   id: 'exam-unread-handwriting',
   name: 'India exam · unread handwriting at the deadline: warned, frozen, pending, read once',
@@ -70,6 +84,7 @@ export const flow = {
       await start.click();
       await page.waitForSelector('.exam-timer', { timeout: 60000 });
       const examId = new URL(page.url()).pathname.split('/').pop();
+      await acceptedEarlier(page, examId);
 
       // ── 1 · one typed-style answer, and one answer written by hand, never read
       await page.locator('.exam-dot').nth(0).click();
@@ -226,7 +241,7 @@ export const flow = {
 };
 
 /** A JEE Main paper with question 21 open for handwriting; "42" is written on it. */
-async function writeFortyTwo({ page, base, goto, createProfile, settle, online }, name) {
+async function writeFortyTwo({ page, base, goto, createProfile, settle, online }, name, { accepted = false } = {}) {
   await goto('/');
   await createProfile({ name, year: 12, course: 'in', track: 'jee-main' });
   await online.signIn({ name });
@@ -236,6 +251,7 @@ async function writeFortyTwo({ page, base, goto, createProfile, settle, online }
   await start.click();
   await page.waitForSelector('.exam-timer', { timeout: 60000 });
   const examId = new URL(page.url()).pathname.split('/').pop();
+  if (accepted) await acceptedEarlier(page, examId);
   await page.locator('.exam-dot').nth(20).click();
   await settle();
   await page.getByRole('button', { name: '✍ Write by hand' }).click();
@@ -268,7 +284,7 @@ export const flowSubmitUnread = {
     try {
       reader.lines = null; reader.text = '42'; reader.confidence = 0.97; reader.down = false;
       const before = reader.requests.length;
-      const { examId } = await writeFortyTwo(ctx, 'Nikhil Rao');
+      const { examId } = await writeFortyTwo(ctx, 'Nikhil Rao', { accepted: true });
       await page.waitForTimeout(2500);
       const head = (await page.locator('.exam-head').innerText()).replace(/\s+/g, ' ');
       const whileSitting = reader.requests.length - before;

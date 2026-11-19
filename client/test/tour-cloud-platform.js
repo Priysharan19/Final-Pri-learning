@@ -6,7 +6,7 @@
 // this flow proves the browser product wiring reaches those contracts correctly.
 
 import { pathToFileURL } from 'node:url';
-import { handwrite, pressRead } from './fakeServerReader.js';
+import { handwrite, markWorking, readingIsNotShown } from './fakeServerReader.js';
 import { enterThroughCard, mockAccountServer } from './support/mock-account.mjs';
 
 const ACCOUNT = {
@@ -204,8 +204,9 @@ export const flow = {
     const inkPrompt = (await page.locator('.q-prompt').innerText()).replace(/\s+/g, ' ').trim();
     const beforeInk = requests.length;
     await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), reader.text);
-    // Read on request (#440): the student asks for the reading.
-    await pressRead(page);
+    // Owner decision, 19 Nov 2026: the reading is not shown; one press marks the working on the student's own page.
+    // There is no Read button: the student presses Mark my working, and the gate answers that press.
+    await markWorking(page);
     await page.waitForFunction(() => /parent or guardian needs to confirm/i.test(document.querySelector('[data-ink-blocker-reason]')?.textContent || ''), null, { timeout: 20000 }).catch(() => {});
     const guardianNote = await inkNotice();
     const guardianBlockedRequests = requests.slice(beforeInk).filter(row => row.path.startsWith('/v1/handwriting/'));
@@ -232,11 +233,13 @@ export const flow = {
     await check('the gate lifting reads nothing by itself: the kept ink waits for the student\'s press',
       reader.requests.length === 0, `${reader.requests.length} transcribe requests before the press`);
     await page.locator('[data-ink-retry-reading]').first().click();
-    await page.waitForSelector('.ink-line', { timeout: 20000 }).catch(() => {});
-    const readBack = await page.locator('.ink-line').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-text') || ''));
-    await check('once the gate lifts, one press reads the kept ink, exactly once — no retyping, no reload',
-      readBack.length === 1 && readBack[0] === reader.text && reader.requests.length === 1,
-      `read ${JSON.stringify(readBack)}; ${reader.requests.length} transcribe requests`);
+    // Owner decision, 19 Nov 2026: the reading is not shown; one press marks the working on the student's own page.
+    // The kept ink is read silently by the one press: what comes back is the marked page (or the final-answer prompt), never the typed reading.
+    await page.waitForSelector('[data-marked-page], [data-final-answer-sentence], .eval-card', { timeout: 20000 }).catch(() => {});
+    const shown = await readingIsNotShown(page, [reader.text].filter(x => x.length >= 6));
+    await check('once the gate lifts, one press reads the kept ink, exactly once — no retyping, no reload — and the reading itself is not shown',
+      reader.requests.length === 1 && shown.structure.length === 0 && shown.leaked.length === 0,
+      `${reader.requests.length} transcribe requests; ${JSON.stringify(shown)}`);
     await check('the same question is still on screen', (await page.locator('.q-prompt').innerText()).replace(/\s+/g, ' ').trim() === inkPrompt);
     await check('the ink that was sent is the picture and nothing else — answer-blind',
       reader.requests.every(r => r.parsed && JSON.stringify(Object.keys(r.parsed)) === '["image"]' && /^data:image\//.test(r.parsed.image)),

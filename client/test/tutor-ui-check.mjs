@@ -264,7 +264,8 @@ const fakeStream = events => async (body, { onEvent }) => { for (const [event, d
   const gate = card.indexOf('showDiagnoseButton({ tutorEnabled, diagnostic, resolved, res: state.res, gradedRetry })');
   const button = card.indexOf('data-tutor-diagnose');
   ok(gate > 0 && button > gate && button - gate < 1500, 'QuestionCard renders the button only inside the tutor-enabled gate');
-  ok(card.split('data-tutor-diagnose').length === 2, 'and nowhere else');
+  // Two places, both behind the showDiagnoseButton gate: the launch row beside Help while the question is open, and its own row once resolved.
+  ok(card.split('data-tutor-diagnose').length === 3 && card.split('showDiagnoseButton({ tutorEnabled, diagnostic, resolved, res: state.res, gradedRetry })').length === 3, 'and nowhere else (the launch row and the resolved row, each behind the gate)');
   ok(/const MistakeDiagnosis = TUTOR_BUILT_OUT \? null : React\.lazy/.test(card), 'the diagnosis panel is a lazy chunk, not built when the tutor is built out');
   const panel = read('src/tutor/MistakeDiagnosis.jsx');
   ok(/\/practice\/\$\{questionId\}\/tutor\/diagnose/.test(panel) && !/steps|answerText|solution/.test(panel.replace(/\/\/.*$/gm, '')), 'the panel asks through the local backend and never handles the solution itself');

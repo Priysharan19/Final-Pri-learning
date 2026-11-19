@@ -387,10 +387,13 @@ function ProfilePractice() {
     syncAssignmentProgress(sessionRef.current);
   };
 
-  const redo = async () => {
+  // `carry` (optional): the student corrected a line on the marked page. The same question is issued again and the
+  // corrected page goes with it (ink/redoCarry.js), but only when it really is the same question.
+  const redo = async carry => {
     if (assignmentTargetReached.current || !serve?.question) return;
     try {
       const r = await api.post(`/history/${serve.question.id}/retry`, { variant: 'same' });
+      if (typeof carry === 'function' && r?.variant === 'same' && r?.question?.id) await carry(r.question.id).catch(() => {});
       setServe(r);
     } catch { load(); setServe(null); }
   };

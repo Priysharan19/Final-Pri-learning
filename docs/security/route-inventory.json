@@ -1958,7 +1958,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "stateless; image only (answer-blind); counts against the deployment paid-call ceiling",
+      "ownership": "stateless; image plus a server-derived bare symbol list from the public stem (answer-blind, ADR-0001 §6); counts against the deployment paid-call ceiling",
       "rateLimits": [
         {
           "key": "handwriting-transcribe",
@@ -3256,7 +3256,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "student owns a sealed server-issued question; final answer or authenticated ink/photo receipt is marked server-side; stable idempotency key commits numerical marks and exactly-once progress; no client award authority. The graded attempt's support (independent / after-feedback / supported / revealed, support v2) is derived from the server's own records of the question; the closed body accepts no support claim, only deviceHelp: true (help shown offline), which can only lower it. A handwritten or photographed submission may carry its ORIGINAL (strokes pri-ink-v1 or the photographed page), checked against its SHA-256 before anything is read or marked, kept insert-once in the same transaction as the mark (attempt_originals, per-account quota), and named by digest in the reply and the graded-attempt event; never sent to any reader",
+      "ownership": "Reading floor (ADR-0001 amendment 19 Nov 2026): a submission that carries its picture is judged only on the lines the server's kept read allows (below PRI_HANDWRITING_CONFIDENCE_FLOOR, uncertain or blank lines are excluded and returned as not read); an unreadable or absent final answer is a 200 FINAL_ANSWER_UNREADABLE that records nothing and spends no try; the attempt records studentConfirmed false, the excluded line indexes and the reading used; `answerTyped: true` (with a picture) marks a final answer the student typed themselves. student owns a sealed server-issued question; final answer or authenticated ink/photo receipt is marked server-side; stable idempotency key commits numerical marks and exactly-once progress; no client award authority. The graded attempt's support (independent / after-feedback / supported / revealed, support v2) is derived from the server's own records of the question; the closed body accepts no support claim, only deviceHelp: true (help shown offline), which can only lower it. A handwritten or photographed submission may carry its ORIGINAL (strokes pri-ink-v1 or the photographed page), checked against its SHA-256 before anything is read or marked, kept insert-once in the same transaction as the mark (attempt_originals, per-account quota), and named by digest in the reply and the graded-attempt event; never sent to any reader",
       "rateLimits": [
         {
           "key": "practice-grade",

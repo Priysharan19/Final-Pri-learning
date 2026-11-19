@@ -759,7 +759,7 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
   // mistake after which nothing is credited.
   const quad = { kind: 'equation', variable: 'x', solutions: [7, -1], source: 'x^2-6x=7' };
   const lone = stepCheck(quad, '(x-3)^2=16\nx-3=4', { prompt: '$x^2-6x=7$' });
-  ok(lone.firstBreak === -1 && lone.lines[1].status === 'ok' && /other is still to find/.test(lone.lines[1].note || ''), 'x - 3 = 4 after (x - 3)^2 = 16 is one branch, not a mistake');
+  ok(lone.firstBreak === -1 && lone.lines[1].status === 'ok' && lone.lines[1].state === 'incomplete' && /x = −1 is also a solution/.test(lone.lines[1].note || ''), 'x - 3 = 4 after (x - 3)^2 = 16 is one branch, not a mistake');
   ok(stepCheck(quad, '(x-3)^2=16\nx-3=5', { prompt: '$x^2-6x=7$' }).firstBreak === 1, 'a branch that is true of no root is still the mistake');
   ok(checkAnswer({ answerType: 'set', answer: { values: [7, -1] }, prompt: 'Solve $x^2-6x=7$.' }, '7').correct !== true, 'and one root is still not the answer');
 }
