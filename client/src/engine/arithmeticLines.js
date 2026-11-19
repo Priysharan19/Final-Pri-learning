@@ -243,13 +243,47 @@ const RULE_PHRASE = Object.freeze({
   'expand': 'expanding brackets', 'factorise': 'factorising', 'difference-of-squares': 'the difference of two squares'
 });
 export const RULE_PHRASES = RULE_PHRASE;
+// A name that states a DIRECTION is used only when the two sides show that direction (read from the parsed trees):
+//   expanding brackets     the line before has a bracketed sum multiplied or raised, and this line has strictly fewer;
+//   factorising            this line is a product (or power) with a bracketed factor, and the line before is not;
+//   difference of squares  one side is such a product and the other is not.
+// Otherwise the step is named nothing.
+const sumNode = x => { x = unwrap(x); return !!x && x.t === 'bin' && (x.op === '+' || x.op === '-'); };
+function bracketsMultiplied(n) {
+  if (!n || typeof n !== 'object') return 0;
+  let c = 0;
+  if (n.t === 'bin' && n.op === '*') c += (sumNode(n.l) ? 1 : 0) + (sumNode(n.r) ? 1 : 0);
+  if (n.t === 'bin' && n.op === '^' && sumNode(n.l) && unwrap(n.r).t === 'num') c++;
+  for (const k of ['l', 'r', 'v', 'arg']) if (n[k] && typeof n[k] === 'object') c += bracketsMultiplied(n[k]);
+  return c;
+}
+function wholeProduct(n) {
+  n = unwrap(n);
+  while (n && n.t === 'neg') n = unwrap(n.v);
+  if (!n) return false;
+  if (n.t === 'bin' && n.op === '^') return sumNode(n.l) && unwrap(n.r).t === 'num';
+  if (n.t === 'bin' && n.op === '*') return productFactors(n).some(sumNode);
+  return false;
+}
+function directionHolds(kind, fromText, toText) {
+  let a, b;
+  try { a = parse(normalize(fromText)); b = parse(normalize(toText)); } catch { return false; }
+  if (!a || !b || a.t === 'equation' || b.t === 'equation') return false;
+  if (kind === 'expand') return bracketsMultiplied(a) > 0 && bracketsMultiplied(b) === 0;   // none left multiplied or raised: a partial expansion or a regrouping is not named
+  if (kind === 'factorise') return wholeProduct(b) && !wholeProduct(a);
+  return wholeProduct(a) !== wholeProduct(b);   // difference of two squares
+}
+const DIRECTED = { 'expand': 'expand', 'factorise': 'factorise', 'difference-of-squares': 'squares' };
 function nameOfRule(fromText, toText) {
   let j = null;
   try { j = justifyStep(fromText, toText); } catch { j = null; }
-  const phrases = [...new Set(((j && j.valid && j.rules) || []).map(r => RULE_PHRASE[r.rule]).filter(Boolean))];
+  const ids = ((j && j.valid && j.rules) || []).map(r => r.rule).filter(id => !DIRECTED[id] || directionHolds(DIRECTED[id], fromText, toText));
+  const phrases = [...new Set(ids.map(id => RULE_PHRASE[id]).filter(Boolean))];
   // The pattern namer often says the same thing with the formula written out (`the reciprocal identity sec θ = 1/cos θ`):
   // when it starts with the proved rule's phrase, its fuller wording is used.
-  const older = nameOfStep(fromText, toText);
+  let older = nameOfStep(fromText, toText);
+  if (older === 'expanding the brackets' && !directionHolds('expand', fromText, toText)) older = '';
+  if (older === 'factorising' && !directionHolds('factorise', fromText, toText)) older = '';
   if (phrases.length === 1 && older.startsWith(phrases[0])) return older;
   if (phrases.length) return phrases.join(' and ');
   return older;
@@ -330,7 +364,7 @@ function derivativeRuleWords(text, variable) {
 // to X", with X from exactForm and only when exactForm has an exact form (a rounded decimal is never offered).
 const plainForm = side => String(side).replace(/[−–—]/g, '-').replace(/\s+/g, '').replace(/[×·]/g, '*').replace(/sqrt/gi, '√').replace(/\bpi\b|(?<=\d)pi/gi, 'π')
   .replace(/\((-?\d+(?:\.\d+)?|√\d+|π)\)/g, '$1').replace(/√\((\d+)\)/g, '√$1');
-function simplifiesTo(side) {
+function simplifiesTo(side, stated) {
   const v = valueOf(side);
   if (v === null) return '';
   const compact = plainForm(side);
@@ -338,6 +372,7 @@ function simplifiesTo(side) {
   const exact = exactForm(v);
   if (/[.]|NaN|Infinity/.test(exact.plain)) return '';
   if (compact === exact.plain.replace(/−/g, '-')) return '';       // already the single value
+  if (stated && stated.includes(`$${exact.tex}$`)) return '';      // the comment has just said this value
   return ` This simplifies to $${exact.tex}$.`;
 }
 
@@ -799,7 +834,7 @@ function stepCheckArithmeticWithinBudget(workingText) {
     while (k >= 0 && !(out[k].status === 'ok' && out[k].state === 'arithmetic')) k--;
     if (k >= 0 && lastSides.has(k)) {
       let more = '';
-      try { more = simplifiesTo(lastSides.get(k)); } catch { more = ''; }
+      try { more = simplifiesTo(lastSides.get(k), out[k].note); } catch { more = ''; }
       if (more) out[k] = { ...out[k], note: out[k].note + more };
     }
   }

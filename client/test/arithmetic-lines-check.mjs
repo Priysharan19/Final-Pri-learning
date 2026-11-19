@@ -393,13 +393,13 @@ ok(model?.cards?.length === 2 && model.cards.every(c => c.status === 'checked' &
     [['2/3 + 1/3 = 3/3'], '1'], [['5! = 5 × 24'], '120'], [['4 × 5 = 20', '= 2 × 10'], '20'], [['-12/8 = -3/2 = -12/8'], '−3/2'], [['√2/2 = 1/√2'], '√2/2']];
   for (const [page, x] of simp) {
     const r = run(page), ticked = r.lines.map((l, k) => (l.status === 'ok' ? k : -1)).filter(k => k >= 0), last = r.lines[ticked[ticked.length - 1]];
-    ok(r.firstBreak === -1 && plain(last.note).endsWith(`${S}${x}.`), `simplifies to ${x}: ${page.join(' ; ')} (${plain(last ? last.note : '')})`);
-    ok(r.lines.filter(l => /simplifies/.test(l.note || '')).length === 1, `only the last ticked line says it: ${page.join(' ; ')}`);
+    ok(r.firstBreak === -1 && plain(last.note).includes(x) && !/simplifies/.test(last.note), `the value ${x} is already stated, so it is not said again: ${page.join(' ; ')} (${plain(last ? last.note : '')})`);
+    ok(r.lines.every(l => !/simplifies/.test(l.note || '')), `no line repeats a value the comment has just stated: ${page.join(' ; ')}`);
   }
   // the TeX is the exact form the formatter gives
-  ok(run(['16/3 = 2[2(4)^2 - 4^3/3]', '= 2[32 - 64/3]']).lines[1].note.endsWith('This simplifies to $\\frac{64}{3}$.'), 'a fraction is a stacked fraction');
-  ok(run(['12√3 = 12e^(ln(3)/2)']).lines[0].note.endsWith('This simplifies to $12\\sqrt{3}$.'), 'a surd is a typeset surd');
-  ok(run(['6/4 = 6/4']).lines[0].note.endsWith('This simplifies to $\\frac{3}{2}$.'), 'a fraction not in lowest terms is reduced');
+  ok(run(['16/3 = 2[2(4)^2 - 4^3/3]', '= 2[32 - 64/3]']).lines[1].note.endsWith('equals the line above: $\\frac{64}{3}$.'), 'a fraction is stated once, stacked');
+  ok(run(['12√3 = 12e^(ln(3)/2)']).lines[0].note.endsWith('come to $12\\sqrt{3}$.'), 'a surd is stated once, typeset');
+  ok(run(['6/4 = 6/4']).lines[0].note === 'Both sides come to $\\frac{3}{2}$.', 'a fraction not in lowest terms is stated reduced, once');
   // already one value, a decimal, only a rounded decimal available, an earlier line, a page with a cross, nothing ticked: no sentence
   const single = [['2 + 3 = 5'], ['3 × 4 = 12'], ['6/4 = 3/2'], ['√12 = 2√3'], ['2√3 × 3 = 6√3'], ['3/2 = 1.5'], ['-3/4 = -0.75'], ['196 + 64 = 260', '= 260'], ['2√65 = √(4 × 65)'],
     ['5! = 120'], ['-3^2 = -9'], ['(-3)^2 = 9'], ['1/2 + 1/3 = 5/6'], ['72 = 6 × 12', '= 72'], ['12 × 6 = 6 × 12 = 73'], ['2 + 2 = 5', '3 + 3 = 6'], ['√3/2 = √3/2'], ['7 = 7'],
@@ -412,6 +412,104 @@ ok(model?.cards?.length === 2 && model.cards.every(c => c.status === 'checked' &
   { const r = run(['72 = 6 × 12', '= 72']); ok(r.lines[0].status === 'ok' && !/simplifies/.test(r.lines[0].note), 'only the LAST ticked line speaks'); }
   // the exact form of a value that arithmetic reached with rounding noise is the whole number
   ok(exactForm(Math.sqrt(2) * Math.sqrt(2)).plain === '2' && exactForm(2.0000000000000004).tex === '2' && exactForm(-3.0000000000000004).plain === '−3', 'rounding noise on a whole number is that whole number');
+  // 5.7 a name that states a DIRECTION is used only when the two sides show it (independent review: a difference of two
+  // squares written as a product was said to be "expanding brackets"). Both sides bracketed, neither, or a mixed move
+  // (partial expansion, regrouping, completing the square either way) are named nothing; every comment below is exact.
+  const BOTH = 'Both sides are the same expression, written two ways.';
+  const direction = [
+    ["(x+1)^2 - (x-1)^2 = ((x+1)-(x-1))((x+1)+(x-1))", "Both sides are the same expression, written two ways."],
+    ["x^2 - 4 = (x-2)^2 + 4x - 8", "Both sides are the same expression, written two ways."],
+    ["x^2 + 6x + 5 = (x+3)^2 - 4", "Both sides are the same expression, written two ways."],
+    ["(x+3)^2 - 4 = (x+1)(x+5)", "Both sides are the same expression, written two ways."],
+    ["2(x+1) + 3(x+1) = 5(x+1)", "Both sides are the same expression, written two ways."],
+    ["(x+1)(x+2) + (x+1) = (x+1)(x+3)", "Both sides are the same expression, written two ways."],
+    ["x(x+1) = x^2 + x", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["x^2 + x = x(x+1)", "Both sides are the same expression, written two ways. It matches factorising."],
+    ["(x+1)^2 = (x+1)(x+1)", "Both sides are the same expression, written two ways."],
+    ["(x+1)(x+1) = (x+1)^2", "Both sides are the same expression, written two ways. It matches the index law: multiplying powers."],
+    ["(x+2)(x+3) = (x+3)(x+2)", "Both sides are the same expression, written two ways."],
+    ["2(x+1) = 2(1+x)", "Both sides are the same expression, written two ways."],
+    ["(x+1)^2 = (1+x)^2", "Both sides are the same expression, written two ways."],
+    ["(x+1)^2 = x^2 + 2x + 1", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["x^2 + 2x + 1 = (x+1)^2", "Both sides are the same expression, written two ways. It matches factorising."],
+    ["x^2 - 6x + 9 = (x-3)^2", "Both sides are the same expression, written two ways. It matches factorising."],
+    ["(x-3)^2 = x^2 - 6x + 9", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["(2x+1)(x-1) = 2x^2 - x - 1", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["2x^2 - x - 1 = (2x+1)(x-1)", "Both sides are the same expression, written two ways. It matches factorising."],
+    ["x^2 + 2x + 1 = x^2 + 2x + 1", "Both sides are the same expression, written two ways."],
+    ["x + x = 2x", "Both sides are the same expression, written two ways."],
+    ["2x = x + x", "Both sides are the same expression, written two ways."],
+    ["3(x+2) - 3x = 6", "Both sides come to 6."],
+    ["x^2 - 1 = (x-1)(x+1)", "Both sides are the same expression, written two ways. It matches the difference of two squares."],
+    ["(x-1)(x+1) = x^2 - 1", "Both sides are the same expression, written two ways. It matches the difference of two squares."],
+    ["x^4 - 1 = (x^2-1)(x^2+1)", "Both sides are the same expression, written two ways. It matches the difference of two squares."],
+    ["(x^2-1)(x^2+1) = x^4 - 1", "Both sides are the same expression, written two ways. It matches the difference of two squares."],
+    ["(x+1)^2 - 1 = x^2 + 2x", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["x^2 + 2x = (x+1)^2 - 1", "Both sides are the same expression, written two ways."],
+    ["(x+1)(x+2)(x+3) = (x^2+3x+2)(x+3)", "Both sides are the same expression, written two ways."],
+    ["(x^2+3x+2)(x+3) = (x+1)(x+2)(x+3)", "Both sides are the same expression, written two ways."],
+    ["(x+1)^2 + (x-1)^2 = 2x^2 + 2", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["2x^2 + 2 = (x+1)^2 + (x-1)^2", "Both sides are the same expression, written two ways."],
+    ["(a+b)^2 - (a-b)^2 = 4ab", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["4ab = (a+b)^2 - (a-b)^2", "Both sides are the same expression, written two ways."],
+    ["(a+b)(a-b) = a^2 - b^2", "Both sides are the same expression, written two ways. It matches the difference of two squares."],
+    ["a^2 - b^2 = (a+b)(a-b)", "Both sides are the same expression, written two ways. It matches the difference of two squares."],
+    ["(x+1)^2 - (x+2)^2 = -2x - 3", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["(x+1)^3 = x^3 + 3x^2 + 3x + 1", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["x^3 + 3x^2 + 3x + 1 = (x+1)^3", "Both sides are the same expression, written two ways. It matches factorising."],
+    ["x(x+1) + x = x(x+2)", "Both sides are the same expression, written two ways."],
+    ["x(x+2) = x(x+1) + x", "Both sides are the same expression, written two ways."],
+    ["x^2 + x + x + 1 = x(x+1) + (x+1)", "Both sides are the same expression, written two ways."],
+    ["x(x+1) + (x+1) = (x+1)^2", "Both sides are the same expression, written two ways."],
+    ["(x+1)^2 = x(x+1) + (x+1)", "Both sides are the same expression, written two ways."],
+    ["3(x+1) = 3x + 3", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["3x + 3 = 3(x+1)", "Both sides are the same expression, written two ways. It matches factorising."],
+    ["(2(x+1)) = 2x + 2", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["x(x-1) - (x-1) = (x-1)^2", "Both sides are the same expression, written two ways."],
+    ["(x-1)^2 = x^2 - 2x + 1", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["x^2 - 5x + 6 = (x-2)(x-3)", "Both sides are the same expression, written two ways. It matches factorising."],
+    ["(x-2)(x-3) = x^2 - 5x + 6", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["(x+5)(x-5) + 25 = x^2", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["x^2 = (x+5)(x-5) + 25", "Both sides are the same expression, written two ways."],
+    ["x^2 - 9 + 9 = x^2", "Both sides are the same expression, written two ways."],
+    ["(x+1)^2 - x^2 = 2x + 1", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["2x + 1 = (x+1)^2 - x^2", "Both sides are the same expression, written two ways."],
+    ["(x+1)^2 - (x-1)^2 = 4x", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["4x = (x+1)^2 - (x-1)^2", "Both sides are the same expression, written two ways."],
+    ["(x+2)^2 - 4 = x^2 + 4x", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["x^2 + 4x = (x+2)^2 - 4", "Both sides are the same expression, written two ways."],
+    ["x^2 + 4x = x(x+4)", "Both sides are the same expression, written two ways. It matches factorising."],
+    ["x(x+4) = x^2 + 4x", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["(x+1)/(x+1) = 1", "Both sides come to 1."],
+    ["(x^2-1)/(x-1) = x+1", "Both sides are the same expression, written two ways."],
+    ["2(x+1) + 3(x+1) = 5x + 5", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["5x + 5 = 2(x+1) + 3(x+1)", "Both sides are the same expression, written two ways."],
+    ["(x+1)(x-1) + 1 = x^2", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["x^2 = (x+1)(x-1) + 1", "Both sides are the same expression, written two ways."],
+    ["(x+3)^2 = (x+3)(x+3)", "Both sides are the same expression, written two ways."],
+    ["x^2 + 7x + 12 = (x+3)(x+4)", "Both sides are the same expression, written two ways. It matches factorising."],
+    ["(x+3)(x+4) = x^2 + 7x + 12", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["(2x)^2 = 4x^2", "Both sides are the same expression, written two ways."],
+    ["4x^2 = (2x)^2", "Both sides are the same expression, written two ways."],
+    ["(x-1)(x+1) - (x^2 - 1) = 0", "Both sides come to 0."],
+    ["(x+2)^2 - (x-2)^2 = 8x", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["8x = (x+2)^2 - (x-2)^2", "Both sides are the same expression, written two ways."],
+    ["(x+2)^2 - (x-2)^2 = ((x+2)-(x-2))((x+2)+(x-2))", "Both sides are the same expression, written two ways."],
+    ["((x+2)-(x-2))((x+2)+(x-2)) = (x+2)^2 - (x-2)^2", "Both sides are the same expression, written two ways."],
+    ["x^2 + 1 - 1 = x^2", "Both sides are the same expression, written two ways."],
+    ["(x+1)^2 - (x+1) = (x+1)x", "Both sides are the same expression, written two ways."]];
+  for (const [line, want] of direction) {
+    const r = run([line]);
+    ok(r.lines[0].status === 'ok' && plain(r.lines[0].note) === want, `direction: ${line} (${plain(r.lines[0].note || '')})`);
+  }
+  ok(direction.length >= 60, `${direction.length} direction pairs`);
+  ok(direction.filter(([, w]) => w === BOTH).length >= 25 && !direction.some(([l, w]) => /^\(x\+1\)\^2 - \(x-1\)\^2 = \(\(/.test(l) && /expanding/.test(w)), 'the reviewer\'s page is named nothing');
+  // a continuation is held to the same direction
+  { const r = run(['x(x+1)', '= x^2 + x', '= x(x+1)']); ok(/expanding brackets\.$/.test(plain(r.lines[1].note)) && /factorising\.$/.test(plain(r.lines[2].note)), `a chain: expanded then factorised (${r.lines.map(l => plain(l.note || ''))})`); }
+  // the value the comment has just stated is not stated again
+  { const r = run(['12', '= 24/2']); ok(r.lines[1].status === 'ok' && !/simplifies/.test(r.lines[1].note), `= 24/2 under = 12 (${r.lines.map(l => plain(l.note || ''))})`); }
+  ok(!/simplifies/.test(run(['2 = 4/2']).lines[0].note), '2 = 4/2 says the value once');
+
   // every comment this part produced typesets: dollars pair up, the TeX renders, no dash
   { const katex = (await import('katex')).default; const mine = [...comments].filter(c => /simplifies|rule|It matches/.test(c));
     let spans = 0, bad = [];
