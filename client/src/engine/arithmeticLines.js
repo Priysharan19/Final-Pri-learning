@@ -29,6 +29,8 @@
 import { parse, normalize, evaluate, variablesOf, exprEquivalent, withEvaluationBudget } from './expr.js';
 import { mathSpan, assignSpan } from './commentTex.js';
 import { justifyStep } from './stepJustify.js';
+import { cleanLatex } from './texSafe.js';
+import { texToPlain } from './texToPlain.js';
 
 // Everything this module evaluates for one page of working is charged to ONE budget (expr.js, "What an evaluation may
 // cost"): what a page costs to check must not depend on what is written on it. When the budget is spent the rest
@@ -620,8 +622,69 @@ function pageDefinitions(raw, out, firstBreak) {
   return broke;
 }
 
-export function stepCheckArithmetic(workingText) {
-  return withEvaluationBudget(PAGE_BUDGET, () => stepCheckArithmeticWithinBudget(workingText));
+/**
+ * `opts.latex`: the reader's TeX for lines of the working, as [{ text, latex }] (a line is matched by its trimmed text).
+ * It is a second reading of a line and is used ONLY to tick or to leave a note, never to cross:
+ *   · the working is checked as written, exactly as without it;
+ *   · a line that came back a note, whose TeX reading is judged true by this same checker, is ticked (its text stays
+ *     the student's);
+ *   · a cross whose line is true under the TeX reading becomes the "may have been misread" note, never a tick;
+ *   · a tick or a note is never turned into a cross.
+ * Both passes are charged to the one page budget.
+ */
+export function stepCheckArithmetic(workingText, opts = null) {
+  return withEvaluationBudget(PAGE_BUDGET, () => {
+    const base = stepCheckArithmeticWithinBudget(workingText);
+    if (!opts || !Array.isArray(opts.latex) || !opts.latex.length) return base;
+    try { return withTexReading(workingText, base, opts.latex); } catch { return base; }
+  });
+}
+
+function withTexReading(workingText, base, pairs) {
+  const raw = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
+  if (base.lines.length !== raw.length) return base;
+  const byText = new Map();
+  for (const pair of pairs) {
+    const key = String(pair?.text ?? '').trim(), tex = cleanLatex(pair?.latex);
+    if (!key || !tex) continue;
+    // Two lines with the same text and different TeX: neither is trusted.
+    byText.set(key, byText.has(key) && byText.get(key) !== tex ? null : tex);
+  }
+  const alt = raw.map(line => {
+    const tex = byText.get(line);
+    const plain = tex ? texToPlain(tex) : null;
+    return plain && plain.replace(/\s+/g, '') !== line.replace(/\s+/g, '') ? plain : null;
+  });
+  if (!alt.some(Boolean)) return base;
+  const second = stepCheckArithmeticWithinBudget(raw.map((line, i) => alt[i] ?? line).join('\n'));
+  if (second.lines.length !== base.lines.length) return base;
+  const lines = base.lines.map(l => ({ ...l }));
+  let changed = false, downgraded = false;
+  const trueUnderTex = i => alt[i] !== null && second.lines[i].status === 'ok' && second.lines[i].state === 'arithmetic';
+  // A cross that stands (the TeX does not clear that line) still governs the lines below it: nothing there is ticked.
+  const standing = base.firstBreak !== -1 && !trueUnderTex(base.firstBreak) ? base.firstBreak : -1;
+  base.lines.forEach((p, i) => {
+    const t = second.lines[i];
+    if (!trueUnderTex(i) || (standing !== -1 && i > standing)) return;
+    if (p.status === 'note') { lines[i] = { ...t, text: p.text }; changed = true; }
+    else if (p.status === 'break') { lines[i] = { text: p.text, status: 'note', note: MISREAD_NOTE, unverified: true }; changed = true; downgraded = true; }
+  });
+  if (!changed) return base;
+  // The cross is gone: the lines that followed from it no longer follow from a slip.
+  if (downgraded) lines.forEach((l, i) => { if (l.status === 'note' && l.note === 'Follows from the earlier slip.') lines[i] = { ...l, note: MISREAD_NOTE }; });
+  const state = l => l.state || (l.status === 'break' ? 'wrong' : l.unreadable ? 'unread' : 'unverified');
+  const full = lines.map(l => ({ ...l, state: state(l) }));
+  const at = st => full.flatMap((l, k) => (l.state === st ? [k + 1] : []));
+  const unverified = at('unverified'), unread = at('unread');
+  const firstBreak = full.findIndex(l => l.status === 'break');
+  return {
+    ...base,
+    lines: full,
+    firstBreak,
+    diagnosis: firstBreak === -1 ? null : base.diagnosis,
+    summary: { ...base.summary, checked: full.filter(l => l.status === 'ok').length, arithmetic: at('arithmetic'), wrong: at('wrong'), unverified, unread,
+      reason: unverified.length ? base.summary.reason || 'Pri checks only the arithmetic on this question. These lines have none it can check on its own.' : null }
+  };
 }
 function stepCheckArithmeticWithinBudget(workingText) {
   const raw = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);

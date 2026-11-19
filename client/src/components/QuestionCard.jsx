@@ -29,7 +29,7 @@ import { READER_PERMISSION, readerPermission } from '../ink/readerPermission.js'
 import { cloudReadingEnabled, forgetCloudReads, setReadingQuestion, INK_READER_STATE, noteReaderRefusal, readerBlock, readPhotoWithCloud, resumeReaderNow, takeCloudReadingNotice } from '../ink/cloudReader.js';
 import { retryClock, retryWhen } from '../ink/readerFailure.js';
 import { preparePhoto } from '../ink/photoRaster.js';
-import { buildTranscript, editLine, includedLines, reviveTranscript, unreadablePage, workingOf } from '../photo/transcript.js';
+import { buildTranscript, editLine, includedLatex, includedLines, reviveTranscript, unreadablePage, workingOf } from '../photo/transcript.js';
 import { proposeFinalAnswer, readsAsWritten } from '../photo/finalAnswer.js';
 import { clearPhotoDraft, confirmPhotoDraftSaved, readPhotoDraft, savePhotoDraft } from '../local/photoDrafts.js';
 import { lineMarks } from './workingEvidence.js';
@@ -2276,6 +2276,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // How Pri read each line, for the on-demand view on the marked page (never shown before marking), and the
   // correction that marks the page again: the same question issued again (Redo) with the corrected page carried in.
   const pageReading = markedOn ? { lines: (writeMode ? (judged?.lines || inkResult?.lines || []) : includedLines(photoLines || { lines: [] })).map(l => (typeof l === 'string' ? l : String(l?.text ?? ''))) } : null;
+  // A photographed line keeps the reader's own TeX (when it passed the safe-TeX gate) beside its text, so the marked page can set the
+  // line as it was written. Display only; the lines themselves, and what is marked, are unchanged.
+  if (pageReading && !writeMode) { const tex = includedLatex(photoLines || { lines: [] }); pageReading.lines = pageReading.lines.map((text, i) => (tex[i] ? { text, latex: tex[i] } : text)); }
   const correctReadLine = (i, text) => {
     if (!onRedo || busy || !markedOn) return;
     const clean = String(text ?? '').replace(/\s+/g, ' ').trim();

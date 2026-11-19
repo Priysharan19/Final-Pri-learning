@@ -150,6 +150,8 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
   if (!page) return null;
   const level = !!tops;
   const textOf = n => { const l = reading?.lines?.[n - 1]; return typeof l === 'string' ? l : String(l?.text ?? ''); };
+  // The reader's own TeX for line n, when it has one for the line as shown.
+  const latexOf = n => { const l = reading?.lines?.[n - 1]; return l && typeof l === 'object' && typeof l.latex === 'string' && l.latex ? l.latex : null; };
   const lineOpen = n => showAll || shown.has(n);
   const toggleLine = n => setShown(prev => { const next = new Set(prev); if (next.has(n)) next.delete(n); else next.add(n); return next; });
   // One line's reading, on demand, with Edit. A correction marks the page again (the caller's business).
@@ -165,7 +167,7 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
           {open && (
             <>
               {text.trim()
-                ? <p className="mp-expr" data-mp-reading={n} data-text={text} aria-label={t('mp.readingOf', { n })}><Typeset text={text} texOf={lineOf} /></p>
+                ? <p className="mp-expr" data-mp-reading={n} data-text={text} aria-label={t('mp.readingOf', { n })}><Typeset text={text} texOf={lineOf} tex={latexOf(n)} /></p>
                 : <p className="mp-text" data-mp-reading={n}>{t('mp.readingBlank')}</p>}
               {onCorrect && !isEditing && (
                 <button type="button" className="mp-link" data-mp-edit-line={n} onClick={() => setEditing({ line: n, text })}>{t('mp.edit')}</button>
@@ -251,7 +253,7 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
                   <b>{status === 'follows' ? t('aw.status.follows', { n: card.followsFrom }) : t(st.word)}</b>
                 </p>
                 {(status === 'first-error' || status === 'follows') && card.text && (
-                  <p className="mp-expr" data-mp-expr><Typeset text={card.text} texOf={lineOf} /></p>
+                  <p className="mp-expr" data-mp-expr><Typeset text={card.text} texOf={lineOf} tex={textOf(n).replace(/\s+/g, '') === String(card.text).replace(/\s+/g, '') ? latexOf(n) : null} /></p>
                 )}
                 {status === 'first-error'
                   ? <p className="mp-text mp-sentence-1" data-mp-why-error>{sentence ? (sentence.includes('$') && dollarsBalanced(sentence) ? <EngineComment text={sentence} /> : <Typeset text={sentence} texOf={texOf} />) : (n > 1 ? t('aw.body.firstError', { n: n - 1 }) : t('aw.body.firstErrorStart'))}</p>

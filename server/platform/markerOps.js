@@ -84,7 +84,7 @@ export function marksPossibleFor(q) {
   return Math.max(1, Math.min(maxMarks, keySteps.length || 1));
 }
 
-export function stepEvidence(q, answer, steps, result) {
+export function stepEvidence(q, answer, steps, result, opts = null) {
   const meta = stepMetaFor(q);
   let report = result.stepReport || null;
   if (meta && steps && !report) {
@@ -95,7 +95,7 @@ export function stepEvidence(q, answer, steps, result) {
   // No Step Check for this question: the arithmetic on each line is still checked (engine/arithmeticLines.js).
   // That report proves only that stated numbers are equal; it reaches no mark below (meta is null there).
   if (!meta && steps && !report && typeof steps === 'string' && !OBJECTIVE.has(q.answerType) && !Array.isArray(q.boardScheme)) {
-    try { report = stepCheckArithmetic(steps); } catch { report = null; }
+    try { report = stepCheckArithmetic(steps, opts && Array.isArray(opts.latex) ? { latex: opts.latex } : null); } catch { report = null; }
     // Nothing judged (no line was arithmetic): the reply says nothing about the lines, as before.
     if (report && !report.lines.some(l => l.status === 'ok' || l.status === 'break')) report = null;
   }
@@ -406,12 +406,12 @@ export const MARKER_OPS = Object.freeze({
    * under its transaction and asks again if it turns out to need evidence that
    * was not computed. Blank working costs nothing, so it is always "computed".
    */
-  practice({ q, answer, working, evidenceIfWrong, policy }, emit) {
+  practice({ q, answer, working, workingLatex, evidenceIfWrong, policy }, emit) {
     const result = sketchReport(q, answer, checkAnswer(q, answer));
     emit({ result });
     const wanted = result.correct || evidenceIfWrong || !String(working || '').trim();
     if (!wanted) return { result, evidence: null };
-    const evidence = stepEvidence(q, answer, working, result);
+    const evidence = stepEvidence(q, answer, working, result, Array.isArray(workingLatex) ? { latex: workingLatex } : null);
     // Final answer only: the step report stays, the method mark does not.
     return { result, evidence: policyOf({ policy }).methodMarks ? evidence : { stepReport: evidence.stepReport, partial: null, ...(evidence.board ? { board: evidence.board } : {}) } };
   },

@@ -22,6 +22,7 @@ import { spendCeilingMissing } from './spendCeiling.js';
 import { recognitionOpsFor, sendRecognitionRefusal } from './recognitionOps.js';
 import { issueReadReceipt } from './readReceipt.js';
 import { stemSymbols } from './stemSymbols.js';
+import { safeLatexLines } from '../../client/src/engine/texSafe.js';
 import { cachedServerReleaseIdentity } from './releaseIdentity.js';
 import { recordProviderCall } from './metrics.js';
 import { logEvent } from './observability.js';
@@ -249,7 +250,8 @@ export function createHandwritingRouter(db, {
           reused,
           transcription: {
             engine: result.engine,
-            lines: result.lines,
+            // the reader's TeX is model output headed for a renderer: it passes engine/texSafe.js or it is null
+            lines: safeLatexLines(result.lines),
             text: result.text,
             confidence: result.confidence,
             confidenceFloor: Number.isFinite(Number(result.confidenceFloor))

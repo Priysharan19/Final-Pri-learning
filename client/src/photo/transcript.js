@@ -20,6 +20,7 @@
 // Pure: no network, no storage, no DOM.
 // ─────────────────────────────────────────────────────────────────────────────
 import { stripSentence } from './finalAnswer.js';
+import { cleanLatex } from '../engine/texSafe.js';
 
 export const MAX_LINES = 60;
 export const MAX_LINE_CHARS = 400;
@@ -252,6 +253,7 @@ export function buildTranscript(transcription, question = {}) {
       doubt: typeof line?.doubt === 'string' && line.doubt.trim() ? line.doubt.trim().slice(0, 120) : null,
       gapBefore: line?.gapBefore === true,
       segments: cleanSegments(line?.segments),
+      latex: cleanLatex(line?.latex),          // the reader's own TeX, display only, when it passes texSafe
       box: cleanBox(line?.box)
     }))
     .filter(line => line.text)
@@ -269,6 +271,7 @@ export function buildTranscript(transcription, question = {}) {
       doubt: line.doubt || (letter ? `${letter.question} or ${letter.read}` : null),
       gapBefore: line.gapBefore,
       ...(line.segments ? { segments: line.segments } : {}),
+      ...(line.latex ? { latex: line.latex } : {}),
       ...(line.box ? { box: line.box } : {}),
       excluded: !!out,
       why: out ? out.why : null,
@@ -283,12 +286,26 @@ const excludedAt = (relevance, index) => relevance.excluded.find(e => e.index ==
 export function includedLines(transcript) {
   return (transcript?.lines || []).filter(l => !l.excluded && String(l.text).trim()).map(l => markerText(l.text).trim());
 }
+/**
+ * The reader's TeX for each included line, in the order of `includedLines` (null where there is none). Only for a line
+ * the student has not changed, and only TeX with no words in it (it is set as maths alone).
+ */
+export function includedLatex(transcript) {
+  return (transcript?.lines || []).filter(l => !l.excluded && String(l.text).trim())
+    .map(l => (!l.edited && typeof l.latex === 'string' && cleanLatex(l.latex) && !/\\(?:text|mathrm|mathbf|operatorname)(?![A-Za-z])/.test(l.latex) ? l.latex : null));
+}
 export function workingOf(transcript) { return includedLines(transcript).join('\n'); }
 
 /** The student's own edit of one line. The reader's text stays in `read`. */
 export function editLine(transcript, index, text) {
   const value = markerText(String(text ?? '').replace(/\n/g, ' '));
-  return { ...transcript, lines: transcript.lines.map((l, i) => (i === index ? { ...l, text: value, edited: value.trim() !== String(l.read).trim(), confirmed: false } : l)) };
+  // The reader's TeX describes the reader's text: once the student has changed the line it describes nothing.
+  return { ...transcript, lines: transcript.lines.map((l, i) => {
+    if (i !== index) return l;
+    const { latex, ...rest } = l;
+    const edited = value.trim() !== String(l.read).trim();
+    return { ...rest, ...(latex && !edited ? { latex } : {}), text: value, edited, confirmed: false };
+  }) };
 }
 /** The student says the reader's text for this line is what they wrote (nothing changed). */
 export function confirmLine(transcript, index) {
@@ -316,6 +333,7 @@ export function reviveTranscript(value) {
     doubt: typeof l?.doubt === 'string' ? l.doubt.slice(0, 120) : null,
     gapBefore: l?.gapBefore === true,
     ...(cleanSegments(l?.segments) ? { segments: cleanSegments(l.segments) } : {}),
+    ...(cleanLatex(l?.latex) ? { latex: cleanLatex(l.latex) } : {}),
     ...(cleanBox(l?.box) ? { box: cleanBox(l.box) } : {}),
     excluded: l?.excluded === true,
     why: ['before-question', 'after-break', 'student'].includes(l?.why) ? l.why : null,
