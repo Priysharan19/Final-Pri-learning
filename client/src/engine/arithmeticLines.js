@@ -640,10 +640,13 @@ export function stepCheckArithmetic(workingText, opts = null) {
   });
 }
 
-/** The content of a line as an unordered bag: digit runs, single letters, and the names of functions and constants. */
+/**
+ * The content of a line in SOURCE ORDER: each digit, each single letter, each function or constant name. Digits are
+ * single tokens so a run may split or join across a layout command (12 and \frac{1}{2}) but never reorder (21 is not).
+ */
 function contentSignature(text) {
   const s = String(text).toLowerCase().replace(/√/g, 'sqrt').replace(/π/g, 'pi').replace(/θ/g, 'theta').replace(/²/g, '2').replace(/³/g, '3');
-  return (s.match(/arcsin|arccos|arctan|cosec|sqrt|cbrt|theta|sin|cos|tan|sec|csc|cot|exp|ln|log|pi|\d+|[a-z]/g) || []).sort().join(' ');
+  return (s.match(/arcsin|arccos|arctan|cosec|sqrt|cbrt|theta|sin|cos|tan|sec|csc|cot|exp|ln|log|pi|\d|[a-z]/g) || []).join(' ');
 }
 
 function withTexReading(workingText, base, pairs) {

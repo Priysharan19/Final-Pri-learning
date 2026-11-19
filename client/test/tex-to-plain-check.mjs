@@ -112,6 +112,14 @@ const L = (text, latex) => ({ text, latex });
   ok(tick('x = 2 so 2+2=5', '2+2=4') === 'note', 'words in the text that the TeX lacks: no tick');
   ok(tick('hello = 4', '2+2=4') === 'note', 'a different line: no tick');
   ok(tick('2+2=5', '2+2=4') === 'note', 'a cross is softened to the misread note, not ticked and not kept as a cross');
+  // the same tokens in another ORDER are another line
+  ok(tick('3 2 = 8', '2^3 = 8') === 'note', 'reordered digits (3 2 vs 2^3): no tick');
+  ok(tick('1 3 = 2', '3 - 1 = 2') === 'note', 'reordered digits (1 3 vs 3-1): no tick');
+  ok(tick('1 2 = 0.5', '\\frac{1}{2} = 0.5') === 'ok', '1 2 = 0.5 with the fraction: ticked');
+  ok(tick('2 2 = 4', '2^2 = 4') === 'ok', '2 2 = 4 with 2^2: ticked');
+  ok(tick('2 3 = 6', '2\\cdot 3 = 6') === 'ok', '2 3 = 6 with 2 times 3: ticked');
+  ok(tick('8 3 = 2', '\\sqrt[3]{8} = 2') === 'note', '8 3 = 2 with the cube root of 8: no tick');
+  ok(tick('2 1 = 0.5', '\\frac{1}{2} = 0.5') !== 'ok', '21 is not the fraction 1 over 2');
   ok(tick('2+2=4 so', '2+2=4') === 'note' && tick('2+2=4', '2+2=4') === 'ok', 'the same content is ticked only when the plain check already could');
 }
 
