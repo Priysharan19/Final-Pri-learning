@@ -277,7 +277,7 @@ export function stepCheckArithmetic(workingText) {
       if (/\/\s*\d+(?:\.\d+)?\s*[A-Za-z(]|\/\s*[A-Za-z]\s*[A-Za-z(]|\^\s*-?\d+(?:\.\d+)?[A-Za-z]|\^\s*[A-Za-z][A-Za-z0-9(]/.test(bare)) return note(line, NOT_PROVED);
       // A division followed by a product groups two ways (6/2(1+2), 10!/3!7!, 1/cos θ tan θ, 1/2x). Every bracket is
       // first folded to one mark, so a function's own bracket cannot hide what follows the denominator.
-      const folded = side => { let t = side, last; do { last = t; t = t.replace(/\([^()]*\)/g, '#'); } while (t !== last); return t; };
+      const folded = side => { let t = side, last; do { last = t; t = t.replace(/\([^()]*\)/g, '#'); } while (t !== last); return t.replace(/(?:√|sqrt)\s*(?:#|\d+(?:\.\d+)?|[A-Za-zθαβφ])/gi, '#'); };   // a root is one factor too: 1/√2 x
       if (written.some(s => /[\/÷]\s*(?:[A-Za-z]{2,6}#|#|\d+(?:\.\d+)?!?|[A-Za-zθαβφ](?![A-Za-z#]))(?:\^\S+?)?\s*(?:\*|[A-Za-zθαβφ#(\d])|[\/÷].*\*/.test(folded(s)))) return note(line, NOT_PROVED);
       const infos = written.map(infoOf);
       const lastInfo = infos[infos.length - 1];
