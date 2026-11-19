@@ -781,11 +781,14 @@ ok(model?.cards?.length === 2 && model.cards.every(c => c.status === 'checked' &
   ok(S(TWO, ['f(2) = 1', 'g(2) = 4']) === '..', 'wrong values of the given functions: notes');
   ok(S(TWO, ['f(2) + g(2) = 0 + 5']) === 'T', 'a sum of the two given functions, true');
   ok(!/X/.test(S(TWO, ['f(2) = 1', 'g(2) = 4', 'f(2) + g(2) = 5'])), 'never a cross from the given functions');
-  // the same name given twice in the prompt is ambiguous: restating either is given, nothing else is read from it
+  // the same name given twice (a piecewise definition, a name with two conditions) gives no facts: nothing is ticked from it
   const SAME = 'The curve $y = x^2$ meets the line $y = 2x$. Find the points of intersection.';
-  ok(S(SAME, ['y = x^2', 'y = 2x']) === 'TT' && S(SAME, ['y(3) = 9']) === '.', 'the same name given twice: each restatement is ticked, but y(3) is not read from either');
-  ok(S(SAME, ['y = x^2 + 1']) === '.' && noteOf(SAME, ['y = x^2 + 1'], 0) !== MISMATCH, 'the same name given twice: no near-copy note');
-
+  ok(questionFacts({ prompt: SAME }) === null && S(SAME, ['y = x^2', 'y = 2x', 'y(3) = 9']) === '...', 'the same name given twice: no facts, exactly as without them');
+  const PIECE = 'Let $f(x) = x^2$ for $x \\ge 0$ and $f(x) = -x$ for $x < 0$. Find $f(-3)$.';
+  ok(questionFacts({ prompt: PIECE }) === null && S(PIECE, ['f(x) = x^2', 'f(x) = -x']) === '..', 'a piecewise prompt with two definitions of f: the student\'s own f(x) = x^2 is not ticked as given');
+  const CASES = 'Let $f(x) = \\begin{cases} x^2 & x \\ge 0 \\\\ -x & x < 0 \\end{cases}$. Find $f(-3)$.';
+  ok(questionFacts({ prompt: CASES }) === null && S(CASES, ['f(x) = x^2', 'f(x) = -x']) === '..', 'a cases prompt: no facts, f(x) = x^2 is not ticked as given');
+  ok(questionFacts({ prompt: 'Let $f(x) = x^2$ for $x \\ge 0$. Find $f(3)$.' }) !== null && S('Let $f(x) = x^2$ for $x \\ge 0$. Find $f(3)$.', ['f(x) = x^2']) === 'T', 'one definition with a condition is still a definition');
   // given numbers
   const NUM = 'Let $a = 3, b = 4$. Find $a^2 + b^2$.';
   ok(S(NUM, ['a = 3', 'b = 4']) === 'TT' && noteOf(NUM, ['a = 3'], 0) === GIVEN, 'given numbers copied');

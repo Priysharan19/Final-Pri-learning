@@ -85,6 +85,52 @@ export function marksPossibleFor(q) {
   return Math.max(1, Math.min(maxMarks, keySteps.length || 1));
 }
 
+/** The true-as-written report for a working (engine/arithmeticLines.js), or null when it cannot be made. */
+function trueAsWritten(q, steps, opts) {
+  try {
+    const facts = opts && Object.hasOwn(opts, 'facts') ? opts.facts : questionFacts(q);
+    return stepCheckArithmetic(steps, { latex: opts && Array.isArray(opts.latex) ? opts.latex : null, facts });
+  } catch { return null; }
+}
+
+/**
+ * FEEDBACK ONLY, run after every mark is computed (nothing reads its result but the result card). A question with a
+ * Step Check leaves the lines it does not cover unjudged, though some of them are true as written (live, 20 November
+ * 2026: four true lines of an integral came back "not checked"). For each such line the true-as-written report's TICK
+ * is copied over; it says the line is true as written, never that it is the right step, and it is never a mark.
+ *   · only a line the topic report left a note (never one it ticked, crossed or marked as following a slip);
+ *   · nothing at or after the topic report's first break; a cross is never copied;
+ *   · lines are matched by index AND identical text, or the fold is skipped entirely.
+ * Returns the report itself when nothing is folded.
+ */
+export function foldTrueAsWritten(report, arithmetic) {
+  if (!report || !arithmetic || !Array.isArray(report.lines) || !Array.isArray(arithmetic.lines) || report.lines.length !== arithmetic.lines.length) return report;
+  if (report.lines.some((l, i) => String(l?.text ?? '').trim() !== String(arithmetic.lines[i]?.text ?? '').trim())) return report;
+  const brk = report.lines.findIndex(l => l?.status === 'break');
+  const limit = brk >= 0 ? brk : report.lines.length;
+  let folded = 0;
+  const lines = report.lines.map((l, i) => {
+    const a = arithmetic.lines[i];
+    const unjudged = l?.status === 'note' && (l.state === undefined || l.state === 'unverified' || l.state === 'unread') && l.note !== 'Follows from the earlier slip.';
+    if (i >= limit || !unjudged || a?.status !== 'ok' || a.state !== 'arithmetic') return l;
+    folded++;
+    return { text: l.text, status: 'ok', state: 'arithmetic', note: a.note, valueChain: a.valueChain };
+  });
+  if (!folded) return report;
+  // The report is now one that judges each line on its own (a state on every line), so the card says WHICH lines were checked.
+  const stated = lines.map(l => ({ ...l, state: l.state || (l.status === 'ok' ? 'verified' : l.status === 'break' ? 'wrong' : l.unreadable ? 'unread' : 'unverified') }));
+  const at = st => stated.flatMap((l, k) => (l.state === st ? [k + 1] : []));
+  const unverified = at('unverified'), unread = at('unread');
+  return {
+    ...report, lines: stated, source: 'value-chain', folded: true,
+    summary: {
+      ...(report.summary || {}), total: stated.length, checked: stated.filter(l => l.status === 'ok').length,
+      given: at('given'), verified: at('verified'), arithmetic: at('arithmetic'), conditions: at('condition'), wrong: at('wrong'), unverified, unread,
+      reason: unverified.length ? (report.summary?.reason || 'Pri could not tie these lines to anything it can prove about this question, so it did not mark them.') : null
+    }
+  };
+}
+
 export function stepEvidence(q, answer, steps, result, opts = null) {
   const meta = stepMetaFor(q);
   let report = result.stepReport || null;
@@ -99,10 +145,7 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
     // What the question's own prompt gives (engine/questionFacts.js: read from `prompt` alone, never the answer or the
     // solution) lets a line that copies it, or sets up what it asks for, be ticked. `opts.facts` overrides it (the audit
     // measures with and without); it is never the typed final answer, which is not parsed here.
-    try {
-      const facts = opts && Object.hasOwn(opts, 'facts') ? opts.facts : questionFacts(q);
-      report = stepCheckArithmetic(steps, { latex: opts && Array.isArray(opts.latex) ? opts.latex : null, facts });
-    } catch { report = null; }
+    report = trueAsWritten(q, steps, opts);
     // Nothing judged (no line was arithmetic): the reply says nothing about the lines, as before.
     if (report && !report.lines.some(l => l.status === 'ok' || l.status === 'break')) report = null;
   }
@@ -140,6 +183,17 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
   const board = Array.isArray(q.boardScheme) ? boardAward(q, meta, report, result.correct === true) : null;
   // An arithmetic report keeps to arithmetic: no milestone tick is added to it, so its wording stays true of every tick.
   try { if (report && report.arithmetic !== true) report = annotateMilestones(q, report); } catch { /* the report stands */ }
+  // Feedback only (see foldTrueAsWritten): after every mark above, so no mark, partial or milestone reads it.
+  if (meta && steps && typeof steps === 'string' && !OBJECTIVE.has(q.answerType) && !Array.isArray(q.boardScheme) && !(opts && opts.fold === false)) {
+    try {
+      const needs = !report || (Array.isArray(report.lines) && report.lines.some(l => l?.status === 'note'));
+      if (needs) {
+        const arithmetic = trueAsWritten(q, steps, opts);
+        if (!report) { if (arithmetic && arithmetic.lines.some(l => l.status === 'ok' || l.status === 'break')) report = arithmetic; }
+        else report = foldTrueAsWritten(report, arithmetic);
+      }
+    } catch { /* the report stands */ }
+  }
   // A true-as-written tick on a line that ends at the student's own WRONG answer (`so 10^1 = 10` when the answer is 30)
   // reads as "this is right". The arithmetic is; the value was not accepted (it may be wrong, or right in a form or unit
   // the question did not accept: the note claims only what is true in both cases). Such a tick becomes that note.

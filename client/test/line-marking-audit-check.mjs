@@ -40,9 +40,9 @@ for (const id of ids) {
       const li = await interpretAfterStepCheck({ question: q, working, stepReport: ev, env: ON });
       const rep = reportWithInterpretation({ stepReport: ev, lineInterpretation: li, working });
       score(engine, t, ev, id, 'engine'); score(full, t, rep, id, 'with interpreter'); score(perFamily[id], t, rep, id, null);
-      // Before: the facts switched off (opts.facts null), nothing else changed. The bar below applies to this too.
+      // Before: the facts and the true-as-written fold switched off (opts.facts null, opts.fold false), nothing else changed. The bar below applies to this too.
       let ev0 = null;
-      try { ev0 = stepEvidence(q, '', working, { correct: false }, { facts: null }).stepReport; } catch { ev0 = null; }
+      try { ev0 = stepEvidence(q, '', working, { correct: false }, { facts: null, fold: false }).stepReport; } catch { ev0 = null; }
       const li0 = await interpretAfterStepCheck({ question: q, working, stepReport: ev0, env: ON });
       score(engine0, t, ev0, id, null); score(full0, t, reportWithInterpretation({ stepReport: ev0, lineInterpretation: li0, working }), id, null);
     }

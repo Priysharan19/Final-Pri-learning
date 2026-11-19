@@ -49,8 +49,9 @@ const ok = (c, m) => { if (c) pass++; else { fail++; console.error('FAIL:', m); 
     'Differentiate $x^2 \\sin x$.', 'Evaluate $\\int_0^2 x^2\\,dx$.', 'Show that $y = 2x$ is a line.'])
     ok(f(prompt) === null, `no fact: ${prompt.slice(0, 60)}`);
   ok(f('Let $x = 2$. Solve $x^2 - 4x + 3 = 0$.') === null, 'a number that an equation of the prompt is about is not given');
-  ok(f('The line $y = 2x$ and the curve $y = x^2$.').defs.length === 2 && f('The line $y = 2x$ and the curve $y = x^2$.').area === null, 'two definitions of y: both listed, no area form');
-  ok(f('Find the area bounded by $y = 2x(4 - x)$ and the line $y = x$.')?.area === null, 'a second boundary: no area form');
+  ok(f('The line $y = 2x$ and the curve $y = x^2$.') === null, 'two definitions of y: no facts at all');
+  ok(f('Let $f(x) = \\begin{cases} x^2 & x \\ge 0 \\\\ -x & x < 0 \\end{cases}$.') === null && f('Let $f(x) = x^2$ for $x \\ge 0$ and $f(x) = -x$ for $x < 0$.') === null, 'a piecewise prompt: no facts at all');
+  ok(f('Find the area bounded by $y = 2x(4 - x)$ and the line $y = x$.')?.area == null, 'a second boundary: no area form');
   ok(f('Find the area bounded by $y = 4 - x^2$ and the x-axis for $x \\ge 0$.')?.area === null, 'a restriction written as maths: no area form');
   ok(f('Find the area bounded by $y = 4 - x^2$ and the x-axis in the first quadrant.')?.area === null, 'a restriction in words: no area form');
   ok(f('Find half the area bounded by $y = 4 - x^2$ and the x-axis.')?.area === null, 'half the area: no area form');

@@ -3430,7 +3430,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   </span>
                 </div>
               )}
-              <div className="eval-head">
+              {/* With the score card above, the head is not drawn twice: it stays in the markup for the layout tests but is hidden from sight (CSS) and from assistive tech, which hear the one announcement in the status line. */}
+              <div className="eval-head" aria-hidden={instrumentScore ? 'true' : undefined}>
                 <span className="eval-title">
                   <Icon name={verdictGood ? 'check' : 'correction'} />
                   {t(verdictGood ? 'verdict.correct' : res.revealed ? 'verdict.revealed' : 'verdict.notThisTime')}
@@ -3606,7 +3607,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               ? <span className="ws-answer-preview muted">{t('verdict.yourAnswerIs')} <MathText text={`$${texOf(String(shownAnswerLine).replace(/^\s*[=≈]\s*/, ''))}$`} /></span>
               : resolved && serverAuthoritative && statusText
                 /* The verdict word is already on the page in the score card; the live region still announces it, once, to a screen reader. */
-                ? <span className="sr-only" data-verdict-announcement>{statusText}</span>
+                ? <span className="sr-only" data-verdict-announcement>{statusText}{instrumentScore ? ` ${t('verdict.marksOutOf', { earned: shownGrade.awarded, total: shownGrade.possible })}` : ''}</span>
                 : statusText}
             {/* Handwriting is read only by the server reader (#316); say so where the work is submitted. */}
             {writeMode && !isMcq && (

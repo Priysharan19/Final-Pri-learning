@@ -13,6 +13,7 @@
 //   5. The worked solution's coefficients are in lowest terms with the exact value beside its rounding; the key is not touched.
 import { readFileSync } from 'node:fs';
 import { markerOf, MARKER_HEIGHT, boxesFromPhoto, buildMarkedPage, commentItems } from '../src/components/markedPageModel.js';
+import { buildAnnotatedWorking } from '../src/components/annotatedWorkingModel.js';
 import { missingStepsPhrase } from '../src/components/missingStepsCopy.js';
 import { lookupString } from '../src/i18n/core.js';
 import en from '../src/i18n/strings.en.js';
@@ -136,6 +137,36 @@ ok(exactShown === seen, 'every step line shows the exact value with its rounding
       '$-\\dfrac{2}{3} - 0 = -\\dfrac{2}{3} \\approx -0.667$'
     ], 'F(x) = (1/3)x^3 - x^2 and F(1) = -2/3 ≈ -0.667');
   }
+}
+
+// ── 6. the Evaluation block follows the real line states (owner's live page, 20 Nov 2026) ─────────────
+// It said "Every step was checked by Pri's engine" and "Every line was checked; 0 named rules were found" over eight lines
+// not one of which was checked.
+{
+  const L = (text, status, extra = {}) => ({ text, status, ...extra });
+  const none = buildAnnotatedWorking({ lines: ['a = 1', 'b = 2', 'c = 3'], stepReport: { lines: [L('a = 1', 'note'), L('b = 2', 'note'), L('c = 3', 'note')], firstBreak: -1 } });
+  ok(none && none.noneChecked === true && none.allChecked === false && none.summary.key === 'aw.summary.none', 'nothing checked: the summary says none were checked');
+  const some = buildAnnotatedWorking({ lines: ['2x + 4', '2(x + 2)', 'y'], stepReport: { lines: [L('2x + 4', 'ok'), L('2(x + 2)', 'ok'), L('y', 'note')], firstBreak: -1 } });
+  ok(some && some.allChecked === false && some.summary.key === 'aw.summary.some' && some.summary.vars.checked === 2 && some.summary.vars.total === 3, 'some lines checked: "N of M lines checked", never "every line"');
+  const all = buildAnnotatedWorking({ lines: ['2x + 4', '2(x + 2)'], stepReport: { lines: [L('2x + 4', 'ok'), L('2(x + 2)', 'ok')], firstBreak: -1 } });
+  ok(all && all.allChecked === true && !all.noneChecked, 'every line checked: allChecked');
+  ok(all && (all.summary.key === 'aw.summary.allCheckedPlain' ? all.summary.vars.rules === 0 : all.summary.vars.rules > 0), 'with no named rule the sentence about named rules is dropped');
+  // the value-chain model: nothing checked
+  const vc = buildAnnotatedWorking({ lines: ['a', 'b'], stepReport: { source: 'value-chain', lines: [L('a', 'note', { state: 'unverified' }), L('b', 'note', { state: 'unverified' })], firstBreak: -1, summary: {} } });
+  ok(vc && vc.noneChecked === true && vc.allChecked === false && vc.summary.key === 'aw.summary.none', 'a value-chain report with nothing checked says so');
+  const folded = buildAnnotatedWorking({ lines: ['a', 'b'], stepReport: { source: 'value-chain', folded: true, lines: [L('a', 'note', { state: 'unverified' }), L('b', 'ok', { state: 'arithmetic' })], firstBreak: -1, summary: {} } });
+  ok(folded && folded.noneChecked === false && folded.allChecked === false && folded.summary.key === 'aw.summary.some', 'a folded report with one true-as-written line: some checked');
+  for (const k of ['aw.summary.none', 'aw.summary.allCheckedPlain', 'aw.summary.proofDirectPlain', 'aw.summary.proofMeetPlain', 'aw.eval.provenanceNone', 'aw.eval.provenanceNoneInk']) {
+    ok(typeof en[k] === 'string' && typeof hi[k] === 'string' && hi[k] !== en[k], `${k} in English and Hindi`);
+    ok(!/[—–]/.test(en[k]) && !/[—–]/.test(hi[k]) && !/\b0 named|named rules? (?:was|were) found/.test(en[k]), `${k}: no dash, no "0 named rules"`);
+  }
+  ok(/\{total\}/.test(en['aw.summary.none']) && /\{total\}/.test(hi['aw.summary.none']), 'the none sentence carries the line count');
+  const comp = read('../src/components/AnnotatedWorking.jsx');
+  ok(/model\.noneChecked \? \(source === 'handwriting' \? 'aw\.eval\.provenanceNoneInk' : 'aw\.eval\.provenanceNone'\)/.test(comp), 'the provenance sentence is the none sentence when nothing was checked');
+  // the score card: each figure once visually, one announcement
+  const card = read('../src/components/QuestionCard.jsx');
+  ok(/<div className="eval-head" aria-hidden=\{instrumentScore \? 'true' : undefined\}>/.test(card), 'with the score card the head is hidden from assistive tech (the card itself is aria-hidden too)');
+  ok(/data-verdict-announcement>\{statusText\}\{instrumentScore \?/.test(card) && (card.match(/data-verdict-announcement/g) || []).length === 1, 'one screen-reader announcement, with the marks');
 }
 
 if (fail.length) { console.error(fail.map(f => `  · ${f}`).join('\n')); console.error(`MARKED PAGE HONESTY: FAIL (${fail.length} of ${pass + fail.length})`); process.exit(1); }

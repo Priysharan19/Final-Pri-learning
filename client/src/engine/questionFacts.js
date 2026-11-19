@@ -62,6 +62,8 @@ function topLevelPieces(tex) {
 export function questionFacts(q) {
   const prompt = q && typeof q === 'object' ? q.prompt : null;
   if (typeof prompt !== 'string' || !prompt || prompt.length > MAX_PROMPT) return null;
+  // A piecewise definition (cases, or the same name defined twice, each with its condition) gives no facts at all.
+  if (/\\begin\{(?:cases|array|aligned|align)\*?\}|\\left\\\{/.test(prompt)) return null;
   const defs = [], equationLetters = new Set();
   const found = [];
   const seen = new Set();
@@ -103,6 +105,6 @@ export function questionFacts(q) {
       && AREA_SHAPES.some(r => r.test(words))) {
     area = { name: defs[0].name };
   }
-  if (!defs.length) return null;
+  if (!defs.length || new Set(found.map(d => d.name)).size !== found.length) return null;
   return { defs, area };
 }
