@@ -387,7 +387,6 @@ ok(model?.cards?.length === 2 && model.cards.every(c => c.status === 'checked' &
   }
 
   // 5.6 B.1 "This simplifies to": the last ticked line of a page with no cross, when its last side is a worked expression
-  const S = ' This simplifies to ';
   const simp = [
     [['16/3 = 2[2(4)^2 - 4^3/3]', '= 2[32 - 64/3]'], '64/3'], [['12 × 6 = 6 × 12'], '72'], [['-√3 = -2 × √3/2'], '−√3'], [['12√3 = 12e^(ln(3)/2)'], '12√3'],
     [['3/2 = 6/4'], '3/2'], [['6/4 = 6/4'], '3/2'], [['2 + 3 + 4 = 9 = 3 × 3'], '9'], [['6√3 = 2√3 × 3'], '6√3'], [['2√3 = √12'], '2√3'], [['100 - 36 = 64 = 2^6'], '64'],
@@ -573,7 +572,7 @@ ok(model?.cards?.length === 2 && model.cards.every(c => c.status === 'checked' &
   ok(renders([one('sin 30° = 1/2').note, one('tan 60° = √3').note, one('sin(180° - θ) = sin θ').note].join(' ')) && !/[—–]/.test(degreeTicks.map(([f]) => noteOf(f)).join(' ')), 'the new comments typeset and carry no dash');
 
   // 6.4 derivative marks typeset (commentTex)
-  const marks = [["y'", "y'"], ["f'(x)", "f'(x)"], ["u'", "u'"], ["f''(x)", "f''(x)"], ["f'(2)", "f'(2)"], ["y''", "y''"], ['dy/dx', '\\frac{dy}{dx}'], ['d/dx', '\\frac{d}{dx}'], ['du/dx', '\\frac{du}{dx}'], ['d²y/dx²', '\\frac{d^{2}y}{dx^{2}}'], ['d^2y/dx^2', '\\frac{d^{2}y}{dx^{2}}'], ['d/dx(x^2)', '\\frac{d}{dx}\\left(x^{2}\\right)']];
+  const marks = [["y'", "y'"], ["f'(x)", "f'(x)"], ["u'", "u'"], ["f''(x)", "f''(x)"], ["f'(2)", "f'(2)"], ["y''", "y''"], ['dy/dx', '\\frac{dy}{dx}'], ['d/dx', '\\frac{d}{dx}'], ['du/dx', '\\frac{du}{dx}'], ['d²y/dx²', '\\frac{d^{2}y}{dx^{2}}'], ['d^2y/dx^2', '\\frac{d^{2}y}{dx^{2}}'], ['d/dx(x^2)', '\\frac{d}{dx}(x^{2})'], ['d/dx(3x + 1)', '\\frac{d}{dx}(3x + 1)']];
   for (const [src, tex] of marks) ok(derivativeMarkTex(src) === tex && fragmentTex(src) === tex, `derivative mark ${src} is ${tex} (${derivativeMarkTex(src)})`);
   for (const bad of ['d²y/dx', 'dy/d', 'y', "ab'", 'dy/dxy', 'y^\'', "'y'"]) ok(derivativeMarkTex(bad) === null, `not a derivative mark: ${bad}`);
   ok(mathSpan("y' = 2x") === "$y' = 2x$" && mathSpan('dy/dx = 2x') === '$\\frac{dy}{dx} = 2x$' && mathSpan("f'(x) = 3x^2") === "$f'(x) = 3x^{2}$" && mathSpan("u' = 2x - 4") === "$u' = 2x - 4$", 'an equation with a derivative mark is one typeset span');
@@ -607,6 +606,28 @@ ok(model?.cards?.length === 2 && model.cards.every(c => c.status === 'checked' &
   ok(!/simplif/.test(noteOf('1/√2 = 0.7071')) && !/simplif/.test(noteOf('cos(π/4) = 0.7071')), 'a decimal answer gets no note');
   ok(run(['2x + 3x = 2x + 3x', 'x = 4']).lines.every(l => !/simplifies/.test(l.note || '')), 'a line after it moves the last line: no note on the earlier one');
   ok(run(['2x + 3x = 2x + 3x']).firstBreak === -1 && run(['2x + 3x = 2x + 3x']).lines[0].state === 'arithmetic', 'the note never changes the tick');
+
+  // 6.6 review of 5b3ac56a3: a power followed by brackets (any base, any exponent form) is read both ways; a line true under ANY reading is never crossed
+  for (const [f, want] of [['e^π(2) = e^(2π)', 'note'], ['e^2(3)(4) = e^24', 'note'], ['2^3(2) = 64', 'note'], ['2^3(2) = 16', 'ok'], ['x^2(3) = x^6', 'note'], ['10^2(3) = 300', 'ok'], ['10^2(3) = 1000000', 'note'],
+    ['e^π(2) = 2e^π', 'ok'], ['3^2(2) = 81', 'note'], ['3^2(2) = 18', 'ok'], ['2^(1+2)(2) = 64', 'note'], ['2^3(2)(2) = 2^12', 'note'], ['2^3(2)(2) = 32', 'ok']]) ok(one(f).status === want, `a power then brackets: ${f} is ${want} (${one(f).status})`);
+  for (const f of ['2^3(2) = 17', '10^2(3) = 301', '3^2(2) = 19', 'e^2(3) = e^2(4)', '2^3(2) = 15']) ok(one(f).status === 'break', `false under every reading is still crossed: ${f} (${one(f).status})`);
+
+  // 6.7 a quote-closing apostrophe is never a prime; d/dx(…) takes its argument; dy/dx inside a larger expression stays plain
+  for (const t of ["call it 'point A' now", "call it 'point a' now", "call it 'the line l' and then 'y' again", "Say 'f' then 'g' and it's fine", "the 'x' value, then the 'y' value."]) ok(typesetDerivativeMarks(t) === t, `a quote is not a prime: ${t} (${typesetDerivativeMarks(t)})`);
+  ok(typesetDerivativeMarks("call it 'f' and then take f'(x) and y' too") === "call it 'f' and then take $f'(x)$ and $y'$ too", 'a closed quote ends: a real mark after it is still set');
+  ok(typesetDerivativeMarks("A' and B'(x) stay as written") === "A' and B'(x) stay as written", 'a capital letter with a prime in a sentence is not a derivative mark');
+  ok(typesetDerivativeMarks('Take d/dx(x^2) now') === 'Take $\\frac{d}{dx}(x^{2})$ now' && renders(typesetDerivativeMarks('Take d/dx(x^2) now')), 'd/dx(x^2) in prose is one span with its argument');
+  ok(mathSpan('d/dx(x^2) = 2x') === '$\\frac{d}{dx}(x^{2}) = 2x$' && fragmentTex('d/dx(x^2)') === '\\frac{d}{dx}(x^{2})', 'd/dx(x^2) is one span with its argument');
+  for (const f of ['3dy/dx = 6x', '(dy/dx)/(dx/dt) = dy/dt', 'dy/dx / 2 = x', 'dy/dx + 1 = 2x', '2dy/dx', 'd/dx(x^2) + 1 = 2x + 1']) {
+    const m = mathSpan(f);
+    ok(!/\\frac\{dy\}\{d\}/.test(m) && !/\\cdot x/.test(m) && (m === f || renders(m)), `dy/dx inside a larger expression is never a quotient of products: ${f} (${m})`);
+  }
+  ok(mathSpan('3dy/dx = 6x') === '3dy/dx = 6x' && fragmentTex('dy/dx / 2') === null, 'such a span stays plain text');
+  // a backslash and a dollar in a student's line: what the renderer shows is what was written (MathText unescapes `\$` only)
+  { const shown = t => t.split(/(?<!\\)\$((?:\\\$|[^$])+?)(?<!\\)\$/g).filter((_, i) => i % 2 === 0).join('').replace(/\\\$/g, '$');
+    ok(shown(mathSpan('a\\$b')) === 'a\\$b' && mathSpan('a\\$b') === 'a\\\\$b', `a\\$b is shown as written (${mathSpan('a\\$b')})`);
+    ok(shown(mathSpan('a\\')) === 'a\\' && shown(mathSpan('a\\\\')) === 'a\\\\' && dollarsBalanced(mathSpan('a\\$b')), 'a trailing and a doubled backslash are shown as written');
+    ok(shown(mathSpan('cost $5 * 2')) === 'cost $5 × 2' && dollarsBalanced(mathSpan('cost $5 * 2')), 'a literal dollar is escaped, a star is a times sign'); }
 }
 
 console.log(`ARITHMETIC LINES: ${fail ? 'FAIL' : 'PASS'} — ${pass}/${pass + fail} checks — false arithmetic crossed, true arithmetic ticked as arithmetic only, no mark from it`);

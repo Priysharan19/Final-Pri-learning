@@ -37,16 +37,32 @@ export function derivativeMarkTex(text) {
     return `\\frac{d${sq}${m[2] || ''}}{d${m[3]}${sq}}`;
   }
   m = OF_EXPRESSION.exec(raw);
-  if (m) { const inner = fragmentTex(m[2]); return inner === null ? null : `\\frac{d}{d${m[1]}}\\left(${inner}\\right)`; }
+  if (m) { const inner = fragmentTex(m[2]); return inner === null ? null : `\\frac{d}{d${m[1]}}(${inner})`; }
   return null;
 }
 
-// In a sentence: one letter, then primes, then an optional (argument). The letter must not belong to a word
-// ("isn't", "Pri's", "students'") or sit in quotation marks ('y'), and the prime must not lead into a word ("I'm").
+// In a sentence: one lowercase letter, then primes, then an optional (argument); or d/dx(…), dy/dx, d²y/dx². The letter must
+// not belong to a word ("isn't", "Pri's", "students'"), the prime must not lead into a word ("I'm"), and it must not be
+// the apostrophe that closes a quoted phrase (call it 'point a' now): see quoteClosers.
 const IN_PROSE = new RegExp(
-  `(?<![A-Za-z0-9'’‘"“′])([A-Za-z])(${PRIMES}{1,3})(?:\\(\\s*(-?\\d+(?:\\.\\d+)?|[A-Za-z])\\s*\\))?(?![A-Za-z0-9'’])` +
+  `(?<![A-Za-z0-9'’‘"“′])([a-z])(${PRIMES}{1,3})(?:\\(\\s*(-?\\d+(?:\\.\\d+)?|[A-Za-z])\\s*\\))?(?![A-Za-z0-9'’])` +
+  `|(?<![A-Za-z0-9_])d/d[a-z]\\([^()]*\\)` +
   `|(?<![A-Za-z0-9_])d${SQUARE}?[a-z]?/d[a-z]${SQUARE}?(?![A-Za-z0-9])`, 'g');
 const MATH_SPAN_IN_TEXT = /(?<!\\)\$(?:\\\$|[^$])+?(?<!\\)\$/g;
+/** Positions of the apostrophes that close a quoted phrase: an opening ' (no letter or digit before it) stays open until the next ' that follows a letter or digit. */
+function quoteClosers(chunk) {
+  const closers = new Set();
+  let open = false;
+  for (let i = 0; i < chunk.length; i++) {
+    const c = chunk[i];
+    if (/[.?!]/.test(c) && /\s/.test(chunk[i + 1] || ' ')) { open = false; continue; }
+    if (c !== "'" && c !== '‘') continue;
+    const before = chunk[i - 1] || '', after = chunk[i + 1] || '';
+    if (!/[A-Za-z0-9]/.test(before) && /[A-Za-z0-9]/.test(after)) open = true;
+    else if (open && /[A-Za-z0-9]/.test(before) && !/[A-Za-z0-9]/.test(after)) { closers.add(i); open = false; }
+  }
+  return closers;
+}
 
 /**
  * An engine sentence with every derivative mark in its prose set as maths ($y'$, $\frac{dy}{dx}$). Maths already
@@ -55,7 +71,14 @@ const MATH_SPAN_IN_TEXT = /(?<!\\)\$(?:\\\$|[^$])+?(?<!\\)\$/g;
 export function typesetDerivativeMarks(text) {
   const s = String(text ?? '');
   if (!/['′]|\/d/.test(s)) return s;
-  const prose = chunk => chunk.replace(IN_PROSE, found => { const tex = derivativeMarkTex(found); return tex === null ? found : `$${tex}$`; });
+  const prose = chunk => {
+    const closers = quoteClosers(chunk);
+    return chunk.replace(IN_PROSE, (found, letter, primes, arg, at) => {
+      if (primes && closers.has(at + 1)) return found;
+      const tex = derivativeMarkTex(found);
+      return tex === null ? found : `$${tex}$`;
+    });
+  };
   let out = '', last = 0;
   for (const m of s.matchAll(MATH_SPAN_IN_TEXT)) { out += prose(s.slice(last, m.index)) + m[0]; last = m.index + m[0].length; }
   return out + prose(s.slice(last));
@@ -68,6 +91,8 @@ export function fragmentTex(text) {
   if (/^-?\d+(?:\.\d+)?$/.test(raw)) return raw;
   const mark = derivativeMarkTex(raw);
   if (mark !== null) return mark;
+  // dy/dx inside a larger expression (3dy/dx, (dy/dx)/(dx/dt)): read as a quotient it would be wrong and nothing is guessed, so it stays plain.
+  if (/(?<![A-Za-z_])d(?:\^?2|²)?[a-z]?\/d[a-z]/.test(raw)) return null;
   // Arithmetic on numbers alone: answerToTex leaves such text for a list of numbers, this is one expression.
   if (/^[\d\s.+\-*/^()]+$/.test(raw)) return /\d\s+\d/.test(raw) ? null : expressionTex(raw);
   const out = answerToTex(raw);
@@ -89,6 +114,8 @@ export function lineTex(text) {
 }
 
 /** Text that stays plain inside a sentence: a literal dollar is escaped and `*` (italics in the renderer) becomes ×. */
+// A backslash is deliberately NOT doubled: the renderer (MathText) unescapes `\$` and nothing else, so `a\\` would be shown with
+// two backslashes. `a\$b` becomes `a\\$b`, whose `$` is escaped, and is shown as `a\$b`; `a\\` is shown as `a\\`.
 const plainText = s => String(s ?? '').replace(/\*/g, '×').replace(/\$/g, '\\$');
 
 /** A student's expression or equation as a `$…$` span for a comment, or as plain text when it cannot be set. */

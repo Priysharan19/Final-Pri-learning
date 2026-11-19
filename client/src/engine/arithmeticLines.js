@@ -202,27 +202,44 @@ function bracketFunctions(text) {
 // number, or a bracketed group and a bracket follows it. A bare `e^2x` stays ambiguous (e^(2x) or e^2 times x) and is
 // never judged. The only other reading of `e^2(3)` is e^(2·3); a line that is true under that reading is never crossed.
 const EXPONENT_LETTER_BRACKET = /(?<=e)\^\s*(-?\s*[A-Za-z])(?=\s*\()/g;
-const EXPONENT_THEN_BRACKET = /(?<![A-Za-z])e\s*\^\s*(-?\s*(?:\d+(?:\.\d+)?|[A-Za-z]|\([^()]*\)))\s*\(/g;
-/** The side read with the exponent taking the bracket after it (e^2(3) as e^(2·3)); null when no exponent is followed by one. */
-function exponentTakesBracket(side) {
-  let out = '', from = 0, changed = false;
-  EXPONENT_THEN_BRACKET.lastIndex = 0;
-  for (let m; (m = EXPONENT_THEN_BRACKET.exec(side)); ) {
-    const open = m.index + m[0].length - 1;
-    let depth = 0, end = -1;
-    for (let k = open; k < side.length; k++) { if (side[k] === '(') depth++; else if (side[k] === ')' && --depth === 0) { end = k; break; } }
-    if (end < 0) return null;
-    out += `${side.slice(from, m.index)}e^((${m[1].replace(/\s+/g, '')})*${side.slice(open, end + 1)})`;
-    from = end + 1; changed = true;
-    EXPONENT_THEN_BRACKET.lastIndex = from;
+// Any power (a number, e or π raised to a number, π, a letter or a group) followed by one or more brackets: 2^3(2), e^π(2), e^2(3)(4).
+const POWER_THEN_BRACKET = /(?:(?<![A-Za-z0-9.])\d+(?:\.\d+)?|(?<![A-Za-z])(?:e|π|pi))\s*\^\s*(-?\s*(?:\d+(?:\.\d+)?|π|pi|[A-Za-z]|\([^()]*\)))/g;
+const closingBracket = (t, open) => { let depth = 0; for (let k = open; k < t.length; k++) { if (t[k] === '(') depth++; else if (t[k] === ')' && --depth === 0) return k; } return -1; };
+/** Every other reading of a side: the exponent takes the first k brackets after it (k = 1, 2, …) at every such power. */
+function exponentTakesBrackets(side) {
+  const places = [];
+  POWER_THEN_BRACKET.lastIndex = 0;
+  for (let m; (m = POWER_THEN_BRACKET.exec(side)); ) {
+    const brackets = [];
+    let at = m.index + m[0].length;
+    for (;;) {
+      const open = side.slice(at).search(/\S/);
+      if (open < 0 || side[at + open] !== '(') break;
+      const end = closingBracket(side, at + open);
+      if (end < 0) return [];
+      brackets.push([at + open, end]); at = end + 1;
+    }
+    if (brackets.length) { places.push({ from: m.index, base: m[0].slice(0, m[0].indexOf('^')).trim(), exp: m[1].replace(/\s+/g, ''), brackets, end: at }); POWER_THEN_BRACKET.lastIndex = at; }
   }
-  return changed ? out + side.slice(from) : null;
+  if (!places.length) return [];
+  const most = Math.max(...places.map(p => p.brackets.length));
+  const out = [];
+  for (let k = 1; k <= most; k++) {
+    let text = '', from = 0;
+    for (const p of places) {
+      const take = Math.min(k, p.brackets.length);
+      text += side.slice(from, p.from) + `${p.base}^((${p.exp})${p.brackets.slice(0, take).map(([o, e]) => `*${side.slice(o, e + 1)}`).join('')})`;
+      from = p.brackets[take - 1][1] + 1;
+    }
+    out.push(text + side.slice(from));
+  }
+  return out;
 }
-/** True when some choice of reading (product, or the exponent taking its bracket) makes every side agree. */
+/** True when some choice of reading (product, or the exponent taking its brackets) makes every side agree. */
 function trueUnderExponentReading(sides, values) {
-  const alts = sides.map(s => { const a = exponentTakesBracket(s); return a === null ? null : valueOf(a); });
-  if (alts.every(a => a === null)) return false;
-  const choices = sides.map((_, i) => (alts[i] === null ? [values[i]] : [values[i], alts[i]]));
+  const alts = sides.map(s => exponentTakesBrackets(s).map(valueOf).filter(v => v !== null));
+  if (alts.every(a => !a.length)) return false;
+  const choices = sides.map((_, i) => [values[i], ...alts[i]]);
   const walk = (i, picked) => (i === choices.length ? picked.every(x => close(x, picked[0])) : choices[i].some(c => walk(i + 1, [...picked, c])));
   return walk(0, []);
 }
