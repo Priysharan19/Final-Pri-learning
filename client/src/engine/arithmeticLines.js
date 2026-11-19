@@ -405,7 +405,7 @@ function pageDefinitions(raw, out, firstBreak) {
     if (cross) { broke = { index: i, message: cross }; break; }
     for (const [name, d] of facts) if (!d.open) defs[name] = d;
     // A letter set on this line in a way this pass did not record (`Let x = 4`, `x = 4 now`) no longer has its old value.
-    for (const k of Object.keys(defs)) if (!facts.some(([name]) => name === k) && new RegExp(`(?<![A-Za-z])${k.replace("'", "\\'")}\\s*=`).test(src)) delete defs[k];
+    for (const k of Object.keys(defs)) if (!facts.some(([name]) => name === k) && new RegExp(`(?<![A-Za-z])${k.replace(/[^A-Za-z]/g, '\\$&')}\\s*=`).test(src)) delete defs[k];
     if (!lineHolds) { if (ticks.length) carry = null; continue; }
     if (ticks.length && out[i].status === 'note') out[i] = { text: out[i].text, status: 'ok', state: 'arithmetic', note: ticks.join(' '), valueChain: { rule: 'page-definitions' } };
   }
