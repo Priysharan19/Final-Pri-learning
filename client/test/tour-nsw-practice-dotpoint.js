@@ -96,6 +96,7 @@ try {
     check(`${label}: it lists All dot points and exactly the topic's issued dot points`,
       JSON.stringify(options) === JSON.stringify(['All dot points', ...expected.map(d => d.text)]), JSON.stringify(options).slice(0, 200));
     check(`${label}: nothing is chosen and no chip shows`, await select.inputValue() === '' && await page.locator('[data-dotpoint-chip]').count() === 0);
+    await page.waitForTimeout(900);   // the page's own entrance settles before anything is measured
     const before = await metrics();
     check(`${label}: the page does not scroll sideways`, before.scrollX <= 0, String(before.scrollX));
     await shot(`dotpoint-${label}-1-closed.png`);
@@ -114,17 +115,22 @@ try {
     const chip = page.locator('[data-dotpoint-chip]');
     check(`${label}: the chip names it`, await chip.count() === 1 && (await chip.innerText()).includes('Dot point:'), await chip.allInnerTexts().then(x => x.join('|')));
     check(`${label}: the question header names it`, await page.locator('[data-served-dotpoint]').count() === 1 && (await page.locator('[data-served-dotpoint]').innerText()).includes(target.text.slice(0, 20)));
-    const live = await page.locator('[data-dotpoint-picker] [data-shell-announce]').innerText();
+    await page.waitForFunction(() => (document.querySelector('[data-dotpoint-picker] [data-shell-announce]')?.textContent || '').length > 0, null, { timeout: 5000 }).catch(() => {});
+    const live = await page.locator('[data-dotpoint-picker] [data-shell-announce]').textContent();
     check(`${label}: the change was announced`, live.includes(target.text.slice(0, 20)), live);
+    await page.waitForTimeout(900);
     const during = await metrics();
     check(`${label}: choosing did not change the control's size or position`, JSON.stringify(during.pick) === JSON.stringify(before.pick), `${JSON.stringify(before.pick)} -> ${JSON.stringify(during.pick)}`);
     check(`${label}: the writing area did not shift sideways or scroll the page`, during.q.width === before.q.width && during.scrollX <= 0, `${before.q.width} -> ${during.q.width}`);
     await shot(`dotpoint-${label}-3-active.png`);
 
     stage = `${label}: clear the chip`;
-    const was2 = await qid();
     await page.locator('[data-dotpoint-clear]').click();
-    await nextQuestion(was2);
+    // The question on the desk is unfinished work and stays: All dot points resumes it, it is never discarded.
+    await page.waitForFunction(() => !new URL(location.href).searchParams.has('dotpoint') && !document.querySelector('[data-dotpoint-chip]'), null, { timeout: 30000 });
+    await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
+    await online.settled();
+    await page.waitForTimeout(900);
     check(`${label}: the chip's clear button removes dotpoint from the URL`, !new URL(page.url()).searchParams.has('dotpoint') && new URL(page.url()).searchParams.get('subtopic') === CHAPTER, page.url());
     check(`${label}: the control is back on All dot points`, await select.inputValue() === '' && await page.locator('[data-dotpoint-chip]').count() === 0);
     const after = await metrics();
@@ -149,7 +155,8 @@ try {
   await sel.focus();
   const was3 = await qid();
   await page.keyboard.press('ArrowDown');
-  await nextQuestion(was3);
+  await page.waitForFunction(() => new URL(location.href).searchParams.has('dotpoint'), null, { timeout: 30000 });
+  await page.waitForFunction(id => { const el = document.querySelector('.qpage[data-question-id]'); return el && el.getAttribute('data-question-id') !== id; }, was3, { timeout: 30000 });
   check('the keyboard alone chooses a dot point (arrow keys on the focused select)', new URL(page.url()).searchParams.has('dotpoint'), page.url());
   check('focus stays on the control after the choice', await sel.evaluate(el => el === document.activeElement));
 } catch (err) {
