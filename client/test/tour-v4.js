@@ -65,7 +65,7 @@ const paperAnswers = (page) => page.evaluate(() => {
     const clone = el.cloneNode(true);
     for (const m of clone.querySelectorAll('.katex-mathml')) m.remove();
     const text = (clone.textContent || '').replace(/\s+/g, ' ').trim();
-    const found = /^Question (\d+) — answer:\s*(.+)$/.exec(text);
+    const found = /^Question (\d+), answer:\s*(.+)$/.exec(text);
     if (!found) continue;
     const n = Number(found[1]);
     const answer = found[2].trim();
