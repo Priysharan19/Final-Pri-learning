@@ -95,6 +95,8 @@ function ProfilePractice() {
       // Never interrupt someone who has started an answer: typed text, ink on the
       // page, a pen stroke in progress, or a photo attached. (The empty answer
       // box is focused on arrival, so focus alone says nothing.)
+      // A short window (a phone on its side) has no room for a note beside the work.
+      if (window.innerHeight < 500) return;
       if (document.querySelector('.qpage[data-has-work="true"]') || penDown.current) return;
       const a = document.activeElement;
       if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA') && String(a.value || '') !== '') return;

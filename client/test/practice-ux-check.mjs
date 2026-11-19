@@ -60,6 +60,9 @@ ok(/Escape/.test(tour) && /data-tour-skip/.test(tour), 'Escape and Skip close it
 ok(/noteRef\.current\?\.focus/.test(tour) && /back\?\.focus/.test(tour), 'focus moves to the note and returns to the control');
 ok(/String\(a\.value \|\| ''\) !== ''/.test(base), 'the focused empty answer box does not suppress the tour; typed text does');
 ok(!/<div[^>]*(aria-modal|role="dialog")/.test(tour), 'not a modal');
+ok(!/scrollIntoView/.test(tour) && /preventScroll: true/.test(tour) && !/\.focus\(\)/.test(tour.replace(/focus\(\{ preventScroll: true \}\)/g, '')), 'the tour never scrolls the page: no scrollIntoView, every focus() is preventScroll');
+ok(/window\.innerHeight < 500/.test(base) && /@media \(max-height: 500px\) \{ \.q-recent \{ display: none; \} \}/.test(read('../src/workspace.css')), 'on a short window neither the tour nor the list can move the writing area');
+ok(/const inView/.test(tour), 'a control off screen at the start is left out, not scrolled to');
 ok(/Escape/.test(tour) && !/stopPropagation/.test(tour) && /noteRef\.current\?\.contains\(document\.activeElement\)/.test(tour), 'Escape never swallows the key and acts only from the note or when nothing else is open');
 ok(/data-has-work=\{hasWork/.test(read('../src/components/QuestionCard.jsx')) && /penDown\.current/.test(base) && /data-has-work="true"/.test(base), 'the tour waits for typed text, ink, a pen stroke or a photo');
 const recentSrc = read('../src/components/RecentAttempts.jsx');

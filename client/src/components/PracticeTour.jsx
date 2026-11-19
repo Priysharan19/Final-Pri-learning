@@ -11,20 +11,27 @@ import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from
 import { useT } from '../i18n/index.js';
 import { TOUR_STEPS } from '../lib/firstRunTour.js';
 
+// The tour never scrolls the page: a control that is not on screen when it starts is left out.
+const inView = s => {
+  const el = document.querySelector(s.anchor);
+  if (!el) return false;
+  const r = el.getBoundingClientRect();
+  return r.bottom > 0 && r.top < window.innerHeight && r.right > 0 && r.left < window.innerWidth;
+};
 const GAP = 8;
 const EDGE = 16;
 
 export default function PracticeTour({ onClose }) {
   const t = useT();
   const [at, setAt] = useState(0);
-  const [steps, setSteps] = useState(() => TOUR_STEPS.filter(s => document.querySelector(s.anchor)));
+  const [steps, setSteps] = useState(() => TOUR_STEPS.filter(inView));
   const [box, setBox] = useState(null);
   const noteRef = useRef(null);
   const step = steps[at];
 
   // The controls may arrive a moment after the first paint (the question loads).
   useEffect(() => {
-    const live = TOUR_STEPS.filter(s => document.querySelector(s.anchor));
+    const live = TOUR_STEPS.filter(inView);
     if (live.length !== steps.length) setSteps(live);
     if (!live.length) onClose(false);   // nothing to point at: close without recording it as seen
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -49,7 +56,6 @@ export default function PracticeTour({ onClose }) {
 
   useLayoutEffect(() => {
     if (!step) return undefined;
-    document.querySelector(step.anchor)?.scrollIntoView?.({ block: 'nearest' });
     place();
     let raf = 0;
     const again = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(place); };
