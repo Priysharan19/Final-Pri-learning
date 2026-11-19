@@ -19,6 +19,7 @@ export const AU_STRINGS = Object.freeze({
   'login.heroSub': 'Maths practice for NSW students — your working marked line by line, with worked solutions. Answers are checked by Pri’s server, so checking needs a Pri account and a connection.',
   'login.brandKicker': 'NSW Years 11 and 12 · Advanced and Extension 1',
   'login.welcomeSub': 'Practise for the HSC. Your working is checked line by line.',
+  'login.heroNote': 'Answers are checked by Pri’s server, so checking needs a connection. Five questions a day need no account. No ads.',
   'login.point1': 'Generated practice questions for NSW Mathematics',
   'settings.freeCourses': 'NSW Mathematics',
   'settings.premiumAdds': 'HSC Pass will remove the daily practice and exam-simulation limits, and add advanced Pri Explain and advanced analytics. Your work, history and progress are kept if HSC Pass ends.',

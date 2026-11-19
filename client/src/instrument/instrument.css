@@ -748,6 +748,13 @@ html.ui-instrument .auth-wrap:has(> .in-signin-plot) > .auth-col {
   html.ui-instrument .auth-wrap > .in-signin-plot { display: none; }
   html.ui-instrument .auth-wrap:has(> .in-signin-plot) > .auth-col { box-shadow: none; padding: 32px 16px; }
 }
+/* Prithagoras (19 Nov 2026, first-screen pass): the form column is one continuous surface beside the scene,
+   not a band floating in it, and reads flush left in one measure, like the question page a visitor came from. */
+html.ui-instrument[data-edition=prithagoras] .auth-wrap:has(> .in-signin-plot) > .auth-col { margin-block: 0; }
+html.ui-instrument[data-edition=prithagoras] .auth-wrap:has(> .in-signin-plot) > .auth-col > * { width: 100%; max-width: 360px; text-align: left !important; justify-content: flex-start; }
+html.ui-instrument[data-edition=prithagoras] .auth-col .login-try { margin: 14px 0 0; font-size: 13px; }
+html.ui-instrument[data-edition=prithagoras] .auth-wrap:has(> .in-signin-plot) > .auth-col .linklike { padding-inline: 0; justify-content: flex-start; }
+html.ui-instrument[data-edition=prithagoras] .auth-col > .signin-landing :has(> .linklike) { text-align: left !important; justify-content: flex-start; }
 html.ui-instrument .auth-card,
 html.ui-instrument .signin-landing { border-radius: 6px; background: var(--in-l1); box-shadow: 0 0 0 1px var(--in-edge-2); border: 0; }
 html.ui-instrument .auth-col > .signin-landing { box-shadow: none; padding-inline: 0; max-width: 304px; }

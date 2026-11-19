@@ -83,6 +83,15 @@ How it is held:
   without a deploy of code.
 - The trial's numbers are product choices, not research results; no conversion or efficacy claim
   is made for them.
+- **First screen, Prithagoras (19 November 2026, client only).** The Prithagoras first screen
+  (`client/src/guest/GuestPage.jsx`) opens on a question instead of the picker. The server routes,
+  limits and marking are unchanged; what changes is when the first question is asked for: once, on
+  arrival, and only when the token's five are untouched and the page is visible. That question is
+  one of the five whether or not it is answered. A reload, a return later the same day or a hidden
+  tab asks for nothing and shows the choices. Changing topic with a question open says that the new
+  question uses one of the five and the open one is left unanswered. What a visitor types is shown
+  typeset by the bundled notation code (never evaluated, never sent). Priyabhata keeps the picker.
+  `client/test/tour-guest-trial.js` holds each of these.
 
 ## Not decided here
 

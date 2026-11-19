@@ -21,6 +21,7 @@ import { Wordmark } from '../components/BrandMark.jsx';
 import PageLink from '../components/PageLink.jsx';
 import { EDITION } from '../platform/edition.js';
 import QuestionPicker from './QuestionPicker.jsx';
+import GuestPage from './GuestPage.jsx';
 import { guestTarget } from './guestMenu.js';
 import { startGuest, askGuest, answerGuest } from './guestTrial.js';
 import './guest.css';
@@ -46,7 +47,12 @@ function Languages() {
   );
 }
 
+/** The first screen: Prithagoras opens on a question (GuestPage.jsx); Priyabhata keeps the picker below. */
 export default function GuestTry() {
+  return EDITION === 'prithagoras' ? <GuestPage /> : <PickerFirst />;
+}
+
+function PickerFirst() {
   const t = useT();
   const nav = useNavigate();
   const [stage, setStage] = useState('pick'); // pick | loading | question | verdict | signup
