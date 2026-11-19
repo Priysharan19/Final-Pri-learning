@@ -21,8 +21,18 @@ const LIMITS = { steps: 12, lines: 40, values: 8 };
 
 function sidesOf(text) {
   // A side is a value when it has a digit in it: a bare letter (the x of `x = 5`) or a word is not one.
-  return String(text).replace(/[≈≃]/g, '=').split('=').map(x => x.trim()).filter(x => x && /\d/.test(x))
-    .map(x => { try { return infoOf(x); } catch { return null; } }).filter(Boolean);
+  // Each side is also read the other ways a student writes the same value (independent review): with a unit or a
+  // note after it (27.2 m, 1215.51 dollars, 1215.51 (2 dp)), with a currency sign in front, and with a constant of
+  // integration (+ c). Every reading that parses is kept: finding a step is lenient on purpose.
+  const out = [];
+  for (const side of String(text).replace(/[≈≃]/g, '=').split('=').map(x => x.trim()).filter(x => x && /\d/.test(x))) {
+    const bare = side.replace(/^[$€£]\s*/, '').replace(/\s*\([^()\d]*\d?\s*[A-Za-z. ]+\)\s*$/, '');
+    const readings = new Set([side, bare,
+      bare.replace(/(\d)\s*(?:[A-Za-z°%]+(?:\s*\/\s*[A-Za-z]+)?(?:\^-?\d)?)(?:\s+[A-Za-z]+)*\s*$/, '$1'),
+      bare.replace(/\s*\+\s*[cCkK]\s*$/, '')]);
+    for (const r of readings) { if (!r || !/\d/.test(r)) continue; let info = null; try { info = infoOf(r); } catch { info = null; } if (info) out.push(info); }
+  }
+  return out;
 }
 /** The values one step of the worked solution reaches (never the bare numbers 0, 1 or -1, which appear everywhere). */
 function valuesOfStep(step) {

@@ -30,6 +30,9 @@ ok(missingSteps({ steps: [{ h: 'Round', d: '$\\sqrt{740} \\approx 27.2$' }] }, '
 ok(missingSteps({ steps: [{ h: 'Trivial', d: '$x = 1$' }] }, 'y = 7') === null, 'a step that reaches only 0, 1 or -1 is not reported');
 ok(missingSteps({ steps: [{ h: 'Expand', d: '$(x+1)^2 = x^2 + 2x + 1$' }] }, 'y = x^2 + 2x + 1') === null && missingSteps({ steps: [{ h: 'Expand', d: '$(x+1)^2 = x^2 + 2x + 1$' }] }, 'y = x^2 + 1')?.missing[0].heading === 'Expand', 'expressions are matched as expressions');
 
+// independent review: ordinary ways of writing a value that is on the page
+for (const [d, page] of [['$d = 27.2$', 'x = 27.2 m'], ['$d = 27.2$', 'd = 27.2m'], ['$d = 27.2$', 'd = 27.2 metres'], ['$d = 27.2$', 'speed = 27.2 km/h'], ['$d = 27.2$', 'angle = 27.2 degrees'], ['$d = 5$', 'd = 5 m'], ['$A = 1215.51$', 'A = 1215.51 dollars'], ['$A = 1215.51$', 'A = $1215.51'], ['$A = 1215.51$', 'FV = 1215.51 (2 dp)'], ['$2(5x+1)^5$', 'I = 2(5x+1)^5 + c'], ['$2(5x+1)^5$', 'y = 2(5x+1)^5 + C'], ['$6x$', "y' = 6x"]]) ok(missingSteps({ steps: [{ h: 'Step', d }] }, page) === null, `found when written as: ${page} (${JSON.stringify(missingSteps({ steps: [{ h: 'Step', d }] }, page))})`);
+ok(missingSteps({ steps: [{ h: 'Step', d: '$d = 27.2$' }] }, 'd = 31.4 m')?.missing.length === 1 && missingSteps({ steps: [{ h: 'Step', d: '$2(5x+1)^5$' }] }, 'I = 2(5x+1)^4 + c')?.missing.length === 1, 'a different value with a unit or + c is still not found');
 // wiring: shown only for an answer that is not right; no mark is touched
 const working = PAGE.join('\n');
 const wrong = stepEvidence(Q, '3', working, { correct: false });
