@@ -93,6 +93,15 @@
 .q-credit { color: var(--ink-2); font-size: 13px; }
 .q-credit .dot { color: var(--ink-3); }
 .q-why { color: var(--ink-2); font-size: 14px; margin: 14px 0 0; padding-left: 12px; border-left: 2px solid var(--hairline-strong); }
+/* Report a problem with this question: an inline form under the prompt, the same hairline as the "why" note. */
+.q-report { display: grid; gap: 10px; margin: 14px 0 0; padding: 12px; border: 1px solid var(--hairline-strong); border-radius: 6px; background: var(--paper); max-width: 520px; }
+.q-report fieldset { display: grid; gap: 6px; margin: 0; padding: 0; border: 0; min-width: 0; }
+.q-report legend { padding: 0; margin-bottom: 6px; font-weight: 600; color: var(--ink); }
+.q-report-opt { display: flex; align-items: center; gap: 8px; color: var(--ink-2); font-size: 14px; min-height: var(--tap-min, 32px); cursor: pointer; }
+.q-report-note { display: grid; gap: 4px; }
+.q-report-note textarea.input { min-height: 64px; }
+.q-report-fail { margin: 0; font-size: 13px; color: var(--correction); }
+.q-report-actions { display: flex; gap: 8px; }
 .sym-key { border-radius: var(--radius-xs); background: var(--surface); }
 .sym-key:hover { border-color: var(--accent-line); color: var(--ink); }
 .hintbox, .ya-line { font-family: var(--font-prose-math); }

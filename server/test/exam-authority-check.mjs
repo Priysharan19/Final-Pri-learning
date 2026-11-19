@@ -67,7 +67,7 @@ const { paperLayout, sectionRangeOf } = await import('../../client/src/engine/in
 const { subtopicsForYear } = await import('../../client/src/engine/curriculum.js');
 const { multipartForYear } = await import('../../client/src/engine/generators/multipart.js');
 const { FREE_EXAM_ALLOWANCE } = await import('../../client/src/platform/entitlements.js');
-const { contentHashOf } = await import('../../client/src/engine/contentIdentity.js');
+const { contentHashOf, CONTENT_VERSION } = await import('../../client/src/engine/contentIdentity.js');
 const { MAX_OPEN_PAPERS } = await import('../platform/exams.js');
 const { contentIdentityOf, seenKeysOf } = await import('../platform/contentSeen.js');
 const { encryptDeliveryToken } = await import('../platform/deliveryCrypto.js');
@@ -811,7 +811,7 @@ try {
     {
       const sealedPractice = async id => JSON.parse((await h.db.get("SELECT response_json FROM idempotency_keys WHERE scope='practice-question' AND key=?", [id])).response_json);
       const preparedFor = sq => encryptDeliveryToken(JSON.stringify({ g: sq.generator, d: Number(sq.payload.difficulty), s: Number(sq.payload.seed), m: 'practice',
-        x: Date.now() + 60 * 60 * 1000, n: randomUUID() }), 'practice-prepared-v1');
+        x: Date.now() + 60 * 60 * 1000, n: randomUUID(), c: CONTENT_VERSION }), 'practice-prepared-v1');
       const bind = (account, sq) => h.request('/v1/practice/issue', { method: 'POST', jar: account.jar, body: { prepared: preparedFor(sq), account: String(account.account.id) } });
       const bound = await bind(rep, x);
       eq([bound.status, bound.data.repeat, bound.data.question.prompt], [201, true, x.payload.prompt], 'the same content, prepared signed-out and bound to the account after the paper, is a repeat');

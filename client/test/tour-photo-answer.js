@@ -45,6 +45,7 @@ import { randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { handwrite, markWorking, readingIsNotShown } from './fakeServerReader.js';
 import { directFormsOnly } from '../src/engine/generators/index.js';
+import { CONTENT_VERSION } from '../src/engine/contentIdentity.js';   // a prepared token carries the content version it was minted under
 
 const EVIDENCE = 'SYNTHETIC-READER EVIDENCE';
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
@@ -111,7 +112,7 @@ async function serveOwnersQuestion(ctx, online) {
     // is a direct one; only a request seen to be binding a token is left alone.
     if (body && body.prepared !== undefined) return route.continue();
     const prepared = encryptDeliveryToken(JSON.stringify({
-      g: OWNER.generator, d: OWNER.difficulty, s: OWNER.seed, m: 'practice', x: Date.now() + 60 * 60 * 1000, n: randomUUID()
+      g: OWNER.generator, d: OWNER.difficulty, s: OWNER.seed, m: 'practice', x: Date.now() + 60 * 60 * 1000, n: randomUUID(), c: CONTENT_VERSION
     }), 'practice-prepared-v1');
     const accountId = body?.account ?? online.account?.id;
     if (!accountId) return route.continue();

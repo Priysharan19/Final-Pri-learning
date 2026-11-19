@@ -87,6 +87,8 @@ function keyOf(q) {
     case 'ratio': return `${a.a}:${a.b}`;
     case 'expression': return a.expr ?? null;
     case 'mcq': return Number.isInteger(a.correctIndex) ? String(a.correctIndex) : null;
+    // A sketch is answered by a declared feature set: the key the form wrote from the numbers shown, as the form sends it.
+    case 'graph-sketch': return a.key && typeof a.key === 'object' ? JSON.stringify(a.key) : null;
     default: return null;
   }
 }
@@ -237,9 +239,34 @@ function expressionWrongs(q, a) {
   return cands.filter(([input]) => input.length <= 118 && [e, ...(a.anyOf || [])].every(c => clearlyDifferent(input, c)))
     .map(([input, why]) => ({ input, why }));
 }
+/** One-feature mistakes of a sketch's key (this suite's own; the marker is never asked how it would build them). */
+function sketchWrongs(a) {
+  const k = a.key, out = [];
+  const make = (mut, why) => { const c = JSON.parse(JSON.stringify(k)); mut(c); out.push({ input: JSON.stringify(c), why }); };
+  if (Array.isArray(k?.intercepts?.x)) {
+    k.intercepts.x.forEach((v, i) => make(c => { c.intercepts.x[i] = v + 1; }, `x-intercept ${i + 1} off by one`));
+    if (k.intercepts.x.length) make(c => { c.intercepts.x.pop(); }, 'an x-intercept missing');
+    make(c => { c.intercepts.x.push(k.intercepts.x.length ? Math.max(...k.intercepts.x) + 3 : 3); }, 'an x-intercept too many');
+  }
+  if (typeof k?.intercepts?.y === 'number') {
+    make(c => { c.intercepts.y = k.intercepts.y + 1; }, 'y-intercept off by one');
+    if (k.intercepts.y !== 0) make(c => { c.intercepts.y = -k.intercepts.y; }, 'y-intercept negated');
+  }
+  if (Array.isArray(k?.turning) && k.turning.length) {
+    k.turning.forEach((t, i) => {
+      make(c => { c.turning[i].kind = t.kind === 'max' ? 'min' : 'max'; }, `turning point ${i + 1} the wrong way up`);
+      make(c => { c.turning[i].x = t.x + 1; }, `turning point ${i + 1} x off by one`);
+      make(c => { c.turning[i].y = t.y + 1; }, `turning point ${i + 1} y off by one`);
+      if (Math.abs(t.x - t.y) > 1) make(c => { c.turning[i].x = t.y; c.turning[i].y = t.x; }, `turning point ${i + 1} coordinates swapped`);
+    });
+    make(c => { c.turning.pop(); }, 'a turning point missing');
+  }
+  return out;
+}
 function wrongsFor(q) {
   const a = q.answer || {};
   switch (q.answerType) {
+    case 'graph-sketch': return a.key ? sketchWrongs(a) : [];
     case 'numeric': return typeof a.value === 'number' ? numericWrongs(q, a) : [];
     case 'set': return Array.isArray(a.values) && a.values.length ? setWrongs(q, a) : [];
     case 'point': return pointWrongs(q, a);
@@ -357,7 +384,9 @@ function sweepCell(generator, difficulty, count = true, admitted = nswIssuable, 
     if (count) totals.keys++;
     const own = verdict(q, key);
     if (own.correct !== true) add('KEY', `${where}: the stored answer ${JSON.stringify(key)} is ${own.invalid ? 'unread' : 'marked wrong'} (${String(own.feedback || '').slice(0, 80)})`);
-    if (q.answerType !== 'mcq') {
+    // A sketch's printed answer is a sentence naming its features: it is not a feature set a student could enter,
+    // so it is held to renderFaults' rule (real, non-empty text) and not read back through the marker.
+    if (q.answerType !== 'mcq' && q.answerType !== 'graph-sketch') {
       const printed = String(answerTextFor(q) ?? '');
       if (printed && printed !== key) {
         if (count) totals.printed++;

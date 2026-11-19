@@ -34,6 +34,7 @@ import { proposeFinalAnswer, readsAsWritten } from '../photo/finalAnswer.js';
 import { clearPhotoDraft, confirmPhotoDraftSaved, readPhotoDraft, savePhotoDraft } from '../local/photoDrafts.js';
 import { lineMarks } from './workingEvidence.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
+import QuestionReport from './QuestionReport.jsx';
 import { renderPdfPages, MAX_PDF_INPUT_BYTES } from '../ink/pdfPage.js';
 import { intakeImageFile, intakeMessageKey, isPdfFile, claimsHeic, PHOTO_OR_PDF_ACCEPT } from '../ink/photoIntake.js';
 import useFileDrop from '../lib/useFileDrop.js';
@@ -63,8 +64,10 @@ import { blockedInkRecovery, canOpenInkSignIn, inkRecoveryWords } from './signed
 import './inkAccountRecovery.css';
 import { useFormFactor } from '../platform/formFactor.js';
 import Icon from './Icon.jsx';
+import { EngineComment } from './EngineComment.jsx';
 import Working from '../instrument/Working.jsx';
 import TypedAnswerFields from './TypedAnswerFields.jsx';
+import SketchAnswer from './SketchAnswer.jsx';
 import VerifiedMarkBreakdown from './VerifiedMarkBreakdown.jsx';
 import { finalAnswerGuidance, moveToWorking, workingAreaMode } from './typedAnswerGuide.js';
 import '../workspace.css';
@@ -384,7 +387,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [restoredReading, setRestoredReading] = useState(null);
   const restoredAnswerRef = useRef(null);
   const inkExtrasRef = useRef({});
-  const [mode, setMode] = useState(() => preferMode());       // 'type' | 'write' | 'photo'
+  // A graph-sketch answer is a form of features, never ink or a photo: it is always the typed surface.
+  const [mode, setMode] = useState(() => (question.answerType === 'graph-sketch' ? 'type' : preferMode()));       // 'type' | 'write' | 'photo'
   const [inkResult, setInkResult] = useState(null);
   // The ink surface owns the truth about whether recognition was attempted.
   // A blocker before the reader runs must never be labelled bad handwriting.
@@ -414,6 +418,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [showWhy, setShowWhy] = useState(false);
   const [showSyms, setShowSyms] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const [state, setState] = useState({ phase: 'answering' });
   // Submit found that the server no longer holds the read of this page (it
   // was read long ago). Submit never buys a read: the student is asked to
@@ -549,7 +554,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     // An old photo must never follow the student into a new question.
     photoReadGeneration.current += 1;
     pendingPdf.current = null;
-    setPhoto(null); setPhotoSignInOpen(false); setInkSignInOpen(false); setPhotoReattachRequired(false); setBookmarked(false);
+    setPhoto(null); setPhotoSignInOpen(false); setInkSignInOpen(false); setPhotoReattachRequired(false); setBookmarked(false); setReportOpen(false);
     setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
     setPhotoLines(null); setPhotoNote(null); setPhotoAnswerSource(null); setPhotoRestored(false);
     ++photoSaveRevision.current;
@@ -602,6 +607,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // Whether this copy of the question can ever be marked (checkAccess.js).
   const unmarkable = useMemo(() => (diagnostic ? null : unmarkableNotice(question)), [diagnostic, question.checkState, question.subtopic]);
   const isWorking = question.answerType === 'working';
+  const isSketch = question.answerType === 'graph-sketch';
   const totalMarks = question.criteria?.length || 1;
   // A question that carries method marks keeps its working area open, so
   // working typed there is always part of the submission.
@@ -1012,7 +1018,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // far more often than it offers, because a wrong graph teaches a wrong thing;
   // where it declines there is simply no graph.
   const plotSpec = useMemo(() => {
-    if (!res?.solution) return null;
+    // A sketch question shows its own marked sketch (SketchAnswer), not a second, generically windowed graph.
+    if (!res?.solution || question.answerType === 'graph-sketch') return null;
     try {
       return plotSpecFor({
         prompt: question.prompt,
@@ -1022,7 +1029,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         chapterId: question.chapterId
       });
     } catch { return null; }
-  }, [question.prompt, question.subtopic, question.chapterId, res]);
+  }, [question.prompt, question.subtopic, question.chapterId, question.answerType, res]);
 
   // The recogniser is only fetched once something on screen needs its LaTeX.
   // Outside write mode the only strings that reach texOf are these two.
@@ -2184,10 +2191,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       if (v.status === 'ok') {
         cards.push({
           kind: 'good', line: i + 1,
-          text: v.note || (i === 0 ? t('verdict.lineValidStart') : t('verdict.lineChecksOut'))
+          text: v.note || (i === 0 ? t('verdict.lineValidStart') : t('verdict.lineChecksOut')), engine: !!v.note
         });
       } else if (v.status === 'break' || v.status === 'wrong') {
-        cards.push({ kind: 'bad', line: i + 1, text: v.note || t('verdict.lineBreaks') });
+        cards.push({ kind: 'bad', line: i + 1, text: v.note || t('verdict.lineBreaks'), engine: !!v.note });
       }
     });
     return cards.length ? cards : null;
@@ -2552,7 +2559,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           </div>
         ))}
       </div>
-      {res.solution.answerText && (
+      {res.solution.answerText && !isSketch && (
         <div className="final-answer">
           <div className="sc-label" style={{ marginBottom: 8 }}>{t('verdict.finalAnswer')}</div>
           <MathText text={answerToTex(res.solution.answerText)} />
@@ -2717,6 +2724,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         </div>
         {figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: figure }} />}
         {showWhy && why && <p className="q-why">{why}</p>}
+        {reportOpen && question.serverQuestionId && (
+          <QuestionReport questionId={question.serverQuestionId} onClose={() => setReportOpen(false)}
+            onSent={() => { setReportOpen(false); toast(t('report.thanks'), 3200); }} />
+        )}
 
         {/* The tutor policy's smallest next step (engine/tutorPolicy.js), above
             the ladder; a rung it suggests is opened by getHint, as the rung is. */}
@@ -2770,7 +2781,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         </div>
 
         <div className="ws-tools no-print" ref={toolsRef}>
-          {!isMcq && (
+          {!isMcq && !isSketch && (
             <div className="mode-tabs seg" role="group" aria-label={t('verdict.answerModes')}>
               <button type="button" className={`mode-tab ${mode === 'type' ? 'on' : ''}`} aria-pressed={mode === 'type'} title={t('verdict.modeTypeTitle')}
                 aria-label={t('verdict.modeTypeLabel')} onClick={() => flipMode('type')}><Icon name="type" size={16} />{t('verdict.modeType')}</button>
@@ -2808,6 +2819,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               <button type="button" className={`icon-btn q-rail-btn ${bookmarked ? 'on' : ''}`} aria-pressed={bookmarked}
                 title={t('verdict.favorite')} aria-label={t('verdict.favoriteThis')} onClick={toggleBookmark}><Icon name="bookmark" /></button>
             )}
+            {!diagnostic && question.serverQuestionId && (
+              <button type="button" className={`icon-btn q-rail-btn ${reportOpen ? 'on' : ''}`} aria-expanded={reportOpen} data-report-question
+                title={t('report.open')} aria-label={t('report.open')} onClick={() => setReportOpen(o => !o)}><Icon name="flag" /></button>
+            )}
           </div>
         </div>
 
@@ -2830,6 +2845,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 </button>
               );
             })}
+          </div>
+        ) : isSketch ? (
+          <div className={`editor-shell${resolved ? ' ink-disabled' : ''}`} data-sketch-shell>
+            <SketchAnswer question={question} value={answer} onChange={editAnswer} onSubmit={submit} disabled={resolved}
+              result={resolved ? res?.solution?.sketch || null : null} inputRef={inputRef} />
           </div>
         ) : mode !== 'write' ? (
           <div className={`editor-shell ${resolved ? 'ink-disabled' : ''}${drop.dragging ? ' is-dropping' : ''}`} data-photo-drop={mode === 'photo' ? (drop.dragging ? 'active' : 'ready') : undefined} {...drop.bind}>
@@ -3329,7 +3349,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           <div className="ink-comments">
             <div className="ink-comment bad">
               <div className="ic-head">{t('verdict.lookHere')}<span className="ic-line">{t('verdict.onLine', { n: firstBad.line })}</span></div>
-              {firstBad.text}
+              {firstBad.engine ? <EngineComment text={firstBad.text} /> : firstBad.text}
             </div>
             {cloudWorkingNote && (
               <div className={`ink-comment ${cloudWorkingNote.tone === 'break' ? 'bad' : 'note'}`}>
@@ -3350,7 +3370,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 {otherComments.map((c, i) => (
                   <div key={i} className={`ink-comment ${c.kind}`} style={{ marginTop: 8 }}>
                     <div className="ic-head">{t('verdict.mistake')}<span className="ic-line">{t('verdict.onLine', { n: c.line })}</span></div>
-                    {c.text}
+                    {c.engine ? <EngineComment text={c.text} /> : c.text}
                   </div>
                 ))}
               </details>
@@ -3444,7 +3464,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 {workEvidence && !verdictGood && Array.isArray(res?.stepReport?.missing) && res.stepReport.missing.length > 0 && (
                   <div data-working-missing={res.stepReport.missing.length}>{t('verdict.workingMissing', { count: res.stepReport.missing.length, n: res.stepReport.missing.length, steps: res.stepReport.missing.slice(0, 4).map(m => `${m.step}. ${m.heading}`).join('; ') })}</div>
                 )}
-                {!verdictGood && res.solution && (
+                {!verdictGood && res.solution && !isSketch && (
                   <div className="eval-expected">{t('verdict.expected')} <b><MathText text={answerToTex(res.solution.answerText)} /></b></div>
                 )}
                 {awInput && (
@@ -3749,7 +3769,7 @@ function StepReport({ report, instrument = false, correctAnswer = null }) {
         {l.status === 'break' && <b style={{ fontFamily: 'var(--font)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{t(i === first ? 'verdict.mistakeIsHere' : 'verdict.alsoWrong')}</b>}
         {l.secondBreak === true && l.status !== 'break' && <b style={{ fontFamily: 'var(--font)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{t('verdict.alsoWrong')}</b>}
         {l.status === 'ok' && l.ecf === true && <b style={{ fontFamily: 'var(--font)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{t('verdict.carriedForward')}</b>}
-        {l.note && !l.diagnosis && <span style={{ fontFamily: 'var(--font)', fontWeight: 400, fontSize: 12.5 }}> — {l.note}</span>}
+        {l.note && !l.diagnosis && <span style={{ fontFamily: 'var(--font)', fontWeight: 400, fontSize: 12.5 }}> — <EngineComment text={l.note} /></span>}
       </div>
       {l.diagnosis && <Diagnosis d={l.diagnosis} line={i + 1} />}
       {i === first && typeof beforeFirst === 'string' && typeof l.text === 'string' && (
@@ -3819,7 +3839,7 @@ function Diagnosis({ d, line }) {
       {nameLine
         ? <div className="diagnosis-title">{nameLine}</div>
         : <div className="diagnosis-title">{hedged && d.code !== 'counterexample' ? t('verdict.thisLooksLikeTitle', { title: d.title }) : d.title}</div>}
-      <div className="diagnosis-body">{d.message}</div>
+      <div className="diagnosis-body"><EngineComment text={d.message} /></div>
       {nameLine ? <div className="diagnosis-fix">{t(named.explain)}</div> : (d.fix && <div className="diagnosis-fix">{d.fix}</div>)}
     </div>
   );

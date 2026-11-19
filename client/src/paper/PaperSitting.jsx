@@ -306,7 +306,7 @@ export default function PaperSitting() {
           <p className="pp-totals" data-paper-totals>{t('paper.totals', { count: totals.autoAvailable, awarded: totals.autoAwarded, available: totals.autoAvailable, selfChecked: totals.selfChecked })}</p>
           <p className="muted">{t('paper.res.totalsNote', { total: totals.total })}</p>
           {totals.emptyParts > 0 && <p className="muted">{t('paper.res.emptyParts', { n: totals.emptyParts })}</p>}
-          <PaperNext attemptId={attemptId} paperId={attempt.paperId} />
+          {!attempt.paperId.startsWith('mp-practice-set-') && <PaperNext attemptId={attemptId} paperId={attempt.paperId} />}
         </section>
       )}
 

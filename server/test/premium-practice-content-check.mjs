@@ -20,6 +20,7 @@ import './support/hermetic.mjs';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { CONTENT_VERSION } from '../../client/src/engine/contentIdentity.js';   // a prepared token carries the content version it was minted under
 import { randomUUID } from 'node:crypto';
 
 const scratch = mkdtempSync(join(tmpdir(), 'pri-premium-content-'));
@@ -57,7 +58,7 @@ const counted = async accountId => {
   return row ? Number(JSON.parse(row.response_json).issued) : 0;
 };
 const eventOf = async id => { const row = await h.db.get("SELECT id,payload_json FROM learning_events WHERE kind='graded-attempt' AND entity_id=?", [id]); return row ? { eventId: row.id, ...JSON.parse(row.payload_json) } : null; };
-const preparedToken = (g, d = 3) => encryptDeliveryToken(JSON.stringify({ g, d, s: 7, m: 'practice', x: Date.now() + 60 * 60 * 1000, n: randomUUID() }), 'practice-prepared-v1');
+const preparedToken = (g, d = 3) => encryptDeliveryToken(JSON.stringify({ g, d, s: 7, m: 'practice', x: Date.now() + 60 * 60 * 1000, n: randomUUID(), c: CONTENT_VERSION }), 'practice-prepared-v1');
 const premiumRefusal = r => r.status === 402 && r.data?.error?.code === 'PREMIUM_REQUIRED' && r.data.error.capability === 'jee-advanced-content';
 
 /** A question this account resolved wrong under a diagnosed trap: a filed notebook entry. */

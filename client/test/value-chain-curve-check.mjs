@@ -5,6 +5,7 @@
 import { stepCheck } from '../src/engine/checker.js';
 import { year12Nsw } from '../src/engine/generators/year12-nsw.js';
 import { stepMetaFor } from '../../server/platform/markerOps.js';
+import { plainComment } from '../src/engine/commentTex.js';
 import { buildAnnotatedWorking } from '../src/components/annotatedWorkingModel.js';
 import { generateQuestion, loadAllBanks } from '../src/engine/generators/index.js';
 
@@ -18,7 +19,7 @@ const OWNER = ['y=2x³+9x²', "y'=6x²+18x", "for stat points y'=0", '0=6x²+18x
 let r = run([...OWNER, 'y(0)=0', 'smallest: (0,0)']);
 ok(r.lines.map(l => l.state).join() === 'given,verified,condition,verified,verified,verified,verified,wrong', `the owner's 8 lines: ${r.lines.map(l => l.state)}`);
 ok(r.firstBreak === 7, 'the first (and only) error is line 8, not the true y(0) = 0');
-ok(/x = -3 is smaller than x = 0, so use x = -3: y\(-3\) = 27/.test(r.lines[7].note), `plain-words explanation: ${r.lines[7].note}`);
+ok(/x = -3 is smaller than x = 0, so use x = -3: y\(-3\) = 27/.test(plainComment(r.lines[7].note).replace(/−/g, '-')), `plain-words explanation: ${r.lines[7].note}`);
 ok(!r.lines.some(l => /constraint|identity|allowed domain/i.test(`${l.note || ''} ${l.diagnosis?.message || ''}`)), 'no "lost its constraint / identity" wording anywhere');
 ok(r.summary.total === 8 && r.summary.checked === 6 && r.summary.unverified.length === 0 && r.summary.wrong.join() === '8', `summary counts: ${JSON.stringify(r.summary)}`);
 r = run([...OWNER, 'y(-3)=27', 'smallest: (-3,27)']);

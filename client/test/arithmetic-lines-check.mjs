@@ -12,7 +12,8 @@
 // Part 3  Wiring: the server uses it only where a question has no Step Check,
 //         it reaches no mark, and the result card never calls it "consistent
 //         with the correct solution".
-import { stepCheckArithmetic } from '../src/engine/arithmeticLines.js';
+import { stepCheckArithmetic, exactForm } from '../src/engine/arithmeticLines.js';
+import { plainComment, dollarsBalanced } from '../src/engine/commentTex.js';
 import { fullyVerifiedWorking } from '../src/engine/misconceptions.js';
 import { workingEvidence, workingEvidenceCopy } from '../src/components/attemptEvidence.js';
 import { buildAnnotatedWorking } from '../src/components/annotatedWorkingModel.js';
@@ -22,7 +23,15 @@ import hi from '../src/i18n/strings.hi.js';
 
 let pass = 0, fail = 0;
 const ok = (c, m) => { if (c) pass++; else { fail++; console.error('FAIL:', m); } };
-const run = lines => stepCheckArithmetic(lines.join('\n'));
+// Every comment any test page below produces, kept for the typesetting checks at the end.
+const comments = new Set();
+import { createHash } from 'node:crypto';
+const verdictHash = createHash('sha256');
+let reportsSeen = 0;
+const keep = report => { reportsSeen++; verdictHash.update(JSON.stringify([report.firstBreak, (report.lines || []).map(l => [l.status, l.state])])); for (const l of report.lines || []) if (l.note) comments.add(l.note); if (report.diagnosis?.message) comments.add(report.diagnosis.message); return report; };
+const run = lines => keep(stepCheckArithmetic(lines.join('\n')));
+// A comment's maths is TeX between dollars; the assertions below read it as the plain sentence it stands for.
+const plain = plainComment;
 const st = lines => run(lines).lines.map(l => l.status).join();
 
 // ── Part 1 · the rules ───────────────────────────────────────────────────────
@@ -35,8 +44,8 @@ ok(r.lines[10].state === 'arithmetic' && r.arithmetic === true && r.source === '
 ok(r.lines.slice(0, 5).every(l => l.status === 'note'), `vectors, words and a column sum are not judged (${r.lines.slice(0, 5).map(l => l.status)})`);
 
 r = run(['-20 - 6 = 14']);
-ok(r.lines[0].status === 'break' && /−26/.test(r.diagnosis.message) && /14/.test(r.diagnosis.message), `false arithmetic is crossed with both values (${r.diagnosis?.message})`);
-ok(st(['3 × 4', '= 12', '= 13']) === 'note,ok,break' && /line above comes to 12/.test(run(['3 × 4', '= 12', '= 13']).diagnosis.message), 'a continuation is held to the line above');
+ok(r.lines[0].status === 'break' && /−26/.test(plain(r.diagnosis.message)) && /14/.test(plain(r.diagnosis.message)), `false arithmetic is crossed with both values (${r.diagnosis?.message})`);
+ok(st(['3 × 4', '= 12', '= 13']) === 'note,ok,break' && /line above comes to 12/.test(plain(run(['3 × 4', '= 12', '= 13']).diagnosis.message)), 'a continuation is held to the line above');
 ok(st(['196 + 64 = 260', '1/2 + 1/3 = 5/6', '5! = 120', '(-3)^2 = 9', '-3^2 = -9', '√16 = 4', '2(3+4) = 14', '6[4^2 - 2^2] = 72', '7 = 7']) === 'ok,ok,ok,ok,ok,ok,ok,ok,ok', 'true arithmetic is ticked');
 for (const f of ['1/2 + 1/3 = 2/5', '(-3)^2 = -9', '2 + 2 = 4 = 5', '6(16 - 4) = 62', 'sqrt(16) = 5', '7 × 8 = 54', '100 - 37 = 73']) ok(st([f]) === 'break', `false arithmetic is crossed: ${f}`);
 ok(st(['2 + 2 = 5', '3 + 3 = 6']) === 'break,note', 'lines after the slip are not judged');
@@ -66,7 +75,7 @@ ok(st(['500 = 340', '6000 = 18']) === 'note,note' && st(['3 × 4 = 12', '= 13'])
   const PROOF = ['LHS = (secθ - cosθ)/(cosecθ - sinθ)', 'Numerator: secθ - cosθ', '= 1/cosθ - cosθ', '= (1 - cos^2θ)/cosθ', '= sin^2θ/cosθ = sinθ tanθ', 'Denominator: cosecθ - sinθ', '= 1/sinθ - sinθ', '= (1 - sin^2θ)/sinθ', '= cos^2θ/sinθ = cosθ/tanθ', 'LHS = sinθ tanθ / (cosθ/tanθ)', '= tan^2θ × tanθ', '= tan^3θ = RHS //'];
   const p = run(PROOF);
   ok(p.lines.map(l => l.status).join() === 'note,note,ok,ok,ok,note,ok,ok,ok,note,ok,ok', `the trig proof: every step is ticked, the lines that only set up are notes (${p.lines.map(l => l.status)})`);
-  ok(/reciprocal identity sec θ = 1\/cos θ/.test(p.lines[2].note) && /common denominator/.test(p.lines[3].note) && /Pythagorean identity/.test(p.lines[4].note) && /reciprocal identity cosec θ = 1\/sin θ/.test(p.lines[6].note), `each tick names the step it matches (${p.lines[2].note} | ${p.lines[6].note})`);
+  ok(/reciprocal identity sec θ = 1\/cos θ/.test(plain(p.lines[2].note)) && /common denominator/.test(plain(p.lines[3].note)) && /Pythagorean identity/.test(plain(p.lines[4].note)) && /reciprocal identity cosec θ = 1\/sin θ/.test(plain(p.lines[6].note)), `each tick names the step it matches (${p.lines[2].note} | ${p.lines[6].note})`);
   ok(p.firstBreak === -1 && p.lines.every(l => l.status !== 'break'), 'and nothing is crossed');
 }
 ok(st(['sin θ cos θ = cos θ sin θ', 'sin 2θ = 2 sin θ cos θ', 'cos^2 x = 1 - sin^2 x', 'tan x = sin x / cos x', '1 + tan^2 A = sec^2 A', 'ln x + ln x = 2 ln x', '2sin(x)cos(x) = sin(2x)', 'cot θ = cos θ/sin θ']) === 'ok,ok,ok,ok,ok,ok,ok,ok', 'unbracketed functions of one letter are read');
@@ -79,15 +88,15 @@ ok(st(['x/π = x/π', 'π r^2/π = r^2', '2π r/2 = π r']) === 'ok,ok,ok', 'π 
 ok(st(['x/√2 = √2 x/2', '1/√2 = √2/2']) === 'ok,ok', 'a root as the whole denominator is read');
 ok(st(['sin θ/cos θ = tan θ', '(1 - cos^2 θ)/cos θ = sin^2 θ/cos θ', 'sin θ tan θ/(cos θ/tan θ) = tan^3 θ']) === 'ok,ok,ok', 'a plain quotient is still read');
 ok(st(['LHS = 5', '= 6']) === 'note,note' && st(['Total: 3 + 4', '= 8']) === 'note,note' && st(['Total: 3 + 4', '= 7']) === 'note,ok', 'after a labelled line a `=` line is ticked when it agrees and never crossed');
-ok(st(['(x+1)^2 = x^2 + 2x + 1']) === 'ok' && /expanding the brackets/.test(run(['(x+1)^2 = x^2 + 2x + 1']).lines[0].note) && /factorising/.test(run(['x^2 - 9 = (x-3)(x+3)']).lines[0].note), 'expanding and factorising are named');
+ok(st(['(x+1)^2 = x^2 + 2x + 1']) === 'ok' && /expanding brackets/.test(run(['(x+1)^2 = x^2 + 2x + 1']).lines[0].note) && /the difference of two squares/.test(run(['x^2 - 9 = (x-3)(x+3)']).lines[0].note), 'expanding and factorising are named');
 // what the page itself defines (owner, 19 November: side by side with a competitor on his own pages)
 {
   const slip = run(['e^(8k) = 3 so k = ln(3)/8', 'A = 12e^(4k) = 12e^(ln(3)/4)', 'A = 12 x 3^(1/4) grams']);
-  ok(slip.lines.map(l => l.status).join() === 'ok,break,note' && /With k = ln\(3\)\/8 from above/.test(slip.diagnosis.message) && /20\.78/.test(slip.diagnosis.message), `a value carried from the line above is held to: the slip is crossed with the reason (${slip.lines.map(l => l.status)} · ${slip.diagnosis?.message})`);
+  ok(slip.lines.map(l => l.status).join() === 'ok,break,note' && /With k = ln\(3\)\/8 from above/.test(plain(slip.diagnosis.message)) && /12√3/.test(plain(slip.diagnosis.message)) && Math.abs(12 * Math.sqrt(3) - 20.7846) < 1e-4, `a value carried from the line above is held to: the slip is crossed with the reason (${slip.lines.map(l => l.status)} · ${slip.diagnosis?.message})`);
   ok(st(['e^(8k) = 3 so k = ln(3)/8', 'A = 12e^(4k) = 12e^(ln(3)/2)', '= 12 sqrt(3)']) === 'ok,ok,ok', 'the same working without the slip is ticked on every line');
   const quot = run(['f(x) = (x^2 - 4x + 1)/e^x', 'u = x^2 - 4x + 1', 'v = e^x', "u' = 2x - 4", "v' = e^x", "f'(x) = (vu' - uv')/v^2", '-x^2 + 6x - 5 = 0', '(x - 5)(x - 1) = 0', 'x = 5', 'x = 1']);
   ok(quot.lines.map(l => l.status).join() === 'note,note,note,ok,ok,ok,note,ok,ok,ok', `definitions, their derivatives, the quotient rule line, an equation rearranged and its roots (${quot.lines.map(l => l.status)})`);
-  ok(/derivative of u = x\^2 - 4x \+ 1/.test(quot.lines[3].note) && /same equation/.test(quot.lines[7].note) && /satisfies the equation/.test(quot.lines[8].note), 'each of those ticks says what was checked');
+  ok(/derivative of u = x\^2 - 4x \+ 1/.test(plain(quot.lines[3].note)) && /same equation/.test(plain(quot.lines[7].note)) && /satisfies the equation/.test(plain(quot.lines[8].note)), 'each of those ticks says what was checked');
   ok(st(['u = x^2 - 4x + 1', "u' = 2x - 5"]) === 'note,break' && st(['y = sin(3x)', "y' = 3cos(3x)"]) === 'note,ok' && st(['y = sin(3x)', "y' = cos(3x)"]) === 'note,break', 'a wrong derivative of something the page defined is crossed');
   for (const page of [['y = sin(3x)', "y' = (3√(2))/2"], ['y = x^2', "y' = 6"], ['u = x^2', "u' = 2.0x + 0.1"], ['k = 2', 'k = 3', '2k = 6'], ['x = 2', 'x^2 = 9'], ['k = 2', 'A = k + 1 = 3.5'], ['a = 3', 'b = 4', 'c^2 = a^2 + b^2', 'c = 5'], ['x^2 = 9', 'x = 4'], ['2x + 1 = 7', '2x = 8'], ['n = 5', 'n! = 100 + 20'], ['t = 5', '3t + 5 = 21']]) ok(!/break/.test(st(page)), `not crossed: ${page.join(' | ')} (${st(page)})`);
   ok(st(['k = 2', 'A = 3k + 1 = 8']) === 'note,break' && st(['k = 2', '3k + 1 = 8']) === 'note,note' && st(['k = 2', '3k + 1 = 7']) === 'note,ok' && st(['k = 2', 'k = 3', '2k = 6']) === 'note,note,ok', 'a worked chain under a name is held to the latest value of a letter; two sides on their own may be a new equation and are never crossed');
@@ -100,7 +109,7 @@ ok(st(['x^2 - 4 = 0 so (x-2)(x+2) = 0', 'x = 2']) === 'ok,ok' && st(['2x = 4 so 
 // e and π as numbers; a function value in front of a worked chain; a sign claim after it (owner, 19 November)
 {
   const sign = run(['b)(ii) a(2) = (4 - 8 + 2)e^(-2) = 2e^(-2) > 0 so the displacement is a maximum']);
-  ok(sign.lines[0].status === 'break' && /−0\.27/.test(sign.diagnosis.message), `the sign slip a competitor caught is crossed with both values (${sign.lines[0].status} · ${sign.diagnosis?.message})`);
+  ok(sign.lines[0].status === 'break' && /−0\.27/.test(plain(sign.diagnosis.message)), `the sign slip a competitor caught is crossed with both values (${sign.lines[0].status} · ${sign.diagnosis?.message})`);
   ok(st(['a(2) = (4 - 8 + 2)e^(-2) = -2e^(-2) < 0 so the displacement is a maximum']) === 'ok', 'the same line without the slip is ticked');
   ok(st(['a(2) = (4 - 8 + 2)e^(-2) = -2e^(-2) > 0 so it is a minimum']) === 'note', 'a true chain with a false sign claim after it is not ticked');
   ok(st(['e^0 = 1', 'π/2 + π/2 = π', '2π/2 = π', 'e^2 e^3 = e^5', 'f(2) = 3 + 4 = 7']) === 'ok,ok,ok,ok,ok', 'exact lines with e and π are ticked');
@@ -111,7 +120,7 @@ ok(st(['x^2 - 4 = 0 so (x-2)(x+2) = 0', 'x = 2']) === 'ok,ok' && st(['2x = 4 so 
 // a handwriting test a competitor marked line by line)
 {
   const page = run(['1/x + 1/y + 1/z = log 3 + log 2 + log 5', '= log (3 + 2 + 5) = log 10 = 1', 'so 10^1 = 10']);
-  ok(page.lines.map(l => l.status).join() === 'note,break,note' && /whether log means base 10 or base e/.test(page.diagnosis.message), `the wrong log law is crossed with the reason (${page.lines.map(l => l.status)} · ${page.diagnosis?.message})`);
+  ok(page.lines.map(l => l.status).join() === 'note,break,note' && /whether log means base 10 or base e/.test(plain(page.diagnosis.message)), `the wrong log law is crossed with the reason (${page.lines.map(l => l.status)} · ${page.diagnosis?.message})`);
   ok(st(['log 3 + log 2 + log 5 = log 30', 'ln 8 = 3 ln 2', 'log 8 = 3 log 2', 'ln 3 + ln 4 = ln 12', 'log (2 × 5) = log 2 + log 5']) === 'ok,ok,ok,ok,ok', 'log laws true in either base are ticked');
   ok(st(['ln 8 = 2 ln 3']) === 'break' && st(['log 2 + log 5 = log 7']) === 'break' && st(['ln 3 + ln 4 = ln 7']) === 'break', 'and false in either base are crossed');
   for (const f of ['log 100 = 2', 'log 2 + log 5 = 1', 'ln 100 = 2', 'log 10 = 1', 'log e = 1', 'log x = 2', 'log 2x = log 2 + log x', 'log 3.0 + log 2 = log 7', 'log_2 8 = 4', 'log 3^2 = 2 log 3', 'log 3! = log 5', 'ln 2 = 0.69', '2 log 3 = log 6']) ok(st([f]) !== 'break' || f === '2 log 3 = log 6', `true in one base only, or not read one way: never crossed: ${f} (${st([f])})`);
@@ -127,7 +136,7 @@ ok(st(['x^2 - 4 = 0 so (x-2)(x+2) = 0', 'x = 2']) === 'ok,ok' && st(['2x = 4 so 
   const LIVE = ['8 y = 2x(4 - x).', 'Area = ∫_0^4 2x(4 - x) dx ;', '= 2∫_0^4 4x - x^2 dx', '= 2[4x^2/2 - x^3/3]_0^4', '= 2[2x^2 - x^3/3]_0^4', '16/3 = 2[2(4)^2 - 4^3/3] = 2[32 - 64/3]', '= 64/3'];
   const live = run(LIVE);
   ok(live.firstBreak === -1 && live.lines.map(l => l.status).join() === 'note,note,ok,ok,ok,ok,ok', `nothing on the page is crossed and every worked line is ticked (${live.lines.map(l => l.status)})`);
-  ok(/64\/3/.test(live.lines[5].note) && /16\/3 in front of it was not read as part of the line/.test(live.lines[5].note) && !/21\.3/.test(JSON.stringify(live.lines)), `the tick says what was left out, and values are written as fractions (${live.lines[5].note})`);
+  ok(/64\/3/.test(plain(live.lines[5].note)) && /16\/3 in front of it was not read as part of the line/.test(plain(live.lines[5].note)) && !/21\.3/.test(JSON.stringify(live.lines)), `the tick says what was left out, and values are written as fractions (${live.lines[5].note})`);
   ok(st(['16/3 = 2[32 - 64/3]']) === 'note' && st(['14 = -20 - 6']) === 'note' && st(['7 = 5 + 1 = 6']) === 'note' && st(['5 = 2 + 3']) === 'ok', 'a bare number in front of worked expressions is never crossed; a true one is still ticked');
   ok(st(['-20 - 6 = 14']) === 'break' && st(['2 + 3 = 6']) === 'break' && st(['2[32 - 64/3] = 16/3']) === 'break', 'a worked expression set equal to a wrong value is still crossed');
   ok(st(['Area = 3 × 4', '= 12']) === 'note,ok' && st(['Volume = 2 + 2 = 5']) === 'break' && st(['Area = 12']) === 'note', 'a word in front of `=` is a label');
@@ -193,7 +202,7 @@ ok(stepEvidence(WITH, '4', '2x = 8\nx = 4', { correct: true }).stepReport?.arith
 { // a tick must not sit on the line that ends at the student's own wrong answer
   const QW = { answerType: 'numeric', answer: { value: 30 }, prompt: 'Find the value.', steps: [] };
   const wrong = stepEvidence(QW, '10', '2 + 3 = 5\nso 10^1 = 10', { correct: false }).stepReport;
-  ok(wrong.lines.map(l => l.status).join() === 'ok,note' && /was not accepted as the answer/.test(wrong.lines[1].note), `the line that ends at the wrong answer is a note that says so (${wrong.lines.map(l => l.status)})`);
+  ok(wrong.lines.map(l => l.status).join() === 'ok,note' && /was not accepted as the answer/.test(plain(wrong.lines[1].note)), `the line that ends at the wrong answer is a note that says so (${wrong.lines.map(l => l.status)})`);
   const right = stepEvidence(QW, '30', '5 × 6 = 30', { correct: true }).stepReport;
   ok(right.lines[0].status === 'ok', 'a line that ends at the right answer keeps its tick');
   // the typed answer is never parsed or evaluated for this note (CI's cost-of-marking guard caught an earlier version)
@@ -215,6 +224,298 @@ ok(!/consistent with the correct solution/.test(JSON.stringify(en[copy.key])) &&
 ok(typeof en['aw.body.arithmetic'] === 'string' && typeof hi['aw.body.arithmetic'] === 'string' && typeof en['mp.why.arithmetic'] === 'string' && typeof hi['mp.why.arithmetic'] === 'string' && hi['verdict.workingArithmetic'], 'the wording exists in both languages');
 const model = buildAnnotatedWorking({ stepReport: run(lines), lines });
 ok(model?.cards?.length === 2 && model.cards.every(c => c.status === 'checked' && c.valueChain === 'arithmetic'), `the marked page shows them as arithmetic ticks (${JSON.stringify(model?.cards?.map(c => [c.status, c.valueChain]))})`);
+
+// ── Part 4 · values in exact form, and comments as maths ─────────────────────
+{
+  const plainOf = v => exactForm(v).plain, texOf = v => exactForm(v).tex;
+  const cases = [[21.333333333333332, '64/3', '\\frac{64}{3}'], [-Math.sqrt(3), '−√3', '-\\sqrt{3}'], [Math.sqrt(3) / 2, '√3/2', '\\frac{\\sqrt{3}}{2}'],
+    [Math.PI / 3, 'π/3', '\\frac{\\pi}{3}'], [2 * Math.PI / 3, '2π/3', '\\frac{2\\pi}{3}'], [12 * Math.sqrt(3), '12√3', '12\\sqrt{3}'],
+    [-1.7320508, '−1.7321', '-1.7321'], [20.78461, '20.7846', '20.7846'], [7, '7', '7'], [-0, '0', '0'], [0.5, '1/2', '\\frac{1}{2}'], [-5 / 12, '−5/12', '-\\frac{5}{12}'],
+    [3 * Math.sqrt(2) / 2, '3√2/2', '\\frac{3\\sqrt{2}}{2}'], [Math.PI, 'π', '\\pi'], [-Math.PI / 2, '−π/2', '-\\frac{\\pi}{2}'], [Math.sqrt(2), '√2', '\\sqrt{2}'],
+    [Math.sqrt(0.5), '√2/2', '\\frac{\\sqrt{2}}{2}'], [1.4142, '1.4142', '1.4142'], [Math.sqrt(53), '7.2801', '7.2801'], [1 / 13, '0.0769', '0.0769']];
+  for (const [v, plainWant, texWant] of cases) ok(plainOf(v) === plainWant && texOf(v) === texWant, `exact form of ${v}: ${plainOf(v)} · ${texOf(v)}`);
+  // an exact form is only ever used when it reproduces the value
+  let wrongForm = 0;
+  for (let k = 0; k < 4000; k++) {
+    const v = (Math.sin(k * 12.9898) * 43758.5453 % 1) * 40 + (k % 7 ? 0 : 1) * k / 13;
+    const f = exactForm(v).plain.replace('−', '-');
+    const m = f.match(/^(-?)(\d*)(√(\d+)|π)?(?:\/(\d+))?$/);
+    if (!m) continue;
+    const num = m[3] ? (m[2] === '' ? 1 : +m[2]) * (m[3] === 'π' ? Math.PI : Math.sqrt(+m[4])) : +m[2];
+    const got = (m[1] ? -1 : 1) * num / (m[5] ? +m[5] : 1);
+    if (Math.abs(got - v) > 1e-4 * Math.max(1, Math.abs(v)) && !/\./.test(f)) wrongForm++;
+  }
+  ok(wrongForm === 0, `an exact form always reproduces its value (${wrongForm} wrong)`);
+  // a line of constants says what the plain-number path says
+  ok(plain(run(['2 + 3 = 5']).lines[0].note) === 'Both sides come to 5.', 'a line of constants: both sides come to the value');
+  const con = run(['3 × 4', '= 12', '= 12']);
+  ok(con.lines.every(l => !/for every value of the letters/.test(l.note || '')), 'no comment says "for every value of the letters" about constants');
+  ok(/^This equals the line above: 12\.$/.test(plain(con.lines[2].note || '')) , `a continuation of constants: this equals the line above (${con.lines[2].note})`);
+  const live = run(['16/3 = 2[2(4)^2 - 4^3/3]', '= 2[32 - 64/3]', '= 64/3']);
+  ok(live.lines.some(l => /\$\\frac\{\d+\}\{\d+\}\$/.test(l.note || '')), `a fraction in a comment is a stacked fraction in TeX (${live.lines.map(l => l.note)})`);
+  // every comment: dollars pair up, the TeX renders, and nothing is left as an engine's plain notation
+  const all = [...comments];
+  ok(all.length >= 30, `the test pages produced ${all.length} distinct comments`);
+  ok(all.every(dollarsBalanced), `every comment has balanced dollars (${all.filter(c => !dollarsBalanced(c)).join(' | ')})`);
+  const katex = (await import('katex')).default;
+  let spans = 0, bad = [];
+  for (const c of all) for (const m of c.matchAll(/(?<!\\)\$((?:\\\$|[^$])+?)(?<!\\)\$/g)) {
+    spans++;
+    try { katex.renderToString(m[1], { throwOnError: true, strict: 'error' }); } catch (e) { bad.push(`${m[1]} (${e.message})`); }
+  }
+  ok(spans >= 20 && bad.length === 0, `${spans} maths spans in comments all render in KaTeX (${bad.join(' | ')})`);
+  ok(all.every(c => !/[—–]/.test(c)), 'no comment contains a dash');
+}
+
+
+// ── Part 5 · words only: the rule a tick names, and "This simplifies to" ─────────
+// Owner, 19 November 2026 (a competitor's comments name the rule a step uses and say when an answer should be
+// simplified). Both are WORDS added to a comment. No line is ticked, crossed or left as a note because of them.
+{
+  // 5.0 no verdict moved: every page the sweeps above ran (24497 of them, every one of their lines' status and state,
+  // and where the first cross fell) hashes to the value recorded BEFORE these words were added.
+  ok(reportsSeen === 24497 && verdictHash.copy().digest('hex') === 'f2c42cfd16afc3e4e5cd6ab18e7dec53289d0d2e0f832cf84ffa05b7abce8ade', `no verdict changed across ${reportsSeen} pages (digest ${verdictHash.copy().digest('hex').slice(0, 12)})`);
+  // (placed after 5.0 so the pages it runs are not part of the recorded digest)
+  // independent review of the typesetting: a whole number with float noise is printed as that whole number
+  ok(!/144/.test(JSON.stringify(run(['6[4^2 - 2^2] = 6(16 - 4)', '= 72']).lines)) && !/\\frac\{\d+\}\{2\}\$\./.test(run(['0.1 + 0.2 + 71.7 = 72']).lines[0].note || ''), 'no value is printed as an unreduced fraction of a whole number');
+
+  // 5.1 the phrase for each rule is the working view's own label, lower-cased
+  const { RULE_PHRASES } = await import('../src/engine/arithmeticLines.js');
+  const { STEP_RULE_IDS } = await import('../src/engine/stepJustify.js');
+  for (const id of STEP_RULE_IDS) {
+    const key = 'aw.rule.' + id.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+    ok(typeof RULE_PHRASES[id] === 'string' && typeof en[key] === 'string' && RULE_PHRASES[id].replace(/^the /, '').toLowerCase() === en[key].toLowerCase(), `the phrase for ${id} is the label ${key}: "${RULE_PHRASES[id]}" / "${en[key]}"`);
+  }
+
+  // 5.2 A.1 a tick names the rule justifyStep proves for the two sides (or the older namer's fuller wording)
+  const SAME = 'Both sides are the same expression, written two ways.';
+  const named = [
+    ['sec(x) = 1/cos(x)', 'the reciprocal identity sec x = 1/cos x'], ['cosec(x) = 1/sin(x)', 'the reciprocal identity cosec x = 1/sin x'],
+    ['cot(x) = 1/tan(x)', 'the reciprocal identity cot x = 1/tan x'], ['tan(x) = sin(x)/cos(x)', 'the quotient identity'], ['cot(x) = cos(x)/sin(x)', 'the quotient identity'],
+    ['sin(2x) = 2sin(x)cos(x)', 'the double-angle formula for sine'], ['sin(a + b) = sin(a)cos(b) + cos(a)sin(b)', 'the compound-angle formula for sine'],
+    ['cos(a - b) = cos(a)cos(b) + sin(a)sin(b)', 'the compound-angle formula for cosine'], ['tan(a + b) = (tan(a) + tan(b))/(1 - tan(a)tan(b))', 'the compound-angle formula for tangent'],
+    ['1/x + 1/y = (x + y)/(xy)', 'writing as one fraction over a common denominator'], ['(a + b)/c = a/c + b/c', 'splitting a fraction'],
+    ['(a/b)/(c/d) = (a/b)(d/c)', 'dividing by a fraction (multiply by its reciprocal)'], ['(a/b)(c/d) = (ac)/(bd)', 'multiplying fractions'],
+    ['((x + 3)(x - 3))/(x - 3) = x + 3', 'cancelling a common factor'], ['(6x)/(3y) = (2x)/y', 'cancelling a common factor'],
+    ['2(x + 1) = 2x + 2', 'expanding brackets'], ['(x + 1)(x + 2) = x^2 + 3x + 2', 'expanding brackets'], ['x^2 + 3x = x(x + 3)', 'factorising'],
+    ['x^2 + 5x + 6 = (x + 2)(x + 3)', 'factorising'], ['(x + 3)(x - 3) = x^2 - 9', 'the difference of two squares'],
+    ['x^2 × x^3 = x^5', 'the index law: multiplying powers'], ['(x^2)^3 = x^6', 'the index law: power of a power'],
+    ['tan(x)cos(x) = sin(x)', 'the quotient identity and cancelling a common factor']];
+  for (const [line, name] of named) {
+    const r = run([line]);
+    ok(r.lines[0].status === 'ok' && plain(r.lines[0].note) === `${SAME} It matches ${name}.`, `names the step: ${line} (${plain(r.lines[0].note)})`);
+  }
+  // …and nothing is named where justifyStep and the older namer have nothing to say (the tick itself is unchanged)
+  for (const line of ['x + 1 = 1 + x', 'x^2 - 1 = x^2 - 1', '2x = x + x', 'x + y = y + x', 'a(b + c) = a(b + c)']) {
+    const r = run([line]);
+    ok(r.lines.every(l => !/It matches/.test(l.note || '')), `no rule is named for ${line} (${r.lines.map(l => plain(l.note || ''))})`);
+  }
+  // a step whose two sides are not the line above is not named from it: the continuation below is held to ITS source
+  { const r = run(['x^2 + 3x', '= x(x + 3)']);
+    ok(r.lines[1].status === 'ok' && /It matches factorising\.$/.test(plain(r.lines[1].note)) && !/It matches/.test(r.lines[0].note || ''), `a continuation is named from the line above (${r.lines.map(l => plain(l.note))})`); }
+
+  // 5.3 A.2 the rule behind a derivative tick, from the shape of the function the page defined
+  const D = "This is the derivative of ";
+  const derivs = [
+    [['y = cos(2x)', "y' = -2sin(2x)"], 'y = cos(2x), by the chain rule with the inner derivative 2.'],
+    [['y = (3x+1)^5', "y' = 15(3x+1)^4"], 'y = (3x + 1)^5, by the chain rule with the inner derivative 3.'],
+    [['y = ln(2x+5)', "y' = 2/(2x+5)"], 'y = ln(2x + 5), by the chain rule with the inner derivative 2.'],
+    [['y = sin(x/3)', "y' = cos(x/3)/3"], 'y = sin(x/3), by the chain rule with the inner derivative 1/3.'],
+    [['y = (1-2x)^3', "y' = -6(1-2x)^2"], 'y = (1 - 2x)^3, by the chain rule with the inner derivative −2.'],
+    [['y = (x/4+1)^2', "y' = (x/4+1)/2"], 'y = (x/4 + 1)^2, by the chain rule with the inner derivative 1/4.'],
+    [['y = 3sin(2x)', "y' = 6cos(2x)"], 'y = 3sin(2x), by the chain rule with the inner derivative 2.'],
+    [['y = e^(2x)', "y' = 2*e^(2x)"], 'y = e^(2x), by the chain rule with the inner derivative 2.'],
+    [['y = e^(-3t^2)', "y' = -6t*e^(-3t^2)"], 'y = e^{-3t^2}, by the chain rule.'],
+    [['y = (x^2+1)^3', "y' = 6x(x^2+1)^2"], 'y = (x^2 + 1)^3, by the chain rule.'],
+    [['y = sin(x)^2', "y' = 2sin(x)cos(x)"], 'y = sin(x)^2, by the chain rule.'],
+    [['y = cos(x+1)', "y' = -sin(x+1)"], 'y = cos(x + 1), by the chain rule.'],
+    [['y = sin(x^2)', "y' = 2x cos(x^2)"], 'y = sin(x^2), by the chain rule.'],
+    [['u = x^2 - 4x + 1', "u' = 2x - 4"], 'u = x^2 - 4x + 1, by the power rule.'],
+    [['y = x^3 + 2x', "y' = 3x^2 + 2"], 'y = x^3 + 2x, by the power rule.'],
+    [['y = 5x^4 - x^2', "y' = 20x^3 - 2x"], 'y = 5x^4 - x^2, by the power rule.'],
+    [['y = 3x^2', "y' = 6x"], 'y = 3x^2, by the power rule.'],
+    [['y = x^2', "y' = 2x"], 'y = x^2, by the power rule.'],
+    [['y = -x^3', "y' = -3x^2"], 'y = -x^3, by the power rule.'],
+    [['y = x^2/3', "y' = 2x/3"], 'y = \\frac{x^2}{3}, by the power rule.'],
+    [['f(x) = x^3 - 3x', "f'(x) = 3x^2 - 3"], 'f = x^3 - 3x, by the power rule.'],
+    [['y = x^2 sin(x)', "y' = 2x sin(x) + x^2 cos(x)"], 'y = x^2 sin(x), by the product rule.'],
+    [['y = x e^(2x)', "y' = e^(2x) + 2x*e^(2x)"], 'y = xe^(2x), by the product rule.'],
+    [['y = x^2 cos(x)', "y' = 2x cos(x) - x^2 sin(x)"], 'y = x^2 cos(x), by the product rule.'],
+    [['y = (x+1)(x+2)', "y' = 2x + 3"], 'y = (x + 1)(x + 2), by the product rule.'],
+    [['y = x/(x+1)', "y' = 1/(x+1)^2"], 'y = x/(x + 1), by the quotient rule.'],
+    [['y = (x^2)/(x+3)', "y' = (x^2+6x)/(x+3)^2"], 'y = \\frac{x^2}{x + 3}, by the quotient rule.'],
+    [['y = (x+2)/(x+5)', "y' = 3/(x+5)^2"], 'y = (x + 2)/(x + 5), by the quotient rule.']];
+  for (const [page, tail] of derivs) {
+    const r = run(page);
+    ok(r.firstBreak === -1 && r.lines.map(l => l.status).join() === 'note,ok' && plain(r.lines[1].note) === D + tail, `names the rule: ${page.join(' ; ')} (${plain(r.lines[1].note || '')})`);
+  }
+  // the raw comment keeps the maths as TeX the client typesets
+  ok(run(['y = cos(2x)', "y' = -2sin(2x)"]).lines[1].note === "This is the derivative of $y = \\cos\\left(2x\\right)$, by the chain rule with the inner derivative $2$.", `the chain-rule comment is TeX (${run(['y = cos(2x)', "y' = -2sin(2x)"]).lines[1].note})`);
+  ok(run(['y = sin(x/3)', "y' = cos(x/3)/3"]).lines[1].note.endsWith('with the inner derivative $\\frac{1}{3}$.'), 'a fractional inner derivative is a stacked fraction');
+
+  // 5.4 nothing is named: elementary derivatives, a constant times a function, sums, mixtures, three factors, a constant
+  // numerator, implicit functions, a definition that is not the source, a page that moved to a new part
+  const none = [
+    [['y = sin(x)', "y' = cos(x)"], 'y = sin(x).'], [['y = cos(x)', "y' = -sin(x)"], 'y = cos(x).'], [['y = e^x', "y' = e^x"], 'y = e^x.'],
+    [['y = 2^x', "y' = 2^x*ln(2)"], 'y = 2^x.'], [['y = 1/x', "y' = -1/x^2"], 'y = 1/x.'], [['y = 1/(x+5)', "y' = -1/(x+5)^2"], 'y = 1/(x + 5).'],
+    [['y = x^2 + sin(x)', "y' = 2x + cos(x)"], 'y = x^2 + sin(x).'], [['y = sin(x) + cos(x)', "y' = cos(x) - sin(x)"], 'y = sin(x) + cos(x).'],
+    [['y = 3x', "y' = 3"], 'y = 3x.'], [['y = 3x + 2', "y' = 3"], 'y = 3x + 2.'], [['y = x', "y' = 1"], 'y = x.'],
+    [['y = x^2 + (3x+1)^5', "y' = 2x + 15(3x+1)^4"], 'y = x^2 + (3x + 1)^5.'], [['y = x sin(x) cos(x)', "y' = sin(x)cos(x) + x cos(x)^2 - x sin(x)^2"], 'y = xsin(x)cos(x).'],
+    [['y = 3sin(x)', "y' = 3cos(x)"], 'y = 3sin(x).'], [['y = x^2 e^x sin(x)', "y' = 2x e^x sin(x) + x^2 e^x sin(x) + x^2 e^x cos(x)"], 'y = x^2e^xsin(x).']];
+  for (const [page, tail] of none) {
+    const r = run(page);
+    ok(r.lines[1].status === 'ok' && plain(r.lines[1].note) === D + tail && !/rule|inner derivative/.test(r.lines[1].note), `names nothing: ${page.join(' ; ')} (${plain(r.lines[1].note || '')})`);
+  }
+  // no tick, so no rule: a definition by another letter, a different part, a wrong claim, an implicit relation, a pair the engine does not read
+  const unticked = [
+    ['u = x^2 + 1', 'y = u^3', "y' = 6x(x^2+1)^2"], ['u = 2x + 1', 'y = u^3', "y' = 6(2x+1)^2"], ['y = x^2', "z' = 2x"], ['y = x^2', "y' = 3x^2"], ['y = x^2', "y' = 2x + 1"],
+    ['y = cos(2x)', '(b) Find y\'', "y' = -2sin(2x)"], ['x^2 + y^2 = 25', '2x + 2y y\' = 0'], ['x^2 + y^2 = 25', "y' = -x/y"], ['y = x^x', "y' = x^x(ln(x)+1)"],
+    ['y = sqrt(x)', "y' = 1/(2sqrt(x))"], ['y = 5', "y' = 0"]];
+  for (const page of unticked) {
+    const r = run(page);
+    ok(r.lines.every(l => !/rule|inner derivative|It matches/.test(plain(l.note || ''))), `no rule where nothing is ticked: ${page.join(' ; ')} (${r.lines.map(l => l.status)})`);
+  }
+  // a function defined with another letter's value put in is not named (the page shows u^3, not the expansion)
+  ok(!/rule/.test(plain(run(['u = x^2 + 1', 'y = u^3', "y' = 6x(x^2+1)^2"]).lines.map(l => l.note).join(' '))), 'y = u^3 is not named from the function it expands to');
+
+  // 5.5 A.3 supplementary and exact-value trig steps are named only where justifyStep names them: it names neither
+  for (const page of [['cos(π - x) = -cos(x)'], ['sin(π - x) = sin(x)'], ['sin(π/6) = 1/2'], ['cos(π/3) = sin(π/6)']]) {
+    const r = run(page);
+    ok(r.lines.every(l => !/It matches/.test(l.note || '')), `no supplementary or exact-value rule is invented: ${page[0]}`);
+  }
+
+  // 5.6 B.1 "This simplifies to": the last ticked line of a page with no cross, when its last side is a worked expression
+  const S = ' This simplifies to ';
+  const simp = [
+    [['16/3 = 2[2(4)^2 - 4^3/3]', '= 2[32 - 64/3]'], '64/3'], [['12 × 6 = 6 × 12'], '72'], [['-√3 = -2 × √3/2'], '−√3'], [['12√3 = 12e^(ln(3)/2)'], '12√3'],
+    [['3/2 = 6/4'], '3/2'], [['6/4 = 6/4'], '3/2'], [['2 + 3 + 4 = 9 = 3 × 3'], '9'], [['6√3 = 2√3 × 3'], '6√3'], [['2√3 = √12'], '2√3'], [['100 - 36 = 64 = 2^6'], '64'],
+    [['1/2 + 1/3 = 5/6 = 10/12'], '5/6'], [['√2 × √2 = 2 × 1'], '2'], [['3 × (4 + 5) = 3 × 9'], '27'], [['72 = 6 × 12', 'x = 3'], '72'], [['-3/4 = -6/8'], '−3/4'],
+    [['2/3 + 1/3 = 3/3'], '1'], [['5! = 5 × 24'], '120'], [['4 × 5 = 20', '= 2 × 10'], '20'], [['-12/8 = -3/2 = -12/8'], '−3/2'], [['√2/2 = 1/√2'], '√2/2']];
+  for (const [page, x] of simp) {
+    const r = run(page), ticked = r.lines.map((l, k) => (l.status === 'ok' ? k : -1)).filter(k => k >= 0), last = r.lines[ticked[ticked.length - 1]];
+    ok(r.firstBreak === -1 && plain(last.note).endsWith(' Give the final answer in that simplified form.') && plain(last.note).includes(x), `the value ${x} is stated once, then the answer is asked for in that form: ${page.join(' ; ')} (${plain(last ? last.note : '')})`);
+    ok(r.lines.filter(l => /Give the final answer/.test(l.note || '')).length === 1 && r.lines.every(l => !/simplifies/.test(l.note || '')), `only the last ticked line is asked to simplify: ${page.join(' ; ')}`);
+  }
+  // the TeX is the exact form the formatter gives
+  ok(run(['16/3 = 2[2(4)^2 - 4^3/3]', '= 2[32 - 64/3]']).lines[1].note === 'This equals the line above: $\\frac{64}{3}$. Give the final answer in that simplified form.', 'a fraction is stated once, stacked, then the prompt');
+  ok(run(['12√3 = 12e^(ln(3)/2)']).lines[0].note === 'Both sides come to $12\\sqrt{3}$. Give the final answer in that simplified form.', 'a surd is stated once, typeset, then the prompt');
+  ok(run(['6/4 = 6/4']).lines[0].note === 'Both sides come to $\\frac{3}{2}$. Give the final answer in that simplified form.', 'a fraction not in lowest terms is stated reduced, then the prompt');
+  // already one value, a decimal, only a rounded decimal available, an earlier line, a page with a cross, nothing ticked: no sentence
+  const single = [['2 + 3 = 5'], ['3 × 4 = 12'], ['6/4 = 3/2'], ['√12 = 2√3'], ['2√3 × 3 = 6√3'], ['3/2 = 1.5'], ['-3/4 = -0.75'], ['196 + 64 = 260', '= 260'], ['2√65 = √(4 × 65)'],
+    ['5! = 120'], ['-3^2 = -9'], ['(-3)^2 = 9'], ['1/2 + 1/3 = 5/6'], ['72 = 6 × 12', '= 72'], ['12 × 6 = 6 × 12 = 73'], ['2 + 2 = 5', '3 + 3 = 6'], ['√3/2 = √3/2'], ['7 = 7'],
+    ['3 × 4 = 12', '= 12'], ['2π = 2π'], ['-√3/2 = -√3/2'], ['6/3 = 2'], ['10/4 = 5/2'], ['sqrt(3)/2 = (√3)/2'], ['e^2 = e^2'], ['20.78 = 20.78']];
+  for (const page of single) {
+    const r = run(page);
+    ok(r.lines.every(l => !/simplifies|Give the final answer/.test(l.note || '')), `no "simplify" sentence: ${page.join(' ; ')} (${r.lines.map(l => plain(l.note || ''))})`);
+  }
+  // an earlier unsimplified line does not get it when a later line is ticked
+  { const r = run(['72 = 6 × 12', '= 72']); ok(r.lines[0].status === 'ok' && !/simplifies/.test(r.lines[0].note), 'only the LAST ticked line speaks'); }
+  // the exact form of a value that arithmetic reached with rounding noise is the whole number
+  ok(exactForm(Math.sqrt(2) * Math.sqrt(2)).plain === '2' && exactForm(2.0000000000000004).tex === '2' && exactForm(-3.0000000000000004).plain === '−3', 'rounding noise on a whole number is that whole number');
+  // 5.7 a name that states a DIRECTION is used only when the two sides show it (independent review: a difference of two
+  // squares written as a product was said to be "expanding brackets"). Both sides bracketed, neither, or a mixed move
+  // (partial expansion, regrouping, completing the square either way) are named nothing; every comment below is exact.
+  const BOTH = 'Both sides are the same expression, written two ways.';
+  const direction = [
+    ["(x+1)^2 - (x-1)^2 = ((x+1)-(x-1))((x+1)+(x-1))", "Both sides are the same expression, written two ways."],
+    ["x^2 - 4 = (x-2)^2 + 4x - 8", "Both sides are the same expression, written two ways."],
+    ["x^2 + 6x + 5 = (x+3)^2 - 4", "Both sides are the same expression, written two ways."],
+    ["(x+3)^2 - 4 = (x+1)(x+5)", "Both sides are the same expression, written two ways."],
+    ["2(x+1) + 3(x+1) = 5(x+1)", "Both sides are the same expression, written two ways."],
+    ["(x+1)(x+2) + (x+1) = (x+1)(x+3)", "Both sides are the same expression, written two ways."],
+    ["x(x+1) = x^2 + x", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["x^2 + x = x(x+1)", "Both sides are the same expression, written two ways. It matches factorising."],
+    ["(x+1)^2 = (x+1)(x+1)", "Both sides are the same expression, written two ways."],
+    ["(x+1)(x+1) = (x+1)^2", "Both sides are the same expression, written two ways. It matches the index law: multiplying powers."],
+    ["(x+2)(x+3) = (x+3)(x+2)", "Both sides are the same expression, written two ways."],
+    ["2(x+1) = 2(1+x)", "Both sides are the same expression, written two ways."],
+    ["(x+1)^2 = (1+x)^2", "Both sides are the same expression, written two ways."],
+    ["(x+1)^2 = x^2 + 2x + 1", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["x^2 + 2x + 1 = (x+1)^2", "Both sides are the same expression, written two ways. It matches factorising."],
+    ["x^2 - 6x + 9 = (x-3)^2", "Both sides are the same expression, written two ways. It matches factorising."],
+    ["(x-3)^2 = x^2 - 6x + 9", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["(2x+1)(x-1) = 2x^2 - x - 1", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["2x^2 - x - 1 = (2x+1)(x-1)", "Both sides are the same expression, written two ways. It matches factorising."],
+    ["x^2 + 2x + 1 = x^2 + 2x + 1", "Both sides are the same expression, written two ways."],
+    ["x + x = 2x", "Both sides are the same expression, written two ways."],
+    ["2x = x + x", "Both sides are the same expression, written two ways."],
+    ["3(x+2) - 3x = 6", "Both sides come to 6."],
+    ["x^2 - 1 = (x-1)(x+1)", "Both sides are the same expression, written two ways. It matches the difference of two squares."],
+    ["(x-1)(x+1) = x^2 - 1", "Both sides are the same expression, written two ways. It matches the difference of two squares."],
+    ["x^4 - 1 = (x^2-1)(x^2+1)", "Both sides are the same expression, written two ways. It matches the difference of two squares."],
+    ["(x^2-1)(x^2+1) = x^4 - 1", "Both sides are the same expression, written two ways. It matches the difference of two squares."],
+    ["(x+1)^2 - 1 = x^2 + 2x", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["x^2 + 2x = (x+1)^2 - 1", "Both sides are the same expression, written two ways."],
+    ["(x+1)(x+2)(x+3) = (x^2+3x+2)(x+3)", "Both sides are the same expression, written two ways."],
+    ["(x^2+3x+2)(x+3) = (x+1)(x+2)(x+3)", "Both sides are the same expression, written two ways."],
+    ["(x+1)^2 + (x-1)^2 = 2x^2 + 2", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["2x^2 + 2 = (x+1)^2 + (x-1)^2", "Both sides are the same expression, written two ways."],
+    ["(a+b)^2 - (a-b)^2 = 4ab", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["4ab = (a+b)^2 - (a-b)^2", "Both sides are the same expression, written two ways."],
+    ["(a+b)(a-b) = a^2 - b^2", "Both sides are the same expression, written two ways. It matches the difference of two squares."],
+    ["a^2 - b^2 = (a+b)(a-b)", "Both sides are the same expression, written two ways. It matches the difference of two squares."],
+    ["(x+1)^2 - (x+2)^2 = -2x - 3", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["(x+1)^3 = x^3 + 3x^2 + 3x + 1", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["x^3 + 3x^2 + 3x + 1 = (x+1)^3", "Both sides are the same expression, written two ways. It matches factorising."],
+    ["x(x+1) + x = x(x+2)", "Both sides are the same expression, written two ways."],
+    ["x(x+2) = x(x+1) + x", "Both sides are the same expression, written two ways."],
+    ["x^2 + x + x + 1 = x(x+1) + (x+1)", "Both sides are the same expression, written two ways."],
+    ["x(x+1) + (x+1) = (x+1)^2", "Both sides are the same expression, written two ways."],
+    ["(x+1)^2 = x(x+1) + (x+1)", "Both sides are the same expression, written two ways."],
+    ["3(x+1) = 3x + 3", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["3x + 3 = 3(x+1)", "Both sides are the same expression, written two ways. It matches factorising."],
+    ["(2(x+1)) = 2x + 2", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["x(x-1) - (x-1) = (x-1)^2", "Both sides are the same expression, written two ways."],
+    ["(x-1)^2 = x^2 - 2x + 1", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["x^2 - 5x + 6 = (x-2)(x-3)", "Both sides are the same expression, written two ways. It matches factorising."],
+    ["(x-2)(x-3) = x^2 - 5x + 6", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["(x+5)(x-5) + 25 = x^2", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["x^2 = (x+5)(x-5) + 25", "Both sides are the same expression, written two ways."],
+    ["x^2 - 9 + 9 = x^2", "Both sides are the same expression, written two ways."],
+    ["(x+1)^2 - x^2 = 2x + 1", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["2x + 1 = (x+1)^2 - x^2", "Both sides are the same expression, written two ways."],
+    ["(x+1)^2 - (x-1)^2 = 4x", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["4x = (x+1)^2 - (x-1)^2", "Both sides are the same expression, written two ways."],
+    ["(x+2)^2 - 4 = x^2 + 4x", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["x^2 + 4x = (x+2)^2 - 4", "Both sides are the same expression, written two ways."],
+    ["x^2 + 4x = x(x+4)", "Both sides are the same expression, written two ways. It matches factorising."],
+    ["x(x+4) = x^2 + 4x", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["(x+1)/(x+1) = 1", "Both sides come to 1."],
+    ["(x^2-1)/(x-1) = x+1", "Both sides are the same expression, written two ways."],
+    ["2(x+1) + 3(x+1) = 5x + 5", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["5x + 5 = 2(x+1) + 3(x+1)", "Both sides are the same expression, written two ways."],
+    ["(x+1)(x-1) + 1 = x^2", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["x^2 = (x+1)(x-1) + 1", "Both sides are the same expression, written two ways."],
+    ["(x+3)^2 = (x+3)(x+3)", "Both sides are the same expression, written two ways."],
+    ["x^2 + 7x + 12 = (x+3)(x+4)", "Both sides are the same expression, written two ways. It matches factorising."],
+    ["(x+3)(x+4) = x^2 + 7x + 12", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["(2x)^2 = 4x^2", "Both sides are the same expression, written two ways."],
+    ["4x^2 = (2x)^2", "Both sides are the same expression, written two ways."],
+    ["(x-1)(x+1) - (x^2 - 1) = 0", "Both sides come to 0."],
+    ["(x+2)^2 - (x-2)^2 = 8x", "Both sides are the same expression, written two ways. It matches expanding brackets."],
+    ["8x = (x+2)^2 - (x-2)^2", "Both sides are the same expression, written two ways."],
+    ["(x+2)^2 - (x-2)^2 = ((x+2)-(x-2))((x+2)+(x-2))", "Both sides are the same expression, written two ways."],
+    ["((x+2)-(x-2))((x+2)+(x-2)) = (x+2)^2 - (x-2)^2", "Both sides are the same expression, written two ways."],
+    ["x^2 + 1 - 1 = x^2", "Both sides are the same expression, written two ways."],
+    ["(x+1)^2 - (x+1) = (x+1)x", "Both sides are the same expression, written two ways."]];
+  for (const [line, want] of direction) {
+    const r = run([line]);
+    ok(r.lines[0].status === 'ok' && plain(r.lines[0].note) === want, `direction: ${line} (${plain(r.lines[0].note || '')})`);
+  }
+  ok(direction.length >= 60, `${direction.length} direction pairs`);
+  ok(direction.filter(([, w]) => w === BOTH).length >= 25 && !direction.some(([l, w]) => /^\(x\+1\)\^2 - \(x-1\)\^2 = \(\(/.test(l) && /expanding/.test(w)), 'the reviewer\'s page is named nothing');
+  // a continuation is held to the same direction
+  { const r = run(['x(x+1)', '= x^2 + x', '= x(x+1)']); ok(/expanding brackets\.$/.test(plain(r.lines[1].note)) && /factorising\.$/.test(plain(r.lines[2].note)), `a chain: expanded then factorised (${r.lines.map(l => plain(l.note || ''))})`); }
+  // the value the comment has just stated is not stated twice: the student is asked for the answer in that form
+  { const r = run(['12', '= 24/2']); ok(r.lines[1].status === 'ok' && plain(r.lines[1].note) === 'This equals the line above: 12. Give the final answer in that simplified form.', `= 24/2 under = 12 (${r.lines.map(l => plain(l.note || ''))})`); }
+  ok(plain(run(['2 = 4/2']).lines[0].note) === 'Both sides come to 2. Give the final answer in that simplified form.', '2 = 4/2 states the value once, then the prompt');
+
+  // every comment this part produced typesets: dollars pair up, the TeX renders, no dash
+  { const katex = (await import('katex')).default; const mine = [...comments].filter(c => /simplifies|rule|It matches/.test(c));
+    let spans = 0, bad = [];
+    for (const c of mine) for (const m of c.matchAll(/(?<!\\)\$((?:\\\$|[^$])+?)(?<!\\)\$/g)) { spans++; try { katex.renderToString(m[1], { throwOnError: true, strict: 'error' }); } catch (e) { bad.push(`${m[1]} (${e.message})`); } }
+    ok(mine.length >= 60 && mine.every(dollarsBalanced) && mine.every(c => !/[—–]/.test(c) && !/\byou\b/i.test(c)) && spans >= 20 && bad.length === 0, `${mine.length} new comments, ${spans} maths spans: balanced, render, no dash, no "you" (${bad.join(' | ')})`); }
+}
 
 console.log(`ARITHMETIC LINES: ${fail ? 'FAIL' : 'PASS'} — ${pass}/${pass + fail} checks — false arithmetic crossed, true arithmetic ticked as arithmetic only, no mark from it`);
 if (fail) process.exit(1);

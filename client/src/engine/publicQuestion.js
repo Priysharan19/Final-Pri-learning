@@ -7,7 +7,9 @@ export const PUBLIC_QUESTION_FIELDS = Object.freeze([
   'prompt', 'answerType', 'options', 'mcqOptions', 'inputHint', 'answerPrefix', 'answerSuffix',
   'hints', 'pyq', 'pyqSource', 'pyqYear', 'pyqExam', 'archive',
   'subtopic', 'difficulty', 'dotpoint', 'dotpoints', 'dotpointRequested', 'dotpointExact',
-  'contentId', 'contentVersion', 'contentHash', 'figure'
+  'contentId', 'contentVersion', 'contentHash', 'figure',
+  // A graph-sketch question: WHICH features the answer form asks for (never their values).
+  'sketchAsk'
 ]);
 
 export function publicQuestionFields(q) {

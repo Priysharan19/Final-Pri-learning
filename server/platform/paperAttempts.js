@@ -99,6 +99,10 @@ async function readRow(db, accountId, scope, key, now) {
  */
 export function mountPaperAttempts(router, db, ctx) {
   const { offered, byId, docs, dir, capability } = ctx;
+  // Generated practice sets (papers.js): sat like any paper, but never a source of re-test parts and never given a plan.
+  const retestDocs = ctx.retestDocs || docs;
+  const practiceIds = ctx.practiceIds || new Set();
+  const practiceSubtopics = ctx.practiceSubtopics || {};
   const clock = ctx.now || (() => Date.now());
   const transcribe = ctx.transcribe || transcribeHandwriting;
   const env = ctx.env || process.env;
@@ -181,11 +185,22 @@ export function mountPaperAttempts(router, db, ctx) {
     if (!offered) return refuse(res, 404, 'PAPERS_NOT_AVAILABLE', 'No practice papers are offered here.');
     const subtopic = String(req.params.subtopic || '');
     const outcomes = SUBTOPIC_OUTCOMES[subtopic];
-    if (!outcomes) return res.json({ subtopic, questions: [] });
+    const practiceOutcomes = Object.hasOwn(practiceSubtopics, subtopic) ? practiceSubtopics[subtopic] : null;
+    if (!outcomes && !practiceOutcomes) return res.json({ subtopic, questions: [] });
     const premium = await ctx.isPremium(req.platformSession.account_id);
     const out = [];
+    const sets = [];
     for (const doc of docs.values()) {
       const entry = byId.get(doc.id);
+      // The generated practice sets: every question whose parts carry one of the chapter's outcomes; free (the entry is a sample).
+      if (practiceIds.has(doc.id)) {
+        for (const q of doc.sections.flatMap(sec => sec.questions)) {
+          const hit = leafPartsOf(q).filter(p => (p.classification?.outcomes || []).some(o => (practiceOutcomes || []).includes(o)));
+          if (hit.length) sets.push({ paperId: doc.id, paperNumber: doc.paperNumber, title: doc.title, question: q.number, marks: q.marks, matchingParts: hit.map(p => p.id), generated: true, locked: false });
+        }
+        continue;
+      }
+      if (!outcomes) continue;
       for (const q of doc.sections.find(sec => sec.id === 'II')?.questions || []) {
         const hit = leafPartsOf(q).filter(p => (p.classification?.outcomes || []).some(o => outcomes.includes(o)));
         if (!hit.length) continue;
@@ -194,7 +209,9 @@ export function mountPaperAttempts(router, db, ctx) {
       }
     }
     out.sort((a, b) => Number(a.locked) - Number(b.locked) || a.paperNumber - b.paperNumber || a.question - b.question);
-    return res.json({ subtopic, questions: out.slice(0, 12) });
+    sets.sort((a, b) => a.paperNumber - b.paperNumber || a.question - b.question);
+    // At most four generated questions (one per set), then the authored papers' questions: neither crowds the other out of the twelve.
+    return res.json({ subtopic, questions: [...sets.slice(0, 4), ...out].slice(0, 12) });
   });
 
   // ── List ───────────────────────────────────────────────────────────────────
@@ -415,6 +432,7 @@ export function mountPaperAttempts(router, db, ctx) {
     const s = await sitting(req, res);
     if (!s) return null;
     if (!s.result) { refuse(res, 409, 'PAPER_NOT_SUBMITTED', 'The plan is made from a submitted sitting.'); return null; }
+    if (practiceIds.has(s.sit.paperId)) { refuse(res, 409, 'PAPER_PLAN_UNAVAILABLE', 'A practice set has no plan or re-test; the chapter practice is the next step.'); return null; }
     if (!(await ctx.isPremium(s.accountId))) { premiumRefusal(res, capability); return null; }
     return s;
   };
@@ -423,7 +441,7 @@ export function mountPaperAttempts(router, db, ctx) {
     if (!s) return undefined;
     const plan = buildPlan(s.doc, s.result);
     const sat = await sittingPapers(s.accountId, s.now);
-    const retest = buildRetest(docs, plan.items, sat);
+    const retest = buildRetest(retestDocs, plan.items, sat);
     return res.json({ attemptId: s.id, ...plan, retest: { parts: retest.parts.length, marks: retest.marks, fallbacks: retest.fallbacks },
       limits: 'Only parts the engine marks are counted. This is a list of topics to practise, not a prediction of any mark.' });
   });
@@ -433,7 +451,7 @@ export function mountPaperAttempts(router, db, ctx) {
     if (s.sit.retest) return refuse(res, 409, 'PAPER_RETEST_OF_RETEST', 'Make a re-test from a paper sitting.');
     const plan = buildPlan(s.doc, s.result);
     const sat = await sittingPapers(s.accountId, s.now);
-    const built = buildRetest(docs, plan.items, sat);
+    const built = buildRetest(retestDocs, plan.items, sat);
     if (!built.parts.length) return refuse(res, 409, 'PAPER_RETEST_EMPTY', 'No unseen paper part covers these topics on its own. Use the practice plan.', { fallbacks: built.fallbacks });
     const out = await db.transaction(async () => {
       const rows = await db.all("SELECT key,response_json FROM idempotency_keys WHERE account_id=? AND scope='paper-sitting' AND expires_at>?", [s.accountId, s.now]);

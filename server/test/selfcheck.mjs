@@ -377,6 +377,8 @@ function answerForms(q) {
   };
   declare('canonicalInput', a.canonicalInput);
   switch (q.answerType) {
+    // A graph-sketch answer is a feature set (graphFeatures.js); the keyed set, as the form submits it, must be marked right.
+    case 'graph-sketch': declare('key', a.key ? JSON.stringify(a.key) : undefined); break;
     case 'numeric': {
       if (a.surdForm) declare('surdForm', `${a.surdForm.k === 1 ? '' : a.surdForm.k === -1 ? '-' : a.surdForm.k}sqrt(${a.surdForm.r})`);
       if (a.simplestFraction) declare('simplestFraction', `${a.simplestFraction.n}/${a.simplestFraction.d}`);
