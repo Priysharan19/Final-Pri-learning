@@ -15,7 +15,7 @@
 // image ships — see Dockerfile and production-runtime-image-check.mjs). It
 // must never import a server module: the worker has no store and no secrets.
 import { derivedMetaOff } from '../../client/src/engine/derivedMetaOff.js';
-import { checkAnswer, stepCheck, methodMarks } from '../../client/src/engine/checker.js';
+import { checkAnswer, stepCheck, methodMarks, claimFreeReport } from '../../client/src/engine/checker.js';
 import { markObjective, markMultiCorrect } from '../../client/src/engine/indiaExams.js';
 import { markMatrixMatch } from '../../client/src/engine/matrixMatch.js';
 import { markGraphSketch, readFeatureSet, sketchMethodCredit, sketchVerdicts } from '../../client/src/engine/graphFeatures.js';
@@ -181,6 +181,15 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
   // (matchBoardPoints). A right answer with junk, repeated or no working is
   // worth the answer point alone, never the printed marks (D25 delta review).
   const board = Array.isArray(q.boardScheme) ? boardAward(q, meta, report, result.correct === true) : null;
+  // Feedback only, after every mark: the topic check's CROSS on a definition, a label or a bare margin number is shown as a note,
+  // and the lines after it are judged as if it were absent (checker.claimFreeReport). Every mark, `correct`, method mark and
+  // board tick above was computed from the report the topic check made, unchanged. `opts.claims === false` is the test switch.
+  if (meta && steps && typeof steps === 'string' && report && report.arithmetic !== true && !(opts && opts.claims === false)) {
+    try {
+      const shown = claimFreeReport(meta, steps, { prompt: q.prompt }, report);
+      if (shown !== report) { report = shown; }
+    } catch { /* the report stands */ }
+  }
   // An arithmetic report keeps to arithmetic: no milestone tick is added to it, so its wording stays true of every tick.
   try { if (report && report.arithmetic !== true) report = annotateMilestones(q, report); } catch { /* the report stands */ }
   // Feedback only (see foldTrueAsWritten): after every mark above, so no mark, partial or milestone reads it.

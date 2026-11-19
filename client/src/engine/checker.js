@@ -2454,16 +2454,13 @@ function stepCheckPlan(meta, workingText) {
  * saw it: with it, a line about a second unknown is checked against the
  * equations the question gives; without it, such a line is a note.
  */
-/** Test-only: the rule below can be switched off to compare with the previous behaviour. Always on in production. */
-export const claimRule = { on: true };
 export function stepCheck(meta, workingText, options = null) {
-  const run = (text) => withEvaluationBudget(EVALUATION_BUDGET, () => nameChangedTerm(stepCheckWithinBudget(meta, text, options)));
-  const report = run(workingText);
-  if (!claimRule.on) return report;   // test-only switch (client/test/topic-claims-identity-check.mjs): the report as it was before the rule below
-  try { return notClaims(meta, workingText, options, report, run); } catch { return report; }
+  return withEvaluationBudget(EVALUATION_BUDGET, () => nameChangedTerm(stepCheckWithinBudget(meta, workingText, options)));
 }
 
 // ── A definition, a label or a margin number is not a claim (owner, 20 November 2026) ────────────────────────────
+// FEEDBACK LAYER ONLY. `stepCheck` above is what every mark, correctness decision, method mark and board tick reads, and it
+// is unchanged. This is applied to the report that is DISPLAYED, after all marks are computed (markerOps.stepEvidence).
 // Live: on `Find ∫20x^4 dx` the line `y = 2x(4 - x)` (the student's own name for the curve) was crossed by the
 // antiderivative check, and a margin number `16/3` on its own line was crossed. Owner's rule: a definition or side
 // formula is never crossed; a bare number is not a claim. A topic checker's CROSS on such a line is therefore a note,
@@ -2503,6 +2500,12 @@ function notAClaim(text, names, words) {
   // a word label (`Area = …`) is the student's own unless the question or its check uses that word (`max = 17`, `period = …`)
   return /^[A-Za-z]+$/.test(head) && !NOT_LABELS.test(head) && head.length >= 3 && !(words && words.test(head)) ? A_NOTE : null;
 }
+/** The displayed report: the topic report with its crossed definitions, labels and bare numbers as notes. One evaluation budget. */
+export function claimFreeReport(meta, workingText, options, report) {
+  try {
+    return withEvaluationBudget(EVALUATION_BUDGET, () => notClaims(meta, workingText, options, report, text => nameChangedTerm(stepCheckWithinBudget(meta, text, options))));
+  } catch { return report; }
+}
 function notClaims(meta, workingText, options, report, run) {
   if (!report || !Array.isArray(report.lines) || report.lines.every(l => l?.status !== 'break')) return report;
   const original = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
@@ -2514,7 +2517,7 @@ function notClaims(meta, workingText, options, report, run) {
   const usedWords = { test: w => vocabulary.has(String(w).toLowerCase()) || ['value-chain', 'vector-chain', 'plan'].includes(meta?.kind) };
   const removed = new Map();   // original index → note
   let current = report, keep = original.map((_, i) => i);
-  for (let round = 0; round < 6; round++) {
+  for (let round = 0; round < original.length; round++) {
     const at = current.lines.findIndex(l => l?.status === 'break');
     if (at < 0) break;
     const why = notAClaim(current.lines[at].text, names, usedWords);
