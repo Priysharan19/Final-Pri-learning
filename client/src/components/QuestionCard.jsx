@@ -2536,8 +2536,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           <div className="step" key={i}>
             <span className="step-n">{i + 1}</span>
             <div>
-              <div className="step-h"><MathText text={s.h} /></div>
-              <div className="step-d"><MathText text={s.d} /></div>
+              {/* The worked solution is content, in the content's language, like the prompt above. */}
+              <div className="step-h" lang="en"><MathText text={s.h} /></div>
+              <div className="step-d" lang="en"><MathText text={s.d} /></div>
               {/* "Why this step?" — a grounded dialogue about this step; tutor on only, after resolution. */}
               {WhyStep && tutorEnabled && !diagnostic && resolved && (
                 <button type="button" className="btn btn-ghost btn-sm no-print" data-why-step={i} aria-expanded={whyStep === i}
@@ -3446,6 +3447,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                     working: with no report, the working was not checked. */}
                 {workEvidenceCopy && (
                   <div data-working-evidence={workEvidence.kind}>{t(workEvidenceCopy.key, workEvidenceCopy.vars)}</div>
+                )}
+                {/* Which steps of the worked solution are nowhere on the page (the server's finding; feedback only). */}
+                {workEvidence && !verdictGood && Array.isArray(res?.stepReport?.missing) && res.stepReport.missing.length > 0 && (
+                  <div data-working-missing={res.stepReport.missing.length}>{t('verdict.workingMissing', { count: res.stepReport.missing.length, n: res.stepReport.missing.length, steps: res.stepReport.missing.slice(0, 4).map(m => `${m.step}. ${m.heading}`).join('; ') })}</div>
                 )}
                 {!verdictGood && res.solution && !isSketch && (
                   <div className="eval-expected">{t('verdict.expected')} <b><MathText text={answerToTex(res.solution.answerText)} /></b></div>

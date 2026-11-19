@@ -531,6 +531,7 @@ export default {
   'verdict.workingNotChecked': 'Your final answer was checked. Your working was not verified.',
   'verdict.workingAllChecked': { one: 'Your working was checked: the {n} line you submitted is consistent with the correct solution.', other: 'Your working was checked: all {n} lines you submitted are consistent with the correct solution.' },
   'verdict.workingArithmetic': { one: 'Line {checked} of your working is true as written. Pri has not checked that your lines are the right steps for this question.', other: 'Lines {checked} of your working are true as written. Pri has not checked that your lines are the right steps for this question.' },
+  'verdict.workingMissing': { one: 'Not found in your working: step {steps} of the worked solution. If you used another method, check that it reaches the same value.', other: 'Not found in your working: steps {steps} of the worked solution. If you used another method, check that it reaches the same values.' },
   'verdict.workingSomeChecked': '{ok} of the {total} lines of your working were checked and are consistent with the correct solution. The rest were not verified.',
   'verdict.workingWhichAll': 'Lines checked: {checked}. Each is true for the question.',
   'verdict.workingWhichUnread': 'Lines checked: {checked}. Could not be read as maths: {unread}.',

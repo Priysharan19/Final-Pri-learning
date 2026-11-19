@@ -25,6 +25,8 @@ import { checkProof } from '../../client/src/engine/proofSteps.js';
 // module reads no environment itself: markingPolicy.js imports nothing.
 import { policyOf } from './markingPolicy.js';
 import { stepCheckArithmetic } from '../../client/src/engine/arithmeticLines.js';
+import { missingSteps } from '../../client/src/engine/missingSteps.js';
+import { infoOf as arithmeticInfo, cleanStatement } from '../../client/src/engine/arithmeticLines.js';
 import { annotateMilestones } from '../../client/src/engine/milestones.js';
 import { awardBoardScheme, matchBoardPoints } from '../../client/src/engine/boardScheme.js';
 import { answerForm, effectiveSymbols, firstFinalAttempt, planGivens, readClaimForm } from './finalAttempt.js';
@@ -131,6 +133,31 @@ export function stepEvidence(q, answer, steps, result) {
   const board = Array.isArray(q.boardScheme) ? boardAward(q, meta, report, result.correct === true) : null;
   // An arithmetic report keeps to arithmetic: no milestone tick is added to it, so its wording stays true of every tick.
   try { if (report && report.arithmetic !== true) report = annotateMilestones(q, report); } catch { /* the report stands */ }
+  // A true-as-written tick on a line that ends at the student's own WRONG answer (`so 10^1 = 10` when the answer is 30)
+  // reads as "this is right". The arithmetic is; the value was not accepted (it may be wrong, or right in a form or unit
+  // the question did not accept: the note claims only what is true in both cases). Such a tick becomes that note.
+  try {
+    // The submitted answer is read only when it is a plain number: nothing a student types into the answer box is
+    // parsed or evaluated here (what an answer costs to mark must not depend on what is written in it).
+    const typed = typeof answer === 'string' ? answer.trim() : '';
+    const given = /^-?\d{1,15}(?:\.\d{1,10})?$/.test(typed) ? { value: Number(typed) } : null;
+    if (report && result.correct === false && given && Array.isArray(report.lines)) {
+      let changed = false;
+      const lines = report.lines.map(l => {
+        if (l?.status !== 'ok' || l.state !== 'arithmetic') return l;
+        const sides = String(l.text).replace(/[≈≃]/g, '=').split('=').map(x => x.trim()).filter(Boolean);
+        let last = null;
+        try { last = arithmeticInfo(cleanStatement(sides[sides.length - 1] || '')); } catch { last = null; }
+        if (!last || last.value === undefined || Math.abs(last.value - given.value) > 1e-9 * Math.max(1, Math.abs(given.value))) return l;
+        changed = true;
+        return { text: l.text, status: 'note', state: 'unverified', unverified: true, note: 'The arithmetic on this line is right, but this value was not accepted as the answer.' };
+      });
+      if (changed) report = { ...report, lines };
+    }
+  } catch { /* the report stands */ }
+  // Feedback only, for an answer that is not right: the steps of the worked solution whose values are nowhere on the
+  // page (engine/missingSteps.js). Computed after every mark above; nothing reads it but the result card.
+  try { if (report && result.correct !== true && typeof steps === 'string') { const gap = missingSteps(q, steps); if (gap) report = { ...report, missing: gap.missing, stepsFound: gap.found, stepsReadable: gap.total }; } } catch { /* the report stands */ }
   return board ? { stepReport: report, partial, board } : { stepReport: report, partial };
 }
 
