@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import Icon from '../components/Icon.jsx';
@@ -17,6 +18,7 @@ import { INSTRUMENT_UI } from '../platform/features.js';
 import { offersCourse, offeredLanguages, offeredYears, pathwayOffered } from '../platform/edition.js';
 import Glyph from '../instrument/Glyph.jsx';
 import { sellsPremium, useSaleAvailable } from '../paywall/useSaleAvailable.js';
+import { resetTour } from '../lib/firstRunTour.js';
 
 // The instrument build draws a glyph beside each section name (s9); the
 // flag-off build renders exactly what it did.
@@ -384,6 +386,7 @@ function SecuritySection({ toast }) {
 export default function Settings() {
   const { user, setUser, toast } = useApp();
   const t = useT();
+  const goTo = useNavigate();
   const [storageInfo, setStorageInfo] = useState(null);
   // Where Premium is not on sale (the edition has no provider, or its server says it is not selling) there is no
   // plan to show: the Plan section, with its plan wording and the line about what Premium adds, is not drawn.
@@ -714,6 +717,12 @@ export default function Settings() {
               {t(user.course === 'in' ? 'settings.helpBodyIndia' : 'settings.helpBody')}
               {!priNative.isNativeShell() && t('settings.addToHomeScreen')}
             </p>
+            {user.cloudLinked && (
+              <p style={{ marginTop: 10 }}>
+                <button type="button" className="btn btn-ghost btn-sm" data-tour-restart
+                  onClick={() => { resetTour(user.id); goTo('/practice'); }}>{t('tour.restart')}</button>
+              </p>
+            )}
           </div>
         </div>
       </div>
