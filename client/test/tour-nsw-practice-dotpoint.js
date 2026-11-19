@@ -112,6 +112,8 @@ try {
     await page.locator('.ws-exit').focus();
     for (let i = 0; i < 8 && !(await select.evaluate(el => el === document.activeElement)); i++) await page.keyboard.press('Tab');
     check(`${label}: the Tab key reaches the control`, await select.evaluate(el => el === document.activeElement));
+    const ring = await select.evaluate(el => { const c = getComputedStyle(el); return { outline: c.outlineStyle, width: c.outlineWidth, shadow: c.boxShadow, border: c.borderTopColor }; });
+    check(`${label}: keyboard focus is visible on the control`, (ring.outline !== 'none' && parseFloat(ring.width) >= 2) || ring.shadow !== 'none', JSON.stringify(ring));
     await shot(`dotpoint-${label}-2-focused.png`);
 
     stage = `${label}: choose a dot point`;
