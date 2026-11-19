@@ -129,7 +129,8 @@ export function stepEvidence(q, answer, steps, result) {
   // (matchBoardPoints). A right answer with junk, repeated or no working is
   // worth the answer point alone, never the printed marks (D25 delta review).
   const board = Array.isArray(q.boardScheme) ? boardAward(q, meta, report, result.correct === true) : null;
-  try { if (report) report = annotateMilestones(q, report); } catch { /* the report stands */ }
+  // An arithmetic report keeps to arithmetic: no milestone tick is added to it, so its wording stays true of every tick.
+  try { if (report && report.arithmetic !== true) report = annotateMilestones(q, report); } catch { /* the report stands */ }
   return board ? { stepReport: report, partial, board } : { stepReport: report, partial };
 }
 

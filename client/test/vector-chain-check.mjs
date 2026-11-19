@@ -43,6 +43,9 @@ ok(r.lines.map(l => l.status).join() === 'ok,ok,ok,note,break,note', `a margin s
 ok(st(['|4a+3b|', '196', '+64', '= 260']) === 'ok,note,note,note', 'a `=` line of plain numbers after a margin sum is never held to the chain');
 ok(st(['|4a+3b|', 'Hamilton paths', '= |[14;8]|']) === 'ok,note,note', 'words end the chain for good');
 ok(st(['|4a+3b|', '196 + 64', '= |[-26;8]|', '= sqrt(740)']) === 'ok,note,ok,ok', 'and a true vector line after a margin sum is ticked');
+// independent review of the margin-sum rule: a true line tied to a chain it does not continue
+ok(st(['|4a+3b|', '= |[-26,8]|', '2 + 3', '= 5', '= |[3,4]|']) === 'ok,ok,note,note,note', 'after a `=` line of plain numbers the margin sum owns the lines below it');
+ok(st(['|4a+3b|', '= |[-26,8]|', '2 + 3 = 5', '= |[3,4]|']) === 'ok,ok,note,note', 'a vector line that equals the margin sum continues the sum');
 // the same page written correctly, and read correctly
 ok(st(['|4a+3b|', '= |4[-5,-1]+3[-2,4]|', '= |[-20-6,-4+12]|', '= |[-26,8]| = √(26^2+8^2)', '= √740', '≈ 27.20']) === 'ok,ok,ok,ok,ok,ok', 'correct working: every line ticked');
 ok(st(['4a = (-20,-4)', '3b = (-6,12)', '4a+3b = (-26,8)', '|4a+3b| = √(676+64)', '= 27.2']) === 'ok,ok,ok,ok,ok', 'labelled working with round brackets: every line ticked');

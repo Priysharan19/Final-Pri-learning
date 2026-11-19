@@ -101,6 +101,11 @@ export function stepCheckArithmetic(workingText) {
       // `Ans = 72` continues the line above; `6 x 12` between two numbers is a times sign; square brackets group.
       .replace(/^(?:ans|answer)\.?\s*(?==)/i, '').replace(/(\d|\))\s+x\s+(?=\d|\()/gi, '$1*')
       .replace(/\[([^\[\],;_]*)\](?![_^])/g, '($1)');
+    // Independent review, round 1. None of these is arithmetic Pri can read one way only, so none is judged:
+    //   a line label or a trailing equation number (`1. 2+3 = 5`, `(2) 2+3 = 5`, `2 + 3 = 5 (2)`), which would be multiplied in;
+    //   a comma (two statements on a line, or a decimal comma); a line that starts with an operator and so carries the
+    //   line above forward (`- 1 = 2`); a spaced dot (`3 . 4`).
+    if (/^\(?\d{1,3}[.)](?:\s|$)|^\(\d{1,3}\)|\s\(\d{1,3}\)\s*$|[,;:]|^[+*/×÷]|^-\s|\d\s+\.\s*\d|\d\s*\.\s+\d/.test(line.replace(/[−–—]/g, '-'))) return note(line, NOTE);
     // A mixed number (2 1/2) or a spaced thousand (1 000) reads as a product: two numbers side by side are not judged.
     if (/[<>≤≥≠%°]|==|!=|\d\s+\d/.test(text)) return note(line, NOTE);
     // Any letter left (a variable, π, e, a unit, a function name) and the line is not arithmetic on numbers alone.
@@ -120,6 +125,8 @@ export function stepCheckArithmetic(workingText) {
     const allValues = continuation && before ? [before.value, ...values] : values;
     if (allSides.length < 2) return note(line, continuation ? 'Not checked: the line above is not arithmetic Pri can check, so this line has nothing to be compared with.' : NOTE);
 
+    // A division followed by a product (6/2(1+2), 10!/3!7!, 5·4·3/3·2·1) is read two ways by convention: not judged.
+    if (allSides.some(s => /[\/÷]/.test(s) && /[\/÷].*(?:\*|[\d)!]\s*\(|\)\s*\d|!\s*\d)/.test(s))) return note(line, NOTE);
     const soft = approx || allSides.some(s => /\d\.\d|^\.\d|[^\d]\.\d/.test(s) || FUNCTION_WORDS.test(s));
     if (allValues.every(v => close(v, allValues[0]))) {
       out.push({ text: line, status: 'ok', state: 'arithmetic', valueChain: { rule: 'arithmetic' } });

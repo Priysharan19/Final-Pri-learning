@@ -80,7 +80,7 @@ export function workingEvidence({ res, submitted } = {}) {
   if (ok === 0) return { kind: 'none' };
   // The arithmetic check (engine/arithmeticLines.js) proves only that stated numbers are equal: it is never
   // reported as "consistent with the solution".
-  if (report.arithmetic === true) return { kind: 'arithmetic', ok, total, checked: report.lines.flatMap((l, i) => (l.status === 'ok' ? [i + 1] : [])) };
+  if (report.arithmetic === true) return { kind: 'arithmetic', ok, total, checked: report.lines.flatMap((l, i) => (l.state === 'arithmetic' ? [i + 1] : [])) };
   if (ok === total) return { kind: 'all', total };
   // A value-chain report (engine/valueChain.js) judges each line on its own, so
   // the card can say WHICH lines were checked and which could not be read.

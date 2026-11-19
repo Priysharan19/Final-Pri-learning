@@ -239,6 +239,7 @@ export function stepCheckVectorChain(meta, workingText) {
   // interrupted is held, and only a `=` line with a vector in it, which cannot continue a sum of plain
   // numbers, is checked against it.
   let held = null;
+  let sideValue = null;   // what the margin sum itself came to, when it can be read
   const SIDE_SUM = /^[\d\s+\-*/().^=]+$/;
 
   const note = (text, why, { keep = false, ...extra } = {}) => { out.push({ text, status: 'note', note: why, unverified: true, ...extra }); if (!keep) chain = null; };
@@ -260,7 +261,7 @@ export function stepCheckVectorChain(meta, workingText) {
     const text = line.replace(/[−–—]/g, '-').replace(/[×·]/g, '*').replace(/≈/g, '=').replace(/√/g, ' sqrt ').replace(/²/g, '^2').replace(/³/g, '^3').replace(/([A-Za-z])[~̰]/g, '$1')
       .replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore|thus)\s+/i, '');
     const continuation = /^\s*=/.test(text);
-    if (!continuation) held = SIDE_SUM.test(text) ? (chain || held) : null;
+    if (!continuation) { held = SIDE_SUM.test(text) ? (chain || held) : null; sideValue = null; }
     // "about equal", or a decimal inside a line, may be a rounded value: such a line is never crossed.
     const approx = /≈/.test(line);
     const soft = seg => approx || seg.hasDecimal;
@@ -276,7 +277,14 @@ export function stepCheckVectorChain(meta, workingText) {
 
     const first = segs.find(s => s.symbolic);
     // a. the question fixes this line's value; b. or the chain above does
-    if (continuation && !chain && held && segs.some(s => isVec(s.value) || s.inner)) chain = held;
+    if (!continuation && held) { const lastSide = segs[segs.length - 1]; sideValue = isVec(lastSide.value) ? null : lastSide.value; }
+    if (continuation && !chain && held) {
+      // A `=` line of plain numbers continues the margin sum, and so may the lines after it: the held chain is dropped.
+      // A vector line whose value is what the margin sum came to (`2 + 3 = 5`, `= |[3,4]|`) continues the sum too.
+      const hasVector = segs.some(s => isVec(s.value) || s.inner);
+      const continuesSum = sideValue !== null && segs.some(s => !isVec(s.value) && close(s.value, sideValue));
+      if (hasVector && !continuesSum) chain = held; else held = null;
+    }
     // A continuation is held to the chain even when it names a vector itself: `= |a| + |b|` is not |4a+3b|.
     const truth = continuation && chain ? chain : first ? { value: first.value, inner: first.inner } : null;
     if (truth) {
