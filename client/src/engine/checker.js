@@ -11,7 +11,7 @@ import { normalize, parse, evaluate, exprEquivalent, numsClose, variablesOf, wit
 // working is checked comes out of this — see "What an evaluation may cost" in expr.js.
 const EVALUATION_BUDGET = 50000;
 import { diagnoseStep } from './diagnose.js';
-import { assessCalculusLine, calculusContext, lineProvenFalse, refineDerivativeLine } from './calculusSteps.js';
+import { assessCalculusLine, calculusContext, lineProvenFalse, refineDerivativeLine, sideLine } from './calculusSteps.js';
 import { diagnoseTopicLine } from './misconceptions/topics/index.js';
 import { answerTooLong } from './checker-core.js';
 import { changedTerm } from './slips.js';
@@ -870,6 +870,29 @@ function expressionReference(meta, prompt, out, { lineAbove = false } = {}) {
 }
 
 /**
+ * `text` is the product of some, not all, of the top-level FACTORS of `whole`: (x + 1)(x + 2)(x + 3) with the first two
+ * multiplied out is x^2 + 3x + 2, a true partial product on the way to the expansion, never a slip.
+ */
+function isPartialProduct(text, whole) {
+  const target = parseExpr(text), tree = parseExpr(whole);
+  // Only for algebra: in a chain of numbers every line has the one value, and a factor copied out of a product is not a step of it.
+  if (!target || !tree || variablesOf(target).size === 0) return false;
+  const factors = [];
+  const flatten = node => {
+    if (node?.t === 'group' && node.v?.t === 'bin' && node.v.op === '*') return flatten(node.v);
+    if (node?.t === 'bin' && node.op === '*') { flatten(node.l); flatten(node.r); } else factors.push(node);
+  };
+  flatten(tree);
+  if (factors.length < 2 || factors.length > 7) return false;
+  for (let mask = 1; mask < (1 << factors.length) - 1; mask++) {
+    let prod = null;
+    factors.forEach((f, k) => { if (mask & (1 << k)) prod = prod ? { t: 'bin', op: '*', l: prod, r: f } : f; });
+    try { if (exprEquivalent(target, prod) === true) return true; } catch { /* not comparable */ }
+  }
+  return false;
+}
+
+/**
  * `text` is a TRUE PARTIAL of `whole`: the sum of some, not all, of its top-level terms (the working
  * 4(4x + 2) → 16x + 8 on the way to 4(4x + 2) + 2). Only that shape is a partial; a line that merely equals
  * some part of a quotient or a power is not, so a slip is not excused by coincidence.
@@ -951,7 +974,8 @@ function judgeExpressionLine(cleaned, meta, { reference = null, promptSpans = []
     if (ast && (letters.length || !canonLetters.size) && letters.every(v => canonLetters.has(v))) {
       // A TRUE PARTIAL result is not a slip: a line equal to a proper part of the expression above (or of
       // the question's own) is that part worked out, so it is "couldn't verify", never a cross.
-      if (reference && isPartOf(tail, reference)) return unread;
+      if (reference && (isPartOf(tail, reference) || isPartialProduct(tail, reference))) return unread;
+      if (promptSpans.some(span => isPartialProduct(tail, span) || isPartOf(tail, span))) return unread;
       // A line that only restates something the question writes is not a claim about the answer.
       if (promptSpans.some(span => { try { return same(tail, span); } catch { return false; } })) return unread;
       return { status: 'break', note: 'This line is no longer equivalent to the expression you started with — the slip is here.' };
@@ -1566,7 +1590,8 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
         // (calculusSteps.js): the question restated is the START, an
         // antiderivative is verified by differentiating it, and a slip is
         // named. A line it cannot read falls through to the old rule below.
-        const assessed = assessCalculusLine(line, calculus, meta, calculusStage);
+        const side = sideLine(line, calculus, out.map(l => String(l.text)));
+        const assessed = side ? { status: side.status, note: side.note, side: true } : assessCalculusLine(line, calculus, meta, calculusStage);
         // Every-reading rule (CTO ruling): a bare or "= …" line, or a line "∫f dx = F", is crossed only when the engine proves it
         // false under every plausible reading; otherwise it abstains below. A definition of the method (u = …, du = …) never is.
         const squashed = proseClean.replace(/\s+/g, '');
@@ -1574,7 +1599,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
         const provenFalse = assessed && assessed.status === 'break' && !SIDE_DEFINITION.test(squashed)
           && (!AUXILIARY_CALCULUS.test(proseClean) || onlyIntegralAux || /^\s*=/.test(String(line).trim()) || DERIVATIVE_CLAIM.test(squashed))
           && lineProvenFalse(line, calculus, out.map(l => String(l.text)));
-        if (assessed && assessed.status === 'break' && !provenFalse && (SIDE_DEFINITION.test(squashed) || AUXILIARY_CALCULUS.test(proseClean) || !DERIVATIVE_CLAIM.test(squashed)
+        if (assessed && assessed.status === 'break' && !assessed.side && !provenFalse && (SIDE_DEFINITION.test(squashed) || AUXILIARY_CALCULUS.test(proseClean) || !DERIVATIVE_CLAIM.test(squashed)
             || calculus?.relation === 'antiderivative')) {   // a derivative claim inside an integral question is about a side function
           // A definition or a side derivative of the method (u = 2x + 2, du = 2x dx, d/du u^4 = 4u^3)
           // is a line about another quantity: it is not the integral or the derivative, so it is

@@ -258,7 +258,8 @@ incompleteAt('(2^x−4)(2^x+1) loses a root', eqMeta([0, 2]), ['4^x-5*2^x+4=0', 
   ok(`a first line that loses a root is incomplete, not a break, with a prompt (owner decision 7, 18 Nov 2026), got ${JSON.stringify(rep.lines.map(l => l.status))}`, rep.firstBreak === -1 && rep.lines[0].state === 'incomplete');
   const rep2 = report(eqMeta([0, 2]), ['(2^x-1)(2^x-5)=0', '2^x=1', 'x=0', 'x=2']);
   // (2^x-5 has a root 2^x=5 that is not a root of the question: that value is NOT a root, so this stays a break.)
-  ok(`a wrong first factorisation whose line holds at a value that is not a root is still a break, got ${JSON.stringify(rep2.lines.map(l => l.status))}`, rep2.firstBreak === 0 || rep2.lines[0].state === 'incomplete');
+  ok(`a wrong first factorisation whose line holds at a value that is not a root is still a break, got ${JSON.stringify(rep2.lines.map(l => l.status))}`, rep2.firstBreak === 0 && rep2.lines[0].status === 'break' && !rep2.lines[0].state && /also solves the original/.test(rep2.lines[0].note) &&
+    rep2.lines.slice(1).every(l => l.status === 'note' && /Follows from the earlier slip/.test(l.note)));
   const rep3 = report(eqMeta([1, 100]), ['log(x)(log(x)-3)=0']);
   // log x = 3 gives x = 1000, which is not a root: still a break (a).
   ok(`log x (log x − 3) = 0 for roots 1 and 100 still breaks: x = 1000 is not a root, got ${JSON.stringify(rep3.lines.map(l => l.status))}`, rep3.firstBreak === 0);

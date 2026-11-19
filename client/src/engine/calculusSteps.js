@@ -171,7 +171,7 @@ export function calculusContext(meta, prompt) {
     const eq = plain && plain.split('=');
     if (eq && eq.length === 2 && /^[a-z](\([a-z]\))?$/i.test(eq[0].trim())) {
       const given = tryParse(eq[1]);
-      if (given) return { relation: 'derivative', given, variable: (variablesOf(given).values().next().value) || 'x', canonical: tryParse(meta.canonical) };
+      if (given) return { relation: 'derivative', given, variable: (variablesOf(given).values().next().value) || 'x', dependent: eq[0].trim().replace(/\(.*$/, ''), canonical: tryParse(meta.canonical) };
     }
   }
   return null;
@@ -702,6 +702,52 @@ export function lineProvenFalse(line, ctx, previousTexts = []) {
     if (sameFunction(last.asFunction, given)) return false;                          // equal to the question's own function
     return true;
   } catch { return false; }
+}
+
+/**
+ * A line about another quantity than the one the question asks about (CTO ruling, review of f177f682a): a definition
+ * ("let u = x^2 + 1", "A = pi r^2", "f(x) = x^3"), an assignment ("x = 2"), or the derivative of one letter with respect to
+ * another that is not the asked derivative ("dy/du = 3u^2", "dA/dr = 2 pi r", "ds/dt = 3t^2"). Such a line is never held to the
+ * answer. It is crossed only when it is a derivative of a letter the student defined on an earlier line and the engine proves it
+ * false from that definition ("y = u^3" then "dy/du = 4u^2"); proven true is a note that says so. Null: not such a line.
+ */
+export function sideLine(line, ctx, previousTexts = []) {
+  try {
+    if (!ctx || !line) return null;
+    const v = ctx.variable;
+    const text = normalize(String(line)).replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore)\s+/i, '').trim();
+    const defNote = 'This defines something the method uses, so it is not checked against the answer.';
+    if (/^let\b/i.test(text)) return { status: 'note', note: defNote };
+    const dep = new Set(['y', 'F', ctx.dependent].filter(Boolean));
+    // dN/dD = rhs
+    const d = /^d\s*([A-Za-z])\s*\/\s*d\s*([A-Za-z])\s*=\s*(.+)$/.exec(text);
+    if (d) {
+      const [, N, D, rhs] = d;
+      if (D === v && (dep.has(N))) return null;               // the asked derivative: judged as before
+      const defs = [];
+      for (const prior of previousTexts) {
+        const m = new RegExp('^\\s*(?:let\\s+)?' + N + '\\s*=\\s*(.+)$', 'i').exec(normalize(String(prior)).replace(/^∴\s*/, ''));
+        if (m && !/=/.test(m[1])) defs.push(m[1].trim());
+      }
+      const R = tryParse(rhs);
+      for (const def of defs) {
+        const E = tryParse(def);
+        if (!E || !R) continue;
+        const vars = new Set([...variablesOf(E), ...variablesOf(R)]);
+        if ([...vars].some(l => l !== D && l !== 'e') || !vars.has(D)) continue;
+        const cache = new WeakMap();
+        const same = sameFunction(x => valueAt(R, x, D), x => derivativeAt(E, x, D, cache).value, 1e-6);
+        const exact = derivativeAt(E, 1.3, D, cache).exact;
+        return same ? { status: 'note', note: `True: it follows from ${N} = ${def}.` }
+          : exact ? { status: 'break', note: `This does not follow from your own line ${N} = ${def}.` } : { status: 'note', note: defNote };
+      }
+      return { status: 'note', note: defNote };
+    }
+    // a letter (or letter(x)) = something, where the letter is not the question's own function or derivative: a definition or an assignment
+    const a = /^([A-Za-z])\s*(?:\(\s*[A-Za-z]\s*\))?\s*=\s*(.+)$/.exec(text);
+    if (a && !dep.has(a[1]) && !/=/.test(a[2].replace(/[<>≤≥!]=/g, ''))) return { status: 'note', note: defNote };
+    return null;
+  } catch { return null; }
 }
 
 /** Every diagnosis code this module can name, for the misconception ontology and its tests. */
