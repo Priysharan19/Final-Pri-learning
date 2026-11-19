@@ -77,6 +77,8 @@ export function reportWithInterpretation({ stepReport, lineInterpretation, worki
     if (firstBreak >= 0 && i > firstBreak) return own || { text, status: 'note', unverified: true, state: 'unverified', note: 'Follows from the earlier slip.' };
     if (r.verdict === 'valid') { added++; return { text, status: 'ok', state: 'verified', valueChain: { rule: 'interpreter' } }; }
     if (r.verdict === 'given') { added++; return { text, status: 'ok', state: 'given', restates: true, note: 'From the question.', valueChain: { rule: 'interpreter-given' } }; }
+    // Two bare numbers and nothing else (`500 = 340`) is words lost in reading, not a sum someone got wrong (labelled audit).
+    if (r.verdict === 'first-break' && /^\s*-?\d+(?:\.\d+)?\s*=\s*-?\d+(?:\.\d+)?\s*$/.test(text)) return note();
     if (r.verdict === 'first-break') {
       added++;
       const message = typeof r.why === 'string' && r.why ? r.why : WHY_FALLBACK;
@@ -87,6 +89,9 @@ export function reportWithInterpretation({ stepReport, lineInterpretation, worki
     return note();
   });
   if (!added) return stepReport || null;
+  // After the interpreter's first wrong line a true-as-written tick below it is withdrawn, as every checker does:
+  // the line may only follow from the slip.
+  if (firstBreak >= 0) lines.forEach((l, k) => { if (k > firstBreak && l.state === 'arithmetic') lines[k] = { text: l.text, status: 'note', unverified: true, state: 'unverified', note: 'Follows from the earlier slip.' }; });
   // A line the engine or the arithmetic check ticked AFTER what is now the first wrong line stays as it was judged.
   const at = st => lines.flatMap((l, k) => (l.state === st ? [k + 1] : []));
   const unverified = at('unverified'), unread = at('unread');

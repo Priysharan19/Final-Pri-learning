@@ -35,6 +35,8 @@ const SOFT_NOTE = 'Not checked: this line may use a rounded value, so it is not 
 const MISREAD_NOTE = 'Not checked: this line may have been misread, so it is not marked.';
 const FUNCTION_WORDS = /\b(?:sin|cos|tan|sec|cosec|csc|cot|ln|log|asin|acos|atan|arcsin|arccos|arctan)\b/i;
 
+// `Ans = 72` under the working: ticked when it equals the line above, never crossed (it may answer something else).
+const ANS_LABEL = /^(?:ans|answer)\.?\s*(?==)/i;
 const close = (a, b) => Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b));
 const shown = v => { const r = Math.round(v * 1e6) / 1e6; return String(Object.is(r, -0) ? 0 : r).replace(/-/g, '−'); };
 
@@ -179,8 +181,11 @@ export function stepCheckArithmetic(workingText) {
     if (firstBreak !== -1) return note(line, 'Follows from the earlier slip.');
     const text0 = line.replace(/\s*\.\s*$/, '').replace(/[−–—]/g, '-').replace(/[×·]/g, '*').replace(/÷/g, '/').replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore|thus)\s+/i, '')
       // `Ans = 72` continues the line above; `6 x 12` between two numbers is a times sign; square brackets group.
-      .replace(/^(?:ans|answer)\.?\s*(?==)/i, '').replace(/(\d|\))\s+x\s+(?=\d|\()/gi, '$1*')
+      .replace(ANS_LABEL, '').replace(/(\d|\))\s+x\s+(?=\d|\()/gi, '$1*')
       .replace(/\[([^\[\],;_]*)\](?![_^])/g, '($1)');
+    const ansLine = ANS_LABEL.test(line.replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore|thus)\s+/i, ''));
+    // A root with an index, √[3]{…}, is not read: its bracket is not a grouping.
+    if (/(?:√|sqrt)\s*\[/i.test(line)) return note(line, NOTE);
     const calc = /∫|\]_/.test(text0) ? workOutCalculus(text0) : { text: text0, used: false };
     if (!calc) return note(line, NOT_PROVED);
     const text = calc.text;
@@ -195,22 +200,34 @@ export function stepCheckArithmetic(workingText) {
     // nCr and nPr between two numbers, and sqrt, are arithmetic.
     if (calc.used || /[A-Za-zπθ]/.test(text.replace(/sqrt/gi, '').replace(/(\d)\s*[CP]\s*(?=\d)/g, '$1'))) {
       // True as written, or a note: never a cross (see "Lines that are true as written").
-      // Independent review: a letter before a bracket may be a function, and f(x+h) = f(x)+f(h) read as products is a
-      // false line that looks like an identity. Only a named function, or one of the letters that students multiply a
-      // bracket by (x, n, k, a, b, c, m, r) with more than a single term inside, is read. A division or a power followed
-      // by a number-and-letter or two letters (1/2x, x^2x, 1/xy) groups two ways and is not read either.
-      const bare = text.replace(/(?<![A-Za-z])(?:sqrt|arcsin|arccos|arctan|asin|acos|atan|cosec|sin|cos|tan|sec|csc|cot|ln|log|exp|abs)(?![A-Za-z])/gi, '#');
-      if (/[A-Za-zπθ]\s*\(/.test(bare.replace(/(?<![A-Za-z])[xnkabcmr]\s*\((?!\s*-?\s*[A-Za-z0-9.]+\s*\))/g, '#('))) return note(line, NOT_PROVED);
-      if (/\/\s*\d+(?:\.\d+)?\s*[A-Za-z(]|\/\s*[A-Za-z]\s*[A-Za-z(]|\^\s*-?\d+(?:\.\d+)?[A-Za-z]|\^\s*[A-Za-z][A-Za-z0-9(]/.test(bare)) return note(line, NOT_PROVED);
       if (/≈|≃|~/.test(text)) return note(line, NOT_PROVED);
       const bits = text.split('=').map(s => s.trim());
       const cont = bits[0] === '' && bits.length >= 2;
       const written = cont ? bits.slice(1) : bits;
       if (written.some(s => !s)) return note(line, UNREAD, { unreadable: true });
+      // A last side of plain numbers carries to the `=` line below (tick only) even when the line itself is not read.
+      { const tail = valueOf(written[written.length - 1]); if (tail !== null) prev = { text: written[written.length - 1], value: tail, calculus: true }; }
+      // Independent review (two rounds): a letter before a bracket may be a function, and f(x+h) = f(x)+f(h) or
+      // x(t+h) = xt+xh read as products is a false line that looks like an identity. A letter before a bracket is read
+      // as a product only when the same letter stands inside that bracket (x(x+2), n(n+1)): a function is not applied
+      // to itself in school working. A named function must be followed by its bracket (sin x^2 groups two ways).
+      // A division or a power followed by a number-and-letter or two letters (1/2x, x^2x, 1/xy) groups two ways too.
+      const NAMED = /(?<![A-Za-z])(?:sqrt|arcsin|arccos|arctan|asin|acos|atan|cosec|sin|cos|tan|sec|csc|cot|ln|log|exp|abs)(?![A-Za-z])/gi;
+      if (/#(?!\()/.test(text.replace(NAMED, '#'))) return note(line, NOT_PROVED);
+      const bare = text.replace(NAMED, '#');
+      for (const m of bare.matchAll(/([A-Za-zπθ])\s*\(/g)) {
+        let depth = 0, end = -1;
+        for (let k = m.index + m[0].length - 1; k < bare.length; k++) { if (bare[k] === '(') depth++; else if (bare[k] === ')' && --depth === 0) { end = k; break; } }
+        const inside = end < 0 ? '' : bare.slice(m.index + m[0].length, end);
+        if (!new RegExp(`${m[1]}(?!\\s*\\()`).test(inside)) return note(line, NOT_PROVED);
+      }
+      if (/\/\s*\d+(?:\.\d+)?\s*[A-Za-z(]|\/\s*[A-Za-z]\s*[A-Za-z(]|\^\s*-?\d+(?:\.\d+)?[A-Za-z]|\^\s*[A-Za-z][A-Za-z0-9(]/.test(bare)) return note(line, NOT_PROVED);
       if (written.some(s => /[\/÷]/.test(s) && /[\/÷].*(?:\*|[\d)!]\s*\(|\)\s*\d|!\s*\d)/.test(s))) return note(line, NOT_PROVED);
       const infos = written.map(infoOf);
       const lastInfo = infos[infos.length - 1];
-      if (lastInfo) prev = { text: written[written.length - 1], ...lastInfo, calculus: calc.used || !!carried?.calculus };
+      // What a line of letters or an integral leaves for the `=` line below is tick only (`calculus`): `t = 5` then `= 20`
+      // is the student carrying on something else, not a claim that 5 is 20 (found by the labelled audit).
+      if (lastInfo) prev = { text: written[written.length - 1], ...lastInfo, calculus: true };
       if (infos.some(x => !x)) return note(line, NOT_PROVED);
       const all = cont && carried ? [carried, ...infos] : infos;
       if (all.length < 2 || !all.every(x => sameAsWritten(x, all[0]))) return note(line, NOT_PROVED);
@@ -251,6 +268,9 @@ export function stepCheckArithmetic(workingText) {
       return;
     }
     if (soft) return note(line, SOFT_NOTE);
+    if (ansLine) return note(line, NOTE);
+    // Two bare numbers and nothing else (`500 = 340`) is words lost in reading, not a sum someone got wrong.
+    if (allSides.every(x => /^\s*-?\d+(?:\.\d+)?\s*$/.test(x)) && !(continuation && before)) return note(line, NOTE);
     if (trueUnderAnotherReading(allSides, allValues)) return note(line, MISREAD_NOTE);
     const k = allValues.findIndex(v => !close(v, allValues[0]));
     const message = continuation && before && k >= 1 && allValues.slice(1, k).every(v => close(v, allValues[0]))

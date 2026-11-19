@@ -48,6 +48,7 @@ ok(practice.indexOf('interpretAfterStepCheck(') > practice.indexOf('const { step
   ok(kept === vc, 'after an engine break the interpreter adds no tick');
   const overturn = reportWithInterpretation({ stepReport: { source: 'value-chain', firstBreak: -1, lines: [{ text: 'a', status: 'ok', state: 'verified' }] }, lineInterpretation: { lines: [{ index: 0, engine: false, verdict: 'first-break', why: 'x' }] }, working: 'a' });
   ok(overturn.lines[0].status === 'ok', 'an engine verdict is never overturned, even by a malformed interpretation');
+  ok(reportWithInterpretation({ stepReport: null, lineInterpretation: { lines: [{ index: 0, engine: false, verdict: 'first-break', why: 'x' }, { index: 1, engine: false, verdict: 'valid' }] }, working: '500 = 340\n2 + 2 = 4' }).lines[0].status === 'note', 'two bare numbers stated equal are never crossed');
   ok(reportWithInterpretation({ stepReport: null, lineInterpretation: { lines: [{ index: 0, engine: false, verdict: 'valid' }] }, working: 'a\nb' }) === null, 'a result that does not line up with the working is dropped');
   const practiceSrc = readFileSync(new URL('../platform/practice.js', import.meta.url), 'utf8');
   ok(/partial: invalid \? null : partial/.test(practiceSrc) && !/reportWithInterpretation\([^)]*\)[^\n]*marks/.test(practiceSrc) && practiceSrc.split('reportWithInterpretation(').length === 2, 'the folded report is used once, in the reply, and is not read by any mark');
