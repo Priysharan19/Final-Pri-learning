@@ -69,7 +69,7 @@ Award: **3 of 3**. Criteria earned: amplitude (1), midline (1), extreme (1).
 |---:|---|---|---|---|
 | 1 | `amplitude = 16` | true line | checked | amplitude |
 | 2 | `midline = 22` | true line | checked | midline |
-| 3 | `minimum = 38` | wrong here (This comes to 38, which is not the minimum.) | wrong here | nothing |
+| 3 | `minimum = 38` | wrong here (This comes to $38$, which is not the minimum.) | wrong here | nothing |
 
 Award: **2 of 3**. Criteria earned: amplitude (1), midline (1).
 
@@ -77,7 +77,7 @@ Award: **2 of 3**. Criteria earned: amplitude (1), midline (1).
 
 | # | What the student wrote | Engine says | Interpreter says | Counts toward |
 |---:|---|---|---|---|
-| 1 | `amplitude = 17` | wrong here (This comes to 17, which is not the amplitude.) | wrong here | nothing |
+| 1 | `amplitude = 17` | wrong here (This comes to $17$, which is not the amplitude.) | wrong here | nothing |
 | 2 | `midline = 23` | no verdict (Follows from the earlier slip.) | follows from the earlier mistake | nothing |
 | 3 | `minimum = 38` | no verdict (Follows from the earlier slip.) | follows from the earlier mistake | nothing |
 
@@ -89,7 +89,7 @@ Transcript with an earlier slip, on the same question:
 
 | # | What the student wrote | Engine says | Interpreter says | Counts toward |
 |---:|---|---|---|---|
-| 1 | `amplitude = 17` | wrong here (This comes to 17, which is not the amplitude.) | wrong here | nothing |
+| 1 | `amplitude = 17` | wrong here (This comes to $17$, which is not the amplitude.) | wrong here | nothing |
 | 2 | `midline = 22` | no verdict (Follows from the earlier slip.) | checked | nothing |
 | 3 | `minimum = 5` | no verdict (Follows from the earlier slip.) | follows from the earlier mistake | nothing |
 

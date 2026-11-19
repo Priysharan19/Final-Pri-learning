@@ -37,6 +37,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from 'node:os';
 import { extname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { CONTENT_VERSION } from '../../client/src/engine/contentIdentity.js';
 import { REPO, bytesOf, enrol, localSecrets, makeHttp, openStudio } from './real-photo-support.mjs';
 
 const client = file => import(pathToFileURL(join(REPO, 'client', 'src', file)).href);
@@ -127,7 +128,7 @@ try {
   // THIS RUN's local key (the launcher made it; no deployed server has it) and
   // the real server binds it. A production client cannot do this.
   async function issueOwners() {
-    const prepared = secrets.encryptDeliveryToken(JSON.stringify({ g: OWNER.generator, d: OWNER.difficulty, s: OWNER.seed, m: 'practice', x: Date.now() + 3600000, n: randomUUID() }), 'practice-prepared-v1');
+    const prepared = secrets.encryptDeliveryToken(JSON.stringify({ g: OWNER.generator, d: OWNER.difficulty, s: OWNER.seed, m: 'practice', x: Date.now() + 3600000, n: randomUUID(), c: CONTENT_VERSION }), 'practice-prepared-v1');
     const res = await http('/v1/practice/issue', { method: 'POST', jar, body: { prepared, account: String(student.accountId) } });
     if (res.status !== 201) throw new Error(`issue: ${res.status} ${res.code}`);
     return res.data.question;

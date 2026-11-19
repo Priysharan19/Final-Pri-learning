@@ -65,7 +65,7 @@ Final answer check: correct.
 | # | What the student wrote | Engine says | Interpreter says | Counts toward |
 |---:|---|---|---|---|
 | 1 | `h(10) = 15 + 12sin((π*(10))/(12))` | true line | checked | substitute |
-| 2 | `h(10) = 22` | wrong here (This comes to 22, which is not the h(10).) | wrong here | nothing |
+| 2 | `h(10) = 22` | wrong here (This comes to $22$, which is not the $h(10)$.) | wrong here | nothing |
 
 Award: **1 of 2**. Criteria earned: substitute (1).
 Final answer check: not correct.
@@ -74,7 +74,7 @@ Final answer check: not correct.
 
 | # | What the student wrote | Engine says | Interpreter says | Counts toward |
 |---:|---|---|---|---|
-| 1 | `h(10) = 15 + 12sin((π*(11))/(12))` | wrong here (This comes to 18.105829, which is not the h(10).) | wrong here | nothing |
+| 1 | `h(10) = 15 + 12sin((π*(11))/(12))` | wrong here (This comes to $18.105829$, which is not the $h(10)$.) | wrong here | nothing |
 | 2 | `h(10) = 22` | no verdict (Follows from the earlier slip.) | follows from the earlier mistake | nothing |
 
 Award: **0 of 2**. Criteria earned: none.
@@ -86,7 +86,7 @@ Transcript with an earlier slip, on the same question:
 
 | # | What the student wrote | Engine says | Interpreter says | Counts toward |
 |---:|---|---|---|---|
-| 1 | `h(10) = 15 + 12sin((π*(11))/(12))` | wrong here (This comes to 18.105829, which is not the h(10).) | wrong here | nothing |
+| 1 | `h(10) = 15 + 12sin((π*(11))/(12))` | wrong here (This comes to $18.105829$, which is not the $h(10)$.) | wrong here | nothing |
 | 2 | `= 22` | no verdict (Follows from the earlier slip.) | could not verify (does not match the line above; it may continue an earlier step) | nothing |
 
 Award: **0 of 2**. Criteria earned: none.
