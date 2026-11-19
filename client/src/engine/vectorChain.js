@@ -30,9 +30,12 @@
 //      leading plus sign, [-6,+12], is how a stacked sum [-20-6; -4+12] comes
 //      back when it is misread, so that line is a note, never a cross.
 //
-// Inside a magnitude chain a vector with the bars left off is compared with
-// the vector inside the bars. A decimal that is the true value correctly
-// rounded to the places written is accepted. Nothing here awards a method mark.
+// A vector where a length is expected (the bars left off, or not read) is
+// never ticked: a length is not a vector. It is crossed only when its own
+// length is wrong as well. A decimal that is the true value correctly rounded
+// to the places written is accepted; any other line with a decimal or an
+// "about equal" sign may be a rounding and is never crossed. Nothing here
+// awards a method mark.
 
 export const VECTOR_CHAIN = 'vector-chain';
 
@@ -184,7 +187,7 @@ function evaluateSegment(text, vectors) {
     try { const got = evaluateSegment(text.trim().slice(1, -1), vectors); if (isVec(got.value)) inner = got.value; } catch { inner = null; }
   }
   const dec = toks.length <= 2 && toks[toks.length - 1]?.t === 'num' && (toks.length === 1 || toks[0].t === '-') ? toks[toks.length - 1].raw.match(/\.(\d+)$/) : null;
-  return { value, symbolic, suspect, inner, decimals: dec ? dec[1].length : null };
+  return { value, symbolic, suspect, inner, decimals: dec ? dec[1].length : null, hasDecimal: toks.some(t => t.t === 'num' && t.raw.includes('.')) };
 }
 
 /** The meta is well formed: named number vectors of one dimension and a target that evaluates. */
@@ -212,10 +215,9 @@ function compare(seg, truth) {
     if (isVec(x)) return vecClose(x, T) ? 'ok' : (x.length === T.length ? 'wrong' : 'unsure');
     return 'unsure';                                             // a number in a chain of vectors: not judged
   }
-  if (isVec(x)) {                                                // the bars were left off (or not read)
-    if (truth.inner && vecClose(x, truth.inner)) return 'ok';
-    return close(norm(x), T) ? 'unsure' : 'wrong';
-  }
+  // A vector where a length is expected (the bars left off, or not read). A length is never equal to a
+  // vector, so this is never ticked; it is crossed only when its own length is not the length either.
+  if (isVec(x)) return close(norm(x), T) ? 'unsure' : 'wrong';
   // The same length from a different vector, |(26, 8)| for |(-26, 8)|, is not ticked.
   if (close(x, T)) return seg.inner && truth.inner && !vecClose(seg.inner, truth.inner) ? 'unsure' : 'ok';
   if (seg.decimals !== null) {
@@ -250,9 +252,14 @@ export function stepCheckVectorChain(meta, workingText) {
     if (!m) return note(line, GENERIC_NOTE);
     if (i >= LIMITS.lines || line.length > LIMITS.chars) return note(line, 'Not verified: this line is too long or too far down the working to check.');
     if (firstBreak !== -1) return note(line, 'Follows from the earlier slip.');
-    const text = line.replace(/[−–—]/g, '-').replace(/[×·]/g, '*').replace(/≈/g, '=').replace(/√/g, ' sqrt ').replace(/[~̰]/g, '')
+    const text = line.replace(/[−–—]/g, '-').replace(/[×·]/g, '*').replace(/≈/g, '=').replace(/√/g, ' sqrt ').replace(/²/g, '^2').replace(/³/g, '^3').replace(/([A-Za-z])[~̰]/g, '$1')
       .replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore|thus)\s+/i, '');
     const continuation = /^\s*=/.test(text);
+    // "about equal", or a decimal inside a line, may be a rounded value: such a line is never crossed.
+    const approx = /≈/.test(line);
+    const soft = seg => approx || seg.hasDecimal;
+    // `+ 3b` under `4a` carries a sum over two lines; that layout is not read.
+    if (/^\+/.test(text)) return note(line, GENERIC_NOTE);
     if (/[<>≤≥≠]|==|!=/.test(text)) return note(line, GENERIC_NOTE, { keep: continuation });
     const parts = text.split('=').map(s => s.trim());
     const sides = continuation ? parts.slice(1) : parts;
@@ -266,7 +273,7 @@ export function stepCheckVectorChain(meta, workingText) {
     // A continuation is held to the chain even when it names a vector itself: `= |a| + |b|` is not |4a+3b|.
     const truth = continuation && chain ? chain : first ? { value: first.value, inner: first.inner } : null;
     if (truth) {
-      const results = segs.map(s => compare(s, truth));
+      const results = segs.map(s => { const got = compare(s, truth); return got === 'wrong' && soft(s) ? 'unsure' : got; });
       const bad = results.indexOf('wrong');
       if (bad !== -1) return cross(line, i, mismatch(segs[bad], truth));
       chain = truth;
@@ -279,7 +286,7 @@ export function stepCheckVectorChain(meta, workingText) {
     // c. numbers only
     const vecs = segs.filter(s => isVec(s.value));
     for (let k = 1; k < vecs.length; k++) {
-      if (vecs[k].value.length === vecs[0].value.length && !vecClose(vecs[k].value, vecs[0].value)) {
+      if (vecs[k].value.length === vecs[0].value.length && !vecClose(vecs[k].value, vecs[0].value) && !segs.some(soft)) {
         return cross(line, i, `This line says ${shown(vecs[0].value)} equals ${shown(vecs[k].value)}, and it does not.`);
       }
     }

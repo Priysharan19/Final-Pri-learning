@@ -46,16 +46,26 @@ ok(st(['a = [-5,-1]', 'b = [-2;4]', '4a + 3b = [-26;8]']) === 'ok,ok,ok', 'the g
 ok(st(['|4a+3b| = |a|+|b|']) === 'break', 'the magnitude of a sum is not the sum of the magnitudes');
 ok(st(['|4a+3b|', '= 4|a|+3|b|']) === 'ok,break', 'a continuation that names the vectors is still held to the chain');
 ok(st(['4a = (-20,4)']) === 'break', 'a wrong multiple is crossed');
-ok(st(['[-20,-4]+[-6,12]', '= [-26,8]', '= [14,8]']) === 'ok,ok,break', 'a chain of numbers only: the false step is crossed');
+ok(st(['[-20,-4]+[-6,12]', '= [-26,8]', '= [14,8]']) === 'note,ok,break', 'a chain of numbers only: the false step is crossed');
 ok(st(['[-20,-4]+[-6,12] = [14,8]']) === 'break', 'two vectors stated equal that are not');
 ok(st(['|4a+3b| = 30']) === 'break', 'a wrong magnitude is crossed');
 r = run(['4a+3b = (-26,8)', '= (14,8)', '|4a+3b| = √260']);
 ok(r.lines.map(l => l.status).join() === 'ok,break,note' && r.lines[2].note === 'Follows from the earlier slip.', 'lines after the slip are not judged');
 
 // never a false tick, never a false cross
+// independent review, round 1: a length is never equal to a vector
+for (const page of [['|4a+3b| = (-26,8)'], ['|a| = (-5,-1)'], ['|a| = a'], ['27.2 = (-26,8)']]) ok(st(page) === 'note', `a length stated equal to a vector is not ticked: ${page}`);
+ok(st(['|4a+3b|', '= (-26,8)']) === 'ok,note' && st(['|4a+3b| = |(-26,8)|', '= (-26,8)']) === 'ok,note', 'nor as a continuation');
+// independent review, round 1: a rounded value is never crossed
+for (const page of [['|4a+3b| ≈ 27'], ['|a| ≈ 5'], ['|4a+3b| ≈ 30'], ['|a|+|b| = 5.10+4.47'], ['4|a| = 4(5.10)'], ['4|a| = 4 × 5.1 = 20.4'], ['a/|a| = (-0.98,-0.20)'], ['(1/3)a = (-1.67,-0.33)'], ['a/3 = (-1.67,-0.33)'], ['|a|^2 = 5.099^2'], ['|4a+3b| = 27.3']]) ok(!/break/.test(st(page)), `a line that may be a rounding is not crossed: ${page} (${st(page)})`);
+ok(st(['|4a+3b|', '= |(-26,8)|', '= sqrt(740)', '≈ 27']) === 'ok,ok,ok,note', 'a coarser rounding at the end of a true chain is a note');
+ok(st(['4a', '= (-20,-4)', '+ 3b', '= (-26,8)']) === 'ok,ok,note,note', 'a sum carried over two lines is not read, and its true total is not crossed');
+ok(st(['|a| ~ 5']) === 'note', 'a tilde between values is not read as a product');
+ok(st(['|a|² = 26', '|4a+3b| = √((-26)²+8²)']) === 'ok,ok', 'superscript squares are read');
 ok(st(['|4a+3b|', '= |[26,8]|']) === 'ok,note', 'a different vector of the same length is not ticked');
 ok(st(['|4a+3b|', '= [26,8]']) === 'ok,note', 'the same, with the bars left off');
-ok(st(['|4a+3b| = 27.21']) === 'note' && st(['|4a+3b| = 27.2']) === 'ok' && st(['|4a+3b| = 27.203']) === 'ok', 'a correctly rounded decimal is accepted; a near miss is a note');
+ok(st(['|4a+3b| = 27']) === 'break', 'a whole number stated exactly equal is still held to the value');
+ok(st(['|4a+3b| = 27.21']) === 'note' && st(['|4a+3b| = 35.5']) === 'note' && st(['|4a+3b| = 27.2']) === 'ok' && st(['|4a+3b| = 27.203']) === 'ok', 'a correctly rounded decimal is accepted; a near miss is a note');
 ok(st(['196+64=250', '196', '+64', 'x = 3', 'a.b = 6', 'a·b = 6', 'let c = 4a']) === 'note,note,note,note,note,note,note', 'side arithmetic, other letters and dot products are not judged');
 ok(st(['= [14,8]']) === 'note', 'a continuation of nothing is not judged');
 ok(st(['4a = (-20,-4)', '196', '= (14,8)']) === 'ok,note,note', 'an unverified line that does not continue the chain ends it');
