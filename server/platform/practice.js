@@ -20,6 +20,7 @@ import { encryptDeliveryToken, decryptDeliveryToken } from './deliveryCrypto.js'
 import { opaqueContentId, opaqueContentHash, contentSeenEvidence, markContentSeen, contentTried, markContentTried, seenAmong, seenKeysOf, triedKeysOf, repeatEvidenceOf } from './contentSeen.js';
 import { misconceptionIdForTrap, misconceptionIdForDiagnosis, misconceptionById } from '../../client/src/engine/misconceptions.js';
 import { slipHint } from '../../client/src/engine/slipHint.js';
+import { cleanLatex, safeLatexLines } from '../../client/src/engine/texSafe.js';
 import { slipPatterns } from '../../client/src/engine/slipPattern.js';
 import { misconceptionLabel } from '../../client/src/engine/adaptive.js';
 import { HINT_RUNGS, buildHintLadder, ladderAvailable, ladderEvidence, markWeightAfter, nextRungAfter, rungLevelOf } from '../../client/src/engine/hintLadder.js';
@@ -957,7 +958,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       committed.status === 403 ? 'Guardian consent changed while this answer was being read.' :
       committed.status === 401 ? 'Sign in again before retrying recognition.' : 'This question has been completed.');
     return res.status(201).json({ receipt, questionId: qid, mode: body.mode, reused,
-      transcription: { text, lines: result.lines || [], confidence: result.confidence ?? null,
+      transcription: { text, lines: safeLatexLines(result.lines || []), confidence: result.confidence ?? null,
         needsConfirmation: result.needsConfirmation === true } });
   });
 
@@ -1279,6 +1280,10 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     // question answered by its working).
     let markAnswer = body.answer;
     let working = Array.isArray(body.steps) ? body.steps.join('\n') : String(body.steps || '');
+    // The reader's own TeX for the lines it read, kept on the server beside their text (never sent by the client).
+    // A submitted line is matched to it only by identical text, so a line the student edited carries none. The line
+    // checker may use it to tick or to leave a note, never to cross (arithmeticLines.js).
+    let workingLatex = null;
 
     // ── Mark first, with no transaction open; then commit under the lock ────
     // The marker runs in a worker thread (markerPool.js) and is awaited, so it
@@ -1460,6 +1465,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         }
         if (byWorking && floored.excluded.length) markAnswer = answerLines.filter((_, i) => !floored.excluded.includes(i)).join('\n');
         else if (floored.excluded.length) working = stepsSent.filter((_, i) => !floored.excluded.includes(i)).join('\n');
+        if (!byWorking) workingLatex = readLines.filter(l => cleanLatex(l?.latex)).map(l => ({ text: String(l.text ?? ''), latex: cleanLatex(l.latex) }));
         reading = { text, needsConfirmation, corrected, reused: read.reused === true, recognizedAt: Date.now(),
           studentConfirmed: false, excludedLines: floored.excluded, lineStates,
           readLines: readLines.map(l => ({ text: String(l?.text ?? ''), confidence: Number(l?.confidence), uncertain: l?.uncertain === true })), floor: floorOf };
@@ -1469,7 +1475,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // One round trip: the answer, and the working only when the reply could
       // use it (the answer is right, or a wrong answer resolves the question).
       const marked = await timePhase('marker', () => markerPool().run('practice', {
-        q: forecast.q, answer: markAnswer, working,
+        q: forecast.q, answer: markAnswer, working, ...(workingLatex?.length ? { workingLatex } : {}),
         evidenceIfWrong: evidenceForced || writtenWorking || forecast.spent || ONE_TRY_MODES.includes(forecast.q._practiceMode)
       }, { key: accountId }));
       // Refused before it ran: nothing marked, nothing spent, same key retries.

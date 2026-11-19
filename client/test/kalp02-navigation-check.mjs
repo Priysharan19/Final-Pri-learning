@@ -71,7 +71,8 @@ check('unknown routes use role-safe landing', has(app, 'path="*" element={<Navig
 check('Review filter is URL-backed', has(history, 'useSearchParams'));
 check('Review reads filter query', has(history, "params.get('filter')"));
 check('Review filter changes navigation state', has(history, 'setParams('));
-check('Review keeps real retry path', has(history, "api.post(`/history/${id}/retry`"));
+// The retry request moved to pages/historyRetry.js so the practice page's recent attempts use the same path (train marking 6).
+check('Review keeps real retry path', has(history, "import { retryServe } from './historyRetry.js'") && has(history, 'retryServe(') && has(read('client/src/pages/historyRetry.js'), "api.post(`/history/${id}/retry`"));
 check('teacher Classes anchor exists', has(teach, 'id="teacher-classes"'));
 check('teacher Assignments anchor exists', has(teach, 'id="teacher-assignments"'));
 check('teacher Analytics anchor exists', has(teach, 'id="teacher-analytics"'));

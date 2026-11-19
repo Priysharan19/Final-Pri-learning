@@ -11,7 +11,10 @@ import { prettyLine } from '../photo/transcript.js';
 import { splitWordsAndMaths } from '../photo/typeset.js';
 
 /** One line, set the way it reads: words upright, maths typeset. */
-export function Typeset({ text, texOf, segments = null }) {
+export function Typeset({ text, texOf, segments = null, tex = null }) {
+  // The reader's own TeX for the line (validated, still describing the line as shown): set from it, through the same
+  // MathText path, so what is drawn is what was written. It carries no words (the caller checks), so no language is set.
+  if (tex) return <span className="rr-text"><span className="rr-maths" data-from-latex><MathText text={`$${tex}$`} /></span></span>;
   // The reader's own split (words versus maths) when it still restates the line; else the heuristic split.
   const runs = segments
     ? segments.map(p => ({ kind: p.kind === 'text' ? 'words' : 'maths', text: p.kind === 'text' ? p.value : prettyLine(p.value) }))

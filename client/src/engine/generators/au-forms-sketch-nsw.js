@@ -41,7 +41,6 @@ const sg = k => (k < 0 ? `- ${Math.abs(k)}` : `+ ${k}`);
 const fx = r => (r === 0 ? 'x' : `(x ${sg(-r)})`);
 const lead = a => (a === 1 ? '' : a === -1 ? '-' : String(a));
 const pt = (x, y) => `(${num(x)}, ${num(y)})`;
-const list = xs => xs.map(num).join(' and ');
 const nature = k => (k === 'max' ? 'maximum' : 'minimum');
 
 /**

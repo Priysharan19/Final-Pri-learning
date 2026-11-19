@@ -11,10 +11,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import React from 'react';
 import { MathText } from '../lib/latex.jsx';
-import { dollarsBalanced } from '../engine/commentTex.js';
+import { dollarsBalanced, typesetDerivativeMarks } from '../engine/commentTex.js';
 
 export function EngineComment({ text, className }) {
-  const s = String(text ?? '');
+  // A derivative mark in the prose (y', f'(x), dy/dx) is set as maths too; a comment whose dollars do not pair up is left alone.
+  const raw = String(text ?? '');
+  const s = dollarsBalanced(raw) ? typesetDerivativeMarks(raw) : raw;
   const maths = s.includes('$') && dollarsBalanced(s);
   return <span lang="en" className={className} data-engine-comment>{maths ? <MathText text={s} /> : s}</span>;
 }

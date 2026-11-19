@@ -29,7 +29,7 @@ import { READER_PERMISSION, readerPermission } from '../ink/readerPermission.js'
 import { cloudReadingEnabled, forgetCloudReads, setReadingQuestion, INK_READER_STATE, noteReaderRefusal, readerBlock, readPhotoWithCloud, resumeReaderNow, takeCloudReadingNotice } from '../ink/cloudReader.js';
 import { retryClock, retryWhen } from '../ink/readerFailure.js';
 import { preparePhoto } from '../ink/photoRaster.js';
-import { buildTranscript, editLine, includedLines, reviveTranscript, unreadablePage, workingOf } from '../photo/transcript.js';
+import { buildTranscript, editLine, includedLatex, includedLines, reviveTranscript, unreadablePage, workingOf } from '../photo/transcript.js';
 import { proposeFinalAnswer, readsAsWritten } from '../photo/finalAnswer.js';
 import { clearPhotoDraft, confirmPhotoDraftSaved, readPhotoDraft, savePhotoDraft } from '../local/photoDrafts.js';
 import { lineMarks } from './workingEvidence.js';
@@ -370,7 +370,7 @@ function OpenTryReading({ t, texOf, lines, unread, onCorrect }) {
   );
 }
 
-export default function QuestionCard({ question, why, reason, reasonTag = null, onResolved, onNext, onRedo, onReplace = null, compact = false, diagnostic = null, sessionIndex = null, sessionLength = null, sessionAnswered = 0 }) {
+export default function QuestionCard({ question, why, reason, reasonTag = null, onResolved, onNext, onRedo, onReplace = null, compact = false, diagnostic = null, sessionIndex = null, sessionLength = null, sessionAnswered = 0, belowWork = null }) {
   const { celebrate, refreshUser, refreshDue, refreshRecent, toast, user } = useApp();
   const t = useT();
   const [answer, setAnswer] = useState('');
@@ -2276,6 +2276,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // How Pri read each line, for the on-demand view on the marked page (never shown before marking), and the
   // correction that marks the page again: the same question issued again (Redo) with the corrected page carried in.
   const pageReading = markedOn ? { lines: (writeMode ? (judged?.lines || inkResult?.lines || []) : includedLines(photoLines || { lines: [] })).map(l => (typeof l === 'string' ? l : String(l?.text ?? ''))) } : null;
+  // A photographed line keeps the reader's own TeX (when it passed the safe-TeX gate) beside its text, so the marked page can set the
+  // line as it was written. Display only; the lines themselves, and what is marked, are unchanged.
+  if (pageReading && !writeMode) { const tex = includedLatex(photoLines || { lines: [] }); pageReading.lines = pageReading.lines.map((text, i) => (tex[i] ? { text, latex: tex[i] } : text)); }
   const correctReadLine = (i, text) => {
     if (!onRedo || busy || !markedOn) return;
     const clean = String(text ?? '').replace(/\s+/g, ' ').trim();
@@ -2683,7 +2686,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   );
 
   return (
-    <div className={`qpage ws ${split ? 'ws-split' : 'ws-single'}`} data-phase={state.phase} data-mode={isMcq ? 'mcq' : mode} data-question-id={question.id}>
+    <div className={`qpage ws ${split ? 'ws-split' : 'ws-single'}`} data-phase={state.phase} data-has-work={hasWork ? 'true' : undefined} data-mode={isMcq ? 'mcq' : mode} data-question-id={question.id}>
       {/* ── The question: the page's reference object ── */}
       <section className="ws-context" aria-label={t('verdict.questionRegion')}>
         <div className="q-topmeta">
@@ -2782,7 +2785,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
 
         <div className="ws-tools no-print" ref={toolsRef}>
           {!isMcq && !isSketch && (
-            <div className="mode-tabs seg" role="group" aria-label={t('verdict.answerModes')}>
+            <div className="mode-tabs seg" role="group" data-tour="modes" aria-label={t('verdict.answerModes')}>
               <button type="button" className={`mode-tab ${mode === 'type' ? 'on' : ''}`} aria-pressed={mode === 'type'} title={t('verdict.modeTypeTitle')}
                 aria-label={t('verdict.modeTypeLabel')} onClick={() => flipMode('type')}><Icon name="type" size={16} />{t('verdict.modeType')}</button>
               <button type="button" className={`mode-tab ${mode === 'write' ? 'on' : ''}`} aria-pressed={mode === 'write'} title={t('verdict.modeWriteTitle')}
@@ -3591,6 +3594,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           </>
         )}
 
+        {/* Page furniture the host adds under the work (Practice's recent attempts): above the action bar, so the bar stays the last thing on the page. */}
+        {belowWork}
+
         {/* ── One obvious next move; everything else stays reachable and quiet ── */}
         <div className="ws-actions editor-foot no-print">
           <span className="status-line" data-state={statusState} data-work-state={workState} data-work-vocab={vocab.state || undefined} role="status" aria-live="polite">
@@ -3696,7 +3702,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               <button type="button" className="btn btn-quiet" data-check-replace-cancel onClick={() => setReplaceArmed(false)}>{t('check.draftKeep')}</button>
             )}
             {!(diagnostic && resolved) && primary && (
-              <button className="btn btn-primary" data-primary-action={unmarkable ? 'replace' : undefined} onClick={primary.run} disabled={primary.disabled} aria-busy={busy || undefined}
+              <button className="btn btn-primary" data-tour="submit" data-primary-action={unmarkable ? 'replace' : undefined} onClick={primary.run} disabled={primary.disabled} aria-busy={busy || undefined}
                 aria-describedby={submitReasonKey ? `submit-reason-${question.id}` : undefined}
                 aria-keyshortcuts={instrumentCheckKey ? 'Meta+Enter Control+Enter' : undefined}>
                 {instrumentCheckKey && <Icon name="scan" size={16} />}
