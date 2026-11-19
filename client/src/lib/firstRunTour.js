@@ -5,9 +5,10 @@
 // clears the key.
 export const TOUR_KEY_PREFIX = 'pri.tour.practice.';
 
-// [id, selector of the control it describes, catalogue key, where the note sits]
+// [id, selector of the control it describes, catalogue key, where the note sits;
+// `gutter`: on a wide screen the note is narrow enough to stay in the left margin, off the question]
 export const TOUR_STEPS = Object.freeze([
-  Object.freeze({ id: 'topic', anchor: '[data-tour="topic"]', key: 'tour.topic', side: 'below' }),
+  Object.freeze({ id: 'topic', anchor: '[data-tour="topic"]', key: 'tour.topic', side: 'below', gutter: true }),
   Object.freeze({ id: 'answer', anchor: '[data-tour="modes"]', key: 'tour.answer', side: 'below' }),
   Object.freeze({ id: 'marked', anchor: '[data-tour="submit"]', key: 'tour.marked', side: 'above' }),
   Object.freeze({ id: 'history', anchor: '[data-tour="history"]', key: 'tour.history', side: 'above' })

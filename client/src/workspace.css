@@ -293,7 +293,7 @@ html[data-edition=prithagoras] .qpage.ws .verdict{scroll-margin-bottom:148px}
 .tutor-launch-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 
 /* Recent attempts under a Practice question: a closed disclosure, then a plain list on the same hairline. */
-.q-recent { margin: 16px auto 0; width: 100%; max-width: 720px; padding: 0 16px; box-sizing: border-box; }
+.q-recent { margin: 16px auto 0; width: min(820px, calc(100% - 32px)); }   /* the question card's own width and gutter */
 .q-recent-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 0; border-top: 1px solid var(--hairline); }
 .q-recent-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 8px 0; border-bottom: 1px solid var(--hairline); font-size: 14px; }
 .q-recent-row time { min-width: 56px; }

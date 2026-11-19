@@ -35,7 +35,7 @@ export default function PracticeTour({ onClose }) {
     const note = noteRef.current;
     if (!el || !note) return;
     const r = el.getBoundingClientRect();
-    const w = Math.min(320, window.innerWidth - 2 * EDGE);
+    const w = step.gutter && window.innerWidth >= 900 ? 236 : Math.min(320, window.innerWidth - 2 * EDGE);
     const h = note.offsetHeight;
     const left = Math.max(EDGE, Math.min(r.left, window.innerWidth - w - EDGE));
     let top = step.side === 'above' ? r.top - h - GAP : r.bottom + GAP;
