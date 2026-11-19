@@ -39,8 +39,7 @@ for (const id of ids) {
 const families = new Set(cases.map(c => c.id));
 ok(families.size >= 40, `${families.size} Step Check families enumerated`);
 
-let moreMarks = 0, fewerMarks = 0;
-let pages = 0, plainPages = 0, claimPages = 0, plainDiff = 0, changed = 0, offBreakOnNote = 0, lineDiff = 0, markedDiff = 0;
+let pages = 0, plainPages = 0, claimPages = 0, plainDiff = 0, changed = 0, lineDiff = 0, markedDiff = 0;
 const EXTRA = [['7 + 8 = 15'], ['y = 2x(4 - x)'], ['16/3'], ['Area = ∫_0^4 2x(4 - x) dx'], ['u = 2x + 3', '12'], ['f(x) = x^2 + 1']];
 for (const { id, q } of cases) {
   const ts = transcriptsFor(q).slice(0, 3);

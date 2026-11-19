@@ -827,7 +827,6 @@ ok(model?.cards?.length === 2 && model.cards.every(c => c.status === 'checked' &
   ok(S('Solve $x^2 - 5x + 6 = 0$.', ['x^2 - 5x + 6 = 0', 'x = 2 or x = 3']) === '.T', 'the roots: ticked only by the existing check against the equation, as before');
 
   // the area form is a whitelist of whole prompts: anything else about the region means no area fact
-  const REGION = '. Find the area bounded by the curve and the x-axis';
   for (const prompt of [
     'The curve $y = 4 - x^2$ and the x-axis for $x \\ge 0$. Find the area bounded by the curve and the x-axis.',
     'Find the area bounded by $y = 4 - x^2$ and the x-axis where $x > 0$.',
@@ -839,7 +838,10 @@ ok(model?.cards?.length === 2 && model.cards.every(c => c.status === 'checked' &
     'The curve $y = 4 - x^2$ is reflected in the x-axis. Find the area bounded by the curve and the x-axis.',
     'Find the area bounded by $y = 4 - x^2$ and the x-axis above the line $y = 1$.',
     'Find the area bounded by $y = 4 - x^2$ and the x-axis, correct to 2 decimal places.'
-  ]) ok(questionFacts({ prompt })?.area === null || questionFacts({ prompt }) === null, `no area form: ${prompt.slice(0, 70)}`) && ok(S(prompt, ['Area = ∫_-2^2 (4 - x^2) dx']) === '.', `the area integral is not ticked: ${prompt.slice(0, 70)}`);
+  ]) {
+    ok(questionFacts({ prompt })?.area === null || questionFacts({ prompt }) === null, `no area form: ${prompt.slice(0, 70)}`);
+    ok(S(prompt, ['Area = ∫_-2^2 (4 - x^2) dx']) === '.', `the area integral is not ticked: ${prompt.slice(0, 70)}`);
+  }
   for (const prompt of [
     'Find the area bounded by $y = 4 - x^2$ and the x-axis.',
     'Calculate the area bounded by the curve $y = 4 - x^2$ and the x-axis.',
