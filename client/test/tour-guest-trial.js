@@ -98,8 +98,8 @@ for (const edition of editions) {
       await page.locator('[data-guest-question]').waitFor({ timeout: 30000 });
       check(`${edition}: the first screen is a question, already drawn`, await page.locator('[data-guest-question] .gp-prompt').isVisible() && await page.getByRole('heading', { level: 1 }).count() === 1);
       check(`${edition}: the server issued exactly one question for it`, issued.length === 1, String(issued.length));
-      check(`${edition}: the answer field is ready: it has the focus, and its label and the question describe it`,
-        await page.evaluate(() => document.activeElement?.id === 'gt-answer' && document.activeElement.labels.length === 1 && document.activeElement.getAttribute('aria-describedby') === 'gp-prompt'));
+      check(`${edition}: on arrival the heading "Question 1 of 5" has the focus, and the answer field is labelled and described by the question`,
+        await page.evaluate(() => document.activeElement?.id === 'gp-title' && /1/.test(document.activeElement.textContent) && /5/.test(document.activeElement.textContent) && document.getElementById('gt-answer').labels.length === 1 && document.getElementById('gt-answer').getAttribute('aria-describedby') === 'gp-prompt'));
       const motion = await page.locator('.gp-prompt').evaluate(e => { const c = getComputedStyle(e); return { name: c.animationName, ms: parseFloat(c.animationDuration) * 1000 }; });
       check(`${edition}: the arrival question draws in once, in under 250 ms`, motion.name === 'gp-arrive' && motion.ms > 0 && motion.ms <= 250, JSON.stringify(motion));
       check(`${edition}: "Sign in" is top right, one click`, await page.getByTestId('guest-sign-in').isVisible());

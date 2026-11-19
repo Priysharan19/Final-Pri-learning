@@ -123,6 +123,8 @@ export default function GuestPage() {
   const [arrived, setArrived] = useState(false);   // the question on the page is the one drawn on arrival (it draws in once)
   const headRef = useRef(null);
   const answerRef = useRef(null);
+  const flying = useRef(false);                   // one question request at a time per page (a second tab is the server's to count)
+  const arrivalSent = useRef(false);
   const land = useRef(null);                      // where focus goes once the next view is drawn
 
   const courses = useMemo(() => coursesFor(EDITION, choice.year), [choice.year]);
@@ -145,6 +147,8 @@ export default function GuestPage() {
   const start = useCallback(async (picked, { arrival = false } = {}) => {
     setProblem(null);
     if (picked.form === 'written') return prompt('written');
+    if (flying.current) return;
+    flying.current = true;
     setBusy(true);
     try {
       const target = guestTarget(EDITION, picked);
@@ -155,7 +159,8 @@ export default function GuestPage() {
       setAnswer(''); setOption(null); setVerdict(null); setHint(false); setChoosing(false);
       // A fine pointer means a keyboard is at hand: the visitor can type at once. A phone keeps its keyboard down until asked.
       const typed = out.question?.answerType !== 'mcq';
-      land.current = arrival ? (typed && globalThis.matchMedia?.('(pointer: fine)').matches ? 'answer' : null) : (typed ? 'answer' : 'head');
+      // On arrival the heading takes focus so a screen reader says "Question n of 5" first; later questions go to the answer.
+      land.current = arrival ? 'head' : (typed ? 'answer' : 'head');
       setArrived(arrival);
       setStage('question');
     } catch (error) {
@@ -163,7 +168,7 @@ export default function GuestPage() {
       // On arrival a refusal is never the first thing said: the chooser is, and it will say so when asked.
       if (!arrival && ['limit', 'address', 'busy', 'account'].includes(r)) prompt(r);
       else { if (!arrival || r === 'none') setProblem(ERROR_KEY[r] || 'guest.offline'); setStage(s => (s === 'opening' ? 'choose' : s)); if (!arrival) setChoosing(true); }
-    } finally { setBusy(false); }
+    } finally { flying.current = false; setBusy(false); }
   }, []);
 
   // Arrival. Untouched day and a page someone is looking at: draw the first question now. Otherwise the chooser.
@@ -173,7 +178,7 @@ export default function GuestPage() {
       if (!live) return;
       setRemaining(s.remaining); if (s.limit) setLimit(s.limit);
       if (s.remaining === 0) { setWhy('limit'); setStage('signup'); }
-      else if (s.remaining === s.limit && choice.form !== 'written' && document.visibilityState === 'visible') start(choice, { arrival: true });
+      else if (s.remaining === s.limit && choice.form !== 'written' && document.visibilityState === 'visible' && !arrivalSent.current) { arrivalSent.current = true; start(choice, { arrival: true }); }
       else setStage('choose');
     }).catch(() => { if (live) setStage('choose'); });
     return () => { live = false; };
