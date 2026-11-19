@@ -38,7 +38,15 @@ const FUNCTION_WORDS = /\b(?:sin|cos|tan|sec|cosec|csc|cot|ln|log|asin|acos|atan
 // `Ans = 72` under the working: ticked when it equals the line above, never crossed (it may answer something else).
 const ANS_LABEL = /^(?:ans|answer)\.?\s*(?==)/i;
 const close = (a, b) => Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b));
-const shown = v => { const r = Math.round(v * 1e6) / 1e6; return String(Object.is(r, -0) ? 0 : r).replace(/-/g, '−'); };
+// A value is shown the way a student writes it: a whole number, a simple fraction (64/3, not 21.333333), or four
+// decimal places.
+const shown = v => {
+  const minus = s => String(s).replace(/-/g, '−');
+  if (Number.isInteger(v)) return minus(Object.is(v, -0) ? 0 : v);
+  for (let d = 2; d <= 12; d++) { const n = Math.round(v * d); if (Math.abs(v * d - n) < 1e-9 && Math.abs(n) < 100000) return minus(`${n}/${d}`); }
+  const r = Math.round(v * 1e4) / 1e4;
+  return minus(Object.is(r, -0) ? 0 : r);
+};
 
 /** The value of one side when it is plain arithmetic on numbers; null otherwise. */
 function valueOf(side) {
@@ -440,7 +448,8 @@ export function stepCheckArithmetic(workingText) {
     const carried = prev;
     // A label is set aside: `Numerator:`, `LHS =` in front, `= RHS` behind, an end mark. What such a line leaves for
     // the `=` line below is tick only, like a line of letters.
-    const src0 = line.replace(/^[A-Za-z][A-Za-z ]{1,24}:\s*(?=\S)/, '').replace(/^(?:LHS|RHS|L\.H\.S\.?|R\.H\.S\.?)\s*=\s*(?=\S)/i, '')
+    // (a word in front of `=`, such as `Area = …`, labels the line like `Area: …`; a full stop or semicolon may end it)
+    const src0 = line.replace(/\s*[;.]\s*$/, '').replace(/^(?!(?:sin|cos|tan|sec|cosec|csc|cot|ln|log|sqrt|exp|abs|pi|ans|answer|lhs|rhs)\b)[A-Za-z]{3,14}\s*=\s*(?=\S)/i, '').replace(/^[A-Za-z][A-Za-z ]{1,24}:\s*(?=\S)/, '').replace(/^(?:LHS|RHS|L\.H\.S\.?|R\.H\.S\.?)\s*=\s*(?=\S)/i, '')
       .replace(/\s*(?:\/\/|∎|□)\s*$/, '').replace(/\s*=\s*(?:LHS|RHS|L\.H\.S\.?|R\.H\.S\.?)\s*$/i, '');
     // Owner, 19 November 2026 (a sign slip a competitor caught: `a(2) = (4 - 8 + 2)e^(-2) = 2e^(-2) > 0 so …`):
     //   · a value of a function in front of a worked chain (`a(2) = … = …`) is a label for the chain;
@@ -585,6 +594,23 @@ export function stepCheckArithmetic(workingText) {
     if (ansLine) return note(line, NOTE);
     // Two bare numbers and nothing else (`500 = 340`) is words lost in reading, not a sum someone got wrong.
     if (allSides.every(x => /^\s*-?\d+(?:\.\d+)?\s*$/.test(x)) && !(continuation && before)) return note(line, NOTE);
+    // Owner's page, 19 November 2026 (live): a number jotted in the margin was read into the start of a true line,
+    // `16/3 = 2[2(4)^2 - 4^3/3] = 2[32 - 64/3]`, and the line was crossed. A bare number in FRONT of worked
+    // expressions that agree with one another is not the line's own claim:
+    //   · when what follows it equals the chain above, the line is ticked as that continuation, and the comment says
+    //     the number in front was left out;
+    //   · otherwise the line is a note. It is never crossed.
+    if (!continuation && allSides.length >= 2 && /^\s*-?\d+(?:\.\d+)?(?:\s*\/\s*\d+)?\s*$/.test(allSides[0]) && /[-+*\/^(]/.test(allSides.slice(1).join(' ').replace(/^\s*-/, ''))) {
+      const rest = allValues.slice(1);
+      if (rest.every(v => close(v, rest[0])) && !close(allValues[0], rest[0])) {
+        if (carried && carried.value !== undefined && closeLoose(rest[0], carried.value)) {
+          prev = { value: rest[0], text: sides[sides.length - 1], calculus: true };
+          out.push({ text: line, status: 'ok', state: 'arithmetic', note: `This equals the line above: ${shown(rest[0])}. The ${allSides[0].trim()} in front of it was not read as part of the line.`, valueChain: { rule: 'true-as-written' } });
+          return;
+        }
+        return note(line, MISREAD_NOTE);
+      }
+    }
     if (trueUnderAnotherReading(allSides, allValues)) return note(line, MISREAD_NOTE);
     const k = allValues.findIndex(v => !close(v, allValues[0]));
     const message = logFalseInBoth ? `${allSides[0].trim()} does not equal ${allSides[k].trim()}, whether log means base 10 or base e.`

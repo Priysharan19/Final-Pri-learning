@@ -122,6 +122,16 @@ ok(st(['x^2 - 4 = 0 so (x-2)(x+2) = 0', 'x = 2']) === 'ok,ok' && st(['2x = 4 so 
   ok(st(['d = 3^2 + 4^2', '= 25', '= 5']) === 'note,ok,note' && st(['d = 3^2 + 4^2', '= 24', '= 5']) === 'note,break,note', 'only the first rewrite under a worked expression is held to it; a line after that is never crossed');
   ok(st(['t = 5', '= 20']) === 'note,note' && st(['v = 3(4) + 5', '= 20']) === 'note,break' && st(['v = 3(4) + 5', '= 17']) === 'note,ok' && st(['Total: 3 + 4', '= 8']) === 'note,note', 'a rewrite is held to a worked expression above it; a bare number or a labelled line above stays tick only');
 }
+// the owner's live page, 19 November 2026: a number from the margin read into the start of a true line
+{
+  const LIVE = ['8 y = 2x(4 - x).', 'Area = ∫_0^4 2x(4 - x) dx ;', '= 2∫_0^4 4x - x^2 dx', '= 2[4x^2/2 - x^3/3]_0^4', '= 2[2x^2 - x^3/3]_0^4', '16/3 = 2[2(4)^2 - 4^3/3] = 2[32 - 64/3]', '= 64/3'];
+  const live = run(LIVE);
+  ok(live.firstBreak === -1 && live.lines.map(l => l.status).join() === 'note,note,ok,ok,ok,ok,ok', `nothing on the page is crossed and every worked line is ticked (${live.lines.map(l => l.status)})`);
+  ok(/64\/3/.test(live.lines[5].note) && /16\/3 in front of it was not read as part of the line/.test(live.lines[5].note) && !/21\.3/.test(JSON.stringify(live.lines)), `the tick says what was left out, and values are written as fractions (${live.lines[5].note})`);
+  ok(st(['16/3 = 2[32 - 64/3]']) === 'note' && st(['14 = -20 - 6']) === 'note' && st(['7 = 5 + 1 = 6']) === 'note' && st(['5 = 2 + 3']) === 'ok', 'a bare number in front of worked expressions is never crossed; a true one is still ticked');
+  ok(st(['-20 - 6 = 14']) === 'break' && st(['2 + 3 = 6']) === 'break' && st(['2[32 - 64/3] = 16/3']) === 'break', 'a worked expression set equal to a wrong value is still crossed');
+  ok(st(['Area = 3 × 4', '= 12']) === 'note,ok' && st(['Volume = 2 + 2 = 5']) === 'break' && st(['Area = 12']) === 'note', 'a word in front of `=` is a label');
+}
 // never crossed
 for (const f of ['3x + 2 = 11', 'x = 3', 'n = 5', 'P(A) = 3', 'sin(30) = 2', 'log(100) = 3', 'ln 5 = 2', 'pi = 3', 'e^2 = 7', '50% of 80 = 30', '90° = 2', '5 cm + 3 cm = 9 cm', '2 1/2 = 5/2', '1 000 = 1000', '3 < 2', '4 ≠ 4', 'the answer is 5', '', '= 5', '6/0 = 3', '(((', '2 + = 4']) ok(!/break|ok/.test(st([f])), `not judged: "${f}" (${st([f])})`);
 for (const f of ['0.5 + 0.25 = 0.8', '1000(1.05)^3 = 1157', '10/3 = 3.3', '22/7 ≈ 3', '√2 ≈ 1', '740^0.5 = 27']) ok(st([f]) === 'note', `a line that may be a rounding is not crossed: ${f}`);
