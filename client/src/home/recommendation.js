@@ -129,7 +129,13 @@ export function resolveHomeRecommendation({
     if (item) rows.push(item);
   }
 
-  if (resume) rows.push(item(
+  // "Continue" is a promise that the student started something. A new account has
+  // answered nothing, and the practice page may already have drawn it a first question
+  // on arrival (it is served, not started), so an unanswered practice row alone is not
+  // a thing to continue: the first-practice card opens that same question. A task the
+  // student set or was given keeps its own resume.
+  const attempted = Math.max(0, Number(stats?.totals?.attempts) || 0) > 0 || Math.max(0, Number(user?.today?.questions) || 0) > 0;
+  if (resume && (resume.kind === 'task' || attempted)) rows.push(item(
     resume.kind === 'task' ? 'task-resume' : 'practice-resume',
     resume.kind === 'task' ? 84 : 83,
     resume.taskId || resume.questionId || 'practice',

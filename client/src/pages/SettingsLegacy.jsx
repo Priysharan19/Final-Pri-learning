@@ -16,6 +16,7 @@ import { errorReportsEnabled, setErrorReportsEnabled } from '../platform/telemet
 import { INSTRUMENT_UI } from '../platform/features.js';
 import { offersCourse, offeredLanguages, offeredYears, pathwayOffered } from '../platform/edition.js';
 import Glyph from '../instrument/Glyph.jsx';
+import { sellsPremium, useSaleAvailable } from '../paywall/useSaleAvailable.js';
 
 // The instrument build draws a glyph beside each section name (s9); the
 // flag-off build renders exactly what it did.
@@ -276,7 +277,7 @@ const SECTIONS_ALL = [
   ['data', '⇅', 'settings.secData'],
   ['help', '?', 'settings.secHelp'],
 ];
-const SECTIONS = offeredLanguages(LANGUAGES).length > 1 ? SECTIONS_ALL : SECTIONS_ALL.filter(([k]) => k !== 'language');
+const SECTIONS_BASE = SECTIONS_ALL.filter(([k]) => k !== 'language' || offeredLanguages(LANGUAGES).length > 1);
 
 function SecuritySection({ toast }) {
   const { user, setUser } = useApp();
@@ -384,7 +385,12 @@ export default function Settings() {
   const { user, setUser, toast } = useApp();
   const t = useT();
   const [storageInfo, setStorageInfo] = useState(null);
-  const [active, setActive] = useState('plan');
+  // Where Premium is not on sale (the edition has no provider, or its server says it is not selling) there is no
+  // plan to show: the Plan section, with its plan wording and the line about what Premium adds, is not drawn.
+  const sells = sellsPremium(useSaleAvailable());
+  const SECTIONS = sells ? SECTIONS_BASE : SECTIONS_BASE.filter(([k]) => k !== 'plan');
+  const [activeRaw, setActive] = useState('plan');
+  const active = SECTIONS.some(([k]) => k === activeRaw) ? activeRaw : SECTIONS[0][0];
   const importRef = useRef(null);
   const secRefs = useRef({});
   useEffect(() => { api.get('/data/storage').then(setStorageInfo).catch(() => { }); }, []);
@@ -497,6 +503,7 @@ export default function Settings() {
 
         <div className="grid" style={{ gap: 18 }}>
           {/* ── Plan ── */}
+          {sells && (
           <div className="card" ref={el => secRefs.current.plan = el}>
             <h2>{t('settings.localPlan')}</h2>
             <p className="muted" style={{ margin: '4px 0 14px' }}>{t(FREE_TIER.practicePerDay === null ? 'settings.localPlanSubUncapped' : 'settings.localPlanSub', { limit: FREE_TIER.practicePerDay, exams: FREE_TIER.examsPerWindow, days: FREE_TIER.examWindowDays })}</p>
@@ -510,6 +517,7 @@ export default function Settings() {
             {/* #283: what Premium adds, worded from PLAN_CAPABILITIES — never "all features". */}
             <p className="muted" data-premium-adds style={{ margin: '10px 0 0', fontSize: 13 }}>{t('settings.premiumAdds')}</p>
           </div>
+          )}
 
           {/* ── Account information ── */}
           <div className="card">

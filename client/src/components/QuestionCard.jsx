@@ -34,6 +34,7 @@ import { proposeFinalAnswer, readsAsWritten } from '../photo/finalAnswer.js';
 import { clearPhotoDraft, confirmPhotoDraftSaved, readPhotoDraft, savePhotoDraft } from '../local/photoDrafts.js';
 import { lineMarks } from './workingEvidence.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
+import QuestionReport from './QuestionReport.jsx';
 import { renderPdfPages, MAX_PDF_INPUT_BYTES } from '../ink/pdfPage.js';
 import { intakeImageFile, intakeMessageKey, isPdfFile, claimsHeic, PHOTO_OR_PDF_ACCEPT } from '../ink/photoIntake.js';
 import useFileDrop from '../lib/useFileDrop.js';
@@ -415,6 +416,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [showWhy, setShowWhy] = useState(false);
   const [showSyms, setShowSyms] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const [state, setState] = useState({ phase: 'answering' });
   // Submit found that the server no longer holds the read of this page (it
   // was read long ago). Submit never buys a read: the student is asked to
@@ -550,7 +552,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     // An old photo must never follow the student into a new question.
     photoReadGeneration.current += 1;
     pendingPdf.current = null;
-    setPhoto(null); setPhotoSignInOpen(false); setInkSignInOpen(false); setPhotoReattachRequired(false); setBookmarked(false);
+    setPhoto(null); setPhotoSignInOpen(false); setInkSignInOpen(false); setPhotoReattachRequired(false); setBookmarked(false); setReportOpen(false);
     setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
     setPhotoLines(null); setPhotoNote(null); setPhotoAnswerSource(null); setPhotoRestored(false);
     ++photoSaveRevision.current;
@@ -2718,6 +2720,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         </div>
         {figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: figure }} />}
         {showWhy && why && <p className="q-why">{why}</p>}
+        {reportOpen && question.serverQuestionId && (
+          <QuestionReport questionId={question.serverQuestionId} onClose={() => setReportOpen(false)}
+            onSent={() => { setReportOpen(false); toast(t('report.thanks'), 3200); }} />
+        )}
 
         {/* The tutor policy's smallest next step (engine/tutorPolicy.js), above
             the ladder; a rung it suggests is opened by getHint, as the rung is. */}
@@ -2808,6 +2814,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             {!diagnostic && (
               <button type="button" className={`icon-btn q-rail-btn ${bookmarked ? 'on' : ''}`} aria-pressed={bookmarked}
                 title={t('verdict.favorite')} aria-label={t('verdict.favoriteThis')} onClick={toggleBookmark}><Icon name="bookmark" /></button>
+            )}
+            {!diagnostic && question.serverQuestionId && (
+              <button type="button" className={`icon-btn q-rail-btn ${reportOpen ? 'on' : ''}`} aria-expanded={reportOpen} data-report-question
+                title={t('report.open')} aria-label={t('report.open')} onClick={() => setReportOpen(o => !o)}><Icon name="flag" /></button>
             )}
           </div>
         </div>
