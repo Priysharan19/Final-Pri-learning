@@ -10,7 +10,7 @@ Reproduce: `node tools/understanding-audit/run.mjs` (deterministic; fixed seeds;
 
 - 91.9% of generated questions have no step check at all: the server never judges a line of their working.
 - Over all working lines in the corpus, 6.4% get any verdict and 6.4% of correct lines are ticked.
-- Where the step check does run, 59.9% of lines get a verdict, 58.9% of correct lines are ticked, 0 correct lines are crossed, 268 of 289 slipped lines are caught at the right line, and 0 wrong lines are ticked.
+- Where the step check does run, 59.8% of lines get a verdict, 58.8% of correct lines are ticked, 0 correct lines are crossed, 268 of 289 slipped lines are caught at the right line, and 0 wrong lines are ticked.
 
 ## 1. Whether the question offers a step check at all
 
@@ -37,10 +37,10 @@ The server calls `stepCheck` only when `stepMetaFor(q)` returns a meta (an autho
 
 | Group | Scored lines | Any verdict | Correct lines ticked | False crosses | Wrong lines caught at the right line | FALSE TICKS |
 |---|---:|---:|---:|---:|---:|---:|
-| All | 8647 | 59.9% | 58.9% | 0 | 92.7% | 0 |
-| NSW | 5770 | 47.0% | 45.7% | 0 | 88.0% | 0 |
+| All | 8647 | 59.8% | 58.8% | 0 | 92.7% | 0 |
+| NSW | 5770 | 46.9% | 45.6% | 0 | 88.0% | 0 |
 | India | 2877 | 85.7% | 85.1% | 0 | 100.0% | 0 |
-| All, excluding template lines | 8005 | 63.2% | 62.2% | 0 | 92.7% | 0 |
+| All, excluding template lines | 8005 | 63.1% | 62.2% | 0 | 92.7% | 0 |
 
 Template lines are authored lines that use a symbol the question never introduces (for example the generic formula `f'(x) = a(cx + e) + c(ax + b)`). They are true in the generator's terms but a student would not write them, so silence on them is arguably right. The last row removes them.
 
@@ -62,19 +62,19 @@ None in this corpus.
 
 | Group | Scored lines | Any verdict | Correct lines ticked | False crosses | Wrong lines caught at the right line | FALSE TICKS |
 |---|---:|---:|---:|---:|---:|---:|
+| owner-misread | 3 | 0.0% | 0.0% | 0 | n/a | 0 |
 | units | 29 | 17.2% | 17.2% | 0 | n/a | 0 |
+| owner-clean | 3 | 33.3% | 33.3% | 0 | n/a | 0 |
 | continuation | 29 | 41.4% | 41.4% | 0 | n/a | 0 |
 | restate | 1610 | 52.4% | 52.4% | 0 | n/a | 0 |
 | substitution | 131 | 53.4% | 53.4% | 0 | n/a | 0 |
 | labelled | 1434 | 57.3% | 57.3% | 0 | n/a | 0 |
 | therefore | 1808 | 57.8% | 57.8% | 0 | n/a | 0 |
 | bare | 1769 | 59.2% | 59.2% | 0 | n/a | 0 |
-| owner-misread | 3 | 66.7% | 66.7% | 0 | n/a | 0 |
 | sentence | 626 | 68.4% | 68.4% | 0 | n/a | 0 |
 | slip | 1190 | 74.5% | 70.8% | 0 | 92.7% | 0 |
 | owner-wrong-choice | 7 | 85.7% | 85.7% | 0 | n/a | 0 |
 | owner-right-choice | 8 | 87.5% | 87.5% | 0 | n/a | 0 |
-| owner-clean | 3 | 100.0% | 100.0% | 0 | n/a | 0 |
 
 Style names: bare = equation chain with the answer last; labelled = `label = value` or `label: value` answer line; therefore = answer line prefixed `∴`, `so`, `hence` or `therefore`; restate = question's expression written first; continuation = lines starting `=`; substitution = `f(2) = …`, `when x = …`, `let …`; units = units or words on the answer line; sentence = a prose line in the middle; slip = one realistic error (sign, arithmetic, dropped factor).
 
@@ -82,6 +82,7 @@ Same, over all questions (including those with no step check):
 
 | Group | Scored lines | Any verdict | Correct lines ticked | False crosses | Wrong lines caught at the right line | FALSE TICKS |
 |---|---:|---:|---:|---:|---:|---:|
+| owner-misread | 3 | 0.0% | 0.0% | 0 | n/a | 0 |
 | units | 2849 | 0.2% | 0.2% | 0 | n/a | 0 |
 | continuation | 516 | 2.3% | 2.3% | 0 | n/a | 0 |
 | labelled | 15037 | 5.5% | 5.5% | 0 | n/a | 0 |
@@ -91,10 +92,9 @@ Same, over all questions (including those with no step check):
 | sentence | 5853 | 7.3% | 7.3% | 0 | n/a | 0 |
 | restate | 10239 | 8.2% | 8.2% | 0 | n/a | 0 |
 | substitution | 454 | 15.4% | 15.4% | 0 | n/a | 0 |
-| owner-misread | 3 | 66.7% | 66.7% | 0 | n/a | 0 |
+| owner-clean | 3 | 33.3% | 33.3% | 0 | n/a | 0 |
 | owner-wrong-choice | 7 | 85.7% | 85.7% | 0 | n/a | 0 |
 | owner-right-choice | 8 | 87.5% | 87.5% | 0 | n/a | 0 |
-| owner-clean | 3 | 100.0% | 100.0% | 0 | n/a | 0 |
 
 ## 6. By question family
 
@@ -108,6 +108,7 @@ Same, over all questions (including those with no step check):
 | me12-trigeq (NSW) | 475 | 13.9% | 13.9% | 0 | n/a | 0 |
 | y12-explogcalc (NSW) | 184 | 15.8% | 14.8% | 0 | 100.0% | 0 |
 | c11-sets (India) | 68 | 16.2% | 16.2% | 0 | n/a | 0 |
+| hand:owner-buoy (NSW) | 6 | 16.7% | 16.7% | 0 | n/a | 0 |
 | y11-sine-cosine-rule (NSW) | 55 | 21.8% | 17.3% | 0 | 100.0% | 0 |
 | me12-calc (NSW) | 125 | 17.6% | 17.6% | 0 | n/a | 0 |
 | mex-integration (NSW) | 58 | 20.7% | 20.7% | 0 | n/a | 0 |
@@ -116,7 +117,6 @@ Same, over all questions (including those with no step check):
 | c12-definite-integrals (India) | 139 | 29.5% | 26.3% | 0 | 100.0% | 0 |
 | c11-complex-numbers (India) | 141 | 29.8% | 26.7% | 0 | 100.0% | 0 |
 | ms12-nonright (NSW) | 21 | 38.1% | 31.6% | 0 | 100.0% | 0 |
-| y8-linear (NSW) | 101 | 38.6% | 35.4% | 0 | 100.0% | 0 |
 
 ### 6b. All 47 families that offer a step check, worst first
 
@@ -128,6 +128,7 @@ Same, over all questions (including those with no step check):
 | me12-trigeq (NSW) | 475 | 13.9% | 13.9% | 0 | n/a | 0 |
 | y12-explogcalc (NSW) | 184 | 15.8% | 14.8% | 0 | 100.0% | 0 |
 | c11-sets (India) | 68 | 16.2% | 16.2% | 0 | n/a | 0 |
+| hand:owner-buoy (NSW) | 6 | 16.7% | 16.7% | 0 | n/a | 0 |
 | y11-sine-cosine-rule (NSW) | 55 | 21.8% | 17.3% | 0 | 100.0% | 0 |
 | me12-calc (NSW) | 125 | 17.6% | 17.6% | 0 | n/a | 0 |
 | mex-integration (NSW) | 58 | 20.7% | 20.7% | 0 | n/a | 0 |
@@ -158,7 +159,6 @@ Same, over all questions (including those with no step check):
 | y10-quadratics (NSW) | 224 | 70.1% | 70.1% | 0 | n/a | 0 |
 | c10-linear-pair-methods (India) | 373 | 76.9% | 76.2% | 0 | 100.0% | 0 |
 | y7-equations (NSW) | 265 | 78.1% | 77.5% | 0 | 87.5% | 0 |
-| hand:owner-buoy (NSW) | 6 | 83.3% | 83.3% | 0 | n/a | 0 |
 | hand:owner-stationary (NSW) | 15 | 86.7% | 86.7% | 0 | n/a | 0 |
 | c7-range-display-reasoning (India) | 216 | 88.9% | 88.9% | 0 | n/a | 0 |
 | y8-equations (NSW) | 403 | 89.6% | 89.1% | 0 | 100.0% | 0 |
@@ -199,19 +199,19 @@ Full list: `c10-ap-daily-life-reasoning`, `c10-ap-inverse-competency`, `c10-ap-s
 
 ## 7. Why the engine is silent (questions with a step check)
 
-3470 scored lines got no verdict. Reasons are assigned from the shape of the line (first matching rule), so they are this audit's classification, not the engine's own words.
+3474 scored lines got no verdict. Reasons are assigned from the shape of the line (first matching rule), so they are this audit's classification, not the engine's own words.
 
 | # | Reason | Silent lines | Share of silent | Example |
 |---:|---|---:|---:|---|
-| 1 | equation, other form | 915 | 26.4% | `a^2 = 121` (bare) |
+| 1 | equation, other form | 915 | 26.3% | `a^2 = 121` (bare) |
 | 2 | line judged to be off the answer path ("this question’s check covers the lines that lead to the answer") | 641 | 18.5% | `x = 197 - 8 × 22 = 21` (bare) |
 | 3 | line is about a letter other than the question’s unknown | 390 | 11.2% | `x^2 - 2x + 26 = 0` (restate) |
 | 4 | equation with a symbol the question never introduces (template/formula line) | 236 | 6.8% | `a + b = 7` (bare) |
-| 5 | word label before the value ("max = …", "x-int: …", "ans = …") | 210 | 6.1% | `f(g(x)) = (4x + 1) + 2 = 4x + 3` (bare) |
+| 5 | word label before the value ("max = …", "x-int: …", "ans = …") | 212 | 6.1% | `f(g(x)) = (4x + 1) + 2 = 4x + 3` (bare) |
 | 6 | units / words after the number ("= 27 m", "72 °", "10 years") | 192 | 5.5% | `-33 dollars` (units) |
 | 7 | single-letter variable equation ("x = 35", "a = 10") not matching an expected step | 163 | 4.7% | `x = 4y + 2` (bare) |
 | 8 | expression only, no "=" (not an equation) | 139 | 4.0% | `f⁻¹(x): (x - 2)/2` (labelled) |
-| 9 | continuation line starting with "=" | 116 | 3.3% | `= 9` (continuation) |
+| 9 | continuation line starting with "=" | 118 | 3.4% | `= 9` (continuation) |
 | 10 | inequality or chained comparison | 101 | 2.9% | `b^2 - 4ac = 4 - 104 = -100 < 0` (bare) |
 | 11 | function / point evaluation ("f(2) = …", "P(-3) = …") | 101 | 2.9% | `f(x) = 4x + 2` (restate) |
 | 12 | starts with a "∴" / "so" / "hence" / "therefore" prefix | 97 | 2.8% | `so ans = 2 or 3 or 6 or 8 or 9 or 11 or 12` (therefore) |

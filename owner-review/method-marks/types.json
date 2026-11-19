@@ -147,7 +147,7 @@
           "decidedBy": "interpreter"
         }
       ],
-      "digest": "9c183521d681ab80092b6659812e28b7e6d7df7b0ea53398d020befc8d633c73"
+      "digest": "6e34ad8532c9f09b60ec7fc0e444805b220b8806dde224404f911ec23ca5d96d"
     },
     {
       "id": "y12-trig-evaluate",
@@ -173,7 +173,7 @@
           "decidedBy": "answer checker"
         }
       ],
-      "digest": "c23cfa56a7b5dacd7bf40237d288a64a48e3e1df428d5fb40a9255f3c2474e2e"
+      "digest": "ec83c0aafa5924efa40e02454f5ffa7913733f8770dab6c0a28ba69779fb30d4"
     },
     {
       "id": "y12-diff-explog",

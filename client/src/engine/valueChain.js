@@ -166,7 +166,7 @@ export function domainRestricted(meta, prompt) {
   if (meta && (meta.domain || meta.interval || meta.restricted || meta.fn?.domain || meta.fn?.interval)) return true;
   // A half-line lower bound ("for t ≥ 0", "t > 0") leaves a periodic function every value it takes, so it is not a restriction.
   const text = String(prompt || '').replace(/[A-Za-z]\s*(?:≥|>|\\ge(?:q)?\b|\\gt\b)\s*-?\d+(?:\.\d+)?(?![\d.]*\s*(?:≤|<|\\le|\\lt))/gi, ' ');
-  return /[≤≥<>]|\\(?:le|leq|ge|geq|lt|gt)\b|\bdomain\b|\binterval\b|\bbetween\b|\brestrict|\\in\s*[\[(]|\bfrom\s+\$?(?:[a-z]\s*=\s*)?-?\d[^.?]*\bto\s+\$?(?:[a-z]\s*=\s*)?-?\d|\bfirst\s+\d|\bduring\b|\bwithin\b|\buntil\b/i.test(text);
+  return /\b(?:first|next|last|initial)\s+(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|hour|minute|second|day|week|month|year)\b|\b(?:over|for|in|during|within|until|up to)\s+(?:the\s+)?(?:first|next|last|initial)\b|\b(?:for|from|over)\s+\$?(?:[a-z]\s*=\s*)?-?\d+(?:\.\d+)?\s*(?:to|-|–)\s*-?\d|\b[a-z]\$?\s*(?:in|∈)\s*\$?\s*[\[(]|[a-z]\s*=\s*-?\d+(?:\.\d+)?\s*[,;]\s*-?\d|\bat\s+(?:the\s+)?times?\b|\bonly\b|[≤≥<>]|\\(?:le|leq|ge|geq|lt|gt)\b|\bdomain\b|\binterval\b|\bbetween\b|\brestrict|\\in\s*[\[(]|\bfrom\s+\$?(?:[a-z]\s*=\s*)?-?\d[^.?]*\bto\s+\$?(?:[a-z]\s*=\s*)?-?\d|\bfirst\s+\d|\bduring\b|\bwithin\b|\buntil\b/i.test(text);
 }
 
 export function stepCheckValueChain(meta, workingText, options = null) {
@@ -237,7 +237,9 @@ export function stepCheckValueChain(meta, workingText, options = null) {
     }
     let truth, name;
     if (label.type === 'quantity') {
-      if (restricted && label.key !== 'period') return note(line, 'Not verified: this question restricts the values, and Pri checks this quantity over the whole function, so it is not marked.');
+      // Safe by default: the max / min / amplitude / midline are the function's global values, so they are held to the line only when
+      // the question is positively known to be unrestricted (the generator's meta says fullDomain) and its prompt shows no restriction.
+      if ((restricted || meta.fullDomain !== true) && label.key !== 'period') return note(line, 'Not verified: Pri cannot tell that this question covers every value of the function, and the maximum or minimum on part of it can differ, so this line is not marked.');
       truth = trueQuantity(fn, label.key);
       name = QUANTITY_NAMES[label.key];
     } else {

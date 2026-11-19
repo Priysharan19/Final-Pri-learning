@@ -1592,6 +1592,14 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
         // named. A line it cannot read falls through to the old rule below.
         const side = sideLine(line, calculus, out.map(l => String(l.text)));
         let assessed = side ? { status: side.status, note: side.note, side: true } : assessCalculusLine(line, calculus, meta, calculusStage);
+        // Every-reading rule for an exponent written as an unbracketed fraction (x^-1/2 is x^(-1/2) or (x^-1)/2) and for a decimal
+        // approximation of an exact constant (6.28r for 2πr): neither is provably false, so the line abstains.
+        if (assessed && assessed.status === 'break' && !assessed.side && calculus) {
+          const unbracketedFractionExponent = /\^\s*-?\s*\d+(?:\.\d+)?\s*\/\s*[\d(a-z]/i.test(String(line));
+          const roundedConstant = /(?:π|\bpi\b|\\pi)/i.test(String(meta.canonical || '') + ' ' + String(prompt || '')) && /\d\.\d/.test(String(line));
+          if (unbracketedFractionExponent) assessed = { status: 'note', note: 'This exponent can be read two ways (x^-1/2 is x^(-1/2) or x^-1 over 2), so it is not marked wrong. Put the exponent in brackets.' };
+          else if (roundedConstant) assessed = { status: 'note', note: 'This uses a rounded value of π, so it is not marked wrong. Keep π exact or say the rounding.' };
+        }
         // Every-reading rule for an unbracketed function argument ("2cos 2x" is 2cos(2x) or 2cos(2)·x): the line is crossed only when it
         // is false under every reading; true under either, it abstains.
         if (assessed && assessed.status === 'break' && !assessed.side && calculus) {

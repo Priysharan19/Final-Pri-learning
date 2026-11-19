@@ -140,6 +140,43 @@ ok(status(EXP, EP, ['x^3+6x^2+11x+7'])[0] === 'break', 'a wrong full expansion i
   ok(status(CHM, CHP, ['d/dx[(x^2+1)^3] = 3(x^2+1)^2 * 3x'])[0] !== 'ok', 'and a false right side after the bracketed operator is never ticked');
 }
 
+// ── Review round 2: the prompt-defined context only ADDS crosses for lines provably false against the derivative of the prompt's own definition ──
+{
+  // Differential list: every line here is TRUE (or a legitimate abstention) and was a note on the path before the prompt-defined context
+  // existed, so none may be a break. Each entry: [canonical, prompt, lines].
+  const TRUE_LINES = [
+    ['12', 'Find dA/dr when r = 2 if A = 3r^2.', ['dA/dr = 6r']],
+    ['12', 'Find dA/dr at r = 2 if A = 3r^2.', ['dA/dr = 6r']],
+    ['12', 'Evaluate dA/dr when r=2 if A = 3r^2.', ['dA/dr = 6r']],
+    ['12', 'Find the value of dA/dr when r = 2 if A = 3r^2.', ['dA/dr = 6r', '= 12']],
+    ['4', 'Find dA/dr when r = 2, where A = r^2.', ['dA/dr = 2r', '= 4']],
+    ['4', 'Find $\\dfrac{dA}{dr}$ when $r = 2$, where $A = r^2$.', ['dA/dr = 2r', '= 4']],
+    ['6t', 's = t^3. Find ds/dt and hence d²s/dt².', ['ds/dt = 3t^2']],
+    ['6t', 's = t^3. Find ds/dt and hence d^2s/dt^2.', ['ds/dt = 3t^2']],
+    ['6t', 'Given s = t^3, find the second derivative; first find ds/dt.', ['ds/dt = 3t^2']],
+    ['2*pi*r', 'Find dA/dr where A = πr^2.', ['dA/dr = 6.28r']],
+    ['2*pi*r', 'Find dA/dr where A = πr^2.', ['dA/dr = 3.14 * 2r']],
+    ['2*pi*r', 'Find dA/dr where A = πr^2.', ['dA/dr = 6.283r']],
+    ['2*pi*r', 'Find dA/dr where A = πr^2. Use π = 3.14.', ['dA/dr = 6.28r']],
+    ['1/(2*sqrt(r))', 'A = sqrt(r). Find dA/dr.', ['dA/dr = 1/2 * r^-1/2']],
+    ['1/(2*sqrt(r))', 'A = sqrt(r). Find dA/dr.', ['dA/dr = 1/2 r^-1/2']],
+    ['2*pi*r', 'Find dA/dr where A = πr^2.', ['A = πr^2', 'dA/dr = 2πr']],
+    ['3t^2', 'Find ds/dt if s = t^3.', ['s = t^3', 'ds/dt = 3t^2']]
+  ];
+  for (const [c, p, lines] of TRUE_LINES) ok(!status({ kind: 'expression', canonical: c }, p, lines).includes('break'), `a true line is never crossed: ${p} · ${lines.join(' ; ')}`);
+  // and the unbracketed fraction exponent and a rounded π hold on the plain y = f(x) path as well
+  ok(!status({ kind: 'expression', canonical: '1/(2*sqrt(x))' }, 'Differentiate $y = \\sqrt{x}$.', ['dy/dx = 1/2 * x^-1/2']).includes('break'), 'y = sqrt(x): x^-1/2 can be read two ways, so it is not crossed');
+  ok(status({ kind: 'expression', canonical: '1/(2*sqrt(r))' }, 'A = sqrt(r). Find dA/dr.', ['dA/dr = 1/2 * r^(-1/2)'])[0] === 'ok', 'the bracketed true exponent still ticks');
+  ok(status({ kind: 'expression', canonical: '1/(2*sqrt(r))' }, 'A = sqrt(r). Find dA/dr.', ['dA/dr = 1/3 * r^(-1/2)'])[0] === 'break', 'and a false one with a bracketed exponent is crossed');
+  ok(status({ kind: 'expression', canonical: '2*pi*r' }, 'Find dA/dr where A = πr^2.', ['dA/dr = 2πr'])[0] === 'ok', 'the exact 2πr ticks');
+  // a false line is still crossed when the question is the plain first derivative of what the prompt defines
+  ok(status({ kind: 'expression', canonical: '6r' }, 'Find dA/dr if A = 3r^2.', ['dA/dr = 5r'])[0] === 'break', 'dA/dr = 5r for A = 3r^2 is crossed');
+  ok(status({ kind: 'expression', canonical: '6r' }, 'Find dA/dr if A = 3r^2.', ['dA/dr = 6r'])[0] === 'ok', 'dA/dr = 6r for A = 3r^2 ticks');
+  // a canonical that is not the derivative of the definition (a value, a higher derivative) never builds the context
+  ok(status({ kind: 'expression', canonical: '12' }, 'Find dA/dr if A = 3r^2 at the point r = 2.', ['dA/dr = 5r']).every(x => x !== 'break'), 'a value asked at a point: a general derivative line is not held to the value');
+  ok(status({ kind: 'expression', canonical: '6t' }, 'Find d2s/dt2 for s = t^3.', ['ds/dt = 4t^2']).every(x => x !== 'break'), 'a second derivative asked: the first-derivative line is not held to it');
+}
+
 // A wrong line is never ticked, whichever reading is tried.
 for (const wrong of ['= 5(3x + 5)^4', '= 3x + 5', '= 20(3x + 5)^4']) ok(status(D.meta, D.prompt, ['y = (3x + 5)^5', wrong])[1] !== 'ok', `derivative: ${wrong} is never ticked`);
 for (const wrong of ['= 14e^(2x)', '= 7e^(2x) * 4', '= 28e^(2x)']) ok(status(I.meta, I.prompt, ['∫14e^(2x)dx', wrong])[1] !== 'ok', `integral: ${wrong} is never ticked`);

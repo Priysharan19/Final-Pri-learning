@@ -154,6 +154,10 @@ function texToPlain(tex) {
  * `given` is the integrand, or the function to differentiate. Null otherwise
  * (a definite integral, a rate, a tangent, a prompt with no single function).
  */
+// A prompt that asks for a value at a point, a second derivative, several derivatives or a rounded constant is not the plain
+// "derivative of the quantity it defines": the prompt-defined context is not built for it.
+const ASKS_MORE = /\b(?:when|at|evaluate|value|hence|second|third|higher|then|gradient|rate|approximat\w*|round\w*|decimal)\b|d\s*(?:\^|²|\\?\^?\{?2)|d²|[a-z]\s*(?:''|″)|\\(?:ddot|ddots)|\b[a-z]\s*=\s*-?\d+(?:\.\d+)?\b(?!\s*[a-z(])|3\.14|\bπ\s*=|\\pi\s*=|\bpi\s*=/i;
+
 export function calculusContext(meta, prompt) {
   if (!meta || meta.kind !== 'expression' || typeof meta.canonical !== 'string') return null;
   const text = String(prompt || '');
@@ -178,7 +182,7 @@ export function calculusContext(meta, prompt) {
   // itself defines the quantity, so a line about it can be held to it. The asked letters must be named by the prompt and the
   // quantity defined once, as a plain function of the other letter.
   const asked = [...text.matchAll(/\\d?frac\s*\{\s*d\s*([A-Za-z])\s*\}\s*\{\s*d\s*([A-Za-z])\s*\}|\bd\s*([A-Za-z])\s*\/\s*d\s*([A-Za-z])\b/g)];
-  if (asked.length === 1 && /differentiat|derivative|\bfind\b|\bd\s*[A-Za-z]\s*\/|\\frac/i.test(text)) {
+  if (asked.length === 1 && !ASKS_MORE.test(text) && /differentiat|derivative|\bfind\b|\bd\s*[A-Za-z]\s*\/|\\frac/i.test(text)) {
     const N = asked[0][1] || asked[0][3], Dv = asked[0][2] || asked[0][4];
     if (N !== Dv) {
       const flat = text.replace(/\$([^$]+)\$/g, (m, a) => ' ' + (texToPlain(a.replace(/\\pi\b/g, 'pi')) || '') + ' ');
@@ -186,7 +190,15 @@ export function calculusContext(meta, prompt) {
       if (defs.length === 1) {
         const given = tryParse(defs[0][1].trim());
         if (given && [...variablesOf(given)].every(l => l === Dv || l === 'e') && variablesOf(given).has(Dv)) {
-          return { relation: 'derivative', given, variable: Dv, dependent: N, canonical: tryParse(meta.canonical) };
+          // Only the first derivative of the prompt's own definition: the canonical must BE that derivative (not a value at a point,
+          // a second derivative or another kind of answer), else this is not a question the context can hold a line to.
+          const canonical = tryParse(meta.canonical);
+          const cache = new WeakMap();
+          if (canonical && [...variablesOf(canonical)].every(l => l === Dv || l === 'e')
+              && sameFunction(x => valueAt(canonical, x, Dv), x => derivativeAt(given, x, Dv, cache).value, 1e-6)
+              && derivativeAt(given, 1.3, Dv, cache).exact) {
+            return { relation: 'derivative', given, variable: Dv, dependent: N, canonical, promptDefined: true };
+          }
         }
       }
     }
