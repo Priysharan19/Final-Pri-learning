@@ -14,7 +14,7 @@ import { BRAND } from '../brand/edition.js';
 import { useApp } from '../App.jsx';
 import { useT } from '../i18n/index.js';
 import { ext1PapersFor } from '../pages/Ext1Papers.jsx';
-import { practiceSetsFor } from './practiceSets.js';
+import { practiceSetsFor } from '../engine/multipart/practiceSets.js';
 import { examStyleFor, startSitting } from './paperApi.js';
 
 export default function ExamStyleQuestions({ chapter }) {
