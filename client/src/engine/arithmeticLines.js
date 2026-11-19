@@ -144,7 +144,10 @@ const LOG_BARE = new RegExp(`(?<![A-Za-z])(ln|log)\\s+([A-Za-z]|[θαβφ])${FN_
 function bracketFunctions(text) {
   return text
     .replace(TRIG_BARE, (_, fn, power, arg) => (power ? `(${fn}(${arg.replace(/\s+/g, '')}))^${power}` : `${fn}(${arg.replace(/\s+/g, '')})`))
-    .replace(LOG_BARE, (_, fn, arg) => `${fn}(${arg})`);
+    .replace(LOG_BARE, (_, fn, arg) => `${fn}(${arg})`)
+    // a logarithm of one plain number (log 3, ln 10), and a space before its bracket (log (3 + 2))
+    .replace(/(?<![A-Za-z])(ln|log)\s+\(/g, '$1(')
+    .replace(/(?<![A-Za-z])(ln|log)\s*(\d+(?:\.\d+)?)(?!\s*[A-Za-z0-9^(.!])/g, '$1($2)');
 }
 
 // The comment on a tick may name the step, but only as something the two
@@ -447,7 +450,10 @@ export function stepCheckArithmetic(workingText) {
       else { const words = src.match(/^(.*=.*?[\d)])\s+(?:so|hence|therefore|thus)\s+[A-Za-z][^=<>\d]*$/i); if (words) src = words[1]; }
       src = src.replace(/^[A-Za-z]'{0,2}\(\s*-?\d+(?:\.\d+)?\s*\)\s*=\s*(?=[^=]+=)/, ''); }
     const afterLabel = labelled; labelled = src !== line;
-    const before = carried && carried.value !== undefined && !carried.calculus && !afterLabel ? carried : null;   // plain arithmetic only
+    // Plain arithmetic only, with one more case (owner, 19 November: `… = log 3 + log 2 + log 5` then `= log(3 + 2 + 5)`):
+    // a line of letters whose LAST side is a worked expression of plain numbers. The `=` line below it rewrites that
+    // expression, so it is held to it. A bare number left by such a line (`t = 5` then `= 20`) stays tick only.
+    const before = carried && carried.value !== undefined && (!carried.calculus || carried.compound) && !afterLabel ? carried : null;
     prev = null;
     if (i >= LIMITS.lines || line.length > LIMITS.chars) return note(line, 'Not checked: this line is too long or too far down the working to check.');
     if (firstBreak !== -1) return note(line, 'Follows from the earlier slip.');
@@ -473,7 +479,7 @@ export function stepCheckArithmetic(workingText) {
     // The constants e and π are numbers; a digit on each side of e (3e2) is not read.
     const CONSTANT = /(?<![A-Za-z])(?:e|pi|π)(?![A-Za-z])/g;
     if (/\de\s*[-+]?\s*\d/.test(text)) return note(line, NOTE);   // 3e2, and 2e + 3 (which reads as 2000)
-    if (calc.used || /[A-Za-zπθ]/.test(text.replace(/sqrt/gi, '').replace(/(\d)\s*[CP]\s*(?=\d)/g, '$1').replace(CONSTANT, ''))) {
+    if (calc.used || /[A-Za-zπθ]/.test(text.replace(/sqrt/gi, '').replace(/(\d)\s*[CP]\s*(?=\d)/g, '$1').replace(CONSTANT, '').replace(/(?<![A-Za-z])(?:ln|log)(?=\()/g, ''))) {
       if (signClaim) return note(line, NOT_PROVED);
       // True as written, or a note: never a cross (see "Lines that are true as written").
       if (/≈|≃|~/.test(text)) return note(line, NOT_PROVED);
@@ -482,7 +488,7 @@ export function stepCheckArithmetic(workingText) {
       const written = cont ? bits.slice(1) : bits;
       if (written.some(s => !s)) return note(line, UNREAD, { unreadable: true });
       // A last side of plain numbers carries to the `=` line below (tick only) even when the line itself is not read.
-      { const tail = valueOf(written[written.length - 1]); if (tail !== null) prev = { text: written[written.length - 1], value: tail, calculus: true }; }
+      { const tail = valueOf(written[written.length - 1]); if (tail !== null) prev = { text: written[written.length - 1], value: tail, calculus: true, compound: !calc.used && /[-+*\/^(]/.test(written[written.length - 1].trim().replace(/^-/, '')) }; }
       // Independent review (two rounds): a letter before a bracket may be a function, and f(x+h) = f(x)+f(h) or
       // x(t+h) = xt+xh read as products is a false line that looks like an identity. A letter before a bracket is read
       // as a product only when the same letter stands inside that bracket (x(x+2), n(n+1)): a function is not applied
@@ -505,7 +511,7 @@ export function stepCheckArithmetic(workingText) {
       const lastInfo = infos[infos.length - 1];
       // What a line of letters or an integral leaves for the `=` line below is tick only (`calculus`): `t = 5` then `= 20`
       // is the student carrying on something else, not a claim that 5 is 20 (found by the labelled audit).
-      if (lastInfo) prev = { text: written[written.length - 1], ...lastInfo, calculus: true };
+      if (lastInfo) prev = { text: written[written.length - 1], ...lastInfo, calculus: true, compound: !calc.used && lastInfo.value !== undefined && /[-+*\/^(]/.test(written[written.length - 1].trim().replace(/^-/, '')) };
       if (infos.some(x => !x)) return note(line, NOT_PROVED);
       const all = cont && carried ? [carried, ...infos] : infos;
       if (all.length < 2 || !all.every(x => sameAsWritten(x, all[0]))) return note(line, NOT_PROVED);
@@ -543,7 +549,22 @@ export function stepCheckArithmetic(workingText) {
     // A division followed by a product (6/2(1+2), 10!/3!7!, 5·4·3/3·2·1) is read two ways by convention: not judged.
     if (allSides.some(s => /[\/÷]/.test(s) && /[\/÷].*(?:\*|[\d)!]\s*\(|\)\s*\d|!\s*\d)/.test(s))) return note(line, NOTE);
     if (allSides.some(x => x.match(CONSTANT) && twoWays(folded(x).trim()))) return note(line, NOTE);   // 1/2π groups two ways
-    const soft = approx || allSides.some(s => /\d\.\d|^\.\d|[^\d]\.\d/.test(s) || FUNCTION_WORDS.test(s));
+    // `log` may be base 10 or base e. A line with it is ticked only when it is true in both, and crossed only when it
+    // is false in both (log 3 + log 2 + log 5 = log(3 + 2 + 5) is false whichever base is meant).
+    const BARE_LOG = /(?<![A-Za-z])log\(/g;
+    let logFalseInBoth = false;
+    if (allSides.some(x => x.match(BARE_LOG))) {
+      const natural = allSides.map(x => valueOf(x.replace(BARE_LOG, 'ln(')));
+      if (natural.some(v => v === null)) return note(line, NOTE);
+      const true10 = allValues.every(v => close(v, allValues[0])), trueE = natural.every(v => close(v, natural[0]));
+      if (true10 !== trueE) return note(line, 'Not checked: this line is true for one base of log and not the other, so it is not marked.');
+      logFalseInBoth = !true10;
+    }
+    const soft = approx || allSides.some(s => /\d\.\d|^\.\d|[^\d]\.\d/.test(s) || FUNCTION_WORDS.test(s.replace(/(?<![A-Za-z])(?:ln|log)(?=\()/g, '')));
+    // A logarithm set equal to a plain number (ln 5 = 2, log 100 = 3) may be a rounding or a slip of base: a cross needs
+    // a logarithm on both of the sides that disagree.
+    { const hasLog = x => /(?<![A-Za-z])(?:ln|log)\(/.test(x); const k0 = allValues.findIndex(v => !close(v, allValues[0]));
+      if (k0 > 0 && allSides.some(hasLog) && !(hasLog(allSides[0]) && hasLog(allSides[k0]))) return note(line, SOFT_NOTE); }
     if (allValues.every(v => close(v, allValues[0]))) {
       if (signClaim && !(signClaim === '>' ? allValues[0] > 0 : allValues[0] < 0)) return note(line, NOTE);
       const why = continuation && before ? `This equals the line above: ${shown(allValues[0])}.` : `Both sides come to ${shown(allValues[0])}.`;
@@ -561,7 +582,8 @@ export function stepCheckArithmetic(workingText) {
     if (allSides.every(x => /^\s*-?\d+(?:\.\d+)?\s*$/.test(x)) && !(continuation && before)) return note(line, NOTE);
     if (trueUnderAnotherReading(allSides, allValues)) return note(line, MISREAD_NOTE);
     const k = allValues.findIndex(v => !close(v, allValues[0]));
-    const message = continuation && before && k >= 1 && allValues.slice(1, k).every(v => close(v, allValues[0]))
+    const message = logFalseInBoth ? `${allSides[0].trim()} does not equal ${allSides[k].trim()}, whether log means base 10 or base e.`
+      : continuation && before && k >= 1 && allValues.slice(1, k).every(v => close(v, allValues[0]))
       ? `The line above comes to ${shown(allValues[0])}, but this line gives ${shown(allValues[k])}.`
       : `${allSides[0].trim()} comes to ${shown(allValues[0])}, but this line gives ${shown(allValues[k])}.`;
     diagnosis = { code: 'arithmetic-not-equal', title: 'The two sides of this line are not equal', message, fix: 'Work this line out again, one operation at a time.', confidence: 'high' };

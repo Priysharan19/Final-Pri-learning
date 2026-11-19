@@ -107,6 +107,17 @@ ok(st(['x^2 - 4 = 0 so (x-2)(x+2) = 0', 'x = 2']) === 'ok,ok' && st(['2x = 4 so 
   ok(st(['e^2 e^3 = e^6']) === 'break' && st(['f(2) = 3 + 4 = 8']) === 'break', 'and crossed when the constant stands on every side, or under a function value');
   for (const f of ['e^2 = 4e', '3e = e + 6', 'e + 1 = 4 - e', '2e = e^2', 'e = e + 1', '2π = 6', 'e^2 = 7', 'e = 3', 'π = 22/7', '2e + 3e = 5e', '2e + 3e = 6e', '3e2 = 300', '2e-3 = 1', '1/2π = π/2', '1/2e = e/2', 'f(2) = 5', 'f(x) = 3 + 4 = 8', '2πr = 10π', 'e^x = 5', 'a(2) > 0 so max', 'x(2) = 2 + 2 = 5 > 0']) ok(st([f]) === 'note' || (f === 'x(2) = 2 + 2 = 5 > 0' && st([f]) === 'break'), `not judged: ${f} (${st([f])})`);
 }
+// logs in either base, a rewrite of a worked expression, and a tick that ends at a wrong answer (owner, 19 November:
+// a handwriting test a competitor marked line by line)
+{
+  const page = run(['1/x + 1/y + 1/z = log 3 + log 2 + log 5', '= log (3 + 2 + 5) = log 10 = 1', 'so 10^1 = 10']);
+  ok(page.lines.map(l => l.status).join() === 'note,break,note' && /whether log means base 10 or base e/.test(page.diagnosis.message), `the wrong log law is crossed with the reason (${page.lines.map(l => l.status)} · ${page.diagnosis?.message})`);
+  ok(st(['log 3 + log 2 + log 5 = log 30', 'ln 8 = 3 ln 2', 'log 8 = 3 log 2', 'ln 3 + ln 4 = ln 12', 'log (2 × 5) = log 2 + log 5']) === 'ok,ok,ok,ok,ok', 'log laws true in either base are ticked');
+  ok(st(['ln 8 = 2 ln 3']) === 'break' && st(['log 2 + log 5 = log 7']) === 'break' && st(['ln 3 + ln 4 = ln 7']) === 'break', 'and false in either base are crossed');
+  for (const f of ['log 100 = 2', 'log 2 + log 5 = 1', 'ln 100 = 2', 'log 10 = 1', 'log e = 1', 'log x = 2', 'log 2x = log 2 + log x', 'log 3.0 + log 2 = log 7', 'log_2 8 = 4', 'log 3^2 = 2 log 3', 'log 3! = log 5', 'ln 2 = 0.69', '2 log 3 = log 6']) ok(st([f]) !== 'break' || f === '2 log 3 = log 6', `true in one base only, or not read one way: never crossed: ${f} (${st([f])})`);
+  ok(st(['2 log 3 = log 6']) === 'break' && st(['2 log 3 = log 9']) === 'ok', 'a coefficient on a log is read');
+  ok(st(['t = 5', '= 20']) === 'note,note' && st(['v = 3(4) + 5', '= 20']) === 'note,break' && st(['v = 3(4) + 5', '= 17']) === 'note,ok' && st(['Total: 3 + 4', '= 8']) === 'note,note', 'a rewrite is held to a worked expression above it; a bare number or a labelled line above stays tick only');
+}
 // never crossed
 for (const f of ['3x + 2 = 11', 'x = 3', 'n = 5', 'P(A) = 3', 'sin(30) = 2', 'log(100) = 3', 'ln 5 = 2', 'pi = 3', 'e^2 = 7', '50% of 80 = 30', '90° = 2', '5 cm + 3 cm = 9 cm', '2 1/2 = 5/2', '1 000 = 1000', '3 < 2', '4 ≠ 4', 'the answer is 5', '', '= 5', '6/0 = 3', '(((', '2 + = 4']) ok(!/break|ok/.test(st([f])), `not judged: "${f}" (${st([f])})`);
 for (const f of ['0.5 + 0.25 = 0.8', '1000(1.05)^3 = 1157', '10/3 = 3.3', '22/7 ≈ 3', '√2 ≈ 1', '740^0.5 = 27']) ok(st([f]) === 'note', `a line that may be a rounding is not crossed: ${f}`);
@@ -153,6 +164,15 @@ ok(stepEvidence(WITH, '4', '2x = 8\nx = 4', { correct: true }).stepReport?.arith
   ok(rep.arithmetic === true && rep.lines.map(l => l.status).join() === 'ok,note,note', `no milestone tick is added to an arithmetic report (${rep.lines.map(l => l.status)})`);
   const evm = workingEvidence({ res: { stepReport: { ...rep, lines: rep.lines.map((l, i) => (i === 2 ? { ...l, status: 'ok', state: undefined } : l)) } }, submitted: { hasWorking: true, lines: w } });
   ok(evm.checked.join() === '1', `only arithmetic ticks are listed as arithmetic (${evm.checked})`);
+}
+{ // a tick must not sit on the line that ends at the student's own wrong answer
+  const QW = { answerType: 'numeric', answer: { value: 30 }, prompt: 'Find the value.', steps: [] };
+  const wrong = stepEvidence(QW, '10', '2 + 3 = 5\nso 10^1 = 10', { correct: false }).stepReport;
+  ok(wrong.lines.map(l => l.status).join() === 'ok,note' && /not the answer to the question/.test(wrong.lines[1].note), `the line that ends at the wrong answer is a note that says so (${wrong.lines.map(l => l.status)})`);
+  const right = stepEvidence(QW, '30', '5 × 6 = 30', { correct: true }).stepReport;
+  ok(right.lines[0].status === 'ok', 'a line that ends at the right answer keeps its tick');
+  const other = stepEvidence(QW, '10', '2 + 3 = 5', { correct: false }).stepReport;
+  ok(other.lines[0].status === 'ok', 'a true line that does not end at the wrong answer keeps its tick');
 }
 ok(fullyVerifiedWorking(run(['2 + 2 = 4'])) === false, 'an arithmetic report is no verified transition');
 
