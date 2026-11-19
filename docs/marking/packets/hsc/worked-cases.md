@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `e1f5c9e469fd6a1087d97215b7d8ccb9f5d38af0a19a559d2bccd7052eabfd38` (`docs/marking/hsc-examiner-certification-dossier.md`).
+Dossier digest: `18ac1db0dc04faf95802ebfffaed397adb05b05d15cd7d688f0bc666101791e2` (`docs/marking/hsc-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -2437,14 +2437,14 @@ Final answer: -6, 7
 
 ## `nsw-final:y11-quadfunc/D2` — seed 1009
 
-> Which is the completed-square form of $y = 3x^2 + 12x + 9$?
+> A parabola crosses the $x$-axis at $x = 1$ and $x = 7$. Find the equation of its axis of symmetry, $x = h$. Give $h$ as a decimal if it is not a whole number.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `2` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. Option 2 is “$3(x + 2)^2 - 3$”. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. Option 0 is “$3(x + 2)^2 + 21$”. |
-| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `4` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `4.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `5` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `5` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-quadfunc/D3` — seed 1009
 
@@ -2833,25 +2833,25 @@ Final answer: -6, 7
 
 ## `nsw-final:y12-appdiff/D2` — seed 1009
 
-> The curve $y = 4x^2 + 8x - 1$ is increasing for all $x > k$ and decreasing for all $x < k$. Find the value of $k$.
+> Find the gradient of the normal to the curve $y = x^2 + x + 4$ at the point where $x = -1$. Give your answer as a decimal, correct to 3 decimal places where needed.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `-1` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `-1.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `1` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `1.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `2` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-appdiff/D3` — seed 1009
 
-> The tangent to $y = x^2 - 2x - 6$ at the point where $x = 2$ crosses the $x$-axis at $A$. Find the $x$-coordinate of $A$.
+> The curve $y = x^3 - 3x^2 - 24x - 6$ is decreasing for $a < x < b$. Find the value of $b - a$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `5` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `5.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `6` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `6` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `6` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `6.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `7` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `7` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-appdiff/D4` — seed 1009
 
