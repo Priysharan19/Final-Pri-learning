@@ -79,7 +79,7 @@ try {
   const metrics = () => page.evaluate(() => {
     const pick = document.querySelector('[data-dotpoint-picker]');
     const q = document.querySelector('.qpage');
-    const r = el => { const b = el?.getBoundingClientRect(); return b ? { top: Math.round(b.top), height: Math.round(b.height), width: Math.round(b.width) } : null; };
+    const r = el => { const b = el?.getBoundingClientRect(); return b ? { top: Math.round(b.top + window.scrollY), height: Math.round(b.height), width: Math.round(b.width) } : null; };
     return { pick: r(pick), select: r(pick?.querySelector('select')), q: r(q), scrollX: document.documentElement.scrollWidth - window.innerWidth };
   });
   const shot = async (name) => { if (SHOTS) await page.screenshot({ path: join(SHOTS, name) }); };
@@ -104,7 +104,7 @@ try {
     await shot(`dotpoint-${label}-2-focused.png`);
 
     stage = `${label}: choose a dot point`;
-    const target = expected[1] || expected[0];
+    const target = (label === 'desktop' ? expected[1] : expected[0]) || expected[0];   // a different dot point from the question on the desk
     const ordinal = dotpointsFor(CHAPTER).findIndex(d => d.id === target.id);
     const was = await qid();
     issued.length = 0;
