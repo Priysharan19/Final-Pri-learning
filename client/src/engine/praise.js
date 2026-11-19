@@ -28,7 +28,7 @@ export function praiseFor(a = {}) {
   const d = Number(a.difficulty), max = Number(a.maxDifficulty) || 4;
   const next = Number.isInteger(d) && hints === 0 && attempt === 1 && d < max ? { difficulty: d + 1 } : null;
   if (next) kinds.push('step-up');
-  const head = parts.length ? `Correct — ${parts.join(' ')}.` : 'Correct.';
+  const head = parts.length ? `Correct: ${parts.join(' ')}.` : 'Correct.';
   return { kinds, text: next ? `${head} Ready for a harder one on the same idea?` : head, next };
 }
 

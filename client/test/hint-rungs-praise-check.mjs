@@ -85,11 +85,11 @@ ok(workingHint(null) === null, 'no report: none');
 
 // ── Group 3: praise ──
 const p1 = praiseFor({ attempt: 1, hintLevel: 0, difficulty: 2, stepReport: { lines: [{ status: 'ok' }, { status: 'ok', milestone: { step: 1 } }] } });
-ok(p1.text === 'Correct — first try, with no hints and all 2 checked lines of working hold. Ready for a harder one on the same idea?' && p1.next.difficulty === 3, 'first try, unaided, working holds, step up');
+ok(p1.text === 'Correct: first try, with no hints and all 2 checked lines of working hold. Ready for a harder one on the same idea?' && p1.next.difficulty === 3, 'first try, unaided, working holds, step up');
 ok(praiseFor({ attempt: 2, hintLevel: 1, difficulty: 2 }).text === 'Correct.' && praiseFor({ attempt: 2, hintLevel: 1, difficulty: 2 }).next === null, 'second try with a hint: plain, no step up');
 ok(praiseFor({ attempt: 1, hintLevel: 0, difficulty: 4 }).next === null, 'top difficulty: no step up');
 ok(!praiseFor({ attempt: 1, hintLevel: 0, stepReport: { lines: [{ status: 'ok' }, { status: 'break' }] } }).kinds.includes('working-checks-out'), 'a break: no working praise');
-ok(praiseFor({ attempt: 2, hintLevel: 1, stepReport: { lines: [{ status: 'ok' }] } }).text === 'Correct — your working line checks out.', 'no dangling "and"');
+ok(praiseFor({ attempt: 2, hintLevel: 1, stepReport: { lines: [{ status: 'ok' }] } }).text === 'Correct: your working line checks out.', 'no dangling "and"');
 ok(!/not verified/.test(ANSWER_ONLY_NOTE), 'the answer-only note is neutral');
 
 console.log(`HINT RUNGS AND PRAISE: ${pass}/${pass + fail}`);

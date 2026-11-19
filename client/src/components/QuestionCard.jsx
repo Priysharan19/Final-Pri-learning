@@ -2028,7 +2028,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       status: v.status,
       note: v.noteKind === 'conclude' && res?.solution?.answerText
         ? `this line should conclude ${String(res.solution.answerText)}`
-        : 'this line doesn’t reach the right answer — rework it'
+        : 'this line doesn’t reach the right answer. Rework it'
     } : v));
   }, [verdictOutcome, state.res, judged, inkResult, judgedLive, isWorking, res]);
 
@@ -3430,7 +3430,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   </span>
                 </div>
               )}
-              <div className="eval-head">
+              {/* With the score card above, the head is not drawn twice: it stays in the markup for the layout tests but is hidden from sight (CSS) and from assistive tech, which hear the one announcement in the status line. */}
+              <div className="eval-head" aria-hidden={instrumentScore ? 'true' : undefined}>
                 <span className="eval-title">
                   <Icon name={verdictGood ? 'check' : 'correction'} />
                   {t(verdictGood ? 'verdict.correct' : res.revealed ? 'verdict.revealed' : 'verdict.notThisTime')}
@@ -3606,7 +3607,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               ? <span className="ws-answer-preview muted">{t('verdict.yourAnswerIs')} <MathText text={`$${texOf(String(shownAnswerLine).replace(/^\s*[=≈]\s*/, ''))}$`} /></span>
               : resolved && serverAuthoritative && statusText
                 /* The verdict word is already on the page in the score card; the live region still announces it, once, to a screen reader. */
-                ? <span className="sr-only" data-verdict-announcement>{statusText}</span>
+                ? <span className="sr-only" data-verdict-announcement>{statusText}{instrumentScore ? ` ${t('verdict.marksOutOf', { earned: shownGrade.awarded, total: shownGrade.possible })}` : ''}</span>
                 : statusText}
             {/* Handwriting is read only by the server reader (#316); say so where the work is submitted. */}
             {writeMode && !isMcq && (
@@ -3779,7 +3780,7 @@ function StepReport({ report, instrument = false, correctAnswer = null }) {
         {l.status === 'break' && <b style={{ fontFamily: 'var(--font)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{t(i === first ? 'verdict.mistakeIsHere' : 'verdict.alsoWrong')}</b>}
         {l.secondBreak === true && l.status !== 'break' && <b style={{ fontFamily: 'var(--font)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{t('verdict.alsoWrong')}</b>}
         {l.status === 'ok' && l.ecf === true && <b style={{ fontFamily: 'var(--font)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{t('verdict.carriedForward')}</b>}
-        {l.note && !l.diagnosis && <span style={{ fontFamily: 'var(--font)', fontWeight: 400, fontSize: 12.5 }}> — <EngineComment text={l.note} /></span>}
+        {l.note && !l.diagnosis && <span style={{ fontFamily: 'var(--font)', fontWeight: 400, fontSize: 12.5 }}>: <EngineComment text={l.note} /></span>}
       </div>
       {l.diagnosis && <Diagnosis d={l.diagnosis} line={i + 1} />}
       {i === first && typeof beforeFirst === 'string' && typeof l.text === 'string' && (

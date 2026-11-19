@@ -522,7 +522,7 @@ function Desk({ attemptId }) {
         <p>{t('desk.tallies', composeDeskExport({ attempt, clock, questions, groups }).tallies)}</p>
         <ul>
           {Array.from({ length: paper.questionCount }, (_, i) => i + 1).map(n => ({ n, e: entryOf(questions, n) })).filter(x => x.e.done || x.e.flagged || x.e.note).map(({ n, e }) => (
-            <li key={n}>{t('shell.q', { n })}{e.done ? ` · ${t('desk.done')}` : ''}{e.flagged ? ` · ${t('desk.flag')}` : ''}{e.note ? ` — ${e.note}` : ''}</li>
+            <li key={n}>{t('shell.q', { n })}{e.done ? ` · ${t('desk.done')}` : ''}{e.flagged ? ` · ${t('desk.flag')}` : ''}{e.note ? `: ${e.note}` : ''}</li>
           ))}
         </ul>
       </ExportActions>

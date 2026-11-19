@@ -16,7 +16,7 @@ export const AU_STRINGS = Object.freeze({
   'msg.classOnly': 'Year {n}',
   'inst.mapTitleScope': '{scope} Mathematics',
   'inst.mapProvenance': 'Prerequisite links are Pri’s own teaching map, not a NESA publication.',
-  'login.heroSub': 'Maths practice for NSW students — your working marked line by line, with worked solutions. Answers are checked by Pri’s server, so checking needs a Pri account and a connection.',
+  'login.heroSub': 'Maths practice for NSW students: your working marked line by line, with worked solutions. Answers are checked by Pri’s server, so checking needs a Pri account and a connection.',
   'login.brandKicker': 'NSW Years 11 and 12 · Advanced and Extension 1',
   'login.welcomeSub': 'Practise for the HSC. Your working is checked line by line.',
   'login.heroNote': 'Answers are checked by Pri’s server, so checking needs a connection. Five questions a day need no account. No ads.',
@@ -34,15 +34,15 @@ export const AU_STRINGS = Object.freeze({
   'explain.kicker': 'Pri Explain · Exam mode',
   'insights.lead': 'Read from your own marked practice. Nothing here is a predicted exam score.',
   'insights.forecastHonesty': 'An estimate from your practice, not a predicted exam score. The range is over the marks you have practised only, and it is wide when the evidence is thin.',
-  'board.whyUnitMissing': 'the value is right but the unit ({unit}) is missing — an examiner may withhold this mark',
+  'board.whyUnitMissing': 'the value is right but the unit ({unit}) is missing: an examiner may withhold this mark',
   'board.sentenceNoWorking': Object.freeze({
-    one: '{awarded}/{total}. You wrote only the answer, so {n} step mark was not available. In an exam those are marks you had already earned and did not claim — show the working.',
-    other: '{awarded}/{total}. You wrote only the answer, so {n} step marks were not available. In an exam those are marks you had already earned and did not claim — show the working.'
+    one: '{awarded}/{total}. You wrote only the answer, so {n} step mark was not available. In an exam those are marks you had already earned and did not claim. Show the working.',
+    other: '{awarded}/{total}. You wrote only the answer, so {n} step marks were not available. In an exam those are marks you had already earned and did not claim. Show the working.'
   }),
   'board.sentenceFull': '{awarded}/{total}. Full marks, and the working would earn them in an exam.',
   'board.sentenceMethod': '{awarded}/{total}. The answer is not right, but the method is, and an examiner may award marks for that.',
   'teach.newClassPlaceholder': 'New class name (e.g. Year 10 A)',
-  'teach.rosterHelp': 'Roster files: one student per line — {format}. Names already on this device join; new names get a student profile.',
+  'teach.rosterHelp': 'Roster files: one student per line, written as {format}. Names already on this device join; new names get a student profile.',
   'scn.hand.eyebrow': 'Year 11 · Advanced · Quadratics',
   'signup.parentLead': "Because you are under 15, a parent or guardian approves your account once, by email. Until they do, you can read questions, write and keep drafts on this device, but answers cannot be checked and nothing syncs.",
   'signup.noticeWhat': "Prithagoras stores the student’s name, year, contact details, answers and progress on its servers. The privacy policy names where and by whom.",

@@ -122,7 +122,7 @@ for (const b of NSW_EXAM_BLUEPRINTS) {
   check(five.marks === five.included.reduce((n, slot) => n + slot.marks, 0) && five.marks < b.totalMarks && five.workingMin === scaledMinutes(b.workingMin, five.marks, b.totalMarks) && five.workingMin < b.workingMin,
     `its marks (${five.marks}) and working time (${five.workingMin} min) are scaled to what it examines`);
   const title = nswPaperTitle(b, five);
-  check(title === `${b.label} · Practice paper — 5 of 6 Year 12 outcomes` && !/HSC|trial/i.test(title), `a partial paper is titled by its coverage, never HSC or trial: "${title}"`);
+  check(title === `${b.label} · Practice paper: 5 of 6 Year 12 outcomes` && !/HSC|trial/i.test(title), `a partial paper is titled by its coverage, never HSC or trial: "${title}"`);
   // An omitted Year 11 outcome lowers nothing in the floor but is still omitted.
   const y11gap = blueprintRelease(b, forms(NSW_MIN_FORMS_PER_SLOT, new Set(['ME1-11-05'])), y12);
   check(y11gap.released && !y11gap.full && y11gap.year12.covered === 6 && y11gap.omittedOutcomes.join() === 'ME1-11-05', 'a Year 11 gap leaves the Year 12 floor whole but is still omitted and named');

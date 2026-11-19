@@ -51,6 +51,32 @@ ok(!tourSeen('p1', storage), '"Show the tour again" clears it');
 ok(tourSeen('p1', { getItem() { throw new Error('blocked'); } }), 'unreadable storage never nags');
 const tour = read('../src/components/PracticeTour.jsx');
 const card = read('../src/components/QuestionCard.jsx');
+// The note is always wholly on screen and never above the header, on any window height (it had no lower clamp: on a short
+// window `innerHeight - h - 110` went negative and the note sat over the question or above the top edge).
+{
+  const { tourNoteTop, TOUR_EDGE } = await import('../src/lib/firstRunTour.js');
+  const H = 96, HEADER = 58;
+  for (const vh of [160, 200, 240, 320, 420, 568, 667, 812, 1000]) {
+    for (const side of ['below', 'above']) {
+      for (const anchorTop of [20, 90, 200, 400, 700]) {
+        for (const avoid of [null, { bottom: 180 }, { bottom: 330 }, { bottom: 620 }]) {
+          const top = tourNoteTop({ anchor: { top: anchorTop, bottom: anchorTop + 40 }, side, h: H, vh, minTop: HEADER, avoid });
+          ok(top >= HEADER && top >= TOUR_EDGE, `vh ${vh} ${side} anchor ${anchorTop} avoid ${avoid?.bottom ?? '-'}: the note is not above the header (${top})`);
+          ok(vh < H + HEADER + TOUR_EDGE || top + H <= vh - TOUR_EDGE, `vh ${vh} ${side} anchor ${anchorTop} avoid ${avoid?.bottom ?? '-'}: the note is wholly on screen (${top})`);
+        }
+      }
+    }
+  }
+  // a window with room: under the prompt, clear of the action bar (unchanged)
+  eq(tourNoteTop({ anchor: { top: 100, bottom: 140 }, side: 'below', h: H, vh: 812, minTop: HEADER, avoid: { bottom: 300 } }), 308, 'with room the note sits just under the question text');
+  // a short window: the note covers what is below the prompt (the hint ladder), not the prompt
+  const short = tourNoteTop({ anchor: { top: 100, bottom: 140 }, side: 'below', h: H, vh: 420, minTop: HEADER, avoid: { bottom: 260 } });
+  ok(short >= 260 + 8 && short + H <= 420 - TOUR_EDGE, `a short window: under the prompt and on screen, over the hint ladder (${short})`);
+  // no room even for that: the note stays on screen (it may then cover the prompt, but never leaves the window)
+  const tiny = tourNoteTop({ anchor: { top: 100, bottom: 140 }, side: 'below', h: H, vh: 260, minTop: HEADER, avoid: { bottom: 240 } });
+  ok(tiny >= HEADER && tiny + H <= 260 - TOUR_EDGE, `a very short window keeps the note wholly on screen (${tiny})`);
+  ok(/tourNoteTop\(/.test(tour) && /data-instrument-bar/.test(tour) && !/innerHeight - h - 110/.test(tour), 'the tour places its note through the clamped helper and knows the header');
+}
 for (const s of TOUR_STEPS) {
   ok(keyIn(en, s.key) && keyIn(hi, s.key), `${s.id} has copy in both languages`);
   const attr = s.anchor.match(/data-tour="(\w+)"/)[1];

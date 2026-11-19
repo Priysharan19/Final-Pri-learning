@@ -389,12 +389,12 @@ export function assessNumericCheckLine(ast, { previousAst = null, meta = null } 
       if (!substitutesPreviousLine(ast, previousAst, meta)) return null;
       return {
         status: 'note', trusted: false, check: true,
-        note: 'True — this is the line above with your answer put in. It confirms the answer rather than moving it on.'
+        note: 'True: this is the line above with your answer put in. It confirms the answer rather than moving it on.'
       };
     }
     return {
       status: 'ok', trusted: false, check: true,
-      note: 'Check — both sides come to the same number, so the answer satisfies the equation.'
+      note: 'Check: both sides come to the same number, so the answer satisfies the equation.'
     };
   }
   const diagnosis = {
@@ -409,7 +409,7 @@ export function assessNumericCheckLine(ast, { previousAst = null, meta = null } 
 
 /** Assess one parsed equation line. */
 export function assessEquationLine({ ast, previousAst = null, previousTrusted = false, meta = null } = {}) {
-  if (!ast || ast.t !== 'equation') return { status: 'note', trusted: false, note: 'Skipped — this is not an equation.' };
+  if (!ast || ast.t !== 'equation') return { status: 'note', trusted: false, note: 'Skipped: this is not an equation.' };
   const numericCheck = assessNumericCheckLine(ast, { previousAst, meta });
   if (numericCheck) return numericCheck;
   const variable = meta?.variable;
@@ -420,7 +420,7 @@ export function assessEquationLine({ ast, previousAst = null, previousTrusted = 
       if (!equationHoldsAt(ast, variable, sol)) {
         return {
           status: 'break', trusted: false,
-          note: `This is the line where it goes wrong — ${variable} = ${sol} solves the original problem but no longer satisfies this equation.`,
+          note: `This is the line where it goes wrong: ${variable} = ${sol} solves the original problem but no longer satisfies this equation.`,
           diagnosis: lostSolutionDiagnosis(variable, sol)
         };
       }

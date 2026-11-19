@@ -140,4 +140,4 @@ export function annotateMilestones(q, report) {
   return changed ? { ...report, lines } : report;
 }
 
-export const NOT_CHECKED_NOTE = 'Not checked — this question’s check covers the lines that lead to the answer.';
+export const NOT_CHECKED_NOTE = 'Not checked: this question’s check covers the lines that lead to the answer.';

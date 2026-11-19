@@ -9,7 +9,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useT } from '../i18n/index.js';
-import { TOUR_STEPS } from '../lib/firstRunTour.js';
+import { TOUR_STEPS, TOUR_EDGE as EDGE, tourNoteTop } from '../lib/firstRunTour.js';
 
 // The tour never scrolls the page: a control that is not on screen when it starts is left out.
 const inView = s => {
@@ -18,8 +18,6 @@ const inView = s => {
   const r = el.getBoundingClientRect();
   return r.bottom > 0 && r.top < window.innerHeight && r.right > 0 && r.left < window.innerWidth;
 };
-const GAP = 8;
-const EDGE = 16;
 
 export default function PracticeTour({ onClose }) {
   const t = useT();
@@ -45,12 +43,15 @@ export default function PracticeTour({ onClose }) {
     const w = step.gutter && window.innerWidth >= 900 ? 236 : Math.min(320, window.innerWidth - 2 * EDGE);
     const h = note.offsetHeight;
     const left = Math.max(EDGE, Math.min(r.left, window.innerWidth - w - EDGE));
-    let top = step.side === 'above' ? r.top - h - GAP : r.bottom + GAP;
-    if (top < EDGE) top = r.bottom + GAP;
-    if (top + h > window.innerHeight - EDGE) top = Math.max(EDGE, r.top - h - GAP);
-    // Narrow screens: under the question text, never over it (and clear of the action bar).
+    // Narrow screens: under the question text, never over it (and clear of the action bar). On a short window the note
+    // covers the hint ladder before it covers the prompt, and it is always wholly on screen and below the header.
     const avoid = step.avoid && window.innerWidth < 900 && document.querySelector(step.avoid);
-    if (avoid) top = Math.min(avoid.getBoundingClientRect().bottom + GAP, window.innerHeight - h - 110);
+    const header = document.querySelector('[data-instrument-bar]');
+    const top = tourNoteTop({
+      anchor: r, side: step.side, h, vh: window.innerHeight,
+      minTop: header ? Math.max(0, header.getBoundingClientRect().bottom) : 0,
+      avoid: avoid ? avoid.getBoundingClientRect() : null
+    });
     setBox({ left, top, width: w });
   }, [step]);
 

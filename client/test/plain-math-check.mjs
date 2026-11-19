@@ -29,4 +29,56 @@ eq(plainPromptText('Solve $\\sin\\theta = \\frac{\\sqrt{2}}{2}$.'), 'Solve sin �
 eq(plainPromptText('Find $\\frac{1}{\\sqrt{3}}$.'), 'Find (1)/(√(3)).', 'a root in a denominator');
 eq(plainPromptText('$\\begin{aligned} y &= 2x \\\\ x &= 3 \\end{aligned}$'), 'y = 2x ; x = 3', 'an aligned block is its rows');
 
+
+// ── The escapes a question is written with (Extension 1 and Financial maths prompts, 20 Nov 2026) ──
+eq(plainPromptText('Prove $5 + 9 + \\cdots + (2n - 1)$ for all $n$.'), 'Prove 5 + 9 + … + (2n - 1) for all n.', 'an induction series keeps its ellipsis (it read "5 + + (2n - 1)")');
+eq(plainMath('1 + 2 + \\ldots + n'), '1 + 2 + … + n', '\\ldots is an ellipsis');
+eq(plainMath('a_1, a_2, \\dots, a_n'), 'a1, a2, …, an', '\\dots is an ellipsis');
+eq(plainPromptText('A fund pays $3\\%$ p.a. and a fee of \\$10 is taken.'), 'A fund pays 3% p.a. and a fee of $10 is taken.', 'a percent in a formula reads %, and an escaped dollar in the prose is a dollar');
+eq(plainPromptText('Interest is 1.5\\% a month on \\$20,700 and $18\\%$ a year.'), 'Interest is 1.5% a month on $20,700 and 18% a year.', 'a percent in the prose reads %, and an escaped dollar does not pair with a real one');
+eq(plainPromptText('Hire costs \\$55 plus \\$11 per hour. Find $h$ when $55 + 11h = 61 + 8h$.'), 'Hire costs $55 plus $11 per hour. Find h when 55 + 11h = 61 + 8h.', 'two escaped amounts never become a formula between them');
+eq(plainPromptText('Prices (in \\$10\\,000s) rise.'), 'Prices (in $10 000s) rise.', 'a TeX thin space in the prose is a space');
+eq(plainMath('\\{S\\} \\cup \\{A, B\\}'), '{S} ∪ {A, B}', 'escaped braces are braces; grouping braces are not');
+eq(plainMath('x \\pm 2 \\mid y'), 'x ± 2 | y', '\\pm and \\mid');
+eq(plainMath('\\left( \\frac{1}{2} \\right)^3'), '( (1)/(2) )³', '\\left and \\right go and the bracket stays');
+eq(plainMath('\\left[ x \\right)'), '[ x )', '\\left[ and \\right) keep their bracket');
+eq(plainMath('\\left. \\frac{dy}{dx} \\right|_{x=1}'), '(dy)/(dx) |x=1', '\\left. and \\right. are no bracket');
+eq(plainMath('v = 5 \\text{ m/s}'), 'v = 5 m/s', '\\text keeps its content');
+eq(plainMath('\\mathrm{d}x'), 'dx', '\\mathrm keeps its content');
+eq(plainMath('\\text{Cost} = \\$40'), 'Cost = $40', '\\text and an escaped dollar in a formula');
+eq(plainMath('\\binom{n}{2}'), '(n choose 2)', 'a binomial coefficient is read, not flattened to "n 2"');
+eq(plainPromptText('**Find** the value.'), 'Find the value.', 'bold markers are dropped');
+
+// ── Every NSW Year 11-12 generator, five seeds each: the bar's plain text is plain ──
+// Display only. The prompts are exactly what the server would print; nothing here reaches marking.
+{
+  const SRC = new URL('../src/', import.meta.url).href;
+  const { generateQuestion, loadAllBanks } = await import(`${SRC}engine/generators/index.js`);
+  const { NSW_BANK_LEDGER } = await import('../../server/platform/nswBanks.js');
+  await loadAllBanks();
+  const rows = NSW_BANK_LEDGER.filter(e => /11-12/.test(e.syllabus));
+  assert.ok(rows.length >= 60, `the sweep reaches the Year 11-12 generators (${rows.length})`); pass++;
+  let prompts = 0;
+  const problems = [];
+  const braceOk = (plain, source) => (plain.match(/[{}]/g) || []).length <= (source.match(/\\[{}]|\\[lr]brace/g) || []).length;
+  for (const entry of rows) {
+    for (let difficulty = 1; difficulty <= 4; difficulty += 1) {
+      for (let k = 1; k <= 5; k += 1) {
+        let q = null;
+        try { q = generateQuestion(entry.generator, difficulty, k * 7919 + difficulty); } catch { q = null; }
+        if (!q || typeof q.prompt !== 'string') continue;
+        prompts += 1;
+        const plain = plainPromptText(q.prompt);
+        const label = `${entry.generator} D${difficulty} #${k}: ${plain.slice(0, 80)}`;
+        if (/\\/.test(plain)) problems.push(`backslash in ${label}`);
+        if (!braceOk(plain, q.prompt)) problems.push(`brace in ${label}`);
+        if (/(?:^|[\s(])[+\-−×÷*/=] [+×÷*/=](?=\s|$)/.test(plain) || /\+ \+|= =|× ×|÷ ÷/.test(plain)) problems.push(`doubled operator in ${label}`);
+      }
+    }
+  }
+  assert.ok(prompts >= 1000, `the sweep drew a real number of prompts (${prompts})`); pass++;
+  assert.deepEqual(problems.slice(0, 12), [], `${problems.length} Year 11-12 prompts read badly on the question bar`); pass++;
+  console.log(`plain-math-check: ${prompts} Year 11-12 prompts across ${rows.length} generators read plain (no backslash, no stray brace, no doubled operator)`);
+}
+
 console.log(`plain-math-check: ${pass} checks passed`);

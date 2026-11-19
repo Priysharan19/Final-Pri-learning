@@ -14,7 +14,7 @@ import { saveTextFile } from './files.js';
 /** The fixed line every unmarked export carries (English: it is data, not UI). */
 export const UNMARKED_LINE = 'Unmarked practice. This is not a mark, grade or prediction.';
 /** The top-level `grading` field of a desk export. */
-export const GRADING_LINE = 'none — unmarked practice; not a result';
+export const GRADING_LINE = 'none: unmarked practice; not a result';
 
 /** A value with every object's keys in sorted order (arrays keep their order). */
 export function canonical(value) {

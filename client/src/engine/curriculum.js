@@ -28,7 +28,7 @@ export const CURRICULUM = [
   {
     year: 7,
     title: 'Year 7',
-    caption: 'Foundations — number, early algebra and geometry',
+    caption: 'Foundations: number, early algebra and geometry',
     subtopics: [
       S('y7-integers', 'Integers & Order of Operations', 'Number', 10, [
         'Compare, order and locate integers on a number line',
@@ -80,7 +80,7 @@ export const CURRICULUM = [
   {
     year: 8,
     title: 'Year 8',
-    caption: 'Building fluency — indices, linear thinking and probability',
+    caption: 'Building fluency: indices, linear thinking and probability',
     subtopics: [
       S('y8-indices', 'Index Notation & Laws', 'Number', 11, [
         'Write repeated multiplication in index form',
@@ -137,7 +137,7 @@ export const CURRICULUM = [
   {
     year: 9,
     title: 'Year 9',
-    caption: 'Stepping up — Pythagoras, trigonometry and coordinate geometry',
+    caption: 'Stepping up: Pythagoras, trigonometry and coordinate geometry',
     subtopics: [
       S('y9-pythagoras', "Pythagoras' Theorem", 'Measurement & Geometry', 11, [
         'Find the hypotenuse of a right-angled triangle',
@@ -219,7 +219,7 @@ export const CURRICULUM = [
   {
     year: 10,
     title: 'Year 10',
-    caption: 'Pre-senior mastery — quadratics, surds and advanced trig',
+    caption: 'Pre-senior mastery: quadratics, surds and advanced trig',
     subtopics: [
       S('y10-quadratics', 'Quadratic Equations', 'Algebra', 13, [
         'Factorise monic and non-monic quadratics',
@@ -316,7 +316,7 @@ export const CURRICULUM = [
   {
     year: 11,
     title: 'Year 11',
-    caption: 'Advanced foundations — functions, trig identities and rates of change',
+    caption: 'Advanced foundations: functions, trig identities and rates of change',
     subtopics: [
       S('y11-functions', 'Functions & Relations', 'Functions', 12, [
         'Use function notation and evaluate functions',
@@ -393,7 +393,7 @@ export const CURRICULUM = [
   {
     year: 12,
     title: 'Year 12',
-    caption: 'HSC Advanced — calculus, series, financial maths and distributions',
+    caption: 'HSC Advanced: calculus, series, financial maths and distributions',
     subtopics: [
       S('y12-diff', 'Differentiation Rules', 'Calculus', 13, [
         'Differentiate with the product rule',
@@ -482,7 +482,7 @@ const T = (id, name, strand, weight, code, dotpoints) => ({ id, name, strand, we
 
 export const STREAM_CURRICULUM = {
   'standard-11': {
-    title: 'Standard · Year 11', caption: 'MS — money, measurement and data for the real world',
+    title: 'Standard · Year 11', caption: 'MS: money, measurement and data for the real world',
     subtopics: [
       T('ms11-earning', 'Earning & Managing Money', 'Financial Maths', 12, 'MS-F1', [
         'Calculate wages, salaries, overtime and commission',
@@ -542,7 +542,7 @@ export const STREAM_CURRICULUM = {
     ]
   },
   'standard-12': {
-    title: 'Standard · Year 12', caption: 'MS — loans, annuities, networks and the normal curve',
+    title: 'Standard · Year 12', caption: 'MS: loans, annuities, networks and the normal curve',
     subtopics: [
       T('ms12-loans', 'Investments & Loans', 'Financial Maths', 13, 'MS-F4', [
         'Compound interest investments',
@@ -632,7 +632,7 @@ export const STREAM_CURRICULUM = {
     ]
   },
   'ext1-11': {
-    title: 'Extension 1 · Year 11', caption: 'ME — deeper functions, identities and counting',
+    title: 'Extension 1 · Year 11', caption: 'ME: deeper functions, identities and counting',
     subtopics: [
       T('me11-poly', 'Polynomials & Remainders', 'Algebra', 11, 'ME-F2', [
         'Division of polynomials; remainder and factor theorems',
@@ -672,7 +672,7 @@ export const STREAM_CURRICULUM = {
     ]
   },
   'ext1-12': {
-    title: 'Extension 1 · Year 12', caption: 'ME — induction, vectors and further calculus',
+    title: 'Extension 1 · Year 12', caption: 'ME: induction, vectors and further calculus',
     subtopics: [
       T('me12-induction', 'Proof by Mathematical Induction', 'Algebra', 11, 'ME-P1', [
         'Prove series results by induction',
@@ -732,7 +732,7 @@ export const STREAM_CURRICULUM = {
     ]
   },
   'ext2-12': {
-    title: 'Extension 2 · Year 12', caption: 'MEX — complex numbers, proof and mechanics',
+    title: 'Extension 2 · Year 12', caption: 'MEX: complex numbers, proof and mechanics',
     subtopics: [
       T('mex-proof', 'The Nature of Proof', 'Algebra', 11, 'MEX-P1/P2', [
         'Direct proof and proof by contradiction',

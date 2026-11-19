@@ -418,8 +418,8 @@ export function assessCalculusLine(line, ctx, meta, stage = { claimed: false }) 
       const onlyStart = verdicts.every(x => x === 'start');
       return onlyStart ? { status: 'note', restates: true }
         : { status: 'note', note: ctx.relation === 'antiderivative'
-          ? 'True — differentiating this line gives the integrand. It differs from the final answer by a constant, or is not yet simplified.'
-          : 'True — this line equals the derivative, written another way.' };
+          ? 'True: differentiating this line gives the integrand. It differs from the final answer by a constant, or is not yet simplified.'
+          : 'True: this line equals the derivative, written another way.' };
     }
     const bad = real[firstInvalid];
     const diagnosis = diagnoseSlip(ctx, bad, meta);

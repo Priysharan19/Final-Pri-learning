@@ -676,7 +676,7 @@ export function pickNextAmong({ candidates, ratings, reviewsDue, rand = Math.ran
 
   if (!best) {
     const fallback = fallbackId || (candidates?.[0]?.id ?? SUBTOPICS[0].id);
-    return { subtopic: fallback, difficulty: 1, reason: 'new-ground', why: 'Fresh territory — expanding your syllabus coverage.', target: TARGET_SUCCESS.fresh, score: 0, nextUp: null };
+    return { subtopic: fallback, difficulty: 1, reason: 'new-ground', why: 'Fresh territory: expanding your syllabus coverage.', target: TARGET_SUCCESS.fresh, score: 0, nextUp: null };
   }
 
   const target = targetSuccess({ ...best.st, trapPressure: best.pressure, recentWrong: recentWrongOf(best.st) }, nowMs);
@@ -688,10 +688,10 @@ export function pickNextAmong({ candidates, ratings, reviewsDue, rand = Math.ran
   const difficulty = pickDifficulty(best.st.rating, best.st.attempts, { target, rand: jitterFor(`${best.s.id}#difficulty`, rand) });
   const trap = seekableTraps(best.st.traps, nowMs)[0] || null;
   const why = {
-    review: 'Spaced review — your memory of this one is due to fade.',
+    review: 'Spaced review: your memory of this one is due to fade.',
     'weak-spot': 'Your lowest-scoring topic so far.',
     misconception: trap ? `Same slip keeps coming back: ${trap.label}` : MISCONCEPTION_UNTARGETED_WHY,
-    'new-ground': 'Fresh territory — expanding your syllabus coverage.',
+    'new-ground': 'Fresh territory: expanding your syllabus coverage.',
     rotation: 'Keeping your practice balanced across the syllabus.'
   }[best.reason];
 
@@ -775,16 +775,16 @@ export function predictMark(ratings, year, nowMs = Date.now(), pathway = 'advanc
 export function bandFor(mark, year, pathway = 'advanced') {
   if (year <= 10) {
     const g = mark >= 85 ? 'A' : mark >= 70 ? 'B' : mark >= 55 ? 'C' : mark >= 40 ? 'D' : 'E';
-    const desc = { A: 'Extensive knowledge — top grade', B: 'Thorough knowledge', C: 'Sound knowledge', D: 'Basic knowledge', E: 'Elementary knowledge' }[g];
+    const desc = { A: 'Extensive knowledge: top grade', B: 'Thorough knowledge', C: 'Sound knowledge', D: 'Basic knowledge', E: 'Elementary knowledge' }[g];
     return { scale: 'grade', label: g, desc };
   }
   if (pathway === 'ext1' || pathway === 'ext2') {
     const b = mark >= 90 ? 'E4' : mark >= 75 ? 'E3' : mark >= 60 ? 'E2' : 'E1';
-    const desc = { E4: 'Outstanding — highest extension band', E3: 'Strong extension performance', E2: 'Sound extension performance', E1: 'Developing extension performance' }[b];
+    const desc = { E4: 'Outstanding: highest extension band', E3: 'Strong extension performance', E2: 'Sound extension performance', E1: 'Developing extension performance' }[b];
     return { scale: 'extension', label: b, desc };
   }
   const n = mark >= 90 ? 6 : mark >= 80 ? 5 : mark >= 70 ? 4 : mark >= 60 ? 3 : mark >= 50 ? 2 : 1;
-  const desc = { 6: 'Outstanding — top HSC band', 5: 'High level of achievement', 4: 'Solid, well-rounded achievement', 3: 'Satisfactory achievement', 2: 'Basic achievement', 1: 'Below minimum standard' }[n];
+  const desc = { 6: 'Outstanding: top HSC band', 5: 'High level of achievement', 4: 'Solid, well-rounded achievement', 3: 'Satisfactory achievement', 2: 'Basic achievement', 1: 'Below minimum standard' }[n];
   return { scale: 'band', label: `Band ${n}`, desc };
 }
 

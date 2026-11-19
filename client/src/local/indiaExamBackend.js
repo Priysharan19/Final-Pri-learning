@@ -463,7 +463,7 @@ function criteriaFor(q, marks, marking) {
   if (!key.length) return [{ mark: marks, text: translate('msg.correctFinal') }];
   return key.map((s, i) => ({
     mark: i === key.length - 1 ? marks - (key.length - 1) : 1,
-    text: i === key.length - 1 ? `${s.h} — leading to the correct answer` : s.h
+    text: i === key.length - 1 ? `${s.h}, leading to the correct answer` : s.h
   }));
 }
 
@@ -482,8 +482,8 @@ function finalResult(exam, extra = {}) {
 
 async function saveResponses(profile, id, body = {}) {
   const exam = await requireExam(profile, id);
-  if (exam.finishedAt) throw error('This paper has been submitted — it can no longer change.', 409, 'INDIA_EXAM_ALREADY_SUBMITTED');
-  if (exam.pendingFinish) throw error('This paper has been submitted and is waiting to be marked — it can no longer change.', 409, 'EXAM_SUBMITTED_PENDING');
+  if (exam.finishedAt) throw error('This paper has been submitted. It can no longer change.', 409, 'INDIA_EXAM_ALREADY_SUBMITTED');
+  if (exam.pendingFinish) throw error('This paper has been submitted and is waiting to be marked. It can no longer change.', 409, 'EXAM_SUBMITTED_PENDING');
   const saved = saveExamResponses(exam, body);
   await put('exams', exam);
   // The device copy is saved; the server's follows a moment later and is

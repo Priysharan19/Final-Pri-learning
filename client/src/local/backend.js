@@ -718,7 +718,7 @@ async function requireProfile() {
   const p = await currentProfile();
   if (!p) { const e = new Error('No profile selected'); e.status = 401; throw e; }
   if (p.auth && !hasDataKey(p.id)) {
-    throw Object.assign(new Error('This profile is protected — enter its password.'), { status: 401, needsPassword: true, profileId: p.id });
+    throw Object.assign(new Error('This profile is protected. Enter its password.'), { status: 401, needsPassword: true, profileId: p.id });
   }
   return p;
 }
@@ -813,7 +813,7 @@ const lockedFor = (p, now) => Math.max(0, (p?.lockedUntil || 0) - now);
 function lockedError(ms) {
   const secs = Math.ceil(ms / 1000);
   const when = secs > 90 ? `${Math.ceil(secs / 60)} minutes` : `${secs} seconds`;
-  return Object.assign(new Error(`Too many wrong passwords — try again in ${when}.`), { status: 429, locked: true, retryAfterMs: ms });
+  return Object.assign(new Error(`Too many wrong passwords. Try again in ${when}.`), { status: 429, locked: true, retryAfterMs: ms });
 }
 
 /**
@@ -837,7 +837,7 @@ async function withPassword(pid, password, after) {
       await put('profiles', p);
       const left = lockedFor(p, now);
       if (left) throw lockedError(left);
-      throw Object.assign(new Error('Wrong password — try again.'), { status: 401, needsPassword: true, triesLeft: MAX_FAILS - p.failCount });
+      throw Object.assign(new Error('Wrong password. Try again.'), { status: 401, needsPassword: true, triesLeft: MAX_FAILS - p.failCount });
     }
 
     p.failCount = 0;
@@ -1890,7 +1890,7 @@ function criteriaFor(q) {
   if (!keySteps.length) return [{ mark: 1, text: translate('msg.correctFinal') }];
   return keySteps.map((s, i) => ({
     mark: 1,
-    text: i === keySteps.length - 1 ? `${s.h} — leading to the correct answer` : s.h
+    text: i === keySteps.length - 1 ? `${s.h}, leading to the correct answer` : s.h
   }));
 }
 
@@ -3260,7 +3260,7 @@ const routes = {
       setCurrentPid(id);
       return { user: await publicUser(p) };
     }
-    if (!password) throw Object.assign(new Error('This profile is protected — enter its password.'), { status: 401, needsPassword: true });
+    if (!password) throw Object.assign(new Error('This profile is protected. Enter its password.'), { status: 401, needsPassword: true });
     const opened = await withPassword(id, password, openProfileData);
     setCurrentPid(id);
     opened.lastActiveAt = Date.now();
@@ -3318,7 +3318,7 @@ const routes = {
     // Putting a first password on an open profile is a one-way door — there is
     // nothing on this device that could reset it — so it is never silent.
     if (confirm !== true) {
-      throw Object.assign(new Error('A password can’t be reset if it’s forgotten — this profile’s work would be gone for good.'), { status: 400, needsConfirm: true });
+      throw Object.assign(new Error('A password can’t be reset if it’s forgotten: this profile’s work would be gone for good.'), { status: 400, needsConfirm: true });
     }
     return serialize(p.id, async () => {
       const pw = String(next);
@@ -4639,7 +4639,7 @@ const routes = {
     const p = await requireProfile();
     const e = await get('exams', params.id);
     if (!e || e.pid !== p.id) throw Object.assign(new Error('Exam not found'), { status: 404 });
-    if (e.pendingFinish) throw Object.assign(new Error('This paper has been submitted and is waiting to be marked — it can no longer change.'), { status: 409, code: 'EXAM_SUBMITTED_PENDING' });
+    if (e.pendingFinish) throw Object.assign(new Error('This paper has been submitted and is waiting to be marked. It can no longer change.'), { status: 409, code: 'EXAM_SUBMITTED_PENDING' });
     const saved = saveExamResponses(e, body || {});
     await put('exams', e);
     // Saved on the device; the server's copy follows a moment later and is
@@ -5985,7 +5985,7 @@ function tutorRequest(p, row, q, solution, { level, locale, work, captions, reso
 }
 
 function assertPracticeRow(row) {
-  if (isExamRow(row)) throw examQuestionLocked('This question belongs to an exam paper — answer it in the exam room.');
+  if (isExamRow(row)) throw examQuestionLocked('This question belongs to an exam paper. Answer it in the exam room.');
 }
 
 async function assertReviewableRow(row) {
@@ -6243,6 +6243,7 @@ async function resumableQuestion(profile, body = {}) {
     ? Math.min(4, Math.max(1, Number(body.difficulty))) : null;
 
   const scope = { track: body.track, pyqOnly: body.pyqOnly === true, explicit: !!subtopic };
+  const askedDotpoint = subtopic && body.dotpoint != null && body.dotpoint !== '' ? dotpointOf(subtopic, body.dotpoint) : null;
   const candidates = rows.filter(r => {
     if (!r || r.answered || r.discardedAt || r.examId || r.mode === 'rush' || r.mode === 'match') return false;
     if (!atNamedLevel(r)) return false;
@@ -6253,6 +6254,9 @@ async function resumableQuestion(profile, body = {}) {
     const actual = r.india?.chapterId || r.payload?.subtopic || r.subtopic;
     if (String(actual || '') !== subtopic) return false;
     if (difficulty !== null && Number(r.difficulty) !== difficulty) return false;
+    // A request that names a dot point resumes only a question that belongs to it, so choosing
+    // a dot point on the practice page is answered with one from that dot point.
+    if (askedDotpoint && !r.india && !dotpointsCredited(r.payload).includes(askedDotpoint.id)) return false;
     return true;
   }).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 

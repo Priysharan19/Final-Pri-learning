@@ -430,7 +430,7 @@ const COPY = {
   'distribute-partial': d => ({
     title: 'The bracket was only partly expanded',
     message: `${d.factor} multiplied the first term inside ${d.bracket} but not the rest. ${d.correct} expands to every term.`,
-    fix: 'Everything inside the bracket gets multiplied — a(b + c) = ab + ac.'
+    fix: 'Everything inside the bracket gets multiplied: a(b + c) = ab + ac.'
   }),
   'distribute-sign': d => ({
     title: 'The minus sign reached only the first term',
@@ -439,7 +439,7 @@ const COPY = {
   }),
   'power-of-sum': d => ({
     title: 'A sum was squared term by term',
-    message: `(${d.sum})^${d.power} is not each term raised to ${d.power} — expanding the bracket leaves a cross term behind.`,
+    message: `(${d.sum})^${d.power} is not each term raised to ${d.power}: expanding the bracket leaves a cross term behind.`,
     fix: '(a + b)² = a² + 2ab + b². The 2ab is the part that goes missing.'
   }),
   'negative-squared': d => ({
@@ -450,16 +450,16 @@ const COPY = {
   'power-of-power': d => ({
     title: 'Powers of a power were added instead of multiplied',
     message: `Raising ${d.base}^${d.inner} to the power ${d.outer} multiplies the indices, it does not add them.`,
-    fix: '(xᵃ)ᵇ = xᵃᵇ — multiply. xᵃ · xᵇ = xᵃ⁺ᵇ — add. It is easy to swap these two.'
+    fix: '(xᵃ)ᵇ = xᵃᵇ (multiply). xᵃ · xᵇ = xᵃ⁺ᵇ (add). It is easy to swap these two.'
   }),
   'power-product': d => ({
     title: 'Index law applied the wrong way round',
-    message: `${d.base}^${d.a} ${d.op === '*' ? '×' : '÷'} ${d.base}^${d.b} ${d.op === '*' ? 'adds' : 'subtracts'} the indices — they were ${d.op === '*' ? 'multiplied' : 'divided'} instead.`,
+    message: `${d.base}^${d.a} ${d.op === '*' ? '×' : '÷'} ${d.base}^${d.b} ${d.op === '*' ? 'adds' : 'subtracts'} the indices. They were ${d.op === '*' ? 'multiplied' : 'divided'} instead.`,
     fix: 'Same base: multiply → add the indices, divide → subtract them.'
   }),
   'function-of-sum': d => ({
     title: `${d.fn} was split across a sum`,
-    message: `${d.fn}(${d.arg}) cannot be broken into ${d.fn} of each term — the sum has to be worked out first.`,
+    message: `${d.fn}(${d.arg}) cannot be broken into ${d.fn} of each term: the sum has to be worked out first.`,
     fix: 'Only multiplication passes through these: √(ab) = √a·√b, but √(a + b) ≠ √a + √b.'
   }),
   'fraction-across': d => ({
@@ -470,17 +470,17 @@ const COPY = {
   'cancel-over-sum': d => ({
     title: 'Cancelled with one term of the top only',
     message: `In (${d.top})/${d.bottom} the ${d.bottom} divides the whole numerator, so it cannot be cancelled against a single term.`,
-    fix: 'Factorise the numerator first — you can only cancel a factor of the whole top, never a term of a sum.'
+    fix: 'Factorise the numerator first. You can only cancel a factor of the whole top, never a term of a sum.'
   }),
   'reciprocal-flip': d => ({
     title: 'A fraction was turned upside down',
     message: `${d.top}/${d.bottom} became ${d.bottom}/${d.top}.`,
-    fix: 'Dividing by a fraction flips the fraction you are dividing by — not the one you are dividing.'
+    fix: 'Dividing by a fraction flips the fraction you are dividing by, not the one you are dividing.'
   }),
   'term-dropped': d => ({
     title: 'A term went missing',
     message: `${d.term} is in the line above and not in this one. Everything else matches, so it looks like it was lost in the copy.`,
-    fix: 'Rewrite the whole line before changing it — dropped terms almost always happen while re-copying.'
+    fix: 'Rewrite the whole line before changing it. Dropped terms almost always happen while re-copying.'
   }),
   'sign-flipped': d => ({
     title: 'A sign changed on its own',
@@ -505,7 +505,7 @@ const COPY = {
     fix: 'Whatever you do to one side of an equation has to happen to the other, exactly.'
   }),
   'arithmetic-slip': d => ({
-    title: 'The method is right — the arithmetic is not',
+    title: 'The method is right: the arithmetic is not',
     message: `This line is the line above with ${d.from} in place of ${d.to}. Everything around it is correct.`,
     fix: 'Check that one calculation and carry the rest of the working forward.'
   }),
@@ -527,7 +527,7 @@ const COPY = {
   'counterexample': d => ({
     title: 'This line is no longer true',
     message: d.text,
-    fix: 'Compare it term by term with the line above — the change between them is where to look.'
+    fix: 'Compare it term by term with the line above: the change between them is where to look.'
   })
 };
 
