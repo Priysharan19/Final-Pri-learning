@@ -661,17 +661,57 @@ const numberOf = text => { const i = infoOf(text); return i && i.value !== undef
 const fnOf = (text, v) => { const i = infoOf(text); if (!i) return null; if (i.value !== undefined) return () => i.value; if (i.vars.join() !== v) return null; return x => { try { const y = evaluate(i.ast, { [v]: x }); return Number.isFinite(y) ? y : null; } catch { return null; } }; };
 const lettersOf = text => [...new Set((text.replace(/[A-Za-z]+/g, w => (KEEP.test(w) ? ' ' : w)).match(/[A-Za-z]/g) || []))];
 
+/** `x = 0 or x = -3`, `x = 0, x = -3`, `x = 0 and -3`, `x = ±2`: { letter, items: [{ value }] } with two or more values, or null. */
+function rootList(text) {
+  const t = text.replace(/\s*\.\s*$/, '').replace(/^(?:so|hence|therefore|thus|then|∴)\s+/i, '').trim();
+  const m = t.match(/^([A-Za-z])\s*=\s*(.+)$/);
+  if (!m) return null;
+  const pm = m[2].match(/^±\s*(\S+)$/);
+  if (pm) return { letter: m[1], items: [{ value: pm[1] }, { value: `-${pm[1]}` }] };
+  const pieces = m[2].split(/\s*(?:,|\bor\b|\band\b)\s*/i).map(x => x.trim());
+  if (pieces.length < 2 || pieces.some(x => !x)) return null;
+  const items = [];
+  for (const piece of pieces) {
+    const self = piece.match(new RegExp(`^${m[1]}\\s*=\\s*(.+)$`));
+    const value = (self ? self[1] : piece).trim();
+    if (/[=<>A-Za-z]/.test(value.replace(/(?:sqrt|pi)/gi, '')) || /^±/.test(value)) return null;
+    items.push({ value });
+  }
+  return { letter: m[1], items };
+}
+
 function pageDefinitions(raw, out, firstBreak) {
   const defs = {};            // 'k' → { expr, line }, 'f' → { expr, variable, line }, "u'" → …
   let equation = null;        // the last equation in one unknown: { left, right, variable }
   let broke = null;
   let carry = null;           // { text, variable }: what the last line this pass ticked came to, for the `=` line below
+  let zeroed = null;          // { line, expr, variable }: `y' = 0` was stated straight after a derivative the page set
   const limit = firstBreak === -1 ? raw.length : firstBreak;
   for (let i = 0; i < Math.min(limit, LIMITS.lines); i++) {
     if (raw[i].length > LIMITS.chars) continue;
+    const zeroFor = zeroed && zeroed.line === i - 1 ? zeroed : null;
+    zeroed = null;
     // A new part of the question may give a letter a new value on the paper, not on the page: what was defined is dropped.
     if (/^\(?(?:[a-h]|i{1,3}|iv|v|vi{0,3})[.)]\s|^\([a-h]\)|^(?:part|question|q)\s*\(?[a-h0-9]/i.test(raw[i])) { for (const k of Object.keys(defs)) delete defs[k]; equation = null; carry = null; }
     const src = raw[i].replace(/^\(?[a-h1-9ivx]{1,3}[.)]\s+/i, '').replace(/^[A-Za-z][A-Za-z ]{1,24}:\s*(?=\S)/, '');
+    // `y' = 0` (with or without words before it) straight after a derivative the page set: the next line may set that derivative to zero.
+    { const zm = src.replace(/\s*\.\s*$/, '').match(/^(?:[A-Za-z][A-Za-z ]*\s+)?([A-Za-z])'\s*=\s*0$/);
+      if (zm && defs[`${zm[1]}'`] && defs[`${zm[1]}'`].variable) zeroed = { line: i, expr: defs[`${zm[1]}'`].expr, variable: defs[`${zm[1]}'`].variable }; }
+    // `x = 0 or x = -3`, `x = 0, -3`, `x = ±2`: each listed value is a root of the equation in force above, or the line is not ticked.
+    if (equation && out[i].status === 'note') {
+      const list = rootList(src);
+      if (list && list.letter === equation.variable) {
+        const L = fnOf(equation.left, list.letter), R = fnOf(equation.right, list.letter);
+        const values = list.items.map(x => numberOf(cleanStatement(x.value)));
+        if (L && R && values.every(v => v !== null && v !== undefined)) {
+          const fails = list.items.filter((_, k) => { const a = L(values[k]), b = R(values[k]); return a === null || b === null || !close(a, b); });
+          if (!fails.length) out[i] = { text: out[i].text, status: 'ok', state: 'arithmetic', note: `${list.items.map(x => assignSpan(list.letter, x.value)).join(', ')} each satisfy the equation before it. This does not say these are all the solutions.`, valueChain: { rule: 'page-definitions' } };
+          else out[i] = { ...out[i], note: `Not ticked: ${fails.map(x => assignSpan(list.letter, x.value)).join(', ')} ${fails.length > 1 ? 'do' : 'does'} not satisfy the equation before it.` };
+        }
+        delete defs[list.letter]; carry = null;
+        continue;
+      }
+    }
     if (/[<>≤≥≠≈%°,;:]|==|!=|√\s*\[|∫|\]_/.test(src)) continue;
     const decimal = /\d\.\d|(?:^|[^\d])\.\d/.test(src);
     const ticks = [], facts = [];
@@ -697,6 +737,18 @@ function pageDefinitions(raw, out, firstBreak) {
       const parts = text.split('=').map(x => x.trim());
       if (parts.length < 2 || parts.some(x => !x)) return;
       const head = parts[0];
+      // The derivative the page set, put equal to zero (`0 = 6x^2 + 18x` after `y' = 6x^2 + 18x` and `y' = 0`): true as written, never crossed.
+      if (zeroFor && parts.length === 2 && (parts[0] === '0' || parts[1] === '0')) {
+        const side = parts[0] === '0' ? parts[1] : parts[0];
+        const claim = putIn(side, defs, zeroFor.variable), base = putIn(zeroFor.expr, defs, zeroFor.variable);
+        const a = claim && infoOf(claim.text), b = base && infoOf(base.text);
+        if (a && b && a.vars && b.vars && a.vars.join() === zeroFor.variable && sameAsWritten(a, b)) {
+          const left = putIn(parts[0], defs, zeroFor.variable), right = putIn(parts[1], defs, zeroFor.variable);
+          if (left && right) equation = { left: left.text, right: right.text, variable: zeroFor.variable };
+          ticks.push('This sets the derivative above to zero.');
+          return;
+        }
+      }
       const twoWaysHere = parts.some(x => /[\/÷]/.test(x) && (/[\/÷]\s*\d+(?:\.\d+)?\s*[A-Za-z(]|[\/÷]\s*[A-Za-z]\s*[A-Za-z(]|\^\s*-?\d+(?:\.\d+)?[A-Za-z]|\^\s*[A-Za-z][A-Za-z0-9(]/.test(x)));
       if (twoWaysHere) return;
       // B. a derivative of something the page defined: u' = …, f'(x) = …
@@ -921,8 +973,106 @@ function withTexReading(workingText, base, pairs) {
       reason: unverified.length ? base.summary.reason || 'Pri checks only the arithmetic on this question. These lines have none it can check on its own.' : null }
   };
 }
+
+// ── What the reader writes that the checker reads another way ────────────────────────────────────────────────────────
+// Owner's handwritten pages, 20 November 2026. Normalised before any line is read (the line shown stays as written):
+//   · a prime in any of its forms (′ ’ ʹ ´, and a double prime ″) is the ASCII ' that y' and f'(x) are read from;
+//   · `integral_2^4` is ∫_2^4, and a space after the underscore of a limit (`]_ -2^4`) is not part of the limit.
+function normaliseInk(line) {
+  return String(line)
+    .replace(/(?<=[A-Za-z)])\s*(?:″|′′|’’|ʹʹ|´´)/g, "''")
+    .replace(/(?<=[A-Za-z)])[′’ʹ´]/g, "'")
+    .replace(/(?<![A-Za-z])integral\s*(?=[_^])/gi, '∫')
+    .replace(/(∫|\])\s*_\s+(?=[-−]?\s*[\d{(πe])/g, '$1_');
+}
+
+// ── A column sum written down the page ───────────────────────────────────────────────────────────────────────────────
+//     196          one block: a bare number, one or more lines that start with + or -, an optional rule of dashes,
+//     + 64         and a bare number. The block is true or false as 196 + 64 = 260; only the LAST line carries the
+//     260          verdict. The other lines of the block are notes, and the block never reaches the line below it.
+const COLUMN_NUMBER = /^-?\d+(?:\.\d+)?$/;
+const COLUMN_OP = /^([+\-−–])\s*(\d+(?:\.\d+)?)$/;
+const COLUMN_RULE = /^(?:[-–—−_=]\s*){2,}$|^[–—]$/;
+function findColumns(raw) {
+  const blocks = new Map();   // index of the last line → { members, expression, sum, final, whole }
+  const limit = Math.min(raw.length, LIMITS.lines);
+  for (let i = 0; i < limit; i++) {
+    const first = raw[i].replace(/[−–—]/g, '-').trim();
+    if (!COLUMN_NUMBER.test(first) || raw[i].length > LIMITS.chars) continue;
+    let j = i + 1;
+    const ops = [];
+    while (j < limit && COLUMN_OP.test(raw[j].trim())) { const m = raw[j].trim().match(COLUMN_OP); ops.push([m[1] === '+' ? 1 : -1, m[2]]); j++; }
+    if (!ops.length) continue;
+    let ruled = false;
+    while (j < limit && COLUMN_RULE.test(raw[j].trim())) { ruled = true; j++; }
+    if (j >= limit) continue;
+    const last = raw[j].replace(/[−–—]/g, '-').trim();
+    if (!COLUMN_NUMBER.test(last) || (last.startsWith('-') && !ruled)) continue;
+    const members = []; for (let k = i; k <= j; k++) members.push(k);
+    const numbers = [first, ...ops.map(([, n]) => n), last];
+    const sum = ops.reduce((acc, [sign, n]) => acc + sign * Number(n), Number(first));
+    blocks.set(j, { members, expression: first + ops.map(([sign, n]) => ` ${sign > 0 ? '+' : '-'} ${n}`).join(''), sum, final: Number(last), last, whole: numbers.every(n => /^-?\d+$/.test(n)) });
+    i = j;
+  }
+  return blocks;
+}
+
+// ── Column vectors ──────────────────────────────────────────────────────────────────────────────────────────────────
+// `[14;8]`, `4[-5;-1] + 3[-2;4] = [-20 - 6;-4 + 12]`, `|[14;8]| = √(14^2 + 8^2)`: numeric column vectors, sums of scalar
+// multiples of them, and their magnitudes. TICK ONLY: a vector line that is not proved equal is a note, never a cross.
+const VECTOR_BRACKET = /\[[^\[\]|]*;[^\[\]|]*\]/;
+const arithmeticText = s => s.replace(/[−–—]/g, '-').replace(/[×·]/g, '*').replace(/÷/g, '/').replace(/(\d|\))\s+x\s+(?=\d|\()/gi, '$1*').replace(/\[([^\[\],;_|]*)\](?![_^])/g, '($1)');
+function vectorTerms(s) {
+  const terms = [];
+  let depth = 0, bar = false, cur = '', sign = 1;
+  const flush = () => { terms.push({ sign, text: cur.trim() }); cur = ''; };
+  for (let k = 0; k < s.length; k++) {
+    const c = s[k];
+    if (c === '(' || c === '[') depth++; else if (c === ')' || c === ']') depth--; else if (c === '|') bar = !bar;
+    const before = cur.trim();
+    if ((c === '+' || c === '-') && depth === 0 && !bar && before && !/[*\/^(]$/.test(before)) { flush(); sign = c === '-' ? -1 : 1; continue; }
+    cur += c;
+  }
+  flush();
+  return terms;
+}
+/** { vec: [...] } for a vector, { num } for a number, null when the side is neither. */
+function vectorSide(raw) {
+  let s = arithmeticText(raw.trim());
+  if (!s) return null;
+  if (!VECTOR_BRACKET.test(raw) && !/\|/.test(raw)) { const v = valueOf(s); return v === null ? null : { num: v }; }
+  const terms = vectorTerms(s);
+  if (terms.some(t => t.text === '')) return null;
+  const asVector = t => {
+    const m = t.match(/^(.*?)\s*\*?\s*\[([^\[\]|]*;[^\[\]|]*)\]$/);
+    if (!m) return null;
+    const comps = m[2].split(';').map(c => valueOf(arithmeticText(c)));
+    if (comps.length < 2 || comps.length > 3 || comps.some(c => c === null)) return null;
+    let k = 1;
+    const pre = m[1].trim();
+    if (pre) { k = valueOf(pre === '-' ? '-1' : pre); if (k === null) return null; }
+    return comps.map(c => k * c);
+  };
+  if (terms.length === 1 && /^\|.*\|$/.test(terms[0].text)) {
+    const inner = vectorTerms(terms[0].text.slice(1, -1));
+    const sum = inner.map(t => ({ sign: t.sign, v: asVector(t.text) }));
+    if (!sum.length || sum.some(t => !t.v) || sum.some(t => t.v.length !== sum[0].v.length)) return null;
+    const total = sum[0].v.map((_, c) => sum.reduce((a, t) => a + t.sign * t.v[c], 0));
+    return { num: terms[0].sign * Math.sqrt(total.reduce((a, c) => a + c * c, 0)) };
+  }
+  if (/\|/.test(s)) return null;
+  const parts = terms.map(t => ({ sign: t.sign, v: asVector(t.text) }));
+  if (!parts.length || parts.some(t => !t.v) || parts.some(t => t.v.length !== parts[0].v.length)) return null;
+  return { vec: parts[0].v.map((_, c) => parts.reduce((a, t) => a + t.sign * t.v[c], 0)) };
+}
+const sameVectorSide = (a, b) => (a.vec && b.vec ? a.vec.length === b.vec.length && a.vec.every((x, k) => closeLoose(x, b.vec[k])) : a.num !== undefined && b.num !== undefined && closeLoose(a.num, b.num));
+const showVector = v => `(${v.map(x => String(Number(x.toPrecision(12)))).join(', ')})`;
+
 function stepCheckArithmeticWithinBudget(workingText) {
-  const raw = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
+  const original = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
+  const raw = original.map(normaliseInk);
+  const columns = findColumns(raw), columnMembers = new Set([...columns.values()].flatMap(c => c.members));
+  const lastValue = new Map();   // line index → the value a ticked line came to (for a bare value written under it)
   const out = [];
   let firstBreak = -1;
   let diagnosis = null;
@@ -959,6 +1109,49 @@ function stepCheckArithmeticWithinBudget(workingText) {
     prev = null;
     if (i >= LIMITS.lines || line.length > LIMITS.chars) return note(line, 'Not checked: this line is too long or too far down the working to check.');
     if (firstBreak !== -1) return note(line, 'Follows from the earlier slip.');
+    // A column sum (see findColumns): the block never reaches the line below it, and only its last line carries a verdict.
+    if (columnMembers.has(i)) {
+      // What the line above the block came to still stands for the `=` line below it: tick only (the block may be margin work).
+      prev = carried ? { ...carried, calculus: true, compound: false } : null; labelled = false;
+      const block = columns.get(i);
+      if (!block) return note(line, NOTE);
+      const sums = block.sum, final = block.final;
+      if (closeLoose(sums, final)) {
+        out.push({ text: line, status: 'ok', state: 'arithmetic', note: `This column adds up: ${mathSpan(`${block.expression} = ${block.last}`)}.`, valueChain: { rule: 'true-as-written' } });
+        return;
+      }
+      // False: crossed only when every line is a plain whole number and no other reading of the digits makes it true.
+      if (!block.whole || trueUnderAnotherReading([block.expression, block.last], [sums, final])) return note(line, block.whole ? MISREAD_NOTE : SOFT_NOTE);
+      const message = `${mathSpan(block.expression)} comes to ${shown(sums)}, but this line gives ${shown(final)}.`;
+      diagnosis = { code: 'arithmetic-not-equal', title: 'The two sides of this line are not equal', message, fix: 'Work this line out again, one operation at a time.', confidence: 'high' };
+      firstBreak = i;
+      out.push({ text: line, status: 'break', note: message, diagnosis });
+      prev = null;
+      return;
+    }
+    // Numeric column vectors (see vectorSide): tick only.
+    if (VECTOR_BRACKET.test(src)) {
+      const body = src.replace(/\s*\.\s*$/, '');
+      if (!/[<>≤≥≠≈%°,]|==|!=/.test(body)) {
+        const bits = body.split('=').map(x => x.trim());
+        const cont = bits[0] === '' && bits.length >= 2;
+        const written = cont ? bits.slice(1) : bits;
+        const values = written.every(Boolean) ? written.map(vectorSide) : [];
+        if (values.length && values.every(Boolean)) {
+          const tail = values[values.length - 1];
+          const carry = tail.vec ? { vec: tail.vec, text: written[written.length - 1], calculus: true } : { value: tail.num, text: written[written.length - 1], calculus: true };
+          const above = cont && written.length === 1 && carried && (carried.vec ? { vec: carried.vec } : carried.value !== undefined ? { num: carried.value } : null);
+          const all = above ? [above, ...values] : values;
+          prev = carry;
+          if (all.length >= 2 && all.every(x => sameVectorSide(x, all[0]))) {
+            const what = all[0].vec ? `the same vector ${showVector(all[0].vec)}` : shown(all[0].num);
+            out.push({ text: line, status: 'ok', state: 'arithmetic', note: above ? `This equals the line above: ${what}.` : `Both sides come to ${what}.`, valueChain: { rule: 'true-as-written' } });
+            return;
+          }
+          return note(line, NOT_PROVED);
+        }
+      }
+    }
     const text0 = src.replace(/\s*\.\s*$/, '').replace(/[−–—]/g, '-').replace(/[×·]/g, '*').replace(/÷/g, '/').replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore|thus)\s+/i, '')
       // `Ans = 72` continues the line above; `6 x 12` between two numbers is a times sign; square brackets group.
       .replace(ANS_LABEL, '').replace(/(\d|\))\s+x\s+(?=\d|\()/gi, '$1*')
@@ -1031,6 +1224,7 @@ function stepCheckArithmeticWithinBudget(workingText) {
       let named = !calc.used && !number ? nameOfRule(texts[0], texts[1]) : '';
       if (!calc.used && !named) named = trigStepName(texts[0], texts[1]);
       if (!calc.used) lastSides.set(out.length, written[written.length - 1]);
+      if (all.every(x => x.value !== undefined)) lastValue.set(out.length, all[0].value);
       out.push({ text: line, status: 'ok', state: 'arithmetic', note: named ? `${why} It matches ${named}.` : why, valueChain: { rule: 'true-as-written' } });
       return;
     }
@@ -1049,7 +1243,7 @@ function stepCheckArithmeticWithinBudget(workingText) {
     if (continuation && carried && !before) {
       const agrees = carried.value !== undefined && values.every(v => closeLoose(v, carried.value));
       if (agrees) {
-        prev = { ...prev, calculus: true }; lastSides.set(out.length, sides[sides.length - 1]);
+        prev = { ...prev, calculus: true }; lastSides.set(out.length, sides[sides.length - 1]); lastValue.set(out.length, carried.value);
         const trig = carried.text ? trigStepName(carried.text, sides[0]) : '';   // sin 30° then = 1/2
         out.push({ text: line, status: 'ok', state: 'arithmetic', note: `This equals the line above: ${shown(carried.value)}.${trig ? ` It matches ${trig}.` : ''}`, valueChain: { rule: 'true-as-written' } });
         return;
@@ -1083,7 +1277,7 @@ function stepCheckArithmeticWithinBudget(workingText) {
       if (signClaim && !(signClaim === '>' ? allValues[0] > 0 : allValues[0] < 0)) return note(line, NOTE);
       const trig = continuation && before && before.text ? trigStepName(before.text, sides[0]) : '';   // sin 30° then = 1/2
       const why = (continuation && before ? `This equals the line above: ${shown(allValues[0])}.` : `Both sides come to ${shown(allValues[0])}.`) + (trig ? ` It matches ${trig}.` : '');
-      lastSides.set(out.length, allSides[allSides.length - 1]);
+      lastSides.set(out.length, allSides[allSides.length - 1]); lastValue.set(out.length, allValues[0]);
       out.push({ text: line, status: 'ok', state: 'arithmetic', note: why, valueChain: { rule: 'arithmetic' } });
       return;
     }
@@ -1107,7 +1301,7 @@ function stepCheckArithmeticWithinBudget(workingText) {
       if (rest.every(v => close(v, rest[0])) && !close(allValues[0], rest[0])) {
         if (carried && carried.value !== undefined && closeLoose(rest[0], carried.value)) {
           prev = { value: rest[0], text: sides[sides.length - 1], calculus: true };
-          lastSides.set(out.length, allSides[allSides.length - 1]);
+          lastSides.set(out.length, allSides[allSides.length - 1]); lastValue.set(out.length, rest[0]);
           out.push({ text: line, status: 'ok', state: 'arithmetic', note: `This equals the line above: ${shown(rest[0])}. The ${mathSpan(allSides[0])} in front of it was not read as part of the line.`, valueChain: { rule: 'true-as-written' } });
           return;
         }
@@ -1126,6 +1320,22 @@ function stepCheckArithmeticWithinBudget(workingText) {
     prev = null;
   });
 
+  // A bare value on its own line (64/3) that equals what the working above came to: the student writing the result.
+  // Ticked; one that does not equal it stays a note (it may be margin work), and is never crossed.
+  if (firstBreak === -1) {
+    const BARE = /^-?(?:\d+(?:\.\d+)?(?:\s*\/\s*\d+(?:\.\d+)?)?|\d*\s*√\s*\d+)$/;
+    const bareText = k => raw[k].replace(/[−–—]/g, '-').replace(/\s*\.\s*$/, '').trim();
+    for (let k = 1; k < out.length; k++) {
+      if (out[k].status !== 'note' || out[k].note !== NOTE || columnMembers.has(k) || !BARE.test(bareText(k))) continue;
+      const v = valueOf(bareText(k));
+      if (v === null) continue;
+      let j = k - 1;
+      while (j >= 0 && !columnMembers.has(j) && BARE.test(bareText(j)) && !(out[j].status === 'ok' && lastValue.has(j))) j--;
+      if (j < 0 || columnMembers.has(j) || out[j].status !== 'ok' || !lastValue.has(j) || !closeLoose(v, lastValue.get(j))) continue;
+      out[k] = { text: out[k].text, status: 'ok', state: 'arithmetic', note: `This is the value of the working above: ${shown(v)}.`, valueChain: { rule: 'true-as-written' } };
+      lastValue.set(k, v);
+    }
+  }
   // The second pass: what the page itself defines (see pageDefinitions).
   {
     let broke = null;
@@ -1146,6 +1356,10 @@ function stepCheckArithmeticWithinBudget(workingText) {
       let more = '';
       try {
         more = simplifiesTo(lastSides.get(k), out[k].note);
+        // Not when a later line of the page already states that value (a bare value under the working, or an `=` line).
+        { const v = valueOf(lastSides.get(k));
+          const states = j => (j > k && v !== null) && raw[j].replace(/\s*\.\s*$/, '').split('=').some(x => { const t = x.trim().replace(/[−–—]/g, '-'); return t && valueOf(t) !== null && closeLoose(valueOf(t), v); });
+          if (more && raw.some((_, j) => states(j))) more = ''; }
         // Like terms left uncollected: the last line only (a middle line may be mid-working), and only where the plain-number note had nothing to say.
         // Not when the collected form is already written on the page (2x = x + x): the student has said it.
         const written = new Set(raw.flatMap(l => l.split('=')).map(x => x.replace(/[\s−–—]/g, m => (/\s/.test(m) ? '' : '-'))));
@@ -1155,7 +1369,7 @@ function stepCheckArithmeticWithinBudget(workingText) {
     }
   }
   const state = l => l.state || (l.status === 'break' ? 'wrong' : l.unreadable ? 'unread' : 'unverified');
-  const lines = out.map(l => ({ ...l, state: state(l) }));
+  const lines = out.map((l, k) => ({ ...l, text: original[k] ?? l.text, state: state(l) }));
   const at = st => lines.flatMap((l, k) => (l.state === st ? [k + 1] : []));
   const unverified = at('unverified'), unread = at('unread');
   const summary = {

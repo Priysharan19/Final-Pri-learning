@@ -41,7 +41,9 @@ let r = run(PAGE);
 ok(r.firstBreak === -1, `the owner's integral page: nothing crossed (${r.lines.map(l => l.status)})`);
 ok(r.lines.slice(5).map(l => l.status).join() === 'ok,ok,ok,ok,ok,ok,ok', `every line of the integral is ticked: each is true as written (${r.lines.slice(5).map(l => l.status)})`);
 ok(r.lines[10].state === 'arithmetic' && r.arithmetic === true && r.source === 'value-chain', 'a tick is an arithmetic tick and the report says so');
-ok(r.lines.slice(0, 5).every(l => l.status === 'note'), `vectors, words and a column sum are not judged (${r.lines.slice(0, 5).map(l => l.status)})`);
+// (20 November 2026: numeric column vectors are now read, tick only. The magnitude line and `= sqrt(260)` under it are ticked;
+//  the bare magnitude of a vector, the inline column sum and the words stay notes, and nothing on the page is crossed.)
+ok(r.lines.slice(0, 5).map(l => l.status).join() === 'note,note,ok,ok,note', `vectors are ticked when equal; the rest are not judged (${r.lines.slice(0, 5).map(l => l.status)})`);
 
 r = run(['-20 - 6 = 14']);
 ok(r.lines[0].status === 'break' && /−26/.test(plain(r.diagnosis.message)) && /14/.test(plain(r.diagnosis.message)), `false arithmetic is crossed with both values (${r.diagnosis?.message})`);
@@ -273,8 +275,10 @@ ok(model?.cards?.length === 2 && model.cards.every(c => c.status === 'checked' &
 // simplified). Both are WORDS added to a comment. No line is ticked, crossed or left as a note because of them.
 {
   // 5.0 no verdict moved: every page the sweeps above ran (24497 of them, every one of their lines' status and state,
-  // and where the first cross fell) hashes to the value recorded BEFORE these words were added.
-  ok(reportsSeen === 24497 && verdictHash.copy().digest('hex') === 'f2c42cfd16afc3e4e5cd6ab18e7dec53289d0d2e0f832cf84ffa05b7abce8ade', `no verdict changed across ${reportsSeen} pages (digest ${verdictHash.copy().digest('hex').slice(0, 12)})`);
+  // and where the first cross fell) hashes to the value recorded BEFORE these words were added. Re-recorded on 20 November 2026:
+  // exactly one of those pages moved, the owner's vector page (PAGE above: its magnitude line and `= sqrt(260)` are now ticked, tick only);
+  // the other 24496 verdicts are those of the previous digest, found by running the previous engine over the same pages.
+  ok(reportsSeen === 24497 && verdictHash.copy().digest('hex') === 'c1fe463bf79b1d68c0bde86f348eea790b9bfb2f80eccb4da6d8bfdc8b024a33', `no verdict changed across ${reportsSeen} pages (digest ${verdictHash.copy().digest('hex').slice(0, 12)})`);
   // (placed after 5.0 so the pages it runs are not part of the recorded digest)
   // independent review of the typesetting: a whole number with float noise is printed as that whole number
   ok(!/144/.test(JSON.stringify(run(['6[4^2 - 2^2] = 6(16 - 4)', '= 72']).lines)) && !/\\frac\{\d+\}\{2\}\$\./.test(run(['0.1 + 0.2 + 71.7 = 72']).lines[0].note || ''), 'no value is printed as an unreduced fraction of a whole number');
@@ -628,6 +632,76 @@ ok(model?.cards?.length === 2 && model.cards.every(c => c.status === 'checked' &
     ok(shown(mathSpan('a\\$b')) === 'a\\$b' && mathSpan('a\\$b') === 'a\\\\$b', `a\\$b is shown as written (${mathSpan('a\\$b')})`);
     ok(shown(mathSpan('a\\')) === 'a\\' && shown(mathSpan('a\\\\')) === 'a\\\\' && dollarsBalanced(mathSpan('a\\$b')), 'a trailing and a doubled backslash are shown as written');
     ok(shown(mathSpan('cost $5 * 2')) === 'cost $5 × 2' && dollarsBalanced(mathSpan('cost $5 * 2')), 'a literal dollar is escaped, a star is a times sign'); }
+}
+
+// ── Part 6 · the owner's handwritten pages, 20 November 2026 (read by the live reader; exact transcripts) ─────────────
+// Rules throughout: a true line is never crossed, a wrong line is never ticked, a definition is never crossed, and an
+// unsure line is a note. Every verdict below is tick-only unless it says otherwise.
+{
+  const stat = lines => run(lines).lines.map(l => l.status === 'ok' ? 'T' : l.status === 'break' ? 'X' : '.').join('');
+  const PAGE_A = ['y = 2x^3 + 9x^2', 'y′ = 6x^2 + 18x', 'for stationary points y′ = 0', '0 = 6x^2 + 18x', '0 = 6x[x + 3]', 'x = 0 or x = -3', 'y(0) = 0', 'smallest (0,0)'];
+  const PAGE_B = ['8 y = 2x(4 - x).', 'Area = ∫_0^4 2x(4 - x) dx.', '= 2∫_0^4 4x - x^2 dx', '= 2[4x^2/2 - x^3/3]_0^4', '= 2[2x^2 - x^3/3]_0^4', '= 2[2(4)^2 - 4^3/3] = 2[32 - 64/3]', '16/3', '64/3'];
+  const PAGE_C = ['integral_2^4 12x dx = 12 integral_-2^4 x dx.', '= [12x^2/2]_2^4', '= [6x^2]_ -2^4', '= 6[x^2]_-2^4', '= 6[4^2 - 2^2]', '= 6(16 - 4) = 6 x 12', 'Ans = 72'];
+  const PAGE_D = ['= |[14;8]| = √(14^2 + 8^2)', '196', '+ 64', '260', '= √260'];
+  // 1. every prime-like character is the prime; the line shown stays as the student wrote it
+  ok(stat(PAGE_A) === '.T.TTTT.', `page A: the derivative, its zero, the rearranged equation, both roots and y(0) are ticked (${stat(PAGE_A)})`);
+  ok(run(PAGE_A).lines[1].text === 'y′ = 6x^2 + 18x', 'the text shown is the text written');
+  for (const prime of ["'", '′', '’', 'ʹ', '´']) ok(stat(PAGE_A.map(l => l.replace(/′/g, prime))) === '.T.TTTT.', `the prime ${prime} reads as a prime`);
+  ok(/derivative of/.test(plain(run(PAGE_A).lines[1].note)), 'line 2 is ticked as the derivative of line 1');
+  for (const wrong of ['y′ = 6x^2 + 9x', "y' = 6x^2 + 9x", 'y’ = 6x^2 + 9x', 'y′ = 6x^2 + 18x + 1']) ok(!/T/.test(stat(['y = 2x^3 + 9x^2', wrong]).slice(1)), `a wrong derivative is never ticked: ${wrong} (${stat(['y = 2x^3 + 9x^2', wrong])})`);
+  ok(stat(['y = 2x^3 + 9x^2', 'y′ = 6x^2 + 9x']) === '.X' && stat(['y = 2x^3 + 9x^2', "y' = 6x^2 + 9x"]) === '.X', 'a wrong derivative follows the existing rule for u\': crossed, the same with either mark');
+  ok(stat(['y = 2x^3 + 9x^2', 'y″ = 12x + 18']) === '..', 'a double prime is read and not ticked as a first derivative');
+  // 2. the derivative set to zero
+  { const r = run(PAGE_A);
+    ok(plain(r.lines[3].note) === 'This sets the derivative above to zero.', `line 4 says it sets the derivative to zero (${r.lines[3].note})`);
+    ok(stat(['y = 2x^3 + 9x^2', "y' = 6x^2 + 18x", "y' = 0", '6x^2 + 18x = 0']) === '.T.T', 'with no words before y\' = 0, and the expression on the left');
+    ok(stat(['y = 2x^3 + 9x^2', "y' = 6x^2 + 18x", "y' = 0", '0 = 6x^2 + 17x']) !== '.T.T' && !/X/.test(stat(['y = 2x^3 + 9x^2', "y' = 6x^2 + 18x", "y' = 0", '0 = 6x^2 + 17x'])), 'a different expression is not ticked by this rule, and never crossed');
+    ok(stat(['y = 2x^3 + 9x^2', "y' = 6x^2 + 18x", 'so', '0 = 6x^2 + 18x']) === '.T..', 'without y\' = 0 above it, 0 = (the derivative) is not ticked by this rule');
+    ok(stat(['y = 2x^3 + 9x^2', "y' = 6x^2 + 18x", "y' = 0", '5', '0 = 6x^2 + 18x']) === '.T...' , 'only the line straight after y\' = 0'); }
+  // 3. a list of roots
+  for (const roots of ['x = 0 or x = -3', 'x = 0, x = -3', 'x = 0 and x = -3', 'x = 0, -3', 'x = 0 or -3', 'x = 0 or x = -3.']) {
+    const r = run(PAGE_A.map((l, k) => (k === 5 ? roots : l)));
+    ok(r.lines[5].status === 'ok' && !/all the solutions\.?$/.test('') && /not say these are all/.test(r.lines[5].note), `a list of roots is ticked, not claimed complete: ${roots}`);
+  }
+  for (const bad of ['x = 0 or x = 3', 'x = 1, x = -3', 'x = 3 and x = 4', 'x = ±2']) { const r = run(PAGE_A.map((l, k) => (k === 5 ? bad : l))); ok(r.lines[5].status === 'note' && r.firstBreak === -1 && /does not satisfy|do not satisfy/.test(r.lines[5].note), `a list with a value that is not a root is a note that says so: ${bad} (${r.lines[5].note})`); }
+  ok(stat(['x^2 = 4', 'x = ±2']) === '.T' && stat(['x^2 = 4', 'x = ±3']) === '..', 'x = ±a is a pair of values');
+  ok(stat(['x = 0 or x = -3']) === '.', 'with no equation above, a list of values is not ticked');
+  ok(run(PAGE_A).lines[6].status === 'ok', 'y(-3) and y(0) style lines still work');
+  ok(stat(['y = 2x^3 + 9x^2', "y' = 6x^2 + 18x", "y' = 0", '0 = 6x^2 + 18x', '0 = 6x(x + 3)', 'x = 0 or x = -3', 'y(-3) = 27']) === '.T.TTTT', 'y(-3) = 27 is ticked');
+  ok(stat(['y = 2x^3 + 9x^2', "y' = 6x^2 + 18x", "y' = 0", '0 = 6x^2 + 18x', '0 = 6x(x + 3)', 'x = 0 or x = -3', 'y(-3) = 28']) !== '.T.TTTT.' && !/T$/.test(stat(['y = 2x^3 + 9x^2', "y' = 6x^2 + 18x", "y' = 0", '0 = 6x^2 + 18x', '0 = 6x(x + 3)', 'x = 0 or x = -3', 'y(-3) = 28'])), 'a wrong y(-3) is not ticked');
+  // 5 6 7. the value written under the working
+  { const r = run(PAGE_B);
+    ok(r.firstBreak === -1 && stat(PAGE_B) === '..TTTT.T', `page B: the chain is ticked, the margin 16/3 is a note, 64/3 is ticked (${stat(PAGE_B)})`);
+    ok(/value of the working above/.test(plain(r.lines[7].note)) && /64\/3/.test(plain(r.lines[7].note)), `the bare value says what it is (${plain(r.lines[7].note)})`);
+    ok(!/Give the final answer|simplifies to/.test(r.lines[5].note), `line 6 does not ask for the simplified form: line 8 states it (${r.lines[5].note})`);
+    ok(/Give the final answer in that simplified form/.test(run(PAGE_B.slice(0, 6)).lines[5].note), 'with no line stating it, line 6 still carries the note');
+    ok(stat(['3 × 4', '= 12', '12']) === '.TT' && stat(['3 × 4', '= 12', '12.']) === '.TT' && stat(['3 × 4', '= 12', '13']) === '.T.' && stat(['3 × 4', '= 12', '13', '12']) === '.T.T', 'a bare value equal to the chain is ticked; one that is not stays a note, never a cross');
+    ok(stat(['3 × 4 = 13', '13']) === 'X.', 'after a cross nothing is ticked');
+    ok(stat(['1/2 + 1/3', '= 5/6', '5/6']) === '.TT' && stat(['1/2 + 1/3', '= 5/6', '5/7']) === '.T.', 'fractions too');
+    ok(stat(['2 + 3 = 5.', '= 5.', '5.', 'y = 2x(4 - x).']) === 'TTT.', 'a full stop at the end of a line is punctuation, never a decimal point or a product');
+    ok(stat(['x^2 = 9.', 'y = 2x(4 - x).', '8 y = 2x(4 - x).', 'Area = ∫_0^4 2x(4 - x) dx.']) === '....', 'the question number and the integral label: notes, never crossed');
+    ok(stat(['8 y = 2x(4 - x).', 'y(2) = 16']) === '..', 'an "8 y" that may be 8y is not read as a definition of y, so y(2) = 16 is not ticked'); }
+  // 8. integral written in words
+  { const r = run(PAGE_C);
+    ok(stat(PAGE_C) === 'TTTTTTT' && r.firstBreak === -1, `page C: the word form of the integral is read like ∫ (${stat(PAGE_C)})`);
+    ok(stat(['integral_0^3 x^2 dx = 9', 'integral_0^3 x^2 dx = 10']) === 'T.' && stat(['∫_0^3 x^2 dx = 9', '= [x^3/3]_ 0^3']) === 'TT', 'integral_a^b and a space after the underscore read as ∫_a^b'); }
+  // 9. a column sum
+  { const r = run(PAGE_D);
+    ok(stat(PAGE_D) === 'T..TT' && r.firstBreak === -1, `page D: the column's last line is ticked, the others are notes, and = √260 follows the chain above (${stat(PAGE_D)})`);
+    ok(/196 \+ 64 = 260/.test(plain(r.lines[3].note)), `the tick says the sum (${plain(r.lines[3].note)})`);
+    ok(stat(['196', '+ 64', '260']) === '..T' && stat(['196', '+ 64', '---', '260']) === '...T' && stat(['300', '- 40', '+ 5', '265']) === '...T' && stat(['3', '- 8', '-----', '-5']) === '...T', 'a true column, with or without a rule line, plus and minus');
+    ok(stat(['196', '+ 64', '270']) === '..X' && /260/.test(plain(run(['196', '+ 64', '270']).diagnosis.message)) && /270/.test(plain(run(['196', '+ 64', '270']).diagnosis.message)), 'a false column of whole numbers is crossed on its last line, with the usual message');
+    ok(stat(['1.5', '+ 0.5', '3']) === '...' && stat(['1.5', '+ 0.5', '2']) === '..T' && stat(['0.5', '+ 0.25', '0.8']) === '...', 'a decimal column is ticked when true and a note when false');
+    ok(stat(['196', '260']) === '..' && stat(['196', '+ 64']) === '..' && stat(['196', '+ 64', '+ 5']) === '...', 'two numbers, or a column with no total, are not a sum');
+    ok(stat(['196', '+ 64', '260', '5']) === '..T.', 'a number under the total is not part of the column');
+    ok(stat(['x', '+ 64', '260']) === '...', 'a letter in the column: not a sum');
+    ok(stat(['12', '+ 8', '20', '= 20']) === '..T.' && stat(['2 + 3 = 5', '196', '+ 64', '260', '= 5']) === 'T..TT' && stat(['2 + 3 = 5', '196', '+ 64', '260', '= 6']) === 'T..T.' && stat(['2 + 3 = 5', '196', '+ 64', '260', '= 260']) === 'T..T.', 'the line below a block is held to the chain above it: ticked when equal, otherwise a note, never crossed'); }
+  // 10. column vectors
+  ok(stat(['4[-5;-1] + 3[-2;4] = [-20 - 6;-4 + 12]', '= [-26;8]']) === 'TT', 'a sum of column vectors and the line under it');
+  ok(stat(['4[-5;-1] + 3[-2;4] = [-26;9]']) === '.' && stat(['4[-5;-1] + 3[-2;4] = [-20 - 6;-4 + 12]', '= [-26;9]']) === 'T.', 'a false vector line is a note: tick only');
+  ok(stat(['|[14;8]| = √(14^2 + 8^2)']) === 'T' && stat(['|[14;8]| = 16']) === '.' && stat(['|[3;4]| = 5', '= √25']) === 'TT', 'a magnitude');
+  ok(stat(['[1;2;3] + [1;1;1] = [2;3;4]', '2[1;2] = [2;4]', '-[1;2] = [-1;-2]', '[1;2] - [3;5] = [-2;-3]']) === 'TTTT' && stat(['[1;2;3] + [1;1] = [2;3;4]']) === '.', 'three components, a minus, a scalar; vectors of different size are not compared');
+  ok(!/X/.test(stat(['[1;2] = [2;1]', '[1;2] + [1;2] = [2;5]', '|[3;4]| = 6', '= |[3;4]|'])), 'no vector line is ever crossed');
 }
 
 console.log(`ARITHMETIC LINES: ${fail ? 'FAIL' : 'PASS'} — ${pass}/${pass + fail} checks — false arithmetic crossed, true arithmetic ticked as arithmetic only, no mark from it`);
