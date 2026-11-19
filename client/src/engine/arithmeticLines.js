@@ -28,6 +28,7 @@
 //     have made that slip.
 import { parse, normalize, evaluate, variablesOf, exprEquivalent, withEvaluationBudget } from './expr.js';
 import { mathSpan, assignSpan } from './commentTex.js';
+import { justifyStep } from './stepJustify.js';
 
 // Everything this module evaluates for one page of working is charged to ONE budget (expr.js, "What an evaluation may
 // cost"): what a page costs to check must not depend on what is written on it. When the budget is spent the rest
@@ -54,7 +55,7 @@ export function exactForm(v) {
   const done = (plain, tex) => ({ plain: plain.replace(/^-/, '−'), tex });
   if (!Number.isFinite(v)) return { plain: String(v), tex: String(v) };
   if (Number.isInteger(v)) { const s = String(Object.is(v, -0) ? 0 : v); return done(s, s); }
-  // A whole number carrying float noise (72.00000000000001 from 2[32 - 64/3] × …) is that whole number, not 144/2.
+  // A whole number carrying float noise (72.00000000000001, or √2 × √2 = 2.0000000000000004) is that whole number.
   { const whole = Math.round(v); if (Math.abs(v - whole) <= 1e-9 * Math.max(1, Math.abs(whole))) { const s = String(Object.is(whole, -0) ? 0 : whole); return done(s, s); } }
   const sign = v < 0 ? '-' : '', a = Math.abs(v);
   const reproduces = x => Math.abs(x - a) <= 1e-9 * Math.max(1, a);
@@ -223,6 +224,158 @@ function nameOfStep(fromRaw, toRaw) {
   return '';
 }
 
+// ── Naming the rule on a tick (words only: no line's verdict depends on anything below) ─────────────────────────────
+// stepJustify.js proves which rule turns one expression into the next; when it names one, the comment says so in the
+// same words the working view uses for that rule (AnnotatedWorking.jsx, aw.rule.*; the test pins each phrase to its
+// label). When it names none, the older pattern namer above is the fallback, and otherwise nothing is said.
+const RULE_PHRASE = Object.freeze({
+  'reciprocal': 'the reciprocal identity', 'quotient': 'the quotient identity', 'pythagorean': 'the Pythagorean identity',
+  'pythagorean-tan': 'the Pythagorean identity (tan and sec)', 'pythagorean-cot': 'the Pythagorean identity (cot and cosec)',
+  'double-angle-sin': 'the double-angle formula for sine', 'double-angle-cos': 'the double-angle formula for cosine',
+  'double-angle-cos-cos': 'the double-angle formula for cosine', 'double-angle-cos-sin': 'the double-angle formula for cosine',
+  'double-angle-tan': 'the double-angle formula for tangent', 'compound-sin': 'the compound-angle formula for sine',
+  'compound-cos': 'the compound-angle formula for cosine', 'compound-tan': 'the compound-angle formula for tangent',
+  'log-product': 'the log law for a product', 'log-quotient': 'the log law for a quotient', 'log-power': 'the log law for a power',
+  'common-denominator': 'writing as one fraction over a common denominator', 'split-fraction': 'splitting a fraction',
+  'divide-fraction': 'dividing by a fraction (multiply by its reciprocal)', 'multiply-fractions': 'multiplying fractions',
+  'cancel-common-factor': 'cancelling a common factor', 'index-product': 'the index law: multiplying powers',
+  'index-power': 'the index law: power of a power', 'index-quotient-power': 'the index law: power of a quotient',
+  'expand': 'expanding brackets', 'factorise': 'factorising', 'difference-of-squares': 'the difference of two squares'
+});
+export const RULE_PHRASES = RULE_PHRASE;
+// A name that states a DIRECTION is used only when the two sides show that direction (read from the parsed trees):
+//   expanding brackets     the line before has a bracketed sum multiplied or raised, and this line has strictly fewer;
+//   factorising            this line is a product (or power) with a bracketed factor, and the line before is not;
+//   difference of squares  one side is such a product and the other is not.
+// Otherwise the step is named nothing.
+const sumNode = x => { x = unwrap(x); return !!x && x.t === 'bin' && (x.op === '+' || x.op === '-'); };
+function bracketsMultiplied(n) {
+  if (!n || typeof n !== 'object') return 0;
+  let c = 0;
+  if (n.t === 'bin' && n.op === '*') c += (sumNode(n.l) ? 1 : 0) + (sumNode(n.r) ? 1 : 0);
+  if (n.t === 'bin' && n.op === '^' && sumNode(n.l) && unwrap(n.r).t === 'num') c++;
+  for (const k of ['l', 'r', 'v', 'arg']) if (n[k] && typeof n[k] === 'object') c += bracketsMultiplied(n[k]);
+  return c;
+}
+function wholeProduct(n) {
+  n = unwrap(n);
+  while (n && n.t === 'neg') n = unwrap(n.v);
+  if (!n) return false;
+  if (n.t === 'bin' && n.op === '^') return sumNode(n.l) && unwrap(n.r).t === 'num';
+  if (n.t === 'bin' && n.op === '*') return productFactors(n).some(sumNode);
+  return false;
+}
+function directionHolds(kind, fromText, toText) {
+  let a, b;
+  try { a = parse(normalize(fromText)); b = parse(normalize(toText)); } catch { return false; }
+  if (!a || !b || a.t === 'equation' || b.t === 'equation') return false;
+  if (kind === 'expand') return bracketsMultiplied(a) > 0 && bracketsMultiplied(b) === 0;   // none left multiplied or raised: a partial expansion or a regrouping is not named
+  if (kind === 'factorise') return wholeProduct(b) && !wholeProduct(a);
+  return wholeProduct(a) !== wholeProduct(b);   // difference of two squares
+}
+const DIRECTED = { 'expand': 'expand', 'factorise': 'factorise', 'difference-of-squares': 'squares' };
+function nameOfRule(fromText, toText) {
+  let j = null;
+  try { j = justifyStep(fromText, toText); } catch { j = null; }
+  const ids = ((j && j.valid && j.rules) || []).map(r => r.rule).filter(id => !DIRECTED[id] || directionHolds(DIRECTED[id], fromText, toText));
+  const phrases = [...new Set(ids.map(id => RULE_PHRASE[id]).filter(Boolean))];
+  // The pattern namer often says the same thing with the formula written out (`the reciprocal identity sec θ = 1/cos θ`):
+  // when it starts with the proved rule's phrase, its fuller wording is used.
+  let older = nameOfStep(fromText, toText);
+  if (older === 'expanding the brackets' && !directionHolds('expand', fromText, toText)) older = '';
+  if (older === 'factorising' && !directionHolds('factorise', fromText, toText)) older = '';
+  if (phrases.length === 1 && older.startsWith(phrases[0])) return older;
+  if (phrases.length) return phrases.join(' and ');
+  return older;
+}
+
+// ── The rule behind a derivative, from the SHAPE of the function that was defined ─────────────────────────────────
+// The tick on `u' = …` rests on the number check. The words say a fact about the function the page defined, read from its
+// parsed expression tree: a polynomial, a function of an inner function, a product of two functions of x, a quotient of two.
+// Anything else, or a mixture, is named nothing.
+const unwrap = n => { while (n && n.t === 'group') n = n.v; return n; };
+const dependsOn = (n, v) => !!n && typeof n === 'object' && (n.t === 'var' ? n.v === v : ['l', 'r', 'v', 'arg'].some(k => n[k] && typeof n[k] === 'object' && dependsOn(n[k], v)));
+const CHAIN_FUNCTIONS = new Set(['sin', 'cos', 'tan', 'sec', 'cosec', 'csc', 'cot', 'ln', 'log', 'exp', 'sqrt', 'arcsin', 'arccos', 'arctan', 'asin', 'acos', 'atan']);
+function powerTerm(n, v) {
+  n = unwrap(n);
+  if (!dependsOn(n, v)) return true;
+  if (n.t === 'neg') return powerTerm(n.v, v);
+  if (n.t === 'var') return n.v === v;
+  if (n.t === 'bin' && n.op === '^') return unwrap(n.l).t === 'var' && unwrap(n.l).v === v && !dependsOn(n.r, v);
+  if (n.t === 'bin' && n.op === '*') return !dependsOn(n.l, v) ? powerTerm(n.r, v) : !dependsOn(n.r, v) ? powerTerm(n.l, v) : false;
+  if (n.t === 'bin' && n.op === '/') return !dependsOn(n.r, v) && powerTerm(n.l, v);
+  return false;
+}
+const hasPower = n => !!n && typeof n === 'object' && ((n.t === 'bin' && n.op === '^') || ['l', 'r', 'v', 'arg'].some(k => hasPower(n[k])));   // a straight line alone is not named
+function sumTerms(n, out = []) { n = unwrap(n); if (n.t === 'bin' && (n.op === '+' || n.op === '-')) { sumTerms(n.l, out); sumTerms(n.r, out); } else out.push(n); return out; }
+function productFactors(n, out = []) { if (n.t === 'bin' && n.op === '*') { productFactors(n.l, out); productFactors(n.r, out); } else out.push(n); return out; }
+/** { rule, inner } for the function n of v, where inner is the inner function of a chain; null when no rule is named. */
+function shapeOf(n, v) {
+  n = unwrap(n);
+  if (!dependsOn(n, v)) return null;
+  if (n.t === 'neg') return shapeOf(n.v, v);
+  if (n.t === 'bin' && (n.op === '+' || n.op === '-')) return sumTerms(n).every(t => powerTerm(t, v)) && hasPower(n) ? { rule: 'power rule' } : null;
+  if (n.t === 'bin' && n.op === '*') {
+    const moving = productFactors(n).filter(f => dependsOn(f, v));
+    if (moving.length === 1) return shapeOf(moving[0], v);
+    return moving.length === 2 ? { rule: 'product rule' } : null;
+  }
+  if (n.t === 'bin' && n.op === '/') return !dependsOn(n.r, v) ? shapeOf(n.l, v) : dependsOn(n.l, v) ? { rule: 'quotient rule' } : null;
+  if (n.t === 'bin' && n.op === '^') {
+    const base = unwrap(n.l);
+    if (!dependsOn(n.r, v)) return base.t === 'var' && base.v === v ? { rule: 'power rule' } : { rule: 'chain rule', inner: base };
+    if (!dependsOn(base, v)) { const e = unwrap(n.r); return e.t === 'var' && e.v === v ? null : { rule: 'chain rule', inner: e }; }
+    return null;
+  }
+  if (n.t === 'call' && !Array.isArray(n.args) && CHAIN_FUNCTIONS.has(n.fn)) { const a = unwrap(n.arg); return a.t === 'var' && a.v === v ? null : { rule: 'chain rule', inner: a }; }
+  return null;
+}
+/** The inner function's derivative when it is one constant (checked at several points), as exact TeX; null otherwise. */
+function innerDerivative(inner, v) {
+  const at = x => { try { const y = evaluate(inner, { [v]: x }); return typeof y === 'number' && Number.isFinite(y) ? y : null; } catch { return null; } };
+  let c = null;
+  for (const x of POINTS) {
+    const a = at(x + 1e-4), b = at(x - 1e-4);
+    if (a === null || b === null) return null;
+    const slope = (a - b) / 2e-4;
+    if (c === null) c = slope; else if (Math.abs(slope - c) > 1e-7 * Math.max(1, Math.abs(c))) return null;
+  }
+  if (c === null || Math.abs(c) < 1e-9 || Math.abs(c - 1) < 1e-9) return null;
+  // The central difference of a straight line carries rounding noise: it is read as a whole number or a simple fraction (d <= 12) or not at all.
+  for (let d = 1; d <= 12; d++) {
+    const n = Math.round(c * d);
+    if (n !== 0 && Math.abs(c * d - n) < 1e-8) return `$${exactForm(n / d).tex}$`;
+  }
+  return null;
+}
+/** ", by the chain rule with the inner derivative $2$" for the function `text` of `variable`; '' when nothing can be said. */
+function derivativeRuleWords(text, variable) {
+  let ast;
+  try { ast = parse(normalize(text)); } catch { return ''; }
+  if (!ast || ast.t === 'equation') return '';
+  const shape = shapeOf(ast, variable);
+  if (!shape) return '';
+  const inner = shape.inner ? innerDerivative(shape.inner, variable) : null;
+  return `, by the ${shape.rule}${inner ? ` with the inner derivative ${inner}` : ''}`;
+}
+
+// ── Whether the last line's answer is a value yet ────────────────────────────────────────────────────────────────
+// A worked expression of plain numbers (2[32 - 64/3], -2 × √3/2, 6 × 12) that is not yet one value gets "This simplifies
+// to X", with X from exactForm and only when exactForm has an exact form (a rounded decimal is never offered).
+const plainForm = side => String(side).replace(/[−–—]/g, '-').replace(/\s+/g, '').replace(/[×·]/g, '*').replace(/sqrt/gi, '√').replace(/\bpi\b|(?<=\d)pi/gi, 'π')
+  .replace(/\((-?\d+(?:\.\d+)?|√\d+|π)\)/g, '$1').replace(/√\((\d+)\)/g, '√$1');
+function simplifiesTo(side, stated) {
+  const v = valueOf(side);
+  if (v === null) return '';
+  const compact = plainForm(side);
+  if (/^-?(?:\d+\.\d*|\.\d+)$/.test(compact)) return '';          // a decimal is a value
+  const exact = exactForm(v);
+  if (/[.]|NaN|Infinity/.test(exact.plain)) return '';
+  if (compact === exact.plain.replace(/−/g, '-')) return '';       // already the single value
+  if (stated && stated.includes(`$${exact.tex}$`)) return ' Give the final answer in that simplified form.';   // the value is already said: not said twice
+  return ` This simplifies to $${exact.tex}$.`;
+}
+
 
 // Hoisted so that the plain-number path can use it for lines with e or π.
 const folded = side => { let t = side, last; do { last = t; t = t.replace(/\([^()]*\)/g, '#'); } while (t !== last); return t.replace(/(?:√|∛|sqrt)\s*(?:#|\d+(?:\.\d+)?|[A-Za-zθαβφπ])/gi, '#'); };   // a root is one factor too: 1/√2 x
@@ -377,7 +530,7 @@ function pageDefinitions(raw, out, firstBreak) {
             if (Math.abs(slope - c) <= 1e-5 * Math.max(1, Math.abs(slope), Math.abs(c))) agree++;
             else if (Math.abs(slope - c) > 1e-2 * Math.max(1, Math.abs(slope), Math.abs(c))) differ++;
           }
-          if (tried >= 3 && agree === tried) { carry = { text: claim.text, variable }; ticks.push(`This is the derivative of ${assignSpan(m[1], d.shown)}.`); facts.push([`${m[1]}'`, { expr: parts[1], shown: parts[1], variable: m[2] || d.variable || null, line: i }]); return; }
+          if (tried >= 3 && agree === tried) { carry = { text: claim.text, variable }; ticks.push(`This is the derivative of ${assignSpan(m[1], d.shown)}${lettersOf(d.shown).every(c => c === variable) ? derivativeRuleWords(base.text, variable) : ''}.`); facts.push([`${m[1]}'`, { expr: parts[1], shown: parts[1], variable: m[2] || d.variable || null, line: i }]); return; }
           // A number on the right is the gradient at a point (y' = 3√2/2), not a wrong derivative: never crossed.
           if (tried >= 3 && differ === tried && !decimal && lettersOf(claim.text).includes(variable)) { cross = `The derivative of ${assignSpan(m[1], d.shown)} is not ${mathSpan(parts[1])}.`; return; }
         }
@@ -476,6 +629,7 @@ function stepCheckArithmeticWithinBudget(workingText) {
   let firstBreak = -1;
   let diagnosis = null;
   let labelled = false;
+  const lastSides = new Map();   // line index → the last side of a plain-number tick (for "This simplifies to")
   let prev = null;   // { text, value } or { text, ast, vars }: the last side of the line above, when it could be read
 
   const note = (text, why, extra = {}) => { out.push({ text, status: 'note', note: why, unverified: true, ...extra }); };
@@ -571,7 +725,8 @@ function stepCheckArithmeticWithinBudget(workingText) {
           : cont && carried ? 'This is the line above, written another way.' : 'Both sides are the same expression, written two ways.';
       // The step is named from the first two sides that differ in writing (the line above and this one, or this line's own sides).
       const texts = cont && carried ? [carried.text, ...written] : written;
-      const named = !calc.used && !number ? nameOfStep(texts[0], texts[1]) : '';
+      const named = !calc.used && !number ? nameOfRule(texts[0], texts[1]) : '';
+      if (!calc.used) lastSides.set(out.length, written[written.length - 1]);
       out.push({ text: line, status: 'ok', state: 'arithmetic', note: named ? `${why} It matches ${named}.` : why, valueChain: { rule: 'true-as-written' } });
       return;
     }
@@ -589,7 +744,7 @@ function stepCheckArithmeticWithinBudget(workingText) {
     // agrees and is otherwise a note: the value above came from limits or letters that may have been misread.
     if (continuation && carried && !before) {
       const agrees = carried.value !== undefined && values.every(v => closeLoose(v, carried.value));
-      if (agrees) { prev = { ...prev, calculus: true }; out.push({ text: line, status: 'ok', state: 'arithmetic', note: `This equals the line above: ${shown(carried.value)}.`, valueChain: { rule: 'true-as-written' } }); return; }
+      if (agrees) { prev = { ...prev, calculus: true }; lastSides.set(out.length, sides[sides.length - 1]); out.push({ text: line, status: 'ok', state: 'arithmetic', note: `This equals the line above: ${shown(carried.value)}.`, valueChain: { rule: 'true-as-written' } }); return; }
       return note(line, NOT_PROVED);
     }
     const allSides = continuation && before ? [before.text, ...sides] : sides;
@@ -618,6 +773,7 @@ function stepCheckArithmeticWithinBudget(workingText) {
     if (allValues.every(v => close(v, allValues[0]))) {
       if (signClaim && !(signClaim === '>' ? allValues[0] > 0 : allValues[0] < 0)) return note(line, NOTE);
       const why = continuation && before ? `This equals the line above: ${shown(allValues[0])}.` : `Both sides come to ${shown(allValues[0])}.`;
+      lastSides.set(out.length, allSides[allSides.length - 1]);
       out.push({ text: line, status: 'ok', state: 'arithmetic', note: why, valueChain: { rule: 'arithmetic' } });
       return;
     }
@@ -641,6 +797,7 @@ function stepCheckArithmeticWithinBudget(workingText) {
       if (rest.every(v => close(v, rest[0])) && !close(allValues[0], rest[0])) {
         if (carried && carried.value !== undefined && closeLoose(rest[0], carried.value)) {
           prev = { value: rest[0], text: sides[sides.length - 1], calculus: true };
+          lastSides.set(out.length, allSides[allSides.length - 1]);
           out.push({ text: line, status: 'ok', state: 'arithmetic', note: `This equals the line above: ${shown(rest[0])}. The ${mathSpan(allSides[0])} in front of it was not read as part of the line.`, valueChain: { rule: 'true-as-written' } });
           return;
         }
@@ -669,6 +826,16 @@ function stepCheckArithmeticWithinBudget(workingText) {
       firstBreak = broke.index;
       out[broke.index] = { text: out[broke.index].text, status: 'break', note: message, diagnosis };
       for (let k = broke.index + 1; k < out.length; k++) out[k] = { text: out[k].text, status: 'note', unverified: true, note: 'Follows from the earlier slip.' };
+    }
+  }
+  // Words only: the last ticked line of a page that has no cross says when its last side is not yet one value.
+  if (firstBreak === -1) {
+    let k = out.length - 1;
+    while (k >= 0 && !(out[k].status === 'ok' && out[k].state === 'arithmetic')) k--;
+    if (k >= 0 && lastSides.has(k)) {
+      let more = '';
+      try { more = simplifiesTo(lastSides.get(k), out[k].note); } catch { more = ''; }
+      if (more) out[k] = { ...out[k], note: out[k].note + more };
     }
   }
   const state = l => l.state || (l.status === 'break' ? 'wrong' : l.unreadable ? 'unread' : 'unverified');
