@@ -629,7 +629,7 @@
               "prompt": [
                 {
                   "k": "p",
-                  "t": "You may use $\\cos\\theta = -\\dfrac{45}{53}$. Hence find $\\sin 2\\theta$, correct to 3 decimal places."
+                  "t": "You may use $\\cos\\theta = -\\dfrac{45}{53}$. Hence find $\\tan\\theta$, correct to 3 decimal places."
                 }
               ],
               "criteria": [
@@ -646,11 +646,11 @@
               "sampleAnswer": [
                 {
                   "k": "p",
-                  "t": "Double angle: $\\sin 2\\theta = 2\\sin\\theta\\cos\\theta$"
+                  "t": "Ratio identity: $\\tan\\theta = \\dfrac{\\sin\\theta}{\\cos\\theta}$"
                 },
                 {
                   "k": "p",
-                  "t": "Substitute: $2\\times\\dfrac{28}{53}\\times\\left(-\\dfrac{45}{53}\\right) = -\\dfrac{2520}{2809} \\approx -0.897$"
+                  "t": "Substitute: $\\dfrac{28/53}{-45/53} = -\\dfrac{28}{45} \\approx -0.622$"
                 }
               ],
               "classification": {
@@ -664,7 +664,7 @@
               "answerType": "value",
               "key": {
                 "type": "numeric",
-                "value": -0.897,
+                "value": -0.622,
                 "tol": 0.0005
               },
               "autoMarks": 2

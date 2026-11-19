@@ -177,9 +177,9 @@ function trig(rng) {
     const [a0, b0, c] = rc(rng, [[3, 4, 5], [5, 12, 13], [8, 15, 17], [7, 24, 25], [20, 21, 29], [9, 40, 41], [12, 35, 37], [11, 60, 61], [28, 45, 53], [16, 63, 65], [33, 56, 65], [48, 55, 73]]);
     const [a, b] = rng() < 0.5 ? [a0, b0] : [b0, a0];
     const cosv = -b / c, cosR = rnd(cosv, 3);
-    const s2 = 2 * (a / c) * cosv, s2R = rnd(s2, 3);
+    const tn = -a / b, tnR = rnd(tn, 3);
     const thetaD = 180 - Math.asin(a / c) * 180 / Math.PI, thR = rnd(thetaD, 1);
-    if (!safe(cosv, 3) || !safe(s2, 3) || !safe(thetaD, 1)) return null;
+    if (!safe(cosv, 3) || !safe(tn, 3) || !safe(thetaD, 1)) return null;
     const stem = `The angle $\\theta$ satisfies $\\sin\\theta = \\dfrac{${a}}{${c}}$ and $90^\\circ < \\theta < 180^\\circ$.`;
     return build(stem, [
       numPart('(a)', 2, 'Find $\\cos\\theta$, correct to 3 decimal places.', cosR, {
@@ -188,10 +188,11 @@ function trig(rng) {
         hints: ['Use $\\sin^2\\theta + \\cos^2\\theta = 1$.', 'Take the square root, then decide the sign from the quadrant.', 'Cosine is negative for obtuse angles.'],
         steps: [{ h: 'Identity', d: `$\\cos^2\\theta = 1 - \\left(\\dfrac{${a}}{${c}}\\right)^2 = \\dfrac{${b * b}}{${c * c}}$` }, { h: 'Sign', d: `$\\theta$ is obtuse, so $\\cos\\theta = -\\dfrac{${b}}{${c}} \\approx ${cosR}$` }]
       }),
-      numPart('(b)', 2, `You may use $\\cos\\theta = -\\dfrac{${b}}{${c}}$. Hence find $\\sin 2\\theta$, correct to 3 decimal places.`, s2R, {
+      numPart('(b)', 2, `You may use $\\cos\\theta = -\\dfrac{${b}}{${c}}$. Hence find $\\tan\\theta$, correct to 3 decimal places.`, tnR, {
         tol: 0.0005,
-        hints: ['Use the double angle formula for sine.', '$\\sin 2\\theta = 2\\sin\\theta\\cos\\theta$.', 'Take care with the sign of the product.'],
-        steps: [{ h: 'Double angle', d: '$\\sin 2\\theta = 2\\sin\\theta\\cos\\theta$' }, { h: 'Substitute', d: `$2\\times\\dfrac{${a}}{${c}}\\times\\left(-\\dfrac{${b}}{${c}}\\right) = -\\dfrac{${2 * a * b}}{${c * c}} \\approx ${s2R}$` }]
+        traps: [{ value: rnd(a / b, 3), why: 'In the second quadrant tangent is negative, because sine is positive and cosine is negative.' }],
+        hints: ['Tangent is sine divided by cosine.', 'Substitute the two given ratios and simplify.', 'Take care with the sign: one ratio is positive and the other is negative.'],
+        steps: [{ h: 'Ratio identity', d: '$\\tan\\theta = \\dfrac{\\sin\\theta}{\\cos\\theta}$' }, { h: 'Substitute', d: `$\\dfrac{${a}/${c}}{-${b}/${c}} = -\\dfrac{${a}}{${b}} \\approx ${tnR}$` }]
       }),
       numPart('(c)', 2, `Find $\\theta$ in degrees, correct to 1 decimal place.`, thR, {
         tol: 0.05, suffix: '°',

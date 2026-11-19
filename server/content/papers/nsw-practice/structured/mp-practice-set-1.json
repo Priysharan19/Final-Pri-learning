@@ -629,7 +629,7 @@
               "prompt": [
                 {
                   "k": "p",
-                  "t": "You may use $\\cos\\theta = -\\dfrac{60}{61}$. Hence find $\\sin 2\\theta$, correct to 3 decimal places."
+                  "t": "You may use $\\cos\\theta = -\\dfrac{60}{61}$. Hence find $\\tan\\theta$, correct to 3 decimal places."
                 }
               ],
               "criteria": [
@@ -646,11 +646,11 @@
               "sampleAnswer": [
                 {
                   "k": "p",
-                  "t": "Double angle: $\\sin 2\\theta = 2\\sin\\theta\\cos\\theta$"
+                  "t": "Ratio identity: $\\tan\\theta = \\dfrac{\\sin\\theta}{\\cos\\theta}$"
                 },
                 {
                   "k": "p",
-                  "t": "Substitute: $2\\times\\dfrac{11}{61}\\times\\left(-\\dfrac{60}{61}\\right) = -\\dfrac{1320}{3721} \\approx -0.355$"
+                  "t": "Substitute: $\\dfrac{11/61}{-60/61} = -\\dfrac{11}{60} \\approx -0.183$"
                 }
               ],
               "classification": {
@@ -664,7 +664,7 @@
               "answerType": "value",
               "key": {
                 "type": "numeric",
-                "value": -0.355,
+                "value": -0.183,
                 "tol": 0.0005
               },
               "autoMarks": 2

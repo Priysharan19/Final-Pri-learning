@@ -340,6 +340,13 @@
         {"has":"PRACTICE PAPERS: PASS — 217/217 checks"}
       ]
     },
+    "platform/practice-sets.log": {
+      "job": "platform-contracts",
+      "log": "practice-sets.log",
+      "pins": [
+        {"has":"PRACTICE SETS: PASS — 70/70 checks","note":"Guards the generated Exam-style practice sets served through the papers router: listed apart from the authored papers, free to sit, marked per part by the engine, no plan, re-test or PDF, India 404."}
+      ]
+    },
     "platform/resources.log": {
       "job": "platform-contracts",
       "log": "resources.log",

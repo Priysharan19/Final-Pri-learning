@@ -143,7 +143,7 @@ V['mp-adv11-trig-identity-equation'] = (s) => {
   return [
     { part: 0, check: close(Math.round(Math.cos(theta) * 1000) / 1000, s.parts[0].answer.value, 1e-9), msg: `cos ${Math.cos(theta)} vs key ${s.parts[0].answer.value}` },
     { part: 1, check: close(-Number(rc[1]) / Number(rc[2]), Math.cos(theta), 1e-12), msg: 'restated cos is not cos(theta)' },
-    { part: 1, check: close(Math.round(Math.sin(2 * theta) * dp(3)) / dp(3), s.parts[1].answer.value, 1e-9), msg: `sin 2theta ${Math.sin(2 * theta)} vs key ${s.parts[1].answer.value}` },
+    { part: 1, check: close(Math.round(Math.tan(theta) * dp(3)) / dp(3), s.parts[1].answer.value, 1e-9), msg: `tan theta ${Math.tan(theta)} vs key ${s.parts[1].answer.value}` },
     { part: 2, check: close(Math.round(theta * 180 / Math.PI * 10) / 10, s.parts[2].answer.value, 1e-9), msg: `theta ${theta * 180 / Math.PI} vs key ${s.parts[2].answer.value}` }
   ];
 };

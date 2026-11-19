@@ -375,6 +375,10 @@ jobs:
           # Priyabhata 404, no path traversal.
           node server/test/papers-check.mjs 2>&1 | tee papers.log
           node tools/ci-check-counts.mjs verify platform/papers.log
+          # The generated Exam-style practice sets (server/content/papers/nsw-practice/): free to sit,
+          # offered by chapter, marked per part by the engine, no plan or re-test, no PDF, India 404.
+          node server/test/practice-sets-check.mjs 2>&1 | tee practice-sets.log
+          node tools/ci-check-counts.mjs verify platform/practice-sets.log
           # The Exam Desk (ADR-0002 §8 plan F4a): the unmarked mode — server-stamped
           # clock, one open attempt per paper, the import, never a mark — and the
           # static proof that it reaches nothing of the marking path.
