@@ -120,6 +120,14 @@ const L = (text, latex) => ({ text, latex });
   ok(tick('2 3 = 6', '2\\cdot 3 = 6') === 'ok', '2 3 = 6 with 2 times 3: ticked');
   ok(tick('8 3 = 2', '\\sqrt[3]{8} = 2') === 'note', '8 3 = 2 with the cube root of 8: no tick');
   ok(tick('2 1 = 0.5', '\\frac{1}{2} = 0.5') !== 'ok', '21 is not the fraction 1 over 2');
+  // operators are compared too: the TeX may add structure only where the text has bare adjacency
+  ok(tick('2 + 3 = 8 (1)', '2^3 = 8 (1)') === 'note', 'a different operator and a trailing equation number: note');
+  ok(tick('2 + 3 = 8', '2^3 = 8') !== 'ok', '2 + 3 = 8 with 2^3: not ticked');
+  ok(tick('2 - 3 = 8', '2^3 = 8') !== 'ok', '2 - 3 = 8 with 2^3: not ticked');
+  ok(tick('2 3 = 8', '2^3 = 8') === 'ok', '2 3 = 8 with 2^3: ticked');
+  ok(tick('2 5 = 10', '2\\cdot 5 = 10') === 'ok', '2 5 = 10 with 2 times 5: ticked');
+  ok(tick('1 2 + 1 3 = 5 6', '\\frac{1}{2}+\\frac{1}{3}=\\frac{5}{6}') === 'ok', 'stacked fractions flattened: ticked');
+  ok(tick('2 3 = 8 (1)', '2^3 = 8 (1)') === 'note' && tick('so 2 3 = 8', '2^3 = 8') === 'note' && tick('2 3 = 8, 3', '2^3 = 8') === 'note', 'a label, a trailing number, words or a comma are never upgraded');
   ok(tick('2+2=4 so', '2+2=4') === 'note' && tick('2+2=4', '2+2=4') === 'ok', 'the same content is ticked only when the plain check already could');
 }
 

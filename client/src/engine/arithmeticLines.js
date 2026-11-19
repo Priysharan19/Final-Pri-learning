@@ -649,6 +649,40 @@ function contentSignature(text) {
   return (s.match(/arcsin|arccos|arctan|cosec|sqrt|cbrt|theta|sin|cos|tan|sec|csc|cot|exp|ln|log|pi|\d|[a-z]/g) || []).join(' ');
 }
 
+const FN_RE = 'arcsin|arccos|arctan|cosec|sqrt|cbrt|theta|sin|cos|tan|sec|csc|cot|exp|ln|log|pi';
+/** A line as an ordered run of operands (digit, letter, function name) and explicit operators; brackets and spaces are ignored. */
+function operandOperatorTokens(text) {
+  const s = String(text).toLowerCase().replace(/[−–—]/g, '-').replace(/[×·]/g, '*').replace(/÷/g, '/').replace(/≤/g, '<=').replace(/≥/g, '>=').replace(/≠/g, '!=')
+    .replace(/√/g, 'sqrt').replace(/π/g, 'pi').replace(/θ/g, 'theta').replace(/²/g, '^2').replace(/³/g, '^3');
+  return (s.match(new RegExp(`${FN_RE}|\\d|[a-z]|<=|>=|!=|[+\\-*/^=<>]`, 'g')) || []).map(t => ({ t, op: /^(?:<=|>=|!=|[+\-*/^=<>])$/.test(t) }));
+}
+/**
+ * The text's tokens must be the TeX's with operators deleted and nothing else: every operand in order, every explicit
+ * operator of the text present where it stands, and the TeX adding structure (^, /, *) only where the text has bare adjacency.
+ */
+function sameStatement(text, converted) {
+  const a = operandOperatorTokens(text), b = operandOperatorTokens(converted);
+  let j = 0;
+  for (const x of a) {
+    if (x.op) { if (!(b[j] && b[j].op && b[j].t === x.t)) return false; j++; continue; }
+    while (j < b.length && b[j].op) j++;
+    if (!(b[j] && b[j].t === x.t)) return false;
+    j++;
+  }
+  return b.slice(j).every(y => y.op);
+}
+/** Notes that mean "not judged as one statement" (a label, a trailing equation number, a comma, words), never upgraded. */
+function notOneStatement(text) {
+  const t = String(text).replace(/[−–—]/g, '-');
+  if (/^\(?\d{1,3}[.)](?:\s|$)|^\(\d{1,3}\)|\s\(\d{1,3}\)\s*$|[,;:]|^[+*/×÷]|^-\s|\d\s+\.\s*\d|\d\s*\.\s+\d/.test(t)) return true;
+  const known = new RegExp(`^(?:${FN_RE})$`);
+  for (const w of t.toLowerCase().match(/[a-z]+/g) || []) {
+    if (known.test(w) || w.length === 1) continue;
+    if (w.length >= 3 || /^(?:so|is|if|or|to|of|as|by|we|at|an|it|be|do|no|on)$/.test(w)) { if (!/^(?:sin|cos|tan|sec|csc|cot|exp|log|ln)/.test(w)) return true; }
+  }
+  return false;
+}
+
 function withTexReading(workingText, base, pairs) {
   const raw = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
   if (base.lines.length !== raw.length) return base;
@@ -674,7 +708,7 @@ function withTexReading(workingText, base, pairs) {
   // content as the text (same digits, letters and function names; a word or a different number in the text that the TeX
   // lacks means it is another line). The DOWNGRADE of a cross to the "may have been misread" note stays permissive: any
   // validated TeX reading that makes the line true softens the cross to a note, which claims nothing.
-  const sameContent = i => contentSignature(raw[i]) === contentSignature(alt[i]);
+  const sameContent = i => contentSignature(raw[i]) === contentSignature(alt[i]) && sameStatement(raw[i], alt[i]) && !notOneStatement(raw[i]);
   // A cross that stands (the TeX does not clear that line) still governs the lines below it: nothing there is ticked.
   const standing = base.firstBreak !== -1 && !trueUnderTex(base.firstBreak) ? base.firstBreak : -1;
   base.lines.forEach((p, i) => {
