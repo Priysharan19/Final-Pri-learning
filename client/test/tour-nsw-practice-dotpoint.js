@@ -83,6 +83,12 @@ try {
     const r = el => { const b = el?.getBoundingClientRect(); return b ? { top: Math.round(b.top + window.scrollY), height: Math.round(b.height), width: Math.round(b.width) } : null; };
     return { pick: r(pick), select: r(pick?.querySelector('select')), q: r(q), scrollX: document.documentElement.scrollWidth - window.innerWidth };
   });
+  // The first-run tour offers itself once on a signed-in account's first question; it is not under test here.
+  const skipTour = async () => {
+    await page.waitForTimeout(1200);
+    const skip = page.getByRole('button', { name: 'Skip', exact: true });
+    if (await skip.count()) { await skip.first().click().catch(() => {}); await page.waitForTimeout(300); }
+  };
   const shot = async (name) => { if (SHOTS) await page.screenshot({ path: join(SHOTS, name) }); };
 
   for (const [label, size] of [['desktop', { width: 1280, height: 800 }], ['phone', { width: 375, height: 812 }]]) {
@@ -91,6 +97,7 @@ try {
     await page.goto(`${platform.origin}/practice?subtopic=${CHAPTER}`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
     await online.settled();
+    await skipTour();
     const select = page.getByLabel('Syllabus dot point');
     check(`${label}: a control labelled "Syllabus dot point" is on the page`, await select.count() === 1 && await select.evaluate(el => el.tagName === 'SELECT'));
     const options = await select.locator('option').allTextContents();
@@ -101,7 +108,10 @@ try {
     const before = await metrics();
     check(`${label}: the page does not scroll sideways`, before.scrollX <= 0, String(before.scrollX));
     await shot(`dotpoint-${label}-1-closed.png`);
-    await select.focus();
+    // Reached with the Tab key, so the keyboard focus ring is what the picture shows.
+    await page.locator('.ws-exit').focus();
+    for (let i = 0; i < 8 && !(await select.evaluate(el => el === document.activeElement)); i++) await page.keyboard.press('Tab');
+    check(`${label}: the Tab key reaches the control`, await select.evaluate(el => el === document.activeElement));
     await shot(`dotpoint-${label}-2-focused.png`);
 
     stage = `${label}: choose a dot point`;
