@@ -166,7 +166,9 @@ function nameOfStep(fromRaw, toRaw) {
   if (has(B, 'tan') && !has(A, 'tan') && has(A, 'sin') && has(A, 'cos')) return `tan ${v} = sin ${v} / cos ${v}`;
   if (has(A, 'tan') && !has(B, 'tan') && has(B, 'sin') && has(B, 'cos')) return `tan ${v} = sin ${v} / cos ${v}`;
   if (/(?:sin|cos|tan)\(?2[a-zθαβφ]/.test(A) !== /(?:sin|cos|tan)\(?2[a-zθαβφ]/.test(B)) return 'a double-angle identity';
-  const plain = t => t.replace(/(?:sqrt|sin|cos|tan|sec|csc|cot|ln|log)\(/g, '#[').replace(/#\[[^()]*\)/g, '#');
+  if (/\+/.test(A) && sq(A, 'sin') && sq(A, 'cos') && !(sq(B, 'sin') && sq(B, 'cos'))) return `the Pythagorean identity sin²${v} + cos²${v} = 1`;
+  // Brackets that only hold a function's argument, or wrap a function for its power, are not brackets to expand.
+  const plain = t => t.replace(/(?:sqrt|sin|cos|tan|sec|csc|cot|ln|log)\(/g, '#[').replace(/#\[[^()]*\)/g, '#').replace(/\(#\)/g, '#');
   const pa = plain(A), pb = plain(B);
   if (/\(/.test(pa) && !/\(/.test(pb) && !/\//.test(pa)) return 'expanding the brackets';
   if (!/\(/.test(pa) && /\)\(|\d\(|[a-zθ]\(|\)\^/.test(pb) && !/\//.test(pb)) return 'factorising';
@@ -273,8 +275,10 @@ export function stepCheckArithmetic(workingText) {
         if (!new RegExp(`${m[1]}(?!\\s*\\()`).test(inside)) return note(line, NOT_PROVED);
       }
       if (/\/\s*\d+(?:\.\d+)?\s*[A-Za-z(]|\/\s*[A-Za-z]\s*[A-Za-z(]|\^\s*-?\d+(?:\.\d+)?[A-Za-z]|\^\s*[A-Za-z][A-Za-z0-9(]/.test(bare)) return note(line, NOT_PROVED);
-      // (a product written straight after a division, 1/cos θ tan θ, groups two ways as well)
-      if (written.some(s => /[\/÷]/.test(s) && /[\/÷][^()]*(?:\*|[\d)!]\s*\(|\)\s*\d|!\s*\d|\)\s*[A-Za-zθαβφ])/.test(s.replace(/\(([^()]|\([^()]*\))*\)/g, m => m.replace(/[^()]/g, '')+')')) )) return note(line, NOT_PROVED);
+      // A division followed by a product groups two ways (6/2(1+2), 10!/3!7!, 1/cos θ tan θ, 1/2x). Every bracket is
+      // first folded to one mark, so a function's own bracket cannot hide what follows the denominator.
+      const folded = side => { let t = side, last; do { last = t; t = t.replace(/\([^()]*\)/g, '#'); } while (t !== last); return t; };
+      if (written.some(s => /[\/÷]\s*(?:[A-Za-z]{2,6}#|#|\d+(?:\.\d+)?!?|[A-Za-zθαβφ](?![A-Za-z#]))(?:\^\S+?)?\s*(?:\*|[A-Za-zθαβφ#(\d])|[\/÷].*\*/.test(folded(s)))) return note(line, NOT_PROVED);
       const infos = written.map(infoOf);
       const lastInfo = infos[infos.length - 1];
       // What a line of letters or an integral leaves for the `=` line below is tick only (`calculus`): `t = 5` then `= 20`

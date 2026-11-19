@@ -71,6 +71,11 @@ ok(st(['500 = 340', '6000 = 18']) === 'note,note' && st(['3 × 4 = 12', '= 13'])
 }
 ok(st(['sin θ cos θ = cos θ sin θ', 'sin 2θ = 2 sin θ cos θ', 'cos^2 x = 1 - sin^2 x', 'tan x = sin x / cos x', '1 + tan^2 A = sec^2 A', 'ln x + ln x = 2 ln x', '2sin(x)cos(x) = sin(2x)', 'cot θ = cos θ/sin θ']) === 'ok,ok,ok,ok,ok,ok,ok,ok', 'unbracketed functions of one letter are read');
 for (const f of ['sec θ = 1/sin θ', '1 - cos^2 θ = cos^2 θ', 'sin 2θ = 2 sin θ', 'tan θ = cos θ/sin θ', 'sin^2 θ = sin θ^2', 'cos^-1 x = 1/cos x', 'sin^-1 x = 1/sin x', 'sin θ^2 = sin^2 θ', 'sin x y = y sin x', 'sin xy = x sin y', '1/cos θ tan θ = sin θ', 'sinθcosθ = cosθ', 'cos 2θ = 2 cos θ', 'sec θ - cos θ = sin θ', 'log 2x = 2 log x', 'tan 45 = 1']) ok(st([f]) === 'note', `a false or two-way trig line is a note: ${f} (${st([f])})`);
+// independent review of the trig reading: a product after a division groups two ways; a name must be what happened
+for (const f of ['1/cos θ tan θ = sin θ/cos^2 θ', '1/sin θ cos θ = cos θ/sin θ', '1/cos(θ) tan(θ) = sin(θ)/cos(θ)^2', '1/sin θ cos θ = 1/(sin θ cos θ)', '6/2(1+2) = 9', '6/2(1+2) = 1', '1/2(x+1) = (x+1)/2', '1/2x = x/2']) ok(st([f]) === 'note', `a product straight after a division is not read: ${f} (${st([f])})`);
+for (const [f, bad] of [['cos^2 x tan x = sin x cos x tan x/tan x', /expanding|factoris/], ['sin x sin x = sin^2 x', /expanding|factoris/], ['sin x sin x = (sin x)^2', /expanding|factoris/]]) { const l = run([f]).lines[0]; ok(!bad.test(l.note || ''), `no step is named that did not happen: ${f} (${l.status}: ${l.note})`); }
+ok(/Pythagorean/.test(run(['sin^2 x + cos^2 x + tan x = 1 + tan x']).lines[0].note || ''), 'sin² + cos² becoming 1 is named as the Pythagorean identity');
+ok(st(['sin θ/cos θ = tan θ', '(1 - cos^2 θ)/cos θ = sin^2 θ/cos θ', 'sin θ tan θ/(cos θ/tan θ) = tan^3 θ']) === 'ok,ok,ok', 'a plain quotient is still read');
 ok(st(['LHS = 5', '= 6']) === 'note,note' && st(['Total: 3 + 4', '= 8']) === 'note,note' && st(['Total: 3 + 4', '= 7']) === 'note,ok', 'after a labelled line a `=` line is ticked when it agrees and never crossed');
 ok(st(['(x+1)^2 = x^2 + 2x + 1']) === 'ok' && /expanding the brackets/.test(run(['(x+1)^2 = x^2 + 2x + 1']).lines[0].note) && /factorising/.test(run(['x^2 - 9 = (x-3)(x+3)']).lines[0].note), 'expanding and factorising are named');
 // never crossed
