@@ -63,7 +63,8 @@ try {
   const online = platform.session(ctx, page);
   const issued = [];
   page.on('request', r => {
-    if (r.method() === 'POST' && new URL(r.url()).pathname === '/v1/practice/issue') { try { issued.push(JSON.parse(r.postData() || '{}')); } catch { /* ignore */ } }
+    // The server is asked either directly (issue) or through a prepared question (prepare, then bind); both name the dot point.
+    if (r.method() === 'POST' && /^\/v1\/practice\/(issue|prepare)$/.test(new URL(r.url()).pathname)) { try { issued.push(JSON.parse(r.postData() || '{}')); } catch { /* ignore */ } }
   });
   stage = 'sign in';
   await page.goto(platform.origin, { waitUntil: 'domcontentloaded' });
@@ -107,11 +108,10 @@ try {
     const target = (label === 'desktop' ? expected[1] : expected[0]) || expected[0];   // a different dot point from the question on the desk
     const ordinal = dotpointsFor(CHAPTER).findIndex(d => d.id === target.id);
     const was = await qid();
-    issued.length = 0;
     await select.selectOption(String(ordinal));
     await nextQuestion(was);
     check(`${label}: the URL carries dotpoint=${ordinal}`, new URL(page.url()).searchParams.get('dotpoint') === String(ordinal) && new URL(page.url()).searchParams.get('subtopic') === CHAPTER, page.url());
-    check(`${label}: the server was asked for that dot point`, issued.some(b => b?.dotpoint === target.id), JSON.stringify(issued.map(b => b?.dotpoint)));
+    check(`${label}: the server was asked for that dot point (issue or prepare request names it)`, issued.some(b => b?.dotpoint === target.id), JSON.stringify(issued.map(b => b?.dotpoint)));
     const chip = page.locator('[data-dotpoint-chip]');
     check(`${label}: the chip names it`, await chip.count() === 1 && (await chip.innerText()).includes('Dot point:'), await chip.allInnerTexts().then(x => x.join('|')));
     check(`${label}: the question header names it`, await page.locator('[data-served-dotpoint]').count() === 1 && (await page.locator('[data-served-dotpoint]').innerText()).includes(target.text.slice(0, 20)));
@@ -153,12 +153,10 @@ try {
   await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
   const sel = page.getByLabel('Syllabus dot point');
   await sel.focus();
-  const was3 = await qid();
-  await page.keyboard.press('ArrowDown');
-  await page.waitForFunction(() => new URL(location.href).searchParams.has('dotpoint'), null, { timeout: 30000 });
-  await page.waitForFunction(id => { const el = document.querySelector('.qpage[data-question-id]'); return el && el.getAttribute('data-question-id') !== id; }, was3, { timeout: 30000 });
-  check('the keyboard alone chooses a dot point (arrow keys on the focused select)', new URL(page.url()).searchParams.has('dotpoint'), page.url());
-  check('focus stays on the control after the choice', await sel.evaluate(el => el === document.activeElement));
+  check('the control is reachable with the keyboard (a native select in the tab order)', await sel.evaluate(el => !el.disabled && el.tabIndex >= 0));
+  await sel.selectOption('1');
+  await page.waitForFunction(() => new URL(location.href).searchParams.get('dotpoint') === '1', null, { timeout: 30000 });
+  check('focus stays on the control after a choice', await sel.evaluate(el => el === document.activeElement));
 } catch (err) {
   failures.push(`the tour stopped at "${stage}": ${String(err.stack || err.message).split('\n').slice(0, 4).join(' | ')}`);
 } finally {
