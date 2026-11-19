@@ -393,9 +393,9 @@ function pageDefinitions(raw, out, firstBreak) {
       if (cross) break;
       if (ticks.length > before) { verdicts.push('tick'); continue; }
       const sides = cleanStatement(stmt).split('=').map(x => x.trim());
-      // `x = 3` straight after an equation in x that 3 does not satisfy is a false statement, not a premise.
-      const setsUnknown = sides.length === 2 && equationBefore && sides[0] === equationBefore.variable && numberOf(sides[1]) !== null;
-      if (setsUnknown) { verdicts.push('bad'); continue; }
+      // A statement about the unknown of the equation before it that this pass could not tick (`x = 3`, `2x = 5` after
+      // `2x = 4`) is not a premise: it may be false, so the line is not ticked (independent review, rounds 2 and 3).
+      if (sides.length >= 2 && equationBefore && sides.some(x => lettersOf(x).includes(equationBefore.variable))) { verdicts.push('bad'); continue; }
       const plain = sides.length >= 2 && sides.every(x => x && !lettersOf(x).length);
       const values = plain ? sides.map(numberOf) : [];
       verdicts.push(plain && !(values.every(v => v !== null) && values.every(v => close(v, values[0]))) ? 'bad' : 'premise');

@@ -1,19 +1,19 @@
 {
   "status": "not yet reviewed by a human examiner",
   "generator": "node tools/examiner-packets.mjs",
-  "packetDigest": "868f8d7d998f214e483fccbe617724f1b62683d97d65356be2714f42f9d8a8eb",
+  "packetDigest": "da2589a4530931bf05cce7f4b77491782e0a799600e9a5f3d5868786c9aea765",
   "dossierDigests": {
-    "cbse": "001e5ab5a62461c1351b5e7475951689b18ffdd167a26d7d65ece25c3a12f4ac",
-    "nsw-hsc": "0be26d5ef56d183279b7a70f6ce4c59a816bd4b86741c6d0b6b730efb3166d15"
+    "cbse": "6ddabad7ac7f0a517d914af6287078f7beed9e027d44d4395b62e14c5c8f269a",
+    "nsw-hsc": "8a681dab658d08838ee4e84fc4a0904abddd205346eddd13a1804b1e0535c5c1"
   },
   "files": [
     {
       "file": "docs/marking/packets/cbse/README.md",
-      "sha256": "216a89b28304d5e74f1dfd3ad92923d5e6d67ebe1c94f8aefaae37eb02379810"
+      "sha256": "3989bf53b45ad7b57c1ef39076a8d23f40e88e8e1418834f945743ab8add52f0"
     },
     {
       "file": "docs/marking/packets/cbse/decision-form.md",
-      "sha256": "a271f457ee8f5d3be2eeca7c67a0f3340d23f5119e39d055f3df32da78d63655"
+      "sha256": "89d73614fe6dc7469eab8070034cb75500817027f66eca9a58005b0bd0d13b3c"
     },
     {
       "file": "docs/marking/packets/cbse/independence-statement.md",
@@ -21,19 +21,19 @@
     },
     {
       "file": "docs/marking/packets/cbse/items.json",
-      "sha256": "bda7175e65fdd79f15b2d418737c8c71b2804f91ca141d2b0f2f3e4bd4e6c720"
+      "sha256": "7dd76e570887477c5cc50f02a11579c38355475cab821d9fd199b6ad198c1eb5"
     },
     {
       "file": "docs/marking/packets/cbse/worked-cases.md",
-      "sha256": "083100a49dd11a862d332d1e6232b82078aa90e9326723891eeae85544b3e1d2"
+      "sha256": "b2a3a63d05c60523cc2bfbe55de09c07332ee15bf14a140a31cafaa2a2262420"
     },
     {
       "file": "docs/marking/packets/hsc/README.md",
-      "sha256": "4efa854605d4afce79853e8ddf7cbd0c8d65b85771174414a38a521af97688f2"
+      "sha256": "c39d9a6e45260eb8ed23edc03fc9c62341c586028cd3e367216ba30d5ae75e8d"
     },
     {
       "file": "docs/marking/packets/hsc/decision-form.md",
-      "sha256": "897b81be8bb158849b212d6cac13c0eb9d23045febb2e9b1e6f6522a317c352f"
+      "sha256": "9d858b66cfcb836911232a0562da7dbaea360a6df824e929575508a60bec4339"
     },
     {
       "file": "docs/marking/packets/hsc/independence-statement.md",
@@ -41,11 +41,11 @@
     },
     {
       "file": "docs/marking/packets/hsc/items.json",
-      "sha256": "604facac59fdab62309be37a9abef3dc048232de51310360e88c02d259966232"
+      "sha256": "dd3d3642078a32e565fdfb1df4195fd48c95915a2cc7da7116f8c5801586c93a"
     },
     {
       "file": "docs/marking/packets/hsc/worked-cases.md",
-      "sha256": "dccbeaca323c13a5c691ef6605b2ee51c835ae8e497fd72a0c079f3e9699b808"
+      "sha256": "203d1036cdb696a004c40e787f60cb7760d6912e03b5a4339105bacd5dc9d9a1"
     }
   ]
 }
