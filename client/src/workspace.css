@@ -291,3 +291,19 @@ html[data-edition=prithagoras] .qpage.ws .verdict{scroll-margin-bottom:148px}
 .rr-maths { font-size: var(--text-base); }
 @media (max-width: 520px) { .pf-page.photo-thumb { width: 100%; } }
 .tutor-launch-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+/* Recent attempts under a Practice question: a closed disclosure, then a plain list on the same hairline. */
+.q-recent { margin: 16px auto 0; width: 100%; max-width: 720px; padding: 0 16px; box-sizing: border-box; }
+.q-recent-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 0; border-top: 1px solid var(--hairline); }
+.q-recent-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 8px 0; border-bottom: 1px solid var(--hairline); font-size: 14px; }
+.q-recent-row time { min-width: 56px; }
+.q-recent-result { display: inline-flex; align-items: center; gap: 8px; }
+.q-recent-actions { margin-left: auto; display: inline-flex; gap: 4px; }
+
+/* The first-run tour note: fixed beside its control, never a scrim, and it lets pointer events through except on its own buttons. */
+.pr-tour { position: fixed; z-index: 40; display: grid; gap: 6px; padding: 12px; border: 1px solid var(--hairline-strong); border-radius: 6px; background: var(--paper); color: var(--ink); font-size: 14px; pointer-events: none; }
+.pr-tour:focus-visible { outline: 2px solid var(--accent-line, var(--ink)); outline-offset: 2px; }
+.pr-tour p { margin: 0; }
+.pr-tour-step { font-size: 12px; }
+.pr-tour-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.pr-tour-actions .btn { pointer-events: auto; }

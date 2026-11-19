@@ -2782,7 +2782,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
 
         <div className="ws-tools no-print" ref={toolsRef}>
           {!isMcq && !isSketch && (
-            <div className="mode-tabs seg" role="group" aria-label={t('verdict.answerModes')}>
+            <div className="mode-tabs seg" role="group" data-tour="modes" aria-label={t('verdict.answerModes')}>
               <button type="button" className={`mode-tab ${mode === 'type' ? 'on' : ''}`} aria-pressed={mode === 'type'} title={t('verdict.modeTypeTitle')}
                 aria-label={t('verdict.modeTypeLabel')} onClick={() => flipMode('type')}><Icon name="type" size={16} />{t('verdict.modeType')}</button>
               <button type="button" className={`mode-tab ${mode === 'write' ? 'on' : ''}`} aria-pressed={mode === 'write'} title={t('verdict.modeWriteTitle')}
@@ -3696,7 +3696,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               <button type="button" className="btn btn-quiet" data-check-replace-cancel onClick={() => setReplaceArmed(false)}>{t('check.draftKeep')}</button>
             )}
             {!(diagnostic && resolved) && primary && (
-              <button className="btn btn-primary" data-primary-action={unmarkable ? 'replace' : undefined} onClick={primary.run} disabled={primary.disabled} aria-busy={busy || undefined}
+              <button className="btn btn-primary" data-tour="submit" data-primary-action={unmarkable ? 'replace' : undefined} onClick={primary.run} disabled={primary.disabled} aria-busy={busy || undefined}
                 aria-describedby={submitReasonKey ? `submit-reason-${question.id}` : undefined}
                 aria-keyshortcuts={instrumentCheckKey ? 'Meta+Enter Control+Enter' : undefined}>
                 {instrumentCheckKey && <Icon name="scan" size={16} />}

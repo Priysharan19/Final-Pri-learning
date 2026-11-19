@@ -12,6 +12,9 @@ import {
   assignmentProgressSummary, assignmentQuestionTarget, assignmentSessionFromSubmission
 } from '../platform/assignmentProgress.js';
 import QuestionCard, { SR_ONLY } from '../components/QuestionCard.jsx';
+import RecentAttempts from '../components/RecentAttempts.jsx';
+import { markTourSeen, tourSeen } from '../lib/firstRunTour.js';
+const PracticeTour = React.lazy(() => import('../components/PracticeTour.jsx'));   // on demand: seen once per account
 import PriExplain from '../components/PriExplain.jsx';
 import FreeCapNotice from '../components/FreeCapNotice.jsx';
 import { clearInkDraft, clearPendingSubmission, pendingSubmissionQuestionId, readPendingSubmission } from '../components/practiceRecovery.js';
@@ -74,6 +77,20 @@ function ProfilePractice() {
   const assignmentTargetReached = useRef(false);
   const assignmentSync = useRef(Promise.resolve());
   const [serve, setServe] = useState(null);
+  // First visit: the four-note tour, for a signed-in account that has not seen it.
+  const [tourOn, setTourOn] = useState(false);
+  const tourReady = !!serve && !assignmentMode && user?.cloudLinked === true;
+  useEffect(() => {
+    if (!tourReady || tourSeen(user.id)) return undefined;
+    const timer = setTimeout(() => {
+      // Never interrupt someone already typing or writing an answer.
+      const a = document.activeElement;
+      if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.isContentEditable)) return;
+      setTourOn(true);
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [tourReady, user?.id]);
+  const closeTour = useCallback(seen => { if (seen) markTourSeen(user.id); setTourOn(false); }, [user?.id]);
   // v1.1 instrument: the question's number within this visit to Practice
   // (each distinct question shown counts once). Display only.
   const shownCount = useRef({ id: null, n: 0 });
@@ -436,7 +453,7 @@ function ProfilePractice() {
   const assignmentCompleteLocally = !!assignmentContext && assignmentTargetReached.current;
 
   const exitBar = (
-    <button type="button" className="icon-btn ws-exit" onClick={() => navigate('/')} aria-label={t('practice.leave')}>
+    <button type="button" className="icon-btn ws-exit" data-tour="topic" onClick={() => navigate('/')} aria-label={t('practice.leave')}>
       <Icon name="back" /><span>{t(INSTRUMENT_UI ? 'inst.tabIndex' : 'nav.home')}</span>
     </button>
   );
@@ -718,6 +735,8 @@ function ProfilePractice() {
             }}
             onTrySimilar={serve.question.subtopic && serve.question.subtopic !== 'custom' ? loadSimilar : undefined}
           />
+          {!assignmentMode && <RecentAttempts subtopic={serve.question.subtopic} onServe={setServe} />}
+          {tourOn && <React.Suspense fallback={null}><PracticeTour onClose={closeTour} /></React.Suspense>}
         </>
       )}
     </div>
