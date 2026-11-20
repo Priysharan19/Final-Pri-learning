@@ -3224,6 +3224,7 @@ export default {
   'check.questionTitle': 'This question cannot be checked right now',
   'check.questionHint': 'Try again, or go to the next question.',
   'check.freeCapTitle': 'Today’s free questions are used up',
+  'check.freeLaunchCapHint': 'The current usage allowance has been reached. Your saved work is kept; you can return when the allowance resets.',
   'check.freeCapHint': 'Checking this one would be another of today’s free practice questions, and you have used the free plan’s daily allowance. They come back at midnight, and Premium removes the daily cap.',
   'check.placementNotStarted': 'The placement check has not started, and nothing was marked.',
   'check.gameNotStarted': 'The game has not started, and nothing was marked.',

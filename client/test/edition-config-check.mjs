@@ -122,8 +122,11 @@ ok(vite.featureStates('build', {}).edition === 'priyabhata', 'a build with no PR
 ok(vite.featureStates('build', { PRI_EDITION: 'prithagoras' }).edition === 'prithagoras', 'a Prithagoras build records prithagoras');
 ok(vite.featureDefines('build', { PRI_EDITION: 'prithagoras' }).__PRI_EDITION__ === '"prithagoras"', 'the build defines __PRI_EDITION__');
 ok(throws(() => vite.featureStates('build', { PRI_EDITION: 'typo' })), 'a build with an unknown edition stops');
-ok(vite.featureDefines('build', {}).__PRI_PREMIUM_ON_SALE__ === 'true' && vite.featureDefines('build', { PRI_EDITION: 'prithagoras' }).__PRI_PREMIUM_ON_SALE__ === 'true',
-  'the build tells the bundle whether its edition sells Premium: true for both (Razorpay, Apple and Google in India; Stripe in Australia)');
+ok(vite.featureDefines('build', {}).__PRI_PREMIUM_ON_SALE__ === 'false' && vite.featureDefines('build', {}).__PRI_FREE_LAUNCH__ === 'true' &&
+  vite.featureDefines('build', { NODE_ENV: 'production', PRI_TEST_PAID_MODE: '1' }).__PRI_PREMIUM_ON_SALE__ === 'false' &&
+  vite.featureDefines('build', { NODE_ENV: 'test', PRI_TEST_PAID_MODE: '1' }).__PRI_PREMIUM_ON_SALE__ === 'true' &&
+  vite.featureDefines('build', { PRI_EDITION: 'prithagoras' }).__PRI_PREMIUM_ON_SALE__ === 'true',
+  'India release is free-only, test-only paid fixture is explicit, Australia provider policy unchanged');
 {
   const docker = read('Dockerfile');
   const clientStage = docker.split(/^FROM /m)[1];

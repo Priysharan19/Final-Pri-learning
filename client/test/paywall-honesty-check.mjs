@@ -147,7 +147,7 @@ ok('every arrival reason has copy in both languages', Object.values(ARRIVAL_KEYS
   const panel = read('components/CloudAccountPanel.jsx');
   const config = readFileSync(new URL('../edition.config.mjs', import.meta.url), 'utf8');
   ok('whether Premium is on sale is a build fact, true wherever the build does not say otherwise',
-    nativeBilling.includes("export const PREMIUM_ON_SALE = typeof __PRI_PREMIUM_ON_SALE__ !== 'boolean' || __PRI_PREMIUM_ON_SALE__;"));
+    nativeBilling.includes("export const PREMIUM_ON_SALE = !FREE_LAUNCH && (typeof __PRI_PREMIUM_ON_SALE__ !== 'boolean' || __PRI_PREMIUM_ON_SALE__);"));
   ok('a build with nothing to sell has no store: no StoreKit or Google Play flow can start',
     nativeBilling.includes('return PREMIUM_ON_SALE && STORE_BILLING && priNative.billing.available() ? priNative.billing.store() : null;') &&
     nativeBilling.includes("export const STORE_BILLING = typeof __PRI_STORE_BILLING__ !== 'boolean' || __PRI_STORE_BILLING__;"));
@@ -164,7 +164,7 @@ ok('every arrival reason has copy in both languages', Object.values(ARRIVAL_KEYS
     (panel.match(/setWebCheckout\(/g) || []).length === 3 && (panel.match(/setWebCheckout\(false\)/g) || []).length === 2 &&
     /if \(!enabled \|\| !PREMIUM_ON_SALE\) \{\s*setPricing\(null\);\s*setWebCheckout\(false\);\s*return \(\) => \{ live = false; \};\s*\}\s*cloud\.billingConfig\(\)/.test(panel) &&
     panel.includes('const canUseWebBilling = canSync && webCheckout && !nativeShell;'));
-  ok('and says Premium is not on sale where it is not (the edition sells nothing, or the server says it is not on sale)', /\{!sellsPremium\(saleAvailable\) && !premium && <div[^>]*data-premium-not-on-sale>\s*\{t\('paywall\.notOnSale'\)\}/.test(panel));
+  ok('and says Premium is not on sale where it is not (the edition sells nothing, or the server says it is not on sale)', /\{!FREE_LAUNCH && !sellsPremium\(saleAvailable\) && !premium && <div[^>]*data-premium-not-on-sale>\s*\{t\('paywall\.notOnSale'\)\}/.test(panel));
   ok('every web price and checkout button in the panel is behind that (two buttons and the two prices of the auto-renewal disclosure, itself behind canUseWebBilling)', (panel.match(/price\(pricing\.(monthly|annual), pricing\.currency\)/g) || []).length === 4 &&
     panel.indexOf('{canUseWebBilling && <div') < panel.indexOf('price(pricing.monthly') && (panel.match(/startWebCheckout\('/g) || []).length === 2 && /async function startWebCheckout\(cadence\) \{\s*if \(!canUseWebBilling\) return;/.test(panel));
   for (const [lang, cat] of [['en', en], ['hi', hi]]) {
@@ -179,7 +179,7 @@ ok('the daily-cap notice leads to the Premium screen and says why', /PAYWALL_ROU
 const notebook = read('components/ErrorNotebook.jsx');
 ok('a twin refused at the cap or for JEE Advanced leads to the Premium screen', /isEntitlementGate\(e\)/.test(notebook) && /nav\(PAYWALL_ROUTE/.test(notebook));
 const app = read('App.jsx');
-ok('the route is mounted for students', /<Route path="\/premium" element=\{studentOnly\(<Paywall \/>\)\} \/>/.test(app));
+ok('the paid route is mounted for students only outside the free launch; direct links return to study', /<Route path="\/premium" element=\{studentOnly\(FREE_LAUNCH \? <Navigate to="\/" replace \/> : <Paywall \/>\)\} \/>/.test(app));
 
 console.log(`Paywall honesty — ${pass}/${pass + failures.length} checks`);
 if (failures.length) {

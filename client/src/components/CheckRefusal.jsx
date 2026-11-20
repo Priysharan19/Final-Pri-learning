@@ -116,7 +116,7 @@ export function CheckRefusal({
   return (
     <>
       <div className="verdict-title" data-check-refusal={kind}>{t(copy.titleKey)}</div>
-      <div className="verdict-body">{t(copy.contextKey)} <span className="muted">{t(sessionEnded ? 'check.sessionEnded' : copy.hintKey)}</span></div>
+      <div className="verdict-body">{t(copy.contextKey)} <span className="muted">{t(sessionEnded ? 'check.sessionEnded' : FREE_LAUNCH && copy.action === 'premium' ? 'check.freeLaunchCapHint' : copy.hintKey)}</span></div>
       {copy.action === 'sign-in' && (
         <div style={{ marginTop: 10 }} data-check-session-ended={sessionEnded ? '' : undefined}>
           <CheckSignIn user={user} refreshUser={refreshUser} ready={signInReady} waitText={signInWaitText}

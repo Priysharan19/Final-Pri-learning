@@ -29,7 +29,7 @@ export function captureInvite(loc = typeof window !== 'undefined' ? window.locat
   if (!url.searchParams.has(INVITE_PARAM)) return null;
   url.searchParams.delete(INVITE_PARAM);
   try { window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`); } catch { /* keep going */ }
-  if (!INVITE_CODE.test(code)) return null;
+  if (FREE_LAUNCH || !INVITE_CODE.test(code)) return null;
   try { storage()?.setItem(KEY, JSON.stringify({ code, at: Date.now() })); } catch { /* private mode: no invite */ }
   return code;
 }
