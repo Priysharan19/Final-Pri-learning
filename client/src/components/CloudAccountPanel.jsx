@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
+import { FREE_LAUNCH } from '../platform/launchPolicy.js';
 import { useApp } from '../App.jsx';
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
 import {
@@ -149,6 +150,7 @@ export default function CloudAccountPanel() {
     return () => { live = false; };
   }, [enabled, link?.accountId]);
   const canUseWebBilling = canSync && webCheckout && !nativeShell;
+  const canManageExistingWeb = canSync && entitlement?.provider === 'web';
   const canUseAppleBilling = canSync && nativeStoreKit && !!appleBootstrap?.appAccountToken;
   const liveAccount = session?.connected ? session.account : null;
   const appleMonthly = appleProducts.find(product => product.id === appleBootstrap?.products?.monthly) || null;
@@ -558,7 +560,7 @@ export default function CloudAccountPanel() {
    * which is what the policy says and what the server does.
    */
   async function cancelWebSubscription() {
-    if (!canUseWebBilling) return;
+    if (!canUseWebBilling && !canManageExistingWeb) return;
     // Ending a subscription is not something to do on a mis-tap.
     if (!window.confirm(t('cloud.cancelConfirm'))) return;
     setBusy('cancel-web');
@@ -834,7 +836,7 @@ export default function CloudAccountPanel() {
           )}
         </div>
         <div className="card" style={{ boxShadow: 'none' }}>
-          <div className="sc-label">{t('cloud.premiumAuthority')}</div>
+          <div className="sc-label">{t(FREE_LAUNCH && !premium ? 'cloud.free' : 'cloud.premiumAuthority')}</div>
           <div style={{ fontWeight: 680, marginTop: 4 }}>{premium ? t('cloud.premiumActive') : t('cloud.free')}</div>
           <div className="muted" style={{ fontSize: 13 }}>
             {premium ? `${entitlement.status} · ${entitlement.provider}` : entitlement?.stale ? t('cloud.cacheExpired') : t('cloud.noEntitlement')}
@@ -863,9 +865,10 @@ export default function CloudAccountPanel() {
 
           {canSync && <div style={{ marginTop: 12 }}><TrialNotice /></div>}
           {/* The invite trial: website only, admitted accounts only (store rules, standard #42). */}
-          {canSync && !nativeShell && <InviteFriend />}
+          {!FREE_LAUNCH && canSync && !nativeShell && <InviteFriend />}
+          {FREE_LAUNCH && canManageExistingWeb && !canUseWebBilling && <button className="btn btn-sm btn-quiet" type="button" disabled={!!busy} onClick={cancelWebSubscription}>{t('cloud.cancelSubscription')}</button>}
 
-          {!sellsPremium(saleAvailable) && !premium && <div className="muted" style={{ fontSize: 12, marginTop: 12 }} data-premium-not-on-sale>
+          {!FREE_LAUNCH && !sellsPremium(saleAvailable) && !premium && <div className="muted" style={{ fontSize: 12, marginTop: 12 }} data-premium-not-on-sale>
             {t('paywall.notOnSale')}
           </div>}
 

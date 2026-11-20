@@ -6,6 +6,9 @@
 // opens each gate on the same session.
 
 import './support/hermetic.mjs';
+// Preserve the paid-mode email-verification contract independently of the default free launch.
+process.env.NODE_ENV = 'test';
+process.env.PRI_TEST_PAID_MODE = '1';
 const { startApp, registerAccount, verifyEmail, checks } = await import('./support/app-harness.mjs');
 const { requestedEngine } = await import('./support/engine.mjs');
 

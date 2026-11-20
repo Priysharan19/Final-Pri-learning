@@ -20,6 +20,7 @@
 // 7-day offline window has expired. This module asks that contract a question
 // and records usage; it never writes an entitlement.
 // ─────────────────────────────────────────────────────────────────────────────
+import { FREE_LAUNCH } from '../platform/launchPolicy.js';
 import { get, put } from './idb.js';
 import { cloudLinkRowId } from '../platform/cloudAccount.js';
 import { ENTITLEMENTS, FREE_EXAM_ALLOWANCE, entitlementDecision, normalizeEntitlementSnapshot } from '../platform/entitlements.js';
@@ -164,7 +165,7 @@ export async function assertPracticeAllowed(profile, now = clock()) {
   if (allowance.allowed) return allowance;
   const decision = { reason: allowance.reason };
   throw gateError('FREE_CAP_REACHED',
-    `You have used today's ${FREE_TIER.practicePerDay} free practice questions. They reset at midnight (${allowance.timeZone}), and Premium removes the daily cap.${offlineNote(decision)}`,
+    `You have used today's ${FREE_TIER.practicePerDay} free practice questions. They reset at midnight (${allowance.timeZone}).${FREE_LAUNCH ? '' : ' Premium removes the daily cap.'}${offlineNote(decision)}`,
     { capability: ENTITLEMENTS.UNLIMITED_PRACTICE, used: allowance.used, limit: allowance.limit, resetsAt: allowance.resetsAt, timeZone: allowance.timeZone, reason: allowance.reason, refreshRequired: allowance.refreshRequired });
 }
 
@@ -195,7 +196,7 @@ export async function assertExamAllowed(profile, now = clock()) {
   if (allowance.allowed) return allowance;
   const timeZone = profileTimeZone(profile);
   throw gateError('FREE_CAP_REACHED',
-    `The free plan includes one exam simulation every ${FREE_TIER.examWindowDays} days. Your next free simulation unlocks on ${whenLabel(allowance.nextAt, timeZone, profile)}; Premium includes unlimited simulations.${offlineNote({ reason: allowance.reason })}`,
+    `The free plan includes one exam simulation every ${FREE_TIER.examWindowDays} days. Your next free simulation unlocks on ${whenLabel(allowance.nextAt, timeZone, profile)}.${FREE_LAUNCH ? '' : ' Premium includes unlimited simulations.'}${offlineNote({ reason: allowance.reason })}`,
     { capability: ENTITLEMENTS.PREMIUM_EXAMS, used: allowance.used, limit: allowance.limit, nextAt: allowance.nextAt, windowDays: allowance.windowDays, timeZone, reason: allowance.reason, refreshRequired: allowance.refreshRequired });
 }
 
@@ -219,10 +220,12 @@ const CAPABILITY_COPY = Object.freeze({
 
 /** Throw a 402 unless the linked account currently holds `capability`. */
 export async function requireCapability(profile, capability, now = clock()) {
+  // This admits generated study content, not a fabricated paid entitlement.
+  if (FREE_LAUNCH && profile?.course === 'in' && capability === ENTITLEMENTS.JEE_ADVANCED) return { allowed: true, reason: 'free-launch-content' };
   const decision = await capabilityDecision(profile.id, capability, now);
   if (decision.allowed) return decision;
   throw gateError('PREMIUM_REQUIRED',
-    `${translate(CAPABILITY_COPY[capability] || 'msg.ent.generic')}${offlineNote(decision)}`,
+    `${translate(FREE_LAUNCH ? 'msg.ent.launchUnavailable' : CAPABILITY_COPY[capability] || 'msg.ent.generic')}${offlineNote(decision)}`,
     { capability, reason: decision.reason, refreshRequired: !!decision.refreshRequired });
 }
 

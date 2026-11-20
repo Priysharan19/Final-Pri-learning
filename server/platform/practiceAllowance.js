@@ -32,6 +32,7 @@
 // free plan's copy is "20 practice questions a day, and everything else
 // unlimited" (CAPPED_PRACTICE_MODES).
 // ─────────────────────────────────────────────────────────────────────────────
+import { freeLaunchActive } from './launchPolicy.js';
 import { CAPPED_PRACTICE_MODES, FREE_PRACTICE_ALLOWANCE, practiceDayTimeZone, premiumCapabilityForGenerator } from '../../client/src/engine/practiceAllowance.js';
 import { serverEdition } from './edition.js';
 import { serverEntitlementCapabilities } from './entitlements.js';
@@ -198,7 +199,7 @@ export function refusePracticeCap(res, verdict, now = Date.now()) {
   return res.status(402).json({
     error: {
       code: 'FREE_CAP_REACHED',
-      message: `You have used today's ${verdict.limit} free practice questions. They reset at midnight (${verdict.timeZone}), and ${serverEdition() === 'prithagoras' ? 'HSC Pass will remove' : 'Premium removes'} the daily cap.`,
+      message: freeLaunchActive() ? `You have used today's ${verdict.limit} practice questions. They reset at midnight (${verdict.timeZone}).` : `You have used today's ${verdict.limit} free practice questions. They reset at midnight (${verdict.timeZone}), and ${serverEdition() === 'prithagoras' ? 'HSC Pass will remove' : 'Premium removes'} the daily cap.`,
       capability: 'unlimited-practice',
       plan: 'free',
       used: verdict.used,
@@ -235,6 +236,9 @@ export { premiumCapabilityForGenerator };
 export async function premiumContentRefusal(db, { accountId, generator, now = Date.now() }) {
   const capability = premiumCapabilityForGenerator(generator);
   if (!capability) return null;
+  // Open only generated JEE Advanced content, not rights-gated archives.
+  // All existing question issuance, consent and marking guards still apply.
+  if (freeLaunchActive() && /^jee-advanced-/.test(String(generator))) return null;
   db = asStore(db);
   const snapshot = await db.get('SELECT plan,status,current_period_end,grace_until FROM entitlement_snapshots WHERE account_id=?', [accountId]);
   if (serverEntitlementCapabilities(snapshot, now).includes(capability)) return null;
@@ -251,7 +255,7 @@ export function refusePremiumContent(res, refusal) {
   return res.status(402).json({
     error: {
       code: 'PREMIUM_REQUIRED',
-      message: 'The JEE Advanced track is part of Pri Learning Premium. JEE Main and the CBSE / NCERT chapters stay on the free plan.',
+      message: freeLaunchActive() ? 'This archived content is not available for the initial release.' : 'The JEE Advanced track is part of Pri Learning Premium. JEE Main and the CBSE / NCERT chapters stay on the free plan.',
       capability: refusal.capability,
       plan: 'free',
       retryable: false

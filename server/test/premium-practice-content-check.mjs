@@ -24,7 +24,8 @@ import { CONTENT_VERSION } from '../../client/src/engine/contentIdentity.js';   
 import { randomUUID } from 'node:crypto';
 
 const scratch = mkdtempSync(join(tmpdir(), 'pri-premium-content-'));
-process.env.NODE_ENV = 'test';                  // fixed seeds: the same trap on demand
+process.env.NODE_ENV = 'test';
+process.env.PRI_TEST_PAID_MODE = '1'; // Retain the original paid-mode regression; free-launch is tested separately.                  // fixed seeds: the same trap on demand
 // Owner decision 2026-11-18: the active packaging leaves free practice uncapped,
 // so the cap this suite proves a twin is refused at is the deployment's own,
 // set to the value the free plan used to ship (d19-d20: 20 a day).

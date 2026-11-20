@@ -189,6 +189,7 @@ export const ENGINE_SUITES = [
   'stripe-billing-check.mjs',
   'packaging-enforcement-check.mjs',
   'referral-trial-check.mjs',
+  'india-free-launch-check.mjs',
   // Plan H7: the practice day per edition and the paid-call ceiling under each
   // edition; its HTTP part runs a Prithagoras server as pri_server.
   'edition-ai-budgets-check.mjs',

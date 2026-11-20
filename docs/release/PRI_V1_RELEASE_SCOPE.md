@@ -10,6 +10,8 @@ This document is the canonical binding V1 release boundary for Dream Pri Learnin
 
 The coordinator decisions encoded here are frozen. Repository merge of this documentation records the decision in `main`; it is not permission for agents to expand the V1 while the documentation PR is pending.
 
+**Owner amendment (17 November 2026, #1012; reaffirmed 20 November):** initial India-only Railway V1 is free, with Premium sales, upgrade offers and new referral trials deferred. This supersedes the earlier Premium-at-launch statements including §22.4; paid sales certification is deferred, not safety, consent, marking, privacy, or controlled-release gates. Existing valid subscription lifecycle obligations remain. No store or production settings are changed by this source amendment.
+
 ## 1. Authority and purpose
 
 PRI-R1 defines the **release/container/platform/commercial boundary** for V1.

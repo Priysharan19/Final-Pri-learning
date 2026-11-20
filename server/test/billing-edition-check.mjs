@@ -33,7 +33,7 @@ import { createHmac } from 'node:crypto';
 const ONLY = (process.argv.find(arg => arg.startsWith('--edition=')) || '').slice('--edition='.length) || null;
 
 const ENV = {
-  NODE_ENV: 'test',
+  NODE_ENV: 'test', PRI_TEST_PAID_MODE: '1', // deferred paid-mode provider isolation
   PRI_AUTH_DELIVERY_KEY: '55'.repeat(32),
   PRI_DISPLAY_MONTHLY_PRICE: '199', PRI_DISPLAY_ANNUAL_PRICE: '1499', PRI_DISPLAY_TRIAL_DAYS: '7',
   PRI_RAZORPAY_KEY_ID: 'rzp_test_public_id', PRI_RAZORPAY_KEY_SECRET: 'rzp-test-secret', PRI_RAZORPAY_WEBHOOK_SECRET: 'whsec-test',

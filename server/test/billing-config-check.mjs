@@ -5,12 +5,21 @@ import { commercialConfig } from '../platform/billing.js';
 import { normalizeCommercialDisplay } from '../../client/src/platform/entitlements.js';
 
 const names = [
+  'NODE_ENV', 'PRI_TEST_PAID_MODE',
   'PRI_DISPLAY_CURRENCY', 'PRI_DISPLAY_MONTHLY_PRICE',
   'PRI_DISPLAY_ANNUAL_PRICE', 'PRI_DISPLAY_TRIAL_DAYS'
 ];
 const prior = Object.fromEntries(names.map(name => [name, process.env[name]]));
 try {
   for (const name of names) delete process.env[name];
+  // The launch suppresses prices even when storefront variables remain set.
+  process.env.PRI_DISPLAY_MONTHLY_PRICE = '1234';
+  assert.equal(commercialConfig().available, false);
+  assert.equal(commercialConfig().display.monthly, null);
+  delete process.env.PRI_DISPLAY_MONTHLY_PRICE;
+  // Keep all original assertions for the separate deferred paid-mode fixture.
+  process.env.NODE_ENV = 'test';
+  process.env.PRI_TEST_PAID_MODE = '1';
   const empty = commercialConfig().display;
   assert.equal(empty.monthly, null, 'monthly price must not fall back to a hard-coded commercial amount');
   assert.equal(empty.annual, null, 'annual price must not fall back to a hard-coded commercial amount');

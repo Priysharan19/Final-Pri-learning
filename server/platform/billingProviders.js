@@ -16,6 +16,7 @@
 //
 // What an account already holds (an administrator's grant, a trial) is not a
 // purchase and is untouched: /billing/status and /billing/manage still answer.
+import { freeLaunchActive } from './launchPolicy.js';
 import { BILLING_PROVIDERS, editionOf } from '../../client/edition.config.mjs';
 import { stripeConfigStatus } from './stripe.js';
 
@@ -36,6 +37,7 @@ export const WEB_PROVIDERS = Object.freeze(['razorpay', 'stripe']);
  * everywhere (config, routes, screen) instead of offering a purchase that cannot work.
  */
 export function saleLive(edition) {
+  if (freeLaunchActive(edition)) return false;
   const providers = editionBilling(edition).providers;
   if (!providers.length) return false;
   return providers.some(p => p !== 'stripe') || stripeConfigStatus().configured;
