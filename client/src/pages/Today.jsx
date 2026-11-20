@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { FREE_LAUNCH } from '../platform/launchPolicy.js';
 import { useNavigate } from 'react-router-dom';
 import PageLink from '../components/PageLink.jsx';
 import { api } from '../api.js';
@@ -28,7 +29,7 @@ export default function Today() {
       const r = await api.post(`/notebook/${item.attemptId}/twin`, {});
       nav('/practice', { state: { serve: { question: unassisted(r.question), reason: 'retry', why: t('today.whyRetest') } } });
     } catch (e) {
-      if (isEntitlementGate(e)) nav(PAYWALL_ROUTE, { state: { from: 'practice' } });
+      if (!FREE_LAUNCH && isEntitlementGate(e)) nav(PAYWALL_ROUTE, { state: { from: 'practice' } });
       else toast(<span>{t('today.retestFailed')}</span>);
     } finally { setBusy(false); }
   }

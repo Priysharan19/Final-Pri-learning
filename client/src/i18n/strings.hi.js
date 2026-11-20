@@ -4314,6 +4314,7 @@ export default {
   'msg.ent.practice': 'रोज़ बिना सीमा का अभ्यास {brand} Premium का हिस्सा है।',
   'msg.ent.extraAi': 'AI का अतिरिक्त उपयोग {brand} Premium के लिए है।',
   'msg.ent.generic': 'यह सुविधा {brand} Premium का हिस्सा है।',
+  'msg.ent.launchUnavailable': 'यह सुविधा शुरुआती रिलीज़ में उपलब्ध नहीं है।',
   'msg.ent.genericShort': 'यह {brand} Premium का हिस्सा है।',
   'badge.firstSteps.name': 'पहला क़दम',
   'badge.firstSteps.desc': 'अपना पहला प्रश्न सही हल कीजिए।',

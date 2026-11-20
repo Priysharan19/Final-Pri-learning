@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { FREE_LAUNCH } from '../platform/launchPolicy.js';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { MathText } from '../lib/latex.jsx';
@@ -77,7 +78,7 @@ export default function ErrorNotebook() {
     } catch (e) {
       // A twin is a question of the free day (D19), and JEE Advanced's own
       // questions are Premium: the one Premium screen explains either.
-      if (isEntitlementGate(e)) nav(PAYWALL_ROUTE, { state: { from: e.capability === 'jee-advanced-content' ? 'jee-advanced' : 'practice' } });
+      if (!FREE_LAUNCH && isEntitlementGate(e)) nav(PAYWALL_ROUTE, { state: { from: e.capability === 'jee-advanced-content' ? 'jee-advanced' : 'practice' } });
       else toast(<span>{t('notebook.twinFailed')}</span>);
     } finally { setBusy(false); }
   }

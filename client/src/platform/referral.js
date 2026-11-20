@@ -8,6 +8,7 @@
 // Nothing about a friend is ever collected here: the code is all there is.
 // The store apps neither capture nor claim an invite (web only, store rules).
 // ─────────────────────────────────────────────────────────────────────────────
+import { FREE_LAUNCH } from './launchPolicy.js';
 import { cloud, cloudAvailable } from './cloudTransport.js';
 import { priNative } from './native/index.js';
 
@@ -49,6 +50,7 @@ const forget = () => { try { storage()?.removeItem(KEY); } catch { /* nothing ke
  * network failure keeps it for the next admission.
  */
 export async function claimPendingInvite() {
+  if (FREE_LAUNCH) return null;
   if (!web() || !cloudAvailable()) return null;
   const code = pendingInvite();
   if (!code) return null;

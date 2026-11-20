@@ -2,6 +2,7 @@
 // sign-in a student can complete without leaving the question, and the words
 // and next step for each reason a check was refused. Presentation only —
 // account linking, eligibility and marking stay with the platform modules.
+import { FREE_LAUNCH } from '../platform/launchPolicy.js';
 import React, { useEffect, useRef, useState } from 'react';
 import { useInRouterContext } from 'react-router-dom';
 import PageLink from './PageLink.jsx';
@@ -126,7 +127,7 @@ export function CheckRefusal({
         {copy.action === 'account' && (inRouter
           ? <PageLink to="/settings" {...settings}>{t('app.accountSettings')}</PageLink>
           : <a href="/settings" {...settings}>{t('app.accountSettings')}</a>)}
-        {copy.action === 'premium' && (inRouter
+        {!FREE_LAUNCH && copy.action === 'premium' && (inRouter
           ? <PageLink to="/settings#cloud-account-title" {...settings}>{t('freeCap.seePremium')}</PageLink>
           : <a href="/settings#cloud-account-title" {...settings}>{t('freeCap.seePremium')}</a>)}
         {onRetry && (copy.action === 'retry' || copy.action === 'account') && (

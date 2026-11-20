@@ -8,6 +8,7 @@
 // Late results are never lost: a purchase or restore that answers after the UI
 // stopped waiting is re-emitted through onNativeBillingUpdate() by priNative,
 // and StoreKit itself re-delivers unfinished transactions on the next launch.
+import { FREE_LAUNCH } from './launchPolicy.js';
 import { priNative } from './native/index.js';
 
 /* global __PRI_PREMIUM_ON_SALE__, __PRI_STORE_BILLING__ */
@@ -21,7 +22,7 @@ import { priNative } from './native/index.js';
  * Premium is not on sale yet. The server refuses every purchase route for
  * that edition whatever a bundle does.
  */
-export const PREMIUM_ON_SALE = typeof __PRI_PREMIUM_ON_SALE__ !== 'boolean' || __PRI_PREMIUM_ON_SALE__;
+export const PREMIUM_ON_SALE = !FREE_LAUNCH && (typeof __PRI_PREMIUM_ON_SALE__ !== 'boolean' || __PRI_PREMIUM_ON_SALE__);
 
 /**
  * Whether the edition sells through the App Store or Google Play at all. Prithagoras
@@ -74,6 +75,7 @@ export async function getNativeProducts(productIds) {
 }
 
 export function purchaseNativeProduct(productId, appAccountToken) {
+  if (FREE_LAUNCH) return Promise.reject(Object.assign(new Error('Purchases are not available at launch.'), { code: 'BILLING_NOT_AVAILABLE_IN_EDITION' }));
   return request('purchase', {
     productId: String(productId || ''),
     appAccountToken: String(appAccountToken || '')
@@ -83,6 +85,7 @@ export function purchaseNativeProduct(productId, appAccountToken) {
 /** Google Play: the server-issued obfuscatedAccountId travels with the purchase
  * and comes back inside Google's record, which is how the server binds it. */
 export function purchaseGoogleSubscription({ productId, basePlanId, obfuscatedAccountId }) {
+  if (FREE_LAUNCH) return Promise.reject(Object.assign(new Error('Purchases are not available at launch.'), { code: 'BILLING_NOT_AVAILABLE_IN_EDITION' }));
   return request('purchase', {
     productId: String(productId || ''),
     basePlanId: String(basePlanId || ''),

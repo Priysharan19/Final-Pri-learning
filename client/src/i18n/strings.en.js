@@ -4266,6 +4266,7 @@ export default {
   'msg.ent.practice': 'Unlimited daily practice is part of {brand} Premium.',
   'msg.ent.extraAi': 'Additional AI usage is reserved for {brand} Premium.',
   'msg.ent.generic': 'This feature is part of {brand} Premium.',
+  'msg.ent.launchUnavailable': 'This feature is not available in the initial release.',
   'msg.ent.genericShort': 'This is part of {brand} Premium.',
   'badge.firstSteps.name': 'First Steps',
   'badge.firstSteps.desc': 'Answer your first question correctly.',
