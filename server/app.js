@@ -97,7 +97,11 @@ export async function createServerApp(db, {
   // { edition } for the resource library (resources.js); default: PRI_EDITION.
   resources = {},
   // { edition, now } for the Exam Desk (desk.js); default: PRI_EDITION, Date.now.
-  desk = {}
+  desk = {},
+  // { dir } for the practice papers (papers.js); default: server/content/papers/nsw-ext1.
+  papers = {},
+  // Test-only tuning of the guest trial's limits (guestTrial.js); the product uses the defaults.
+  guest = {}
 } = {}) {
   // The built client this app will serve must have been made for this
   // server's edition (platform/edition.js). Throws before anything is mounted.
@@ -158,7 +162,9 @@ export async function createServerApp(db, {
     billingLifecycle: webBilling.lifecycle,
     parentReport,
     resources,
-    desk
+    desk,
+    papers,
+    guest
   }));
 
   if (legacy && !production) {

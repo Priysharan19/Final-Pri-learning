@@ -27,7 +27,12 @@ import { join } from 'node:path';
 
 const scratch = mkdtempSync(join(tmpdir(), 'pri-daily-cap-'));
 delete process.env.NODE_ENV;              // the product's own mode: the server chooses every question
-delete process.env.PRI_FREE_PRACTICE_PER_DAY; // the shipped default, 20
+// Owner decision 2026-11-18 (docs/product/packaging-2026-11.md): the active
+// packaging leaves free practice uncapped, so the daily-cap MECHANISM this suite
+// proves is exercised through the deployment's own cap, at the value the free
+// plan used to ship (d19-d20: 20 a day). Nothing here is loosened: every
+// assertion below still runs against a real cap of 20.
+process.env.PRI_FREE_PRACTICE_PER_DAY = '20';
 process.env.PRI_PLATFORM_DB = join(scratch, 'platform.db');
 process.env.PRI_AUTH_DELIVERY_KEY = '7c'.repeat(32);
 process.env.PRI_AUTH_EMAIL_PROVIDER = 'test';
@@ -47,7 +52,7 @@ const { FREE_PRACTICE_ALLOWANCE, CAPPED_PRACTICE_MODES } = await import('../../c
 const h = await startApp({ engine: requestedEngine() });
 const c = checks();
 const DAY = 24 * 60 * 60 * 1000;
-const LIMIT = FREE_PRACTICE_ALLOWANCE.perDay;
+const LIMIT = 20; // the deployment cap set above (the superseded d19-d20 figure)
 const REQUEST = { generator: 'c8-linear-equations-both-sides', difficulty: 2, curriculum: 'in', mode: 'practice' };
 const PASSWORD = 'correct-horse-battery';
 const post = (path, body, jar = {}, headers = {}) => h.request(path, { method: 'POST', jar, body, headers });
@@ -67,7 +72,8 @@ const kolkataDay = ms => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolk
 
 try {
   // ── the pure rules ──────────────────────────────────────────────────────────
-  c.eq(LIMIT, 20, 'the free plan is 20 practice questions a day — one definition, shared with the device');
+  c.eq(FREE_PRACTICE_ALLOWANCE.perDay, null, 'the active packaging (value-2026-11, owner decision 2026-11-18) does not cap free practice; the cap tested here is the deployment\'s own');
+  c.eq(LIMIT, 20, 'the cap exercised below is 20 a day, the superseded d19-d20 figure');
   c.eq(PRACTICE_DAY_TIME_ZONE, 'Asia/Kolkata', 'the server\'s day is the Indian calendar day');
   for (const ms of [Date.UTC(2026, 8, 5, 18, 0, 0), Date.UTC(2026, 8, 5, 18, 30, 0), Date.UTC(2026, 8, 5, 18, 29, 59, 999), Date.UTC(2026, 0, 1, 0, 0, 0), Date.UTC(2026, 11, 31, 23, 59, 59), realNow()]) {
     const day = practiceDay(ms);
@@ -77,7 +83,8 @@ try {
   }
   c.eq(practiceDay(Date.UTC(2026, 8, 5, 18, 29, 59, 999)).key, '2026-09-05', '23:59:59.999 IST is still the same day');
   c.eq(practiceDay(Date.UTC(2026, 8, 5, 18, 30, 0)).key, '2026-09-06', 'and 00:00:00 IST is the next');
-  c.eq(freePracticePerDay({}), LIMIT, 'unset, the deployment runs the shipped cap');
+  c.eq(freePracticePerDay({}), null, 'unset, the deployment runs the active packaging: no cap');
+  c.eq(freePracticePerDay({ PRI_FREE_PRACTICE_PER_DAY: '20' }), LIMIT, 'set to 20, the deployment runs the cap this suite exercises');
   c.eq(freePracticePerDay({ PRI_FREE_PRACTICE_PER_DAY: '35' }), 35, 'the cap is deployment-tunable');
   c.deq(practiceAllowanceConfigProblems({}), [], 'no configuration is a valid configuration');
   for (const bad of ['0', '-3', 'twenty', '1.5', '100001']) c.eq(practiceAllowanceConfigProblems({ PRI_FREE_PRACTICE_PER_DAY: bad }).length, 1, `PRI_FREE_PRACTICE_PER_DAY=${bad} is a configuration problem (production refuses to boot)`);

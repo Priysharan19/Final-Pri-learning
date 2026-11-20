@@ -64,8 +64,11 @@ export function rungLevelOf(level) {
 export const rungAt = level => HINT_RUNGS[rungLevelOf(level) - 1] || null;
 
 /** Mark weight (0–1) still available after `level` rungs have been opened. */
-export function markWeightAfter(level) {
+export function markWeightAfter(level, free = false) {
   const n = rungLevelOf(level);
+  // Free hints (owner decision, 19 Nov 2026, Prithagoras): nudge, method and worked step
+  // take nothing off; the full solution still ends the question with no credit.
+  if (free) return n >= HINT_RUNGS.length ? 0 : 1;
   let weight = 1;
   for (let i = 0; i < n; i++) weight -= RUNG_COST[HINT_RUNGS[i]];
   return round2(clamp01(weight));
@@ -234,12 +237,12 @@ export function ladderAvailable(q) {
  * level reached, the rung names, the weight that was left and the help units
  * charged. `null` fields when no rung was opened keep old rows readable.
  */
-export function ladderEvidence(level) {
+export function ladderEvidence(level, free = false) {
   const n = rungLevelOf(level);
   return {
     hintLevel: n,
     hintRungs: HINT_RUNGS.slice(0, n),
-    markWeight: markWeightAfter(n),
+    markWeight: markWeightAfter(n, free),
     hintHelpUnits: helpUnitsAfter(n)
   };
 }
@@ -258,5 +261,5 @@ export function workingHint(report) {
   const good = lines.slice(0, at).filter(l => l?.status === 'ok').length;
   const fix = text(lines[at]?.diagnosis?.fix);
   const lead = good === 0 ? '' : good === 1 ? 'Your first line checks out. ' : `Your first ${good} lines check out. `;
-  return `${lead}Look again at line ${at + 1}${fix ? `: ${fix}` : ' — compare it carefully with the line above.'}`;
+  return `${lead}Look again at line ${at + 1}${fix ? `: ${fix}` : ': compare it carefully with the line above.'}`;
 }

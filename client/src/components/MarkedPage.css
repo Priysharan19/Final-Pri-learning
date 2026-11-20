@@ -1,0 +1,87 @@
+/* The marked page: the student's own page, each judged line outlined, one comment per line
+   beside it (below it on a phone). Hairline borders and icons, never a coloured edge on a
+   card; a state is an icon and a word as well as a colour. Spacing is the 4px scale. */
+.mp { display: grid; gap: var(--space-3); min-width: 0; }
+.mp-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-2) var(--space-4); }
+.mp-sentence { margin: 0; color: var(--ink); font-size: 15px; line-height: 1.5; }
+.mp-mark { margin: 0; color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.mp-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); align-items: start; }
+@media (min-width: 800px) { .mp-body { grid-template-columns: minmax(0, 1fr) minmax(240px, 320px); } }
+
+.mp-page { margin: 0; min-width: 0; }
+.mp-sheet { position: relative; padding-left: 30px; border: 1px solid var(--hairline-strong); border-radius: var(--radius-lg); background: var(--surface-raised); overflow: hidden; }
+.mp-sheet-in { position: relative; }
+/* A tall page of ink never pushes the first error below the fold on a wide screen: its height is capped and its width follows. */
+@media (min-width: 800px) { .mp-sheet-in { max-width: calc((100vh - 260px) * var(--mp-ar, 100)); } }
+.mp-img, .mp-ink { display: block; width: 100%; height: auto; }
+.mp-stroke { fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+
+.mp-box { position: absolute; box-sizing: border-box; border: 1.5px solid var(--ink-3); border-radius: var(--radius); }
+.mp-box.is-checked, .mp-box.is-condition { border-color: var(--good); }
+.mp-box.is-first-error { border-color: var(--correction); border-width: 2px; }
+.mp-box.is-follows, .mp-box.is-incomplete { border-color: var(--warn); border-style: dashed; }
+.mp-box.is-quiet { border-color: var(--hairline-strong); border-style: dotted; }
+.mp-box.is-active { background: var(--accent-soft); outline: 2px solid var(--ink); outline-offset: 1px; }
+
+.mp-tag { position: absolute; left: -4px; top: 50%; transform: translate(-100%, -50%); display: inline-flex; align-items: center; gap: var(--space-1);
+  padding: 0 var(--space-1); font-size: 11px; line-height: 16px; font-variant-numeric: tabular-nums; color: var(--ink); background: var(--surface-raised);
+  border: 1px solid var(--hairline-strong); border-radius: var(--radius-sm); }
+
+.mp-comments { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); position: relative; min-width: 0; }
+.mp-card { box-sizing: border-box; border: 1px solid var(--hairline-strong); border-radius: var(--radius-lg); background: var(--surface-raised);
+  padding: var(--space-2) var(--space-3); font-size: 13.5px; line-height: 1.45; color: var(--ink-2); }
+.mp-card:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.mp-card.is-active { border-color: var(--ink); background: var(--accent-soft); }
+.mp-card.is-first-error { border-color: var(--correction-line); }
+.mp-card.is-quiet { border-style: dotted; color: var(--ink-3); }
+.mp-state { display: flex; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-1); color: var(--ink); }
+.mp-state b { font-weight: 600; margin-left: auto; }
+.mp-card.is-checked .mp-state b, .mp-card.is-condition .mp-state b { color: var(--good); }
+.mp-card.is-first-error .mp-state b { color: var(--correction); }
+.mp-card.is-follows .mp-state b, .mp-card.is-incomplete .mp-state b { color: var(--warn); }
+.mp-text p { margin: var(--space-1) 0; }
+.mp-expr { margin: var(--space-1) 0; overflow-x: auto; overflow-y: hidden; }
+.mp-card .aw-fix, .mp-card .aw-more { color: var(--ink-3); }
+
+.mp-criteria { display: grid; gap: var(--space-2); }
+.mp-table { width: 100%; border-collapse: collapse; font-size: 13.5px; color: var(--ink-2); border: 1px solid var(--hairline-strong); }
+.mp-table caption { text-align: left; padding: 0 0 var(--space-2); font-weight: 600; color: var(--ink); }
+.mp-table th, .mp-table td { text-align: left; vertical-align: top; padding: var(--space-2) var(--space-3); border-top: 1px solid var(--hairline); }
+.mp-table td svg { vertical-align: -2px; margin-right: var(--space-1); }
+.mp-why { display: block; color: var(--ink-3); font-size: 12.5px; }
+.mp-label { margin: 0; color: var(--ink-3); font-size: 12.5px; }
+
+/* How Pri read a line: on demand only, a quiet text action, never shown before marking. */
+.mp-read-all { margin: 0; }
+.mp-link { appearance: none; background: none; border: 0; padding: var(--space-1) 0; font: inherit; font-size: 12.5px; color: var(--ink-2);
+  text-decoration: underline; text-underline-offset: 3px; cursor: pointer; min-height: 24px; }
+.mp-link:hover { color: var(--ink); }
+.mp-link:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: var(--radius-sm); }
+.mp-read { margin-top: var(--space-1); display: grid; gap: var(--space-1); justify-items: start; }
+.mp-how { color: var(--ink-2); }
+.mp-edit { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.mp-edit input { flex: 1 1 160px; min-width: 0; min-height: 36px; padding: 0 var(--space-2); font: inherit; color: var(--ink); background: var(--surface-raised);
+  border: 1px solid var(--hairline-strong); border-radius: var(--radius); }
+
+/* The verified line is one compact row; only the first error and the not-read card are full cards. */
+.mp-card.mp-row { display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-3); min-height: 28px; height: 28px; overflow: hidden; white-space: nowrap; }
+.mp-card.mp-row svg { flex: none; color: var(--good); }
+.mp-row-n { color: var(--ink); }
+.mp-row-why { color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; }
+.mp-sentence-1 { color: var(--ink); }
+.mp-mark-quiet { flex-basis: 100%; margin: 0; color: var(--ink-3); font-size: 13px; line-height: 1.4; }
+.mp-photo-note { margin-top: var(--space-1); color: var(--ink-3); font-size: 12.5px; }
+@media (max-width: 799px) {
+  .mp-sheet { padding-left: 22px; }
+  .mp-tag { font-size: 10px; line-height: 14px; padding: 0 2px; gap: 0; }
+  .mp-tag svg { display: none; }
+}
+/* With the on-demand reading offered, the row keeps its one line at rest; opening a reading lets it grow in place. */
+.mp-card.mp-row.has-read { height: auto; flex-wrap: wrap; overflow: visible; }
+.mp-row.has-read .mp-read { display: contents; }
+.mp-row.has-read .mp-read > button { margin-left: auto; padding: 0; min-height: 0; }
+.mp-row.has-read .mp-read > div { flex: 1 0 100%; padding-bottom: var(--space-2); white-space: normal; }
+
+/* A photo is marked with a bar at the line's left edge, not a tight outline: the reader's box is its own estimate of where the line is. */
+.mp-box.is-approx { border-width: 0 0 0 2px; border-radius: 0; }
+.mp-box.is-approx.is-active { background: none; outline: none; border-left-width: 4px; }

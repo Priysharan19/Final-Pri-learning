@@ -21,7 +21,7 @@ copy before the first post.
 | Class 9: 8 of the 15 CBSE 2026–27 chapters; Class 8: the earlier NCERT book | `client/src/engine/indiaProductionMeta.js` notes; decision D24 |
 | Generated questions; a repeat is flagged when a pool is small | `client/src/engine/contentIdentity.js` repeat window; `docs/content/certification-report.md` |
 | Timed paper simulations, marked automatically; no rank predicted | `server/platform/exams.js`; `strings.en.js` `progress.honesty` |
-| Free: 20 questions a day, one timed paper in 30 days; Premium ₹199 / ₹1,499 | `client/src/local/entitlementGate.js`; decision D19 |
+| Free: no daily practice limit, one timed paper in 30 days; Premium ₹199 / ₹1,499 | `client/src/engine/packaging.js`; owner decision 2026-11-18 |
 
 Nothing on a slide makes a coverage or completeness claim, states an accuracy figure or a
 marking-authority comparison, predicts a rank, claims to work without a connection, names a
@@ -41,7 +41,7 @@ phrases are listed in `client/test/marketing-claims-check.mjs`, which runs over 
 > Class 9 currently has 8 of the 15 chapters in the CBSE 2026–27 list; Class 8 follows the
 > earlier NCERT book.
 >
-> Free: 20 questions a day. Premium: ₹199 a month or ₹1,499 a year.
+> Free: no daily limit on practice questions. Premium: ₹199 a month or ₹1,499 a year.
 >
 > Not endorsed by NCERT, CBSE or the NTA. Follow @pri.learning — coming soon. 🔔
 

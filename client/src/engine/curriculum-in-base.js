@@ -151,7 +151,7 @@ export const IN_CURRICULUM = [
   {
     grade: 7,
     title: 'Class 7',
-    caption: 'NCERT Class 7 — integers, rationals, first algebra and plane geometry',
+    caption: 'NCERT Class 7: integers, rationals, first algebra and plane geometry',
     chapters: [
       C('c7-integers', 'Integers', 'Number & Arithmetic', 10, [
         'Represent, compare and order integers on the number line',
@@ -224,7 +224,7 @@ export const IN_CURRICULUM = [
     grade: 8,
     title: 'Class 8',
     // The honest label Class 8 carries until the Ganita Prakash rebuild (D24).
-    caption: 'NCERT Class 8 — follows the earlier NCERT book (Reprint 2024–25): rationals, identities, mensuration and first graphs',
+    caption: 'NCERT Class 8: follows the earlier NCERT book (Reprint 2024–25): rationals, identities, mensuration and first graphs',
     chapters: [
       C('c8-rational-numbers', 'Rational Numbers', 'Number & Arithmetic', 10, [
         'Use closure, commutativity, associativity and distributivity',
@@ -296,7 +296,7 @@ export const IN_CURRICULUM = [
   {
     grade: 9,
     title: 'Class 9',
-    caption: 'NCERT Class 9 — irrationals, polynomials, proof-based geometry',
+    caption: 'NCERT Class 9: irrationals, polynomials, proof-based geometry',
     chapters: [
       C('c9-number-systems', 'Number Systems', 'Number & Arithmetic', 11, [
         'Place rational and irrational numbers on the number line',
@@ -368,7 +368,7 @@ export const IN_CURRICULUM = [
   {
     grade: 10,
     title: 'Class 10',
-    caption: 'NCERT Class 10 — the board year: quadratics, AP, similarity, trigonometry',
+    caption: 'NCERT Class 10: the board year: quadratics, AP, similarity, trigonometry',
     chapters: [
       C('c10-real-numbers', 'Real Numbers', 'Number Theory', BOARD, [
         "Apply Euclid's division lemma and the fundamental theorem of arithmetic",
@@ -445,7 +445,7 @@ export const IN_CURRICULUM = [
   {
     grade: 11,
     title: 'Class 11',
-    caption: 'NCERT Class 11 — the JEE foundation year',
+    caption: 'NCERT Class 11: the JEE foundation year',
     chapters: [
       C('c11-sets', 'Sets', 'Reasoning & Proof', BOARD, [
         'Use set notation, subsets, power sets and the universal set',
@@ -522,7 +522,7 @@ export const IN_CURRICULUM = [
   {
     grade: 12,
     title: 'Class 12',
-    caption: 'NCERT Class 12 — calculus, matrices, vectors and the board exam',
+    caption: 'NCERT Class 12: calculus, matrices, vectors and the board exam',
     chapters: [
       C('c12-relations-functions', 'Relations and Functions', 'Algebra', BOARD, [
         'Classify relations as reflexive, symmetric and transitive',
@@ -633,7 +633,7 @@ export const IN_TRACKS = {
   'jee-advanced': {
     id: 'jee-advanced',
     name: 'JEE Advanced',
-    caption: 'The same syllabus taken to multi-concept depth — the difficulty is the difference',
+    caption: 'The same syllabus taken to multi-concept depth: the difficulty is the difference',
     difficultyFloor: 3,
     difficultyCeiling: 4,
     scopeFor: () => [...senior(11), ...senior(12)],
@@ -642,7 +642,7 @@ export const IN_TRACKS = {
   olympiad: {
     id: 'olympiad',
     name: 'Olympiad (PRMO → RMO → INMO)',
-    caption: 'Not harder school maths — a different subject',
+    caption: 'Not harder school maths: a different subject',
     difficultyFloor: 1,
     difficultyCeiling: 4,
     scopeFor: () => OLYMPIAD_TOPICS.map(t => t.id),

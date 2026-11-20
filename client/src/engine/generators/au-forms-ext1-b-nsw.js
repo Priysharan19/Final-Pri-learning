@@ -17,7 +17,7 @@ const deg = r => r * 180 / Math.PI;
 const go = f => { for (let i = 0; i < 400; i++) { const q = f(); if (q) return q; } throw new Error('au-forms ext1-b: no valid draw'); };
 
 /** A numeric payload; a trap that equals the key (or repeats) is not a misconception, so it is dropped. */
-function num(prompt, value, { tol, suffix, traps = [], hints, steps } = {}) {
+function num(prompt, value, { tol, suffix, traps = [], hints, steps, stepcheck } = {}) {
   const seen = [value];
   const tr = [];
   for (const t of traps) {
@@ -29,6 +29,7 @@ function num(prompt, value, { tol, suffix, traps = [], hints, steps } = {}) {
   const answer = tol ? { value, tol } : { value };
   const q = { prompt, answerType: 'numeric', answer, traps: tr, hints, steps };
   if (suffix) q.answerSuffix = suffix;
+  if (stepcheck) q.stepcheck = stepcheck;
   return q;
 }
 function mc(rng, prompt, correct, ds, hints, steps) {
@@ -720,7 +721,9 @@ const makeV1c = (rng) => go(() => {
   return num(`Given $${A} = ${col(a[0], a[1])}$ and $${B} = ${col(b[0], b[1])}$, find $\\left|${sc(p, A)} ${q < 0 ? "-" : "+"} ${Math.abs(q) === 1 ? "" : Math.abs(q)}${B}\\right|$, correct to 2 decimal places.`, rnd(m, 2), {
     tol: 0.0005, traps: [{ value: rnd(Math.abs(p) * hyp(...a) + Math.abs(q) * hyp(...b), 2), why: 'The magnitude of a sum is not the sum of the magnitudes — combine the components first.' }],
     hints: ['Find the combined vector component by component.', `$x$: $${p}(${a[0]}) + (${q})(${b[0]}) = ${cx}$.`, `Then $\\sqrt{x^2 + y^2}$.`],
-    steps: [{ h: 'Combine', d: `$${col(cx, cy)}$` }, { h: 'Magnitude', d: `$\\sqrt{${cx * cx} + ${cy * cy}} \\approx ${rnd(m, 2)}$` }]
+    steps: [{ h: 'Combine', d: `$${col(cx, cy)}$` }, { h: 'Magnitude', d: `$\\sqrt{${cx * cx} + ${cy * cy}} \\approx ${rnd(m, 2)}$` }],
+    // The working is judged line by line from the two vectors the question gives (engine/vectorChain.js).
+    stepcheck: { kind: 'vector-chain', vectors: { a, b }, target: `|${p}*a+(${q})*b|` }
   });
 });
 const makeV1d = (rng) => {

@@ -1,0 +1,654 @@
+{
+ "status": "DRAFT for the author's review: not approved. Nothing in this file is switched on.",
+ "paper": "ext1-2027-p13",
+ "schemeDigest": "e64d328a215d5ca433569f7492836d453667ca71c225febe4bfcee244209166c",
+ "source": "the criteria exactly as written in the author's marking guidelines; marks per criterion are his, not guessed",
+ "sectionII": {
+  "parts": 16,
+  "criteria": 60,
+  "engineCanAward": 13,
+  "engineCannot": 47
+ },
+ "parts": [
+  {
+   "id": "q11a",
+   "question": 11,
+   "marks": 4,
+   "answerType": "value",
+   "keyed": true,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides the correct product with complete reasoning",
+     "marks": 4,
+     "engine": "yes, final answer only",
+     "decidedBy": "answer checker",
+     "why": "the engine checks the final answer against a key verified by computation (numeric). It earns 1 mark at most, because a bare answer earns at most 1 mark on a multi-mark part (CTO decision, 19 Nov 2026, to be confirmed by the author). The justification the criterion also asks for cannot be verified."
+    },
+    {
+     "key": "c2",
+     "text": "Establishes the identity $xP''(x) + (1-x)P'(x) + 4P(x) = 0$ for the monic quartic $P(x)$ whose zeroes are the four numbers, or finds the sum, the sum of the squares and the sum of the cubes of the four numbers, or equivalent merit",
+     "marks": 3,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c3",
+     "text": "Shows that $xP''(x) + (1-x)P'(x)$ is zero at each of the four numbers, or finds both the sum of the four numbers and the sum of their reciprocals, or equivalent merit",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c4",
+     "text": "Introduces the polynomial whose zeroes are the four numbers and relates $\\dfrac{1}{x-p} + \\dfrac{1}{x-q} + \\dfrac{1}{x-r}$ to its derivatives, or adds the four equations after multiplying each by a power of its number so that the terms cancel in pairs, or equivalent merit",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    }
+   ],
+   "digest": "3f4368c49de51fa5b00246a771683a66047fa9a25f0799f08891d316be538baa"
+  },
+  {
+   "id": "q11b",
+   "question": 11,
+   "marks": 4,
+   "answerType": "value",
+   "keyed": true,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides the correct fourth solution with complete reasoning",
+     "marks": 4,
+     "engine": "yes, final answer only",
+     "decidedBy": "answer checker",
+     "why": "the engine checks the final answer against a key verified by computation (numeric). It earns 1 mark at most, because a bare answer earns at most 1 mark on a multi-mark part (CTO decision, 19 Nov 2026, to be confirmed by the author). The justification the criterion also asks for cannot be verified."
+    },
+    {
+     "key": "c2",
+     "text": "Shows that the four solutions add to an odd multiple of $\\pi$, or equivalent merit",
+     "marks": 3,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c3",
+     "text": "Obtains the quartic equation in $t = \\tan\\dfrac{x}{2}$ and a relation between its coefficients that does not involve $a$, $b$ or $c$, or equivalent merit",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c4",
+     "text": "Rewrites the equation as a polynomial equation in $\\tan\\dfrac{x}{2}$, or equivalent merit",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    }
+   ],
+   "digest": "630d84aadc9c7e9f2a6cdfde895b39dba7f7ddf396af0b862afe13dccfa9dd20"
+  },
+  {
+   "id": "q11c",
+   "question": 11,
+   "marks": 4,
+   "answerType": "show-that",
+   "keyed": false,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides the correct formula and a complete proof by induction",
+     "marks": 4,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    },
+    {
+     "key": "c2",
+     "text": "Proves that $(2n+3)S_{n+1} = (2n+2)S_{n}$, or equivalent merit",
+     "marks": 3,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    },
+    {
+     "key": "c3",
+     "text": "States the correct formula, verifies the initial case and makes progress relating $S_{n+1}$ to $S_{n}$ by means of a binomial identity, or equivalent merit",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    },
+    {
+     "key": "c4",
+     "text": "Obtains the correct formula from evaluated cases, or equivalent merit",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    }
+   ],
+   "digest": "32b30e4d70774b865cf83a17be02e1ccb42724a6ae2463d0c33e26ececffe73b"
+  },
+  {
+   "id": "q11d",
+   "question": 11,
+   "marks": 3,
+   "answerType": "open",
+   "keyed": false,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides the correct set of values of $c$, with a complete count that deals with the end values",
+     "marks": 3,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a part whose answer is not a single value, expression, set, interval or equation (or whose key could not be verified), so it has no key."
+    },
+    {
+     "key": "c2",
+     "text": "Shows that the meeting points not on $y = x$ correspond to the solutions of $c = 2s - \\dfrac{s^{3}}{3}$ with $-2 < s < 2$, or equivalent merit",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a part whose answer is not a single value, expression, set, interval or equation (or whose key could not be verified), so it has no key."
+    },
+    {
+     "key": "c3",
+     "text": "Shows that there is exactly one meeting point on $y = x$ and that any other meeting point $(p, q)$ satisfies $p^{2} + pq + q^{2} = 3$, or equivalent merit",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a part whose answer is not a single value, expression, set, interval or equation (or whose key could not be verified), so it has no key."
+    }
+   ],
+   "digest": "cf5bb16a3af107236693c84ae7ff6a4dbf2ce4ba4fd2365187b26c9fbda1b58a"
+  },
+  {
+   "id": "q12a",
+   "question": 12,
+   "marks": 4,
+   "answerType": "proof-explain",
+   "keyed": false,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides the correct values of $p$ with full justification",
+     "marks": 4,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "an explanation: words are not machine-judged."
+    },
+    {
+     "key": "c2",
+     "text": "Reduces the problem to comparing the values of the winning probability at the points $p = \\frac{k}{2m+1}$ and obtains a correct comparison of neighbouring values, or equivalent merit",
+     "marks": 3,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "an explanation: words are not machine-judged."
+    },
+    {
+     "key": "c3",
+     "text": "Shows that the least winning probability occurs at a value of $p$ where two numbers of heads are equally likely, or equivalent merit",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "an explanation: words are not machine-judged."
+    },
+    {
+     "key": "c4",
+     "text": "Finds the values of $p$ for which $k$ heads is a most likely result, or equivalent merit",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "an explanation: words are not machine-judged."
+    }
+   ],
+   "digest": "1a99ac9e1f90554ef73cb62862025f343030eb89aeaa6af16abb14bb60d3fb28"
+  },
+  {
+   "id": "q12b",
+   "question": 12,
+   "marks": 3,
+   "answerType": "expression",
+   "keyed": true,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides a correct expression for the probability with justification that every case has been included",
+     "marks": 3,
+     "engine": "yes, final answer only",
+     "decidedBy": "answer checker",
+     "why": "the engine checks the final answer against a key verified by computation (expression). It earns 1 mark at most, because a bare answer earns at most 1 mark on a multi-mark part (CTO decision, 19 Nov 2026, to be confirmed by the author). The justification the criterion also asks for cannot be verified."
+    },
+    {
+     "key": "c2",
+     "text": "Finds, with the probability of each, all possible resultants of one family of jets that could be balanced by the other family, or equivalent merit",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c3",
+     "text": "Separates the small jets from the large jets and compares the possible magnitudes of their two resultants, or combines opposite jets and expresses a resultant in terms of two non-parallel vectors, or equivalent merit",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    }
+   ],
+   "digest": "b0bfbb4e4ce5f04b2a1ff1dac5c35e43c9a77b01ad306279fca2c54c2683b617"
+  },
+  {
+   "id": "q12c-i",
+   "question": 12,
+   "marks": 4,
+   "answerType": "value",
+   "keyed": true,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides the correct expected value in exact form",
+     "marks": 4,
+     "engine": "yes, final answer only",
+     "decidedBy": "answer checker",
+     "why": "the engine checks the final answer against a key verified by computation (exact). It earns 1 mark at most, because a bare answer earns at most 1 mark on a multi-mark part (CTO decision, 19 Nov 2026, to be confirmed by the author). The justification the criterion also asks for cannot be verified."
+    },
+    {
+     "key": "c2",
+     "text": "Finds the probability distribution of the number of cards that stay in position, or equivalent merit",
+     "marks": 3,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c3",
+     "text": "Identifies exactly which cards stay in position in a given shuffle, or equivalent merit",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c4",
+     "text": "Shows that every combination of a cut and a merge has probability $\\frac{1}{2^{52}}$, or equivalent merit",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    }
+   ],
+   "digest": "df0b7125bb37851e20b76875c997a1a462eed88fd4cc4d643d36df890d001dc2"
+  },
+  {
+   "id": "q12c-ii",
+   "question": 12,
+   "marks": 4,
+   "answerType": "value",
+   "keyed": true,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides the correct probability in exact form",
+     "marks": 4,
+     "engine": "yes, final answer only",
+     "decidedBy": "answer checker",
+     "why": "the engine checks the final answer against a key verified by computation (exact). It earns 1 mark at most, because a bare answer earns at most 1 mark on a multi-mark part (CTO decision, 19 Nov 2026, to be confirmed by the author). The justification the criterion also asks for cannot be verified."
+    },
+    {
+     "key": "c2",
+     "text": "Obtains a correct condition, in terms of the two shuffles, for the deck to finish in its original order, or correctly counts the first shuffles that the second shuffle can undo, or equivalent merit",
+     "marks": 3,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c3",
+     "text": "Describes the pair of shuffles by $4^{52}$ equally likely outcomes in a way that determines the final order, or finds the probability of each possible result of one shuffle, or equivalent merit",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c4",
+     "text": "Uses the fact that each cut and merge of one shuffle has probability $\\frac{1}{2^{52}}$ for both shuffles, or equivalent merit",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    }
+   ],
+   "digest": "ec03df619f12455b1f443196b8a92ba275172ad1923e262f10a04e1278eb4303"
+  },
+  {
+   "id": "q13a-i",
+   "question": 13,
+   "marks": 3,
+   "answerType": "expression",
+   "keyed": true,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides the correct least value $p = \\pi\\sqrt{10 - 2\\sqrt{17}}$ with justification",
+     "marks": 3,
+     "engine": "yes, final answer only",
+     "decidedBy": "answer checker",
+     "why": "the engine checks the final answer against a key verified by computation (expression). It earns 1 mark at most, because a bare answer earns at most 1 mark on a multi-mark part (CTO decision, 19 Nov 2026, to be confirmed by the author). The justification the criterion also asks for cannot be verified."
+    },
+    {
+     "key": "c2",
+     "text": "Obtains $(10 - D)^{2} + w^{2} = 34$ (or equivalent) for the stage in which the pond is above the widest part and the water inside is below it, and attempts to find the least difference in levels, or equivalent merit",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c3",
+     "text": "Obtains the volume of the float below a given height in both halves, or obtains $D^{2} - w^{2} = 16$ for the first stage, or equivalent merit",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    }
+   ],
+   "digest": "53ee07b116a5dd7589298a6fb0a66b51f5701d68161e973c01bcc64af6874e1e"
+  },
+  {
+   "id": "q13a-ii",
+   "question": 13,
+   "marks": 4,
+   "answerType": "expression",
+   "keyed": true,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides the correct time, $\\dfrac{8(53\\sqrt2 - 32)}{15}$ seconds",
+     "marks": 4,
+     "engine": "yes, final answer only",
+     "decidedBy": "answer checker",
+     "why": "the engine checks the final answer against a key verified by computation (expression). It earns 1 mark at most, because a bare answer earns at most 1 mark on a multi-mark part (CTO decision, 19 Nov 2026, to be confirmed by the author). The justification the criterion also asks for cannot be verified."
+    },
+    {
+     "key": "c2",
+     "text": "Obtains a differential equation in one variable that can be integrated, such as $\\big(256h^{-\\frac72} - h^{\\frac12}\\big)\\dfrac{dh}{dt} = \\dfrac12$, with correct end values, or equivalent merit",
+     "marks": 3,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c3",
+     "text": "Obtains $u^{2} - e^{2} = 16$ and the rate equation $8u\\dfrac{du}{dt} = -\\sqrt{u - e}$, or equivalent merit",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c4",
+     "text": "Obtains the volume of water inside when its surface is above the widest part, or obtains $u^{2} - e^{2} = 16$, or equivalent merit",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    }
+   ],
+   "digest": "490bf305bdb2c2382d6d915db1fe892a3f91636f877a8e5727e1ac9a2781bfb5"
+  },
+  {
+   "id": "q13b-i",
+   "question": 13,
+   "marks": 4,
+   "answerType": "value",
+   "keyed": true,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides the correct greatest distance, 300 m, with justification that it is reached",
+     "marks": 4,
+     "engine": "yes, final answer only",
+     "decidedBy": "answer checker",
+     "why": "the engine checks the final answer against a key verified by computation (numeric). It earns 1 mark at most, because a bare answer earns at most 1 mark on a multi-mark part (CTO decision, 19 Nov 2026, to be confirmed by the author). The justification the criterion also asks for cannot be verified."
+    },
+    {
+     "key": "c2",
+     "text": "Obtains a relation between $r$ and the position of the drone that does not involve time, such as $25r + 15Y = 3000$, and attempts to find the greatest value of $r$, or equivalent merit",
+     "marks": 3,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c3",
+     "text": "Obtains correct expressions for two rates of change, such as $\\dfrac{dr}{dt}$ and $\\dfrac{dY}{dt}$, or equivalent merit",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c4",
+     "text": "Sets up the motion relative to the truck with the velocity of the drone perpendicular to the line of sight, or finds $\\dfrac{dr}{dt}$, or equivalent merit",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    }
+   ],
+   "digest": "4ee086b19304c5e6e51d4f02e946e05da3cda7505b7f26b4c73ffb32c4cf3233"
+  },
+  {
+   "id": "q13b-ii",
+   "question": 13,
+   "marks": 4,
+   "answerType": "value",
+   "keyed": true,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides the correct distance, 80 m",
+     "marks": 4,
+     "engine": "yes, final answer only",
+     "decidedBy": "answer checker",
+     "why": "the engine checks the final answer against a key verified by computation (numeric). It earns 1 mark at most, because a bare answer earns at most 1 mark on a multi-mark part (CTO decision, 19 Nov 2026, to be confirmed by the author). The justification the criterion also asks for cannot be verified."
+    },
+    {
+     "key": "c2",
+     "text": "Finds the time taken, $6.4$ s, or equivalent merit",
+     "marks": 3,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c3",
+     "text": "Obtains $\\dfrac{dX}{dt}$ as a function of $X$ alone, or equivalent merit",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c4",
+     "text": "Obtains $r = 120 - Y$ and the path of the drone relative to the truck, or equivalent merit",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    }
+   ],
+   "digest": "fbd3cbc8c3b9934e2aa3a57e60facfb541ea48b8bf202e0788894999fb6257c4"
+  },
+  {
+   "id": "q14a-i",
+   "question": 14,
+   "marks": 3,
+   "answerType": "expression",
+   "keyed": true,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides the correct solution, including the comparison of the two circles and a check that the extreme position of $D$ gives an acute angle between the tunnels",
+     "marks": 3,
+     "engine": "yes, final answer only",
+     "decidedBy": "answer checker",
+     "why": "the engine checks the final answer against a key verified by computation (expression). It earns 1 mark at most, because a bare answer earns at most 1 mark on a multi-mark part (CTO decision, 19 Nov 2026, to be confirmed by the author). The justification the criterion also asks for cannot be verified."
+    },
+    {
+     "key": "c2",
+     "text": "Shows that $D$ lies on one of two circles, for example $\\mathbf{d}\\cdot\\mathbf{n} = \\frac15$ for two unit vectors $\\mathbf{n}$, with the restriction that keeps the angle acute, or equivalent merit",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c3",
+     "text": "Introduces unit vectors from $O$ and writes the condition on the tunnels as an equation in scalar products, or equivalent merit",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    }
+   ],
+   "digest": "1e114e56707c7c7c0245e87c4c20eea0f42658fdee50baf85d3166a60f3f08fb"
+  },
+  {
+   "id": "q14a-ii",
+   "question": 14,
+   "marks": 4,
+   "answerType": "expression",
+   "keyed": true,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides the correct solution, including a proof that no satellite at a lower height can see all three cities",
+     "marks": 4,
+     "engine": "yes, final answer only",
+     "decidedBy": "answer checker",
+     "why": "the engine checks the final answer against a key verified by computation (expression). It earns 1 mark at most, because a bare answer earns at most 1 mark on a multi-mark part (CTO decision, 19 Nov 2026, to be confirmed by the author). The justification the criterion also asks for cannot be verified."
+    },
+    {
+     "key": "c2",
+     "text": "Finds a direction $\\mathbf{n}$ with $\\mathbf{n}\\cdot\\mathbf{a} = \\mathbf{n}\\cdot\\mathbf{b} = \\mathbf{n}\\cdot\\mathbf{c}$ and the corresponding height, or proves the bound without showing that it is attained, or equivalent merit",
+     "marks": 3,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c3",
+     "text": "Obtains the condition $(R + h)\\,\\mathbf{n}\\cdot\\mathbf{x} \\ge R$ for each city and recognises that the position above the middle of the route $AB$ fails for $C$, or equivalent merit",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c4",
+     "text": "Obtains a correct condition for one city to be seen from the satellite, or equivalent merit",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    }
+   ],
+   "digest": "b8a6b4c962eb8c7f9094e9b2b16c1fba27587fa87f82720e7186176dd7cf122a"
+  },
+  {
+   "id": "q14b-i",
+   "question": 14,
+   "marks": 4,
+   "answerType": "expression",
+   "keyed": true,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides the correct solution",
+     "marks": 4,
+     "engine": "yes, final answer only",
+     "decidedBy": "answer checker",
+     "why": "the engine checks the final answer against a key verified by computation (expression). It earns 1 mark at most, because a bare answer earns at most 1 mark on a multi-mark part (CTO decision, 19 Nov 2026, to be confirmed by the author). The justification the criterion also asks for cannot be verified."
+    },
+    {
+     "key": "c2",
+     "text": "Reduces the expected area to a multiple of $\\sum (N-1-k)\\sin\\frac{2\\pi k}{N}$ and makes substantial progress towards a closed form for this sum, or equivalent merit",
+     "marks": 3,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c3",
+     "text": "Obtains the area of every triangle, including those that do not contain the centre, as $\\frac12(\\sin k_{1}x + \\sin k_{2}x + \\sin k_{3}x)$ and counts the triangles that have a given arc, or equivalent merit",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c4",
+     "text": "Expresses the area of a triangle that contains the centre in terms of the angles at the centre, or equivalent merit",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    }
+   ],
+   "digest": "7f9c439c1e3e84783550c8bdafe2aa6b200ee7af8ad224203e6d2ff8ac92dbac"
+  },
+  {
+   "id": "q14b-ii",
+   "question": 14,
+   "marks": 4,
+   "answerType": "expression",
+   "keyed": true,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides the correct solution",
+     "marks": 4,
+     "engine": "yes, final answer only",
+     "decidedBy": "answer checker",
+     "why": "the engine checks the final answer against a key verified by computation (expression). It earns 1 mark at most, because a bare answer earns at most 1 mark on a multi-mark part (CTO decision, 19 Nov 2026, to be confirmed by the author). The justification the criterion also asks for cannot be verified."
+    },
+    {
+     "key": "c2",
+     "text": "Obtains the expected number as $1 + \\sum N\\binom{m}{k-1}\\big/\\binom{N}{k}$, or equivalent, and makes substantial progress towards a closed form, or equivalent merit",
+     "marks": 3,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c3",
+     "text": "Counts the sets of $k$ posts whose yard does not contain the centre, $N\\binom{m}{k-1}$, with a reason why no set is counted twice, or equivalent merit",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c4",
+     "text": "Recognises that the centre is outside the yard exactly when the chosen posts all lie among $m + 1$ neighbouring posts, where $N = 2m + 1$, or equivalent merit",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    }
+   ],
+   "digest": "b4c42e116c0f856a33c20340c0f795d6d2e6cb652eda36ae9294bff09c5c328d"
+  }
+ ]
+}

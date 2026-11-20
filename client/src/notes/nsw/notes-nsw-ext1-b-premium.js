@@ -16,9 +16,24 @@ export default {
     ],
     diagrams: [],
     working: [
-      '\\begin{aligned}\\text{LHS of }P(k+1)&=\\left[1+3+\\cdots+(2k-1)\\right]+(2k+1)\\\\&=k^2+2k+1\\\\&=(k+1)^2\\end{aligned}',
-      '\\begin{aligned}7^{k+1}-1&=7\\cdot7^k-1\\\\&=7(6m+1)-1\\\\&=42m+6=6(7m+1)\\end{aligned}',
-      '\\begin{aligned}2^{k+1}&=2\\cdot2^k>2k^2\\\\2k^2-(k+1)^2&=k^2-2k-1=(k-1)^2-2>0\\\\\\therefore\\ 2^{k+1}&>(k+1)^2\\end{aligned}'
+      [
+        { say: 'Basis case $n=1$:', tex: '\\text{LHS}&=1=1^2' },
+        { say: 'Add the next term $2k+1$ to the assumption $P(k)$:', tex: '\\text{LHS of }P(k+1)&=\\left[1+3+\\cdots+(2k-1)\\right]+(2k+1)' },
+        { tex: '&=k^2+2k+1' },
+        { tex: '&=(k+1)^2' }
+      ],
+      [
+        { say: 'Basis case $n=1$:', tex: '7^1-1&=6' },
+        { say: 'Assume $7^k=6m+1$ and write $7^{k+1}$ in terms of $7^k$:', tex: '7^{k+1}-1&=7\\cdot7^k-1' },
+        { tex: '&=7(6m+1)-1' },
+        { tex: '&=42m+6=6(7m+1)' }
+      ],
+      [
+        { say: 'Basis case $n=5$:', tex: '2^5&=32>25' },
+        { say: 'Use the assumption $2^k>k^2$:', tex: '2^{k+1}&=2\\cdot2^k>2k^2' },
+        { say: 'Show $2k^2>(k+1)^2$ for $k\\ge5$:', tex: '2k^2-(k+1)^2&=k^2-2k-1=(k-1)^2-2>0' },
+        { say: 'Combine the two inequalities:', tex: '\\therefore\\ 2^{k+1}&>(k+1)^2' }
+      ]
     ],
     check: [
       { question: 'In an induction proof of $1+2+\\cdots+n=\\tfrac{n(n+1)}2$, show that $\\tfrac{k(k+1)}2+(k+1)=\\tfrac{(k+1)(k+2)}2$.', answer: 'Factor out $(k+1)$: $(k+1)\\left(\\tfrac k2+1\\right)=\\tfrac{(k+1)(k+2)}2$.', verify: { kind: 'equivalent', a: 'k*(k+1)/2+(k+1)', b: '(k+1)*(k+2)/2' } },
@@ -39,9 +54,28 @@ export default {
       { title: 'The path of the projectile', spec: { kind: 'function', xmin: -2, xmax: 40, ymin: -2, ymax: 8, curves: [{ expr: 'x/sqrt(3)-x^2/60', intercepts: true, label: 'y=\\dfrac{x}{\\sqrt3}-\\dfrac{x^2}{60}' }] }, note: 'The ball launched at $20$ m/s and $30^\\circ$ travels along this parabola. It lands at $x=20\\sqrt3\\approx34.6$ m and peaks at $5$ m.' }
     ],
     working: [
-      '\\begin{aligned}\\mathbf{a}\\cdot\\mathbf{b}&=2(1)+(-1)(2)+2(-2)=-4\\\\\\cos\\theta&=\\frac{-4}{3\\times3}=-\\frac49\\end{aligned}',
-      '\\begin{aligned}\\mathbf{a}\\cdot\\mathbf{b}&=6k-12=0\\\\k&=2\\end{aligned}',
-      '\\begin{aligned}y&=10t-5t^2=5t(2-t)=0\\Rightarrow t=2\\\\x&=10\\sqrt3\\times2=20\\sqrt3\\\\y_{\\max}&=10(1)-5(1)^2=5\\end{aligned}'
+      [
+        { say: 'Magnitude of $\\mathbf{a}$:', tex: '|\\mathbf{a}|&=\\sqrt{4+1+4}=3' },
+        { say: 'Magnitude of $\\mathbf{b}$:', tex: '|\\mathbf{b}|&=\\sqrt{1+4+4}=3' },
+        { say: 'Dot product:', tex: '\\mathbf{a}\\cdot\\mathbf{b}&=2(1)+(-1)(2)+2(-2)=-4' },
+        { say: 'Angle formula $\\cos\\theta=\\dfrac{\\mathbf{a}\\cdot\\mathbf{b}}{|\\mathbf{a}||\\mathbf{b}|}$:', tex: '\\cos\\theta&=\\dfrac{-4}{3\\times3}=-\\dfrac49' },
+        { say: 'Angle, obtuse because the dot product is negative:', tex: '\\theta&\\approx116.4^\\circ' }
+      ],
+      [
+        { say: 'Perpendicular vectors have dot product zero:', tex: '\\mathbf{a}\\cdot\\mathbf{b}&=6k+3(-4)=6k-12=0' },
+        { say: 'Solve for $k$:', tex: 'k&=2' }
+      ],
+      [
+        { say: 'Horizontal position:', tex: 'x&=20\\cos30^\\circ\\,t=10\\sqrt3\\,t' },
+        { say: 'Vertical position:', tex: 'y&=20\\sin30^\\circ\\,t-5t^2=10t-5t^2' },
+        { say: 'It lands when $y=0$:', tex: '10t-5t^2&=5t(2-t)=0' },
+        { say: 'Time of flight:', tex: 't&=2' },
+        { say: 'Range, using $t=2$:', tex: 'x&=10\\sqrt3\\times2=20\\sqrt3' },
+        { tex: '&\\approx34.6' },
+        { say: 'At the top the vertical velocity is zero:', tex: '10-10t&=0' },
+        { say: 'Time at maximum height:', tex: 't&=1' },
+        { say: 'Maximum height:', tex: 'y_{\\max}&=10(1)-5(1)^2=5' }
+      ]
     ],
     check: [
       { question: 'Find $|3\\mathbf{i}-4\\mathbf{j}+12\\mathbf{k}|$.', answer: '$13$', verify: { kind: 'value', expr: 'sqrt(3^2+(-4)^2+12^2)', answer: '13' } },
@@ -62,9 +96,21 @@ export default {
       { title: 'The graph of $y=\\cos^{-1}x$', spec: { kind: 'function', xmin: -1.6, xmax: 1.6, ymin: -0.5, ymax: 3.6, curves: [{ expr: 'acos(x)', label: 'y=\\cos^{-1}x' }], points: [{ x: -1, y: 3.14159, label: '(-1,\\pi)' }, { x: 1, y: 0, label: '(1,0)' }, { x: 0, y: 1.5708, label: '\\left(0,\\tfrac{\\pi}{2}\\right)' }] }, note: 'The range is $[0,\\pi]$, and the curve passes through $\\left(0,\\tfrac\\pi2\\right)$ because $\\sin^{-1}x+\\cos^{-1}x=\\tfrac\\pi2$.' }
     ],
     working: [
-      '\\begin{aligned}\\cos y&=-\\tfrac{\\sqrt3}{2},\\quad0\\le y\\le\\pi\\\\y&=\\pi-\\tfrac\\pi6=\\tfrac{5\\pi}{6}\\end{aligned}',
-      '\\begin{aligned}\\sin\\tfrac{4\\pi}{3}&=-\\tfrac{\\sqrt3}{2}\\\\\\sin^{-1}\\left(-\\tfrac{\\sqrt3}{2}\\right)&=-\\tfrac\\pi3\\end{aligned}',
-      '\\begin{aligned}\\sin(\\alpha+\\beta)&=\\tfrac35\\cdot\\tfrac5{13}+\\tfrac45\\cdot\\tfrac{12}{13}\\\\&=\\tfrac{15}{65}+\\tfrac{48}{65}=\\tfrac{63}{65}\\end{aligned}'
+      [
+        { say: 'Let $y=\\cos^{-1}\\left(-\\dfrac{\\sqrt3}{2}\\right)$, with $y$ in $[0,\\pi]$:', tex: '\\cos y&=-\\dfrac{\\sqrt3}{2},\\quad0\\le y\\le\\pi' },
+        { say: 'Cosine is negative in the second quadrant and the related acute angle is $\\dfrac\\pi6$:', tex: 'y&=\\pi-\\dfrac\\pi6=\\dfrac{5\\pi}{6}' }
+      ],
+      [
+        { say: 'Evaluate the inner sine:', tex: '\\sin\\left(\\dfrac{4\\pi}{3}\\right)&=-\\sin\\left(\\dfrac\\pi3\\right)=-\\dfrac{\\sqrt3}{2}' },
+        { say: 'Find the angle in $\\left[-\\dfrac\\pi2,\\dfrac\\pi2\\right]$ with that sine:', tex: '\\sin^{-1}\\left(-\\dfrac{\\sqrt3}{2}\\right)&=-\\dfrac\\pi3' }
+      ],
+      [
+        { say: 'Let $\\alpha=\\sin^{-1}\\left(\\dfrac35\\right)$, an acute angle:', tex: '\\sin\\alpha&=\\dfrac35,\\quad\\cos\\alpha=\\dfrac45' },
+        { say: 'Let $\\beta=\\cos^{-1}\\left(\\dfrac5{13}\\right)$, an acute angle:', tex: '\\cos\\beta&=\\dfrac5{13},\\quad\\sin\\beta=\\dfrac{12}{13}' },
+        { say: 'Compound angle formula:', tex: '\\sin(\\alpha+\\beta)&=\\sin\\alpha\\cos\\beta+\\cos\\alpha\\sin\\beta' },
+        { say: 'Substitute the ratios:', tex: '&=\\dfrac35\\cdot\\dfrac5{13}+\\dfrac45\\cdot\\dfrac{12}{13}' },
+        { tex: '&=\\dfrac{15}{65}+\\dfrac{48}{65}=\\dfrac{63}{65}' }
+      ]
     ],
     check: [
       { question: 'Find the exact value of $\\tan^{-1}(1)$.', answer: '$\\dfrac\\pi4$', verify: { kind: 'value', expr: 'atan(1)', answer: 'pi/4' } },
@@ -84,9 +130,22 @@ export default {
       { title: 'A function and its derivative', spec: { kind: 'function', xmin: -6, xmax: 6, ymin: -2, ymax: 2, curves: [{ expr: 'atan(x)', label: 'y=\\tan^{-1}x' }, { expr: '1/(1+x^2)', label: 'y=\\dfrac{1}{1+x^2}' }], asymptotes: [{ y: 1.5708, label: 'y=\\tfrac{\\pi}{2}' }, { y: -1.5708, label: 'y=-\\tfrac{\\pi}{2}' }] }, note: 'The derivative $\\tfrac1{1+x^2}$ equals $1$ at $x=0$, which is the steepest gradient of $\\tan^{-1}x$, and it shrinks to $0$ as the curve flattens towards its asymptotes.' }
     ],
     working: [
-      '\\begin{aligned}y&=\\tan^{-1}(3x)\\\\\\frac{dy}{dx}&=\\frac{3}{1+(3x)^2}=\\frac{3}{1+9x^2}\\\\\\left.\\frac{dy}{dx}\\right|_{x=1/3}&=\\frac{3}{2}\\end{aligned}',
-      '\\begin{aligned}\\int_0^3\\frac{dx}{9+x^2}&=\\left[\\tfrac13\\tan^{-1}\\tfrac x3\\right]_0^3\\\\&=\\tfrac13\\cdot\\tfrac\\pi4-0=\\tfrac{\\pi}{12}\\end{aligned}',
-      '\\begin{aligned}\\int_0^1x(x^2+1)^3dx&=\\tfrac12\\int_1^2u^3\\,du\\\\&=\\tfrac12\\left[\\tfrac{u^4}{4}\\right]_1^2=\\tfrac{15}{8}\\end{aligned}'
+      [
+        { say: 'Function:', tex: 'y&=\\tan^{-1}(3x)' },
+        { say: 'Differentiate, using $\\dfrac{d}{dx}\\tan^{-1}u=\\dfrac1{1+u^2}\\cdot\\dfrac{du}{dx}$ with $u=3x$:', tex: '\\dfrac{dy}{dx}&=\\dfrac{3}{1+(3x)^2}=\\dfrac{3}{1+9x^2}' },
+        { say: 'Gradient at $x=\\dfrac13$:', tex: '\\left.\\dfrac{dy}{dx}\\right|_{x=\\dfrac13}&=\\dfrac{3}{1+9\\left(\\dfrac13\\right)^2}=\\dfrac32' }
+      ],
+      [
+        { say: 'Standard form $\\int\\dfrac{dx}{a^2+x^2}$ with $a=3$:', tex: '\\int_0^3\\dfrac{dx}{9+x^2}&=\\left[\\dfrac13\\tan^{-1}\\left(\\dfrac x3\\right)\\right]_0^3' },
+        { say: 'Substitute the limits:', tex: '&=\\dfrac13\\cdot\\dfrac\\pi4-0=\\dfrac{\\pi}{12}' }
+      ],
+      [
+        { say: 'Substitute $u=x^2+1$:', tex: 'du&=2x\\,dx' },
+        { say: 'Change the limits:', tex: 'u&=1\\text{ when }x=0,\\quad u=2\\text{ when }x=1' },
+        { say: 'Rewrite in terms of $u$, using $x\\,dx=\\dfrac12du$:', tex: '\\int_0^1x(x^2+1)^3\\,dx&=\\dfrac12\\int_1^2u^3\\,du' },
+        { say: 'Integrate:', tex: '&=\\dfrac12\\left[\\dfrac{u^4}{4}\\right]_1^2' },
+        { tex: '&=\\dfrac12\\cdot\\dfrac{16-1}{4}=\\dfrac{15}{8}' }
+      ]
     ],
     check: [
       { question: 'Evaluate $\\displaystyle\\int_0^{\\pi/2}\\sin^2x\\,dx$.', answer: '$\\dfrac\\pi4$', verify: { kind: 'value', expr: '(pi/2)/2-(sin(pi)/4-0)', answer: 'pi/4' } },
@@ -107,9 +166,26 @@ export default {
       { title: 'Tea cooling towards room temperature', spec: { kind: 'function', xmin: 0, xmax: 30, ymin: 0, ymax: 100, curves: [{ expr: '20+70*exp(-ln(2)/5*x)', label: 'T=20+70e^{-kt}' }], asymptotes: [{ y: 20, label: 'T=20' }], points: [{ x: 0, y: 90, label: '(0,90)' }, { x: 5, y: 55, label: '(5,55)' }, { x: 10, y: 37.5, label: '(10,37.5)' }] }, note: 'Every $5$ minutes the gap above $20^\\circ\\text{C}$ halves: $70$, $35$, then $17.5$, giving $90$, $55$, $37.5$.' }
     ],
     working: [
-      '\\begin{aligned}P(2)&=8-12+4=0\\\\P\'(x)&=3x^2-6x,\\quad P\'(2)=0\\\\P(x)&=(x-2)^2(x+1)\\end{aligned}',
-      '\\begin{aligned}V&=\\pi\\int_0^4x\\,dx\\\\&=\\pi\\left[\\tfrac{x^2}{2}\\right]_0^4=8\\pi\\end{aligned}',
-      '\\begin{aligned}T&=20+70e^{-kt},\\quad e^{-5k}=\\tfrac12\\\\T(10)&=20+70\\left(\\tfrac12\\right)^2=37.5\\end{aligned}'
+      [
+        { say: 'Test $x=2$:', tex: 'P(2)&=8-12+4=0' },
+        { say: 'Differentiate:', tex: 'P\'(x)&=3x^2-6x' },
+        { say: 'The derivative is also zero at $x=2$, so the zero has multiplicity at least $2$:', tex: 'P\'(2)&=3(4)-6(2)=12-12=0' },
+        { say: 'Divide $P(x)$ by $(x-2)^2$:', tex: 'P(x)&=(x-2)^2(x+1)' },
+        { say: 'The zeros, listed with multiplicity:', tex: 'x&=2,\\ 2,\\ -1' }
+      ],
+      [
+        { say: 'Volume of revolution about the $x$-axis, with $y^2=x$:', tex: 'V&=\\pi\\int_0^4y^2\\,dx=\\pi\\int_0^4x\\,dx' },
+        { say: 'Integrate:', tex: '&=\\pi\\left[\\dfrac{x^2}{2}\\right]_0^4=8\\pi' }
+      ],
+      [
+        { say: 'General solution:', tex: 'T&=20+Ae^{-kt}' },
+        { say: 'At $t=0$ the temperature is $90$:', tex: 'T(0)&=20+A=90' },
+        { say: 'Solve for $A$:', tex: 'A&=70' },
+        { say: 'At $t=5$ the temperature is $55$:', tex: 'T(5)&=20+70e^{-5k}=55' },
+        { say: 'Solve for $e^{-5k}$:', tex: 'e^{-5k}&=\\dfrac12' },
+        { say: 'Now find the value when $t=10$:', tex: 'e^{-10k}&=\\left(e^{-5k}\\right)^2=\\left(\\dfrac12\\right)^2=\\dfrac14' },
+        { say: 'Temperature after $10$ minutes:', tex: 'T(10)&=20+70\\cdot\\dfrac14=37.5' }
+      ]
     ],
     check: [
       { question: 'Find the area enclosed between $y=x$ and $y=x^2$ for $0\\le x\\le1$.', answer: '$\\dfrac16$', verify: { kind: 'value', expr: '1^2/2-1^3/3', answer: '1/6' } },
@@ -130,9 +206,24 @@ export default {
       { title: 'The sample mean is clustered more tightly', spec: { kind: 'normal', mu: 50, sigma: 2, from: 1.5, to: 4, mode: 'z' }, note: 'The mean of $36$ values is approximately normal with mean $50$ and standard deviation $2$. The shaded tail beyond $x=53$ ($z=1.5$) has area about $0.0668$.' }
     ],
     working: [
-      '\\begin{aligned}P(X=2)&=\\binom52(0.4)^2(0.6)^3\\\\&=10\\times0.16\\times0.216\\\\&=0.3456\\end{aligned}',
-      '\\begin{aligned}P(X\\ge1)&=1-P(X=0)\\\\&=1-\\left(\\tfrac56\\right)^4=\\tfrac{671}{1296}\\end{aligned}',
-      '\\begin{aligned}\\text{sd}(\\bar X)&=\\frac{12}{\\sqrt{36}}=2\\\\z&=\\frac{53-50}{2}=1.5\\\\P(\\bar X>53)&\\approx0.0668\\end{aligned}'
+      [
+        { say: 'Binomial probability with $n=5$, $p=0.4$, $q=0.6$, $r=2$:', tex: 'P(X=2)&=\\dbinom52(0.4)^2(0.6)^3' },
+        { tex: '&=10\\times0.16\\times0.216' },
+        { tex: '&=0.3456' }
+      ],
+      [
+        { say: 'Let $X$ be the number of sixes:', tex: 'X&\\sim\\text{Bin}\\left(4,\\dfrac16\\right)' },
+        { say: 'Use the complement:', tex: 'P(X\\ge1)&=1-P(X=0)' },
+        { say: 'Probability of no sixes in four rolls:', tex: '&=1-\\left(\\dfrac56\\right)^4=1-\\dfrac{625}{1296}' },
+        { tex: '&=\\dfrac{671}{1296}' },
+        { tex: '&\\approx0.518' }
+      ],
+      [
+        { say: 'Standard deviation of the sample mean:', tex: '\\text{sd}(\\bar X)&=\\dfrac{12}{\\sqrt{36}}=2' },
+        { say: 'Central limit theorem: $\\bar X$ is approximately normal, so standardise:', tex: 'z&=\\dfrac{53-50}{2}=1.5' },
+        { say: 'Probability:', tex: 'P(\\bar X>53)&=P(Z>1.5)' },
+        { tex: '&\\approx0.0668' }
+      ]
     ],
     check: [
       { question: 'A fair coin is tossed $3$ times. Find the probability of exactly two heads.', answer: '$\\dfrac38$', verify: { kind: 'value', expr: 'nCr(3,2)*(1/2)^3', answer: '3/8' } },

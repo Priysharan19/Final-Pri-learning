@@ -15,11 +15,13 @@ import { useNavigate } from 'react-router-dom';
 import { loadSavedFilters, saveFilters } from './homeCache.js';
 import Icon from '../components/Icon.jsx';
 import TermGloss from '../components/TermGloss.jsx';
-import { dotpointAvailable, practiceTargetAvailable, selectableDifficulties, topicAvailability } from '../engine/curriculumAvailability.js';
+import { chapterOffered, dotpointAvailable, practiceTargetAvailable, selectableDifficulties, topicAvailability } from '../engine/curriculumAvailability.js';
 import { useT } from '../i18n/index.js';
 import { textMatches, useGlossary } from '../i18n/glossary.js';
 import { practiceDifficulties, practiceHref } from '../lib/practiceLinks.js';
 import { studyHref } from '../lib/studyJourney.js';
+import { offeredYears } from '../platform/edition.js';
+import { difficultyLabel, difficultyPair } from '../lib/difficultyText.js';
 
 const DIFF_KEYS = { 1: 'difficulty.1', 2: 'difficulty.2', 3: 'difficulty.3', 4: 'difficulty.4' };
 
@@ -80,6 +82,8 @@ export default function TopicGenerator({ user, curriculum }) {
     if (!section) return [];
     const m = new Map();
     for (const s of section.subtopics) {
+      // A chapter with no question at any level is not offered (owner decision 2026-11-18).
+      if (!chapterOffered(s)) continue;
       if (topicQuery.trim() && !textMatches(s.name, topicQuery) && !textMatches(s.strand || '', topicQuery)) continue;
       if (!m.has(s.strand)) m.set(s.strand, []);
       m.get(s.strand).push(s);
@@ -230,7 +234,7 @@ export default function TopicGenerator({ user, curriculum }) {
                 <>
                   <div className="gen-pane-title">{t(india ? 'home.pickClass' : 'home.pickYear')}</div>
                   <div className="gen-opts">
-                    {[7, 8, 9, 10, 11, 12].map(y => (
+                    {offeredYears([7, 8, 9, 10, 11, 12]).map(y => (
                       <button key={y} className={`gen-opt ${year === y ? 'on' : ''}`} aria-pressed={year === y}
                         onClick={() => { setYear(y); setSectionKey(null); setSubtopic(null); setDotpoint(null); setCat('course'); }}>
                         {t(india ? 'common.classNumber' : 'common.yearNumber', { n: y })}{y === user.year ? <small>{t('home.yours')}</small> : null}
@@ -313,14 +317,14 @@ export default function TopicGenerator({ user, curriculum }) {
                     {offeredDifficulties.map(d => (
                       <button key={d} className={`gen-opt ${chosenDifficulty === d ? 'on' : ''}`} aria-pressed={chosenDifficulty === d}
                         onClick={() => setDifficulty(chosenDifficulty === d ? null : d)}>
-                        {`D${d}`} · {t(DIFF_KEYS[d])}
+                        {difficultyPair(d, t)}
                       </button>
                     ))}
                   </div>
                   {selSub && missingDifficulties.length > 0 && (
                     <p className="muted" data-difficulty-unavailable style={{ margin: '10px 0 0' }}>
                       {t(selectedDotpoint ? 'home.difficultyMissingDotpoint' : 'home.difficultyMissingTopic', {
-                        levels: missingDifficulties.map(d => `D${d} · ${t(DIFF_KEYS[d])}`).join(', ')
+                        levels: missingDifficulties.map(d => difficultyPair(d, t)).join(', ')
                       })}
                     </p>
                   )}
@@ -335,7 +339,7 @@ export default function TopicGenerator({ user, curriculum }) {
           <h3 className="gen-pane-title">{t('study.choosePath')}</h3>
           <p className="muted" data-study-context>
             {selSub.name}{selectedDotpoint ? ` · ${typeof selectedDotpoint === 'string' ? selectedDotpoint : selectedDotpoint.text}` : ''}
-            {chosenDifficulty != null ? ` · D${chosenDifficulty}` : ''}
+            {chosenDifficulty != null ? ` · ${difficultyLabel(chosenDifficulty, t)}` : ''}
           </p>
           <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
             {studyAvailable && (

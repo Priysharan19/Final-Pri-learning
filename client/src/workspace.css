@@ -93,6 +93,15 @@
 .q-credit { color: var(--ink-2); font-size: 13px; }
 .q-credit .dot { color: var(--ink-3); }
 .q-why { color: var(--ink-2); font-size: 14px; margin: 14px 0 0; padding-left: 12px; border-left: 2px solid var(--hairline-strong); }
+/* Report a problem with this question: an inline form under the prompt, the same hairline as the "why" note. */
+.q-report { display: grid; gap: 10px; margin: 14px 0 0; padding: 12px; border: 1px solid var(--hairline-strong); border-radius: 6px; background: var(--paper); max-width: 520px; }
+.q-report fieldset { display: grid; gap: 6px; margin: 0; padding: 0; border: 0; min-width: 0; }
+.q-report legend { padding: 0; margin-bottom: 6px; font-weight: 600; color: var(--ink); }
+.q-report-opt { display: flex; align-items: center; gap: 8px; color: var(--ink-2); font-size: 14px; min-height: var(--tap-min, 32px); cursor: pointer; }
+.q-report-note { display: grid; gap: 4px; }
+.q-report-note textarea.input { min-height: 64px; }
+.q-report-fail { margin: 0; font-size: 13px; color: var(--correction); }
+.q-report-actions { display: flex; gap: 8px; }
 .sym-key { border-radius: var(--radius-xs); background: var(--surface); }
 .sym-key:hover { border-color: var(--accent-line); color: var(--ink); }
 .hintbox, .ya-line { font-family: var(--font-prose-math); }
@@ -225,26 +234,97 @@
 .exam-head { background: var(--page); -webkit-backdrop-filter: none; backdrop-filter: none; }
 .ws-read-by { margin-left: 8px; font-size: 12.5px; color: var(--ink-3); }
 
-/* ── Confirm the reading (P0 #11) ─ the whole recognised answer, typeset, before it is sent. */
-.ws-confirm-lines { display: grid; gap: 6px; margin: 8px 0; }
-.ws-confirm-line { display: flex; align-items: baseline; gap: 10px; padding: 4px 8px; border-radius: 4px; }
-.ws-confirm-line.is-unsure { box-shadow: inset 0 0 0 1px var(--in-slip, currentColor); background: color-mix(in srgb, var(--in-slip, currentColor) 10%, transparent); }
-.ws-confirm-unsure { font: 500 11px var(--in-mono, monospace); letter-spacing: 0.06em; text-transform: uppercase; color: var(--in-tx-2, inherit); }
-.ws-confirm-acts { display: flex; gap: 8px; }
 
-/* ── Check what Pri read (verified page, step 1) ─ recognised maths set in Computer
-   Modern (KaTeX's own face) under each line; an uncertain line is a static dashed
-   outline with its question in words. The only looping motion is the pulse, and it
-   exists only when motion is allowed; under reduced motion the outline and the
-   words carry it. */
-.ws-confirm-count { margin-left: auto; font: 500 12px var(--in-mono, monospace); font-variant-numeric: tabular-nums; color: var(--in-tx-2, inherit); }
-.ws-confirm-blind { margin: 2px 0 6px; font-size: 12.5px; }
-.ws-confirm-line { display: grid; grid-template-columns: 22px 1fr; gap: 4px 8px; align-items: baseline; }
-.ws-confirm-n { font: 500 11px var(--in-mono, monospace); color: var(--in-tx-3, inherit); }
-.ws-cm .katex { font-size: 1.15em; }
-.ws-confirm-line.is-unsure { outline: 1.5px dashed var(--in-slip, currentColor); outline-offset: 2px; box-shadow: none; }
-.ws-confirm-ask { grid-column: 2; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.ws-confirm-ask .btn { min-height: 44px; }
-.ws-confirm-acts .btn { min-height: 44px; }
-@keyframes ws-unsure-pulse { 0%, 100% { outline-color: var(--in-slip, currentColor); } 50% { outline-color: color-mix(in srgb, var(--in-slip, currentColor) 35%, transparent); } }
-@media (prefers-reduced-motion: no-preference) { .ws-confirm-line.is-unsure { animation: ws-unsure-pulse 1.4s ease-in-out infinite; } }
+
+/* ── Walk-through fixes, 19 Nov 2026 (Prithagoras: [data-edition] is on <html>) ───────────────────────────
+   1. The sticky action bar sits over the foot of the page. Anything the page scrolls to (a "Not quite" card, the
+      offline or server-fault notice, its Try again button) has to land ABOVE it, not under it: the page reserves
+      the bar's height when it scrolls something into view, and those cards keep their own margin.
+   2. In Write mode beside the hint ladder (about 900 to 1180 px wide) the status text was squeezed into a column
+      of its own beside three buttons. It takes its own full row under them instead. */
+html[data-edition=prithagoras]:has(.qpage.ws){scroll-padding-bottom:148px}
+html[data-edition=prithagoras] .qpage.ws .verdict{scroll-margin-bottom:148px}
+@media (max-width:1180px){
+  html[data-edition=prithagoras] .ws-actions.editor-foot{row-gap:6px}
+  html[data-edition=prithagoras] .ws-actions.editor-foot .status-line{flex:1 1 100%;order:2;min-width:0}
+  html[data-edition=prithagoras] .ws-actions.editor-foot .in-wbar-note{display:none}
+}
+
+
+
+/* ── Photo answer: one calm flow (owner request, 18 Nov 2026) ──────────────
+   Quiet instrument on paper: existing tokens, hairlines, no gradients. */
+.photo-answer { margin-bottom: 14px; }
+.editor-shell.is-dropping { outline: 2px dashed var(--accent); outline-offset: -4px; background: var(--accent-soft); }
+.pf-empty { display: grid; justify-items: center; gap: 12px; text-align: center; padding: 28px 16px; border: 1.5px dashed var(--hairline-strong); border-radius: 6px; background: var(--paper); }
+.pf-empty.is-dragging { border-color: var(--accent); background: var(--accent-soft); }
+.pf-lead { margin: 0; font-size: var(--text-md); color: var(--ink); max-width: 36ch; }
+.pf-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.pf-hint { margin: 0; font-size: 13px; }
+.pf-busy { display: flex; align-items: center; gap: 10px; padding: 28px 16px; border: 1px solid var(--hairline); border-radius: 6px; background: var(--paper); color: var(--ink-2); }
+.pf-spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--hairline-strong); border-top-color: var(--accent); animation: pf-turn 0.9s linear infinite; }
+@keyframes pf-turn { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .pf-spin { animation: none; } }
+.pf-failed { display: grid; gap: 12px; padding: 18px 16px; border: 1px solid var(--hairline-strong); border-left: 3px solid var(--uncertain-line, var(--hairline-strong)); border-radius: 6px; background: var(--paper); }
+.pf-reason { margin: 0; color: var(--ink); font-size: var(--text-base); }
+.pf-failed .pf-actions { justify-content: flex-start; }
+.pf-attached { display: grid; gap: 12px; align-items: start; }
+.pf-preview { display: grid; gap: 8px; justify-items: start; }
+.pf-page.photo-thumb { position: relative; display: block; width: min(100%, 420px); height: auto; max-height: 340px; padding: 0; cursor: zoom-in; background: var(--paper); border: 1px solid var(--hairline-strong); border-radius: 4px; overflow: hidden; }
+.pf-page.photo-thumb:disabled { cursor: default; min-height: 120px; }
+.pf-page.photo-thumb img { display: block; width: 100%; height: auto; max-height: 340px; object-fit: contain; }
+.pf-page-pdf { display: grid; place-items: center; min-height: 120px; font: 600 15px var(--font-mono); color: var(--ink-3); }
+.pf-page-zoom { position: absolute; right: 6px; bottom: 6px; padding: 2px 8px; border-radius: 3px; font-size: 12px; background: var(--surface); color: var(--ink-2); border: 1px solid var(--hairline-strong); }
+.pf-tools { display: flex; flex-wrap: wrap; gap: 4px 8px; }
+.pf-status { min-width: 0; }
+.pf-how { margin-top: 6px; font-size: 12.5px; color: var(--ink-3); }
+.pf-how summary { cursor: pointer; width: fit-content; }
+.pf-how p { margin: 6px 0 0; max-width: 60ch; }
+.pf-dropping { margin: 8px 0 0; font-size: 13px; color: var(--accent); }
+.pf-lightbox { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 16px; }
+.pf-lightbox-scrim { position: absolute; inset: 0; border: 0; background: color-mix(in srgb, var(--ink) 55%, transparent); cursor: zoom-out; }
+.pf-lightbox-body { position: relative; display: grid; gap: 10px; justify-items: center; max-width: min(96vw, 1100px); max-height: 94vh; padding: 12px; background: var(--surface); border: 1px solid var(--hairline-strong); border-radius: 6px; }
+.pf-lightbox-body img { display: block; max-width: 100%; max-height: calc(94vh - 90px); object-fit: contain; }
+@media (min-width: 900px) { .pf-attached { grid-template-columns: minmax(260px, 420px) minmax(0, 1fr); } }
+
+.rr-words { font-family: var(--font); font-size: var(--text-base); font-style: normal; color: var(--ink-2); }
+.rr-maths { font-size: var(--text-base); }
+@media (max-width: 520px) { .pf-page.photo-thumb { width: 100%; } }
+.tutor-launch-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+/* Recent attempts under a Practice question: a closed disclosure, then a plain list on the same hairline. */
+.q-recent { margin: 16px 0 0; }
+/* A short window (a phone on its side): the list would only lengthen the page under the writing area. */
+@media (max-height: 500px) { .q-recent { display: none; } }   /* inside the question card, above its action bar */
+.q-recent-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 0; border-top: 1px solid var(--hairline); }
+.q-recent-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 8px 0; border-bottom: 1px solid var(--hairline); font-size: 14px; }
+.q-recent-row time { min-width: 56px; }
+.q-recent-result { display: inline-flex; align-items: center; gap: 8px; }
+.q-recent-actions { margin-left: auto; display: inline-flex; gap: 4px; }
+
+/* The first-run tour note: fixed beside its control, never a scrim, and it lets pointer events through except on its own buttons. */
+.pr-tour { position: fixed; z-index: 40; display: grid; gap: 6px; padding: 12px; border: 1px solid var(--hairline-strong); border-radius: 6px; background: var(--paper); color: var(--ink); font-size: 14px; pointer-events: none; }
+.pr-tour:focus-visible { outline: 2px solid var(--accent-line, var(--ink)); outline-offset: 2px; }
+.pr-tour p { margin: 0; }
+.pr-tour-step { font-size: 12px; }
+.pr-tour-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.pr-tour-actions .btn { pointer-events: auto; }
+
+/* The syllabus dot point control: one labelled select and, when a dot point is
+   chosen, its chip on the same line, so choosing never changes the row's height. */
+.dp-pick { display: grid; gap: 4px; min-width: 0; }
+.dp-pick .label { margin: 0 0 0 1px; }
+.dp-pick-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.dp-pick-row select { flex: 1 1 0; min-width: 0; min-height: 44px; text-overflow: ellipsis; }
+.dp-chip { flex: 0 1 auto; min-width: 0; max-width: 48%; min-height: 44px; box-sizing: border-box; }
+.dp-chip-text { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.dp-chip .chip-x { min-width: 28px; min-height: 28px; padding: 0; display: inline-grid; place-items: center; flex: none; }
+.dp-none { margin: 0; }
+/* On a phone the chip sits on the "Clear filter" line, in the row that is already there, so the select
+   keeps the full width and the line count never changes. */
+.dp-chip-phone { display: none; }
+@media (max-width: 760px) {
+  .dp-pick-row .dp-chip-wide { display: none; }
+  .ws-filter-inline .dp-chip-phone { display: inline-flex; flex: 0 1 auto; max-width: calc(100% - 120px); min-height: 32px; margin-left: 8px; padding: 2px 8px; font-size: 13px; }
+  .ws-filter-inline { flex-wrap: nowrap; align-items: center; min-width: 0; overflow: hidden; }
+}

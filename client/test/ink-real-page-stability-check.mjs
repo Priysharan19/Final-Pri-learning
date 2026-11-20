@@ -20,7 +20,7 @@ assert.match(backend, /Array\.isArray\(pt\) \? pt\[0\]/, 'backend must decode co
 // goes through the auto path), and a page that is being read is never sent again.
 assert.doesNotMatch(ink, /SETTLE_MS/, 'no settle window may send a page to the reader');
 assert.doesNotMatch(ink, /setTimeout\([^;]*readNow/, 'no timer calls readNow directly: timed reads go through the auto path only');
-assert.match(ink, /autoTimerRef\.current = setTimeout\(\(\) => \{[\s\S]*?readRef2\.current\?\.\(\{ auto: true \}\);[\s\S]*?\}, AUTO_READ_IDLE_MS\)/, 'the idle pause sends one auto read for the page as it stands');
+assert.match(ink, /autoTimerRef\.current = setTimeout\(async \(\) => \{[\s\S]*?readRef2\.current\?\.\(\{ auto: true, ask \}\)[\s\S]*?\}, AUTO_READ_IDLE_MS\)/, 'the idle pause sends one auto read for the page as it stands');
 assert.match(ink, /pageSig !== readRef\.current && pageSig !== autoTriedRef\.current && autoCountRef\.current < AUTO_READ_MAX/, 'an unchanged page, a page already tried and a page past the cap are never read again');
 // Two explicit, user-initiated calls and no others: the Try again button, and
 // the control the card's Submit uses when the writing changed after it was read

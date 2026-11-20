@@ -13,6 +13,7 @@
 // of the row it sits in. This mirrors indiaState() in local/backend.js.
 // ─────────────────────────────────────────────────────────────────────────────
 import { scopeForYear } from '../engine/curriculum.js';
+import { offeredScope } from '../engine/offering.js';
 import { indiaScope, cleanIndiaTrack } from '../engine/indiaProduct.js';
 import { generatorsFor } from '../engine/curriculum-in-base.js';
 import { START_RATING, masteryOf } from '../engine/adaptive.js';
@@ -34,7 +35,7 @@ export function candidatesForProfile(profile = {}) {
       order, own: true, keys: [ch.id, ...generatorsFor(ch).filter(g => g !== ch.id)]
     }));
   }
-  const { own, revision } = scopeForYear(year, profile?.pathway || 'advanced');
+  const { own, revision } = offeredScope(scopeForYear(year, profile?.pathway || 'advanced'));
   const rows = own.map((s, order) => ({
     id: s.id, name: s.name, strand: s.strand || '', weight: Number(s.weight) || 1, order, own: true, keys: [s.id]
   }));

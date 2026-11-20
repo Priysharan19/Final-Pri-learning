@@ -1,0 +1,2689 @@
+{
+ "format": "pri-paper-v1",
+ "id": "ext1-2027-p08",
+ "paperNumber": 8,
+ "title": "Practice Paper 8",
+ "course": "nsw-ext1",
+ "edition": "prithagoras",
+ "year": 2027,
+ "totalMarks": 70,
+ "readingTime": "10 minutes",
+ "workingTime": "2 hours",
+ "markingScheme": {
+  "status": "draft",
+  "note": "The marking guideline as written by the author. Not approved for criterion marks.",
+  "digest": "04286b6dcf107cf7d46acd3ba673c4a04a36d9f42e8b57926d599bb1c7921ec5"
+ },
+ "sections": [
+  {
+   "id": "I",
+   "title": "Section I",
+   "marks": 10,
+   "minutes": 15,
+   "instructions": "Attempt Questions 1 to 10. Allow about 15 minutes for this section.",
+   "questions": [
+    {
+     "id": "q1",
+     "number": 1,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The zeros of the polynomial $x^3 + bx^2 + cx + d$ are real and form an arithmetic sequence."
+      },
+      {
+       "k": "p",
+       "t": "Which of the following must be true?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q1",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$b^3 = 27d$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$b^2 = 3c$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$2b^3 - 9bc + 27d = 0$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$bc = 9d$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "C"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Let the zeros be $m - e$, $m$ and $m + e$. Their sum is $3m = -b$, so the middle zero is $m = -\\dfrac{b}{3}$, and it is a zero of the polynomial:"
+        },
+        {
+         "k": "math",
+         "t": "-\\frac{b^3}{27} + \\frac{b^3}{9} - \\frac{bc}{3} + d = 0, \\qquad\\text{that is,}\\qquad 2b^3 - 9bc + 27d = 0."
+        },
+        {
+         "k": "p",
+         "t": "(Option B holds only when $e = 0$, and option A only for special cases.)"
+        }
+       ],
+       "classification": {
+        "content": "Zeros and coefficients of polynomials",
+        "outcomes": [
+         "ME1-11-02"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q2",
+     "number": 2,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "What is the range of the function $f(x) = 3\\sin x + 4\\cos x$ for $0 \\le x \\le \\dfrac{\\pi}{2}$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q2",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$3 \\le y \\le 5$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$4 \\le y \\le 5$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-5 \\le y \\le 5$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$3 \\le y \\le 4$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "A"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$f(x) = 5\\sin(x + \\phi)$ where $\\phi = \\tan^{-1}\\dfrac43$, which is between $0$ and $\\dfrac{\\pi}{2}$. As $x$ goes from $0$ to $\\dfrac{\\pi}{2}$, $x + \\phi$ goes from $\\phi$ to $\\dfrac{\\pi}{2} + \\phi$, passing through $\\dfrac{\\pi}{2}$, so the greatest value is 5. The least value is at an endpoint: $f(0) = 4$ and $f\\left(\\dfrac{\\pi}{2}\\right) = 3$. So the range is $3 \\le y \\le 5$."
+        }
+       ],
+       "classification": {
+        "content": "Auxiliary angle; range of a function",
+        "outcomes": [
+         "ME1-11-03"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q3",
+     "number": 3,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The unit vectors $\\underset{\\sim}{a}$, $\\underset{\\sim}{b}$ and $\\underset{\\sim}{c}$ satisfy $\\underset{\\sim}{a} + \\underset{\\sim}{b} + \\underset{\\sim}{c} = \\underset{\\sim}{0}$."
+      },
+      {
+       "k": "p",
+       "t": "What is the value of $\\underset{\\sim}{a}\\cdot\\underset{\\sim}{b} + \\underset{\\sim}{b}\\cdot\\underset{\\sim}{c} + \\underset{\\sim}{c}\\cdot\\underset{\\sim}{a}$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q3",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$0$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-1$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac32$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-\\dfrac32$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "D"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$0 = \\left|\\underset{\\sim}{a} + \\underset{\\sim}{b} + \\underset{\\sim}{c}\\right|^2 = 3 + 2\\left(\\underset{\\sim}{a}\\cdot\\underset{\\sim}{b} + \\underset{\\sim}{b}\\cdot\\underset{\\sim}{c} + \\underset{\\sim}{c}\\cdot\\underset{\\sim}{a}\\right)$, so the value is $-\\dfrac32$."
+        }
+       ],
+       "classification": {
+        "content": "Vectors; scalar product",
+        "outcomes": [
+         "ME1-12-02"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q4",
+     "number": 4,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "Two balls are projected from the same point on horizontal ground with the same speed, at angles $\\theta$ and $90^\\circ - \\theta$ to the horizontal, where $0^\\circ < \\theta < 45^\\circ$."
+      },
+      {
+       "k": "p",
+       "t": "What is the time of flight of the first ball divided by the time of flight of the second?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q4",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\sin\\theta$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\tan\\theta$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$1$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\tan^2\\theta$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "B"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "A ball projected with speed $V$ at angle $\\beta$ lands after time $\\dfrac{2V\\sin\\beta}{g}$. So the ratio is $\\dfrac{\\sin\\theta}{\\sin\\left(90^\\circ - \\theta\\right)} = \\dfrac{\\sin\\theta}{\\cos\\theta} = \\tan\\theta$. (The two balls land at the same point, but at different times.)"
+        }
+       ],
+       "classification": {
+        "content": "Projectile motion",
+        "outcomes": [
+         "ME1-12-02"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q5",
+     "number": 5,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "Let $n \\ge 2$ be an integer."
+      },
+      {
+       "k": "p",
+       "t": "Which expression is equal to $\\displaystyle\\sum_{k=0}^{n}k^2\\binom{n}{k}$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q5",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$n\\,2^{n-1}$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$n^2\\,2^{n-1}$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$n(n - 1)\\,2^{n-2}$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$n(n + 1)\\,2^{n-2}$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "D"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Differentiate $(1 + x)^n = \\sum\\binom{n}{k}x^k$, multiply by $x$, and differentiate again:"
+        },
+        {
+         "k": "math",
+         "t": "\\sum_{k=0}^{n}k^2\\binom{n}{k}x^{k-1} = \\frac{d}{dx}\\left(nx(1 + x)^{n-1}\\right) = n(1 + x)^{n-1} + n(n - 1)x(1 + x)^{n-2}."
+        },
+        {
+         "k": "p",
+         "t": "At $x = 1$ this is $n2^{n-1} + n(n - 1)2^{n-2} = n(n + 1)2^{n-2}$. (Check: $n = 2$ gives $0 + 2 + 4 = 6$.)"
+        }
+       ],
+       "classification": {
+        "content": "The binomial theorem; identities",
+        "outcomes": [
+         "ME1-11-04"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q6",
+     "number": 6,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "Ten points are marked on a circle, and every pair of the points is joined by a chord. No three of the chords pass through the same point inside the circle. The diagram shows the same construction for 6 points."
+      },
+      {
+       "k": "fig",
+       "name": "figchords"
+      },
+      {
+       "k": "p",
+       "t": "How many points inside the circle are crossing points of two chords?"
+      }
+     ],
+     "figures": [
+      "figchords"
+     ],
+     "parts": [
+      {
+       "id": "q6",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "210"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "45"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "120"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "252"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "A"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Each crossing point inside the circle comes from exactly one set of 4 of the marked points (it is the crossing point of the two diagonals of the quadrilateral that they form), and each set of 4 points gives exactly one crossing point. So the number is $\\dbinom{10}{4} = 210$."
+        }
+       ],
+       "classification": {
+        "content": "Counting techniques; combinations",
+        "outcomes": [
+         "ME1-11-04"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q7",
+     "number": 7,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The proportion $\\hat{p}$ of successes in a random sample of size $n$ is to have a standard deviation of at most 0.02, whatever the value of the population proportion $p$."
+      },
+      {
+       "k": "p",
+       "t": "What is the least possible value of $n$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q7",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "50"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "1250"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "625"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "2500"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "C"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The standard deviation of $\\hat{p}$ is $\\sqrt{\\dfrac{p(1 - p)}{n}}$, and $p(1 - p)$ is at most $\\dfrac14$ (when $p = \\dfrac12$). So we need $\\dfrac{1}{4n} \\le 0.0004$, that is, $n \\ge 625$."
+        }
+       ],
+       "classification": {
+        "content": "Sample proportions",
+        "outcomes": [
+         "ME1-12-06"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q8",
+     "number": 8,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "Let $f(x) = x + e^x$, and let $g$ be the inverse function of $f$."
+      },
+      {
+       "k": "p",
+       "t": "What is the value of $\\displaystyle\\int_1^{1 + e}g(x)\\,dx$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q8",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac12$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac32$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$e - \\dfrac12$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$e + \\dfrac12$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "B"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$f(0) = 1$ and $f(1) = 1 + e$. The region under $y = g(x)$ from $x = 1$ to $x = 1 + e$, together with the region between $y = f(x)$ and the $x$-axis from $0$ to $1$, fills a rectangle of width $1 + e$ and height 1 with a rectangle of width 1 and height 0 removed. So"
+        },
+        {
+         "k": "math",
+         "t": "\\int_1^{1 + e}g(x)\\,dx = (1 + e) \\times 1 - \\int_0^1\\left(x + e^x\\right)dx = 1 + e - \\left(\\frac12 + e - 1\\right) = \\frac32."
+        }
+       ],
+       "classification": {
+        "content": "Inverse functions; areas",
+        "outcomes": [
+         "ME1-11-01",
+         "ME1-12-04"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q9",
+     "number": 9,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "How many solutions does the equation $\\sin x + \\sin 2x + \\sin 3x = 0$ have for $0 \\le x \\le 2\\pi$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q9",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "5"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "6"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "9"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "7"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "D"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$\\sin x + \\sin 3x = 2\\sin 2x\\cos x$, so the equation is $\\sin 2x\\,(2\\cos x + 1) = 0$. Then $\\sin 2x = 0$ gives $x = 0, \\dfrac{\\pi}{2}, \\pi, \\dfrac{3\\pi}{2}, 2\\pi$, and $\\cos x = -\\dfrac12$ gives $x = \\dfrac{2\\pi}{3}, \\dfrac{4\\pi}{3}$. There are 7 solutions."
+        }
+       ],
+       "classification": {
+        "content": "Trigonometric equations; sums to products",
+        "outcomes": [
+         "ME1-11-03"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q10",
+     "number": 10,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "A tank is a cylinder lying on its side, as shown in the cross-section. Water is poured into the empty tank at a constant rate until the tank is full. The depth of the water at time $t$ is $h$."
+      },
+      {
+       "k": "fig",
+       "name": "figtankeight"
+      },
+      {
+       "k": "p",
+       "t": "Which graph shows $h$ against $t$?"
+      }
+     ],
+     "figures": [
+      "figtankeight"
+     ],
+     "parts": [
+      {
+       "id": "q10",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figQ10OptA"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figQ10OptB"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figQ10OptC"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figQ10OptD"
+          }
+         ]
+        }
+       ],
+       "figureOptions": true,
+       "key": {
+        "type": "mcq",
+        "answer": "A"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The rate at which $h$ increases is the rate of flow divided by the area of the water surface, and the width of the surface is $0$ at the bottom, greatest halfway up, and $0$ again at the top. So $h$ increases very fast at first (the graph starts vertically), most slowly when the tank is half full, and very fast again at the end (the graph ends vertically). The graph is concave down and then concave up: graph A."
+        }
+       ],
+       "classification": {
+        "content": "Rates of change; graphs",
+        "outcomes": [
+         "ME1-12-05",
+         "ME1-11-01"
+        ]
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "II",
+   "title": "Section II",
+   "marks": 60,
+   "minutes": 105,
+   "instructions": "Attempt Questions 11 to 14. Allow about 1 hour and 45 minutes for this section. Show relevant mathematical reasoning and/or calculations.",
+   "questions": [
+    {
+     "id": "q11",
+     "number": 11,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q11a",
+       "label": "(a)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Find all the values of $k$ for which the polynomial $x^4 - 4x + k$ has exactly two different real zeros."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct values with justification"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds the least value of the polynomial and relates it to the number of zeros"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds the only stationary point of the polynomial"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Let $P(x) = x^4 - 4x + k$. Then $P'(x) = 4\\left(x^3 - 1\\right)$, which is negative for $x < 1$ and positive for $x > 1$. So $P$ decreases on $x \\le 1$ and increases on $x \\ge 1$, and its least value is $P(1) = k - 3$."
+        },
+        {
+         "k": "p",
+         "t": "Since $P(x) \\to \\infty$ as $x \\to \\pm\\infty$, the polynomial has two different real zeros (one on each side of $x = 1$) when $k - 3 < 0$, one real zero when $k = 3$, and none when $k > 3$. So the values are $k < 3$."
+        }
+       ],
+       "classification": {
+        "content": "Polynomials; graphs of functions; stationary points",
+        "outcomes": [
+         "ME1-11-02",
+         "ME1-12-04"
+        ]
+       },
+       "figures": [],
+       "answerType": "value",
+       "key": {
+        "type": "interval",
+        "region": "k < 3",
+        "variable": "k",
+        "display": "k<3"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p08.py: exact distinct-real-root count of x^4-4x+k (SymPy) on a rational grid of k in [-50,10] plus k=3 and 3+-1e-6: exactly two iff k<3"
+      },
+      {
+       "id": "q11b",
+       "label": "(b)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Let $\\theta = \\dfrac{\\pi}{5}$, so that $\\cos 3\\theta = -\\cos 2\\theta$. Find the exact value of $\\cos\\dfrac{\\pi}{5}$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct exact value with justification"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Obtains and factorises a cubic equation in $\\cos\\theta$"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Expresses $\\cos 3\\theta$ and $\\cos 2\\theta$ in terms of $\\cos\\theta$"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Let $c = \\cos\\theta$. Then $4c^3 - 3c = -\\left(2c^2 - 1\\right)$, that is,"
+        },
+        {
+         "k": "math",
+         "t": "4c^3 + 2c^2 - 3c - 1 = 0, \\qquad\\text{so}\\qquad (c + 1)\\left(4c^2 - 2c - 1\\right) = 0."
+        },
+        {
+         "k": "p",
+         "t": "Since $\\cos\\dfrac{\\pi}{5} > 0$, $c$ is the positive zero of $4c^2 - 2c - 1$: $\\ \\cos\\dfrac{\\pi}{5} = \\dfrac{1 + \\sqrt5}{4}$."
+        }
+       ],
+       "classification": {
+        "content": "Trigonometric identities; polynomials",
+        "outcomes": [
+         "ME1-11-03",
+         "ME1-11-02"
+        ]
+       },
+       "figures": [],
+       "answerType": "expression",
+       "key": {
+        "type": "expression",
+        "expr": "(1+sqrt(5))/4",
+        "display": "\\dfrac{1+\\sqrt5}{4}"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p08.py: mpmath cos(pi/5) to 40 digits equals (1+sqrt5)/4; also satisfies cos3t=-cos2t"
+      },
+      {
+       "id": "q11c",
+       "label": "(c)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Find, in terms of $n$, the value of $\\displaystyle\\sum_{k=0}^{n}\\binom{n}{k}\\binom{n}{k+1}$, where $n \\ge 1$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct value with justification"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Recognises the sum as a coefficient in the expansion of $(1 + x)^{2n}$, or equivalent merit"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Writes $\\dbinom{n}{k+1} = \\dbinom{n}{n - 1 - k}$, or equivalent merit"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Since $\\dbinom{n}{k+1} = \\dbinom{n}{n - 1 - k}$, the sum is $\\displaystyle\\sum_{k}\\binom{n}{k}\\binom{n}{n - 1 - k}$. This is the coefficient of $x^{n-1}$ in the product $(1 + x)^n(1 + x)^n = (1 + x)^{2n}$, because $x^k$ from the first factor is paired with $x^{n-1-k}$ from the second. So the sum is"
+        },
+        {
+         "k": "math",
+         "t": "\\binom{2n}{n - 1}."
+        },
+        {
+         "k": "p",
+         "t": "(For example, $n = 3$ gives $1 \\times 3 + 3 \\times 3 + 3 \\times 1 = 15 = \\dbinom{6}{2}$.)"
+        }
+       ],
+       "classification": {
+        "content": "Binomial identities (coefficients in a product)",
+        "outcomes": [
+         "ME1-11-05"
+        ]
+       },
+       "figures": [],
+       "answerType": "expression",
+       "key": {
+        "type": "expression",
+        "expr": "nCr(2*n,n-1)",
+        "display": "\\dbinom{2n}{n-1}"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p08.py: exact integer sums for n=1..16 equal C(2n,n-1)"
+      },
+      {
+       "id": "q11d",
+       "label": "(d)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "The numbers $1, 2, 3, \\ldots, 8$ are arranged in a row so that every number except the first differs by 1 from at least one of the numbers to its left. One such arrangement is $4\\ 5\\ 3\\ 6\\ 2\\ 1\\ 7\\ 8$."
+        },
+        {
+         "k": "p",
+         "t": "Find the number of such arrangements."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct number with justification"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Shows that the last number is 1 or 8, or that the numbers placed at each stage are consecutive"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Lists or counts the arrangements for a small case correctly, or equivalent merit"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Each new number is next to a number already placed, so at every stage the numbers placed so far are a block of consecutive integers. In particular, after the last number is removed the remaining seven numbers are consecutive, so the last number is 1 or 8."
+        },
+        {
+         "k": "p",
+         "t": "The same argument applies to the first seven numbers (which form an arrangement of a block of seven consecutive integers with the same property), so the seventh number is the smallest or the largest of that block, and so on. Working backwards, each of the last seven numbers has 2 choices, and then the first number is determined. Every such sequence of choices gives a valid arrangement, so there are $2^7 = 128$ arrangements."
+        }
+       ],
+       "classification": {
+        "content": "Counting techniques",
+        "outcomes": [
+         "ME1-11-04"
+        ]
+       },
+       "figures": [],
+       "answerType": "value",
+       "key": {
+        "type": "numeric",
+        "value": 128,
+        "display": "128"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p08.py: brute force over all 8! = 40320 arrangements"
+      },
+      {
+       "id": "q11e",
+       "label": "(e)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Use the substitution $u = \\sqrt{x}$ to find the exact value of $\\displaystyle\\int_{\\frac13}^{3}\\frac{dx}{(x + 1)\\sqrt{x}}$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct exact value"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Transforms the integral correctly, or equivalent merit"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds $dx$ in terms of $du$, or the new limits"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$x = u^2$, so $dx = 2u\\,du$, and the limits become $\\dfrac{1}{\\sqrt3}$ and $\\sqrt3$. The integral is"
+        },
+        {
+         "k": "math",
+         "t": "\\int_{\\frac{1}{\\sqrt3}}^{\\sqrt3}\\frac{2u\\,du}{\\left(u^2 + 1\\right)u} = 2\\Bigl[\\tan^{-1}u\\Bigr]_{\\frac{1}{\\sqrt3}}^{\\sqrt3} = 2\\left(\\frac{\\pi}{3} - \\frac{\\pi}{6}\\right) = \\frac{\\pi}{3}."
+        }
+       ],
+       "classification": {
+        "content": "Integration by substitution; inverse trigonometric functions",
+        "outcomes": [
+         "ME1-12-04",
+         "ME1-12-03"
+        ]
+       },
+       "figures": [],
+       "answerType": "expression",
+       "key": {
+        "type": "expression",
+        "expr": "pi/3",
+        "display": "\\dfrac{\\pi}{3}"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p08.py: mpmath quadrature of the original integral to 30 digits"
+      }
+     ]
+    },
+    {
+     "id": "q12",
+     "number": 12,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q12a",
+       "label": "(a)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "In the triangle $OAB$, $\\overrightarrow{OA} = \\underset{\\sim}{a}$ and $\\overrightarrow{OB} = \\underset{\\sim}{b}$, where $\\left|\\underset{\\sim}{a}\\right| = 3$ and $\\left|\\underset{\\sim}{b}\\right| = 6$. The point $P$ lies on $AB$ and $OP$ bisects the angle $AOB$."
+        },
+        {
+         "k": "fig",
+         "name": "figbis"
+        },
+        {
+         "k": "p",
+         "t": "Find $\\overrightarrow{OP}$ in terms of $\\underset{\\sim}{a}$ and $\\underset{\\sim}{b}$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct vector with justification"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Writes $\\overrightarrow{OP}$ as a multiple of a sum of unit vectors and uses the condition for $P$ to lie on $AB$"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Recognises that the sum of the unit vectors along $\\underset{\\sim}{a}$ and $\\underset{\\sim}{b}$ bisects the angle"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The unit vectors $\\dfrac{\\underset{\\sim}{a}}{3}$ and $\\dfrac{\\underset{\\sim}{b}}{6}$ have equal length, so their sum is along the diagonal of a rhombus and bisects the angle $AOB$. Hence $\\overrightarrow{OP} = s\\left(\\dfrac{\\underset{\\sim}{a}}{3} + \\dfrac{\\underset{\\sim}{b}}{6}\\right)$ for some $s > 0$."
+        },
+        {
+         "k": "p",
+         "t": "A point $\\lambda\\underset{\\sim}{a} + \\mu\\underset{\\sim}{b}$ lies on the line $AB$ when $\\lambda + \\mu = 1$. So $\\dfrac{s}{3} + \\dfrac{s}{6} = 1$, giving $s = 2$, and"
+        },
+        {
+         "k": "math",
+         "t": "\\overrightarrow{OP} = \\frac23\\underset{\\sim}{a} + \\frac13\\underset{\\sim}{b}."
+        }
+       ],
+       "classification": {
+        "content": "Vectors in two dimensions; unit vectors",
+        "outcomes": [
+         "ME1-12-02"
+        ]
+       },
+       "figures": [
+        "figbis"
+       ],
+       "answerType": "expression",
+       "key": {
+        "type": "expression",
+        "expr": "2/3*a+1/3*b",
+        "display": "\\overrightarrow{OP}=\\dfrac23\\,\\underset{\\sim}{a}+\\dfrac13\\,\\underset{\\sim}{b}"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p08.py: for 6 random angles AOB, P found on AB by bisection so that angle AOP = angle POB; OP = (2/3)a+(1/3)b to 1e-9"
+      },
+      {
+       "id": "q12b",
+       "label": "(b)",
+       "marks": 4,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "The region inside the circle $x^2 + (y - 2)^2 = 1$ is rotated about the $x$-axis to form a ring doughnut."
+        },
+        {
+         "k": "fig",
+         "name": "figtorus"
+        },
+        {
+         "k": "p",
+         "t": "Find the exact volume of the doughnut."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct exact volume"
+          }
+         ],
+         "marks": 4
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Evaluates the integral with a minor error"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Writes a correct integral for the volume"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds the upper and lower boundaries of the region in terms of $x$"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The upper and lower halves of the circle are $y = 2 \\pm \\sqrt{1 - x^2}$ for $-1 \\le x \\le 1$. Each cross-section of the doughnut perpendicular to the $x$-axis is a ring, so the volume is"
+        },
+        {
+         "k": "math",
+         "t": "\\pi\\int_{-1}^{1}\\left[\\left(2 + \\sqrt{1 - x^2}\\right)^2 - \\left(2 - \\sqrt{1 - x^2}\\right)^2\\right]dx = 8\\pi\\int_{-1}^{1}\\sqrt{1 - x^2}\\,dx."
+        },
+        {
+         "k": "p",
+         "t": "The last integral is the area of a semicircle of radius 1, which is $\\dfrac{\\pi}{2}$. So the volume is $8\\pi \\times \\dfrac{\\pi}{2} = 4\\pi^2$."
+        }
+       ],
+       "classification": {
+        "content": "Volumes of solids of revolution",
+        "outcomes": [
+         "ME1-12-04"
+        ]
+       },
+       "figures": [
+        "figtorus"
+       ],
+       "answerType": "expression",
+       "key": {
+        "type": "expression",
+        "expr": "4*pi^2",
+        "display": "4\\pi^2"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p08.py: mpmath quadrature of the washer integral to 30 digits"
+      },
+      {
+       "id": "q12c",
+       "label": "(c)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Each person in a group of $k$ people has a birthday on one of $n$ days, each day being equally likely, independently of the other people, where $2 \\le k \\le n$."
+        }
+       ],
+       "parts": [
+        {
+         "id": "q12c-i",
+         "label": "(i)",
+         "marks": 1,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Explain why the probability that all $k$ people have different birthdays is"
+          },
+          {
+           "k": "math",
+           "t": "\\left(1 - \\frac1n\\right)\\left(1 - \\frac2n\\right)\\cdots\\left(1 - \\frac{k - 1}{n}\\right)."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct explanation"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Take the people in turn. The second person has a birthday different from the first with probability $1 - \\dfrac1n$. Given that the first $j$ birthdays are all different, the next person avoids those $j$ days with probability $1 - \\dfrac{j}{n}$. Multiplying these probabilities for $j = 1, 2, \\ldots, k - 1$ gives the result."
+          }
+         ],
+         "classification": {
+          "content": "Probability of different birthdays; solving a quadratic inequality",
+          "outcomes": [
+           "ME1-12-06",
+           "ME1-11-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "proof-explain",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q12c-ii",
+         "label": "(ii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Suppose that $n = 7$ and $k = 3$. Find the probability that at least two of the three people have the same birthday."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct probability"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Uses part (i) to find the probability that all three birthdays are different, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "By part (i), the probability that all three birthdays are different is $\\left(1 - \\dfrac17\\right)\\left(1 - \\dfrac27\\right) = \\dfrac{30}{49}$. So the probability that at least two are the same is $1 - \\dfrac{30}{49} = \\dfrac{19}{49}$."
+          }
+         ],
+         "classification": {
+          "content": "Probability of different birthdays; solving a quadratic inequality",
+          "outcomes": [
+           "ME1-12-06",
+           "ME1-11-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "value",
+         "key": {
+          "type": "exact",
+          "n": "19",
+          "d": "49",
+          "display": "\\dfrac{19}{49}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p08.py: all 7^3=343 birthday triples enumerated, exact Fraction"
+        },
+        {
+         "id": "q12c-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the least value of $n$ for which the probability that three people all have different birthdays is greater than $\\dfrac{9}{10}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct value with justification"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Forms and solves the quadratic inequality, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes the probability as $\\left(1 - \\dfrac1n\\right)\\left(1 - \\dfrac2n\\right)$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "By part (i) with $k = 3$ we need $\\left(1 - \\dfrac1n\\right)\\left(1 - \\dfrac2n\\right) > \\dfrac{9}{10}$, that is, $10(n - 1)(n - 2) > 9n^2$, so $n^2 - 30n + 20 > 0$. The roots of $n^2 - 30n + 20$ are $15 \\pm \\sqrt{205}$, and $15 + \\sqrt{205} \\approx 29.3$, so the inequality holds for integers $n \\ge 30$ (and $n \\ge 3$ is needed for three different birthdays). Check: for $n = 30$ the probability is $\\dfrac{29 \\times 28}{900} = \\dfrac{203}{225} > \\dfrac{9}{10}$, and for $n = 29$ it is $\\dfrac{28 \\times 27}{841} = \\dfrac{756}{841} < \\dfrac{9}{10}$. The least value is $n = 30$."
+          }
+         ],
+         "classification": {
+          "content": "Probability of different birthdays; solving a quadratic inequality",
+          "outcomes": [
+           "ME1-12-06",
+           "ME1-11-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "value",
+         "key": {
+          "type": "numeric",
+          "value": 30,
+          "display": "30"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p08.py: exact Fractions: P(3 distinct)=(1-1/n)(1-2/n) first exceeds 9/10 at n=30 and stays above for n up to 400"
+        },
+        {
+         "id": "q12c-iv",
+         "label": "(iv)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Suppose that $n = 7$. Find the least value of $k$ for which the probability that at least two of the $k$ people have the same birthday is greater than $\\dfrac12$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct value with justification"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the probability that all birthdays are different for $k = 3$ or $k = 4$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "By part (i) with $n = 7$, the probability that all $k$ birthdays are different is $\\dfrac67$ for $k = 2$, $\\dfrac{30}{49}$ for $k = 3$ and $\\dfrac{6 \\times 5 \\times 4}{7^3} = \\dfrac{120}{343}$ for $k = 4$. The probability that at least two are the same is $1 - \\dfrac{30}{49} = \\dfrac{19}{49} < \\dfrac12$ for $k = 3$, and $1 - \\dfrac{120}{343} = \\dfrac{223}{343} > \\dfrac12$ for $k = 4$. The probabilities increase with $k$, so the least value is $k = 4$."
+          }
+         ],
+         "classification": {
+          "content": "Probability of different birthdays; solving a quadratic inequality",
+          "outcomes": [
+           "ME1-12-06",
+           "ME1-11-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "value",
+         "key": {
+          "type": "numeric",
+          "value": 4,
+          "display": "4"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p08.py: all 7^k assignments enumerated for k=2..5: first k with P(shared)>1/2 is 4"
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": []
+      }
+     ]
+    },
+    {
+     "id": "q13",
+     "number": 13,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q13a",
+       "label": "(a)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A person, modelled as a box with a horizontal top of area $A$ and a vertical front and back each of area $F$, walks a distance $d$ in a straight line at a constant speed $v$ in the direction of $\\underset{\\sim}{i}$. Rain falls with constant velocity $w\\,\\underset{\\sim}{i} - r\\,\\underset{\\sim}{j}$, where $w \\ge 0$ and $r > 0$, and contains a mass $\\rho$ of water per unit volume of air."
+        },
+        {
+         "k": "p",
+         "t": "The mass of rain striking a flat surface per unit time is $\\rho S\\left|\\underset{\\sim}{u}\\right|$, where $S$ is the area of the surface and $\\underset{\\sim}{u}$ is the component, perpendicular to the surface, of the velocity of the rain relative to the surface."
+        },
+        {
+         "k": "fig",
+         "name": "figrain"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q13a-i",
+         "label": "(i)",
+         "marks": 1,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Write down the velocity of the rain relative to the person."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct relative velocity"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$\\left(w\\,\\underset{\\sim}{i} - r\\,\\underset{\\sim}{j}\\right) - v\\,\\underset{\\sim}{i} = (w - v)\\,\\underset{\\sim}{i} - r\\,\\underset{\\sim}{j}$."
+          }
+         ],
+         "classification": {
+          "content": "Vectors; relative velocity; optimisation",
+          "outcomes": [
+           "ME1-12-02",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13a-ii",
+         "label": "(ii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that the total mass of rain that strikes the person during the walk is"
+          },
+          {
+           "k": "math",
+           "t": "W(v) = \\frac{\\rho d\\left(Ar + F\\left|v - w\\right|\\right)}{v}."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the rate at which rain strikes the top, or the walking time"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The walk takes time $\\dfrac{d}{v}$. The component of the relative velocity perpendicular to the top is $-r\\,\\underset{\\sim}{j}$, so rain strikes the top at the rate $\\rho Ar$. The component perpendicular to the front and back is $(w - v)\\,\\underset{\\sim}{i}$: if $v > w$ the rain strikes the front, and if $v < w$ it strikes the back, in either case at the rate $\\rho F\\left|v - w\\right|$. So"
+          },
+          {
+           "k": "math",
+           "t": "W(v) = \\frac{d}{v}\\left(\\rho Ar + \\rho F\\left|v - w\\right|\\right) = \\frac{\\rho d\\left(Ar + F\\left|v - w\\right|\\right)}{v}."
+          }
+         ],
+         "classification": {
+          "content": "Vectors; relative velocity; optimisation",
+          "outcomes": [
+           "ME1-12-02",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13a-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Suppose that $Fw > Ar$. Find the speed $v$ for which $W(v)$ is least."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct speed with justification"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Shows that $W$ decreases for $v < w$, or increases for $v > w$"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes $W(v)$ without the absolute value for $v < w$ or for $v > w$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "For $0 < v \\le w$: $\\ W(v) = \\rho d\\left(\\dfrac{Ar + Fw}{v} - F\\right)$, which decreases as $v$ increases."
+          },
+          {
+           "k": "p",
+           "t": "For $v \\ge w$: $\\ W(v) = \\rho d\\left(F + \\dfrac{Ar - Fw}{v}\\right)$. Since $Ar - Fw < 0$, this increases as $v$ increases."
+          },
+          {
+           "k": "p",
+           "t": "So $W(v)$ is least when $v = w$: the person should walk at the same speed as the wind carries the rain, so that no rain strikes the front or the back."
+          }
+         ],
+         "classification": {
+          "content": "Vectors; relative velocity; optimisation",
+          "outcomes": [
+           "ME1-12-02",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "w",
+          "display": "v=w"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p08.py: rain mass rate summed over top/front/back from the relative velocity; grid minimiser of W over v for 10 random (A,r,F,w) with Fw>Ar"
+        },
+        {
+         "id": "q13a-iv",
+         "label": "(iv)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Suppose instead that $Fw < Ar$, and that the person cannot move faster than a speed $U$, where $U > w$. Find the least possible value of $W(v)$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct least value"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Shows that $W$ decreases for all $v$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "By the expressions in part (iii), $W(v)$ decreases for $v \\le w$, and for $v \\ge w$ it is $\\rho d\\left(F + \\dfrac{Ar - Fw}{v}\\right)$, which also decreases because $Ar - Fw > 0$. So the person should move as fast as possible, and the least value is"
+          },
+          {
+           "k": "math",
+           "t": "W(U) = \\rho d\\left(F + \\frac{Ar - Fw}{U}\\right)."
+          }
+         ],
+         "classification": {
+          "content": "Vectors; relative velocity; optimisation",
+          "outcomes": [
+           "ME1-12-02",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figrain"
+       ]
+      },
+      {
+       "id": "q13b",
+       "label": "(b)",
+       "marks": 7,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Snow began to fall at a constant rate at some time before noon, and kept falling all afternoon, so that the depth of the snow is proportional to the time since it began to fall. At noon a snowplough began to clear a road. The speed of the plough is inversely proportional to the depth of the snow. The plough cleared 2 km of road in the first hour and 1 km in the second hour."
+        },
+        {
+         "k": "p",
+         "t": "Snow began to fall $T$ hours before noon, and $t$ hours after noon the plough has cleared $x$ km, so that $\\dfrac{dx}{dt} = \\dfrac{k}{t + T}$ for a positive constant $k$."
+        },
+        {
+         "k": "fig",
+         "name": "figplough"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q13b-i",
+         "label": "(i)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that $x = k\\ln\\left(\\dfrac{t + T}{T}\\right)$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Integrates correctly with a constant of integration"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Integrating, $x = k\\ln(t + T) + C$. At noon $t = 0$ and $x = 0$, so $C = -k\\ln T$, and $x = k\\ln\\left(\\dfrac{t + T}{T}\\right)$."
+          }
+         ],
+         "classification": {
+          "content": "Modelling with differential equations; logarithms; polynomials",
+          "outcomes": [
+           "ME1-12-05",
+           "ME1-11-02"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13b-ii",
+         "label": "(ii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that $(T + 1)^3 = T(T + 2)^2$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Obtains an equation relating two logarithms without $k$"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes the two given distances in terms of $k$ and $T$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "At $t = 1$, $x = 2$, and at $t = 2$, $x = 3$:"
+          },
+          {
+           "k": "math",
+           "t": "2 = k\\ln\\frac{T + 1}{T}, \\qquad 3 = k\\ln\\frac{T + 2}{T}."
+          },
+          {
+           "k": "p",
+           "t": "Subtracting, $1 = k\\ln\\dfrac{T + 2}{T + 1}$, so $\\ln\\dfrac{T + 1}{T} = 2\\ln\\dfrac{T + 2}{T + 1}$, that is,"
+          },
+          {
+           "k": "math",
+           "t": "\\frac{T + 1}{T} = \\frac{(T + 2)^2}{(T + 1)^2}, \\qquad\\text{so}\\qquad (T + 1)^3 = T(T + 2)^2."
+          }
+         ],
+         "classification": {
+          "content": "Modelling with differential equations; logarithms; polynomials",
+          "outcomes": [
+           "ME1-12-05",
+           "ME1-11-02"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13b-iii",
+         "label": "(iii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the time at which the snow began to fall, correct to the nearest minute."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct time"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Reduces the equation in part (ii) to a quadratic equation and solves it"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Expanding, $T^3 + 3T^2 + 3T + 1 = T^3 + 4T^2 + 4T$, so $T^2 + T - 1 = 0$ and, since $T > 0$,"
+          },
+          {
+           "k": "math",
+           "t": "T = \\frac{\\sqrt5 - 1}{2} \\approx 0.618 \\text{ hours} \\approx 37 \\text{ minutes}."
+          },
+          {
+           "k": "p",
+           "t": "The snow began to fall at about 11:23 am."
+          }
+         ],
+         "classification": {
+          "content": "Modelling with differential equations; logarithms; polynomials",
+          "outcomes": [
+           "ME1-12-05",
+           "ME1-11-02"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figplough"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "q14",
+     "number": 14,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q14a",
+       "label": "(a)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A plane is inclined at an angle $\\alpha$ to the horizontal. A ball is projected from the point $O$ at the foot of the plane with speed $V$ at an angle $\\theta$ to the horizontal, where $\\alpha < \\theta < \\dfrac{\\pi}{2}$, in the vertical plane that contains a line of greatest slope. At time $t$ the ball has position vector"
+        },
+        {
+         "k": "math",
+         "t": "\\underset{\\sim}{r}(t) = Vt\\cos\\theta\\;\\underset{\\sim}{i} + \\left(Vt\\sin\\theta - \\tfrac12gt^2\\right)\\underset{\\sim}{j}"
+        },
+        {
+         "k": "p",
+         "t": "relative to $O$. (Do NOT prove this.) The ball lands on the plane at $Q$. The vector $\\underset{\\sim}{n} = -\\sin\\alpha\\,\\underset{\\sim}{i} + \\cos\\alpha\\,\\underset{\\sim}{j}$ is a unit vector perpendicular to the plane."
+        },
+        {
+         "k": "fig",
+         "name": "figincline"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q14a-i",
+         "label": "(i)",
+         "marks": 1,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that $\\underset{\\sim}{r}(t)\\cdot\\underset{\\sim}{n} = Vt\\sin(\\theta - \\alpha) - \\tfrac12gt^2\\cos\\alpha$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$\\underset{\\sim}{r}(t)\\cdot\\underset{\\sim}{n} = -Vt\\cos\\theta\\sin\\alpha + Vt\\sin\\theta\\cos\\alpha - \\tfrac12gt^2\\cos\\alpha = Vt\\sin(\\theta - \\alpha) - \\tfrac12gt^2\\cos\\alpha$."
+          }
+         ],
+         "classification": {
+          "content": "Projectile motion in vector form; trigonometric identities; optimisation",
+          "outcomes": [
+           "ME1-12-02",
+           "ME1-11-03"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14a-ii",
+         "label": "(ii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that $\\ OQ = \\dfrac{2V^2\\cos\\theta\\sin(\\theta - \\alpha)}{g\\cos^2\\alpha}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the time at which the ball lands on the plane"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The ball is on the plane when $\\underset{\\sim}{r}(t)\\cdot\\underset{\\sim}{n} = 0$, and it lands when $t = \\dfrac{2V\\sin(\\theta - \\alpha)}{g\\cos\\alpha}$. The horizontal distance travelled is then $Vt\\cos\\theta = OQ\\cos\\alpha$, so"
+          },
+          {
+           "k": "math",
+           "t": "OQ = \\frac{V\\cos\\theta}{\\cos\\alpha} \\times \\frac{2V\\sin(\\theta - \\alpha)}{g\\cos\\alpha} = \\frac{2V^2\\cos\\theta\\sin(\\theta - \\alpha)}{g\\cos^2\\alpha}."
+          }
+         ],
+         "classification": {
+          "content": "Projectile motion in vector form; trigonometric identities; optimisation",
+          "outcomes": [
+           "ME1-12-02",
+           "ME1-11-03"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14a-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the greatest value of $OQ$ as $\\theta$ varies."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct greatest value"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the value of $\\theta$ that gives the greatest distance"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes $2\\cos\\theta\\sin(\\theta - \\alpha)$ as a difference of sines, or differentiates $OQ$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$2\\cos\\theta\\sin(\\theta - \\alpha) = \\sin(2\\theta - \\alpha) - \\sin\\alpha$. Since $\\alpha < 2\\theta - \\alpha < \\pi - \\alpha$, this is greatest when $2\\theta - \\alpha = \\dfrac{\\pi}{2}$, that is, $\\theta = \\dfrac{\\pi}{4} + \\dfrac{\\alpha}{2}$. The greatest value of $OQ$ is"
+          },
+          {
+           "k": "math",
+           "t": "\\frac{V^2(1 - \\sin\\alpha)}{g\\cos^2\\alpha} = \\frac{V^2(1 - \\sin\\alpha)}{g(1 - \\sin\\alpha)(1 + \\sin\\alpha)} = \\frac{V^2}{g(1 + \\sin\\alpha)}."
+          }
+         ],
+         "classification": {
+          "content": "Projectile motion in vector form; trigonometric identities; optimisation",
+          "outcomes": [
+           "ME1-12-02",
+           "ME1-11-03"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "V^2/(g*(1+sin(alpha)))",
+          "display": "\\dfrac{V^2}{g(1+\\sin\\alpha)}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p08.py: landing time from r.n=0, OQ=t V cos(theta)/cos(alpha); golden-section maximum over theta for 10 random (V,g,alpha)"
+        },
+        {
+         "id": "q14a-iv",
+         "label": "(iv)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that the ball strikes the plane at right angles exactly when"
+          },
+          {
+           "k": "math",
+           "t": "2\\tan(\\theta - \\alpha) = \\cot\\alpha."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the velocity at $Q$ and writes the condition as a scalar product with a vector along the plane"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The ball strikes the plane at right angles when its velocity $V\\cos\\theta\\,\\underset{\\sim}{i} + (V\\sin\\theta - gt)\\,\\underset{\\sim}{j}$ is perpendicular to $\\cos\\alpha\\,\\underset{\\sim}{i} + \\sin\\alpha\\,\\underset{\\sim}{j}$, a vector along the plane:"
+          },
+          {
+           "k": "math",
+           "t": "V\\cos\\theta\\cos\\alpha + V\\sin\\theta\\sin\\alpha - gt\\sin\\alpha = 0, \\qquad\\text{that is,}\\qquad V\\cos(\\theta - \\alpha) = gt\\sin\\alpha."
+          },
+          {
+           "k": "p",
+           "t": "With $t = \\dfrac{2V\\sin(\\theta - \\alpha)}{g\\cos\\alpha}$ this is $\\cos(\\theta - \\alpha) = \\dfrac{2\\sin(\\theta - \\alpha)\\sin\\alpha}{\\cos\\alpha}$, that is, $\\cot\\alpha = 2\\tan(\\theta - \\alpha)$."
+          }
+         ],
+         "classification": {
+          "content": "Projectile motion in vector form; trigonometric identities; optimisation",
+          "outcomes": [
+           "ME1-12-02",
+           "ME1-11-03"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figincline"
+       ]
+      },
+      {
+       "id": "q14b",
+       "label": "(b)",
+       "marks": 7,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A manager interviews $n$ candidates for a job one at a time, in a random order, all orders being equally likely, where $n \\ge 3$. After each interview the manager can rank that candidate against all those already seen, and must then either offer the job to that candidate (and stop) or reject the candidate for good."
+        },
+        {
+         "k": "p",
+         "t": "The manager chooses an integer $r$ with $1 \\le r < n$, rejects the first $r$ candidates, and then offers the job to the first candidate who is better than every candidate seen before. Let $P(r)$ be the probability that the job is offered to the best of the $n$ candidates."
+        },
+        {
+         "k": "fig",
+         "name": "figcand"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q14b-i",
+         "label": "(i)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Suppose the best candidate is in position $k$, where $k > r$. Explain why the best candidate is offered the job exactly when the best of the first $k - 1$ candidates is among the first $r$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct explanation"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Explains one direction of the equivalence"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "If the best of the first $k - 1$ candidates is among the first $r$, then none of candidates $r + 1, \\ldots, k - 1$ is better than everyone seen before (each is worse than that candidate), so no offer is made before position $k$, and the best candidate, being better than everyone, is offered the job."
+          },
+          {
+           "k": "p",
+           "t": "If instead the best of the first $k - 1$ is in position $j$ with $r < j < k$, then that candidate is better than everyone before position $j$ and is offered the job, so the best candidate is never reached."
+          }
+         ],
+         "classification": {
+          "content": "Probability; exact calculation from a sum; optimisation",
+          "outcomes": [
+           "ME1-12-06",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "proof-explain",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14b-ii",
+         "label": "(ii)",
+         "marks": 1,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that $\\ P(r) = \\dfrac{r}{n}\\displaystyle\\sum_{k=r+1}^{n}\\frac{1}{k - 1}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The best candidate is in position $k$ with probability $\\dfrac1n$. If $k \\le r$ the best candidate is rejected. If $k > r$, the best of the first $k - 1$ candidates is equally likely to be in each of those $k - 1$ positions, so by part (i) the best candidate is chosen with probability $\\dfrac{r}{k - 1}$. Adding over $k$,"
+          },
+          {
+           "k": "math",
+           "t": "P(r) = \\sum_{k=r+1}^{n}\\frac1n \\times \\frac{r}{k - 1} = \\frac{r}{n}\\sum_{k=r+1}^{n}\\frac{1}{k - 1}."
+          }
+         ],
+         "classification": {
+          "content": "Probability; exact calculation from a sum; optimisation",
+          "outcomes": [
+           "ME1-12-06",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14b-iii",
+         "label": "(iii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Suppose that $n = 5$. Find the value of $r$ for which $P(r)$ is greatest, and the greatest value of $P(r)$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct value of $r$ and the greatest value"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Uses part (ii) to find $P(r)$ for the possible values of $r$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "By part (ii) with $n = 5$: $P(1) = \\dfrac15\\left(1 + \\dfrac12 + \\dfrac13 + \\dfrac14\\right) = \\dfrac{5}{12}$, $\\ P(2) = \\dfrac25\\left(\\dfrac12 + \\dfrac13 + \\dfrac14\\right) = \\dfrac{13}{30}$, $\\ P(3) = \\dfrac35\\left(\\dfrac13 + \\dfrac14\\right) = \\dfrac{7}{20}$, $\\ P(4) = \\dfrac45 \\times \\dfrac14 = \\dfrac15$. The greatest value is $P(2) = \\dfrac{13}{30}$, when $r = 2$."
+          }
+         ],
+         "classification": {
+          "content": "Probability; exact calculation from a sum; optimisation",
+          "outcomes": [
+           "ME1-12-06",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14b-iv",
+         "label": "(iv)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "It can be shown that, for large $n$, $P(r)$ is approximately $x\\ln\\dfrac1x$, where $x = \\dfrac{r}{n}$. (Do NOT prove this.) Find the greatest value of $x\\ln\\dfrac1x$ for $0 < x < 1$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct greatest value with justification"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the stationary point"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Let $f(x) = -x\\ln x$. Then $f'(x) = -\\ln x - 1$, which is positive for $x < \\dfrac1e$ and negative for $x > \\dfrac1e$. So the greatest value is $f\\left(\\dfrac1e\\right) = \\dfrac1e$."
+          },
+          {
+           "k": "p",
+           "t": "(So if the manager rejects about $\\dfrac{n}{e}$ of the candidates, about 37%, the best candidate is chosen with probability close to $\\dfrac1e$, however large $n$ is.)"
+          }
+         ],
+         "classification": {
+          "content": "Probability; exact calculation from a sum; optimisation",
+          "outcomes": [
+           "ME1-12-06",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "1/e",
+          "display": "\\dfrac1e"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p08.py: golden-section maximum of x ln(1/x) on (0,1) = 0.367879441"
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figcand"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "figures": [
+  "figchords",
+  "figtankeight",
+  "figQ10OptA",
+  "figQ10OptB",
+  "figQ10OptC",
+  "figQ10OptD",
+  "figbis",
+  "figtorus",
+  "figrain",
+  "figplough",
+  "figincline",
+  "figcand"
+ ]
+}

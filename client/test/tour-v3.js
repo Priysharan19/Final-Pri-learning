@@ -184,7 +184,7 @@ export const flow = {
     await check('a correct answer is not told what was expected instead',
       !/Expected:/.test(marked), `evaluation reads ${JSON.stringify(marked.slice(0, 160))}`);
     await check('the session counter agrees it was right',
-      /session 1\/2/.test(await page.locator('.ctx-pill-meta').innerText()),
+      /1 of 2 right this session/.test(await page.locator('.ctx-pill-meta').innerText()),
       `context pill reads ${JSON.stringify(await page.locator('.ctx-pill-meta').innerText())}`);
     const ledger = online.ledger();
     await check('the server holds exactly these two questions as completed, once each',

@@ -1,0 +1,1447 @@
+{
+  "format": "pri-paper-v1",
+  "id": "mp-practice-set-1",
+  "paperNumber": 101,
+  "title": "Exam-style practice set 1",
+  "course": "nsw-practice",
+  "edition": "prithagoras",
+  "generated": true,
+  "provenance": {
+    "generator": "tools/build-multipart-papers.mjs",
+    "seed": 1,
+    "sets": [
+      "mp-adv12-stationary",
+      "mp-adv12-motion-exp",
+      "mp-adv12-exp-model",
+      "mp-adv11-trig-identity-equation",
+      "mp-adv12-log-laws",
+      "mp-adv12-area-integral",
+      "mp-ext1-vectors",
+      "mp-ext1-projectile"
+    ],
+    "note": "Generated practice questions. Not an HSC or NESA paper. No examiner has reviewed them."
+  },
+  "totalMarks": 52,
+  "readingTime": "0 minutes",
+  "workingTime": "89 minutes",
+  "markingScheme": {
+    "status": "generated",
+    "note": "One criterion per part, the correct final answer. Not approved for criterion marks.",
+    "digest": "185a7c6614019ca727a0d26b7dcc7bec317228d1d142c69e0cca08f6531b7731"
+  },
+  "sections": [
+    {
+      "id": "I",
+      "title": "Multi-part practice questions",
+      "marks": 52,
+      "minutes": 89,
+      "instructions": "Answer each part in its own box. A part is marked on its final answer. Show relevant mathematical reasoning.",
+      "questions": [
+        {
+          "id": "q1",
+          "number": 1,
+          "marks": 7,
+          "stem": [
+            {
+              "k": "p",
+              "t": "A curve has equation $y = f(x)$, where $f(x) = 2x^3 - 9x^2 + 12x + 1$."
+            }
+          ],
+          "figures": [],
+          "parts": [
+            {
+              "id": "q1a",
+              "label": "(a)",
+              "marks": 2,
+              "prompt": [
+                {
+                  "k": "p",
+                  "t": "Find $f'(x)$."
+                }
+              ],
+              "criteria": [
+                {
+                  "text": [
+                    {
+                      "k": "p",
+                      "t": "Provides the correct answer"
+                    }
+                  ],
+                  "marks": 2
+                }
+              ],
+              "sampleAnswer": [
+                {
+                  "k": "p",
+                  "t": "Power rule: Multiply each coefficient by its power, then reduce the power by one."
+                },
+                {
+                  "k": "p",
+                  "t": "Result: $f'(x) = 6x^2 - 18x + 12$"
+                }
+              ],
+              "classification": {
+                "content": "Stationary points of a cubic",
+                "outcomes": [
+                  "MAV-11-06",
+                  "MAV-12-06"
+                ]
+              },
+              "figures": [],
+              "answerType": "expression",
+              "key": {
+                "type": "expression",
+                "expr": "6*x^2-18*x+12"
+              },
+              "autoMarks": 2
+            },
+            {
+              "id": "q1b",
+              "label": "(b)",
+              "marks": 2,
+              "prompt": [
+                {
+                  "k": "p",
+                  "t": "You may use $f'(x) = 6x^2 - 18x + 12$. Hence find the $x$-coordinates of the stationary points of the curve."
+                }
+              ],
+              "criteria": [
+                {
+                  "text": [
+                    {
+                      "k": "p",
+                      "t": "Provides the correct answer"
+                    }
+                  ],
+                  "marks": 2
+                }
+              ],
+              "sampleAnswer": [
+                {
+                  "k": "p",
+                  "t": "Set the gradient to zero: $6x^2 - 18x + 12 = 0$"
+                },
+                {
+                  "k": "p",
+                  "t": "Factorise: $6(x - 1)(x - 2) = 0$"
+                },
+                {
+                  "k": "p",
+                  "t": "Solve: $x = 1$ or $x = 2$"
+                }
+              ],
+              "classification": {
+                "content": "Stationary points of a cubic",
+                "outcomes": [
+                  "MAV-11-06",
+                  "MAV-12-06"
+                ]
+              },
+              "figures": [],
+              "answerType": "value",
+              "key": {
+                "type": "set",
+                "values": [
+                  1,
+                  2
+                ]
+              },
+              "autoMarks": 2
+            },
+            {
+              "id": "q1c",
+              "label": "(c)",
+              "marks": 3,
+              "prompt": [
+                {
+                  "k": "p",
+                  "t": "The curve has stationary points at $x = 1$ and $x = 2$. Find the $y$-coordinate of the local maximum."
+                }
+              ],
+              "criteria": [
+                {
+                  "text": [
+                    {
+                      "k": "p",
+                      "t": "Provides the correct answer"
+                    }
+                  ],
+                  "marks": 3
+                }
+              ],
+              "sampleAnswer": [
+                {
+                  "k": "p",
+                  "t": "Which point: The leading coefficient is positive, so the local maximum is at the smaller value, $x = 1$."
+                },
+                {
+                  "k": "p",
+                  "t": "Substitute: $f(1) = 6$"
+                }
+              ],
+              "classification": {
+                "content": "Stationary points of a cubic",
+                "outcomes": [
+                  "MAV-11-06",
+                  "MAV-12-06"
+                ]
+              },
+              "figures": [],
+              "answerType": "value",
+              "key": {
+                "type": "numeric",
+                "value": 6
+              },
+              "autoMarks": 3
+            }
+          ]
+        },
+        {
+          "id": "q2",
+          "number": 2,
+          "marks": 6,
+          "stem": [
+            {
+              "k": "p",
+              "t": "A particle moves along a straight line. Its displacement $x$ metres from the origin at time $t$ seconds is given by $x = 18 - 9e^{-0.25t}$, for $t \\ge 0$."
+            }
+          ],
+          "figures": [],
+          "parts": [
+            {
+              "id": "q2a",
+              "label": "(a)",
+              "marks": 2,
+              "prompt": [
+                {
+                  "k": "p",
+                  "t": "Find an expression for the velocity $v$ of the particle at time $t$."
+                }
+              ],
+              "criteria": [
+                {
+                  "text": [
+                    {
+                      "k": "p",
+                      "t": "Provides the correct answer"
+                    }
+                  ],
+                  "marks": 2
+                }
+              ],
+              "sampleAnswer": [
+                {
+                  "k": "p",
+                  "t": "Differentiate: $\\dfrac{d}{dt}\\left(18 - 9e^{-0.25t}\\right)$"
+                },
+                {
+                  "k": "p",
+                  "t": "Apply the rule: $v = -9\\times(-0.25)e^{-0.25t} = 2.25e^{-0.25t}$"
+                }
+              ],
+              "classification": {
+                "content": "Motion with an exponential displacement",
+                "outcomes": [
+                  "MAV-12-04",
+                  "MAV-12-06"
+                ]
+              },
+              "figures": [],
+              "answerType": "expression",
+              "key": {
+                "type": "expression",
+                "expr": "2.25*exp(-0.25*t)"
+              },
+              "autoMarks": 2
+            },
+            {
+              "id": "q2b",
+              "label": "(b)",
+              "marks": 1,
+              "prompt": [
+                {
+                  "k": "p",
+                  "t": "You may use $v = 2.25e^{-0.25t}$. Find the initial velocity of the particle."
+                }
+              ],
+              "criteria": [
+                {
+                  "text": [
+                    {
+                      "k": "p",
+                      "t": "Provides the correct answer"
+                    }
+                  ],
+                  "marks": 1
+                }
+              ],
+              "sampleAnswer": [
+                {
+                  "k": "p",
+                  "t": "Substitute: At $t = 0$, $e^{-0.25\\times 0} = e^0 = 1$."
+                },
+                {
+                  "k": "p",
+                  "t": "Evaluate: $v(0) = 2.25$ m/s"
+                }
+              ],
+              "classification": {
+                "content": "Motion with an exponential displacement",
+                "outcomes": [
+                  "MAV-12-04",
+                  "MAV-12-06"
+                ]
+              },
+              "figures": [],
+              "answerType": "value",
+              "key": {
+                "type": "numeric",
+                "value": 2.25
+              },
+              "autoMarks": 1,
+              "answerSuffix": "m/s"
+            },
+            {
+              "id": "q2c",
+              "label": "(c)",
+              "marks": 2,
+              "prompt": [
+                {
+                  "k": "p",
+                  "t": "You may use $v = 2.25e^{-0.25t}$. Find the time at which the velocity of the particle is $1$ m/s, correct to 2 decimal places."
+                }
+              ],
+              "criteria": [
+                {
+                  "text": [
+                    {
+                      "k": "p",
+                      "t": "Provides the correct answer"
+                    }
+                  ],
+                  "marks": 2
+                }
+              ],
+              "sampleAnswer": [
+                {
+                  "k": "p",
+                  "t": "Equation: $2.25e^{-0.25t} = 1$"
+                },
+                {
+                  "k": "p",
+                  "t": "Isolate: $e^{-0.25t} = \\dfrac{1}{2.25}$"
+                },
+                {
+                  "k": "p",
+                  "t": "Take logarithms: $t = \\dfrac{\\ln(2.25/1)}{0.25} \\approx 3.24$"
+                }
+              ],
+              "classification": {
+                "content": "Motion with an exponential displacement",
+                "outcomes": [
+                  "MAV-12-04",
+                  "MAV-12-06"
+                ]
+              },
+              "figures": [],
+              "answerType": "value",
+              "key": {
+                "type": "numeric",
+                "value": 3.24,
+                "tol": 0.005
+              },
+              "autoMarks": 2,
+              "answerSuffix": "s"
+            },
+            {
+              "id": "q2d",
+              "label": "(d)",
+              "marks": 1,
+              "prompt": [
+                {
+                  "k": "p",
+                  "t": "Find the displacement of the particle as $t \\to \\infty$."
+                }
+              ],
+              "criteria": [
+                {
+                  "text": [
+                    {
+                      "k": "p",
+                      "t": "Provides the correct answer"
+                    }
+                  ],
+                  "marks": 1
+                }
+              ],
+              "sampleAnswer": [
+                {
+                  "k": "p",
+                  "t": "Exponential term: As $t \\to \\infty$, $e^{-0.25t} \\to 0$."
+                },
+                {
+                  "k": "p",
+                  "t": "Limit: So $x \\to 18 - 9(0) = 18$ m."
+                }
+              ],
+              "classification": {
+                "content": "Motion with an exponential displacement",
+                "outcomes": [
+                  "MAV-12-04",
+                  "MAV-12-06"
+                ]
+              },
+              "figures": [],
+              "answerType": "value",
+              "key": {
+                "type": "numeric",
+                "value": 18
+              },
+              "autoMarks": 1,
+              "answerSuffix": "m"
+            }
+          ]
+        },
+        {
+          "id": "q3",
+          "number": 3,
+          "marks": 7,
+          "stem": [
+            {
+              "k": "p",
+              "t": "The mass $M$ grams of a radioactive substance after $t$ years is modelled by $M = 120e^{-0.02t}$."
+            }
+          ],
+          "figures": [],
+          "parts": [
+            {
+              "id": "q3a",
+              "label": "(a)",
+              "marks": 2,
+              "prompt": [
+                {
+                  "k": "p",
+                  "t": "Find the mass of the substance after 18 years, correct to 2 decimal places."
+                }
+              ],
+              "criteria": [
+                {
+                  "text": [
+                    {
+                      "k": "p",
+                      "t": "Provides the correct answer"
+                    }
+                  ],
+                  "marks": 2
+                }
+              ],
+              "sampleAnswer": [
+                {
+                  "k": "p",
+                  "t": "Substitute: $M = 120e^{-0.02\\times 18}$"
+                },
+                {
+                  "k": "p",
+                  "t": "Evaluate: $M \\approx 83.72$ g"
+                }
+              ],
+              "classification": {
+                "content": "Exponential decay model",
+                "outcomes": [
+                  "MAV-11-07",
+                  "MAV-12-06"
+                ]
+              },
+              "figures": [],
+              "answerType": "value",
+              "key": {
+                "type": "numeric",
+                "value": 83.72,
+                "tol": 0.005
+              },
+              "autoMarks": 2,
+              "answerSuffix": "g"
+            },
+            {
+              "id": "q3b",
+              "label": "(b)",
+              "marks": 2,
+              "prompt": [
+                {
+                  "k": "p",
+                  "t": "The half-life is the time taken for the mass to fall to half of its initial value. Find the half-life, correct to 1 decimal place."
+                }
+              ],
+              "criteria": [
+                {
+                  "text": [
+                    {
+                      "k": "p",
+                      "t": "Provides the correct answer"
+                    }
+                  ],
+                  "marks": 2
+                }
+              ],
+              "sampleAnswer": [
+                {
+                  "k": "p",
+                  "t": "Set up: $120e^{-0.02t} = 60$, so $e^{-0.02t} = \\dfrac{1}{2}$"
+                },
+                {
+                  "k": "p",
+                  "t": "Logarithms: $-0.02t = -\\ln 2$"
+                },
+                {
+                  "k": "p",
+                  "t": "Solve: $t = \\dfrac{\\ln 2}{0.02} \\approx 34.7$ years"
+                }
+              ],
+              "classification": {
+                "content": "Exponential decay model",
+                "outcomes": [
+                  "MAV-11-07",
+                  "MAV-12-06"
+                ]
+              },
+              "figures": [],
+              "answerType": "value",
+              "key": {
+                "type": "numeric",
+                "value": 34.7,
+                "tol": 0.05
+              },
+              "autoMarks": 2,
+              "answerSuffix": "years"
+            },
+            {
+              "id": "q3c",
+              "label": "(c)",
+              "marks": 3,
+              "prompt": [
+                {
+                  "k": "p",
+                  "t": "You may use $\\dfrac{dM}{dt} = -0.02M$. Hence find the rate at which the mass is decreasing at the instant when the mass is $116$ g."
+                }
+              ],
+              "criteria": [
+                {
+                  "text": [
+                    {
+                      "k": "p",
+                      "t": "Provides the correct answer"
+                    }
+                  ],
+                  "marks": 3
+                }
+              ],
+              "sampleAnswer": [
+                {
+                  "k": "p",
+                  "t": "Substitute: $\\dfrac{dM}{dt} = -0.02\\times 116$"
+                },
+                {
+                  "k": "p",
+                  "t": "Interpret: $\\dfrac{dM}{dt} = -2.32$, so the mass is decreasing at 2.32 g/year."
+                }
+              ],
+              "classification": {
+                "content": "Exponential decay model",
+                "outcomes": [
+                  "MAV-11-07",
+                  "MAV-12-06"
+                ]
+              },
+              "figures": [],
+              "answerType": "value",
+              "key": {
+                "type": "numeric",
+                "value": 2.32
+              },
+              "autoMarks": 3,
+              "answerSuffix": "g/year"
+            }
+          ]
+        },
+        {
+          "id": "q4",
+          "number": 4,
+          "marks": 6,
+          "stem": [
+            {
+              "k": "p",
+              "t": "The angle $\\theta$ satisfies $\\sin\\theta = \\dfrac{11}{61}$ and $90^\\circ < \\theta < 180^\\circ$."
+            }
+          ],
+          "figures": [],
+          "parts": [
+            {
+              "id": "q4a",
+              "label": "(a)",
+              "marks": 2,
+              "prompt": [
+                {
+                  "k": "p",
+                  "t": "Find $\\cos\\theta$, correct to 3 decimal places."
+                }
+              ],
+              "criteria": [
+                {
+                  "text": [
+                    {
+                      "k": "p",
+                      "t": "Provides the correct answer"
+                    }
+                  ],
+                  "marks": 2
+                }
+              ],
+              "sampleAnswer": [
+                {
+                  "k": "p",
+                  "t": "Identity: $\\cos^2\\theta = 1 - \\left(\\dfrac{11}{61}\\right)^2 = \\dfrac{3600}{3721}$"
+                },
+                {
+                  "k": "p",
+                  "t": "Sign: $\\theta$ is obtuse, so $\\cos\\theta = -\\dfrac{60}{61} \\approx -0.984$"
+                }
+              ],
+              "classification": {
+                "content": "Trigonometric ratios and equations",
+                "outcomes": [
+                  "MAV-11-04",
+                  "MAV-11-05"
+                ]
+              },
+              "figures": [],
+              "answerType": "value",
+              "key": {
+                "type": "numeric",
+                "value": -0.984,
+                "tol": 0.0005
+              },
+              "autoMarks": 2
+            },
+            {
+              "id": "q4b",
+              "label": "(b)",
+              "marks": 2,
+              "prompt": [
+                {
+                  "k": "p",
+                  "t": "You may use $\\cos\\theta = -\\dfrac{60}{61}$. Hence find $\\tan\\theta$, correct to 3 decimal places."
+                }
+              ],
+              "criteria": [
+                {
+                  "text": [
+                    {
+                      "k": "p",
+                      "t": "Provides the correct answer"
+                    }
+                  ],
+                  "marks": 2
+                }
+              ],
+              "sampleAnswer": [
+                {
+                  "k": "p",
+                  "t": "Ratio identity: $\\tan\\theta = \\dfrac{\\sin\\theta}{\\cos\\theta}$"
+                },
+                {
+                  "k": "p",
+                  "t": "Substitute: $\\dfrac{11/61}{-60/61} = -\\dfrac{11}{60} \\approx -0.183$"
+                }
+              ],
+              "classification": {
+                "content": "Trigonometric ratios and equations",
+                "outcomes": [
+                  "MAV-11-04",
+                  "MAV-11-05"
+                ]
+              },
+              "figures": [],
+              "answerType": "value",
+              "key": {
+                "type": "numeric",
+                "value": -0.183,
+                "tol": 0.0005
+              },
+              "autoMarks": 2
+            },
+            {
+              "id": "q4c",
+              "label": "(c)",
+              "marks": 2,
+              "prompt": [
+                {
+                  "k": "p",
+                  "t": "Find $\\theta$ in degrees, correct to 1 decimal place."
+                }
+              ],
+              "criteria": [
+                {
+                  "text": [
+                    {
+                      "k": "p",
+                      "t": "Provides the correct answer"
+                    }
+                  ],
+                  "marks": 2
+                }
+              ],
+              "sampleAnswer": [
+                {
+                  "k": "p",
+                  "t": "Acute angle: $\\sin^{-1}\\left(\\dfrac{11}{61}\\right) \\approx 10.4^\\circ$"
+                },
+                {
+                  "k": "p",
+                  "t": "Obtuse angle: $\\theta = 180^\\circ - 10.4^\\circ = 169.6^\\circ$"
+                }
+              ],
+              "classification": {
+                "content": "Trigonometric ratios and equations",
+                "outcomes": [
+                  "MAV-11-04",
+                  "MAV-11-05"
+                ]
+              },
+              "figures": [],
+              "answerType": "value",
+              "key": {
+                "type": "numeric",
+                "value": 169.6,
+                "tol": 0.05
+              },
+              "autoMarks": 2,
+              "answerSuffix": "°"
+            }
+          ]
+        },
+        {
+          "id": "q5",
+          "number": 5,
+          "marks": 6,
+          "stem": [
+            {
+              "k": "p",
+              "t": "Consider the equation $\\log_2 x + \\log_2 (x - 7) = 3$, where $x > 7$."
+            }
+          ],
+          "figures": [],
+          "parts": [
+            {
+              "id": "q5a",
+              "label": "(a)",
+              "marks": 1,
+              "prompt": [
+                {
+                  "k": "p",
+                  "t": "Use the logarithm laws to write the equation in the form $x(x - 7) = N$. Find $N$."
+                }
+              ],
+              "criteria": [
+                {
+                  "text": [
+                    {
+                      "k": "p",
+                      "t": "Provides the correct answer"
+                    }
+                  ],
+                  "marks": 1
+                }
+              ],
+              "sampleAnswer": [
+                {
+                  "k": "p",
+                  "t": "Combine: $\\log_2 \\left[x(x - 7)\\right] = 3$"
+                },
+                {
+                  "k": "p",
+                  "t": "Index form: $x(x - 7) = 2^{3} = 8$"
+                }
+              ],
+              "classification": {
+                "content": "Logarithm laws and equations",
+                "outcomes": [
+                  "MAV-11-07",
+                  "MAV-11-08"
+                ]
+              },
+              "figures": [],
+              "answerType": "value",
+              "key": {
+                "type": "numeric",
+                "value": 8
+              },
+              "autoMarks": 1
+            },
+            {
+              "id": "q5b",
+              "label": "(b)",
+              "marks": 3,
+              "prompt": [
+                {
+                  "k": "p",
+                  "t": "You may use $x^2 - 7x = 8$. Hence find the value of $x$ that satisfies the original equation."
+                }
+              ],
+              "criteria": [
+                {
+                  "text": [
+                    {
+                      "k": "p",
+                      "t": "Provides the correct answer"
+                    }
+                  ],
+                  "marks": 3
+                }
+              ],
+              "sampleAnswer": [
+                {
+                  "k": "p",
+                  "t": "Rearrange: $x^2 - 7x - 8 = 0$"
+                },
+                {
+                  "k": "p",
+                  "t": "Factorise: $(x - 8)(x + 1) = 0$"
+                },
+                {
+                  "k": "p",
+                  "t": "Reject a root: $x = 8$ or $x = -1$; since $x > 7$, $x = 8$."
+                }
+              ],
+              "classification": {
+                "content": "Logarithm laws and equations",
+                "outcomes": [
+                  "MAV-11-07",
+                  "MAV-11-08"
+                ]
+              },
+              "figures": [],
+              "answerType": "value",
+              "key": {
+                "type": "numeric",
+                "value": 8
+              },
+              "autoMarks": 3
+            },
+            {
+              "id": "q5c",
+              "label": "(c)",
+              "marks": 2,
+              "prompt": [
+                {
+                  "k": "p",
+                  "t": "Given that $x = 8$, evaluate $\\log_{4} x$."
+                }
+              ],
+              "criteria": [
+                {
+                  "text": [
+                    {
+                      "k": "p",
+                      "t": "Provides the correct answer"
+                    }
+                  ],
+                  "marks": 2
+                }
+              ],
+              "sampleAnswer": [
+                {
+                  "k": "p",
+                  "t": "Powers of 2: $8 = 2^{3}$ and $4 = 2^2$"
+                },
+                {
+                  "k": "p",
+                  "t": "Change of base: $\\log_{4} 8 = \\dfrac{\\log_2 8}{\\log_2 4} = \\dfrac{3}{2} = 1.5$"
+                }
+              ],
+              "classification": {
+                "content": "Logarithm laws and equations",
+                "outcomes": [
+                  "MAV-11-07",
+                  "MAV-11-08"
+                ]
+              },
+              "figures": [],
+              "answerType": "value",
+              "key": {
+                "type": "numeric",
+                "value": 1.5
+              },
+              "autoMarks": 2
+            }
+          ]
+        },
+        {
+          "id": "q6",
+          "number": 6,
+          "marks": 6,
+          "stem": [
+            {
+              "k": "p",
+              "t": "The curve $y = 12x(2 - x)$ meets the $x$-axis at two points."
+            }
+          ],
+          "figures": [],
+          "parts": [
+            {
+              "id": "q6a",
+              "label": "(a)",
+              "marks": 1,
+              "prompt": [
+                {
+                  "k": "p",
+                  "t": "Find the $x$-coordinates of the points where the curve meets the $x$-axis."
+                }
+              ],
+              "criteria": [
+                {
+                  "text": [
+                    {
+                      "k": "p",
+                      "t": "Provides the correct answer"
+                    }
+                  ],
+                  "marks": 1
+                }
+              ],
+              "sampleAnswer": [
+                {
+                  "k": "p",
+                  "t": "Set y to zero: $12x(2 - x) = 0$"
+                },
+                {
+                  "k": "p",
+                  "t": "Solve: $x = 0$ or $x = 2$"
+                }
+              ],
+              "classification": {
+                "content": "Area under a curve",
+                "outcomes": [
+                  "MAV-12-05"
+                ]
+              },
+              "figures": [],
+              "answerType": "value",
+              "key": {
+                "type": "set",
+                "values": [
+                  0,
+                  2
+                ]
+              },
+              "autoMarks": 1
+            },
+            {
+              "id": "q6b",
+              "label": "(b)",
+              "marks": 2,
+              "prompt": [
+                {
+                  "k": "p",
+                  "t": "Find $\\displaystyle\\int 12x(2 - x)\\,dx$. (You may omit the $+C$.)"
+                }
+              ],
+              "criteria": [
+                {
+                  "text": [
+                    {
+                      "k": "p",
+                      "t": "Provides the correct answer"
+                    }
+                  ],
+                  "marks": 2
+                }
+              ],
+              "sampleAnswer": [
+                {
+                  "k": "p",
+                  "t": "Expand: $12x(2 - x) = 24x - 12x^2$"
+                },
+                {
+                  "k": "p",
+                  "t": "Integrate: $\\int (24x - 12x^2)\\,dx = 12x^2 - 4x^3 + C$"
+                }
+              ],
+              "classification": {
+                "content": "Area under a curve",
+                "outcomes": [
+                  "MAV-12-05"
+                ]
+              },
+              "figures": [],
+              "answerType": "expression",
+              "key": {
+                "type": "expression",
+                "expr": "12*x^2-4*x^3"
+              },
+              "autoMarks": 2
+            },
+            {
+              "id": "q6c",
+              "label": "(c)",
+              "marks": 3,
+              "prompt": [
+                {
+                  "k": "p",
+                  "t": "You may use $\\displaystyle\\int 12x(2 - x)\\,dx = 12x^2 - 4x^3 + C$. Hence find the area enclosed between the curve and the $x$-axis."
+                }
+              ],
+              "criteria": [
+                {
+                  "text": [
+                    {
+                      "k": "p",
+                      "t": "Provides the correct answer"
+                    }
+                  ],
+                  "marks": 3
+                }
+              ],
+              "sampleAnswer": [
+                {
+                  "k": "p",
+                  "t": "Limits: The area is $\\displaystyle\\int_0^{2} 12x(2 - x)\\,dx$."
+                },
+                {
+                  "k": "p",
+                  "t": "Substitute: $\\left[12x^2 - 4x^3\\right]_0^{2} = 12(2)^2 - 4(2)^3 - 0$"
+                },
+                {
+                  "k": "p",
+                  "t": "Evaluate: $16$ square units"
+                }
+              ],
+              "classification": {
+                "content": "Area under a curve",
+                "outcomes": [
+                  "MAV-12-05"
+                ]
+              },
+              "figures": [],
+              "answerType": "value",
+              "key": {
+                "type": "numeric",
+                "value": 16
+              },
+              "autoMarks": 3,
+              "answerSuffix": "square units"
+            }
+          ]
+        },
+        {
+          "id": "q7",
+          "number": 7,
+          "marks": 7,
+          "stem": [
+            {
+              "k": "p",
+              "t": "Let $\\underset{\\sim}{a} = \\begin{pmatrix} 2 \\\\ -6 \\end{pmatrix}$ and $\\underset{\\sim}{b} = \\begin{pmatrix} 6 \\\\ 6 \\end{pmatrix}$."
+            }
+          ],
+          "figures": [],
+          "parts": [
+            {
+              "id": "q7a",
+              "label": "(a)",
+              "marks": 2,
+              "prompt": [
+                {
+                  "k": "p",
+                  "t": "Find $\\left|-2\\underset{\\sim}{a} + \\underset{\\sim}{b}\\right|$, correct to 2 decimal places."
+                }
+              ],
+              "criteria": [
+                {
+                  "text": [
+                    {
+                      "k": "p",
+                      "t": "Provides the correct answer"
+                    }
+                  ],
+                  "marks": 2
+                }
+              ],
+              "sampleAnswer": [
+                {
+                  "k": "p",
+                  "t": "Combine: $\\begin{pmatrix} 2 \\\\ 18 \\end{pmatrix}$"
+                },
+                {
+                  "k": "p",
+                  "t": "Magnitude: $\\sqrt{4 + 324} \\approx 18.11$"
+                }
+              ],
+              "classification": {
+                "content": "Vectors in the plane",
+                "outcomes": [
+                  "ME1-12-02"
+                ]
+              },
+              "figures": [],
+              "answerType": "value",
+              "key": {
+                "type": "numeric",
+                "value": 18.11,
+                "tol": 0.0005
+              },
+              "autoMarks": 2
+            },
+            {
+              "id": "q7b",
+              "label": "(b)",
+              "marks": 1,
+              "prompt": [
+                {
+                  "k": "p",
+                  "t": "Find $\\underset{\\sim}{a}\\cdot\\underset{\\sim}{b}$."
+                }
+              ],
+              "criteria": [
+                {
+                  "text": [
+                    {
+                      "k": "p",
+                      "t": "Provides the correct answer"
+                    }
+                  ],
+                  "marks": 1
+                }
+              ],
+              "sampleAnswer": [
+                {
+                  "k": "p",
+                  "t": "Formula: $\\underset{\\sim}{a}\\cdot\\underset{\\sim}{b} = a_1b_1 + a_2b_2$"
+                },
+                {
+                  "k": "p",
+                  "t": "Substitute: $(2)(6) + (-6)(6) = -24$"
+                }
+              ],
+              "classification": {
+                "content": "Vectors in the plane",
+                "outcomes": [
+                  "ME1-12-02"
+                ]
+              },
+              "figures": [],
+              "answerType": "value",
+              "key": {
+                "type": "numeric",
+                "value": -24
+              },
+              "autoMarks": 1
+            },
+            {
+              "id": "q7c",
+              "label": "(c)",
+              "marks": 2,
+              "prompt": [
+                {
+                  "k": "p",
+                  "t": "You may use $\\underset{\\sim}{a}\\cdot\\underset{\\sim}{b} = -24$. Hence find the angle between $\\underset{\\sim}{a}$ and $\\underset{\\sim}{b}$, correct to 1 decimal place."
+                }
+              ],
+              "criteria": [
+                {
+                  "text": [
+                    {
+                      "k": "p",
+                      "t": "Provides the correct answer"
+                    }
+                  ],
+                  "marks": 2
+                }
+              ],
+              "sampleAnswer": [
+                {
+                  "k": "p",
+                  "t": "Magnitudes: $|\\underset{\\sim}{a}| = \\sqrt{40}$, $|\\underset{\\sim}{b}| = \\sqrt{72}$"
+                },
+                {
+                  "k": "p",
+                  "t": "Cosine: $\\cos\\theta = \\dfrac{-24}{\\sqrt{40}\\sqrt{72}}$"
+                },
+                {
+                  "k": "p",
+                  "t": "Angle: $\\theta \\approx 116.6^\\circ$"
+                }
+              ],
+              "classification": {
+                "content": "Vectors in the plane",
+                "outcomes": [
+                  "ME1-12-02"
+                ]
+              },
+              "figures": [],
+              "answerType": "value",
+              "key": {
+                "type": "numeric",
+                "value": 116.6,
+                "tol": 0.05
+              },
+              "autoMarks": 2,
+              "answerSuffix": "°"
+            },
+            {
+              "id": "q7d",
+              "label": "(d)",
+              "marks": 2,
+              "prompt": [
+                {
+                  "k": "p",
+                  "t": "You may use $\\underset{\\sim}{a}\\cdot\\underset{\\sim}{b} = -24$. Find the value of $k$ for which $\\underset{\\sim}{a} + k\\underset{\\sim}{b}$ is perpendicular to $\\underset{\\sim}{b}$, correct to 2 decimal places."
+                }
+              ],
+              "criteria": [
+                {
+                  "text": [
+                    {
+                      "k": "p",
+                      "t": "Provides the correct answer"
+                    }
+                  ],
+                  "marks": 2
+                }
+              ],
+              "sampleAnswer": [
+                {
+                  "k": "p",
+                  "t": "Perpendicular: $(\\underset{\\sim}{a} + k\\underset{\\sim}{b})\\cdot \\underset{\\sim}{b} = 0$"
+                },
+                {
+                  "k": "p",
+                  "t": "Expand: $\\underset{\\sim}{a}\\cdot\\underset{\\sim}{b} + k|\\underset{\\sim}{b}|^2 = 0$, so $-24 + 72k = 0$"
+                },
+                {
+                  "k": "p",
+                  "t": "Solve: $k = -\\dfrac{-24}{72} \\approx 0.33$"
+                }
+              ],
+              "classification": {
+                "content": "Vectors in the plane",
+                "outcomes": [
+                  "ME1-12-02"
+                ]
+              },
+              "figures": [],
+              "answerType": "value",
+              "key": {
+                "type": "numeric",
+                "value": 0.33,
+                "tol": 0.005
+              },
+              "autoMarks": 2
+            }
+          ]
+        },
+        {
+          "id": "q8",
+          "number": 8,
+          "marks": 7,
+          "stem": [
+            {
+              "k": "p",
+              "t": "A ball is kicked from level ground. At time $t$ seconds its horizontal and vertical positions, in metres, are $x = 30t$ and $y = 40t - 5t^2$. Ignore air resistance."
+            }
+          ],
+          "figures": [],
+          "parts": [
+            {
+              "id": "q8a",
+              "label": "(a)",
+              "marks": 1,
+              "prompt": [
+                {
+                  "k": "p",
+                  "t": "Find the initial speed of the ball."
+                }
+              ],
+              "criteria": [
+                {
+                  "text": [
+                    {
+                      "k": "p",
+                      "t": "Provides the correct answer"
+                    }
+                  ],
+                  "marks": 1
+                }
+              ],
+              "sampleAnswer": [
+                {
+                  "k": "p",
+                  "t": "Components: Initial velocity components: $30$ m/s and $40$ m/s."
+                },
+                {
+                  "k": "p",
+                  "t": "Magnitude: $\\sqrt{30^2 + 40^2} = 50$ m/s"
+                }
+              ],
+              "classification": {
+                "content": "Projectile motion",
+                "outcomes": [
+                  "ME1-12-02"
+                ]
+              },
+              "figures": [],
+              "answerType": "value",
+              "key": {
+                "type": "numeric",
+                "value": 50
+              },
+              "autoMarks": 1,
+              "answerSuffix": "m/s"
+            },
+            {
+              "id": "q8b",
+              "label": "(b)",
+              "marks": 2,
+              "prompt": [
+                {
+                  "k": "p",
+                  "t": "Find the time of flight, that is, the time when the ball returns to the ground."
+                }
+              ],
+              "criteria": [
+                {
+                  "text": [
+                    {
+                      "k": "p",
+                      "t": "Provides the correct answer"
+                    }
+                  ],
+                  "marks": 2
+                }
+              ],
+              "sampleAnswer": [
+                {
+                  "k": "p",
+                  "t": "Set y to zero: $40t - 5t^2 = 0$"
+                },
+                {
+                  "k": "p",
+                  "t": "Factorise: $t(40 - 5t) = 0$"
+                },
+                {
+                  "k": "p",
+                  "t": "Solve: $t = 0$ (launch) or $t = 8$"
+                }
+              ],
+              "classification": {
+                "content": "Projectile motion",
+                "outcomes": [
+                  "ME1-12-02"
+                ]
+              },
+              "figures": [],
+              "answerType": "value",
+              "key": {
+                "type": "numeric",
+                "value": 8
+              },
+              "autoMarks": 2,
+              "answerSuffix": "s"
+            },
+            {
+              "id": "q8c",
+              "label": "(c)",
+              "marks": 2,
+              "prompt": [
+                {
+                  "k": "p",
+                  "t": "You may use that the ball lands when $t = 8$. Hence find the horizontal range of the ball."
+                }
+              ],
+              "criteria": [
+                {
+                  "text": [
+                    {
+                      "k": "p",
+                      "t": "Provides the correct answer"
+                    }
+                  ],
+                  "marks": 2
+                }
+              ],
+              "sampleAnswer": [
+                {
+                  "k": "p",
+                  "t": "Substitute: $x = 30\\times 8$"
+                },
+                {
+                  "k": "p",
+                  "t": "Range: $240$ m"
+                }
+              ],
+              "classification": {
+                "content": "Projectile motion",
+                "outcomes": [
+                  "ME1-12-02"
+                ]
+              },
+              "figures": [],
+              "answerType": "value",
+              "key": {
+                "type": "numeric",
+                "value": 240
+              },
+              "autoMarks": 2,
+              "answerSuffix": "m"
+            },
+            {
+              "id": "q8d",
+              "label": "(d)",
+              "marks": 2,
+              "prompt": [
+                {
+                  "k": "p",
+                  "t": "Find the maximum height reached by the ball."
+                }
+              ],
+              "criteria": [
+                {
+                  "text": [
+                    {
+                      "k": "p",
+                      "t": "Provides the correct answer"
+                    }
+                  ],
+                  "marks": 2
+                }
+              ],
+              "sampleAnswer": [
+                {
+                  "k": "p",
+                  "t": "Vertical velocity: $\\dfrac{dy}{dt} = 40 - 10t = 0$, so $t = 4$"
+                },
+                {
+                  "k": "p",
+                  "t": "Substitute: $y = 40(4) - 5(4)^2 = 80$ m"
+                }
+              ],
+              "classification": {
+                "content": "Projectile motion",
+                "outcomes": [
+                  "ME1-12-02"
+                ]
+              },
+              "figures": [],
+              "answerType": "value",
+              "key": {
+                "type": "numeric",
+                "value": 80
+              },
+              "autoMarks": 2,
+              "answerSuffix": "m"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "figures": []
+}

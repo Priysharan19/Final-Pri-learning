@@ -148,7 +148,7 @@ export function runDemo({ glyph = null, lines = DEMO_LINES, chain = CHAIN, corre
       else if (chainBreak >= 0 && line.chain > chainBreak) status = STATUS.FOLLOWS;
       return { n: line.n, status, engine: row ? [row] : [] };
     }
-    const rows = line.claims(glyph).map(c => stepCheck(c.meta, c.working).lines || []);
+    const rows = line.claims(glyph).map(c => stepCheck(c.meta, c.working, { prompt: DEMO_QUESTION_TEX }).lines || []);
     const flat = rows.flat();
     let status = STATUS.UNVERIFIED;
     if (flat.some(r => r.status === 'break')) status = STATUS.ERROR;

@@ -76,13 +76,16 @@ export function Intuition({ text }) {
   );
 }
 
+/** A diagram title is set quietly: inline-size maths, no stretched brackets (\dfrac -> \tfrac, \left( -> plain). */
+export const quietTitle = t => String(t).replace(/\\dfrac/g, '\\tfrac').replace(/\\left\s*([([|])/g, '$1').replace(/\\right\s*([)\]|])/g, '$1');
+
 /** Teaching diagrams from the kit, each with the note that says what to look at. Interactive kinds stay interactive here. */
 export function TeachingDiagrams({ items }) {
   return (
     <div className="nn-diagrams">
       {items.map((d, i) => (
         <div key={i} className="nn-diagram">
-          {d.title && <h3 className="nn-diagram-t"><MathText text={d.title} /></h3>}
+          {d.title && <h3 className="nn-diagram-t"><MathText text={quietTitle(d.title)} /></h3>}
           <DiagramFromSpec spec={d.spec} interactive />
           {d.note && <MathText block className="nn-diagram-note" text={d.note} />}
         </div>
@@ -269,7 +272,7 @@ export function Flashcards({ chapter, points, onClose }) {
           <>
             <p className="nt-sr" aria-live="polite">{t('notes.cardProgress', { n: i + 1, total: points.length })}</p>
             <button type="button" key={i} className={`nt-card${flipped ? ' is-flipped' : ''}`} data-testid="notes-card"
-              aria-label={`${t('notes.flip')} — ${t('notes.cardProgress', { n: i + 1, total: points.length })}`}
+              aria-label={`${t('notes.flip')}, ${t('notes.cardProgress', { n: i + 1, total: points.length })}`}
               onClick={() => setFlipped(f => !f)}>
               <span className="nt-card-inner">
                 <span className="nt-card-face nt-card-front" aria-hidden={flipped}>

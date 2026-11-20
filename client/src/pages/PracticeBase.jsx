@@ -1,3 +1,4 @@
+import { playSound } from '../lib/sound.js';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import PageLink from '../components/PageLink.jsx';
@@ -11,6 +12,9 @@ import {
   assignmentProgressSummary, assignmentQuestionTarget, assignmentSessionFromSubmission
 } from '../platform/assignmentProgress.js';
 import QuestionCard, { SR_ONLY } from '../components/QuestionCard.jsx';
+import RecentAttempts from '../components/RecentAttempts.jsx';
+import { markTourSeen, tourSeen } from '../lib/firstRunTour.js';
+const PracticeTour = React.lazy(() => import('../components/PracticeTour.jsx'));   // on demand: seen once per account
 import PriExplain from '../components/PriExplain.jsx';
 import FreeCapNotice from '../components/FreeCapNotice.jsx';
 import { clearInkDraft, clearPendingSubmission, pendingSubmissionQuestionId, readPendingSubmission } from '../components/practiceRecovery.js';
@@ -23,6 +27,10 @@ import { consumeSessionReceipt } from './practiceSessionReceipt.js';
 import { shouldReloadPracticeOnCloudSignIn } from './practiceCloudRecovery.js';
 import { BRAND } from '../brand/edition.js';
 import Working from '../instrument/Working.jsx';
+import { difficultyPair } from '../lib/difficultyText.js';
+import DotpointPicker, { DotpointChip } from '../components/DotpointPicker.jsx';
+import { useAnnounce } from '../examShell/useAnnounce.js';
+import { chapterRowOf, dotpointChoices, readDotpointParam, withDotpoint } from '../lib/practiceDotpoints.js';
 
 // Reuse the existing verified account flow; never create a parallel practice login.
 const PracticeAccountRecovery = React.lazy(() => import('../components/CloudAccountPanel.jsx'));
@@ -72,6 +80,45 @@ function ProfilePractice() {
   const assignmentTargetReached = useRef(false);
   const assignmentSync = useRef(Promise.resolve());
   const [serve, setServe] = useState(null);
+  // The dot points of the topic in the URL, from the same GET /curriculum the home
+  // page reads. Offered for the Australian edition only; Indian chapters keep their own path.
+  const [chapterRow, setChapterRow] = useState(null);
+  useEffect(() => {
+    setChapterRow(null);
+    if (!subtopic || taskId || assignmentMode || user?.course === 'in') return undefined;
+    let live = true;
+    api.get('/curriculum').then(c => { if (live) setChapterRow(chapterRowOf(c, subtopic)); }).catch(() => { });
+    return () => { live = false; };
+  }, [subtopic, taskId, assignmentMode, user?.course]);
+  // First visit: the four-note tour, for a signed-in account that has not seen it.
+  const [tourOn, setTourOn] = useState(false);
+  const penDown = useRef(false);
+  useEffect(() => {
+    const down = e => { if (e.target?.closest?.('.ink-wrap')) penDown.current = true; };
+    const up = () => { penDown.current = false; };
+    document.addEventListener('pointerdown', down, true);
+    document.addEventListener('pointerup', up, true);
+    document.addEventListener('pointercancel', up, true);
+    return () => { document.removeEventListener('pointerdown', down, true); document.removeEventListener('pointerup', up, true); document.removeEventListener('pointercancel', up, true); };
+  }, []);
+  const tourReady = !!serve && !assignmentMode && user?.cloudLinked === true;
+  useEffect(() => {
+    if (!tourReady || tourSeen(user.id)) return undefined;
+    const timer = setTimeout(() => {
+      // Never interrupt someone who has started an answer: typed text, ink on the
+      // page, a pen stroke in progress, or a photo attached. (The empty answer
+      // box is focused on arrival, so focus alone says nothing.)
+      // A short window (a phone on its side) has no room for a note beside the work.
+      if (window.innerHeight < 500) return;
+      if (document.querySelector('.qpage[data-has-work="true"]') || penDown.current) return;
+      const a = document.activeElement;
+      if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA') && String(a.value || '') !== '') return;
+      if (a?.isContentEditable && String(a.textContent || '').trim() !== '') return;
+      setTourOn(true);
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [tourReady, user?.id]);
+  const closeTour = useCallback(seen => { if (seen) markTourSeen(user.id); setTourOn(false); }, [user?.id]);
   // v1.1 instrument: the question's number within this visit to Practice
   // (each distinct question shown counts once). Display only.
   const shownCount = useRef({ id: null, n: 0 });
@@ -368,6 +415,7 @@ function ProfilePractice() {
     if (!assignmentMode && !sessionDoneShown.current && before < goal && before + 1 >= goal) {
       sessionDoneShown.current = true;
       setSessionDone({ goal });
+      playSound('setDone');
     }
     const current = sessionRef.current;
     const next = {
@@ -384,10 +432,13 @@ function ProfilePractice() {
     syncAssignmentProgress(sessionRef.current);
   };
 
-  const redo = async () => {
+  // `carry` (optional): the student corrected a line on the marked page. The same question is issued again and the
+  // corrected page goes with it (ink/redoCarry.js), but only when it really is the same question.
+  const redo = async carry => {
     if (assignmentTargetReached.current || !serve?.question) return;
     try {
       const r = await api.post(`/history/${serve.question.id}/retry`, { variant: 'same' });
+      if (typeof carry === 'function' && r?.variant === 'same' && r?.question?.id) await carry(r.question.id).catch(() => {});
       setServe(r);
     } catch { load(); setServe(null); }
   };
@@ -428,9 +479,24 @@ function ProfilePractice() {
     || serve?.question?.subtopicName
     || t(taskId ? 'practice.taskPractice' : subtopic ? 'practice.topicPractice' : 'practice.smartPractice');
   const assignmentCompleteLocally = !!assignmentContext && assignmentTargetReached.current;
+  // The dot point in the URL, and whether the question on the page really belongs to it.
+  // A label is only ever worn by a question the server delivered from that dot point.
+  const dotpointRead = chapterRow && dotpoint != null ? readDotpointParam(chapterRow, dotpoint) : null;
+  const activeDotpoint = dotpointRead?.choice || null;
+  const servedDotpoint = activeDotpoint && serve && (serve.dotpoint === activeDotpoint.id || serve.question?.dotpoint === activeDotpoint.id)
+    ? activeDotpoint : null;
+  const { announce: announceDotpoint, region: dotpointRegion } = useAnnounce();
+  // One way to change the dot point: write the URL (every other filter kept) and say it aloud.
+  const chooseDotpoint = ordinal => {
+    setParams(withDotpoint(params, ordinal));
+    const next = ordinal == null ? null : dotpointChoices(chapterRow).find(c => c.ordinal === ordinal);
+    announceDotpoint(next ? t('practice.dotpointAnnounce', { text: next.text }) : t('practice.dotpointAnnounceAll'));
+  };
+  const allDotpoints = () => chooseDotpoint(null);
+  const showAllDotpoints = dotpoint != null && !taskId && !assignmentMode;
 
   const exitBar = (
-    <button type="button" className="icon-btn ws-exit" onClick={() => navigate('/')} aria-label={t('practice.leave')}>
+    <button type="button" className="icon-btn ws-exit" data-tour="topic" onClick={() => navigate('/')} aria-label={t('practice.leave')}>
       <Icon name="back" /><span>{t(INSTRUMENT_UI ? 'inst.tabIndex' : 'nav.home')}</span>
     </button>
   );
@@ -458,10 +524,10 @@ function ProfilePractice() {
         <div className="ws-bar-title">
           <span className="ctx-pill-name">
             {heading}
-            {dotpoint != null && <span className="muted">{t('practice.dotpointMeta', { n: Number(dotpoint) + 1 })}</span>}
           </span>
           <span className="ctx-pill-meta">
             {metaLine}
+            {servedDotpoint && <span data-served-dotpoint lang="en">{` · ${t('practice.dotpointChip', { text: servedDotpoint.text })}`}</span>}
             {session.answered > 0 && t('practice.sessionScore', { correct: session.correct, answered: session.answered, xp: session.xp })}
             {serve?.nextUp?.name && (
               <span data-next-up={serve.nextUp.subtopic}>
@@ -490,6 +556,12 @@ function ProfilePractice() {
       </header>
 
       <div className="ws-notices">
+        {subtopic && !taskId && !assignmentMode && chapterRow && (
+          <>
+            <DotpointPicker row={chapterRow} value={dotpoint} onChange={chooseDotpoint} />
+            {dotpointRegion}
+          </>
+        )}
         {assignmentContext && <div className="card ws-assignment">
           <div className="spread" style={{ gap: 12, alignItems: 'flex-start' }}>
             <div>
@@ -536,6 +608,7 @@ function ProfilePractice() {
             {(subtopic || taskId || difficulty || pyqOnly || assignmentMode) && (
               <button type="button" className="icon-btn" data-testid="ws-filter-inline-clear" title={t(assignmentMode ? 'assignment.leaveShort' : 'practice.clearFilters')} onClick={() => setParams({})}><Icon name="close" />{t(assignmentMode ? 'assignment.leaveShort' : 'practice.clearShort')}</button>
             )}
+            {subtopic && !taskId && !assignmentMode && <DotpointChip phone active={activeDotpoint} onClear={allDotpoints} />}
           </div>
         )}
         {pyqOnly && <p className="muted">{t('practice.pyqOnlyNote')}</p>}
@@ -549,7 +622,8 @@ function ProfilePractice() {
             <strong>{t('practice.emptyTitle')}</strong>
             <p className="muted" style={{ margin: '4px 0 10px' }}>{t('practice.emptyBody')}</p>
             <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
-              <PageLink className="btn btn-primary btn-sm" to="/">{t('practice.emptyChooseTopic')}</PageLink>
+              {showAllDotpoints && <button type="button" className="btn btn-primary btn-sm" data-dotpoint-all onClick={allDotpoints}>{t('practice.dotpointAll')}</button>}
+              <PageLink className={`btn ${showAllDotpoints ? 'btn-quiet' : 'btn-primary'} btn-sm`} to="/">{t('practice.emptyChooseTopic')}</PageLink>
               {(subtopic || dotpoint != null) && !taskId && !assignmentMode && (
                 <button className="btn btn-quiet btn-sm" onClick={() => setParams(new URLSearchParams())}>{t('practice.emptySmart')}</button>
               )}
@@ -564,7 +638,7 @@ function ProfilePractice() {
           <div className="notice" role="status" data-difficulty-unavailable
             data-difficulty-requested={difficultyGap.requested || ''}>
             <strong>{t(difficultyGap.dotpoint ? 'practice.levelUnavailableDotpoint' : 'practice.levelUnavailableTopic', {
-              requested: difficultyGap.requested ? `D${difficultyGap.requested} · ${t(`difficulty.${difficultyGap.requested}`)}` : ''
+              requested: difficultyGap.requested ? difficultyPair(difficultyGap.requested, t) : ''
             })}</strong>
             <p className="muted" style={{ margin: '4px 0 10px' }}>
               {t(difficultyGap.available.length ? 'practice.levelUnavailableChoose' : 'practice.levelUnavailableNone')}
@@ -573,9 +647,12 @@ function ProfilePractice() {
               {difficultyGap.available.map(d => (
                 <button key={d} type="button" className="btn btn-primary btn-sm" data-difficulty-choice={d}
                   onClick={() => { const next = new URLSearchParams(params); next.set('difficulty', String(d)); setParams(next); }}>
-                  {t('practice.levelPractiseAt', { level: `D${d} · ${t(`difficulty.${d}`)}` })}
+                  {t('practice.levelPractiseAt', { level: difficultyPair(d, t) })}
                 </button>
               ))}
+              {difficultyGap.dotpoint && showAllDotpoints && (
+                <button type="button" className="btn btn-primary btn-sm" data-dotpoint-all onClick={allDotpoints}>{t('practice.dotpointAll')}</button>
+              )}
               {difficulty != null && !taskId && !assignmentMode && (
                 <button type="button" className="btn btn-quiet btn-sm" data-difficulty-choice="adaptive"
                   onClick={() => { const next = new URLSearchParams(params); next.delete('difficulty'); setParams(next); }}>
@@ -693,6 +770,7 @@ function ProfilePractice() {
             onNext={() => load({ fresh: true })}
             onReplace={assignmentMode ? null : () => load({ fresh: true, replaceUnmarkable: true })}
             onRedo={redo}
+            belowWork={assignmentMode ? null : <RecentAttempts subtopic={serve.question.subtopic} onServe={setServe} />}
           />
           <PriExplain
             key={`explain-${user.id}:${serve.question.id}`}
@@ -712,6 +790,7 @@ function ProfilePractice() {
             }}
             onTrySimilar={serve.question.subtopic && serve.question.subtopic !== 'custom' ? loadSimilar : undefined}
           />
+          {tourOn && <React.Suspense fallback={null}><PracticeTour onClose={closeTour} /></React.Suspense>}
         </>
       )}
     </div>

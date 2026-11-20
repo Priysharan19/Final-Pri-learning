@@ -42,7 +42,9 @@ const vite = await import('../vite.config.js');
   ok(helper.EDITION === table.DEFAULT_EDITION && helper.EDITION === 'priyabhata', 'outside a build the app is the default edition, Priyabhata');
   const e = helper.edition();
   const { identity, ...defaults } = e;
-  eq(defaults, { id: 'priyabhata', brand: 'Priyabhata', region: 'IN', defaultCourse: 'in', courses: ['in'], languages: ['en', 'hi'], currency: 'INR', commerce: { currency: 'INR', listPrice: null, differentiators: ['engineSteps', 'youConfirm', 'syllabus', 'examPapers'] }, family: { parentFeatures: true } }, 'edition() is the record: identity, defaults, the pricing facts and the family switch');
+  eq(defaults, { id: 'priyabhata', brand: 'Priyabhata', region: 'IN', defaultCourse: 'in', courses: ['in'],
+    // owner decision, 19 Nov 2026: what an edition offers inside its course, games, hints and its new-device theme (India: everything, games, paid hints, follow the device)
+    offering: null, languages: ['en', 'hi'], currency: 'INR', commerce: { currency: 'INR', listPrice: null, differentiators: ['engineSteps', 'youConfirm', 'syllabus', 'examPapers'] }, games: true, walkthroughFixes: false, hints: { free: false }, themeDefault: 'system', family: { parentFeatures: true } }, 'edition() is the record: identity, defaults, the pricing facts and the family switch');
   // Plan E4: the brand the app draws — Hindi name, cut, its path, the wordmark, the company line — and nothing more;
   // Lit Instrument D6 adds the working indicator's form for that same cut.
   eq(Object.keys(identity).sort(), ['brandHi', 'companyLine', 'company', 'cut', 'cutPath', 'wordmark', 'working'].sort(), 'record.identity holds exactly the brand the app draws');
@@ -239,8 +241,8 @@ try {
   }
   {
     const source = read('src/platform/cloudTransport.js');
-    ok((source.match(/\[EDITION_HEADER\]: EDITION/g) || []).length === 2, 'the request and the streamed tutor turn both declare the edition');
-    ok((source.match(/editionRefusal\(err, data\);/g) || []).length === 3, 'the native, web and streaming paths all read an edition refusal');
+    ok((source.match(/\[EDITION_HEADER\]: EDITION/g) || []).length === 3, 'the request, the PDF download (practice papers) and the streamed tutor turn all declare the edition');
+    ok((source.match(/editionRefusal\(err, data\);/g) || []).length === 4, 'the native, web, PDF-download and streaming paths all read an edition refusal');
     ok(/if \(data\?\.service !== HEALTH_SERVICE\) return null;\s+serverEditionAsked = true;\s+hearServerEdition\(data\.edition\);/.test(source), 'the boot probe hears the serving server\'s edition, so a web start asks nothing extra');
   }
 } finally {
@@ -302,7 +304,8 @@ try {
   const login = read('src/pages/Login.jsx');
   // Plan E3: sign-up reads its course through the helper alone — no record,
   // no table, no mismatch handling of its own.
-  ok(/import \{ defaultCourse, offersCourse \} from '\.\.\/platform\/edition\.js';/.test(login) && !/edition-record|edition\.config|EditionMismatch|X-Pri-Edition/.test(login),
+  // owner decision, 19 Nov 2026: Login also asks the helper which years and courses the edition offers.
+  ok(/import \{ defaultCourse, offersCourse, offeredYears, pathwayOffered, defaultOffering \} from '\.\.\/platform\/edition\.js';/.test(login) && !/edition-record|edition\.config|EditionMismatch|X-Pri-Edition/.test(login),
     'Login.jsx asks only the edition helper for its sign-up course (plan E3)');
   const view = read('src/components/EditionMismatch.jsx');
   ok(!/onClick|<button|<form|href=|reload|retry/i.test(view.replace(/\/\/.*$/gm, '')), 'the screen component offers no action');

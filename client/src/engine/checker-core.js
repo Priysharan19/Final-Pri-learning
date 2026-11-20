@@ -24,7 +24,7 @@ import {
 } from './answer-forms.js';
 import { canonicalUnit, unitContradicts, withoutUnit, writtenUnit, unitsStated, unitDimension, angleUnitWritten, withoutAngleUnit, angleUnitOfSuffix, convertAngle } from './units.js';
 import { acceptsNumeric } from './tolerance.js';
-import { exactValue, fraction, ExactLimit } from './exact.js';
+import { exactValue, fraction, sameFraction, ExactLimit } from './exact.js';
 
 const UNIT_TAIL = /(?<![a-zA-Z])(cm³|m³|mm³|cm²|m²|mm²|km²|km\/h|m\/s|cm|mm|km|kg|ml|l\b|m\b|s\b|h\b|hours?|mins?|minutes?|seconds?|degrees?|deg|°|units?²?|sq units)\s*$/i;
 
@@ -223,8 +223,11 @@ function paiseAsked(question) {
 // precisions the coarser one bounds it, so a correct answer is never refused.
 const PLACE_WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5 };
 const NAMED_PLACES = /\b(one|two|three|four|five|[1-5])\s*(?:decimal\s+places?|d\.\s?p\.?)/gi;
-const NAMED_NEAREST = /\bnearest\s+(whole(?:\s+number)?|integer|tenth|hundredth|thousandth)\b/gi;
-const NEAREST_PLACES = { whole: 0, 'whole number': 0, integer: 0, tenth: 1, hundredth: 2, thousandth: 3 };
+// "to the nearest degree" names a place as surely as "to the nearest whole number": a band of 0.51
+// accepted 7.14 for 7 on "to the nearest degree" (walk-through audit, numeric-tolerance-sweep-check).
+const NEAREST_UNITS = 'degree|dollar|cent|rupee|metre|meter|centimetre|centimeter|millimetre|millimeter|kilometre|kilometer|kilogram|gram|litre|liter|second|minute|hour|day|year|km|cm|mm|kg|mL|L|m|s';
+const NAMED_NEAREST = new RegExp(String.raw`\bnearest\s+(whole(?:\s+number)?|integer|tenth|hundredth|thousandth|${NEAREST_UNITS})s?\b`, 'gi');
+const NEAREST_PLACES = { whole: 0, 'whole number': 0, integer: 0, tenth: 1, hundredth: 2, thousandth: 3, cent: 2 };
 export function namedDecimalPlaces(question) {
   const text = `${question?.prompt ?? ''} ${question?.answerSuffix ?? ''}`;
   const found = [];
@@ -233,8 +236,14 @@ export function namedDecimalPlaces(question) {
   const aboutData = index => /\b(?:measured|recorded|rounded off|known)\b(?:[^.?!]|\.\d)*$/i.test(text.slice(Math.max(0, index - 60), index))
     && !/\b(?:correct|answer|give|round)\w*\b[^.?!]*$/i.test(text.slice(Math.max(0, index - 30), index));
   for (const m of text.matchAll(NAMED_PLACES)) if (!aboutData(m.index)) found.push(PLACE_WORDS[m[1].toLowerCase()]);
-  for (const m of text.matchAll(NAMED_NEAREST)) if (!aboutData(m.index)) found.push(NEAREST_PLACES[m[1].toLowerCase().replace(/\s+/g, ' ')]);
+  for (const m of text.matchAll(NAMED_NEAREST)) if (!aboutData(m.index)) found.push(NEAREST_PLACES[m[1].toLowerCase().replace(/\s+/g, ' ')] ?? 0);
   return found.length ? Math.min(...found) : null;
+}
+// "evaluate … exactly", "find the exact gradient": the answer is a value, not a rounded one.
+// Maths inside $…$ is not the sentence ("P(\\text{exactly } 1)" asks for a probability).
+const EXACT_ASK = /\bexact\b(?!\s+(?:change|same))|\bexactly\b(?!\s+(?:\d|once|twice|thrice|one|two|three|four|five|when|the same|equal|half|as many|divisible))/i;
+export function asksForExactValue(question) {
+  return EXACT_ASK.test(String(question?.prompt ?? '').replace(/\$[^$]*\$/g, ' '));
 }
 function namedPrecisionBand(question) {
   const places = namedDecimalPlaces(question);
@@ -381,10 +390,10 @@ function componentRefusal(question, text) {
   const raw = String(text ?? '').trim();
   if (!raw) return null;
   const ans = question?.answer || {};
-  if (/%|\bper\s?cents?\b/i.test(raw) && !percentAnswerWanted(question, ans)) return 'Write each value on its own — this question does not ask for a percentage.';
-  if (foreignCurrency(question, raw) || (RUPEE_MARK.test(raw) && !moneyQuestion(question))) return 'Write each value on its own — this question does not ask for an amount of money.';
+  if (/%|\bper\s?cents?\b/i.test(raw) && !percentAnswerWanted(question, ans)) return 'Write each value on its own: this question does not ask for a percentage.';
+  if (foreignCurrency(question, raw) || (RUPEE_MARK.test(raw) && !moneyQuestion(question))) return 'Write each value on its own: this question does not ask for an amount of money.';
   const unit = writtenUnit(raw);
-  if (unit && unit !== '°' && unit !== 'rad' && !unitFits(question, unit)) return `Write each value on its own — this question does not ask for an answer in ${unit}.`;
+  if (unit && unit !== '°' && unit !== 'rad' && !unitFits(question, unit)) return `Write each value on its own: this question does not ask for an answer in ${unit}.`;
   // D13 (unevaluated values) is the numeric box's rule; a set keeps its ±
   // forms ("2 ± 3") until the examiner rules on lists.
   return null;
@@ -468,7 +477,7 @@ export function readAnswerLabel(question, raw) {
     // A percentage label this reader cannot match to the ask ("Loss % = 12"
     // on "By what percentage did the price fall?") is left unread: no try is
     // spent on how the answer was labelled.
-    return { unread: 'Write the percentage on its own — like 12%.', asked };
+    return { unread: 'Write the percentage on its own, like 12%.', asked };
   }
   return { input: raw, asked };
 }
@@ -620,7 +629,7 @@ function brokenRun(piece) {
 // Any other operation (a power other than 10ⁿ, a factorial, a trigonometric
 // or counting function, a product of two numbers, a fraction of fractions) is
 // still to be done.
-const D13_REFUSAL = 'Work it out first: a numeric answer is a single value — a number, a fraction, a mixed number, a surd or a multiple of π — with no operation left to do.';
+const D13_REFUSAL = 'Work it out first: a numeric answer is a single value (a number, a fraction, a mixed number, a surd or a multiple of π) with no operation left to do.';
 const D13_MAX_NODES = 64;
 const D13_MIXED = /^-?\d+\s+\d+\s*\/\s*\d+$|^-?\d+\s*\(\d+\)\s*\/\s*\(\d+\)$/;
 const isWholeLiteral = node => node?.t === 'num' && /^\d+$/.test(String(node.s ?? node.v));
@@ -887,10 +896,10 @@ function matchTraps(question, studentValue, studentRaw, shape = null) {
 }
 
 const READ_HELP = {
-  interval: 'I couldn’t read that as a solution set — write it like x > 3, 2 < x ≤ 5, (2, 5] or x < 1 or x > 4.',
-  matrix: 'I couldn’t read that as a matrix — write the rows like [[1, 2], [3, 4]] or 1 2; 3 4.',
-  vector: 'I couldn’t read that as a vector — write it like (1, 2, 3) or i − 2j + 3k.',
-  complex: 'I couldn’t read that as a complex number — write it like 3 + 4i, or in polar form like 5(cos 53° + i sin 53°) or 5 cis 53°.'
+  interval: 'I couldn’t read that as a solution set. Write it like x > 3, 2 < x ≤ 5, (2, 5] or x < 1 or x > 4.',
+  matrix: 'I couldn’t read that as a matrix. Write the rows like [[1, 2], [3, 4]] or 1 2; 3 4.',
+  vector: 'I couldn’t read that as a vector. Write it like (1, 2, 3) or i − 2j + 3k.',
+  complex: 'I couldn’t read that as a complex number. Write it like 3 + 4i, or in polar form like 5(cos 53° + i sin 53°) or 5 cis 53°.'
 };
 
 /**
@@ -928,6 +937,91 @@ export function answerTooLong(rawInput) {
     : null;
 }
 
+
+// ── Practice-paper answer forms ──────────────────────────────────────────────
+/** A subscripted name written as x0, x_0, x_{0} or x₀ becomes the one letter the key uses for it. */
+export function substituteNames(text, names) {
+  let out = String(text);
+  const sub = { '₀': '0', '₁': '1', '₂': '2', '₃': '3', '₄': '4', '₅': '5', '₆': '6', '₇': '7', '₈': '8', '₉': '9' };
+  out = out.replace(/[₀-₉]/g, ch => `_${sub[ch]}`);
+  for (const [name, letter] of Object.entries(names || {})) {
+    const m = /^([A-Za-z])_?\{?([A-Za-z0-9]+)\}?$/.exec(name);
+    if (!m || !/^[A-Za-z]$/.test(letter)) continue;
+    const [, base, tail] = m;
+    // x_0, x_{0}, x0 — not when more letters follow (x01), and not inside a longer word.
+    out = out.replace(new RegExp(`(?<![A-Za-z_])${base}(?:_\\{${tail}\\}|_${tail}|${tail})(?![A-Za-z0-9_])`, 'g'), letter);
+  }
+  return out;
+}
+
+/** Powers of whole numbers written out (2^104) so the exact reader, bounded to powers of 64, sees the integer. Bounded: 4096 bits. */
+function expandBigPowers(text) {
+  return String(text).replace(/(?<![\d.^])(\d{1,6})\s*\^\s*(\d{1,4})(?![\d.^])/g, (whole, b, e) => {
+    const base = BigInt(b), exp = BigInt(e);
+    if (base < 2n || exp <= 64n) return whole;
+    if (BigInt(b.length) * exp > 1300n) return whole;
+    const v = base ** exp;
+    return v.toString(2).length <= 4096 ? `(${v})` : whole;
+  });
+}
+
+/** A rational key (n/d as integer strings) matched EXACTLY: no band, so 1.3e-27 is not 0 and 2 is not 2 − 1/2^51. */
+function checkExactRational(question, rawInput) {
+  const ans = question.answer;
+  let key;
+  try { key = fraction(BigInt(ans.n), BigInt(ans.d)); } catch { return { correct: false }; }
+  const text = cleanInput(rawInput, { stripUnits: false }).replace(/\s+/g, ' ');
+  if (!text || /%/.test(text)) return { correct: false, invalid: true, feedback: 'Write the exact value as a fraction, or a number written out in full.' };
+  let got;
+  try { got = exactValue(expandBigPowers(text)); } catch (err) {
+    if (err instanceof ExactLimit) return { correct: false, invalid: true, feedback: 'That answer is too large to check. Write the value itself, worked out.' };
+    return { correct: false, invalid: true, feedback: 'Write the exact value, for example as a fraction.' };
+  }
+  if (!got) return { correct: false, invalid: true, feedback: 'Write the exact value as a fraction or a number; a rounded decimal or a root is not the exact value asked for.' };
+  return sameFraction(got, key) ? { correct: true } : { correct: false };
+}
+
+const EQUATION_POINTS = [[0.7, 1.3, 0.4, 1.9], [-1.9, 0.6, 1.7, -0.8], [2.3, -1.4, 0.9, 1.1], [-0.4, -2.2, -1.3, 2.6], [1.6, 2.1, -2.4, 0.3], [-2.7, 1.8, 2.2, -1.5]];
+
+/** An equation, as the same equation up to a nonzero constant multiple: (left − right) must be proportional to the key's. */
+function checkEquation(question, rawInput) {
+  const ans = question.answer;
+  let student, key;
+  try {
+    const text = cleanInput(rawInput, { stripUnits: false }).replace(/^[a-zA-Z]?\s*[=≈]\s*/, m => m);
+    const raw = String(rawInput ?? '').trim().replace(/(?<!\.)\.\s*$/, '');
+    student = parse(normalize(raw || text));
+    key = parse(`(${ans.lhs})-(${ans.rhs})`);
+  } catch { return { correct: false, invalid: true, feedback: 'Write the answer as an equation, like 2x − y = 1.' }; }
+  if (student.t !== 'equation') return { correct: false, invalid: true, feedback: 'Write the answer as an equation, with an = sign.' };
+  let vars;
+  try {
+    vars = new Set([...variablesOf(student.l), ...variablesOf(student.r), ...variablesOf(key)]);
+    vars.delete('e'); vars.delete('pi');
+    if (vars.size > 4) return { correct: false };
+    const names = [...vars];
+    const at = point => Object.fromEntries(names.map((n, i) => [n, point[i]]));
+    const val = (ast, env) => evaluate(ast, env);
+    const studentAt = env => val(student.l, env) - val(student.r, env);
+    let base = null;
+    for (const point of EQUATION_POINTS) {
+      const env = at(point);
+      const k = val(key, env), sv = studentAt(env);
+      if (!Number.isFinite(k) || !Number.isFinite(sv)) return { correct: false };
+      if (!base) {
+        if (Math.abs(k) < 1e-9) continue;
+        if (Math.abs(sv) < 1e-9) return { correct: false };
+        base = { k, s: sv };
+        continue;
+      }
+      // s/k must be the one constant ratio: s·k0 = s0·k
+      const lhs = sv * base.k, rhs = base.s * k;
+      if (Math.abs(lhs - rhs) > 1e-8 * Math.max(1, Math.abs(lhs), Math.abs(rhs))) return { correct: false };
+    }
+    return { correct: !!base };
+  } catch { return { correct: false }; }
+}
+
 export function checkAnswer(question, rawInput) {
   // A sketch's feature set is structured data with its own 8 kB cap (readFeatureSet).
   const long = question?.answerType === 'graph-sketch' ? null : answerTooLong(rawInput);
@@ -943,6 +1037,9 @@ function checkAnswerWithinBudget(question, rawInput) {
     if (type === 'interval' || type === 'matrix' || type === 'vector' || type === 'complex') {
       return checkForm(question, rawInput);
     }
+    // Practice papers (paperContent.js): a rational answer matched exactly, and an equation matched up to a constant multiple.
+    if (type === 'exact-rational') return checkExactRational(question, rawInput);
+    if (type === 'equation') return checkEquation(question, rawInput);
     // A pairing grid: right only when every row matches its key exactly.
     if (type === 'matrix-match') return checkMatrixMatch(question, rawInput);
     // A sketch, marked by its features: the engine derives them from the function.
@@ -951,7 +1048,7 @@ function checkAnswerWithinBudget(question, rawInput) {
     if (ans && ans.forbid) {
       const s = normalize(cleanInput(rawInput));
       if (new RegExp(ans.forbid, 'i').test(s)) {
-        return { correct: false, feedback: ans.forbidWhy || 'That form isn’t fully simplified — rewrite it.' };
+        return { correct: false, feedback: ans.forbidWhy || 'That form isn’t fully simplified. Rewrite it.' };
       }
     }
     // Surd-form questions: require k√r exactly (accepts 2sqrt5, 2*sqrt(5), 2√5)
@@ -961,7 +1058,7 @@ function checkAnswerWithinBudget(question, rawInput) {
         const refusal = componentRefusal(question, rawInput);
         if (refusal) return { correct: false, invalid: true, feedback: refusal };
       } else if (unitContradicts(question.answerSuffix, rawInput)) {
-        return { correct: false, feedback: `Check the unit — this question asks for the answer in ${String(question.answerSuffix).trim()}.` };
+        return { correct: false, feedback: `Check the unit: this question asks for the answer in ${String(question.answerSuffix).trim()}.` };
       }
       const s = normalize(cleanInput(rawInput)).replace(/\s|\*/g, '').replace(/^\+/, '');
       const mm = s.match(/^(-?\d*)sqrt\(?(\d+)\)?$/);
@@ -970,14 +1067,14 @@ function checkAnswerWithinBudget(question, rawInput) {
         const r = Number(mm[2]);
         if (k === ans.surdForm.k && r === ans.surdForm.r) return { correct: true };
         if (numsClose(k * Math.sqrt(r), ans.value)) {
-          return { correct: false, feedback: `Equivalent — but not fully simplified: $\\sqrt{${r}}$ still contains a square factor.` };
+          return { correct: false, feedback: `Equivalent, but not fully simplified: $\\sqrt{${r}}$ still contains a square factor.` };
         }
         const why = matchTraps(question, k * Math.sqrt(r), rawInput);
         return { correct: false, feedback: why ?? undefined };
       }
       try {
         const v = parseNumericInput(rawInput).value;
-        if (numsClose(v, ans.value)) return { correct: false, feedback: 'Right value — but write it in simplified surd form $k\\sqrt{r}$ (e.g. 2sqrt(5)).' };
+        if (numsClose(v, ans.value)) return { correct: false, feedback: 'Right value, but write it in simplified surd form $k\\sqrt{r}$ (e.g. 2sqrt(5)).' };
         const why = matchTraps(question, v, rawInput);
         return { correct: false, feedback: why ?? undefined };
       } catch {
@@ -1018,7 +1115,7 @@ function checkAnswerWithinBudget(question, rawInput) {
             const outer = pct.match(/^\((.*)\)$/s) || pct.match(/^\{(.*)\}$/s) || pct.match(/^\[(.*)\]$/s);
             if (outer && !/[(){}[\]]/.test(outer[1])) pct = outer[1].trim();
             if (signs !== 1 || !/%\s*$/.test(pct)) {
-              return { correct: false, feedback: 'Write a percentage once, at the end — like 65%.' };
+              return { correct: false, feedback: 'Write a percentage once, at the end, like 65%.' };
             }
             if (percentAnswerWanted(question, ans)) {
               // The sign is the answer's unit: what stands before it is the
@@ -1037,13 +1134,13 @@ function checkAnswerWithinBudget(question, rawInput) {
         // not: "$500" is not ₹500, and "$12" is not 12 cm (D14).
         if (typeof rawInput === 'string' && foreignCurrency(question, rawInput)) {
           return { correct: false, feedback: moneyQuestion(question)
-            ? 'Check the unit — this question asks for an amount in rupees (₹).'
-            : 'Check the unit — this question does not ask for an amount of money.' };
+            ? 'Check the unit: this question asks for an amount in rupees (₹).'
+            : 'Check the unit: this question does not ask for an amount of money.' };
         }
         // A unit the student wrote that contradicts the question's unit is a
         // wrong answer, never stripped and ignored: 12 cm is not 12 m.
         if (question.answerSuffix && unitContradicts(question.answerSuffix, rawInput)) {
-          return { correct: false, feedback: `Check the unit — this question asks for the answer in ${String(question.answerSuffix).trim()}.` };
+          return { correct: false, feedback: `Check the unit: this question asks for the answer in ${String(question.answerSuffix).trim()}.` };
         }
         // An angle: 60° and π/3 are one answer. The unit the student wrote
         // decides how the number is read; a bare number is in the question's
@@ -1064,7 +1161,7 @@ function checkAnswerWithinBudget(question, rawInput) {
           const box = String(question.answerSuffix).trim();
           const got = writtenUnit(rawInput);
           if (got && !canonicalUnit(box) && !angleUnitOfSuffix(box)) {
-            return { correct: false, feedback: `Check the unit — this question asks for the answer in ${box}.` };
+            return { correct: false, feedback: `Check the unit: this question asks for the answer in ${box}.` };
           }
           rawInput = withoutUnit(rawInput);
         }
@@ -1111,16 +1208,16 @@ function checkAnswerWithinBudget(question, rawInput) {
         // Rupees are money too: "100 rupees" is not 100 metres (Q1 round 2).
         if (!meta.paise && typeof rawInput === 'string' && RUPEE_MARK.test(rawInput) && !moneyQuestion(question)) {
           return { correct: false, feedback: question.answerSuffix
-            ? `Check the unit — this question asks for the answer in ${String(question.answerSuffix).trim()}.`
-            : 'Check the unit — this question does not ask for an amount of money.' };
+            ? `Check the unit: this question asks for the answer in ${String(question.answerSuffix).trim()}.`
+            : 'Check the unit: this question does not ask for an amount of money.' };
         }
         if (meta.paise) {
           // A box that counts rupees in crores or millions is not in paise:
           // "9810 paise" is ₹98.10, not ₹98.1 crore (#723 review P2).
           if (!moneyQuestion(question) || RUPEE_SCALE.test(String(question.answerSuffix ?? '').trim())) {
             return { correct: false, feedback: question.answerSuffix
-              ? `Check the unit — this question asks for the answer in ${String(question.answerSuffix).trim()}.`
-              : 'Check the unit — this question does not ask for an amount in paise.' };
+              ? `Check the unit: this question asks for the answer in ${String(question.answerSuffix).trim()}.`
+              : 'Check the unit: this question does not ask for an amount in paise.' };
           }
           if (!paiseAsked(question)) value /= 100;
         }
@@ -1134,6 +1231,10 @@ function checkAnswerWithinBudget(question, rawInput) {
         // wrong last digit is wrong (false-positive sweep, m-fp-sweep).
         const named = namedPrecisionBand(question);
         if (named != null) tolUsed = Math.min(tolUsed ?? numericBand(target), named);
+        // A question that asks for the EXACT value is not a rounding question: an authored
+        // absolute tol (0.001 on 1/480, half the size of the key) must never decide it. The
+        // band is the default one, relative to the key (a whole key is exact).
+        if (named == null && ans.tol != null && !ans.rounding && !question.pyq && asksForExactValue(question)) tolUsed = Math.min(tolUsed, numericBand(target));
         // A declared JEE rounding rule (engine/tolerance.js) is read only when the
         // reviewed key itself declares it; nothing is inferred.
         let ok = ans.rounding ? acceptsNumeric(value, target, { rounding: ans.rounding, tol: ans.tol }) : numsClose(value, target, tolUsed);
@@ -1177,7 +1278,7 @@ function checkAnswerWithinBudget(question, rawInput) {
             }
             if (gn !== n || gd !== d) {
               const g = gcdInt(gn, gd);
-              return { correct: false, feedback: `Equivalent — but not fully simplified. Divide top and bottom by ${g}.` };
+              return { correct: false, feedback: `Equivalent, but not fully simplified. Divide top and bottom by ${g}.` };
             }
             return { correct: true };
           }
@@ -1195,10 +1296,10 @@ function checkAnswerWithinBudget(question, rawInput) {
         const fractionValueTol = Math.max(1e-9, Math.abs(target) * 1e-9);
         // A whole-number key that demands a fraction (0/1, 3/1) is an exact demand too.
         if (ok && (ans.requireExact || ans.requireFraction) && looksLikeDecimalApprox(rawInput) && !numsClose(value, target, exactTol)) {
-          return { correct: false, feedback: 'So close — but this question wants an exact value (leave it as a fraction, surd or multiple of π rather than a rounded decimal).' };
+          return { correct: false, feedback: 'So close, but this question wants an exact value (leave it as a fraction, surd or multiple of π rather than a rounded decimal).' };
         }
         if (ok && wantsExactValue && !numsClose(matched, target, fractionValueTol)) {
-          return { correct: false, feedback: 'So close — but this question wants an exact value (leave it as a fraction, surd or multiple of π rather than a rounded decimal).' };
+          return { correct: false, feedback: 'So close, but this question wants an exact value (leave it as a fraction, surd or multiple of π rather than a rounded decimal).' };
         }
         if (!ok) {
           const why = matchTraps(question, value, rawInput);
@@ -1219,6 +1320,8 @@ function checkAnswerWithinBudget(question, rawInput) {
         // Units are never stripped from an expression: a trailing s, m, h or l
         // is a variable the student named, not a unit they appended.
         let student = cleanInput(rawInput, { stripUnits: false });
+        // A subscripted name (x0, x_0, x₀) is ONE variable, never x·0: the key names the single letter that stands for it.
+        if (ans.names) student = substituteNames(student, ans.names);
         if (ans.stripC) student = student.replace(/[+\-]\s*c\s*$/i, '').trim();
         // A final answer is a function: it must not add or remove an isolated
         // hole (x/x is not 1). Interval differences (ln x² vs 2 ln x) are only
@@ -1244,12 +1347,12 @@ function checkAnswerWithinBudget(question, rawInput) {
         // A currency mark at the front of the list is read off with the list's
         // braces, so it is judged on the answer as written first.
         if (typeof rawInput === 'string' && (foreignCurrency(question, rawInput) || (RUPEE_MARK.test(rawInput) && !moneyQuestion(question)))) {
-          return { correct: false, invalid: true, feedback: 'Write each value on its own — this question does not ask for an amount of money.' };
+          return { correct: false, invalid: true, feedback: 'Write each value on its own: this question does not ask for an amount of money.' };
         }
         // …and so is a unit at its end ("4 kg"), which the list's reader takes off.
         const trailing = typeof rawInput === 'string' ? writtenUnit(rawInput.trim().replace(/[}\])]\s*$/, '')) : null;
         if (trailing && trailing !== '°' && trailing !== 'rad' && !unitFits(question, trailing)) {
-          return { correct: false, invalid: true, feedback: `Write each value on its own — this question does not ask for an answer in ${trailing}.` };
+          return { correct: false, invalid: true, feedback: `Write each value on its own: this question does not ask for an answer in ${trailing}.` };
         }
         const parts = splitList(rawInput);
         for (const part of parts) {
@@ -1265,10 +1368,13 @@ function checkAnswerWithinBudget(question, rawInput) {
           // rather than telling them how many solutions to write.
           const why = matchTraps(question, values.length === 1 ? values[0] : null, rawInput);
           if (why) return { correct: false, feedback: why };
-          return { correct: false, feedback: targets.length > values.length ? `There ${targets.length === 2 ? 'are two solutions' : `are ${targets.length} solutions`} — you've given ${values.length}.` : 'You have listed too many solutions.' };
+          return { correct: false, feedback: targets.length > values.length ? `There ${targets.length === 2 ? 'are two solutions' : `are ${targets.length} solutions`}. You've given ${values.length}.` : 'You have listed too many solutions.' };
         }
+        // A precision the question names bounds every solution in the list, as it bounds a single number.
+        const setNamed = namedPrecisionBand(question);
+        const setTol = ans.tol != null && setNamed != null ? Math.min(ans.tol, setNamed) : ans.tol;
         for (const [k, v] of values.entries()) {
-          const i = targets.findIndex(t => numsClose(v, t, ans.tol) && (ans.tol != null || !exactlyNotWhole(parsedParts[k], t)));
+          const i = targets.findIndex(t => numsClose(v, t, setTol) && (ans.tol != null || !exactlyNotWhole(parsedParts[k], t)));
           if (i === -1) {
             const why = matchTraps(question, v, rawInput);
             return { correct: false, feedback: why ?? undefined };
@@ -1300,7 +1406,7 @@ function checkAnswerWithinBudget(question, rawInput) {
         const exactOk = ans.tol != null || (!exactlyNotWhole(px, ans.x) && !exactlyNotWhole(py, ans.y));
         const ok = numsClose(x, ans.x, ans.tol) && numsClose(y, ans.y, ans.tol) && exactOk;
         if (!ok && numsClose(y, ans.x, ans.tol) && numsClose(x, ans.y, ans.tol)) {
-          return { correct: false, feedback: 'Check the order — coordinates are written (x, y).' };
+          return { correct: false, feedback: 'Check the order: coordinates are written (x, y).' };
         }
         return ok ? { correct: true } : { correct: false, feedback: matchTraps(question, null, rawInput) ?? undefined };
       }
@@ -1324,12 +1430,12 @@ function checkAnswerWithinBudget(question, rawInput) {
         if (ok && ans.simplified) {
           // Simplest form is two whole numbers with no common factor: 0.2 : 0.6
           // is 1 : 3 in proportion, not simplified (#723 review, item 3).
-          if (!Number.isInteger(a) || !Number.isInteger(b)) return { correct: false, feedback: 'Right proportions — but write the ratio in whole numbers, simplified fully.' };
+          if (!Number.isInteger(a) || !Number.isInteger(b)) return { correct: false, feedback: 'Right proportions, but write the ratio in whole numbers, simplified fully.' };
           const g = gcdInt(a, b);
-          if (g > 1) return { correct: false, feedback: `Right proportions — but simplify the ratio fully (divide both parts by ${g}).` };
+          if (g > 1) return { correct: false, feedback: `Right proportions, but simplify the ratio fully (divide both parts by ${g}).` };
         }
         if (!ok && ka && kb && cross(qa, qb, kb, ka) && ans.a !== ans.b) {
-          return { correct: false, feedback: 'Check the order of the ratio — it looks reversed.' };
+          return { correct: false, feedback: 'Check the order of the ratio. It looks reversed.' };
         }
         return { correct: ok };
       }
@@ -1345,9 +1451,9 @@ function checkAnswerWithinBudget(question, rawInput) {
     if (err instanceof ExactLimit) return { correct: false, invalid: true, feedback: 'That answer is too large to check. Write the value itself, worked out.' };
     // Digits broken apart in a way no single number is written: say how one is.
     if (err?.message === 'Not a single number') {
-      return { correct: false, invalid: true, feedback: 'I couldn’t read that as one number. Write it without gaps (1512), or grouped in the usual way (1,512 or 1 512) — a comma followed by a space reads as two numbers.' };
+      return { correct: false, invalid: true, feedback: 'I couldn’t read that as one number. Write it without gaps (1512), or grouped in the usual way (1,512 or 1 512): a comma followed by a space reads as two numbers.' };
     }
-    return { correct: false, invalid: true, feedback: "I couldn't read that as a maths answer — check for typos (e.g. write 3/4, 0.75, sqrt(2), 2pi, or (2, -3))." };
+    return { correct: false, invalid: true, feedback: "I couldn't read that as a maths answer. Check for typos (e.g. write 3/4, 0.75, sqrt(2), 2pi, or (2, -3))." };
   }
 }
 
@@ -1374,7 +1480,7 @@ function checkForm(question, rawInput) {
     const why = matchTraps(question, null, raw, got);
     if (why) return { correct: false, feedback: why };
     if (sameRegionIgnoringEndpoints(got.intervals, want, ans.tol)) {
-      return { correct: false, feedback: 'Right boundary — but check whether the endpoint is included: ≤ (a square bracket) includes it, < (a round bracket) does not.' };
+      return { correct: false, feedback: 'Right boundary, but check whether the endpoint is included: ≤ (a square bracket) includes it, < (a round bracket) does not.' };
     }
     const flipped = want.map(iv => ({ lo: iv.hi === Infinity ? -Infinity : -iv.hi, hi: iv.lo === -Infinity ? Infinity : -iv.lo, loOpen: iv.hiOpen, hiOpen: iv.loOpen }));
     const mirrored = want.length === 1 && Number.isFinite(want[0].lo) !== Number.isFinite(want[0].hi)
@@ -1384,10 +1490,10 @@ function checkForm(question, rawInput) {
         loOpen: Number.isFinite(want[0].lo) ? true : want[0].hiOpen,
         hiOpen: Number.isFinite(want[0].lo) ? want[0].loOpen : true
       }], ans.tol);
-    if (mirrored) return { correct: false, feedback: 'The boundary is right but the inequality points the wrong way — remember the sign reverses when you multiply or divide by a negative number.' };
-    if (sameRegion(got.intervals, flipped, ans.tol)) return { correct: false, feedback: 'Check the sign of the boundary — the solution set is reflected.' };
+    if (mirrored) return { correct: false, feedback: 'The boundary is right but the inequality points the wrong way. Remember the sign reverses when you multiply or divide by a negative number.' };
+    if (sameRegion(got.intervals, flipped, ans.tol)) return { correct: false, feedback: 'Check the sign of the boundary: the solution set is reflected.' };
     // The sentence does not print the solution set: said after a wrong try, it would be the answer.
-    return { correct: false, feedback: 'Not the solution set — check the boundary values, which side of each the solutions lie on, and whether each boundary is included.' };
+    return { correct: false, feedback: 'Not the solution set. Check the boundary values, which side of each the solutions lie on, and whether each boundary is included.' };
   }
 
   if (type === 'matrix') {
@@ -1400,14 +1506,14 @@ function checkForm(question, rawInput) {
     const why = matchTraps(question, null, raw, got);
     if (why) return { correct: false, feedback: why };
     if (got.rows.length !== want.length || got.rows[0].length !== want[0].length) {
-      return { correct: false, feedback: `The answer is a ${want.length}×${want[0].length} matrix — you have given ${got.rows.length}×${got.rows[0].length}.` };
+      return { correct: false, feedback: `The answer is a ${want.length}×${want[0].length} matrix. You have given ${got.rows.length}×${got.rows[0].length}.` };
     }
-    if (sameMatrix(transposeMatrix(got.rows), want, ans.tol)) return { correct: false, feedback: 'That is the transpose — rows and columns are swapped. Check which index runs along the row.' };
+    if (sameMatrix(transposeMatrix(got.rows), want, ans.tol)) return { correct: false, feedback: 'That is the transpose. Rows and columns are swapped. Check which index runs along the row.' };
     const negated = want.map(r => r.map(v => -v));
-    if (sameMatrix(got.rows, negated, ans.tol)) return { correct: false, feedback: 'Every entry has the wrong sign — check the sign of the scalar or the order of the subtraction.' };
+    if (sameMatrix(got.rows, negated, ans.tol)) return { correct: false, feedback: 'Every entry has the wrong sign. Check the sign of the scalar or the order of the subtraction.' };
     let wrong = 0;
     got.rows.forEach((r, i) => r.forEach((v, j) => { if (!numsClose(v, want[i][j], ans.tol)) wrong++; }));
-    return { correct: false, feedback: wrong === 1 ? 'One entry is wrong — recheck each entry against its row and column.' : `${wrong} entries are wrong — recompute each entry from its row and column.` };
+    return { correct: false, feedback: wrong === 1 ? 'One entry is wrong. Recheck each entry against its row and column.' : `${wrong} entries are wrong. Recompute each entry from its row and column.` };
   }
 
   if (type === 'complex') {
@@ -1423,12 +1529,12 @@ function checkForm(question, rawInput) {
     if (sameComplex(got, want, tol)) return { correct: true };
     const why = matchTraps(question, null, raw, got);
     if (why) return { correct: false, feedback: why };
-    if (sameComplex(got, { re: want.re, im: -want.im }, tol)) return { correct: false, feedback: 'That is the conjugate — the imaginary part has the wrong sign.' };
-    if (sameComplex(got, { re: want.im, im: want.re }, tol)) return { correct: false, feedback: 'Real and imaginary parts are swapped — the real part is the term without i.' };
-    if (sameComplex(got, { re: -want.re, im: -want.im }, tol)) return { correct: false, feedback: 'Every part has the wrong sign — check the sign of the whole number.' };
-    if (Math.abs(got.im) < 1e-9 && numsClose(got.re, mod, tol)) return { correct: false, feedback: 'That is the modulus |z|, not the number itself — write it as a + bi.' };
+    if (sameComplex(got, { re: want.re, im: -want.im }, tol)) return { correct: false, feedback: 'That is the conjugate: the imaginary part has the wrong sign.' };
+    if (sameComplex(got, { re: want.im, im: want.re }, tol)) return { correct: false, feedback: 'Real and imaginary parts are swapped: the real part is the term without i.' };
+    if (sameComplex(got, { re: -want.re, im: -want.im }, tol)) return { correct: false, feedback: 'Every part has the wrong sign. Check the sign of the whole number.' };
+    if (Math.abs(got.im) < 1e-9 && numsClose(got.re, mod, tol)) return { correct: false, feedback: 'That is the modulus |z|, not the number itself. Write it as a + bi.' };
     // The sentence does not print the number: said after a wrong try, it would be the answer.
-    return { correct: false, feedback: 'Not the required complex number — check the real and imaginary parts separately.' };
+    return { correct: false, feedback: 'Not the required complex number. Check the real and imaginary parts separately.' };
   }
 
   // vector
@@ -1440,11 +1546,11 @@ function checkForm(question, rawInput) {
   if (sameVector(got.components, want, ans.tol)) return { correct: true };
   const why = matchTraps(question, null, raw, got);
   if (why) return { correct: false, feedback: why };
-  if (sameVector(got.components, want.map(v => -v), ans.tol)) return { correct: false, feedback: 'That vector points the opposite way — every component has the wrong sign. Check the order of the subtraction.' };
+  if (sameVector(got.components, want.map(v => -v), ans.tol)) return { correct: false, feedback: 'That vector points the opposite way: every component has the wrong sign. Check the order of the subtraction.' };
   const mag = v => Math.sqrt(v.reduce((s, c) => s + c * c, 0));
   const wantMag = mag(want), gotMag = mag(got.components);
-  if (gotMag > 0 && wantMag > 0 && numsClose(gotMag, wantMag) ) return { correct: false, feedback: 'The magnitude is right but the direction is not — check the components one at a time.' };
-  return { correct: false, feedback: 'Not the required vector — check each component against the working.' };
+  if (gotMag > 0 && wantMag > 0 && numsClose(gotMag, wantMag) ) return { correct: false, feedback: 'The magnitude is right but the direction is not. Check the components one at a time.' };
+  return { correct: false, feedback: 'Not the required vector. Check each component against the working.' };
 }
 
 // ── "Show your working" questions ────────────────────────────────────────────
@@ -1465,17 +1571,17 @@ function checkWorkingWithinBudget(q, workingText) {
   const meta = ans.stepMeta;
   let report;
   try { report = stepCheck(meta, workingText); }
-  catch { return { correct: false, feedback: 'I couldn’t read that working — write one step per line.', stepReport: null, validLines: 0 }; }
+  catch { return { correct: false, feedback: 'I couldn’t read that working. Write one step per line.', stepReport: null, validLines: 0 }; }
   const okLines = report.lines.filter(l => l.status === 'ok');
   const parsed = report.lines.filter(l => l.status !== 'note');
   const minLines = ans.minLines || 2;
   if (parsed.length < minLines) {
-    return { correct: false, feedback: `Show at least ${minLines} lines of mathematical working — I could only read ${parsed.length}.`, stepReport: report, validLines: okLines.length };
+    return { correct: false, feedback: `Show at least ${minLines} lines of mathematical working. I could only read ${parsed.length}.`, stepReport: report, validLines: okLines.length };
   }
   if (report.firstBreak !== -1) {
     const named = report.diagnosis && report.diagnosis.code !== 'counterexample'
-      ? `${report.diagnosis.title} — line ${report.firstBreak + 1} is marked below.`
-      : 'There’s a slip in your working — Step Check has marked the line where it breaks.';
+      ? `${report.diagnosis.title}: line ${report.firstBreak + 1} is marked below.`
+      : 'There’s a slip in your working. Step Check has marked the line where it breaks.';
     return { correct: false, feedback: named, stepReport: report, validLines: okLines.length };
   }
   // The final readable line must state the result
@@ -1502,7 +1608,7 @@ function checkWorkingWithinBudget(q, workingText) {
     }
   } catch { reached = false; }
   if (!reached) {
-    return { correct: false, feedback: 'Your steps hold up, but the final line doesn’t state the result — end with the answer (e.g. "x = 3" or the simplified expression).', stepReport: report, validLines: okLines.length };
+    return { correct: false, feedback: 'Your steps hold up, but the final line doesn’t state the result. End with the answer (e.g. "x = 3" or the simplified expression).', stepReport: report, validLines: okLines.length };
   }
   return { correct: true, stepReport: report, validLines: okLines.length };
 }
@@ -1547,7 +1653,7 @@ function stepCheckWithinBudget(meta, workingText) {
         if (sp !== null && sm !== null) {
           const covered = new Set([...sp, ...sm]);
           const ok = sp.length > 0 && sm.length > 0 && covered.size >= Math.min(2, meta.solutions.length);
-          out.push({ text: line, status: ok ? 'ok' : 'break', note: ok ? undefined : 'One branch of the ± doesn’t land on a solution — check the signs.' });
+          out.push({ text: line, status: ok ? 'ok' : 'break', note: ok ? undefined : 'One branch of the ± doesn’t land on a solution. Check the signs.' });
           if (!ok && firstBreak === -1) firstBreak = i;
           return;
         }
@@ -1562,8 +1668,13 @@ function stepCheckWithinBudget(meta, workingText) {
               const R = evaluate(ast.r, env);
               return Number.isFinite(L) && Number.isFinite(R) && Math.abs(L - R) <= Math.max(1e-6, Math.abs(R) * 1e-6);
             });
-            status = holds ? 'ok' : 'break';
-            if (!holds) note = `This is the line where it goes wrong — the true solution no longer satisfies this equation. Compare it carefully with the line above.`;
+            // A root the question's domain removes is part of correct working ("x = -4, rejected"): a bare
+            // claim x = r for a listed `rejected` root is a true statement about the equation, so it is not a slip.
+            const isRejected = !holds && Array.isArray(meta.rejected) && ast.l?.t === 'var' && ast.l.v === meta.variable
+              && meta.rejected.some(r => { try { return numsClose(evaluate(ast.r, {}), r); } catch { return false; } });
+            status = holds || isRejected ? 'ok' : 'break';
+            if (isRejected) note = 'This root solves the equation but lies outside the domain: say so, and keep the root that is allowed.';
+            if (!holds && !isRejected) note = `This is the line where it goes wrong: the true solution no longer satisfies this equation. Compare it carefully with the line above.`;
           }
         } else {
           // a bare value — treat as a claimed solution
@@ -1577,11 +1688,11 @@ function stepCheckWithinBudget(meta, workingText) {
         const candidate = cleaned.includes('=') ? cleaned.split('=').pop() : cleaned;
         const same = exprEquivalent(candidate, target, { positiveOnly: meta.positiveOnly });
         status = same ? 'ok' : 'break';
-        if (!same) note = 'This line is no longer equivalent to the expression you started with — the slip is here.';
+        if (!same) note = 'This line is no longer equivalent to the expression you started with: the slip is here.';
       }
     } catch {
       status = 'note';
-      note = 'Skipped — I couldn’t parse this line as maths.';
+      note = 'Skipped: I couldn’t parse this line as maths.';
     }
     if (status === 'break' && firstBreak === -1) firstBreak = i;
     out.push({ text: line, status, note });

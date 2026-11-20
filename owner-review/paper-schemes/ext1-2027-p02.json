@@ -1,0 +1,714 @@
+{
+ "status": "DRAFT for the author's review: not approved. Nothing in this file is switched on.",
+ "paper": "ext1-2027-p02",
+ "schemeDigest": "244dc8042335b29909e9ad4badbeaa04fc3d83b56677dbc72508421b8b2ca271",
+ "source": "the criteria exactly as written in the author's marking guidelines; marks per criterion are his, not guessed",
+ "sectionII": {
+  "parts": 22,
+  "criteria": 60,
+  "engineCanAward": 7,
+  "engineCannot": 53
+ },
+ "parts": [
+  {
+   "id": "q11a",
+   "question": 11,
+   "marks": 4,
+   "answerType": "value",
+   "keyed": true,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides the correct set of values with justification",
+     "marks": 4,
+     "engine": "yes, final answer only",
+     "decidedBy": "answer checker",
+     "why": "the engine checks the final answer against a key verified by computation (interval). It earns 1 mark at most, because a bare answer earns at most 1 mark on a multi-mark part (CTO decision, 19 Nov 2026, to be confirmed by the author). The justification the criterion also asks for cannot be verified."
+    },
+    {
+     "key": "c2",
+     "text": "Obtains correct conditions on both zeros of the quadratic in $u$ with a minor error or omission",
+     "marks": 3,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c3",
+     "text": "Obtains the quadratic in $u = x + \\frac1x$ and the condition $u^2 > 4$, or equivalent merit",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c4",
+     "text": "Obtains the quadratic in $u = x + \\frac1x$, or equivalent merit",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    }
+   ],
+   "digest": "32ca9e37f32fb01157139f3af06317255be16eca686c1a3ee860a90203a49ea9"
+  },
+  {
+   "id": "q11b",
+   "question": 11,
+   "marks": 3,
+   "answerType": "value",
+   "keyed": true,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides the correct value with justification",
+     "marks": 3,
+     "engine": "yes, final answer only",
+     "decidedBy": "answer checker",
+     "why": "the engine checks the final answer against a key verified by computation (numeric). It earns 1 mark at most, because a bare answer earns at most 1 mark on a multi-mark part (CTO decision, 19 Nov 2026, to be confirmed by the author). The justification the criterion also asks for cannot be verified."
+    },
+    {
+     "key": "c2",
+     "text": "Shows that the zeros are $c^{-3}, c^{-1}, c, c^3$ and relates the two values of $u$, or equivalent merit",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c3",
+     "text": "Observes that the reciprocal of a zero is a zero, or equivalent merit",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    }
+   ],
+   "digest": "351328e8c912771d790120628cfacfaae4a4e889e8da3b77d266eb848a1c9ee3"
+  },
+  {
+   "id": "q11c",
+   "question": 11,
+   "marks": 3,
+   "answerType": "show-that",
+   "keyed": false,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides a correct demonstration",
+     "marks": 3,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    },
+    {
+     "key": "c2",
+     "text": "Evaluates the integral in one of the two ways, or equivalent merit",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    },
+    {
+     "key": "c3",
+     "text": "Expands $1 - (1 - x)^n$, or makes the substitution $u = 1 - x$",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    }
+   ],
+   "digest": "fc32e926e930eafee24d66f9c1b12cfa1b46a4bc05eb26f5f4307f0f05ad570a"
+  },
+  {
+   "id": "q11d",
+   "question": 11,
+   "marks": 3,
+   "answerType": "show-that",
+   "keyed": false,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides a correct proof",
+     "marks": 3,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    },
+    {
+     "key": "c2",
+     "text": "Shows that two different groups have the same sum, or equivalent merit",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    },
+    {
+     "key": "c3",
+     "text": "Counts the non-empty groups or bounds the possible sums, or equivalent merit",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    }
+   ],
+   "digest": "d0a41a31f1de6ed6580007772dc7d46c71bc83979e72f97a52e9dde1447ca944"
+  },
+  {
+   "id": "q11e",
+   "question": 11,
+   "marks": 2,
+   "answerType": "show-that",
+   "keyed": false,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides a correct demonstration",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    },
+    {
+     "key": "c2",
+     "text": "Finds $P(M \\le j)$ or $P(M = j)$, or equivalent merit",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    }
+   ],
+   "digest": "26c971294ed61548000371e5c4966fe8bd93a221766cb524a31a1693a782720b"
+  },
+  {
+   "id": "q12a",
+   "question": 12,
+   "marks": 3,
+   "answerType": "show-that",
+   "keyed": false,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides a correct proof of both directions",
+     "marks": 3,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    },
+    {
+     "key": "c2",
+     "text": "Expands the squared lengths as scalar products and makes substantial progress, or equivalent merit",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    },
+    {
+     "key": "c3",
+     "text": "Writes the lengths in terms of position vectors, or equivalent merit",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    }
+   ],
+   "digest": "4b9c09b9d782309d95d777c935162bc6e58f18b289e8588606053c5fe04b17f7"
+  },
+  {
+   "id": "q12b",
+   "question": 12,
+   "marks": 4,
+   "answerType": "expression",
+   "keyed": true,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides the correct exact value",
+     "marks": 4,
+     "engine": "yes, final answer only",
+     "decidedBy": "answer checker",
+     "why": "the engine checks the final answer against a key verified by computation (expression). It earns 1 mark at most, because a bare answer earns at most 1 mark on a multi-mark part (CTO decision, 19 Nov 2026, to be confirmed by the author). The justification the criterion also asks for cannot be verified."
+    },
+    {
+     "key": "c2",
+     "text": "Obtains an equation for the integral in terms of itself, or equivalent merit",
+     "marks": 3,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c3",
+     "text": "Transforms both $\\dfrac{dx}{1 + x}$ and $\\tan^{-1}x$ correctly",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c4",
+     "text": "Transforms $\\dfrac{dx}{1 + x}$ or $\\tan^{-1}x$ correctly, or equivalent merit",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    }
+   ],
+   "digest": "02a51143c5feb30b55f5b8a9491e58071a7ad1cff21ec6f1aa24539ca4c2a767"
+  },
+  {
+   "id": "q12c-i",
+   "question": 12,
+   "marks": 3,
+   "answerType": "show-that",
+   "keyed": false,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides a correct proof",
+     "marks": 3,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    },
+    {
+     "key": "c2",
+     "text": "Verifies the base case and makes substantial progress with the inductive step",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    },
+    {
+     "key": "c3",
+     "text": "Verifies the base case, or equivalent merit",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    }
+   ],
+   "digest": "ecbda48d32de806336df23d20ab9745fdd0549e7e0dcb5a6a43e22eb25678305"
+  },
+  {
+   "id": "q12c-ii",
+   "question": 12,
+   "marks": 3,
+   "answerType": "show-that",
+   "keyed": false,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides a correct demonstration",
+     "marks": 3,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    },
+    {
+     "key": "c2",
+     "text": "Shows that consecutive integrals are equal, or equivalent merit",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    },
+    {
+     "key": "c3",
+     "text": "Evaluates the integral for $k = 1$ and considers the difference of consecutive integrands, or equivalent merit",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    }
+   ],
+   "digest": "7b61a28c978a68013c269de5f3cf5d3ecb1afe3a9528c42a8e31c99811f8ea1b"
+  },
+  {
+   "id": "q12c-iii",
+   "question": 12,
+   "marks": 2,
+   "answerType": "expression",
+   "keyed": true,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides the correct value with justification",
+     "marks": 2,
+     "engine": "yes, final answer only",
+     "decidedBy": "answer checker",
+     "why": "the engine checks the final answer against a key verified by computation (expression). It earns 1 mark at most, because a bare answer earns at most 1 mark on a multi-mark part (CTO decision, 19 Nov 2026, to be confirmed by the author). The justification the criterion also asks for cannot be verified."
+    },
+    {
+     "key": "c2",
+     "text": "Divides the identity of part (i) by $\\sin\\theta$, or equivalent merit",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    }
+   ],
+   "digest": "e4207d9800d5fd8b85469c2fbf11c3e0967736f17ac5e1a196053341e22ba069"
+  },
+  {
+   "id": "q13a-i",
+   "question": 13,
+   "marks": 3,
+   "answerType": "expression",
+   "keyed": true,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides the correct area",
+     "marks": 3,
+     "engine": "yes, final answer only",
+     "decidedBy": "answer checker",
+     "why": "the engine checks the final answer against a key verified by computation (expression). It earns 1 mark at most, because a bare answer earns at most 1 mark on a multi-mark part (CTO decision, 19 Nov 2026, to be confirmed by the author). The justification the criterion also asks for cannot be verified."
+    },
+    {
+     "key": "c2",
+     "text": "Finds the area of one segment in terms of an angle and relates the angle to $d$, or equivalent merit",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c3",
+     "text": "Finds the angle subtended by the common chord at a centre, or equivalent merit",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    }
+   ],
+   "digest": "737f5410b0d7eefe6525dd5acd9b8ebd5d305ef7e0ae85f6f51e3e8699b70dbc"
+  },
+  {
+   "id": "q13a-ii",
+   "question": 13,
+   "marks": 3,
+   "answerType": "show-that",
+   "keyed": false,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides a correct demonstration",
+     "marks": 3,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    },
+    {
+     "key": "c2",
+     "text": "Differentiates $A$ correctly, or equivalent merit",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    },
+    {
+     "key": "c3",
+     "text": "Finds $L$ in terms of $d$, or attempts to differentiate $A$",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    }
+   ],
+   "digest": "cdf5d635107d0d9b8c9a8795942deb3ecf010138421ecc8f220ed9f7fa2b93c0"
+  },
+  {
+   "id": "q13a-iii",
+   "question": 13,
+   "marks": 2,
+   "answerType": "value",
+   "keyed": true,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides the correct value using part (ii)",
+     "marks": 2,
+     "engine": "yes, final answer only",
+     "decidedBy": "answer checker",
+     "why": "the engine checks the final answer against a key verified by computation (numeric). It earns 1 mark at most, because a bare answer earns at most 1 mark on a multi-mark part (CTO decision, 19 Nov 2026, to be confirmed by the author). The justification the criterion also asks for cannot be verified."
+    },
+    {
+     "key": "c2",
+     "text": "Writes the integral as a change in $A$, or equivalent merit",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    }
+   ],
+   "digest": "0a8ef285cf1c0638fc7742f26cecfda171bd8098ceba926016c7c391f600b696"
+  },
+  {
+   "id": "q13b-i",
+   "question": 13,
+   "marks": 1,
+   "answerType": "show-that",
+   "keyed": false,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides the velocity and the speed",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    }
+   ],
+   "digest": "11f42621bf79b0a566a680e49fafdda7eba1aa4a8e25c3e06f40ad10e908f724"
+  },
+  {
+   "id": "q13b-ii",
+   "question": 13,
+   "marks": 3,
+   "answerType": "show-that",
+   "keyed": false,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides a correct demonstration of all three facts",
+     "marks": 3,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    },
+    {
+     "key": "c2",
+     "text": "Establishes two of the three facts, or equivalent merit",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    },
+    {
+     "key": "c3",
+     "text": "Finds $\\overrightarrow{QP}$, or equivalent merit",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    }
+   ],
+   "digest": "fc760d34a9adbe93483f9707a5e19b0ffe773a264f0b0851998936fa5f6b9938"
+  },
+  {
+   "id": "q13b-iii",
+   "question": 13,
+   "marks": 3,
+   "answerType": "open",
+   "keyed": false,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides $\\cos\\alpha$, the time and the rate",
+     "marks": 3,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a part whose answer is not a single value, expression, set, interval or equation (or whose key could not be verified), so it has no key."
+    },
+    {
+     "key": "c2",
+     "text": "Finds $\\cos\\alpha$ and the time, or equivalent merit",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a part whose answer is not a single value, expression, set, interval or equation (or whose key could not be verified), so it has no key."
+    },
+    {
+     "key": "c3",
+     "text": "Finds $\\underset{\\sim}{r}\\cdot\\underset{\\sim}{v}$ or the length of $\\underset{\\sim}{r}$, or equivalent merit",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a part whose answer is not a single value, expression, set, interval or equation (or whose key could not be verified), so it has no key."
+    }
+   ],
+   "digest": "ea57bbee9d5e5632aea27488cd7e37b639a4001e831559c2fd20b8c614fac02b"
+  },
+  {
+   "id": "q14a-i",
+   "question": 14,
+   "marks": 2,
+   "answerType": "show-that",
+   "keyed": false,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides a correct demonstration",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    },
+    {
+     "key": "c2",
+     "text": "Obtains the equation of the path and a quadratic equation for the points at height $h$, or equivalent merit",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    }
+   ],
+   "digest": "479d94b702f7272e61e6197193e237d3ed2e1a70665c27d8244c80822f093e9f"
+  },
+  {
+   "id": "q14a-ii",
+   "question": 14,
+   "marks": 3,
+   "answerType": "expression",
+   "keyed": true,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides a correct expression for $V^2$",
+     "marks": 3,
+     "engine": "yes, final answer only",
+     "decidedBy": "answer checker",
+     "why": "the engine checks the final answer against a key verified by computation (expression). It earns 1 mark at most, because a bare answer earns at most 1 mark on a multi-mark part (CTO decision, 19 Nov 2026, to be confirmed by the author). The justification the criterion also asks for cannot be verified."
+    },
+    {
+     "key": "c2",
+     "text": "Finds $\\tan\\theta$ in terms of $a$, $d$ and $h$ and relates $V^2$ to $R$ and $\\tan\\theta$, or equivalent merit",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c3",
+     "text": "Finds $\\tan\\theta$ in terms of $a$, $d$ and $h$, or equivalent merit",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    }
+   ],
+   "digest": "3d36a76f7f1fb6949753ab457d09ddc60ac3ba187668092e77a1529360993b26"
+  },
+  {
+   "id": "q14a-iii",
+   "question": 14,
+   "marks": 3,
+   "answerType": "open",
+   "keyed": false,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides the correct least speed and the correct value of $a$",
+     "marks": 3,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a part whose answer is not a single value, expression, set, interval or equation (or whose key could not be verified), so it has no key."
+    },
+    {
+     "key": "c2",
+     "text": "Finds the least value of $V^2$, or equivalent merit",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a part whose answer is not a single value, expression, set, interval or equation (or whose key could not be verified), so it has no key."
+    },
+    {
+     "key": "c3",
+     "text": "Expresses $V^2$ in terms of a single variable such as $a(a + d)$, or equivalent merit",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a part whose answer is not a single value, expression, set, interval or equation (or whose key could not be verified), so it has no key."
+    }
+   ],
+   "digest": "3c3f58fffcef8f65dcf740390164d35511b1d6214ec4789d8eaec7f9253a69e0"
+  },
+  {
+   "id": "q14b-i",
+   "question": 14,
+   "marks": 1,
+   "answerType": "open",
+   "keyed": false,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides both expressions",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a part whose answer is not a single value, expression, set, interval or equation (or whose key could not be verified), so it has no key."
+    }
+   ],
+   "digest": "e6b710da1a56f7ab8305536cfad52c4e16f1e5fce30555fab8717c43ccbb9872"
+  },
+  {
+   "id": "q14b-ii",
+   "question": 14,
+   "marks": 3,
+   "answerType": "show-that",
+   "keyed": false,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides a correct demonstration",
+     "marks": 3,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    },
+    {
+     "key": "c2",
+     "text": "Finds where the derivative of $P(X = 0)$ is stationary, or equivalent merit",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    },
+    {
+     "key": "c3",
+     "text": "Differentiates $P(X = 0)$ with respect to $t$, or equivalent merit",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    }
+   ],
+   "digest": "f6ee96699c09771974a14d2185648b67f0926d05b89f890e046a7942f823a880"
+  },
+  {
+   "id": "q14b-iii",
+   "question": 14,
+   "marks": 3,
+   "answerType": "show-that",
+   "keyed": false,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides a correct proof of both inequalities",
+     "marks": 3,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    },
+    {
+     "key": "c2",
+     "text": "Proves one inequality, or equivalent merit",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    },
+    {
+     "key": "c3",
+     "text": "Finds $P(X = 0)$ and $P(X = 1)$ at that instant, or shows that $\\ln(1 + x) < x$ for $x \\ne 0$",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    }
+   ],
+   "digest": "6a2fcb52e6d9ad54e2ccdea45122e486479d89a1afd47eeb76f58babb007f971"
+  }
+ ]
+}

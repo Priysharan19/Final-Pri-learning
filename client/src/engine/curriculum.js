@@ -28,7 +28,7 @@ export const CURRICULUM = [
   {
     year: 7,
     title: 'Year 7',
-    caption: 'Foundations — number, early algebra and geometry',
+    caption: 'Foundations: number, early algebra and geometry',
     subtopics: [
       S('y7-integers', 'Integers & Order of Operations', 'Number', 10, [
         'Compare, order and locate integers on a number line',
@@ -80,7 +80,7 @@ export const CURRICULUM = [
   {
     year: 8,
     title: 'Year 8',
-    caption: 'Building fluency — indices, linear thinking and probability',
+    caption: 'Building fluency: indices, linear thinking and probability',
     subtopics: [
       S('y8-indices', 'Index Notation & Laws', 'Number', 11, [
         'Write repeated multiplication in index form',
@@ -137,7 +137,7 @@ export const CURRICULUM = [
   {
     year: 9,
     title: 'Year 9',
-    caption: 'Stepping up — Pythagoras, trigonometry and coordinate geometry',
+    caption: 'Stepping up: Pythagoras, trigonometry and coordinate geometry',
     subtopics: [
       S('y9-pythagoras', "Pythagoras' Theorem", 'Measurement & Geometry', 11, [
         'Find the hypotenuse of a right-angled triangle',
@@ -219,7 +219,7 @@ export const CURRICULUM = [
   {
     year: 10,
     title: 'Year 10',
-    caption: 'Pre-senior mastery — quadratics, surds and advanced trig',
+    caption: 'Pre-senior mastery: quadratics, surds and advanced trig',
     subtopics: [
       S('y10-quadratics', 'Quadratic Equations', 'Algebra', 13, [
         'Factorise monic and non-monic quadratics',
@@ -316,7 +316,7 @@ export const CURRICULUM = [
   {
     year: 11,
     title: 'Year 11',
-    caption: 'Advanced foundations — functions, trig identities and rates of change',
+    caption: 'Advanced foundations: functions, trig identities and rates of change',
     subtopics: [
       S('y11-functions', 'Functions & Relations', 'Functions', 12, [
         'Use function notation and evaluate functions',
@@ -393,7 +393,7 @@ export const CURRICULUM = [
   {
     year: 12,
     title: 'Year 12',
-    caption: 'HSC Advanced — calculus, series, financial maths and distributions',
+    caption: 'HSC Advanced: calculus, series, financial maths and distributions',
     subtopics: [
       S('y12-diff', 'Differentiation Rules', 'Calculus', 13, [
         'Differentiate with the product rule',
@@ -440,17 +440,17 @@ export const CURRICULUM = [
         'Interpret motion graphs',
         'Solve rates-of-change problems'
       ]),
-      S('y12-integral-calc', 'Integral Calculus · Answer-Checked Practice', 'Calculus', AUTHORED_WEIGHT, [
+      S('y12-integral-calc', 'Integral Calculus: Practice', 'Calculus', AUTHORED_WEIGHT, [
         'Find antiderivatives of exponential and trigonometric functions',
         'Evaluate definite integrals of polynomial functions',
         'Find displacement from a velocity function'
       ]),
-      S('y12-random-var', 'Random Variables · Answer-Checked Practice', 'Statistics & Probability', AUTHORED_WEIGHT, [
+      S('y12-random-var', 'Random Variables: Practice', 'Statistics & Probability', AUTHORED_WEIGHT, [
         'Find the expected value of a discrete random variable',
         'Find the variance of a discrete random variable',
         'Use z-scores and the 68–95–99.7 rule for a normal distribution'
       ]),
-      S('y12-fin-exact', 'Financial Mathematics · Answer-Checked Practice', 'Financial Maths', AUTHORED_WEIGHT, [
+      S('y12-fin-exact', 'Financial Mathematics: Practice', 'Financial Maths', AUTHORED_WEIGHT, [
         'Find the value of a compound-interest investment',
         'Track the balance of a reducing-balance loan',
         'Find the future value of an annuity as a geometric series'
@@ -482,7 +482,7 @@ const T = (id, name, strand, weight, code, dotpoints) => ({ id, name, strand, we
 
 export const STREAM_CURRICULUM = {
   'standard-11': {
-    title: 'Standard · Year 11', caption: 'MS — money, measurement and data for the real world',
+    title: 'Standard · Year 11', caption: 'MS: money, measurement and data for the real world',
     subtopics: [
       T('ms11-earning', 'Earning & Managing Money', 'Financial Maths', 12, 'MS-F1', [
         'Calculate wages, salaries, overtime and commission',
@@ -542,7 +542,7 @@ export const STREAM_CURRICULUM = {
     ]
   },
   'standard-12': {
-    title: 'Standard · Year 12', caption: 'MS — loans, annuities, networks and the normal curve',
+    title: 'Standard · Year 12', caption: 'MS: loans, annuities, networks and the normal curve',
     subtopics: [
       T('ms12-loans', 'Investments & Loans', 'Financial Maths', 13, 'MS-F4', [
         'Compound interest investments',
@@ -579,7 +579,7 @@ export const STREAM_CURRICULUM = {
         'Use exponential models',
         'Interpret linear graphs of practical situations'
       ]),
-      T('ms12-invest-loans', 'Investment, Loans & Depreciation · Answer-Checked Practice', 'Financial Maths', 8, 'MS-F4', [
+      T('ms12-invest-loans', 'Investment, Loans & Depreciation: Practice', 'Financial Maths', 8, 'MS-F4', [
         'Find the value of a compound-interest investment',
         'Track the balance of a loan with interest and repayments',
         'Find the value of a declining-balance asset'
@@ -609,7 +609,7 @@ export const STREAM_CURRICULUM = {
         'Interpret the gradient of a line of fit',
         'Use a line of fit through two points'
       ]),
-      T('ms12-normal-exact', 'The Normal Distribution · Answer-Checked Practice', 'Statistics & Probability', 8, 'MS-S5', [
+      T('ms12-normal-exact', 'The Normal Distribution: Practice', 'Statistics & Probability', 8, 'MS-S5', [
         'Find a z-score',
         'Use the 68–95–99.7 rule to count values',
         'Find a value from its z-score'
@@ -619,12 +619,12 @@ export const STREAM_CURRICULUM = {
         'Find the value of a simple-interest investment',
         'Find the rate or the time from the interest earned'
       ]),
-      T('ms12-depreciation', 'Depreciation & Loans · Answer-Checked Practice', 'Financial Maths', 8, 'MS-F3', [
+      T('ms12-depreciation', 'Depreciation & Loans: Practice', 'Financial Maths', 8, 'MS-F3', [
         'Find the value of an asset using straight-line depreciation',
         'Find the annual depreciation of an asset',
         'Find the interest paid on a loan repaid in equal instalments'
       ]),
-      T('ms12-right-triangle', 'Right-Angled Triangles · Answer-Checked Practice', 'Trigonometry', 8, 'MS-M3', [
+      T('ms12-right-triangle', 'Right-Angled Triangles: Practice', 'Trigonometry', 8, 'MS-M3', [
         'Use Pythagoras’ theorem to find a side',
         'Use a special-angle ratio to find a side',
         'Find an acute angle from an exact ratio'
@@ -632,7 +632,7 @@ export const STREAM_CURRICULUM = {
     ]
   },
   'ext1-11': {
-    title: 'Extension 1 · Year 11', caption: 'ME — deeper functions, identities and counting',
+    title: 'Extension 1 · Year 11', caption: 'ME: deeper functions, identities and counting',
     subtopics: [
       T('me11-poly', 'Polynomials & Remainders', 'Algebra', 11, 'ME-F2', [
         'Division of polynomials; remainder and factor theorems',
@@ -657,7 +657,7 @@ export const STREAM_CURRICULUM = {
       T('me11-comb', 'Combinatorics', 'Statistics & Probability', 11, 'ME-A1', [
         'Arrangements with restrictions',
         'Selections and committees with conditions',
-        'The pigeonhole principle'
+        'Count arrangements and selections by cases and by complement'
       ]),
       T('me11-rates', 'Rates of Change', 'Calculus', 11, 'ME-C1', [
         'Related rates of change',
@@ -672,7 +672,7 @@ export const STREAM_CURRICULUM = {
     ]
   },
   'ext1-12': {
-    title: 'Extension 1 · Year 12', caption: 'ME — induction, vectors and further calculus',
+    title: 'Extension 1 · Year 12', caption: 'ME: induction, vectors and further calculus',
     subtopics: [
       T('me12-induction', 'Proof by Mathematical Induction', 'Algebra', 11, 'ME-P1', [
         'Prove series results by induction',
@@ -692,7 +692,7 @@ export const STREAM_CURRICULUM = {
       T('me12-calc', 'Further Calculus', 'Calculus', 12, 'ME-C2/C3', [
         'Integration by substitution',
         'Volumes of solids of revolution',
-        'Areas involving inverse functions'
+        'Areas between curves and lines'
       ]),
       T('me12-binomial', 'The Binomial Distribution', 'Statistics & Probability', 10, 'ME-S1', [
         'Binomial probabilities for n trials',
@@ -732,7 +732,7 @@ export const STREAM_CURRICULUM = {
     ]
   },
   'ext2-12': {
-    title: 'Extension 2 · Year 12', caption: 'MEX — complex numbers, proof and mechanics',
+    title: 'Extension 2 · Year 12', caption: 'MEX: complex numbers, proof and mechanics',
     subtopics: [
       T('mex-proof', 'The Nature of Proof', 'Algebra', 11, 'MEX-P1/P2', [
         'Direct proof and proof by contradiction',
@@ -824,6 +824,8 @@ export function yearOfSubtopic(id) {
   return SUBTOPIC_BY_ID[id]?.year ?? null;
 }
 
+// Owner decision, 19 Nov 2026 (Prithagoras): the student reads these words, never the D1 to D4 codes.
+export const DIFF_WORDS = { 1: 'Foundation', 2: 'Intermediate', 3: 'Advanced', 4: 'Extension' };
 export const DIFF_LABELS = { 1: 'D1 · Foundation', 2: 'D2 · Intermediate', 3: 'D3 · Advanced', 4: 'D4 · Exam Extension' };
 
 // ── Dot points ───────────────────────────────────────────────────────────────
@@ -945,19 +947,19 @@ export const DOTPOINT_FORMS = Object.freeze({
   'y11-quadfunc': [[1], [0], [2], [1]],
   'y11-polynomials': [[0], [0], [1], [2]],
   'y11-lines': [[0], [0, 1], [0, 1], [2]],
-  'y11-trigfunc': [[0], [0, 1], [2], []],
+  'y11-trigfunc': [[0], [0, 1], [2], [1, 2]],
   'y11-sine-cosine-rule': [[0], [0], [1], [2]],
   'y11-explog': [[1], [0], [2], [0, 2]],
   'y11-diff': [[0], [0], [1], [2]],
   'y11-probability': [[1], [0, 1], [2], [0]],
   // ── Year 12 Advanced ──────────────────────────────────────────────────────
   'y12-diff': [[2], [0], [1], [2]],
-  'y12-appdiff': [[0], [0], [1], [2]],
+  'y12-appdiff': [[0], [0], [0, 1, 2], [2]],
   'y12-integration': [[0], [1], [2], [2]],
   'y12-trigcalc': [[0], [1], [0], [2]],
   'y12-explogcalc': [[0], [1], [2], [2]],
   'y12-series': [[0], [0], [1], [2]],
-  'y12-financial': [[], [0, 1], [0, 1], [2]],
+  'y12-financial': [[0, 1], [0, 1], [0, 1], [2]],
   'y12-stats': [[0], [0], [1], [2]],
   'y12-motion': [[0], [1], [0, 2], [0]],
   'y12-integral-calc': [[0], [1], [0], [2]],

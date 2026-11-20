@@ -65,7 +65,36 @@
 // 2026.11.40 — Train editions-25 CI fix: Some Applications of Trigonometry (c10-trig-applications) draws only
 // figure-bearing heights-and-distances forms (the right-triangle ratio, the ladder and two new ones, a kite string
 // and an angle of depression); the table and identity expressions stay in the Trigonometry chapter.
-export const CONTENT_VERSION = '2026.11.40';
+// 2026.11.43 — The every-reading rule for bare and "= …" lines (y12-integration's derived step check is back on; the landing demo is
+//              judged with its question), merged with 2026.11.42's NSW content gaps. Served questions are unchanged except where the
+//              merge changed them; the digests are regenerated on the merged tree.
+// 2026.11.44 — Graph-sketch forms: y11-quadfunc D2 and y12-appdiff D2/D3 gain five forms in which the student states a graph's
+//              intercepts and turning points (answerType 'graph-sketch'). Adding forms to those cells changes which question a
+//              given seed draws (612 of 900 sampled draws), so every seed in them is a different question from 2026.11.43's.
+// 2026.11.45 — y12-integration D2 (definite integral of a quadratic from 0): the worked solution prints coefficients in lowest
+//              terms (x^2, not 2/2 x^2) and the exact value beside its rounding (F(1) = -2/3 ≈ -0.667). Display only: every seed draws the
+//              same question with the same key, tolerance and traps; only the steps text of that form changes.
+// 2026.11.42 — Past-paper keys carry the paper's own published acceptance band (answer.officialRange) in the served payload, so the
+//              marker's exact-value and uncalled-for-band rules leave that band alone (16 JEE Advanced chapter digests).
+// 2026.11.41 — Walk-through maths fixes: a grouped-data mode question has one modal class; a numeric key is judged
+// by the band its wording asks for (an exact key carries none, a key to three decimals says so, "exactly" is exact,
+// "to the nearest degree" names its place, a list of solutions is bounded by the precision named); a negative number
+// raised to a power is bracketed in every worked line; Areas Related to Circles serves plane figures (two new forms,
+// arc length and the perimeter of a sector) and Surface Areas and Volumes serves solids (two new forms, the curved
+// surface of a cylinder and the surface of a sphere); the pump question asks how much is removed; the earlier
+// energy-rate, factorise-fully and Year 7 mode corrections are part of this version.
+// 2026.11.42 — NSW content gaps: Advanced and Extension 1 cells that had no question now have verified forms; a set
+// of rational solutions prints as fractions; a previous-year question keeps the exam's published band; the key-format
+// repairs (a constant key, a plain percentage box, a plain value box) and the wider parameter ranges change what
+// those generators serve.
+export const CONTENT_VERSION = '2026.11.45';
+/**
+ * A sealed token that re-generates a question from (generator, difficulty, seed) (a prepared practice question, a guest
+ * ticket) carries the content version it was minted under (`c`). A token with no `c` was minted before that field existed,
+ * under this version or an earlier one: it is read as this version, so it binds only while it is still in force and is
+ * stale after any later bump. Never change this value when bumping CONTENT_VERSION.
+ */
+export const UNVERSIONED_TOKEN_CONTENT_VERSION = '2026.11.43';
 export const LEGACY_CONTENT_VERSION = 'legacy-unversioned';
 
 /** FNV-1a over a string, two lanes, as 16 hex characters. */

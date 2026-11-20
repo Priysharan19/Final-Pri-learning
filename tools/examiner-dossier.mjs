@@ -89,7 +89,7 @@ for (const id of Object.keys(GENERATORS).sort()) {
     for (const seed of SEEDS) {
       let q;
       try { q = generateQuestion(id, diff, seed); } catch { continue; }
-      if (!q || !q.stepcheck) continue;
+      if (!q || !q.stepcheck || q.stepcheck.kind === 'value-chain') continue;   // a value-chain meta is a verdict check, not a rubric plan
       plans.push({ seed, plan: q.stepcheck, answer: q.answer });
       marks = marksPossibleFor(q);
       const sc = q.stepcheck;
@@ -98,7 +98,7 @@ for (const id of Object.keys(GENERATORS).sort()) {
         : `${sc.kind} step check`;
     }
     if (!plans.length) {
-      const found = DISCOVERY.some(seed => { try { return !!generateQuestion(id, diff, seed)?.stepcheck; } catch { return false; } });
+      const found = DISCOVERY.some(seed => { try { const sc = generateQuestion(id, diff, seed)?.stepcheck; return !!sc && sc.kind !== 'value-chain'; } catch { return false; } });
       if (found) { console.error(`EXAMINER DOSSIER: FAIL — ${id}/D${diff} issues step checks but none on the sampled seeds; widen SEEDS`); process.exit(1); }
       continue;
     }

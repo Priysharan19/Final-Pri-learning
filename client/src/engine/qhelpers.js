@@ -53,6 +53,11 @@ export function moneyPlain(v) {
   // Escaped dollar so prompts don't collide with $…$ math delimiters
   return `\\$${Math.abs(v).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
+/**
+ * A substituted value that is raised to a power or multiplied: a negative number is bracketed,
+ * "(-6)^2", never "-6^2" (which reads as -(6^2) = -36). Positive values and strings are unchanged.
+ */
+export const br = v => (typeof v === 'number' && v < 0 ? `(${v})` : `${v}`);
 export const num = v => Number.isInteger(v) ? String(v) : String(r3(v));
 
 // ── Fractions ────────────────────────────────────────────────────────────────
@@ -174,7 +179,21 @@ export function mcq(rng, correct, distractors) {
 /** Degrees → radians. */
 export const rad = d => d * Math.PI / 180;
 
-export const NAMES = ['Aria', 'Blake', 'Chen', 'Dev', 'Elif', 'Finn', 'Grace', 'Hana', 'Ivy', 'Jonah', 'Kiri', 'Leo', 'Mia', 'Noah', 'Ollie', 'Priya', 'Quinn', 'Ruby', 'Sam', 'Tara', 'Uma', 'Vik', 'Willa', 'Xavier', 'Yusuf', 'Zoe'];
+// The names in question text. The banks are SHARED by both editions (Priyabhata's chapters reuse y7-y12 generators,
+// 100 of them), so the pool is chosen by the build's edition, not swapped for everyone: a Prithagoras build draws from
+// NSW_NAMES, which has no Indian name (owner decision 2026-11-18: nothing Indian is visible in the Australian
+// syllabus); a Priyabhata build draws from INDIA_SHARED_NAMES, byte-for-byte the list it always had, so its seeded
+// questions are unchanged. The two lists differ in four positions only (Dev, Priya, Uma, Vik), so every other name
+// is the same for the same seed in both. (client/test/au-no-india-surface-check.mjs holds both halves.)
+export const INDIA_SHARED_NAMES = ['Aria', 'Blake', 'Chen', 'Dev', 'Elif', 'Finn', 'Grace', 'Hana', 'Ivy', 'Jonah', 'Kiri', 'Leo', 'Mia', 'Noah', 'Ollie', 'Priya', 'Quinn', 'Ruby', 'Sam', 'Tara', 'Uma', 'Vik', 'Willa', 'Xavier', 'Yusuf', 'Zoe'];
+export const NSW_NAMES = ['Aria', 'Blake', 'Chen', 'Dean', 'Elif', 'Finn', 'Grace', 'Hana', 'Ivy', 'Jonah', 'Kiri', 'Leo', 'Mia', 'Noah', 'Ollie', 'Piper', 'Quinn', 'Ruby', 'Sam', 'Tara', 'Una', 'Vera', 'Willa', 'Xavier', 'Yusuf', 'Zoe'];
+// The pool the generators draw from. One array, filled in place, so every `import { NAMES }` sees the choice: in Node
+// (the server and the suites) from PRI_EDITION when this module loads; in a browser build by selectNamePool(EDITION)
+// at start-up (client/src/main.jsx), because a build's edition is its record, not a global. Unset is Priyabhata.
+export const NAMES = [...(String(globalThis.process?.env?.PRI_EDITION ?? '').trim() === 'prithagoras' ? NSW_NAMES : INDIA_SHARED_NAMES)];
+export function selectNamePool(editionId) {
+  NAMES.splice(0, NAMES.length, ...(editionId === 'prithagoras' ? NSW_NAMES : INDIA_SHARED_NAMES));
+}
 export const ITEMS = [
   { name: 'a skateboard', price: [80, 320] },
   { name: 'a pair of sneakers', price: [60, 240] },

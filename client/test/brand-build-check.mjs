@@ -81,6 +81,8 @@ function checkBuild(dist) {
 // `Notes` here and `NswNotes` there; studyJourney is the India notes' study-link helper, which the NSW notes do not use), so a name that is a notes chunk is read as one name when two builds are compared.
 // What the notes chunks themselves hold is compared below under its own reason; nothing else may differ.
 export const NOTES_CHUNK = /^(?:notes-.+|Notes|NswNotes|notesIndex|e3|studyJourney)$/;
+// Owner decision, 19 Nov 2026: Prithagoras hides Rapid Fire and Match, so its build (vite.config.js __PRI_GAMES__) emits neither page.
+export const GAMES_CHUNK = /^(?:Rush|Match)$/;
 const NOTES_REF = /\b(?:notes-[A-Za-z0-9_-]+?|NswNotes|Notes|notesIndex|e3|studyJourney)-#\.(js|css)\b/g;
 const norm = s => s.replace(/-[A-Za-z0-9_-]{8}\.(js|css|woff2?|ttf|png|svg|json)\b/g, '-#.$1').replace(/pri-[0-9a-f]{12}/g, 'pri-#').replace(NOTES_REF, 'NOTES-#.$1');
 function contents(dist) {
@@ -105,7 +107,7 @@ if (BOTH) {
     const rootOf = rel => rel.replace(/^assets\//, '').replace(/-[A-Za-z0-9_-]{8}\.\w+$/, '').replace(/^_pri-legal-hindi-none$/, 'legalHindi');
     const roots = m => new Set([...m.keys()].filter(rel => /-[A-Za-z0-9_-]{8}\.\w+$/.test(rel)).map(rootOf));
     const aOnly = [...roots(A)].filter(r => !roots(B).has(r)), bOnly = [...roots(B)].filter(r => !roots(A).has(r));
-    ok(A.size === B.size || [...aOnly, ...bOnly].every(r => NOTES_CHUNK.test(r)), `the two builds have the same files, but for each edition's notes (${A.size}, ${B.size}; only in ${first}: ${aOnly.join(', ') || 'none'}; only in ${other}: ${bOnly.join(', ') || 'none'})`);
+    ok(A.size === B.size || [...aOnly, ...bOnly].every(r => NOTES_CHUNK.test(r) || GAMES_CHUNK.test(r)), `the two builds have the same files, but for each edition's notes (${A.size}, ${B.size}; only in ${first}: ${aOnly.join(', ') || 'none'}; only in ${other}: ${bOnly.join(', ') || 'none'})`);
     // Files that keep their name (no content hash) are compared by name; hashed
     // chunks are compared as a set of normalised contents.
     const plain = rel => !/-[A-Za-z0-9_-]{8}\.\w+$/.test(rel);
@@ -131,6 +133,9 @@ if (BOTH) {
     //                  streams-standard, year8-10) carry the other hash in their import
     //                  line. Priyabhata's own bundle is byte-identical to before.
     const MAY_DIFFER = {
+      // The syllabus board is on in a Prithagoras build and off in a Priyabhata one (owner decision 18 Nov 2026, featureStates):
+      // the feature chunk holds the build's own flag values.
+      features: 'build flags',
       edition: 'brand', Paywall: 'commerce', CloudAccountPanel: 'commerce', useGooglePlayPurchase: 'commerce', useSaleAvailable: 'commerce', Legal: 'legal', i18n: 'language',
       'i18n-hi': 'language', legalHindi: 'language', languages: 'language', core: 'language',
       backend: 'language', indiaProduct: 'language', 'streams-standard': 'language', year8: 'language', year9: 'language', year10: 'language',
@@ -139,7 +144,15 @@ if (BOTH) {
       // `import{It as v,…}` carries other letters, and the shell's preload lists hold one notes chunk more or fewer.
       // They differ in those letters and lists only; the brand and commerce checks below still apply to every chunk.
       App: 'cascade', IndexPage: 'cascade', InstrumentBar: 'cascade', MapPage: 'cascade', PageLink: 'cascade', QuestionCard: 'cascade',
-      SyllabusBoard: 'cascade', api: 'cascade', classroomWords: 'cascade', copy: 'cascade', latex: 'cascade'
+      SyllabusBoard: 'cascade', api: 'cascade', classroomWords: 'cascade', copy: 'cascade', latex: 'cascade',
+      // Owner decisions of 19 Nov 2026 (the edition table: offering, games, hints, themeDefault, walkthroughFixes): a chunk that reads one
+      // of those values through the edition helpers is built with that edition's value, and its importers carry the other
+      // letters. The brand and commerce checks below still apply to every one of them.
+      AccountActivationGate: 'edition values', ExamRoom: 'edition values', Exams: 'edition values', History: 'edition values', InkAnswer: 'edition values',
+      PaperGenerator: 'edition values', PracticeBase: 'edition values', PractisePhoto: 'edition values', ReportHead: 'edition values',
+      Settings: 'edition values', Tasks: 'edition values', TrialNotice: 'edition values', index: 'edition values',
+      AccountDeleteRequest: 'edition values', GuardianConsent: 'edition values', OfferedCourse: 'edition values', SignUpFlow: 'edition values', Teach: 'edition values',
+      difficultyText: 'edition values', glossary: 'edition values', guest: 'edition values', offering: 'edition values'
     };
     //   core           i18n/core.js (split from i18n/index.js in train 23 so the server
     //                  can translate without React) picks the edition's en-AU overrides
@@ -158,8 +171,8 @@ if (BOTH) {
     const names = list => [...new Set(list.map(([rel]) => base(rel)))].sort();
     // The notes chunks are each edition's own (named differently, so compared as a set per side); every other chunk that
     // differs must differ in BOTH builds, and each must be one of the allowed names above.
-    const outsideNotes = list => names(list).filter(n => !NOTES_CHUNK.test(n));
-    ok(JSON.stringify(outsideNotes(onlyA)) === JSON.stringify(outsideNotes(onlyB)) && [...names(onlyA), ...names(onlyB)].every(n => (Object.hasOwn(MAY_DIFFER, n) || NOTES_CHUNK.test(n))),
+    const outsideNotes = list => names(list).filter(n => !NOTES_CHUNK.test(n) && !GAMES_CHUNK.test(n));
+    ok(JSON.stringify(outsideNotes(onlyA)) === JSON.stringify(outsideNotes(onlyB)) && [...names(onlyA), ...names(onlyB)].every(n => (Object.hasOwn(MAY_DIFFER, n) || NOTES_CHUNK.test(n) || GAMES_CHUNK.test(n))),
       `hashed chunks differ only where an edition should (${names(onlyA).join(', ')} | ${names(onlyB).join(', ')})`);
     const brandChunks = (list, id) => list.filter(([, c]) => c.includes(wordmarkTail(id)));
     ok(brandChunks(onlyA, first).length === 1 && base(brandChunks(onlyA, first)[0][0]) === 'edition' && brandChunks(onlyB, other).length === 1 && base(brandChunks(onlyB, other)[0][0]) === 'edition',

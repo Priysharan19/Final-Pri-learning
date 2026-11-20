@@ -39,7 +39,7 @@
 //     at least NSW_RELEASE_FLOOR of the course's Year 12 outcomes are covered.
 //     The course's Year 12 outcomes come from the G2 model, handed in by the
 //     server (never entered here). Its marks and working time are scaled to
-//     what it examines, its title says "Practice paper — N of M Year 12
+//     what it examines, its title says "Practice paper: N of M Year 12
 //     outcomes" (never HSC or trial), and every surface names what it omits.
 //   · Below the floor the blueprint is refused, with its gaps listed.
 // Nothing here pads a slot from another outcome, another course or another
@@ -327,9 +327,9 @@ export function blueprintReleasable(b, pool, options) {
 
 /**
  * The title a paper is sealed under: the server's, never the device's. A
- * partial paper is a "Practice paper — N of M Year 12 outcomes", never an HSC
+ * partial paper is a "Practice paper: N of M Year 12 outcomes", never an HSC
  * paper or a trial.
  */
 export const nswPaperTitle = (b, release = null) => (release && release.released && !release.full
-  ? `${b.label} · Practice paper — ${release.year12.covered} of ${release.year12.total} Year 12 outcomes`
+  ? `${b.label} · Practice paper: ${release.year12.covered} of ${release.year12.total} Year 12 outcomes`
   : `${b.label} · ${NSW_EXAM_LABEL}`);

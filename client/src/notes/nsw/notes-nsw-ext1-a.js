@@ -112,7 +112,7 @@ export default {
     concepts: [
       { title: 'Trigonometry in three dimensions', body: 'Draw the right triangle that lies inside the solid and label its sides. The angle between a line and a plane is the angle between the line and its shadow (projection) on the plane. In a rectangular box with edges $3,4,12$ the base diagonal is $5$ and the space diagonal is $13$.' },
       { title: 'Identities', body: 'The compound-angle formulas $\\sin(A\\pm B)$ and $\\cos(A\\pm B)$ give the double-angle formulas by setting $B=A$. With $t=\\tan\\tfrac{\\theta}{2}$ every ratio becomes a rational function of $t$, which turns many trigonometric equations into algebra.' },
-      { title: 'Trigonometric equations', body: 'Rewrite so that one function of one angle remains (often $\\cos2x=1-2\\sin^2x$ turns an equation into a quadratic in $\\sin x$), solve for the ratio, then list every angle in the stated interval. Always check the interval before writing a solution.' }
+      { title: 'Trigonometric equations', body: 'Rewrite so that one function of one angle remains (often $\\cos(2x)=1-2\\sin^2x$ turns an equation into a quadratic in $\\sin x$), solve for the ratio, then list every angle in the stated interval. Always check the interval before writing a solution.' }
     ],
     definitions: [
       { term: 'Angle between a line and a plane', meaning: 'The acute angle between the line and its projection onto the plane: the smallest angle the line makes with any line in the plane.' },
@@ -143,8 +143,8 @@ export default {
         verify: { kind: 'value', expr: 'sin(5*pi/12)', answer: '(sqrt(6)+sqrt(2))/4' }
       },
       {
-        question: 'Solve $\\cos2x=\\sin x$ for $0\\le x\\le2\\pi$.',
-        steps: ['Replace $\\cos2x$ by $1-2\\sin^2x$: $1-2\\sin^2x=\\sin x$, so $2\\sin^2x+\\sin x-1=0$.', 'Factorise: $(2\\sin x-1)(\\sin x+1)=0$, so $\\sin x=\\tfrac12$ or $\\sin x=-1$.', '$\\sin x=\\tfrac12$ gives $x=\\tfrac{\\pi}{6},\\tfrac{5\\pi}{6}$; $\\sin x=-1$ gives $x=\\tfrac{3\\pi}{2}$.'],
+        question: 'Solve $\\cos(2x)=\\sin x$ for $0\\le x\\le2\\pi$.',
+        steps: ['Replace $\\cos(2x)$ by $1-2\\sin^2x$: $1-2\\sin^2x=\\sin x$, so $2\\sin^2x+\\sin x-1=0$.', 'Factorise: $(2\\sin x-1)(\\sin x+1)=0$, so $\\sin x=\\tfrac12$ or $\\sin x=-1$.', '$\\sin x=\\tfrac12$ gives $x=\\tfrac{\\pi}{6},\\tfrac{5\\pi}{6}$; $\\sin x=-1$ gives $x=\\tfrac{3\\pi}{2}$.'],
         answer: '$x=\\tfrac{\\pi}{6},\\tfrac{5\\pi}{6},\\tfrac{3\\pi}{2}$',
         verify: { kind: 'roots', f: 'cos(2*x)-sin(x)', answers: ['pi/6', '5*pi/6', '3*pi/2'] }
       },

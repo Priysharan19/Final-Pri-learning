@@ -18,7 +18,9 @@ export function exprToLatex(s) {
   }
   t = t.replace(/\(([^()]*)\)\/\(([^()]*)\)/g, '\\frac{$1}{$2}');
   t = t.replace(/\^\(([^()]*)\)/g, '^{$1}');
-  t = t.replace(/\b(sin|cos|tan|sec|csc|cot|ln|log)\b/g, '\\$1 ');
+  // Function names are upright operators, also when a digit or ) runs into them (5sin(x)).
+  t = t.replace(/(?<![A-Za-z\\])(sin|cos|tan|sec|csc|cot|ln|log)(?![A-Za-z])/g, '\\$1 ');
+  t = t.replace(/(?<![A-Za-z\\])(max|min)(?![A-Za-z])/g, '\\operatorname{$1}');
   t = t.replace(/\bLHS\b/g, '\\mathrm{LHS}').replace(/\bRHS\b/g, '\\mathrm{RHS}');
   t = t.replace(/\blet\b/g, '\\mathrm{let}\\;');
   t = t.replace(/∫/g, '\\int ');

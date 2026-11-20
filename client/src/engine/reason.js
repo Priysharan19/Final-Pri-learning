@@ -314,9 +314,9 @@ function extraSolutionDiagnosis(variable, root) {
 function droppedConstraintDiagnosis() {
   return {
     code: 'constraint-dropped',
-    title: 'The equation lost its constraint',
-    message: 'This line is true for every value, so it no longer carries the restriction from the equation above.',
-    fix: 'A valid step must preserve the same solution set; do not replace the equation by an identity such as 0 = 0.',
+    title: 'This line is true for every value',
+    message: 'This line is true for every value of the letter, so it can no longer tell you which values solve the equation.',
+    fix: 'Keep an equation that is true only for the answers, such as 3x = 15, rather than one that is always true, such as 0 = 0.',
     confidence: 'high'
   };
 }
@@ -389,12 +389,12 @@ export function assessNumericCheckLine(ast, { previousAst = null, meta = null } 
       if (!substitutesPreviousLine(ast, previousAst, meta)) return null;
       return {
         status: 'note', trusted: false, check: true,
-        note: 'True — this is the line above with your answer put in. It confirms the answer rather than moving it on.'
+        note: 'True: this is the line above with your answer put in. It confirms the answer rather than moving it on.'
       };
     }
     return {
       status: 'ok', trusted: false, check: true,
-      note: 'Check — both sides come to the same number, so the answer satisfies the equation.'
+      note: 'Check: both sides come to the same number, so the answer satisfies the equation.'
     };
   }
   const diagnosis = {
@@ -409,7 +409,7 @@ export function assessNumericCheckLine(ast, { previousAst = null, meta = null } 
 
 /** Assess one parsed equation line. */
 export function assessEquationLine({ ast, previousAst = null, previousTrusted = false, meta = null } = {}) {
-  if (!ast || ast.t !== 'equation') return { status: 'note', trusted: false, note: 'Skipped — this is not an equation.' };
+  if (!ast || ast.t !== 'equation') return { status: 'note', trusted: false, note: 'Skipped: this is not an equation.' };
   const numericCheck = assessNumericCheckLine(ast, { previousAst, meta });
   if (numericCheck) return numericCheck;
   const variable = meta?.variable;
@@ -420,7 +420,7 @@ export function assessEquationLine({ ast, previousAst = null, previousTrusted = 
       if (!equationHoldsAt(ast, variable, sol)) {
         return {
           status: 'break', trusted: false,
-          note: `This is the line where it goes wrong — ${variable} = ${sol} solves the original problem but no longer satisfies this equation.`,
+          note: `This is the line where it goes wrong: ${variable} = ${sol} solves the original problem but no longer satisfies this equation.`,
           diagnosis: lostSolutionDiagnosis(variable, sol)
         };
       }

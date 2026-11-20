@@ -81,7 +81,12 @@ export function sweepStepMarkingOfOtherForms({ cells, seeds }) {
           const right = report(expr);
           ok(right.firstBreak === -1, `${tag}: the model line "${expr}" is not a break (${JSON.stringify(right.lines.map(l => l.status))})`);
           const changed = report(bump(expr));
-          ok(changed.firstBreak === 0 && changed.lines[0]?.status === 'break', `${tag}: "${bump(expr)}" is a break at line 1 (${JSON.stringify(changed.lines.map(l => l.status))})`);
+          // A changed expression is never verified work. It is crossed (a break at line 1) where the engine can tell it is
+          // not a true step; where an authored restatement or an unsimplified true step of the question's own function
+          // could stand on that line, the engine ABSTAINS (a note) rather than cross a true line (owner decision, 18 Nov
+          // 2026: false crosses are worse than a missed one; understanding audit, 0 false crosses, 0 false ticks).
+          const st = changed.lines[0]?.status;
+          ok(st === 'break' ? changed.firstBreak === 0 : st === 'note' && changed.firstBreak === -1, `${tag}: "${bump(expr)}" is a break at line 1, or an abstention, never a tick (${JSON.stringify(changed.lines.map(l => l.status))})`);
           ok(checkAnswer(q, bump(expr)).correct !== true, `${tag}: a changed expression is not correct`);
         } else if (meta.kind === 'equation' && Array.isArray(meta.solutions) && meta.solutions.length === 1 && meta.variable) {
           const [s] = meta.solutions;

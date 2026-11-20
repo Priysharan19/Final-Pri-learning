@@ -260,10 +260,10 @@ function mergePages(prior = {}, body = {}, allowed) {
 }
 
 export function saveExamResponses(exam, body = {}, now = Date.now()) {
-  if (exam.finishedAt) throw examError('This paper has been submitted — it can no longer change.', 409, 'EXAM_FINALISED');
+  if (exam.finishedAt) throw examError('This paper has been submitted. It can no longer change.', 409, 'EXAM_FINALISED');
   ensureExamClock(exam, now);
   now = exam.latestSeenAt;
-  if (deadlinePassed(exam, now)) throw examError('Time is up on this paper — nothing more can be saved to it.', 409, 'EXAM_DEADLINE_PASSED');
+  if (deadlinePassed(exam, now)) throw examError('Time is up on this paper. Nothing more can be saved to it.', 409, 'EXAM_DEADLINE_PASSED');
   if (inReadingTime(exam, now)) throw examError('Reading time: you can read the paper, but no answers can be written until working time starts.', 409, 'EXAM_READING_TIME');
   const allowed = allowedKeys(exam);
   const prior = exam.responses || {};

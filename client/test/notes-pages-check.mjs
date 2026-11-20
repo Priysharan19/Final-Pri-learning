@@ -34,6 +34,8 @@ import { loadNotesForGrade, loadOlympiadNotes } from '../src/notes/notesIndex.js
 import { NSW_NOTES_TOPIC_BY_ID, loadNswNotesForStage } from '../src/notes/nsw/nswNotesIndex.js';
 import { nswPracticeSubtopic } from '../src/notes/nsw/nswPractice.js';
 import { IN_CHAPTER_BY_ID } from '../src/engine/curriculum-in.js';
+import { livingIdsIn } from '../src/living/placement.india.js';
+import { livingIdsNsw } from '../src/living/placement.nsw.js';
 import { studyResourcesForGrade } from '../src/notes/data/notes-study-resources.js';
 
 const CLIENT = fileURLToPath(new URL('..', import.meta.url));
@@ -43,8 +45,8 @@ let pass = 0;
 const failures = [];
 const ok = (cond, label) => { if (cond) pass++; else failures.push(label); };
 
-const IN_ORDER = ['objective', 'prerequisites', 'intuition', 'ideas', 'definitions', 'formulas', 'points', 'diagram', 'examples', 'mistakes', 'check', 'resources', 'practice'];
-const NSW_ORDER = ['objective', 'prerequisites', 'intuition', 'ideas', 'definitions', 'formulas', 'diagram', 'examples', 'examiners', 'mistakes', 'check', 'practice'];
+const IN_ORDER = ['objective', 'prerequisites', 'intuition', 'ideas', 'definitions', 'formulas', 'living', 'points', 'diagram', 'examples', 'mistakes', 'check', 'resources', 'practice'];
+const NSW_ORDER = ['objective', 'prerequisites', 'intuition', 'ideas', 'definitions', 'formulas', 'living', 'diagram', 'examples', 'examiners', 'mistakes', 'check', 'practice'];
 
 const india = await loadNotesForGrade(10);
 const olympiad = await loadOlympiadNotes();
@@ -67,7 +69,10 @@ for (const c of CASES.filter(x => x.nsw)) {
 // Graph transformations (MAV-11-03) is taught by an issued subtopic (y11-transform: Year 11 Advanced, every difficulty), so
 // its practice link is that subtopic's. The fallback to plain /practice is exercised by a topic no issued subtopic reaches.
 ok(CASES.find(c => c.id === 'mav-11-03').exactPractice === true && CASES.find(c => c.id === 'mav-11-03').practice === '/practice?subtopic=y11-transform', 'mav-11-03 (Graph transformations) links to its issued subtopic y11-transform');
-ok(CASES.find(c => c.id === 'ma5-fin-c-02').exactPractice === false, 'ma5-fin-c-02 has no issued practice subtopic, so it exercises the fallback');
+// Compound interest (MA5-FIN-C-02) is now reached by an issued subtopic (y10-compound, every difficulty), so no real topic is left
+// to take the fallback; the fallback itself is still asserted on a topic that carries no outcomes.
+ok(CASES.find(c => c.id === 'ma5-fin-c-02').practice === '/practice?subtopic=y10-compound', 'ma5-fin-c-02 (Compound interest) links to its issued subtopic y10-compound');
+ok(nswPracticeSubtopic({ id: 'no-outcomes', outcomes: [] }) === null && nswPracticeSubtopic(null) === null, 'a topic no issued subtopic reaches has no practice subtopic, so the page falls back to plain /practice');
 
 function expectedSections(c) {
   const n = c.notes;
@@ -75,7 +80,9 @@ function expectedSections(c) {
     objective: !!n.objective,
     prerequisites: (n.prereqs || []).some(p => (c.nsw ? NSW_NOTES_TOPIC_BY_ID[p] : IN_CHAPTER_BY_ID[p])),
     intuition: !!n.intuition, points: n.points?.length > 0, diagram: n.diagrams?.length > 0, examiners: n.examiners?.length > 0,
-    mistakes: n.mistakes?.length > 0, check: n.check?.length > 0, resources: !!c.resources
+    mistakes: n.mistakes?.length > 0, check: n.check?.length > 0, resources: !!c.resources,
+    // living formulas sit after the formulas wherever the chapter has them (client/src/living/placement.*.js)
+    living: (c.nsw ? livingIdsNsw(c.id) : livingIdsIn(c.id)).length > 0
   };
   return c.order.filter(s => !(s in has) || has[s]);
 }

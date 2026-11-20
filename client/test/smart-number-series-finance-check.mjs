@@ -71,10 +71,11 @@ for (const w of WORKINGS) {
 ok(['number', 'sequences', 'finance'].every(t => registeredTopics().some(r => r.topic === t)), 'the three topics are registered');
 ok(ALL.every(sl => topicDiagnosisCodes().includes(sl.code)), 'every slip code is in the registry');
 let viaRegistry = 0, viaChecker = 0, generic = 0, moved = 0;
+const abstained = [];
 for (const [code, prev, broken] of WRONG) {
   const r = stepCheck({ kind: 'expression', source: prev, canonical: String(prev) }, broken);
   const first = r.lines[0];
-  if (first?.status !== 'break') continue;
+  if (first?.status !== 'break') { abstained.push([code, first?.status]); continue; }
   if (first.diagnosis?.code === code) viaRegistry += 1; else if (first.diagnosis) viaChecker += 1; else generic += 1;
   if (r.firstBreak !== 0) moved += 1;
   ok(first.diagnosis?.code === code, `${code}: "${prev}" → "${broken}" is named through the checker (got ${first.diagnosis?.code})`);
@@ -85,7 +86,11 @@ for (const [code, prev, broken] of WRONG) {
   for (const v of [truth, Math.round(truth * 1e6) / 1e6]) ok(!new RegExp(`(^|[^0-9.])${String(v).replace('.', '\\.')}([^0-9]|$)`).test(bare), `${code}: the message does not state the true value ${v}`);
   ok(!/(^|\s)(1\.15|1\.2|0\.85)\b/.test(bare), `${code}: no multiplier is given away`);
 }
-ok(viaRegistry === WRONG.length, `every wrong fixture is named by its topic slip through the checker (${viaRegistry}/${WRONG.length})`);
+// The checker abstains (a note, never a cross) on a line that is a TRUE PARTIAL of the line above it: "(12 - 4) + 1" then
+// "12 - 4" is that part worked out, so a dropped "+ 1" there is not provably a slip (checker.js judgeExpressionLine, the
+// decided safe behaviour). Only the drop-the-last-term fixtures may abstain; everything else the checker crosses must be named.
+ok(abstained.every(([code, status]) => code === 'sigma-terms-missing-plus-1' && status === 'note'), `only the true-partial fixtures abstain, as a note (${JSON.stringify(abstained)})`);
+ok(viaRegistry + abstained.length === WRONG.length, `every wrong fixture is named by its topic slip through the checker, or abstains as a true partial (${viaRegistry} named + ${abstained.length} abstained of ${WRONG.length})`);
 ok(moved === 0, 'the first break is on the line the check found, every time');
 let flagged = 0;
 for (const [prev, next] of RIGHT) { const r = stepCheck({ kind: 'expression', source: prev, canonical: next }, next); if (r.lines.some(l => l.status === 'break' || l.diagnosis)) flagged += 1; }

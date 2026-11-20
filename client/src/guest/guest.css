@@ -1,0 +1,167 @@
+/* Pri Learning · the guest screen and the question picker (ADR-0003).
+   Existing tokens only; flat surfaces, hairlines, no motion of its own. */
+.auth-wrap.gt { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; place-items: initial; padding: 0; overflow: visible; background: var(--page); color: var(--ink); }
+.auth-wrap.gt > * { margin-block: 0; }
+.gt-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding: var(--space-4) var(--space-4); max-width: 720px; width: 100%; margin: 0 auto; box-sizing: border-box; }
+.gt-main { flex: 1; width: 100%; max-width: 720px; margin: 0 auto; padding: var(--space-4); box-sizing: border-box; }
+.gt-panel { background: var(--surface); border: 1px solid var(--hairline); border-radius: 4px; padding: var(--space-6); }
+.gt-panel h1 { margin: 0 0 var(--space-3); font-family: var(--font-display); font-size: var(--text-lg); font-weight: 600; line-height: 1.25; }
+.gt-panel h1:focus { outline: none; }
+.gt-lede, .gt-quiet, .gt-left { margin: 0 0 var(--space-4); color: var(--ink-2); font-size: var(--text-base); }
+.gt-left { margin: var(--space-4) 0 0; font-size: var(--text-sm); color: var(--ink-3); }
+.gt-problem { margin: 0 0 var(--space-4); padding: var(--space-3); border: 1px solid var(--hairline-strong); border-radius: 4px; color: var(--ink); }
+.gt-prompt { margin: var(--space-4) 0; font-size: var(--text-math); line-height: 1.55; }
+.gt-answer { margin: 0; }
+.gt-typed label, .qp .qp-field > label, .qp legend, .gt-options legend { display: block; margin: 0 0 var(--space-2); font-size: var(--text-sm); font-weight: 600; color: var(--ink-2); }
+.gt-typed-row { display: flex; align-items: center; gap: var(--space-2); }
+.gt-typed-row .input { flex: 1; min-width: 0; }
+.gt-options, .qp-set { margin: 0; padding: 0; border: 0; min-width: 0; }
+.gt-option { display: flex; align-items: center; gap: var(--space-3); min-height: 44px; box-sizing: border-box; margin: 0 0 var(--space-2); padding: var(--space-2) var(--space-3); border: 1px solid var(--control-border); border-radius: 4px; background: var(--surface-raised); font-weight: 400; color: var(--ink); cursor: pointer; }
+.gt-option.on { border-color: var(--accent); background: var(--accent-soft); }
+.gt-option input { flex: none; accent-color: var(--accent); }
+.gt-option:focus-within, .qp-choice:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.gt-key { flex: none; width: 1.4em; font-weight: 600; color: var(--ink-3); }
+.gt-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-4); }
+.gt-hint { margin: var(--space-4) 0 0; padding: var(--space-3); border: 1px solid var(--hairline); border-radius: 4px; color: var(--ink-2); }
+.gt-verdict { margin-top: var(--space-5); padding-top: var(--space-4); border-top: 1px solid var(--hairline); }
+.gt-verdict p { margin: 0 0 var(--space-2); }
+.gt-verdict-line { font-weight: 600; font-size: var(--text-md); }
+.gt-foot { padding: var(--space-4); max-width: 720px; width: 100%; margin: 0 auto; box-sizing: border-box; font-size: var(--text-sm); color: var(--ink-3); }
+.gt-langs { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0 0 var(--space-3); }
+.gt-foot a { color: var(--ink-2); }
+
+.qp { display: grid; gap: var(--space-4); }
+.qp-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+.qp-field { min-width: 0; }
+.qp select.input { width: 100%; min-height: 44px; box-sizing: border-box; }
+.qp-note { margin: var(--space-2) 0 0; color: var(--ink-3); font-size: var(--text-sm); }
+.qp-choices { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.qp .qp-choice { display: inline-flex; margin: 0; align-items: center; gap: var(--space-2); min-height: 44px; box-sizing: border-box; padding: 0 var(--space-3); border: 1px solid var(--control-border); border-radius: 4px; background: var(--surface-raised); font-weight: 400; color: var(--ink); cursor: pointer; }
+.qp .qp-choice:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.qp .qp-choice { position: relative; }
+.qp .qp-choice:has(input:checked) { font-weight: 600; }
+/* The input covers the whole choice, so the hit area is the choice (44px), and the checked state is the choice's own border and fill. */
+.qp .qp-choice input { position: absolute; inset: -1px; width: calc(100% + 2px); height: calc(100% + 2px); margin: 0; appearance: none; -webkit-appearance: none; background: transparent; border: 0; border-radius: inherit; cursor: pointer; }
+.qp-start { justify-self: start; min-width: 160px; min-height: 44px; box-sizing: border-box; }
+
+@media (max-width: 480px) {
+  .gt-panel { padding: var(--space-4); }
+  .qp-row { grid-template-columns: 1fr; }
+  .qp-start { justify-self: stretch; }
+}
+
+/* The quick start on the signed-in Index. */
+.qp-home { margin: var(--space-8) 0; }
+.qp-home h2 { margin: 0 0 var(--space-2); font-size: var(--text-md); font-weight: 600; }
+.qp-home .in-note { margin: 0 0 var(--space-4); }
+
+/* ── Prithagoras first screen (GuestPage.jsx): a question on a page, its choices in the margin. ──
+   Existing tokens and faces only. One transition, on the verdict, and none under reduced motion. */
+.auth-wrap.gt.gp { background: var(--page); }
+.gp-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding: var(--space-4) clamp(16px, 4vw, 48px); border-bottom: 1px solid var(--hairline); }
+.gp-signin { min-height: var(--tap); }
+.gp-main { flex: 1; width: 100%; padding: clamp(32px, 15vh, 160px) clamp(16px, 4vw, 48px) var(--space-12); box-sizing: border-box; }
+.gp-sheet { width: 100%; max-width: 1040px; margin: 0 auto; }
+.gp-paper { display: grid; grid-template-columns: 208px minmax(0, 1fr); }
+.gp-margin { padding-right: var(--space-8); }
+.gp-body { min-width: 0; min-height: 320px; padding-left: clamp(32px, 5vw, 72px); border-left: 1px solid var(--hairline-strong); }
+
+.gp-number { margin: 0; font: 500 var(--text-xs)/1.4 var(--font-mono); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--ink); }
+.gp-number:focus, .gp-display:focus { outline: none; }
+.gp-tally { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); margin: var(--space-3) 0 0; font: 400 var(--text-xs)/1.4 var(--font-mono); color: var(--ink-3); }
+/* The segments the practice page counts a set with (instrument .in-prog10): done, now, still to come. */
+.gp-squares { display: inline-flex; gap: 3px; flex: 1 1 100%; }
+.gp-squares i { width: 22px; height: 4px; border-radius: var(--radius-xs); background: var(--surface-3); }
+.gp-squares i.is-used { background: var(--ink-3); }
+.gp-squares i.is-right { background: var(--good); }
+.gp-squares i.is-wrong { background: var(--correction); }
+.gp-squares i.is-now { background: var(--ink); }
+.gp-context { margin: var(--space-8) 0 0; display: grid; gap: var(--space-4); }
+.gp-context dt, .gp-row > legend, .gp-row > label, .gp-typed > label, .gp-options > legend, .gp-reads-k { font: 500 11px/1.4 var(--font-mono); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--ink-3); }
+.gp-context dd { margin: var(--space-1) 0 0; font-size: var(--text-sm); line-height: 1.4; color: var(--ink); }
+.gp-link { display: inline-flex; align-items: center; min-height: var(--tap); margin: var(--space-2) 0 0; padding: 0; border: 0; background: none; font: inherit; font-size: var(--text-sm); color: var(--ink-2); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.gp-link:hover { color: var(--ink); }
+
+.gp-prompt { margin: -0.35em 0 var(--space-10); max-width: 30em; font-size: clamp(21px, 1.3vw + 13px, 33px); line-height: 1.45; color: var(--ink); text-wrap: pretty; }
+.gp-answer { margin: 0; max-width: 640px; }
+.gp-typed > label, .gp-options > legend { display: block; margin: 0 0 var(--space-2); padding: 0; }
+.gp-typed-row { display: flex; align-items: center; gap: var(--space-3); }
+.gp-affix { flex: none; font-size: var(--text-lg); }
+.gp .gp-input { flex: 1 1 200px; min-width: 0; max-width: 440px; min-height: 56px; padding: 0 var(--space-4); font: 400 18px/1.2 var(--font-mono); background: var(--surface); }
+.gp-typed-row .gp-check { flex: none; min-height: 56px; padding-inline: var(--space-6); }
+/* The working lines: ruled, like the page a student writes on. The typed answer set out large, then the server's answer under it. */
+.gp-working { display: grid; grid-template-columns: 112px minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); max-width: 640px; min-height: 84px; margin: var(--space-4) 0 0; padding: var(--space-3) 0; box-sizing: border-box; border-bottom: 1px solid var(--hairline-strong); color: var(--ink); }
+.gp-line { min-width: 0; overflow-x: auto; overflow-y: hidden; font-size: clamp(24px, 1.4vw + 12px, 34px); line-height: 1.3; }
+.gp-how { font-size: var(--text-sm); line-height: 1.5; color: var(--ink-3); }
+.gp-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-5); margin-top: var(--space-4); }
+.gp-answer > .gp-actions:has(> .gp-link:only-child) { margin-top: 0; }
+.gp-actions .btn { min-height: 48px; padding-inline: var(--space-6); }
+.gp-actions .gp-link { margin: 0; }
+.gp-options { margin: 0; padding: 0; border: 0; min-width: 0; }
+.gp-option { font-size: var(--text-md); min-height: 52px; }
+.gp-option .gp-key { flex: none; width: 1.4em; font: 500 var(--text-sm) var(--font-mono); color: var(--ink-3); }
+.gp-option .gp-mark { margin-left: auto; width: 20px; height: 20px; }
+.gp-hint { max-width: 620px; margin: var(--space-5) 0 0; padding: var(--space-3) 0 0; border-top: 1px solid var(--hairline); color: var(--ink-2); }
+.gp-problem { max-width: 620px; margin: var(--space-4) 0; padding: var(--space-3) var(--space-4); border: 1px solid var(--hairline-strong); border-radius: var(--radius); color: var(--ink); }
+.gp-quiet { margin: var(--space-3) 0 0; color: var(--ink-3); font-size: var(--text-sm); }
+
+.gp-mark { flex: none; fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.gp-mark.is-right { stroke: var(--good); }
+.gp-mark.is-wrong { stroke: var(--correction); }
+.gp-verdict { max-width: 640px; margin-top: var(--space-6); }
+.gp-verdict p { margin: 0; }
+.gp-verdict-line { display: flex; align-items: center; gap: var(--space-3); font-size: 22px; font-weight: 600; line-height: 1.2; }
+.gp-verdict .gp-verdict-answer { margin-top: var(--space-4); }
+@media (prefers-reduced-motion: no-preference) {
+  .gp-verdict { animation: gp-arrive var(--motion-base) var(--ease-standard) both; }
+  .gp-prompt.is-arriving { animation: gp-arrive 220ms var(--ease-standard) both; }
+  @keyframes gp-arrive { from { opacity: 0; transform: translateY(6px); } }
+}
+
+.gp-chooser { max-width: 680px; margin: -10px 0 0; }
+.gp-row { margin: 0; padding: var(--space-1) 0; border: 0; border-bottom: 1px solid var(--hairline); min-width: 0; display: flow-root; }
+.gp-row > legend, .gp-row > label { float: left; width: 96px; padding: 0; margin: 0; line-height: var(--tap); }
+.gp-opts { margin-left: 96px; display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--space-6); min-height: var(--tap); }
+.gp-opt { position: relative; display: inline-flex; align-items: center; min-height: var(--tap); min-width: var(--tap); margin: 0; padding: 0; font-size: var(--text-base); font-weight: 400; color: var(--ink-3); cursor: pointer; }
+.gp-opt input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; appearance: none; -webkit-appearance: none; background: transparent; border: 0; cursor: pointer; }
+.gp-opt span { padding: 6px 0; border-bottom: 2px solid transparent; }
+.gp-opt:hover { color: var(--ink); }
+.gp-opt:has(input:checked) { color: var(--ink); font-weight: 600; }
+.gp-opt:has(input:checked) span { border-bottom-color: var(--ink); }
+.gp-opt:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--radius-sm); }
+.gp-opt input:focus-visible { outline: none; }
+.gp .gp-select { width: 100%; max-width: 420px; min-height: 40px; }
+.gp-chooser .gp-quiet { margin-top: var(--space-4); }
+
+.gp-signup { max-width: 640px; }
+.gp-display { margin: 0 0 var(--space-4); font: 600 clamp(26px, 2.4vw + 12px, 36px)/1.15 var(--font-display); letter-spacing: -0.01em; }
+.gp-lede { margin: 0; max-width: 56ch; font-size: var(--text-md); line-height: 1.55; color: var(--ink-2); }
+
+.gp-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-2) var(--space-6); padding: var(--space-4) clamp(16px, 4vw, 48px); border-top: 1px solid var(--hairline); font-size: var(--text-sm); color: var(--ink-3); }
+.gp-foot p { margin: 0; }
+.gp-foot a { color: var(--ink-2); text-decoration: underline; text-underline-offset: 3px; }
+
+@media (max-width: 820px) {
+  .gp-paper { display: block; }
+  .gp-main { padding-top: var(--space-6); }
+  .gp-squares { flex: none; }
+  .gp-typed-row { flex-wrap: wrap; }
+  .gp .gp-input { max-width: none; }
+  .gp-typed-row .gp-check { flex: 1 1 100%; }
+  .gp-margin { padding: 0 0 var(--space-4); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 var(--space-4); }
+  .gp-tally { margin: 0; }
+  .gp-context { flex: 1 1 100%; margin: var(--space-2) 0 0; display: block; font-size: var(--text-sm); }
+  .gp-context div { display: inline; }
+  .gp-context dt { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .gp-context dd { display: inline; margin: 0; color: var(--ink-2); }
+  .gp-context div + div dd::before { content: " · "; }
+  .gp-margin .gp-link { margin: 0; }
+  .gp-body { min-height: 0; padding: var(--space-6) 0 0; border-left: 0; border-top: 1px solid var(--hairline-strong); }
+  .gp-prompt { margin: 0 0 var(--space-8); }
+  .gp-working { grid-template-columns: minmax(0, 1fr) auto; min-height: 72px; }
+  .gp-working .gp-reads-k { grid-column: 1 / -1; }
+  .gp-actions .btn { flex: 1 1 100%; }
+  .gp-chooser { margin: 0; }
+  .gp-row > legend, .gp-row > label { float: none; display: block; width: auto; line-height: 1.4; padding-top: var(--space-3); }
+  .gp-opts { margin-left: 0; }
+}

@@ -5,10 +5,10 @@
 Prithagoras offers timed papers shaped like an HSC examination, each an "Answer-checked practice paper": sealed and marked by the server on final answers only, with no HSC mark, band, ATAR or prediction. An outcome is **covered** when every slot on it can be filled from at least 3 distinct approved question forms. An approved form is one (generator, difficulty) cell the Prithagoras edition issues (`server/platform/nswBanks.js`); one form yields many questions with different numbers but counts once.
 
 - Every slot covered: the whole paper is released.
-- Otherwise a **partial** paper (only the slots that can be filled) is released when at least 75% of the course's Year 12 outcomes (from the G2 model) are covered. It is titled "Practice paper — N of M Year 12 outcomes", never an HSC paper or a trial; its marks and working time are scaled to what it examines; and the Exams page, the paper and the result name every outcome it leaves out.
+- Otherwise a **partial** paper (only the slots that can be filled) is released when at least 75% of the course's Year 12 outcomes (from the G2 model) are covered. It is titled "Practice paper: N of M Year 12 outcomes", never an HSC paper or a trial; its marks and working time are scaled to what it examines; and the Exams page, the paper and the result name every outcome it leaves out.
 - Below that floor the paper is refused.
 
-The pool today: 463 approved forms. Blueprint structures (times, marks, section sizes) follow NESA's published HSC examination specifications for the 2024 syllabuses, first examined in 2027 (`docs/research/NSW_HSC_CURRICULUM_ASSESSMENT_AUTHORITY.md` §5.3). Which outcome each slot is on is Pri's own design: every Year 12 outcome of the examined course has slots. No NESA paper, question, marking guideline or reference sheet is reproduced. The platform has no authored formula sheet yet, so none is shown.
+The pool today: 530 approved forms. Blueprint structures (times, marks, section sizes) follow NESA's published HSC examination specifications for the 2024 syllabuses, first examined in 2027 (`docs/research/NSW_HSC_CURRICULUM_ASSESSMENT_AUTHORITY.md` §5.3). Which outcome each slot is on is Pri's own design: every Year 12 outcome of the examined course has slots. No NESA paper, question, marking guideline or reference sheet is reproduced. The platform has no authored formula sheet yet, so none is shown.
 
 | Paper | State | Year 12 outcomes covered | Sat as | Omitted outcomes |
 | --- | --- | --- | --- | --- |
@@ -25,20 +25,20 @@ Source: Mathematics Standard 11–12 Syllabus (2024): HSC examinations — https
 | Outcome | Focus area | Year | Slots | Marks | Approved forms | Covered |
 | --- | --- | --- | --- | --- | --- | --- |
 | MST-12-S1-01 | Algebraic relationships | 12 | 3 | 6 | 3 | yes |
-| MST-12-S1-02 | Investment | 12 | 4 | 9 | 4 | yes |
-| MST-12-S1-03 | Depreciation and loans | 12 | 4 | 9 | 4 | yes |
+| MST-12-S1-02 | Investment | 12 | 4 | 9 | 6 | yes |
+| MST-12-S1-03 | Depreciation and loans | 12 | 4 | 9 | 8 | yes |
 | MST-12-S1-04 | Right-angled triangles | 12 | 4 | 9 | 4 | yes |
-| MST-12-S1-05 | Ratios and rates | 12 | 3 | 6 | 4 | yes |
-| MST-12-S1-06 | Bivariate data analysis | 12 | 4 | 9 | 5 | yes |
-| MST-12-S1-07 | Relative frequency and probability | 12 | 3 | 6 | 4 | yes |
+| MST-12-S1-05 | Ratios and rates | 12 | 3 | 6 | 8 | yes |
+| MST-12-S1-06 | Bivariate data analysis | 12 | 4 | 9 | 8 | yes |
+| MST-12-S1-07 | Relative frequency and probability | 12 | 3 | 6 | 6 | yes |
 | MST-11-01 | Formulas and equations | 11 | 2 | 3 | 4 | yes |
 | MST-11-02 | Linear relationships | 11 | 2 | 3 | 4 | yes |
-| MST-11-03 | Earning money | 11 | 3 | 4 | 4 | yes |
-| MST-11-04 | Managing money | 11 | 3 | 4 | 4 | yes |
-| MST-11-05 | Applications of measurement | 11 | 2 | 3 | 6 | yes |
+| MST-11-03 | Earning money | 11 | 3 | 4 | 8 | yes |
+| MST-11-04 | Managing money | 11 | 3 | 4 | 6 | yes |
+| MST-11-05 | Applications of measurement | 11 | 2 | 3 | 7 | yes |
 | MST-11-06 | Time and location | 11 | 2 | 3 | 4 | yes |
 | MST-11-07 | Networks, paths and trees | 11 | 2 | 2 | 4 | yes |
-| MST-11-08 | Data analysis | 11 | 3 | 4 | 3 | yes |
+| MST-11-08 | Data analysis | 11 | 3 | 4 | 4 | yes |
 
 ## Mathematics Standard 2
 
@@ -47,22 +47,22 @@ Source: Mathematics Standard 11–12 Syllabus (2024): HSC examinations — https
 | Outcome | Focus area | Year | Slots | Marks | Approved forms | Covered |
 | --- | --- | --- | --- | --- | --- | --- |
 | MST-12-S2-01 | Algebraic relationships | 12 | 3 | 6 | 4 | yes |
-| MST-12-S2-02 | Investment and loans | 12 | 4 | 9 | 4 | yes |
-| MST-12-S2-03 | Annuities | 12 | 4 | 9 | 4 | yes |
+| MST-12-S2-02 | Investment and loans | 12 | 4 | 9 | 9 | yes |
+| MST-12-S2-03 | Annuities | 12 | 4 | 9 | 8 | yes |
 | MST-12-S2-04 | Trigonometry | 12 | 4 | 9 | 4 | yes |
-| MST-12-S2-05 | Ratios and rates | 12 | 3 | 6 | 4 | yes |
+| MST-12-S2-05 | Ratios and rates | 12 | 3 | 6 | 8 | yes |
 | MST-12-S2-06 | Network flow | 12 | 3 | 6 | 4 | yes |
 | MST-12-S2-07 | Critical path analysis | 12 | 4 | 9 | 4 | yes |
-| MST-12-S2-08 | Bivariate data analysis | 12 | 4 | 9 | 5 | yes |
-| MST-12-S2-09 | Relative frequency and probability | 12 | 3 | 6 | 4 | yes |
-| MST-12-S2-10 | The normal distribution | 12 | 4 | 9 | 6 | yes |
+| MST-12-S2-08 | Bivariate data analysis | 12 | 4 | 9 | 8 | yes |
+| MST-12-S2-09 | Relative frequency and probability | 12 | 3 | 6 | 6 | yes |
+| MST-12-S2-10 | The normal distribution | 12 | 4 | 9 | 8 | yes |
 | MST-11-01 | Formulas and equations | 11 | 3 | 4 | 4 | yes |
-| MST-11-03 | Earning money | 11 | 2 | 3 | 4 | yes |
-| MST-11-05 | Applications of measurement | 11 | 3 | 4 | 6 | yes |
+| MST-11-03 | Earning money | 11 | 2 | 3 | 8 | yes |
+| MST-11-05 | Applications of measurement | 11 | 3 | 4 | 7 | yes |
 | MST-11-06 | Time and location | 11 | 2 | 3 | 4 | yes |
-| MST-11-08 | Data analysis | 11 | 2 | 2 | 3 | yes |
+| MST-11-08 | Data analysis | 11 | 2 | 2 | 4 | yes |
 | MST-11-02 | Linear relationships | 11 | 1 | 2 | 4 | yes |
-| MST-11-04 | Managing money | 11 | 1 | 2 | 4 | yes |
+| MST-11-04 | Managing money | 11 | 1 | 2 | 6 | yes |
 | MST-11-07 | Networks, paths and trees | 11 | 1 | 2 | 4 | yes |
 
 ## Mathematics Advanced
@@ -71,22 +71,22 @@ Source: Mathematics Advanced 11–12 Syllabus (2024): HSC examinations — https
 
 | Outcome | Focus area | Year | Slots | Marks | Approved forms | Covered |
 | --- | --- | --- | --- | --- | --- | --- |
-| MAV-11-02 | Working with functions | 11 | 2 | 3 | 11 | yes |
-| MAV-11-04 | Trigonometry and measure of angles | 11 | 2 | 3 | 6 | yes |
+| MAV-11-02 | Working with functions | 11 | 2 | 3 | 12 | yes |
+| MAV-11-04 | Trigonometry and measure of angles | 11 | 2 | 3 | 11 | yes |
 | MAV-11-07 | Exponential and logarithmic functions | 11 | 2 | 2 | 4 | yes |
 | MAV-11-09 | Probability and data | 11 | 2 | 2 | 3 | yes |
 | MAV-12-01 | Further graph transformations and modelling | 12 | 4 | 8 | 4 | yes |
-| MAV-12-03 | Sequences and series | 12 | 4 | 8 | 3 | yes |
+| MAV-12-03 | Sequences and series | 12 | 4 | 8 | 4 | yes |
 | MAV-12-04 | Differential calculus | 12 | 5 | 11 | 7 | yes |
-| MAV-12-05 | Integral calculus | 12 | 5 | 13 | 6 | yes |
-| MAV-12-06 | Applications of calculus | 12 | 5 | 15 | 13 | yes |
-| MAV-12-07 | Random variables | 12 | 4 | 8 | 5 | yes |
+| MAV-12-05 | Integral calculus | 12 | 5 | 13 | 9 | yes |
+| MAV-12-06 | Applications of calculus | 12 | 5 | 15 | 14 | yes |
+| MAV-12-07 | Random variables | 12 | 4 | 8 | 8 | yes |
 | MAV-12-02 | Further graph transformations and modelling | 12 | 3 | 9 | 4 | yes |
-| MAV-12-08 | Financial mathematics | 12 | 3 | 8 | 4 | yes |
-| MAV-11-01 | Working with functions | 11 | 1 | 1 | 5 | yes |
+| MAV-12-08 | Financial mathematics | 12 | 3 | 8 | 8 | yes |
+| MAV-11-01 | Working with functions | 11 | 1 | 1 | 6 | yes |
 | MAV-11-03 | Graph transformations | 11 | 1 | 2 | 4 | yes |
-| MAV-11-05 | Trigonometric identities and equations | 11 | 1 | 2 | 5 | yes |
-| MAV-11-06 | Introduction to differentiation | 11 | 1 | 2 | 14 | yes |
+| MAV-11-05 | Trigonometric identities and equations | 11 | 1 | 2 | 11 | yes |
+| MAV-11-06 | Introduction to differentiation | 11 | 1 | 2 | 15 | yes |
 | MAV-11-08 | Exponential and logarithmic functions | 11 | 1 | 2 | 6 | yes |
 | MAV-11-10 | Probability and data | 11 | 1 | 1 | 4 | yes |
 
@@ -96,17 +96,17 @@ Source: Mathematics Extension 1 11–12 Syllabus (2024): HSC examinations — ht
 
 | Outcome | Focus area | Year | Slots | Marks | Approved forms | Covered |
 | --- | --- | --- | --- | --- | --- | --- |
-| ME1-11-01 | Further work with functions | 11 | 3 | 5 | 4 | yes |
-| ME1-11-02 | Polynomials | 11 | 3 | 6 | 8 | yes |
-| ME1-11-03 | Further trigonometry | 11 | 2 | 3 | 4 | yes |
-| ME1-11-04 | Permutations and combinations | 11 | 2 | 3 | 3 | yes |
+| ME1-11-01 | Further work with functions | 11 | 3 | 5 | 5 | yes |
+| ME1-11-02 | Polynomials | 11 | 3 | 6 | 9 | yes |
+| ME1-11-03 | Further trigonometry | 11 | 2 | 3 | 8 | yes |
+| ME1-11-04 | Permutations and combinations | 11 | 2 | 3 | 7 | yes |
 | ME1-11-05 | The binomial theorem | 11 | 2 | 2 | 4 | yes |
 | ME1-12-02 | Introduction to vectors | 12 | 4 | 10 | 20 | yes |
 | ME1-12-03 | Inverse trigonometric functions | 12 | 3 | 6 | 4 | yes |
-| ME1-12-04 | Further calculus skills | 12 | 4 | 10 | 4 | yes |
-| ME1-12-05 | Further applications of calculus | 12 | 4 | 9 | 3 | yes |
-| ME1-12-06 | The binomial distribution and sampling distribution of the mean | 12 | 4 | 9 | 7 | yes |
-| ME1-12-01 | Proof by mathematical induction | 12 | 2 | 7 | 7 | yes |
+| ME1-12-04 | Further calculus skills | 12 | 4 | 10 | 6 | yes |
+| ME1-12-05 | Further applications of calculus | 12 | 4 | 9 | 7 | yes |
+| ME1-12-06 | The binomial distribution and sampling distribution of the mean | 12 | 4 | 9 | 8 | yes |
+| ME1-12-01 | Proof by mathematical induction | 12 | 2 | 7 | 8 | yes |
 
 ## Mathematics Extension 2
 

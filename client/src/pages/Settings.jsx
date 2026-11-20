@@ -11,8 +11,10 @@ import { useApp } from '../App.jsx';
 import { useT } from '../i18n/index.js';
 import { BrandMark } from '../components/BrandMark.jsx';
 import { CUT } from '../brand/edition.js';
+import { currentReleaseIdentity } from '../platform/releaseIdentity.js';
 import { HANDS, readHand, writeHand } from '../lib/writingHand.js';
 import { autoReadEnabled, setAutoRead } from '../lib/autoRead.js';
+import { soundsEnabled, setSoundsEnabled, playSound } from '../lib/sound.js';
 
 // The content-operations and admin console is for support and admin accounts
 // only, and the server enforces that on every call it makes. A student never
@@ -103,6 +105,40 @@ function AutoRead() {
   );
 }
 
+// Quiet interface sounds (off by default). Kept on this device.
+function Sounds() {
+  const t = useT();
+  const [on, setOn] = useState(soundsEnabled);
+  return (
+    <div className="card" data-sounds style={{ marginTop: 18 }}>
+      <h2 style={{ marginBottom: 8 }}>{t('sounds.title')}</h2>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+        <button type="button" role="switch" aria-checked={on} aria-label={t('sounds.label')} className={`btn ${on ? 'btn-primary' : 'btn-ghost'}`}
+          style={{ minHeight: 44, minWidth: 64 }} data-sounds-switch onClick={() => { const next = setSoundsEnabled(!on); setOn(next); if (next) playSound('tick'); }}>{on ? t('sounds.on') : t('sounds.off')}</button>
+        <span>{t('sounds.label')}</span>
+      </div>
+      <p className="muted" style={{ margin: '8px 0 0' }}>{t('sounds.note')}</p>
+    </div>
+  );
+}
+
+// Owner request, 19 Nov 2026 (both editions): the release short SHA and build date, in a quiet line at the
+// very bottom, so anyone can tell which build a browser is running. Read from the baked release identity.
+export function buildLine(identity) {
+  const sha = /^[0-9a-f]{40}$/.test(String(identity?.releaseSha || '')) ? identity.releaseSha.slice(0, 7) : null;
+  return { sha, date: String(identity?.buildTimestamp || '').slice(0, 10) || null };
+}
+
+function BuildLine() {
+  const t = useT();
+  const { sha, date } = buildLine(currentReleaseIdentity());
+  return (
+    <p className="muted" data-build-line style={{ margin: '22px 0 8px', fontSize: 12, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
+      {sha ? t('about.build', { sha, date: date || '—' }) : t('about.buildDev')}
+    </p>
+  );
+}
+
 export default function Settings() {
   const { user } = useApp();
   // The classroom product is outside public V1 (PRI_V1_RELEASE_SCOPE §11): a
@@ -119,8 +155,10 @@ export default function Settings() {
       {classroom && <ClassroomPanel />}
       <WritingHand />
       <AutoRead />
+      <Sounds />
       <AboutEdition />
       <StaffOperations />
+      <BuildLine />
     </>
   );
 }

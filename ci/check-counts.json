@@ -37,7 +37,8 @@
         {"has":"3296000/3296000 self-checks passed across 412 subtopics"},
         {"has":"21000/21000 multipart part-checks passed"},
         {"has":"✔ INDIA SUITE PASSED — 2726/2726 checks"},
-        {"has":"MISTAKE VIEW: PASS — 308/308 checks","note":"306 → 308: piecewise (abs/floor/ceil) lines are never read as a chain of equals. 303 → 306: final review — an equation true only on a half-line (|x − 10| = 10 − x) is never read as a chain of equals. 299 → 303: second review — a line undefined near the origin is never read as an identity; a tiny value reads ≈ 0. See why it's wrong: the first break as two graphs, feedback only; null whenever it cannot be shown honestly. 267 → 299: the independent review's cases (identities, substitution lines, chains of equals, rounded roots, the real Step Check path) became regression checks."},
+        {"re":"LINE INTERPRETER: PASS — ([0-9]+)/\\1 checks — verbatim guard","note":"The line interpreter (dark, PRI_FEATURE_LINE_INTERPRETER): a lying interpreter never ticks a wrong line and the request carries no answer. The count follows the number of generator families, so it is matched as N/N."},
+        {"has":"MISTAKE VIEW: PASS — 309/309 checks","note":"308 → 309 (Train 28, re-derived by running): a true root written alone is incomplete, not a mistake, and the first mistake is the line that is actually wrong (owner decision 7). 306 → 308: piecewise (abs/floor/ceil) lines are never read as a chain of equals. 303 → 306: final review — an equation true only on a half-line (|x − 10| = 10 − x) is never read as a chain of equals. 299 → 303: second review — a line undefined near the origin is never read as an identity; a tiny value reads ≈ 0. See why it's wrong: the first break as two graphs, feedback only; null whenever it cannot be shown honestly. 267 → 299: the independent review's cases (identities, substitution lines, chains of equals, rounded roots, the real Step Check path) became regression checks."},
         {"has":"STUDENT PLOT: PASS — 38/38 checks","note":"v1.1: step-mark rows say the engine's mark and never contradict it."},
         {"has":"INDIA DIFFICULTY TRUTH: PASS — 36964/36964 checks"},
         {"has":"PASS 7 lazy-loaded CBSE IX source packs, 84 original student exercises, 21 worked lessons, 105 unique identities","note":"Phase 4: Class IX blind packs, JEE complex D4 + escrow lane, advertised levels, CBSE crosswalk."},
@@ -52,17 +53,17 @@
         {"has":"BOARD SCHEME CONTRACT: PASS — 147/147 checks — Board value points carried in whole-mark groups, never above the Board; only lines the deterministic step check verifies earn, matched to points one-to-one and in order; no model verdict sets a mark; 1 Section B–E archive records, every scheme line engine-verified.","note":"Board-scheme marks contract (L5, R4): CBSE Section B–E value points, awarded only by the deterministic engine."},
         {"has":"DISTINCT QUESTIONS: Class 7 ≥ 3.02×10^8, Class 8 ≥ 5.24×10^8, Class 9 ≥ 1.45×10^8, Class 10 ≥ 1.63×10^8, Class 11 ≥ 2.62×10^8, Class 12 ≥ 3.60×10^8 — 6/6 classes at the 10^8 target","note":"Train 25 integration, re-derived by running tools/distinct-questions.mjs on the merged tree: 5/6 → 6/6 classes at the target. Before (main) → after (this train): Class 7 2.98 → 3.02, Class 8 4.17 → 5.24, Class 9 2.43 → 1.45, Class 10 1.46 → 1.63, Class 11 4.01 → 2.62, Class 12 3.83 → 3.60 (×10^8, lower bounds). Class 9 and 11 FELL because of form draw weighting: the estimator measures the effective size under each generator's own sampling (collision estimate), and the train draws a form in proportion to the questions it can serve, with one weight per skill across the difficulties (ea5d33ef5), so draws concentrate on the larger forms and repeat more within a cell; that lowers the effective size of those classes' cells although more forms exist. Class 7, 8 and 10 rose for the opposite reason (extra forms that were rarely drawn before). Every class stays above the 10^8 target, and Class 9 is the thinnest."},
         {"has":"CLASS X ALGEBRA FORMS: PASS — 5 generators, 29 forms, 6225 items re-derived from the prompt by a second route","note":"Class X Algebra additional forms (L5): 5 generators × D1–D3 take 355 → 360 subtopics, 576 → 591 declared pairs and 2678 → 2708 India checks; every answer re-derived from its prompt by a second route."},
-        {"has":"INDIA HARDEST FORMS: PASS — 652116/652116 checks — 142 hardest-level forms (D3 CBSE Class VII/VIII/X/XI/XII, D4 JEE Class 11/12) for 142 dot points"},
+        {"has":"INDIA HARDEST FORMS: PASS — 653477/653477 checks — 142 hardest-level forms (D3 CBSE Class VII/VIII/X/XI/XII, D4 JEE Class 11/12) for 142 dot points"},
         {"has":"PROMPT VARIABLE CONSISTENCY: PASS — 247204 prompts, 566 claim prompts, 3326 stated solutions, 0 inconsistent"},
         {"has":"59400 questions from 594 declared (generator, difficulty) pairs × 100 draws — 59400 marked correct by their own marker, 59400 well formed"},
-        {"has":"QUESTION VARIANTS: PASS — 594 generated seeds (0 cells skipped: seed not credited by its own key), 4752 variants verified by the marker and distinct by content hash, 2376/2376 bands filled, 985/1188 same-band variants keep the seed","note":"Question variants (L5): every live India cell and every official CBSE record yields variants at each band, each credited by the deterministic marker on its own key and distinct by content hash. 576 → 594 seeds (Train 14: re-derived by running all 4 shards on main 0c655e4cf + #837 + #839)."},
+        {"has":"QUESTION VARIANTS: PASS — 594 generated seeds (0 cells skipped: seed not credited by its own key), 4752 variants verified by the marker and distinct by content hash, 2376/2376 bands filled, 986/1188 same-band variants keep the seed","note":"Question variants (L5): every live India cell and every official CBSE record yields variants at each band, each credited by the deterministic marker on its own key and distinct by content hash. 576 → 594 seeds (Train 14: re-derived by running all 4 shards on main 0c655e4cf + #837 + #839)."},
         {"has":"shape; 95 official CBSE records → 366 Pri variants on their chapter (14 bands with no serving generator).","note":"28/110 → 80/310 records/variants (Train 15: #840, #845, #842 records, re-derived by running all 4 shards). 80/310 → 81/314 (#846: 65/2/1 Q24, re-derived by running all 4 shards on Train 15 + #846)."},
         {"has":"258/258 dot points have a generator behind them; 0 do not"},
         {"has":"NCERT ANSWER FORMS: PASS — 481/481 checks","note":"L1 policies (V1 decisions D12–D14): 478 → 481 forms (D13 flips seven pre-D13 pins to refusals and adds three)."},
-        {"has":"ADVERSARIAL CORPUS: PASS — 11819/11819 checks","note":"#723 (Step 14): the suites the forms gate imports, and the authenticated step14 suites, each pinned by count. 219 → 1397: the SymPy differential oracle cases (2026-11-18) incl. every bypass from the eight #992 reviews (75), 1091 right-answer controls for the final-answer probe, 5 cases once XFAIL now refused by the exact probe, and 3 noise-floor/XFAIL policy pins; re-derived by running the suite."},
+        {"has":"ADVERSARIAL CORPUS: PASS — 12079/12079 checks","note":"12095 → 12079 (train marking 5, as printed by a full local run of the four suite shards; the decrease is explained, not a dropped check): the section other-forms-step-marking draws every other form of each cell at six fixed seeds (10698 → 10682); the five graph-sketch forms added to y11-quadfunc and y12-appdiff take some of those draws and carry no step marking, so 16 step-marking checks are no longer reached. Every other section is unchanged, compared line by line with main f2c260c23. 12093 → 12095 (#1070, printed by CI run 44475084791): other-forms-step-marking 10696 → 10698, the me12-vectors linear-combination form now carries a vector-chain Step Check. 12203 → 12093 (marking release, stated cause): other-forms-step-marking 10806 → 10696 (−110). The derived step check of five families (y10-nonlinear, mex-vectors, y9-indices-sci, y11-explog, c11-straight-lines) is OFF in client/src/engine/derivedMetaOff.js after the 18 Nov understanding audit showed it crossing true lines, so their questions are answer-only and the step sweep has no lines to check for them. Verified by running the suite with that list emptied: it prints 12207 (10810), i.e. main's 12203 plus 4 for new forms. No other group changed. #723 (Step 14): the suites the forms gate imports, and the authenticated step14 suites, each pinned by count. 219 → 1397: the SymPy differential oracle cases (2026-11-18) incl. every bypass from the eight #992 reviews (75), 1091 right-answer controls for the final-answer probe, 5 cases once XFAIL now refused by the exact probe, and 3 noise-floor/XFAIL policy pins; re-derived by running the suite."},
         {"has":"EXACT BOUNDS: PASS — 107/107 checks"},
-        {"has":"STEP14 REVIEW FIXES: PASS — 45995/45995 checks","note":"39533 → 39547 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree)."},
-        {"has":"REVIEW FOLLOW-UPS: PASS — 439/439 checks"},
+        {"has":"STEP14 REVIEW FIXES: PASS — 46111/46111 checks","note":"39533 → 39547 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree)."},
+        {"has":"REVIEW FOLLOW-UPS: PASS — 427/427 checks"},
         {"has":"#680 SOURCED CASES: PASS — 91/91 cases"},
         {"has":"STEP14_DECIMAL_SUMMARY 7/7 engine=sqlite"},
         {"has":"Q1_PERSIST_SUMMARY badFullCredit=0/4 integrityControls=4/4 engine=sqlite"},
@@ -73,10 +74,10 @@
         {"has":"STEP COACH: PASS — 49/49 checks","note":"F1 live step coach (#826): no guess oracle, premium-only, off by default, capped."},
         {"has":"INTERIM MARKING POLICY (D13, D14): PASS — 12655/12655 checks","note":"10855 (Train 6, re-derived by a full local shard run on the merged tree; CI's run of 4136aac56 reported the same). 10855 → 10820 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree): the D13 sweep runs over generated questions, and #812's widened Class 9 generators change that sample (sweep 10481 → 10446); every check is still run and passes, none removed."},
         {"has":"INDIA BANKS (D15): PASS — 173/173 checks","note":"124 (Train 5, re-derived by running india-banks-check): #745 pinned 122 on its base; merged onto main 631019053 the same suite reports 124."},
-        {"has":"NSW BANK QUALITY: PASS — 124 generators, 463 cells issued","note":"Plan G3: the NSW bank quality gate — every issued cell's stored answer accepted, wrong answers refused, options distinct, prompts render."},
+        {"has":"NSW BANK QUALITY: PASS — 133 generators, 530 cells issued","note":"Plan G3: the NSW bank quality gate — every issued cell's stored answer accepted, wrong answers refused, options distinct, prompts render."},
         {"has":"NSW EXAM BLUEPRINTS (G4): PASS — 546 checks","note":"Plan G4: NSW HSC-style blueprints held to NESA's specification, the release check, and the exam-path false-positive sweep."},
-        {"has":"FALSE-POSITIVE SWEEP: PASS — 0 of 489936 wrong answers marked correct across 21600 questions","note":"133426 → 405961 probes (m-finish-10-marking): #667's list probes, #670's percent-sign and label probes and the key carrying a % the question never asked for, over 18072 questions. A count of value perturbations only — it is not evidence of zero false credit. 406804/18072 → 409709/18312 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree). 409709/18312 → 419741/18696, 31792/11932 → 32824/12349 (Train 13: #800 + #784, re-derived on the merged tree). 419741/18696 → 422759/19248 (Train 15: #838 widening + CBSE X/XII Section A (#840, #845) + JEE Main 2026 S2 (#842), re-derived by running all 4 shards on the merged tree). 422759/19248 → 422837/19248 (#846: CBSE XII 65/2/1 Q24, the first Section B record, restacked on Train 15)."},
-        {"has":"CORRECT-ANSWER SWEEP: PASS — 0 of 34306 right answers over 14392 India questions (594 generator×difficulty cells × 30 seeds)","note":"The opposite direction: every right answer to every India question (the key, the box's unit in every spelling, ₹/Rs on an amount, the printed answer, the photo path's \"Ans:\" line) is credited, or refused only by D13."},
+        {"has":"FALSE-POSITIVE SWEEP: PASS — 0 of 490695 wrong answers marked correct across 21600 questions","note":"490897 → 490695 (train sketch 1, stated cause, re-derived by running): five graph-sketch forms joined y11-quadfunc D2 and y12-appdiff D2/D3, so some of the 21600 draws are now sketch questions, whose wrong-answer probes are counted by the graph-sketch checks (12390 single-feature mistakes in graph-sketch-forms-check) and not by this value-perturbation sweep; the question count is unchanged. 133426 → 405961 probes (m-finish-10-marking): #667's list probes, #670's percent-sign and label probes and the key carrying a % the question never asked for, over 18072 questions. A count of value perturbations only — it is not evidence of zero false credit. 406804/18072 → 409709/18312 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree). 409709/18312 → 419741/18696, 31792/11932 → 32824/12349 (Train 13: #800 + #784, re-derived on the merged tree). 419741/18696 → 422759/19248 (Train 15: #838 widening + CBSE X/XII Section A (#840, #845) + JEE Main 2026 S2 (#842), re-derived by running all 4 shards on the merged tree). 422759/19248 → 422837/19248 (#846: CBSE XII 65/2/1 Q24, the first Section B record, restacked on Train 15)."},
+        {"has":"CORRECT-ANSWER SWEEP: PASS — 0 of 34485 right answers over 14462 India questions (594 generator×difficulty cells × 30 seeds)","note":"The opposite direction: every right answer to every India question (the key, the box's unit in every spelling, ₹/Rs on an amount, the printed answer, the photo path's \"Ans:\" line) is credited, or refused only by D13."},
         {"has":"EQUIVALENCE CLASSES: PASS — 672/672 checks across 9 classes","note":"Train 13 (#800 + #784 + the L1 marking types), re-derived by running all 4 shards on the merged tree: 355 → 363 subtopics, 576 → 594 pairs."},
         {"has":"WORKING RUBRICS: PASS — 8737/8737 checks across 13 family levels"},
         {"re":"EXAMINER DOSSIER: PASS — [0-9]+ rubric banks, digest [0-9a-f]{12}…, status PENDING","note":"#499: the examiner dossier matches the marking code it hashes (a marking change re-requests review)."},
@@ -89,7 +90,7 @@
         {"has":"VERIFIED STEP MARKS: PASS"},
         {"has":"VERIFIED STEP MARKS CLIENT: PASS"},
         {"has":"METHOD PROGRESS: PASS — 1011/1011 checks"},
-        {"has":"WORKING BRANCHES: PASS — 32/32 checks"},
+        {"has":"WORKING BRANCHES: PASS — 33/33 checks","note":"32 → 33 (Train 28, re-derived by running): the lone root is incomplete and names the missing root (owner decision 7)."},
         {"has":"AP FIRST ERROR + ECF: PASS — 4885/4885 checks","note":"Issue #430: the first wrong AP line is named, method marks before it stay, error is carried forward once, the answer mark is never paid for a wrong answer, and the adversarial corpus earns nothing it did not show. 2140 → 4396 (review round 1): every reviewer page is now a corpus case (formula lines carrying their arithmetic, prose and comma-less givens, listed terms, a last term slipped through continuations, n(…)/2), and each swept seed also checks three prose spellings of its givens, its one-line formula slip and n(…)/2. 4396 → 4795 (review round 2): D4 carries a slipped last term into the sum as D2 does (four D4 pages), and each swept sum seed also checks a last term slipped on its formula line and summed correctly. 4795 → 4885 (review round 2, adversarial): 22 pages where a line Pri may have misread (a part with no value, two statements run together, a word beside the working, a hedged given) is judged nowhere, and a listed line on a gradient plan (y11-diff) is not a derivative mistake."},
         {"has":"WORKING EVIDENCE: PASS — 25/25 checks"},
         {"has":"Pri Reason V1 precision gate: PASS"},
@@ -112,8 +113,8 @@
         {"has":"INDIA EXAM WEIGHT: PASS — 668/668 checks"},
         {"has":"PLOTTING: PASS — 78/78 checks"},
         {"has":"README TRUTH: PASS — 16/16 checks"},
-        {"has":"LEGAL PAGES: PASS — 385/385 checks","note":"364 (m-finish-16): the review switch, store-purchase wording, retention and crash-report disclosures, and the generated third-party notices page. 374 (L7): no notice makes a coverage claim D24 forbids, in either language. 375 (L7): the D18 wording matches the accounts stream's code (#736). 378 (L7): the notice describes the D17 prompt and is pinned to its code (#737). 383 (L7, Train 4 truth): banner conditions walked, Practise-this and Hindi D18 pinned."},
-        {"has":"LEGAL PROMISES GATE: PASS — 23/23 checks","note":"16 (L7): the accounts stream's names, and PRI_CHILD_ERASURE=enforce printed at nomination. 19 (L7): the D17 prompt promise."},
+        {"has":"LEGAL PAGES: PASS — 393/393 checks","note":"393 (cookies and storage, Razorpay and the error-reporting processor, sole-trader entity wording, 18 Nov). 387 (owner privacy, 18 Nov): the street address and personal iCloud address are absent from every published surface, and the pattern is proven. 364 (m-finish-16): the review switch, store-purchase wording, retention and crash-report disclosures, and the generated third-party notices page. 374 (L7): no notice makes a coverage claim D24 forbids, in either language. 375 (L7): the D18 wording matches the accounts stream's code (#736). 378 (L7): the notice describes the D17 prompt and is pinned to its code (#737). 383 (L7, Train 4 truth): banner conditions walked, Practise-this and Hindi D18 pinned."},
+        {"has":"LEGAL PROMISES GATE: PASS — 35/35 checks","note":"23 → 35 (legal pages of 2026-11-18, re-derived by running node tools/legal-promises.test.mjs). 16 (L7): the accounts stream's names, and PRI_CHILD_ERASURE=enforce printed at nomination. 19 (L7): the D17 prompt promise."},
         {"has":"COUNSEL QUESTIONS: PASS — 13/13 checks","note":"L7: the counsel question sheet quotes the current text and code locations."},
         {"has":"CLOUD HANDWRITING CLIENT: PASS — 199/199 checks","note":"186 → 192 (#196): a remembered read is dropped when the cloud account changes, so account A's transcript and read receipt are never handed to account B on the same device."},
         {"has":"CONTENT HONESTY: PASS","note":"Content honesty (Nov 2026): no student surface claims a review a human never did; marketing, ad, promotion and store copy carry none of the retired claims; past papers are off by default (D23)."},
@@ -127,19 +128,20 @@
         {"has":"TUTOR UI: PASS — 127/127 checks","note":"114 (Train 6, re-derived by a full local shard run on the merged tree; CI's run of 4136aac56 reported the same). 114 → 127 (Train 10, re-derived by a full local run of the 4 suite shards on the merged tree)."},
         {"has":"ERROR REPORTS: PASS — 36/36 checks"},
         {"has":"APPLE SIGN IN: PASS — 66/66 checks"},
-        {"has":"ONBOARDING SCOPE: PASS — 69/69 checks","note":"60 → 62 (plan E4, re-derived by running): the page and manifest checks run for both editions' builds. 62 → 69 (E3, re-derived from run 43607414989): the course step rendered for both editions."},
+        {"has":"ONBOARDING SCOPE: PASS — 70/70 checks","note":"60 → 62 (plan E4, re-derived by running): the page and manifest checks run for both editions' builds. 62 → 69 (E3, re-derived from run 43607414989): the course step rendered for both editions."},
         {"has":"HANDWRITING CLAIMS: PASS — ","note":"No student-facing text says Pri learns a hand (the count follows the string catalogues, so only the verdict is pinned here)."},
         {"has":"RESIDENCY CLAIMS (H7): PASS — ","note":"Plan H7: nothing says work stays in, never leaves or is processed in India or Australia (the count follows the files read)."},
         {"has":"STUDY PLAN: PASS — 215/215 checks","note":"211 → 215 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree)."},
         {"has":"REMINDERS: PASS — 183/183 checks"},
-        {"has":"I18N COVERAGE: PASS — 94/94 checks — 109 files scanned, 0 hard-coded strings","note":"92 → 93 files (standard #08: + components/OriginalWork.jsx, re-derived by running the check). 91: two key-chord literals (⌘/Ctrl ↵ and the ARIA aria-keyshortcuts value) joined the allowlist, each checked for its stated reason. 74 (Train 4, re-derived by running): main 71 + src/parent (ParentReport.jsx, ParentReportEmailAction.jsx, #743) + ink/ReaderPermission.jsx (#737, the D17 prompt). 75 (Train 6, re-derived by running on the merged tree): 74 + tutor/MistakeDiagnosis.jsx (#770). 75 → 77 files (Train 10, re-derived by a full local run of the 4 suite shards on the merged tree). 77 → 78 files (Train 15: + tutor/StepCoachLive.jsx from #826, re-derived by running all 4 shards). 78 → 79 files (plan F1: + library/Library.jsx, re-derived by running the check). 91 → 94 (plan E4, re-derived by running): +1 the ambient placeholders are exactly {brand} and {company}; the allowlist JSON lost \"P\" and \"Pri Learning.\" and gained Priyabhata, Prithagoras, प्रियभट and \"by Pri Learning\". 80 → 89 files (plan F4b: + src/desk (DeskPage, DeskImport, DeskEntry) and src/examShell (six components), re-derived by running the check)."},
+        {"has":"I18N COVERAGE: PASS — 94/94 checks — 120 files scanned, 0 hard-coded strings","note":"119 → 120 files (dot point picker: + components/DotpointPicker.jsx, re-derived by running the check). 117 → 119 files (Practice UX: + components/RecentAttempts.jsx, + components/PracticeTour.jsx, re-derived by running the check). 114 → 117 files (train marking 5, re-derived by running the check on the merged tree): + components/EngineComment.jsx (typesets the engine's line comments), + components/QuestionReport.jsx (report a problem), + components/SketchAnswer.jsx (graph-sketch answer). 109 → 110 files (Ext1Papers.jsx, re-derived by running the check). 92 → 93 files (standard #08: + components/OriginalWork.jsx, re-derived by running the check). 91: two key-chord literals (⌘/Ctrl ↵ and the ARIA aria-keyshortcuts value) joined the allowlist, each checked for its stated reason. 74 (Train 4, re-derived by running): main 71 + src/parent (ParentReport.jsx, ParentReportEmailAction.jsx, #743) + ink/ReaderPermission.jsx (#737, the D17 prompt). 75 (Train 6, re-derived by running on the merged tree): 74 + tutor/MistakeDiagnosis.jsx (#770). 75 → 77 files (Train 10, re-derived by a full local run of the 4 suite shards on the merged tree). 77 → 78 files (Train 15: + tutor/StepCoachLive.jsx from #826, re-derived by running all 4 shards). 78 → 79 files (plan F1: + library/Library.jsx, re-derived by running the check). 91 → 94 (plan E4, re-derived by running): +1 the ambient placeholders are exactly {brand} and {company}; the allowlist JSON lost \"P\" and \"Pri Learning.\" and gained Priyabhata, Prithagoras, प्रियभट and \"by Pri Learning\". 80 → 89 files (plan F4b: + src/desk (DeskPage, DeskImport, DeskEntry) and src/examShell (six components), re-derived by running the check)."},
         {"has":"I18N: PASS — 205/205 checks","note":"198 → 209 (Prithagoras Hindi trim, re-derived by running): six checks that an edition without Hindi ships no Hindi catalogue and Priyabhata is untouched, and five that run the languages.js a Prithagoras build really uses (an English-only list, a stored hi clamped to English, the table still knowing Hindi, and the build stopping if languages.js changes under the clamp). 200 → 198 (plan E4, re-derived by running): \"P\" and \"Pri Learning.\" (the brand tile) and \"Pri\" (the old bar label) left the literal allowlist; \"by Pri Learning\" joined it."},
         {"has":"READER PERMISSION (D17): PASS — 124/124 checks"},
         {"has":"PAGE LINK HISTORY: PASS — 39/39 checks"},
         {"has":"MISCONCEPTION TARGETING: PASS — 41/41 checks"},
         {"has":"LOST MARKS: PASS — 170/170 checks","note":"Ledger 3.6/3.7 (#366 re-implemented on #430): lost-mark explanations, tolerance policy."},
-        {"has":"TOLERANCE POLICY: PASS — 228/228 checks","note":"221 → 228: exact-value demands refuse a calculator display (SymPy differential oracle, 2026-11-18), re-derived by running the suite."},
-        {"has":"PRECISION BAND: PASS — 2143 draws state a precision","note":"Issue #518: a prompt that states a precision keys a tol or rounding."},
+        {"has":"TOLERANCE POLICY: PASS — 235/235 checks","note":"221 → 228: exact-value demands refuse a calculator display (SymPy differential oracle, 2026-11-18), re-derived by running the suite."},
+        {"has":"PRECISION BAND: PASS — 2363 draws state a precision","note":"2360 → 2363 (train marking 5, as printed by a full local run): the graph-sketch forms shift which questions the fixed seeds draw in y11-quadfunc and y12-appdiff (CONTENT_VERSION 2026.11.44). Issue #518: a prompt that states a precision keys a tol or rounding. 2143 → 2360: the nearest-unit wording (degree, cent, dollar) and the three-decimal prompts now state a precision, re-derived by running the suite."},
+        {"re":"numeric-tolerance-sweep: [0-9]+ numeric questions from [0-9]+ generators .* 0 loose cell\\(s\\) in 0 generator\\(s\\); 0 cell\\(s\\) with a rounded key and no stated precision; [0-9]+ key\\(s\\) not accepted as typed; 0 failure\\(s\\)","note":"Walk-through F02: no numeric key, over every generator and difficulty, accepts a value one unit (or 2%) off it, an exact question accepts nothing 0.1% off, and a rounded key states its precision."},
         {"has":"NOTES CONTENT CHECK PASSED — 77/77 chapters","note":"Chapter notes: every curriculum chapter, every worked answer engine-verified."},
         {"has":"I18N VOICE: PASS — 92/92 checks"},
         {"has":"MISCONCEPTION ONTOLOGY: PASS — 99/99 checks"},
@@ -155,10 +157,10 @@
         {"has":"nothing emitted left uncovered; previous-year archive 0 kB","count":1,"op":"eq"},
         {"has":"INTERFACE DECISIONS: PASS — 39/39 checks","note":"The V1 interface decisions in source: one interface from one setting on web, iOS and Android (D7, D8), Classes hidden (D10), the language switch says questions stay in English (D11). 34 → 39: the Aurora skin is the default on chrome (D7) and the D8 fallback is one line of the setting, covered."},
         {"has":"AURORA SKIN: PASS — 47/47 checks","note":"The Aurora skin stays on chrome: scope, no content tokens, glass only on chrome, pools only on Index/Map/Settings, fallbacks, AA. 32 → 47 (Lit Instrument UI1, re-derived by running): violet retired, one edition pool, no glow, ink focus, contrast for both editions."},
-        {"has":"WORKING INDICATOR: PASS — 66/66 checks","note":"Lit Instrument D6: the working indicator is one component, shown only while real work is pending (400 ms in, 480 ms held). 62 → 66 (Paper Generator, re-derived by running: its two sites). 46 → 62 (UI-IND-2, re-derived by running): each of the new sites is checked for a real pending flag and its size."},
+        {"has":"WORKING INDICATOR: PASS — 70/70 checks","note":"Lit Instrument D6: the working indicator is one component, shown only while real work is pending (400 ms in, 480 ms held). 62 → 66 (Paper Generator, re-derived by running: its two sites). 46 → 62 (UI-IND-2, re-derived by running): each of the new sites is checked for a real pending flag and its size."},
         {"has":"CBSE STEP MARKING: PASS — 37/37 checks"},
         {"has":"ENTITLEMENT ENFORCEMENT: PASS — 68/68 checks"},
-        {"has":"PAYWALL HONESTY: PASS — 81/81 checks","note":"68 → 79 (plan E5): an edition with no payment provider has no store, no price and no purchase control, and says Premium is not on sale."},
+        {"has":"PAYWALL HONESTY: PASS — 79/79 checks","note":"81 → 79 (packaging value-2026-11, re-derived by running client/test/paywall-honesty-check.mjs: the Premium column no longer has the unlimited-practice row). 68 → 79 (plan E5): an edition with no payment provider has no store, no price and no purchase control, and says Premium is not on sale."},
         {"has":"NOTEBOOK VIEW: PASS — 19/19 checks"},
         {"has":"PARENT REPORT UI: PASS — 35/35 checks"},
         {"has":"LIBRARY UI: PASS — 56/56 checks","note":"39 → 56 (plan F2): the save toggle and its pending state, the hidden-count line, saved-first order, and the local route that never touches the question bookmarks."},
@@ -169,9 +171,9 @@
         {"has":"DESK IMPORT: PASS — 18/18 checks"},
         {"has":"WORK STATE: PASS — 8/8 checks","note":"Standard #45: one vocabulary for the state of the student's work; every displayed state maps 1:1 and nothing reads as saved, uploaded or marked early."},
         {"has":"ETHICAL COMMERCE: PASS — 11/11 checks","note":"Standard #42: no paywall, upsell or price on the guardian-consent, withdrawn, restriction and age-gate screens, in both languages."},
-        {"has":"EDITION CLIENT (E2): PASS — 139/139 checks","note":"Plan E2: the app knows its own edition from its build, declares it on every /v1 request, and shows a blocking screen at the other's server. 133 → 136 (plan E4, re-derived by running): the record's identity is checked exactly (its keys, the table's values, frozen). 136 → 137 (Lit Instrument D6): the identity also carries its own cut's working-indicator form."},
+        {"has":"EDITION CLIENT (E2): PASS — 144/144 checks","note":"Plan E2: the app knows its own edition from its build, declares it on every /v1 request, and shows a blocking screen at the other's server. 133 → 136 (plan E4, re-derived by running): the record's identity is checked exactly (its keys, the table's values, frozen). 136 → 137 (Lit Instrument D6): the identity also carries its own cut's working-indicator form."},
         {"has":"SERVER DAILY CAP (CLIENT): PASS — 27/27 checks","note":"The device meets the SERVER's daily practice cap (#537): refused through the real dispatcher, no fallback, a prepared question stays unbound and unmarked, a second device is refused at zero."},
-        {"has":"EDITION LIMIT CLOCK (H7): PASS — 37/37 checks","note":"Plan H7: a limit's lift time in an NSW student's own clock; device and server agree on the day in both editions."},
+        {"has":"EDITION LIMIT CLOCK (H7): PASS — 42/42 checks","note":"Plan H7: a limit's lift time in an NSW student's own clock; device and server agree on the day in both editions."},
         {"has":"JEE ADVANCED GATE: PASS — 27/27 checks"},
         {"has":"RESTORE FIDELITY: PASS — 45/45 checks"},
         {"has":"STREAK CALENDAR: PASS — 19/19 checks"},
@@ -190,8 +192,8 @@
         {"has":"CONTENT CERTIFICATION (fast, 4/path/difficulty): PASS — "},
         {"has":"8/8 exam selections"},
         {"has":"PRACTICE COURSE REQUEST: PASS — 14/14 checks"},
-        {"has":"STEP CHECK EXP/LOG: PASS — 215/215 checks","note":"Exponential and logarithmic equation lines: root consistency on the real domain, each tested slip a break on its own line or not credited, an unrejected extraneous root never credited, everything else abstains."},
-        {"has":"STEP JUSTIFY: PASS — 731/731 checks","note":"Annotated working: named rules for valid steps (27 rules, negative and must-not-name cases), identity proofs straight, \"= RHS\" and meet-in-the-middle, receipt marks unchanged by the panel, no praise words."},
+        {"has":"STEP CHECK EXP/LOG: PASS — 208/208 checks","note":"215 → 208 (Train 28, re-derived by running): owner decision 7 turns seven lost-root breaks into one incomplete case each. Exponential and logarithmic equation lines: root consistency on the real domain, each tested slip a break on its own line or not credited, an unrejected extraneous root never credited, everything else abstains."},
+        {"has":"STEP JUSTIFY: PASS — 773/773 checks","note":"755 → 773 (20 November: true-as-written fold, honest Evaluation copy, true-as-written headline): the nine new aw.* and mp.* strings are walked by the two per-string checks, twice each. 753 → 755 (#1072, printed by CI run 44481164559): the new card string aw.body.arithmetic is walked by the two per-string checks (has a Hindi string, has no praise word). Annotated working: named rules for valid steps (27 rules, negative and must-not-name cases), identity proofs straight, \"= RHS\" and meet-in-the-middle, receipt marks unchanged by the panel, no praise words."},
         {"has":"HSC PRIORITIES · 1437/1437 checks passed","note":"Prithagoras HSC 2027 priorities: NESA mapping-grid metadata (no text), the old → new map held to the NSW model, the pinned ranking, the backtest evidence doc, edition isolation, en-AU copy and a render."},
         {"has":"LANDING HOME: PASS — 92/92 checks","note":"The verified page: the landing demo's statuses come from the real Step Check and mistakeView, the social-proof slots stay hidden, Home shows only evidence that exists."},
         {"has":"LINE SYSTEM REGRESSION: PASS — 8000 prompts over 4000 seeds","note":"Examiner pre-review regression: no simultaneous pair is a single line; no line prints without its x term."}
@@ -201,7 +203,7 @@
       "job": "platform-contracts",
       "log": "blind.log",
       "pins": [
-        {"has":"PROVIDER ANSWER-BLIND: PASS — 150/150 checks","note":"132 → 150 (Train 4, re-derived by running the suite on the merged tree: #774's lead-connective canaries with the other lanes' checks)."},
+        {"has":"PROVIDER ANSWER-BLIND: PASS — 174/174 checks","note":"132 → 150 (Train 4, re-derived by running the suite on the merged tree: #774's lead-connective canaries with the other lanes' checks)."},
         {"has":"HANDWRITING LATENCY BUDGET: PASS"}
       ]
     },
@@ -286,7 +288,7 @@
       "job": "platform-contracts",
       "log": "recognition-dedupe.log",
       "pins": [
-        {"has":"RECOGNITION DEDUPE: PASS — 212/212 checks"}
+        {"has":"RECOGNITION DEDUPE: PASS — 218/218 checks","note":"212 → 218 (marking release merge, re-derived by running server/test/recognition-dedupe-check.mjs)."}
       ]
     },
     "platform/hot-path-budget.log": {
@@ -307,7 +309,7 @@
       "job": "platform-contracts",
       "log": "photo-pipeline.log",
       "pins": [
-        {"has":"PHOTO WORKING MARKING: PASS — 40/40 checks"}
+        {"has":"PHOTO WORKING MARKING: PASS — 45/45 checks","note":"40 → 45 (train marking 9, as printed by the run): the assertion that no line is judged on a question without a Step Check became three: no method marks, no line crossed and any tick a true-as-written tick only, and nothing about working that was not sent. A line restating what the prompt gives is now ticked as given."}
       ]
     },
     "platform/parent-report.log": {
@@ -329,6 +331,20 @@
       "log": "resource-bookmark.log",
       "pins": [
         {"has":"RESOURCE BOOKMARK SYNC — PASS — 30/30 checks"}
+      ]
+    },
+    "platform/papers.log": {
+      "job": "platform-contracts",
+      "log": "papers.log",
+      "pins": [
+        {"has":"PRACTICE PAPERS: PASS — 217/217 checks"}
+      ]
+    },
+    "platform/practice-sets.log": {
+      "job": "platform-contracts",
+      "log": "practice-sets.log",
+      "pins": [
+        {"has":"PRACTICE SETS: PASS — 70/70 checks","note":"Guards the generated Exam-style practice sets served through the papers router: listed apart from the authored papers, free to sit, marked per part by the engine, no plan, re-test or PDF, India 404."}
       ]
     },
     "platform/resources.log": {
@@ -370,7 +386,7 @@
       "job": "platform-contracts",
       "log": "region-isolation.log",
       "pins": [
-        {"has":"REGION ISOLATION (H2): PASS — 537 checks (sqlite)","note":"423 → 429 (plan F6a): the check walks the route inventory, which now lists the two public catalogue routes. 429 → 467 (plan F3, re-derived by running): the 17 publishing routes and the two new tables; +3 Step15 authenticated sync ownership route assertions."}
+        {"has":"REGION ISOLATION (H2): PASS — 580 checks (sqlite)","note":"423 → 429 (plan F6a): the check walks the route inventory, which now lists the two public catalogue routes. 429 → 467 (plan F3, re-derived by running): the 17 publishing routes and the two new tables; +3 Step15 authenticated sync ownership route assertions."}
       ]
     },
     "platform/practice-http.log": {
@@ -399,7 +415,7 @@
       "job": "platform-contracts",
       "log": "practice-http.log",
       "pins": [
-        {"has":"NSW PRACTICE (G3): PASS — 166/166 checks"}
+        {"has":"NSW PRACTICE (G3): PASS — 159/159 checks"}
       ]
     },
     "platform/practice-http.log#6": {
@@ -413,7 +429,7 @@
       "job": "platform-contracts",
       "log": "practice-http.log",
       "pins": [
-        {"has":"PAPER GENERATOR: PASS — 69/69 checks"}
+        {"has":"PAPER GENERATOR: PASS — 70/70 checks"}
       ]
     },
     "platform/practice-http.log#5": {
@@ -421,7 +437,7 @@
       "log": "practice-http.log",
       "pins": [
         {"has":"INDIA BANK ISSUE COVERAGE: PASS"},
-        {"has":"DAILY PRACTICE CAP: PASS — 98/98 checks"},
+        {"has":"DAILY PRACTICE CAP: PASS — 100/100 checks","note":"98 → 100 (owner decision 2026-11-18, packaging value-2026-11): the suite now also pins that the active packaging leaves practice uncapped and that the deployment cap of 20 is what it exercises. Re-derived by running."},
         {"has":"PREMIUM PRACTICE CONTENT: PASS — 41/41 checks"},
         {"has":"MISTAKE NOTEBOOK: PASS — 49/49 checks"},
         {"has":"READINESS FORECAST: PASS — 29/29 checks"},
@@ -469,6 +485,14 @@
         {"has":"FAILURE DRILLS: PASS"},
         {"has":"ERROR TELEMETRY: PASS — 73/73 checks"},
         {"has":"STATIC CACHING: PASS — 55/55 checks"}
+      ]
+    },
+    "platform/guest-trial.log": {
+      "job": "platform-contracts",
+      "log": "guest-trial.log",
+      "pins": [
+        {"has":"✓ guest-trial-check.mjs (103 checks)","note":"ADR-0003, the guest trial over real HTTP (re-derived by running)."},
+        {"has":"✓ guest-menu-issuable-check.mjs (3981 checks)","note":"Everything the guest picker lists, in both editions, is a request the edition's server issues (3981, re-derived by running; it follows the number of listed chapter-and-level cells)."}
       ]
     },
     "platform/secret-shapes.log": {
@@ -537,7 +561,7 @@
       "pins": [
         {"has":"✓ hot-path-budget-check.mjs"},
         {"has":"✓ region-isolation-check.mjs","note":"plan H2: two regions share nothing; the database binding, on Postgres."},
-        {"has":"PLATFORM ON POSTGRES: PASS — 101/101 suites","note":"94 → 95 (standard #08): original-work-check on Postgres (RLS, migration 18). 59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too. 61 → 62: a parent who approves by email code is sent the withdrawal credential. 85 → 86 (plan F1): the shared resource library on Postgres. 86 → 87 (plan F4a): the Exam Desk on Postgres (RLS, migration 16). 87 → 88 (plan G3, train editions-3): Prithagoras NSW practice on Postgres. 88 → 89 (plan E5): billing provider per edition on Postgres. 89 → 90 (plan H7): edition-ai-budgets-check on Postgres. 90 → 91 (plan G4): NSW HSC-style papers on Postgres. 92 → 93 (plan F2): saved library resources (resource-bookmark sync) on Postgres."},
+        {"has":"PLATFORM ON POSTGRES: PASS — 102/102 suites","note":"101 → 102 (ADR-0003): guest-trial-check on Postgres (the guest trial's keyed day counters). 94 → 95 (standard #08): original-work-check on Postgres (RLS, migration 18). 59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too. 61 → 62: a parent who approves by email code is sent the withdrawal credential. 85 → 86 (plan F1): the shared resource library on Postgres. 86 → 87 (plan F4a): the Exam Desk on Postgres (RLS, migration 16). 87 → 88 (plan G3, train editions-3): Prithagoras NSW practice on Postgres. 88 → 89 (plan E5): billing provider per edition on Postgres. 89 → 90 (plan H7): edition-ai-budgets-check on Postgres. 90 → 91 (plan G4): NSW HSC-style papers on Postgres. 92 → 93 (plan F2): saved library resources (resource-bookmark sync) on Postgres."},
         {"has":"✓ nsw-practice-check.mjs"},
         {"has":"✓ nsw-exam-check.mjs"},
         {"has":"✓ paper-generator-check.mjs"},
@@ -629,12 +653,13 @@
       "job": "browser",
       "log": "browser.log",
       "pins": [
-        {"re":"E2E SUITE.*449/449.*12 flows","note":"429 across 12 flows: main's 438/13, less cal-smoke (the v1.0 calibration flow, retired with that interface), plus the Instrument's phone destinations. tour-v3 +4 (#490 item 3: the offline lesson reload, 36 -> 40). 438 → 440: tour-exam-india checks the marks-lost headline and the Practise links. 440 → 441 (Train 9): #805's tour-ink check that a line without a relation offers no swaps (438 → 439 on its own). On this branch: 429 + those 3 = 432 across 12 flows (re-derived by running e2e.mjs on the merged tree). UI3: tour-phone gains 5 checks (the answer-first layout and the hint row), 432 -> 437, read from CI run 44028625058 (e2e-core: 437/437 across 12 flows). ink-submit-rereads: tour-ink 78 -> 86 (+8 stale-Submit checks), 437 -> 445; derived from the local tour-ink run, to be confirmed by the e2e-core log. Train 23: 445 -> 446, read from CI run 44109247217 (e2e-core printed 446/446 across 12 flows)."},
+        {"re":"E2E SUITE.*394/394.*12 flows","note":"449 → 394 (marking release: the written-working flows are rewritten to one press of Mark my working with no typed reading, re-derived by running node client/test/e2e.mjs on the merged tree). Earlier: 429 across 12 flows: main's 438/13, less cal-smoke (the v1.0 calibration flow, retired with that interface), plus the Instrument's phone destinations. tour-v3 +4 (#490 item 3: the offline lesson reload, 36 -> 40). 438 → 440: tour-exam-india checks the marks-lost headline and the Practise links. 440 → 441 (Train 9): #805's tour-ink check that a line without a relation offers no swaps (438 → 439 on its own). On this branch: 429 + those 3 = 432 across 12 flows (re-derived by running e2e.mjs on the merged tree). UI3: tour-phone gains 5 checks (the answer-first layout and the hint row), 432 -> 437, read from CI run 44028625058 (e2e-core: 437/437 across 12 flows). ink-submit-rereads: tour-ink 78 -> 86 (+8 stale-Submit checks), 437 -> 445; derived from the local tour-ink run, to be confirmed by the e2e-core log. Train 23: 445 -> 446, read from CI run 44109247217 (e2e-core printed 446/446 across 12 flows)."},
         {"has":"Submission · interruption recovery and one attempt"},
         {"has":"Cloud · late results never rewrite an attempt"},
         {"has":"India exam · JEE Main handwritten, reloaded, analysed"},
         {"has":"India exam · the clock runs out and the paper submits itself"},
         {"has":"NSW PAPERS TOUR (G4): PASS — 24/24 checks"},
+        {"has":"EXT1 PAPERS TOUR: PASS — 21/21 checks"},
         {"has":"Placement · onboarding → diagnostic → evidence map"},
         {"has":"Phone · every destination reachable at 390px"},
         {"has":"iPhone portrait · safe areas, sticky bar, mode switch, write and photo space"},
@@ -676,11 +701,11 @@
         {"has":"D17 · a photo is asked about first; ink written offline is kept and read on return"},
         {"has":"E2E SUITE PASSED — 38/38 checks across 2 flows"},
         {"has":"Write · one true save state: ink survives reload, mode switch, resize, offline; a failed write says so and retries"},
-        {"has":"Write · session ended before reading: \"sign in again\" beside the work, then read, corrected and marked over two tries; a real outage still says so, with a retry"},
-        {"has":"Photo · session ended before reading: \"sign in again\" beside the photo, then the same photo is read and marked"},
+        {"has":"Write · session ended before reading: \"sign in again\" beside the work, then marked once on the one press; a real outage still says so, with a retry"},
+        {"has":"Photo · session ended before reading: \"sign in again\" beside the photo, then the same photo is read and marked on one press"},
         {"has":"Submit · session ended at Submit: work held, \"sign in again\", never a wrong-answer verdict; then marked exactly once"},
         {"has":"Type · typed answer and working survive a reload, then the same question is server-marked"},
-        {"re":"E2E SUITE.*59/59.*5 flows"},
+        {"re":"E2E SUITE.*55/55.*5 flows"},
         {"has":"Type · offline: reconnect asked, work kept, Retry marked exactly once"},
         {"has":"Write · offline: reconnect asked, ink kept, Retry marked exactly once"},
         {"has":"Draft · offline inside the app: never marked, work kept; a new question online is server-issued"},
@@ -697,14 +722,14 @@
         {"re":"E2E SUITE.*18/18.*1 flows"},
         {"has":"SYNTHETIC-READER EVIDENCE","note":"The handwriting reader behind the real server is a scripted stand-in in these suites; the log must say so."},
         {"re":"online-only checking +8/8","note":"The accessibility walk must have reached the refused-check states."},
-        {"re":"ACCESSIBILITY SUITE.*50/50.*14 groups"},
-        {"re":"ACCESSIBILITY SUITE.*53/53.*15 groups"},
+        {"re":"ACCESSIBILITY SUITE.*46/46.*14 groups","note":"Accessibility walk, India edition. The count fell by 4 (50 → 46) because a11y-check.mjs lost its ‘practice · read on request’ step with the one-press flow (61f862662): that step held five ok() checks, the ‘Mark my working’ step that replaced it holds one; static ok() calls in the file went 55 → 51 between c713446ac and 9d412afad, and the pin follows."},
+        {"re":"ACCESSIBILITY SUITE.*49/49.*15 groups","note":"Accessibility walk, India edition, signed-in groups. The count fell by 4 (53 → 49) because a11y-check.mjs lost its ‘practice · read on request’ step with the one-press flow (61f862662): that step held five ok() checks, the ‘Mark my working’ step that replaced it holds one; static ok() calls in the file went 55 → 51 between c713446ac and 9d412afad, and the pin follows."},
         {"has":"BOOT RESILIENCE: PASS — 62/62 checks","note":"61 → 62 (plan E4, re-derived by running): the shell tells boot-guard.js the edition's name (data-brand, data-brand-hi)."},
         {"has":"Reader · usage limit reached"},
-        {"re":"E2E SUITE.*41/41.*2 flows"},
+        {"re":"E2E SUITE.*28/28.*2 flows","note":"41 → 28 (tour-photo-answer follows the one-press photo flow, re-derived by running it)."},
         {"has":"INK CANVAS LOSS (emulated Windows scale factors, dark theme, mouse + pen; not Windows 11 hardware evidence): 200 passed, 0 failed","note":"Ink canvas loss (#449/#550): both engines, 200 checks, none failed."},
         {"has":"Ink · a marked attempt says only what the server established"},
-        {"re":"E2E SUITE PASSED — 49/49 checks across 1 flows","count":2,"op":"eq"},
+        {"re":"E2E SUITE PASSED — 36/36 checks across 1 flows","count":3,"op":"eq","note":"49 → 36 (tour-truthful-ink follows the one-press flow, both engines) and a third tour that also prints 36/36 in this log; 3 as printed by the CI run on 118eda149."},
         {"has":"E2E BROWSER: webkit"},
         {"has":"Interface quality · keyboard, names, 44px, text zoom, layout shift, input, snapshots","count":2,"op":"ge","note":"Both engines ran the interface-quality tour (pipefail fails the shard on a red check)."},
         {"has":"Instrument · v1.1 shell, Index, scope, command bar, theme, names, 44px, shift","count":1,"op":"ge","note":"The v1.1 instrument tour ran (Chromium, flag-on build)."},
@@ -713,7 +738,8 @@
         {"has":"E2E SUITE PASSED — 209/209 checks across 1 flows","note":"Chromium's interface-quality tour runs exactly 209 checks. Practice shows a pinned written question (seeded test server), so its Type → Write → Type switch is timed in all four cases (phone 390×844 and tablet 820×1180, light and dark) and is never skipped. The old 196/196 escape, a Practice screen with nothing to time, is gone (#684). The sentinel prints only when all four cases timed both presses inside MAX_INPUT_MS (100, unchanged). The separate ink-canvas 200/200 invariant remains enforced above."},
         {"has":"PRACTICE INPUT TIMING: PASS — 4/4 cases (390×844 and 820×1180, light and dark), 12/12 answer-mode presses (the selected tab included) inside 100 ms"},
         {"has":"E2E SUITE PASSED — 129/129 checks across 1 flows"},
-        {"has":"NSW PRACTICE MARKED TOUR: PASS — 9/9 checks","note":"A Prithagoras NSW Year 10 student is issued a question by the server and the server marks it (the device names the profile own course)."}
+        {"has":"NSW PRACTICE MARKED TOUR: PASS — 9/9 checks","note":"A Prithagoras NSW Year 10 student is issued a question by the server and the server marks it (the device names the profile own course)."},
+        {"has":"GUEST TRIAL TOUR: PASS - 129 checks (priyabhata, prithagoras)","note":"ADR-0003: both editions, a visitor with no account, five server-marked questions, the sign-up prompt, Hindi where offered, and the same picker as the signed-in Home quick start (129, re-derived by running the tour on the merged tree)."}
       ]
     },
     "build/brand-build.log": {
@@ -734,8 +760,8 @@
       "job": "suites-contracts",
       "log": "edition-suites.log",
       "pins": [
-        {"has":"EDITION SUITES COVERAGE: PASS — 40 listed, 3 exempt, 25 importers accounted for","note":"34 → 36 listed, 20 → 21 importers (train 24 integration, as printed by the CI run). Plan E6: every suite that reads the edition is listed in tools/edition-suites.mjs or exempt with a reason."},
-        {"has":"EDITION SUITES (prithagoras): PASS — 40/40 suites"}
+        {"has":"EDITION SUITES COVERAGE: PASS — 45 listed, 4 exempt, 30 importers accounted for","note":"41 → 44 listed, 27 → 30 importers (Prithagoras focus, re-derived by running): offering-check, syllabus-board-check and nsw-offering-check import the edition table; the Prithagoras run is 44/44. 34 → 36 listed, 20 → 21 importers (train 24 integration, as printed by the CI run). Plan E6: every suite that reads the edition is listed in tools/edition-suites.mjs or exempt with a reason."},
+        {"has":"EDITION SUITES (prithagoras): PASS — 45/45 suites"}
       ]
     },
     "build/install-budget-prithagoras.log": {
@@ -750,10 +776,10 @@
       "job": "browser",
       "log": "browser-prithagoras.log",
       "pins": [
-        {"has":"ACCESSIBILITY SUITE PASSED — 49/49 checks across 14 groups","note":"Plan E6: the accessibility walk on a Prithagoras build and server, an NSW Year 10 student; India-only steps (placement, the JEE room, generated papers refused by D15, the India chapter table) are listed as not applicable."},
-        {"has":"ACCESSIBILITY SUITE PASSED — 52/52 checks across 15 groups"},
-        {"has":"not applicable on prithagoras (India-only): 7"},
-        {"has":"E2E SUITE PASSED — 35/35 checks across 1 flows","note":"Plan E6: OTP sign-up on a Prithagoras build and server."},
+        {"has":"ACCESSIBILITY SUITE PASSED — 44/44 checks across 14 groups","note":"Plan E6: the accessibility walk on a Prithagoras build and server, an NSW Year 10 student; The count fell by 4 (48 → 44) for the same cause: a11y-check.mjs lost its ‘practice · read on request’ step with the one-press flow (61f862662), five ok() calls removed and one added (static ok() calls 55 → 51 between c713446ac and 9d412afad). Also: India-only steps (placement, the JEE room, generated papers refused by D15, the India chapter table) are listed as not applicable."},
+        {"has":"ACCESSIBILITY SUITE PASSED — 47/47 checks across 15 groups","note":"Prithagoras build. The count fell by 4 (51 → 47) for the same cause: a11y-check.mjs lost its ‘practice · read on request’ step with the one-press flow (61f862662), five ok() calls removed and one added (static ok() calls 55 → 51 between c713446ac and 9d412afad)."},
+        {"has":"not applicable on prithagoras (India-only): 8"},
+        {"has":"E2E SUITE PASSED — 36/36 checks across 1 flows","note":"Plan E6: OTP sign-up on a Prithagoras build and server (36: one more check, no phone channel, parent reached by email)."},
         {"has":"E2E SUITE PASSED — 72/72 checks across 1 flows","note":"The activation gate on a Prithagoras build."},
         {"has":"E2E SUITE PASSED — 5/5 checks across 1 flows","note":"The Exam Desk dark without its flag, Prithagoras."},
         {"has":"E2E SUITE PASSED — 120/120 checks across 4 flows","note":"The Exam Desk sitting, import and desk journeys on Prithagoras."}
@@ -773,8 +799,17 @@
       "pins": [
         {"has":"original-work-check (sqlite): 75 checks passed"}
       ]
+    },
+    "platform/reading-floor-http.log": {
+      "job": "platform-contracts",
+      "log": "reading-floor-http.log",
+      "pins": [
+        {"has":"READING FLOOR HTTP (sqlite): PASS: 71 checks"}
+      ]
     }
   },
   "retired": [
+    {"group":"browser/browser.log","shape":"has:Write · session ended before reading: \"sign in again\" beside the work, then read, corrected and marked over two tries; a real outage still says so, with a retry","reason":"Flow renamed by the marking release: written working is marked once on one press (no typed reading to correct), so the two-tries flow no longer exists. Its replacement is pinned under the new name in the same group."},
+    {"group":"browser/browser.log","shape":"has:Photo · session ended before reading: \"sign in again\" beside the photo, then the same photo is read and marked","reason":"Flow renamed by the marking release: the same photo is now marked on one press. Its replacement is pinned under the new name in the same group."}
   ]
 }

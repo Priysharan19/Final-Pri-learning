@@ -164,7 +164,7 @@ export default {
       { front: 'Why is $\\sin^{-1}(\\sin\\pi)$ not $\\pi$?', back: '$\\pi$ is outside the range of $\\sin^{-1}$. $\\sin\\pi=0$, and $\\sin^{-1}0=0$.' }
     ],
     mistakes: [
-      { wrong: '$\\sin^{-1}(\\sin\\tfrac{4\\pi}3)=\\tfrac{4\\pi}3$.', right: 'The answer must lie in $\\left[-\\tfrac\\pi2,\\tfrac\\pi2\\right]$. $\\sin\\tfrac{4\\pi}3=-\\tfrac{\\sqrt3}2$, so the result is $-\\tfrac\\pi3$.' },
+      { wrong: '$\\sin^{-1}(\\sin\\left(\\tfrac{4\\pi}3\\right))=\\tfrac{4\\pi}3$.', right: 'The answer must lie in $\\left[-\\tfrac\\pi2,\\tfrac\\pi2\\right]$. $\\sin\\left(\\tfrac{4\\pi}3\\right)=-\\tfrac{\\sqrt3}2$, so the result is $-\\tfrac\\pi3$.' },
       { wrong: '$\\cos^{-1}\\left(-\\tfrac12\\right)=-\\tfrac\\pi3$.', right: 'Inverse cosine is never negative. $\\cos^{-1}\\left(-\\tfrac12\\right)=\\tfrac{2\\pi}3$.' },
       { wrong: 'Writing a value such as $\\sin^{-1}2$ as an answer.', right: 'Two is outside the domain $[-1,1]$, so $\\sin^{-1}2$ does not exist.' }
     ],
@@ -181,16 +181,16 @@ export default {
       {
         question: 'Evaluate $\\sin^{-1}\\left(\\sin\\dfrac{4\\pi}3\\right)$.',
         steps: [
-          'First, $\\sin\\tfrac{4\\pi}3=-\\sin\\tfrac\\pi3=-\\tfrac{\\sqrt3}2$.',
+          'First, $\\sin\\left(\\tfrac{4\\pi}3\\right)=-\\sin\\left(\\tfrac\\pi3\\right)=-\\tfrac{\\sqrt3}2$.',
           'Now find the angle in $\\left[-\\tfrac\\pi2,\\tfrac\\pi2\\right]$ with that sine: $\\sin^{-1}\\left(-\\tfrac{\\sqrt3}2\\right)=-\\tfrac\\pi3$.'
         ],
         answer: '$-\\dfrac\\pi3$',
         verify: { kind: 'value', expr: 'asin(sin(4*pi/3))', answer: '-pi/3' }
       },
       {
-        question: 'Find the exact value of $\\sin\\left(\\sin^{-1}\\tfrac35+\\cos^{-1}\\tfrac5{13}\\right)$.',
+        question: 'Find the exact value of $\\sin\\left(\\sin^{-1}\\left(\\tfrac35\\right)+\\cos^{-1}\\left(\\tfrac5{13}\\right)\\right)$.',
         steps: [
-          'Let $\\alpha=\\sin^{-1}\\tfrac35$, so $\\sin\\alpha=\\tfrac35$ and $\\cos\\alpha=\\tfrac45$. Let $\\beta=\\cos^{-1}\\tfrac5{13}$, so $\\cos\\beta=\\tfrac5{13}$ and $\\sin\\beta=\\tfrac{12}{13}$.',
+          'Let $\\alpha=\\sin^{-1}\\left(\\tfrac35\\right)$, so $\\sin\\alpha=\\tfrac35$ and $\\cos\\alpha=\\tfrac45$. Let $\\beta=\\cos^{-1}\\left(\\tfrac5{13}\\right)$, so $\\cos\\beta=\\tfrac5{13}$ and $\\sin\\beta=\\tfrac{12}{13}$.',
           'Both angles are acute, so every ratio is positive.',
           '$\\sin(\\alpha+\\beta)=\\sin\\alpha\\cos\\beta+\\cos\\alpha\\sin\\beta=\\tfrac35\\cdot\\tfrac5{13}+\\tfrac45\\cdot\\tfrac{12}{13}=\\tfrac{15+48}{65}=\\tfrac{63}{65}$.'
         ],
@@ -225,7 +225,7 @@ export default {
       { front: 'What is $\\int\\sin^2x\\,dx$?', back: '$\\tfrac x2-\\tfrac{\\sin2x}4+C$, from $\\sin^2x=\\tfrac{1-\\cos2x}2$.' }
     ],
     mistakes: [
-      { wrong: '$\\int\\dfrac{dx}{9+x^2}=\\tan^{-1}\\dfrac x3+C$.', right: 'The $\\tfrac1a$ is needed: $\\int\\tfrac{dx}{9+x^2}=\\tfrac13\\tan^{-1}\\tfrac x3+C$.' },
+      { wrong: '$\\int\\dfrac{dx}{9+x^2}=\\tan^{-1}\\left(\\dfrac x3\\right)+C$.', right: 'The $\\tfrac1a$ is needed: $\\int\\tfrac{dx}{9+x^2}=\\tfrac13\\tan^{-1}\\left(\\tfrac x3\\right)+C$.' },
       { wrong: 'Substituting $u=x^2+1$ in $\\int_0^1x(x^2+1)^3dx$ but keeping the limits $0$ and $1$.', right: 'The limits must become $u(0)=1$ and $u(1)=2$, so the integral is $\\tfrac12\\int_1^2u^3du$.' },
       { wrong: 'Differentiating $\\sin^{-1}(2x)$ as $\\dfrac1{\\sqrt{1-4x^2}}$.', right: 'The chain rule adds a factor of $2$: the derivative is $\\dfrac2{\\sqrt{1-4x^2}}$.' }
     ],
@@ -244,7 +244,7 @@ export default {
         question: 'Evaluate $\\displaystyle\\int_0^3\\frac{dx}{9+x^2}$.',
         steps: [
           'This is the form $\\int\\tfrac{dx}{a^2+x^2}$ with $a=3$.',
-          'An antiderivative is $\\tfrac13\\tan^{-1}\\tfrac x3$.',
+          'An antiderivative is $\\tfrac13\\tan^{-1}\\left(\\tfrac x3\\right)$.',
           'Evaluate: $\\tfrac13\\tan^{-1}(1)-\\tfrac13\\tan^{-1}(0)=\\tfrac13\\cdot\\tfrac\\pi4=\\tfrac\\pi{12}$.'
         ],
         answer: '$\\dfrac\\pi{12}$',

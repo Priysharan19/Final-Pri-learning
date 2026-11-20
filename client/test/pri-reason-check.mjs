@@ -51,8 +51,10 @@ same('expanded identity keeps the stable diagnosis', r.diagnosis?.code, 'constra
 // 5. Losing one branch of a multi-solution equation is a first-class error even
 // when the student writes only the bare value rather than x = value.
 r = stepCheck({ kind: 'equation', variable: 'x', solutions: [-3, 3] }, 'x^2 = 9\n3');
-same('bare single root from a two-root problem breaks', r.firstBreak, 1);
-same('bare single root is diagnosed as lost-root', r.diagnosis?.code, 'lost-root');
+// OWNER DECISION 7 (18 Nov 2026, PR #1054): a true root is never marked wrong; a missing root is incomplete, not a wrong line.
+same('bare single root from a two-root problem is incomplete, not a break', r.firstBreak, -1);
+same('bare single root names what is missing', r.lines[1].state, 'incomplete');
+same('the missing root is named', /x = −3 is also a solution|x = 3 is also a solution/.test(r.lines[1].note), true);
 
 // 6. A valid quadratic rearrangement is still positively provable.
 r = stepCheck({ kind: 'equation', variable: 'x', solutions: [-3, 3] }, 'x^2 = 9\nx^2 - 9 = 0');

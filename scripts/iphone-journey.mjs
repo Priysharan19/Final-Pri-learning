@@ -516,7 +516,8 @@ let offlineRelaunchLines = [];
     } catch (error) { throw new Error(`the local server did not start (${String(error?.message || error).split('\n')[0]})`); }
     server = Object.fromEntries(readFileSync(out, 'utf8').trim().split('\n').map(l => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]));
     if (server.PRI_CLOUD_READER !== 'synthetic') throw new Error('the local server is not running the synthetic reader');
-    writeFileSync(server.PRI_CLOUD_READER_SCRIPT, JSON.stringify({ text: READER_TEXT, confidence: 0.6 }));
+    // A confident wrong reading exercises the new mark-then-correct path. Do not change the production confidence floor.
+    writeFileSync(server.PRI_CLOUD_READER_SCRIPT, JSON.stringify({ text: READER_TEXT, confidence: 0.97 }));
     // The server's own database, read-only: the "teacher's desk" (shared with
     // the Android journey's relay, scripts/journey-oracle.mjs).
     const student = String(server.PRI_CLOUD_NEW_EMAIL || '').toLowerCase();
@@ -552,7 +553,12 @@ let offlineRelaunchLines = [];
           answered.add(n);
           continue;
         }
-        try { reply = ask.kind === 'answer' ? sealedAnswer() : { supported: false, reason: 'unknown question' }; }
+        try {
+          if (ask.kind === 'readerCount') {
+            const entries = existsSync(server.PRI_CLOUD_READER_LOG) ? readFileSync(server.PRI_CLOUD_READER_LOG, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)) : [];
+            reply = { count: entries.filter(e => e.kind === 'reader').length };
+          } else reply = ask.kind === 'answer' ? sealedAnswer() : { supported: false, reason: 'unknown question' };
+        }
         catch (error) { reply = { supported: false, reason: String(error?.message || error).slice(0, 120) }; }
         writeFileSync(join(oracleDir, `reply-${n}.json`), JSON.stringify({ n: Number(n), ...reply }));
         answered.add(n);
@@ -587,16 +593,27 @@ let offlineRelaunchLines = [];
       const done = completed();
       const typed = done.filter(q => q.inputMode === 'typed');
       const ink = done.filter(q => q.inputMode === 'ink');
-      if (done.length !== 2 || typed.length !== 1 || ink.length !== 1) throw new Error(`completed questions by input: ${JSON.stringify(done.map(q => q.inputMode))}`);
+      if (done.length !== 3 || typed.length !== 1 || ink.length !== 2) throw new Error(`completed questions by input: ${JSON.stringify(done.map(q => q.inputMode))}`);
       const [miss, hit] = typed[0].grades;
       if (typed[0].grades.length !== 2 || miss.authoritative !== true || miss.correct !== false || miss.invalid !== false || miss.marksEarned !== 0 ||
           miss.resolved !== false || miss.triesLeft !== 1) throw new Error(`typed miss: ${JSON.stringify(typed[0].grades.map(g => [g.correct, g.invalid, g.marksEarned, g.marksPossible, g.triesLeft]))}`);
       if (hit.authoritative !== true || hit.correct !== true || hit.resolved !== true || hit.marksEarned !== hit.marksPossible || !(hit.marksPossible > 0)) throw new Error(`typed hit: ${JSON.stringify([hit.correct, hit.marksEarned, hit.marksPossible])}`);
-      const [read] = ink[0].grades;
-      if (ink[0].grades.length !== 1 || read.authoritative !== true || read.correct !== true || read.resolved !== true || read.marksEarned !== read.marksPossible || !(read.marksPossible > 0)) throw new Error(`ink: ${JSON.stringify(ink[0].grades.map(g => [g.correct, g.marksEarned, g.marksPossible]))}`);
-      const confirmed = rows('practice-recognition').map(r => JSON.parse(r.response_json)).filter(r => r.questionId === ink[0].id);
-      if (confirmed.length < 2) throw new Error(`${confirmed.length} reading receipt(s) for the handwritten question; expected the reader's and the student's correction`);
-      return `typed: 0/${miss.marksPossible} with 1 try left, then ${hit.marksEarned}/${hit.marksPossible}; handwritten: ${read.marksEarned}/${read.marksPossible} on a corrected reading (${confirmed.length} receipts)`;
+      const wrong = ink.find(q => q.grades[0]?.correct === false);
+      const corrected = ink.find(q => q.grades[0]?.correct === true);
+      if (!wrong || !corrected || wrong.grades.length !== 1 || corrected.grades.length !== 1 || wrong.id === corrected.id)
+        throw new Error('expected two distinct resolved handwritten attempts');
+      const bad = wrong.grades[0], good = corrected.grades[0];
+      if (bad.authoritative !== true || bad.resolved !== true || bad.invalid !== false || bad.marksEarned !== 0 || bad.reading?.studentConfirmed !== false)
+        throw new Error('first handwriting mark was not an authoritative wrong result');
+      if (good.authoritative !== true || good.correct !== true || good.resolved !== true || good.marksEarned !== good.marksPossible || !(good.marksPossible > 0) ||
+          good.reading?.corrected !== true || good.reading?.studentConfirmed !== false || good.attemptId === bad.attemptId)
+        throw new Error('corrected handwriting did not receive a separate authoritative full mark');
+      const receipts = rows('practice-recognition').map(r => ({ key: r.key, ...JSON.parse(r.response_json) }));
+      const original = receipts.find(r => r.questionId === wrong.id && r.text === READER_TEXT && !r.correctedByStudent);
+      const correction = receipts.find(r => r.questionId === corrected.id && r.correctedByStudent === true && r.key === good.reading.receipt);
+      if (!original || !correction || !receipts.some(r => r.key === correction.parentReceipt && r.questionId === corrected.id && r.text === READER_TEXT))
+        throw new Error('missing original or correction-bound server reading receipts');
+      return `typed wrong then correct; handwriting 0/${bad.marksPossible}, then ${good.marksEarned}/${good.marksPossible} on new corrected attempt with bound receipts`;
     });
     verdict('serverReaderAnswerBlind', () => {
       let entries = [];

@@ -151,10 +151,10 @@ ok(/import grievance from '\.\.\/\.\.\/\.\.\/docs\/legal\/grievance\.md\?raw'/.t
 const privacy = au('privacy'), terms = au('terms'), refund = au('refund-policy'), contact = au('contact');
 for (const [label, re] of [
   ['the Australian Privacy Principles / Privacy Act 1988', /Australian Privacy Principles[\s\S]{0,200}Privacy Act 1988|Privacy Act 1988[\s\S]{0,200}Australian Privacy Principles/],
-  ['who is responsible, with an address', /Oakville NSW 2765, Australia/], ['what is collected', /What we collect/], ['why', /Why we use it/],
+  ['who is responsible, with the ABN (a sole trader trading as Pri Learning)', /Priysharan Tripathi trading as Pri Learning, ABN 20 192 090 394/], ['what is collected', /What we collect/], ['why', /Why we use it/],
   ['overseas disclosure under APP 8, with the recipients', /Sending information overseas[\s\S]*OpenAI[\s\S]*Resend/], ['APP 12 and 13: access and correction', /APP 12 and APP 13/],
   ['a complaint to us then the OAIC', /write to us first[\s\S]{0,300}Office of the Australian\s+Information Commissioner \(OAIC\)/],
-  ['children: under 18 treated as a child; a parent or guardian confirms', /unless you say you are, the account is\s+treated as a child's/],
+  ['children: under 15 needs a parent or guardian to confirm; 15 and over does not', /A student under 15 needs a\s+parent or guardian to confirm the account\. A student who is 15 or older does\s+not, and nor does an adult/],
   ['the Children\'s Online Privacy Code, pending and not claimed', /Children.s Online Privacy Code[\s\S]{0,500}not treated any such Code as being in force[\s\S]{0,80}do not claim\s+to comply/],
   ['how long it is kept', /How long we keep it/], ['security and the data-breach promise', /data breach[\s\S]{0,120}tell you/], ['a way to delete', /\/account\/delete-request/]
 ]) ok(re.test(privacy), `the privacy notice has ${label}`);
@@ -162,7 +162,7 @@ ok(!/we (?:comply|are compliant) with the (?:Children|Privacy)/i.test(privacy), 
 ok(/aim to handle your information in line with the APPs/.test(privacy), 'it says we AIM to follow the APPs (whether the Act applies to us is open), not that we are bound or compliant');
 for (const [label, re] of [
   ['Australian Consumer Law guarantees that cannot be excluded', /guarantees that cannot be excluded under the Australian\s+Consumer Law/], ['New South Wales law', /governed by the laws of New South Wales/],
-  ['NSW courts', /courts of New South Wales/], ['final answer only', /Marking is of the final answer only/], ['not NESA-approved, not an official HSC resource', /not endorsed by,\s+affiliated with or approved by NESA[\s\S]{0,200}not an official HSC resource/],
+  ['NSW courts', /courts of New South Wales/], ['final answer only', /Marking is of the final answer only/], ['not affiliated with or endorsed by NESA, not an official HSC resource', /Prithagoras is not affiliated with or endorsed by NESA[\s\S]{0,200}not an official HSC resource/],
   ['no prediction of an HSC mark, band or ATAR', /not a prediction of an HSC mark, band or ATAR/], ['the Premium price in AUD', /A\$9\.99 a month or A\$99 a year/], ['Stripe as the processor', /Stripe, our payment processor/], ['cancelling at the end of the paid period', /You can cancel in the app,\s+and Premium then stays on until the end of the period/], ['no whole-syllabus claim', /does not cover the whole of any syllabus/]
 ]) ok(re.test(terms), `the terms have ${label}`);
 ok(!/exclusive jurisdiction/.test(terms.replace(/non-exclusive/g, '')), 'the terms do not impose an exclusive jurisdiction on a consumer');
@@ -171,7 +171,7 @@ for (const [label, re] of [
   ['an explicit non-statement about GST registration', /not a statement that we\s+are registered for GST/], ['Stripe named as the processor', /Payments are taken by Stripe, our payment processor/], ['the prices', /A\$9\.99 a month\*\* or \*\*A\$99 a year/], ['no card number received or stored', /never receive or store a\s+card number/], ['cancelling at the end of the paid period', /Premium then stays on\s+until the end of the period you have already paid for/], ['a full refund ending Premium at once', /refunded in full, Premium for that period ends at once/], ['NSW Fair Trading', /NSW Fair Trading/]
 ]) ok(re.test(refund), `the refund policy has ${label}`);
 ok(!/no refund|non-refundable|all sales (?:are )?final|refunds? (?:are )?not (?:given|available|offered)/i.test(refund + terms), 'no "no refunds" wording anywhere');
-ok(!/registered for GST(?! and)/.test(refund.replace(/not a statement that we\s+are registered for GST/, '')) && !/\bABN\b/.test(all), 'no claim to be registered for GST, no ABN');
+ok(!/registered for GST(?! and)/.test(refund.replace(/not a statement that we\s+are registered for GST/, '')) && (all.match(/\bABN\b[^\n]{0,20}/g) || []).every(m => /^ABN 20 192 090 394/.test(m)), 'no claim to be registered for GST; the only ABN named is the owner-supplied 20 192 090 394 (no registration or GST claim follows from it)');
 ok(/Office of the Australian\s+Information Commissioner/.test(contact) && /NSW Fair Trading/.test(contact) && /48 hours/.test(contact) && /30 days/.test(contact), 'the contact page says who to write to, what happens, and where to escalate (OAIC, NSW Fair Trading)');
 ok(!/grievance/i.test(all), 'no notice uses the word grievance: Prithagoras has a contact page, not a Grievance Officer');
 
@@ -186,7 +186,7 @@ ok(/FULL refund of the CURRENT period/.test(stripeCode), 'a full refund of the c
 ok(/^const CHECKOUT_HOST = 'checkout\.stripe\.com';$/m.test(stripeCode) && /customer_email: account\.email/.test(stripeCode), 'payment is taken on Stripe\'s hosted page and the account email is the only identifier sent (stripe.js)');
 ok(!/card_number|cardNumber|pan\b/i.test(stripeCode), 'no card number is handled in the Stripe code');
 ok(/stays on\s+until the end of the period/.test(terms) && /A\$9\.99 a month or A\$99 a year/.test(terms) && /Stripe, our payment processor/.test(terms), 'the terms state the price, the processor and the cancellation rule');
-ok(/never receive or store a card number/.test(privacy) && /\*\*Stripe\*\* is our payment processor/.test(privacy) && /Three things are kept after deletion/.test(privacy), 'the privacy notice names Stripe, says no card number is held, and lists the payment record kept after deletion');
+ok(/never receive or store a card number/.test(privacy) && /\*\*Stripe\*\* is our payment processor/.test(privacy) && /Four things are kept after deletion/.test(privacy), 'the privacy notice names Stripe, says no card number is held, and lists the payment record kept after deletion');
 ok(/ON DELETE SET NULL/.test(read('server/platform/billingSchema.js')), 'a payment record outlives the account without its link (billingSchema.js)');
 ok(!/not on sale/.test(all), 'no notice still says Premium is not on sale');
 const marking = read('server/platform/editionMarking.js');
@@ -204,15 +204,19 @@ ok(/bcrypt/i.test(read('server/platform/security.js') + read('server/platform/ac
 ok(/PRI_AUTH_EMAIL_PROVIDER=resend/.test(read('.env.production.example')) && /Resend/.test(privacy), 'email goes through Resend (.env.production.example)');
 ok(/OpenAI/.test(read('client/src/i18n/strings.en.js').match(/'readerPermission\.leadInk':[^\n]*/)?.[0] || '') && /naming OpenAI/.test(privacy), 'the one-time permission prompt names OpenAI, as the notice says');
 ok(/export const READER_PERMISSION_VERSION\s*=/.test(read('client/src/ink/readerPermission.js')), 'and its versioned record exists (readerPermission.js)');
-ok(/isAdult: false/.test(read('client/src/components/CloudAccountPanel.jsx')) && /!form\.isAdult && \(!form\.guardianName\.trim\(\) \|\| !form\.guardianEmail\.trim\(/.test(read('client/src/components/CloudAccountPanel.jsx')) && /18 or older/.test(privacy), 'an account is a child\'s unless the person says they are 18 or older, and a child\'s needs a guardian\'s name and email (CloudAccountPanel.jsx)');
+ok(/export const AU_GUARDIAN_AGE = 15;/.test(read('server/platform/guardianConsent.js')) && /return !\(Number\.isInteger\(years\) && years >= AU_GUARDIAN_AGE && years <= 120\)/.test(read('server/platform/guardianConsent.js')) && /under 15 needs a\s+parent or guardian/.test(privacy) && !/under 18/.test(privacy), 'in Australia an account is a child\'s (needs a guardian) only when the stated age is under 15 or missing, and the notice says 15, not 18 (guardianConsent.js AU_GUARDIAN_AGE)');
 ok(/'\/account\/delete-request'/.test(read('client/src/main.jsx')) && existsSync(join(ROOT, 'client/src/pages/AccountDeleteRequest.jsx')), 'the delete-request page the notice links to exists (main.jsx, AccountDeleteRequest.jsx)');
 ok(/48 hours/.test(contact) && /48 hours/.test(privacy), 'the 48-hour acknowledgement is stated the same way on both pages');
 
 // ── 5 · Placeholders, and the review switch ─────────────────────────────────
-const DECLARED = new Set(['AU_HOSTING_PROVIDER_AND_REGION', 'AU_DATABASE_PROVIDER_AND_REGION', 'CONTACT_EMAIL']);
+// The three formerly-declared placeholders were filled 2026-11-18 (owner-supplied, verified from the live infrastructure).
+const DECLARED = new Set();
 const found = new Set((all.match(/\{\{[A-Z_]+\}\}/g) || []).map(p => p.slice(2, -2)));
 for (const name of found) ok(DECLARED.has(name), `placeholder {{${name}}} is one of the declared four`);
-for (const name of DECLARED) ok(found.has(name), `declared placeholder {{${name}}} is used`);
+ok(found.size === 0, 'no placeholder is left in the Australian notices');
+ok(/Railway[^.]*Singapore/.test(privacy) && /Neon[^.]*Sydney/.test(privacy) && /prilearning19@gmail\.com/.test(privacy + contact), 'the Australian notice states its hosting (Railway, Singapore), its database (Neon, Sydney) and the contact email');
+ok(/## Cookies and storage[\s\S]*Sign-in cookies[\s\S]*no advertising or analytics cookies/.test(privacy), 'the Australian notice has a Cookies and storage section: sign-in cookies and functional storage only, no tracking');
+ok(/error-reporting service\*\* \(Sentry/.test(privacy) && !/Razorpay/.test(privacy), 'the Australian notice names the error-reporting processor and no Indian payment processor');
 const statusPath = join(ROOT, 'docs/legal/au/review-status.json');
 ok(existsSync(statusPath), 'docs/legal/au/review-status.json exists');
 const status = JSON.parse(readFileSync(statusPath, 'utf8'));
@@ -266,8 +270,8 @@ ok(Array.from(AU.map(d => d.text)).every(t => /been\s+reviewed by a\s+lawyer; th
   ok(quotes >= 10 && places >= 6, `the sheet quotes ${quotes} passages and names ${places} places`);
   for (const topic of ['operator', 'overseas', 'children', 'code', 'rights', 'terms', 'refunds']) ok(new RegExp(`\\[${topic}\\]`).test(sheet), `the sheet has a section for [${topic}]`);
   ok(/reviewed: false/.test(sheet) && status.reviewed === false, 'the sheet states the review switch as it is');
-  for (const name of DECLARED) ok(sheet.includes(`{{${name}}}`), `the sheet explains {{${name}}}`);
-  ok(/provider, Neon|Neon Postgres, Sydney/.test(sheet) === true && /Stripe/.test(sheet), 'the sheet records what engineering was told about the providers, labelled as not in the repository');
+  for (const what of ['Railway, Singapore', 'Neon (AWS), Sydney', 'prilearning19@gmail.com']) ok(sheet.includes(what), `the sheet records the filled fact: ${what}`);
+  ok(/Neon \(AWS\), Sydney/.test(sheet) && /Stripe/.test(sheet), 'the sheet records the providers: the owner-supplied, live-verified facts and what the repository shows');
 }
 
 console.log(`${scanned ? scanned.trim() + ' ' : ''}placeholders left in the Australian notices: ${[...found].sort().join(', ') || 'none'}`);

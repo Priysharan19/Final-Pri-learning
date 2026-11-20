@@ -13,6 +13,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { INSTRUMENT_UI } from '../platform/features.js';
+import { themeDefault } from '../platform/edition.js';
 
 export const THEME_PREFS = ['light', 'dark', 'system'];
 export const THEME_STORAGE_KEY = 'pri.theme';
@@ -27,7 +28,7 @@ let switchTimer = null;
  * in the v1.1 instrument interface — the device's own setting (owner decision
  * 2026-10-20).
  */
-export const DEFAULT_THEME_PREF = INSTRUMENT_UI ? 'system' : 'light';
+export const DEFAULT_THEME_PREF = INSTRUMENT_UI ? themeDefault() : 'light';
 export const cleanThemePref = value => (THEME_PREFS.includes(value) ? value : DEFAULT_THEME_PREF);
 
 const systemQuery = () => (typeof window !== 'undefined' && typeof window.matchMedia === 'function'

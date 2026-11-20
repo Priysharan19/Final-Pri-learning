@@ -10,6 +10,7 @@
 // unapproved production Postgres DDL. Old clients are not authorised to treat
 // their offline grades as server grades. The client transport integration is
 // a separate mandatory release gate.
+import { interpretAfterStepCheck, reportWithInterpretation } from './lineInterpreter/overlay.js';
 import { createHash, randomInt, randomUUID } from 'node:crypto';
 import { asyncRouter, asyncHandler } from './asyncRouter.js';
 import { asStore } from './store.js';
@@ -19,6 +20,7 @@ import { encryptDeliveryToken, decryptDeliveryToken } from './deliveryCrypto.js'
 import { opaqueContentId, opaqueContentHash, contentSeenEvidence, markContentSeen, contentTried, markContentTried, seenAmong, seenKeysOf, triedKeysOf, repeatEvidenceOf } from './contentSeen.js';
 import { misconceptionIdForTrap, misconceptionIdForDiagnosis, misconceptionById } from '../../client/src/engine/misconceptions.js';
 import { slipHint } from '../../client/src/engine/slipHint.js';
+import { cleanLatex, safeLatexLines } from '../../client/src/engine/texSafe.js';
 import { slipPatterns } from '../../client/src/engine/slipPattern.js';
 import { misconceptionLabel } from '../../client/src/engine/adaptive.js';
 import { HINT_RUNGS, buildHintLadder, ladderAvailable, ladderEvidence, markWeightAfter, nextRungAfter, rungLevelOf } from '../../client/src/engine/hintLadder.js';
@@ -26,6 +28,7 @@ import { dueDotpoints, reviewStateFromAttempts } from '../../client/src/engine/r
 import { spacedSchedule, LADDER_DAYS, MISS_DROP } from '../../client/src/engine/spacedReview.js';
 import { buildNotebook, firstErrorOf, isMistake } from '../../client/src/engine/mistakeNotebook.js';
 import { PUBLIC_QUESTION_FIELDS } from '../../client/src/engine/publicQuestion.js';
+import { CONTENT_VERSION, UNVERSIONED_TOKEN_CONTENT_VERSION } from '../../client/src/engine/contentIdentity.js';
 import { consentState, consentBlockerCode } from './guardianConsent.js';
 import { loadAllBanks, loadBanksFor, generateQuestion } from '../../client/src/engine/generators/index.js';
 // The marker itself (checkAnswer, stepCheck, methodMarks) is never called on
@@ -41,7 +44,8 @@ import {
   MARKING_TOO_COMPLEX, MARKING_BUSY, TOO_COMPLEX_MESSAGE, WORKING_NOT_READ_NOTE
 } from './markerPool.js';
 import { authoredRegion, formatRegion, formatMatrix, formatVector, formatComplex } from '../../client/src/engine/answer-forms.js';
-import { transcribeHandwriting, validateImage, HandwritingProviderError } from './handwritingProvider.js';
+import { transcribeHandwriting, validateImage, HandwritingProviderError, providerStaticStatus } from './handwritingProvider.js';
+import { applyReadingFloor } from './readingFloor.js';
 import { recognitionOpsFor, sendRecognitionRefusal } from './recognitionOps.js';
 // The free plan's daily cap is decided here, per account, where a creditable
 // question is issued (#537): practiceAllowance.js reads the server's own
@@ -54,7 +58,8 @@ import { verifyReadReceipt } from './readReceipt.js';
 // banks that passed their gates (nswBanks.js). Never a request field.
 import { bankPolicy, sealForEdition, FINAL_ANSWER_MARKING } from './editionBanks.js';
 import { courseAllowedForTests } from './indiaBanks.js';
-import { serverEdition } from './edition.js';
+import { serverEdition, hintsAreFree, editionOffering } from './edition.js';
+import { subtopicOfferedIn } from '../../client/src/engine/offeringRules.js';
 import { serverEntitlementCapabilities } from './entitlements.js';
 import { PYQ_RECORDS } from '../../client/src/engine/pyq/pyqArchive.js';
 import { pyqPayload } from '../../client/src/engine/pyq/pyqSchema.js';
@@ -130,7 +135,7 @@ const DOTPOINT = /^[a-zA-Z0-9._:-]{1,80}$/;
 // which need the same question twice; they are honoured in NODE_ENV=test and
 // nowhere else, and a suite can switch them off to exercise the real contract.
 const fixedSeedsAllowed = env => env.NODE_ENV === 'test' && env.PRI_PRACTICE_SERVER_SEEDS_ONLY !== '1';
-const GRADE_FIELDS = new Set(['submissionId', 'answer', 'mode', 'steps', 'transcriptionReceipt', 'ms', 'image', 'deviceHelp', 'original']);
+const GRADE_FIELDS = new Set(['submissionId', 'answer', 'mode', 'steps', 'transcriptionReceipt', 'ms', 'image', 'deviceHelp', 'original', 'answerTyped']);
 // One reading per request to /recognize, and per submission that carries its
 // own picture: the two share this bucket, so the one-request Submit cannot be
 // used to read more pictures an hour than the receipt route allows.
@@ -225,6 +230,21 @@ function safeQuestion(id, q) {
 
 // Release only after the server has committed a final resolution. This must
 // never be present on an unresolved or newly issued public question.
+/**
+ * One solution of a 'set' key as the student reads it. A rational solution
+ * keyed as a float (4/3 -> 1.3333333333333333) is shown as the fraction the
+ * question asks for; anything that is not within 1e-9 of a fraction with a
+ * denominator of at most 12 is left as authored.
+ */
+function setValueText(v) {
+  if (typeof v !== 'number' || !Number.isFinite(v) || Number.isInteger(v)) return String(v);
+  for (let d = 2; d <= 12; d++) {
+    const n = Math.round(v * d);
+    if (Math.abs(v - n / d) < 1e-9) return `${n}/${d}`;
+  }
+  return String(v);
+}
+
 function answerTextFor(q) {
   const a = q.answer || {};
   switch (q.answerType) {
@@ -235,7 +255,7 @@ function answerTextFor(q) {
       if (a.surdForm) return (a.surdForm.k === 1 ? '' : a.surdForm.k) + '√' + a.surdForm.r;
       return (q.answerPrefix ? q.answerPrefix + ' ' : '') + a.value + (q.answerSuffix ? ' ' + q.answerSuffix : '');
     case 'expression': return a.expr || '';
-    case 'set': return Array.isArray(a.values) ? a.values.join(', ') : '';
+    case 'set': return Array.isArray(a.values) ? a.values.map(setValueText).join(', ') : '';
     case 'point': return '(' + a.x + ', ' + a.y + ')';
     case 'ratio': return a.a + ' : ' + a.b;
     case 'working': return a.canonicalWorking || '';
@@ -246,11 +266,13 @@ function answerTextFor(q) {
     case 'matrix': return Array.isArray(a.rows) ? formatMatrix(a.rows) : '';
     case 'vector': return Array.isArray(a.components) ? formatVector(a.components) : '';
     case 'complex': return Number.isFinite(Number(a.re)) && Number.isFinite(Number(a.im)) ? formatComplex({ re: Number(a.re), im: Number(a.im) }) : '';
+    // The authored sentence for the features a sketch states (graph-sketch forms write it from the numbers shown).
+    case 'graph-sketch': return typeof a.text === 'string' ? a.text : '';
     default: return '';
   }
 }
 
-function solutionFor(q) {
+function solutionFor(q, sketch = null) {
   const steps = q.steps || [];
   const marks = marksPossibleFor(q);
   const keySteps = steps.filter(s => !/^(check|note|bonus)/i.test(s.h)).slice(0, marks);
@@ -260,9 +282,12 @@ function solutionFor(q) {
     ? [{ mark: marks, text: 'Correct final answer' }]
     : keySteps.length
       ? keySteps.map((step, i) => ({ mark: 1, text: i === keySteps.length - 1
-        ? step.h + ' — leading to the correct answer' : step.h }))
+        ? step.h + ', leading to the correct answer' : step.h }))
       : [{ mark: 1, text: 'Correct final answer' }];
-  return { steps, answerText: answerTextFor(q), criteria, solutionText: q.solutionText };
+  return { steps, answerText: answerTextFor(q), criteria, solutionText: q.solutionText,
+    // A sketch question: the function the graph is of (the prompt states it) and, once the student has answered, the marker's
+    // verdict on each feature (graphFeatures.sketchVerdicts). Only a resolved reply reaches here.
+    ...(q.answerType === 'graph-sketch' && q.answer?.graph?.spec ? { sketch: { spec: q.answer.graph.spec, ...(sketch || {}) } } : {}) };
 }
 
 /**
@@ -473,6 +498,8 @@ function* seekQuestion(request, { draw, tries, batches, admits = null }) {
       // A form this edition does not issue (editionBanks.js `admits`) is never
       // served, fresh or as a fallback: the seek passes over it.
       if (admits && !admits(q, generator)) continue;
+      // Rush and Match answer in one line of their own: a sketch is a form of features, so neither is ever dealt one.
+      if (q.answerType === 'graph-sketch' && (request.mode === 'rush' || request.mode === 'match')) continue;
       const hash = opaqueContentHash(q.contentHash);
       const avoided = avoid.has(hash);
       const done = resolved?.[i] === true;
@@ -550,11 +577,12 @@ async function chooseQuestionFor(db, accountId, request, now, { draw = () => ran
  * may start working on before signing in, and the sealed token that lets one
  * account turn it into an issued question later.
  */
-export function createPracticePrepareRoute(db, { banks = bankPolicy() } = {}) {
+export function createPracticePrepareRoute(db, { banks = bankPolicy(), env = process.env } = {}) {
   db = asStore(db);
   return [rateLimit(db, 'practice-prepare', { limit: 90, windowMs: 60 * 60 * 1000 }), asyncHandler(async (req, res) => {
     const request = readQuestionRequest(req.body, PREPARE_FIELDS, banks);
     if (request.error) return reject(res, ...request.error);
+    if (!subtopicOfferedIn(editionOffering(env), request.generator)) return refuseNotOffered(res);
     await ensureBanks();
     let chosen;
     try { chosen = chooseQuestion(request, null, { banks }); }
@@ -564,7 +592,7 @@ export function createPracticePrepareRoute(db, { banks = bankPolicy() } = {}) {
     try {
       prepared = encryptDeliveryToken(JSON.stringify({
         g: request.generator, d: request.difficulty, s: chosen.q.seed, m: request.mode,
-        ...(request.dotpoint ? { p: request.dotpoint } : {}), x: now + PREPARED_TTL, n: randomUUID()
+        ...(request.dotpoint ? { p: request.dotpoint } : {}), x: now + PREPARED_TTL, n: randomUUID(), c: CONTENT_VERSION
       }), PREPARED_CONTEXT);
     } catch { return reject(res, 503, 'PRACTICE_PREPARE_UNAVAILABLE', 'Questions cannot be prepared right now.'); }
     const question = safeQuestion(null, chosen.q);
@@ -579,7 +607,7 @@ function readPrepared(token, banks) {
   try {
     const v = JSON.parse(decryptDeliveryToken(token, PREPARED_CONTEXT));
     if (!plain(v) || !AUTHORED_BANK.test(String(v.g)) || !banks.issues(v.g) || !Number.isInteger(v.d) || !Number.isSafeInteger(v.s) ||
-        !PRACTICE_MODES.includes(v.m) || !Number.isFinite(v.x) || typeof v.n !== 'string' || !UUID.test(v.n)) return null;
+        !PRACTICE_MODES.includes(v.m) || (v.c !== undefined && typeof v.c !== 'string') || !Number.isFinite(v.x) || typeof v.n !== 'string' || !UUID.test(v.n)) return null;
     return v;
   } catch { return null; }
 }
@@ -624,6 +652,16 @@ export function hintWorkNote(work, locale = 'en') {
   return T[work.status] || null;
 }
 
+/**
+ * Owner decision, 19 Nov 2026: Prithagoras offers Years 11 and 12, Advanced and Extension 1 only.
+ * The student app hides everything else; this is the server's refusal for a request that names it
+ * anyway (defence in depth). Priyabhata's offering is null, so it never refuses.
+ */
+function refuseNotOffered(res) {
+  res.set('Cache-Control', 'no-store');
+  return res.status(403).json({ error: { code: 'COURSE_NOT_OFFERED', message: 'This year or course is not offered yet. Year 11 and Year 12 Mathematics Advanced and Extension 1 are.', retryable: false } });
+}
+
 export function createPracticeRouter(db, { transcribe = transcribeHandwriting, env = process.env, banks = bankPolicy() } = {}) {
   db = asStore(db);
   // The free-practice day is the deployment edition's calendar day (plan H7).
@@ -664,11 +702,15 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       const sealed = readPrepared(body.prepared, banks);
       if (!sealed) return reject(res, 400, 'PRACTICE_PREPARED_INVALID', 'This prepared question is not valid.');
       if (sealed.x < now) return reject(res, 410, 'PRACTICE_PREPARED_EXPIRED', 'This prepared question has expired.');
+      // Prepared under other content than this server serves: the seed would draw a different question from the one the
+      // student saw, so it is refused as an expired one is and the device fetches a fresh question.
+      if ((sealed.c ?? UNVERSIONED_TOKEN_CONTENT_VERSION) !== CONTENT_VERSION) return reject(res, 410, 'PRACTICE_PREPARED_EXPIRED', 'This prepared question has expired.');
       // JEE Advanced's own questions are Premium (D19). Decided from the
       // server's entitlement record before anything is generated or written,
       // so a refused bind leaves the prepared token for an account that may.
       const premiumGap = await premiumContentRefusal(db, { accountId, generator: sealed.g, now });
       if (premiumGap) return refusePremiumContent(res, premiumGap);
+      if (!subtopicOfferedIn(editionOffering(env), sealed.g)) return refuseNotOffered(res);
       try { q = generateQuestion(sealed.g, sealed.d, sealed.s, sealed.p); }
       catch { return reject(res, 422, 'PRACTICE_CONTENT_UNSUPPORTED', 'The requested question form is unavailable.'); }
       practiceMode = sealed.m;
@@ -680,6 +722,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       if (request.error) return reject(res, ...request.error);
       const premiumGap = await premiumContentRefusal(db, { accountId, generator: request.generator, now });
       if (premiumGap) return refusePremiumContent(res, premiumGap);
+      if (!subtopicOfferedIn(editionOffering(env), request.generator)) return refuseNotOffered(res);
       if (request.band) {
         const snapshot = await db.get('SELECT plan,status,current_period_end,grace_until FROM entitlement_snapshots WHERE account_id=?', [accountId]);
         if (!serverEntitlementCapabilities(snapshot, now).includes(JEE_BAND_CAPABILITY)) {
@@ -915,7 +958,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       committed.status === 403 ? 'Guardian consent changed while this answer was being read.' :
       committed.status === 401 ? 'Sign in again before retrying recognition.' : 'This question has been completed.');
     return res.status(201).json({ receipt, questionId: qid, mode: body.mode, reused,
-      transcription: { text, lines: result.lines || [], confidence: result.confidence ?? null,
+      transcription: { text, lines: safeLatexLines(result.lines || []), confidence: result.confidence ?? null,
         needsConfirmation: result.needsConfirmation === true } });
   });
 
@@ -1112,7 +1155,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       const rung = buildHintLadder(q)[want - 1];
       return { response: { authoritative: true, questionId: qid, rung: rung.rung, level: reached,
         hint: rung.text, thin: rung.thin, remaining: HINT_RUNGS.length - reached,
-        markWeight: markWeightAfter(reached), next: nextRungAfter(reached) } };
+        markWeight: markWeightAfter(reached, hintsAreFree(env)), next: nextRungAfter(reached) } };
     }, { accountScope: accountId, lock: syncLockKey(accountId) });
     if (!result.status && work) {
       // Charged only after the rung was served, and only for a check that ran.
@@ -1163,6 +1206,11 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     // connection). It can only make an attempt LESS independent, so the
     // device's word is enough for it; nothing can claim independence
     // (attemptSupport.js). Only `true` is accepted.
+    // `answerTyped: true` — the student typed the final answer themselves (the box that asks for it when Pri could
+    // not read that line). Only meaningful with a picture; only `true` is accepted.
+    if (body.answerTyped !== undefined && (body.answerTyped !== true || body.image === undefined)) {
+      return reject(res, 400, 'PRACTICE_SUBMISSION_INVALID', 'answerTyped, when sent, is true and goes with a picture.');
+    }
     if (body.deviceHelp !== undefined && body.deviceHelp !== true) {
       return reject(res, 400, 'PRACTICE_SUBMISSION_INVALID', 'deviceHelp, when sent, is true.');
     }
@@ -1222,10 +1270,20 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     const hash = digest({ qid, submissionId, answer: body.answer, mode, steps: body.steps ?? [], transcriptionReceipt: body.transcriptionReceipt || null, ms: body.ms ?? null,
       ...(withPicture ? { picture: createHash('sha256').update(body.image).digest('hex') } : {}),
       ...(body.deviceHelp === true ? { deviceHelp: true } : {}),
+      ...(body.answerTyped === true ? { answerTyped: true } : {}),
       ...(original ? { original: original.sha256 } : {}) });
     const now = Date.now();
     const idKey = qid + ':' + submissionId;
-    const working = Array.isArray(body.steps) ? body.steps.join('\n') : String(body.steps || '');
+    // `let`: a submission that carries its picture is judged only on the lines the reading floor lets through
+    // (applyReadingFloor, section 1b); typed work and receipts are unchanged.
+    // `markAnswer`: what the engine is given as the answer (the submitted answer, less any line the reading floor left out of a
+    // question answered by its working).
+    let markAnswer = body.answer;
+    let working = Array.isArray(body.steps) ? body.steps.join('\n') : String(body.steps || '');
+    // The reader's own TeX for the lines it read, kept on the server beside their text (never sent by the client).
+    // A submitted line is matched to it only by identical text, so a line the student edited carries none. The line
+    // checker may use it to tick or to leave a note, never to cross (arithmeticLines.js).
+    let workingLatex = null;
 
     // ── Mark first, with no transaction open; then commit under the lock ────
     // The marker runs in a worker thread (markerPool.js) and is awaited, so it
@@ -1327,6 +1385,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     // The reading of a picture this submission carries (read once, kept across
     // the rounds below).
     let reading = null;
+    const writtenWorking = withPicture || mode !== 'typed';
     for (let round = 0; round < 3; round++) {
       // ── 1. Read ──────────────────────────────────────────────────────────
       // Three independent reads, asked for together rather than one after the
@@ -1343,7 +1402,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // ── 1b. Read the picture, when the submission carries one ───────────
       // After the replay above, so recovering a committed reply never reads
       // (or is rate limited or charged) again. Answer-blind: the reader is
-      // handed the picture alone (recognitionOps → handwritingProvider).
+      // handed the picture, and at most a bare stem-symbol list (recognitionOps → handwritingProvider).
       if (withPicture && !reading) {
         const verdict = await timePhase('limit', () => consumeRateLimit(db, `practice-recognize:${sha256(accountId).slice(0, 24)}`, RECOGNIZE_LIMIT));
         if (!verdict.allowed) {
@@ -1373,18 +1432,51 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         // /recognition/:receipt/confirm records, and under its rule: a
         // correction is never blank.
         const corrected = text !== body.answer || needsConfirmation;
+        // ── The reading floor (owner decision 19 Nov 2026, ADR-0001 amendment) ──
+        // The student no longer confirms the reading. In its place: a line the reader read below
+        // PRI_HANDWRITING_CONFIDENCE_FLOOR (never lowered), flagged uncertain, or blank is NEVER judged. It
+        // is dropped from step checking and from the final answer, and comes back as "couldn't read"
+        // (not checked): no tick, no cross. A final answer that is unreadable or absent is not marked
+        // wrong: 200 FINAL_ANSWER_UNREADABLE, nothing recorded, no try spent, the page and reading kept.
+        // The reader never saw the answer, and the engine alone judges what is left. A line the student
+        // edited is their own text, absent from the read lines, and so is judged as typed.
+        const readLines = Array.isArray(read.result.lines) ? read.result.lines
+          // fail closed: a kept read with no per-line record is one doubtful block, never a judgeable page
+          : String(read.result.text || '').split('\n').map(t => ({ text: t, confidence: Number(read.result.confidence), uncertain: read.result.needsConfirmation === true }));
+        const floorOf = Number.isFinite(Number(read.result.confidenceFloor)) ? Number(read.result.confidenceFloor) : providerStaticStatus(env).confidenceFloor;
+        const stepsSent = Array.isArray(body.steps) ? body.steps.map(String) : [];
+        // A question answered BY its working (answerType 'working') sends its lines as the answer itself: there is no
+        // separate final-answer line, so the floor is applied to those lines and the answer is unreadable only when no
+        // judged line is left. Any other question: the working is `steps` and the final answer is `answer`.
+        const byWorking = forecast.q?.answerType === 'working';
+        const answerLines = byWorking ? String(body.answer).split('\n') : null;
+        const floored = byWorking
+          ? applyReadingFloor({ readLines, floor: floorOf, steps: answerLines, answer: answerLines.find(l => l.trim()) ?? '', answerTyped: true })
+          : applyReadingFloor({ readLines, floor: floorOf, steps: stepsSent, answer: body.answer, answerTyped: body.answerTyped === true });
+        const lineStates = (byWorking ? answerLines : stepsSent).map((_, i) => (floored.excluded.includes(i) ? 'not-read' : 'judged'));
+        if (byWorking ? floored.judged.length === 0 : floored.answerUnreadable) {
+          return res.status(200).json({ authoritative: true, questionId: qid, submissionId, resolved: false, code: 'FINAL_ANSWER_UNREADABLE',
+            unreadable: true, studentConfirmed: false, excludedLines: floored.excluded, lineStates,
+            message: 'Pri couldn\u2019t read your final answer. Rewrite that line or type it here.', serverAcknowledgedAt: now });
+        }
+        // (an absent answer was answered above: FINAL_ANSWER_UNREADABLE; this guards a blank answer that got through)
         if (corrected && !body.answer.trim()) {
           return reject(res, 400, 'RECOGNITION_CORRECTION_INVALID', 'Provide corrected text for a valid server receipt.');
         }
-        reading = { text, needsConfirmation, corrected, reused: read.reused === true, recognizedAt: Date.now() };
+        if (byWorking && floored.excluded.length) markAnswer = answerLines.filter((_, i) => !floored.excluded.includes(i)).join('\n');
+        else if (floored.excluded.length) working = stepsSent.filter((_, i) => !floored.excluded.includes(i)).join('\n');
+        if (!byWorking) workingLatex = readLines.filter(l => cleanLatex(l?.latex)).map(l => ({ text: String(l.text ?? ''), latex: cleanLatex(l.latex) }));
+        reading = { text, needsConfirmation, corrected, reused: read.reused === true, recognizedAt: Date.now(),
+          studentConfirmed: false, excludedLines: floored.excluded, lineStates,
+          readLines: readLines.map(l => ({ text: String(l?.text ?? ''), confidence: Number(l?.confidence), uncertain: l?.uncertain === true })), floor: floorOf };
       }
 
       // ── 2. Mark ──────────────────────────────────────────────────────────
       // One round trip: the answer, and the working only when the reply could
       // use it (the answer is right, or a wrong answer resolves the question).
       const marked = await timePhase('marker', () => markerPool().run('practice', {
-        q: forecast.q, answer: body.answer, working,
-        evidenceIfWrong: evidenceForced || forecast.spent || ONE_TRY_MODES.includes(forecast.q._practiceMode)
+        q: forecast.q, answer: markAnswer, working, ...(workingLatex?.length ? { workingLatex } : {}),
+        evidenceIfWrong: evidenceForced || writtenWorking || forecast.spent || ONE_TRY_MODES.includes(forecast.q._practiceMode)
       }, { key: accountId }));
       // Refused before it ran: nothing marked, nothing spent, same key retries.
       if (!marked.ok && marked.code === MARKING_BUSY) return sendMarkerBusy(res);
@@ -1462,7 +1554,11 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       const workingOnly = result.invalid === true && body.answer.trim() === '' && working.trim() !== '';
       const invalid = Boolean(result.invalid && !workingOnly);
       // Invalid input is not a failed mathematical attempt: do not consume a try or close the question.
-      const resolved = !invalid && Boolean(result.correct || spent || ONE_TRY_MODES.includes(q._practiceMode));
+      // CTO ruling 19 Nov 2026 (ADR-0001 amendment): written working (a picture, or an ink/photo reading) is ONE
+      // authoritative attempt: the first Mark my working resolves the question, right or wrong, so the student gets the
+      // full marked page. Decided HERE from what the request carries, never from a client flag. Typed and multiple-choice
+      // answers keep their two tries. An unreadable final answer returned earlier and recorded nothing.
+      const resolved = !invalid && Boolean(result.correct || spent || writtenWorking || ONE_TRY_MODES.includes(q._practiceMode));
       // The working is checked once, and only by the reply that resolves the
       // question — see "What an open question may be told about its working".
       // It was computed in step 2; if this locked read resolves a question the
@@ -1476,6 +1572,9 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       const counted = resolved && finalAnswerOnly ? { stepReport: evidence.stepReport || null, partial: null } : evidence;
       const { stepReport, partial } = resolved ? counted : { stepReport: null, partial: null };
       const notRead = resolved && workingNotRead && working.trim() !== '';
+      // After the engine's step check, never before it, and rules only (the model arm is unreachable here).
+      const lineInterpretation = resolved && !invalid && !notRead
+        ? await interpretAfterStepCheck({ question: q, working, stepReport, env }) : null;
       // A question answered BY its working (the answer is the lines) has a
       // marker's verdict that is itself a verdict on the lines.
       const answeredByWorking = q.answerType === 'working' || Boolean(result.stepReport);
@@ -1517,7 +1616,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // The hint ladder's charge, from the level committed under this lock.
       // `marksEarned` stays the deterministic engine's mark; `creditedMarks`
       // is that mark times the weight the served rungs left.
-      const ladder = ladderEvidence(hintLevel);
+      const ladder = ladderEvidence(hintLevel, hintsAreFree(env));
       const creditedMarks = Math.round(marksEarned * ladder.markWeight * 100) / 100;
       // What the error notebook may file a wrong resolution under: only what
       // the deterministic engine diagnosed — the authored trap its feedback
@@ -1550,8 +1649,11 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         ...(q._repeat === true ? { repeat: true } : {}), ...(q._repeatEvidence ? { repeatEvidence: q._repeatEvidence } : {}),
         // An entry that is not an attempt costs nothing, so it may not return
         // line-by-line verdicts either: they would be a free answer oracle.
-        stepReport: invalid ? null : stepReport, partial: invalid ? null : partial, ...(resolved ? {
-          solution: solutionFor(q),
+        // What the marked page draws: the engine's report with the interpreter's line verdicts folded in (feedback only;
+        // `partial` and every mark above were computed from the engine's report alone).
+        stepReport: invalid ? null : reportWithInterpretation({ stepReport, lineInterpretation, working }), partial: invalid ? null : partial,
+        ...(resolved && !invalid && lineInterpretation ? { lineInterpretation } : {}), ...(resolved ? {
+          solution: solutionFor(q, result.sketch),
           // Supplemental aggregate marking: no per-step allocations are invented.
           ...(!invalid ? { markRows: finalAnswerRows(q, markRowsFor(q, {
             marksEarned, marksPossible, creditedMarks, attemptId, submissionId,
@@ -1572,7 +1674,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       if (reading) {
         const providerReceipt = randomUUID();
         const evidenceRow = { questionId: qid, mode, text: reading.text, recognizedAt: reading.recognizedAt,
-          providerNeedsConfirmation: reading.needsConfirmation, submissionId };
+          providerNeedsConfirmation: reading.needsConfirmation, submissionId,
+          studentConfirmed: false, excludedLines: reading.excludedLines, readLines: reading.readLines, floor: reading.floor };
         records.push(['practice-recognition', providerReceipt, JSON.stringify(evidenceRow), digest(evidenceRow)]);
         let receipt = providerReceipt;
         if (reading.corrected) {
@@ -1585,7 +1688,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         // receipt, whether the student corrected the reading, and whether the
         // read was one this account had already paid for. Never the reading
         // itself: the device showed it already.
-        response.reading = { receipt, corrected: reading.corrected, reused: reading.reused };
+        response.reading = { receipt, corrected: reading.corrected, reused: reading.reused,
+          studentConfirmed: false, excludedLines: reading.excludedLines, lineStates: reading.lineStates };
       }
       // The original, kept with the mark in this transaction and named in the
       // reply by its digest: the mark is recorded with THIS handwriting. An
@@ -1604,6 +1708,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         }
         const kept = await keepOriginal(db, { accountId, edition, questionId: qid, submissionId, attemptId, parsed: original, now,
           reading: { read, confirmed: body.answer, corrected: reading ? reading.corrected : readingProof?.correctedByStudent === true,
+            ...(reading ? { studentConfirmed: false, excludedLines: reading.excludedLines, readLines: reading.readLines } : {}),
             receipt: response.reading?.receipt || (typeof body.transcriptionReceipt === 'string' ? body.transcriptionReceipt : null) } });
         if (kept.saved) keptOriginal = kept.row;
         response.original = kept.saved ? { ...originalProof(kept.row), saved: true } : { sha256: original.sha256, saved: false, reason: kept.reason };
@@ -1909,6 +2014,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     const generator = typeof original._generator === 'string' ? original._generator : original.subtopic;
     const premiumGap = await premiumContentRefusal(db, { accountId, generator, now });
     if (premiumGap) return refusePremiumContent(res, premiumGap);
+    if (!subtopicOfferedIn(editionOffering(env), generator)) return refuseNotOffered(res);
     let chosen;
     try {
       chosen = await chooseQuestionFor(db, accountId, { generator, difficulty: Number(original.difficulty) || 2,
@@ -1979,4 +2085,4 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
 // The same server-owned question choice, public projection and rubric, for the
 // examination router (server/platform/exams.js). One implementation, so a
 // paper and a practice question can never be chosen or marked by two rules.
-export { ensureBanks, chooseQuestion, chooseQuestionFor, stepMetaFor, answerTextFor, opaqueContentId, opaqueContentHash };
+export { ensureBanks, chooseQuestion, chooseQuestionFor, stepMetaFor, answerTextFor, safeQuestion, opaqueContentId, opaqueContentHash };

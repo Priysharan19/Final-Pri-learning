@@ -74,7 +74,7 @@ export function decodeHeader(value) {
 /** The six-digit code a Pri subject leads with, and what it is for. */
 export function codeFromSubject(subject) {
   const s = decodeHeader(subject).trim();
-  const m = /^(\d{6}) is (?:your Pri Learning code|the code to (delete|approve))/.exec(s);
+  const m = /^(\d{6}) is (?:your (?:Pri Learning|Priyabhata|Prithagoras) code|the code to (delete|approve))/.exec(s);
   if (!m) return null;
   return { code: m[1], purpose: m[2] === 'delete' ? 'delete' : m[2] === 'approve' ? 'guardian' : 'sign-in' };
 }

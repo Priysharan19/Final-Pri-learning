@@ -184,6 +184,12 @@ export async function keepOriginal(db, { accountId, edition, questionId, submiss
     confirmed: String(reading?.confirmed ?? ''),
     corrected: reading?.corrected === true,
     receipt: typeof reading?.receipt === 'string' ? reading.receipt : null,
+    // ADR-0001 amendment 19 Nov 2026: the student no longer confirms the reading. A mark given on a picture read
+    // by the server records that, which lines the reading floor excluded (0-based, in the submitted working) and
+    // the reading used (text, confidence, doubt). Absent on a mark that did not come from a server read.
+    ...(reading?.studentConfirmed === false ? { studentConfirmed: false,
+      excludedLines: Array.isArray(reading.excludedLines) ? reading.excludedLines : [],
+      readLines: Array.isArray(reading.readLines) ? reading.readLines : [] } : {}),
     edits: parsed.edits
   });
   await db.run(`INSERT INTO attempt_originals(id,account_id,edition,question_id,submission_id,attempt_id,kind,origin,format,encoding,sha256,byte_length,canonical_bytes,content,lines_json,reading_json,created_at,expires_at)

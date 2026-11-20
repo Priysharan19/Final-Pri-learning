@@ -22,6 +22,8 @@ import { colourFor, scopeFor } from '../instrument/chapters.js';
 import Glyph from '../instrument/Glyph.jsx';
 import BarSlot from '../instrument/BarSlot.jsx';
 import Working from '../instrument/Working.jsx';
+import { difficultyLabel } from '../lib/difficultyText.js';
+import { retryServe } from './historyRetry.js';
 
 // v1.1 instrument: each row carries its certified mark as a strip.
 const INSTRUMENT_STRIP = INSTRUMENT_UI;
@@ -97,7 +99,8 @@ function HistoryForProfile() {
   const [params, setParams] = useSearchParams();
   const requestedFilter = params.get('filter');
   const filter = (INSTRUMENT_STRIP ? INSTRUMENT_FILTERS : FILTERS).some(([key]) => key === requestedFilter) ? requestedFilter : 'all';
-  const [subtopic, setSubtopic] = useState('');
+  // Practice's recent-attempts list links here with the topic and the attempt to open.
+  const [subtopic, setSubtopic] = useState(() => params.get('subtopic') || '');
   const [sort, setSort] = useState('newest');
   const [query, setQuery] = useState('');
   const searchRef = useRef(null);
@@ -171,18 +174,19 @@ function HistoryForProfile() {
 
   async function retry(id, variant) {
     try {
-      const r = await api.post(`/history/${id}/retry`, { variant });
-      nav('/practice', {
-        state: {
-          serve: {
-            question: r.question,
-            reason: 'retry',
-            why: t(variant === 'same' ? 'history.whySame' : 'history.whyFresh')
-          }
-        }
-      });
+      nav('/practice', { state: { serve: await retryServe(id, variant, t) } });
     } catch (e) { toast(<span>{e.message}</span>); }
   }
+
+  // The attempt a link names (?open=) opens once, when its rows have arrived.
+  const autoOpened = useRef(false);
+  useEffect(() => {
+    const want = params.get('open');
+    if (!want || autoOpened.current || !data?.items) return;
+    autoOpened.current = true;
+    if (data.items.some(x => String(x.id) === want)) openDetail(data.items.find(x => String(x.id) === want).id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
 
   async function openDetail(id) {
     detailGate.current?.cancel();
@@ -294,7 +298,7 @@ function HistoryForProfile() {
                 <button className="hist-main in-led-main" aria-expanded={open?.id === item.id} tabIndex={item.id === activeId ? 0 : -1}
                   onFocus={() => setActiveRow(item.id)} onClick={() => openDetail(item.id)}>
                   <i className="in-led-cc" aria-hidden="true" />
-                  <span className="in-led-id">{`D${item.difficulty}`}</span>
+                  <span className="in-led-id">{difficultyLabel(item.difficulty, t)}</span>
                   <span className="in-led-q"><MathText text={item.prompt} /></span>
                   <span className="hist-name in-led-ch" lang="en"><TermGloss text={item.subtopicName} /></span>
                   <span className="in-led-res">
@@ -436,7 +440,7 @@ function HistoryForProfile() {
                   <span className="sr-only">{item.correct ? t('app.correct') : item.correct === false ? t('app.incorrect') : t('history.notMarked')}</span>
                 </span>
                 <span className="hist-name" lang="en"><TermGloss text={item.subtopicName} /></span>
-                <span className="tag">{`D${item.difficulty}`}</span>
+                <span className="tag">{difficultyLabel(item.difficulty, t)}</span>
                 <span className="tag">{MODE_KEY[item.mode] ? t(MODE_KEY[item.mode]) : item.mode}</span>
                 {item.viaInk && <span className="tag" title={t('history.viaInk')}><Icon name="pen" size={13} /><span className="sr-only">{t('history.viaInkSpoken')}</span></span>}
                 {item.hasPhoto && <span className="tag" title={t('history.hasPhoto')}><Icon name="photo" size={13} /><span className="sr-only">{t('history.hasPhotoSpoken')}</span></span>}

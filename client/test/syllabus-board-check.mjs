@@ -471,11 +471,20 @@ for (const code of ['MAV-11-01', 'MAV-12-05', 'ME1-12-02']) {
   ok(/if \(!india\) return \{ course: 'nsw', attempts, papers \};/.test(route), 'the NSW board gets no India chapters');
   ok(/indiaScope\(trackId, p\.year\)/.test(route) && /cleanIndiaTrack\(p\.indiaTrack, p\.year\)/.test(route), 'the India board is the profile\'s own track and class');
   ok(!/answerGiven|answer:|solution/.test(route), 'no answer or solution leaves the route');
-  const { nswCoursesFor } = await (async () => {
+  const { nswCoursesFor, nswCoursesOffered } = await (async () => {
     // nswCoursesFor is plain JS inside the .jsx module: read it by its rule instead of loading React here.
     const fn = /export function nswCoursesFor\(user\) \{([\s\S]*?)\n\}/.exec(boardSrc)[1];
-    return { nswCoursesFor: new Function('user', fn) };
+    // The edition's offering (owner decision, 19 Nov 2026) comes in as two helpers: none (every course, the default
+    // edition) or Prithagoras's own offering, so both are tested.
+    const make = (offering, pathwayOffered) => user => new Function('user', 'offering', 'pathwayOffered', fn)(user, offering, pathwayOffered);
+    const { editionOf } = await import('../edition.config.mjs');
+    const AU = editionOf('prithagoras').offering;
+    return { nswCoursesFor: make(() => null, () => true), nswCoursesOffered: make(() => AU, p => AU.pathways.includes(p)) };
   })();
+  // Offered (Prithagoras): Advanced and Extension 1 only; a hidden course falls back to Advanced until the student chooses.
+  for (const [user, want] of [[{ year: 12, pathway: 'advanced' }, ['advanced']], [{ year: 12, pathway: 'ext1' }, ['extension-1', 'advanced']], [{ year: 11, pathway: 'standard' }, ['advanced']], [{ year: 12, pathway: 'ext2' }, ['extension-1']], [{ year: 9 }, ['advanced']]]) {
+    eq(nswCoursesOffered(user), want, `OFFERED NSW courses for ${JSON.stringify(user)}`);
+  }
   for (const [user, want] of [[{ year: 7 }, ['k10-stage4']], [{ year: 10 }, ['k10-stage5']], [{ year: 12, pathway: 'advanced' }, ['advanced']], [{ year: 11, pathway: 'standard' }, ['standard-2', 'standard-1']], [{ year: 12, pathway: 'ext1' }, ['extension-1', 'advanced']], [{ year: 12, pathway: 'ext2' }, ['extension-2', 'extension-1']]]) {
     eq(nswCoursesFor(user), want, `NSW courses for ${JSON.stringify(user)}`);
   }
@@ -487,8 +496,10 @@ for (const code of ['MAV-11-01', 'MAV-12-05', 'ME1-12-02']) {
 {
   const { featureStates, PENDING_FEATURE_FLAGS } = await import('../vite.config.js');
   ok(PENDING_FEATURE_FLAGS.includes('SYLLABUS_BOARD'), 'SYLLABUS_BOARD is a pending build flag');
-  ok(featureStates('build', {}).syllabusBoard === false, 'a production build without PRI_FEATURE_SYLLABUS_BOARD has the board off');
+  ok(featureStates('build', {}).syllabusBoard === false, 'a Priyabhata production build without PRI_FEATURE_SYLLABUS_BOARD has the board off');
   ok(featureStates('build', { PRI_FEATURE_SYLLABUS_BOARD: '1' }).syllabusBoard === true, 'PRI_FEATURE_SYLLABUS_BOARD=1 turns it on');
+  ok(featureStates('build', { PRI_EDITION: 'prithagoras' }).syllabusBoard === true, 'a Prithagoras production build has the board on (owner decision, 18 Nov 2026)');
+  ok(featureStates('build', { PRI_EDITION: 'prithagoras', PRI_FEATURE_SYLLABUS_BOARD: '0' }).syllabusBoard === false, 'PRI_FEATURE_SYLLABUS_BOARD=0 still switches it off for Prithagoras');
 }
 
 if (failures.length) {

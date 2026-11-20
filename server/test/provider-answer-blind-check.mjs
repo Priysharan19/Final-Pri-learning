@@ -36,7 +36,9 @@ import { fileURLToPath } from 'node:url';
 import { createPlatformDb } from '../platform/db.js';
 import { createHandwritingRouter } from '../platform/handwriting.js';
 import { createWorkingRouter } from '../platform/working.js';
-import { transcribeHandwriting } from '../platform/handwritingProvider.js';
+import { transcribeHandwriting, sanitizeSymbolHint, userTextFor, HINT_FUNCTIONS, MAX_SYMBOL_HINT } from '../platform/handwritingProvider.js';
+import { stemSymbols } from '../platform/stemSymbols.js';
+import { GENERATORS, generateQuestion, loadAllBanks } from '../../client/src/engine/generators/index.js';
 import { checkWorkingWithModel } from '../platform/workingProvider.js';
 import { SESSION_COOKIE, sha256 } from '../platform/security.js';
 import { pngDataUrl } from './support/test-image.mjs';
@@ -197,7 +199,7 @@ for (const sent of wire) {
     ok(!keys.has(forbidden), `${where}: the provider body has a "${forbidden}" field`);
   }
   if (sent.kind === 'transcription') {
-    ok(!sent.body.includes(PROMPT_CANARY), `${where}: transcription is question-blind too — the prompt never travels`);
+    ok(!sent.body.includes(PROMPT_CANARY), `${where}: the question's text never travels — at most a bare symbol list derived from it (section 5)`);
     ok(sent.body.includes(PNG), `${where}: the picture of the ink is what travels`);
   } else {
     ok(sent.body.includes(PROMPT_CANARY), `${where}: step checking sends the question, by design`);
@@ -211,6 +213,8 @@ for (const sent of wire) {
 // adapter to learn the answer on its own and is refused by name.
 const IMPORT_ALLOWLIST = Object.freeze({
   'handwritingProvider.js': [],
+  // Derives the public-stem symbol hint from a PROMPT string; its only import is the provider's own sanitiser.
+  'stemSymbols.js': ['./handwritingProvider.js'],
   'workingProvider.js': ['./misconceptionIds.js']
 });
 const QUESTION_MODULE = /(question|answer|solution|content|curriculum|generator|checker|engine|marking|bank|syllabus|misconceptions\.js|store\.js|db\.js|sync)/i;
@@ -249,6 +253,107 @@ ok(QUESTION_MODULE.test('./content.js') && /\bimport\s*\(/.test(badAdapter), 'an
   }
   ok(/You do not know the question/.test(SYSTEM_INSTRUCTIONS), 'the reader is still told it does not know the question');
   for (const canary of [...HIDDEN_CANARIES, PROMPT_CANARY]) ok(!SYSTEM_INSTRUCTIONS.includes(canary), 'no canary in the instructions');
+}
+
+// ── 5 · The public-stem symbol hint (owner decision 18 Nov 2026) ─────────────
+// Rule 2 now allows ONE thing beside the picture: the unordered set of single
+// symbols (letters, Greek letters, function names) printed in the PUBLIC stem.
+// This section keeps that door exactly that wide.
+{
+  // (1) Only single symbols / function names can ever be sent, whoever built the list.
+  eq(sanitizeSymbolHint(['t', 'π', 'sin', '12', 'x+1', '2x', 'h', 'sin(x)', 'the', 't', '', ' x', 'CANARY_EXPECTED_ANSWER_4b9e', 5, null, { a: 1 }]), ['h', 'sin', 't', 'π'], 'hint: digits, expressions, words, duplicates and non-strings are dropped; the rest is sorted');
+  eq(sanitizeSymbolHint('t'), [], 'hint: not a list is no hint');
+  ok(sanitizeSymbolHint('abcdefghijklmnopqrstuvwxyz'.split('')).length === MAX_SYMBOL_HINT, `hint: at most ${MAX_SYMBOL_HINT} symbols`);
+  ok(sanitizeSymbolHint(['y'.repeat(50)]).length === 0 && sanitizeSymbolHint(['\u0000', '\n', '"', '$', '\\pi']).length === 0, 'hint: no control characters, quotes, dollars or commands');
+  eq(userTextFor([]), 'Transcribe every line of handwriting in this image. Do not solve it.', 'with no symbols the user turn is the constant sentence');
+  const withHint = userTextFor(['t', 'h', 'π', 'sin']);
+  ok(/appear on the page: h, sin, t, π\./.test(withHint), 'with symbols the hint is a bare, sorted list');
+  ok(/may write any other symbol/.test(withHint) && /exactly what is written, even if it looks wrong/.test(withHint), 'and says the student may write anything else and the page is read as written');
+  ok(!/\d/.test(withHint), 'the hint sentence carries no digit');
+  eq(stemSymbols('Differentiate $h = 5\\sin(\\pi t)$ at $t = 2$ cm.'), ['h', 'sin', 't', 'π'], 'stem symbols: letters, a function and π — no numbers, no words, no units');
+  eq(stemSymbols('Evaluate $3 + (-4) \\times (-4)$.'), [], 'a stem with no symbols gives no hint');
+
+  // (2) For every generator family: the request holds no answer, solution or option beyond bare symbols.
+  await loadAllBanks();
+  const allowedSymbol = t => sanitizeSymbolHint([t]).length === 1;
+  const strings = value => {
+    if (value == null) return [];
+    if (typeof value === 'string') return [value.trim()];
+    if (typeof value === 'number' || typeof value === 'boolean') return [String(value)];
+    if (Array.isArray(value)) return value.flatMap(strings);
+    if (typeof value === 'object') return Object.values(value).flatMap(strings);
+    return [];
+  };
+  const okFetch = sink => async (_u, init) => { sink.push(JSON.parse(init.body)); return { ok: true, status: 200, json: async () => ({ output_text: JSON.stringify({ lines: [{ text: 'x', segments: [], latex: '', confidence: 0.97, uncertain: false, doubt: '', gap_before: false }], confidence: 0.97, needs_confirmation: false }) }) }; };
+  const baseline = [];
+  await transcribeHandwriting(PNG, { env, fetchImpl: okFetch(baseline) });
+  let families = 0, questions = 0, withSymbols = 0, tokensChecked = 0;
+  const bad = [];
+  for (const family of Object.keys(GENERATORS)) {
+    families += 1;
+    for (const [difficulty, seed] of [[1, 11], [3, 29]]) {
+      let q;
+      try { q = generateQuestion(family, difficulty, seed); } catch { continue; }
+      questions += 1;
+      const hint = stemSymbols(q.prompt);
+      if (hint.length) withSymbols += 1;
+      const sent = [];
+      await transcribeHandwriting(PNG, { env, symbols: hint, fetchImpl: okFetch(sent) });
+      const turn = sent[0].input[1].content;
+      const userText = turn[0].text;
+      const listed = (/appear on the page: (.*?)\. It is a list/.exec(userText)?.[1] || '').split(', ').filter(Boolean);
+      // every listed item is a bare symbol that really is in the public stem
+      for (const item of listed) {
+        const inStem = item.length === 1 && /[A-Za-z]/.test(item)
+          ? q.prompt.includes(item)
+          : /^[A-Za-z]+$/.test(item)
+            ? q.prompt.includes(item)
+            : /\\[a-z]+|[α-ωΑ-Ω]/.test(q.prompt);
+        if (!allowedSymbol(item) && !HINT_FUNCTIONS.includes(item)) bad.push(`${family}: ${JSON.stringify(item)} is not a bare symbol`);
+        if (!inStem) bad.push(`${family}: ${JSON.stringify(item)} is not in the stem`);
+      }
+      if (/\d/.test(listed.join(''))) bad.push(`${family}: a digit in the hint`);
+      if (userText !== userTextFor(listed)) bad.push(`${family}: the user turn is more than the sentence and the list`);
+      if (turn.map(p => p.type).join() !== 'input_text,input_image') bad.push(`${family}: the user turn is not text and the picture only`);
+      // nothing from the answer side appears in what is sent, beyond the bare symbols
+      // The whole request is the no-hint request with only the user sentence changed.
+      const rebuilt = JSON.parse(JSON.stringify(baseline[0]));
+      rebuilt.input[1].content[0].text = userText;
+      if (JSON.stringify(rebuilt) !== JSON.stringify(sent[0])) bad.push(`${family}: the request differs from the no-hint request in more than the user sentence`);
+      // What varies is the user sentence; the fixed instruction and schema are the same for every question (section 3).
+      const wireText = userText;
+      for (const token of new Set(strings([q.answer, q.steps, q.hints, q.mcqOptions, q.answerSuffix, q.traps]))) {
+        if (token.length < 3 || allowedSymbol(token) || HINT_FUNCTIONS.includes(token)) continue;
+        tokensChecked += 1;
+        // Prose from steps and hints is checked whole (a sentence cannot be a substring by chance);
+        // answers, numbers and expressions are checked against the whole request.
+        if ((/\d/.test(token) || token.length >= 12) && wireText.includes(token)) bad.push(`${family}: answer-side ${JSON.stringify(token).slice(0, 60)} reached the request`);
+      }
+    }
+  }
+  ok(families >= 300 && questions >= 600, `every generator family was drawn (${families} families, ${questions} questions)`);
+  ok(withSymbols > 100, `and many stems really have symbols to hint (${withSymbols})`);
+  ok(tokensChecked > 1000, `and many answer-side strings were searched for (${tokensChecked})`);
+  console.log(`hint scan: ${families} families, ${questions} questions, ${withSymbols} with symbols, ${tokensChecked} answer-side strings searched`);
+  eq(bad.slice(0, 5), [], 'no family sent anything from its answer, solution or options beyond bare stem symbols');
+
+  // (3) A wrong line, with a hint present, is returned exactly as written.
+  const wrongRead = { lines: [{ text: 'n = 3', segments: [], latex: '', confidence: 0.96, uncertain: false, doubt: '', gap_before: false }], confidence: 0.96, needs_confirmation: false };
+  const kept = await transcribeHandwriting(PNG, {
+    env, symbols: ['x', 'y'],
+    fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ output_text: JSON.stringify(wrongRead) }) })
+  });
+  eq([kept.text, kept.lines.length], ['n = 3', 1], 'a line using a symbol the hint did not list is returned as written, not coerced to the hinted symbols');
+  const odd = await transcribeHandwriting(PNG, {
+    env, symbols: ['x'],
+    fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ output_text: JSON.stringify({ ...wrongRead, lines: [{ ...wrongRead.lines[0], text: '2x + 3 = 12' }] }) }) })
+  });
+  eq(odd.text, '2x + 3 = 12', 'and a deliberately wrong equation is returned as written');
+
+  // The route derives the hint from the issued prompt only (static): it reads `prompt` and nothing else.
+  const routeSource = readFileSync(join(PLATFORM, 'handwriting.js'), 'utf8');
+  ok(routeSource.includes("stemSymbols(String(JSON.parse(issued.response_json)?.prompt ?? ''))"), 'the route reads only the prompt field of the issued question');
+  ok(/export function stemSymbols\(prompt\)/.test(readFileSync(join(PLATFORM, 'stemSymbols.js'), 'utf8')), 'stemSymbols takes the prompt string only');
 }
 
 // ── report ───────────────────────────────────────────────────────────────────

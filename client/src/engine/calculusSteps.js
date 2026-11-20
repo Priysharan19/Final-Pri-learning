@@ -134,6 +134,8 @@ const cleanPoly = p => new Map([...p].filter(([, c]) => Math.abs(c) > 1e-12));
 const TEX_SPAN = /\$([^$]+)\$/g;
 function texToPlain(tex) {
   let s = String(tex || '');
+  // An exponent in braces first, so a fraction whose denominator carries one (\dfrac{12}{x^{3}}) has no nested braces left.
+  for (let guard = 0; guard < 6 && /\^\s*\{[^{}]*\}/.test(s); guard++) s = s.replace(/\^\s*\{([^{}]*)\}/g, '^($1)');
   for (let guard = 0; guard < 6 && /\\d?frac/.test(s); guard++) {
     s = s.replace(/\\d?frac\s*(\{[^{}]*\}|[0-9a-zA-Z])\s*(\{[^{}]*\}|[0-9a-zA-Z])/g, (_, a, b) => `((${a.replace(/^\{|\}$/g, '')})/(${b.replace(/^\{|\}$/g, '')}))`);
   }
@@ -152,6 +154,10 @@ function texToPlain(tex) {
  * `given` is the integrand, or the function to differentiate. Null otherwise
  * (a definite integral, a rate, a tangent, a prompt with no single function).
  */
+// A prompt that asks for a value at a point, a second derivative, several derivatives or a rounded constant is not the plain
+// "derivative of the quantity it defines": the prompt-defined context is not built for it.
+const ASKS_MORE = /\b(?:when|at|evaluate|value|hence|second|third|higher|then|gradient|rate|approximat\w*|round\w*|decimal)\b|d\s*(?:\^|²|\\?\^?\{?2)|d²|[a-z]\s*(?:''|″)|\\(?:ddot|ddots)|\b[a-z]\s*=\s*-?\d+(?:\.\d+)?\b(?!\s*[a-z(])|3\.14|\bπ\s*=|\\pi\s*=|\bpi\s*=/i;
+
 export function calculusContext(meta, prompt) {
   if (!meta || meta.kind !== 'expression' || typeof meta.canonical !== 'string') return null;
   const text = String(prompt || '');
@@ -169,7 +175,32 @@ export function calculusContext(meta, prompt) {
     const eq = plain && plain.split('=');
     if (eq && eq.length === 2 && /^[a-z](\([a-z]\))?$/i.test(eq[0].trim())) {
       const given = tryParse(eq[1]);
-      if (given) return { relation: 'derivative', given, variable: (variablesOf(given).values().next().value) || 'x', canonical: tryParse(meta.canonical) };
+      if (given) return { relation: 'derivative', given, variable: (variablesOf(given).values().next().value) || 'x', dependent: eq[0].trim().replace(/\(.*$/, ''), canonical: tryParse(meta.canonical) };
+    }
+  }
+  // A derivative of one named quantity with respect to another ("Find dA/dr if A = πr²", \frac{dA}{dr} where A = …): the prompt
+  // itself defines the quantity, so a line about it can be held to it. The asked letters must be named by the prompt and the
+  // quantity defined once, as a plain function of the other letter.
+  const asked = [...text.matchAll(/\\d?frac\s*\{\s*d\s*([A-Za-z])\s*\}\s*\{\s*d\s*([A-Za-z])\s*\}|\bd\s*([A-Za-z])\s*\/\s*d\s*([A-Za-z])\b/g)];
+  if (asked.length === 1 && !ASKS_MORE.test(text) && /differentiat|derivative|\bfind\b|\bd\s*[A-Za-z]\s*\/|\\frac/i.test(text)) {
+    const N = asked[0][1] || asked[0][3], Dv = asked[0][2] || asked[0][4];
+    if (N !== Dv) {
+      const flat = text.replace(/\$([^$]+)\$/g, (m, a) => ' ' + (texToPlain(a.replace(/\\pi\b/g, 'pi')) || '') + ' ');
+      const defs = [...String(flat).matchAll(new RegExp('(?:^|[\\s,.;(])' + N + '\\s*(?:\\(\\s*' + Dv + '\\s*\\))?\\s*=\\s*([^=,;\\n]+?)(?=\\s*(?:[,;.]\\s|[,;]$|\\.$|$|\\band\\b|\\bfind\\b|\\bwhere\\b))', 'gi'))];
+      if (defs.length === 1) {
+        const given = tryParse(defs[0][1].trim());
+        if (given && [...variablesOf(given)].every(l => l === Dv || l === 'e') && variablesOf(given).has(Dv)) {
+          // Only the first derivative of the prompt's own definition: the canonical must BE that derivative (not a value at a point,
+          // a second derivative or another kind of answer), else this is not a question the context can hold a line to.
+          const canonical = tryParse(meta.canonical);
+          const cache = new WeakMap();
+          if (canonical && [...variablesOf(canonical)].every(l => l === Dv || l === 'e')
+              && sameFunction(x => valueAt(canonical, x, Dv), x => derivativeAt(given, x, Dv, cache).value, 1e-6)
+              && derivativeAt(given, 1.3, Dv, cache).exact) {
+            return { relation: 'derivative', given, variable: Dv, dependent: N, canonical, promptDefined: true };
+          }
+        }
+      }
     }
   }
   return null;
@@ -328,6 +359,15 @@ export function assessCalculusLine(line, ctx, meta, stage = { claimed: false }) 
   // The same expression later on is a claim, and judged as one.
   const startAllowed = !/^\s*=/.test(String(line));
   try {
+    // "dy/dx = … + C": a derivative is a function, not a family of them. Said as a claim (a derivative label), an added arbitrary
+    // constant is false under every reading, whatever else the line says.
+    if (ctx.relation === 'derivative' && /^\s*(?:∴\s*)?(?:d[a-z]\s*\/\s*d[a-z]|[a-z]\s*['′](?:\s*\(\s*[a-z]\s*\))?|[a-z]\s*\(\s*[a-z]\s*\)\s*['′])\s*=/i.test(String(line))) {
+      const tail = segmentsOf(line).filter(t => t !== '').pop();
+      if (tail && termsOf(tail).some(t => t.sign > 0 && CONSTANT_TERM.test(t.text)) && termsOf(tail).length > 1) {
+        const d = D('diff-constant-kept', 'A constant was added', 'A derivative is one function: an arbitrary constant + C belongs to an integral, not to a derivative.', 'Leave out + C when you differentiate.', 'high');
+        return { status: 'break', note: d.message, diagnosis: d };
+      }
+    }
     const segs = segmentsOf(line).filter(s => s !== '');
     if (!segs.length) return null;
     const read = [];
@@ -378,8 +418,8 @@ export function assessCalculusLine(line, ctx, meta, stage = { claimed: false }) 
       const onlyStart = verdicts.every(x => x === 'start');
       return onlyStart ? { status: 'note', restates: true }
         : { status: 'note', note: ctx.relation === 'antiderivative'
-          ? 'True — differentiating this line gives the integrand. It differs from the final answer by a constant, or is not yet simplified.'
-          : 'True — this line equals the derivative, written another way.' };
+          ? 'True: differentiating this line gives the integrand. It differs from the final answer by a constant, or is not yet simplified.'
+          : 'True: this line equals the derivative, written another way.' };
     }
     const bad = real[firstInvalid];
     const diagnosis = diagnoseSlip(ctx, bad, meta);
@@ -610,6 +650,224 @@ export function refineDerivativeLine(text, meta, assessed, stage = { claimed: fa
     const named = derivativeSlip({ given: source, canonical, student: last, variable });
     return named ? { status: 'break', note: named.message, diagnosis: named } : assessed;
   } catch { return assessed; }
+}
+
+const FORMULA_LABEL = /d\s*[uvw]\s*\/\s*d\s*[a-z]|\b[uvw]\s*['′]/i;
+
+/**
+ * A derivative claim whose right side is written in the student's own labels (the quotient rule (v du/dx - u dv/dx)/v^2, the
+ * product rule u dv/dx + v du/dx) is a FORMULA, not a function of the variable. It is proven false only by substituting the
+ * student's own definitions: every label it uses must be defined on an earlier line as a plain function of the variable, the
+ * derivatives of the labels are taken from those definitions, and the result must differ from the question's derivative.
+ * Anything else (a label with no definition, an unreadable definition, a derivative the engine cannot take exactly) abstains.
+ */
+function formulaProvenFalse(rhsText, ctx, previousTexts) {
+  const v = ctx.variable;
+  if (!ctx.canonical) return false;
+  const holders = ['j', 'k', 'h'];
+  if (/[jkh]/i.test(rhsText)) return false;
+  const used = new Map();   // label -> placeholder for its derivative
+  let text = rhsText.replace(/d\s*([uvw])\s*\/\s*d\s*([a-z])/gi, (m, L, w) => {
+    if (w !== v) return '\u0000';
+    const key = L.toLowerCase();
+    if (!used.has(key)) used.set(key, holders[used.size] || null);
+    return used.get(key) || '\u0000';
+  }).replace(/\b([uvw])\s*['′]/gi, (m, L) => {
+    const key = L.toLowerCase();
+    if (!used.has(key)) used.set(key, holders[used.size] || null);
+    return used.get(key) || '\u0000';
+  });
+  if (text.includes('\u0000')) return false;
+  const ast = tryParse(text);
+  if (!ast) return false;
+  const letters = new Set([...variablesOf(ast)].filter(l => l !== v && l !== 'e' && !holders.includes(l)));
+  for (const key of used.keys()) letters.add(key);
+  if (!letters.size) return false;
+  const defs = new Map();
+  for (const L of letters) {
+    if (!/^[uvw]$/.test(L)) return false;
+    let def = null;
+    for (const prior of previousTexts) {
+      const m = new RegExp('^\\s*(?:let\\s+)?' + L + '\\s*=\\s*([^=]+)$', 'i').exec(normalize(String(prior)).replace(/^∴\s*/, ''));
+      if (m) { const a = tryParse(m[1]); def = a && [...variablesOf(a)].every(l => l === v || l === 'e') ? a : null; }
+    }
+    if (!def) return false;
+    defs.set(L, def);
+  }
+  const cache = new WeakMap();
+  const expected = x => valueAt(ctx.canonical, x, v);
+  let exactOnly = true;
+  const mine = x => {
+    const env = { [v]: x };
+    for (const [L, def] of defs) {
+      env[L] = valueAt(def, x, v);
+      const key = used.get(L);
+      if (key) { const d = derivativeAt(def, x, v, cache); if (!d.exact) exactOnly = false; env[key] = d.value; }
+    }
+    try { return evaluate(ast, env); } catch { return NaN; }
+  };
+  const same = sameFunction(mine, expected, 1e-7);
+  return exactOnly && !same && SAMPLE_POINTS.some(x => Number.isFinite(mine(x))) && SAMPLE_POINTS.filter(x => Number.isFinite(mine(x)) && Number.isFinite(expected(x))).length >= 4;
+}
+
+/**
+ * A function applied to an unbracketed argument ("cos 2x", "cos2x", "sin x^2") has two readings of how far the argument runs:
+ * the whole next term (cos(2x)) or only its first factor (cos(2)·x). Returns the line written under each reading, or null when
+ * the line has no such function. A caller that finds the line true under either reading must not cross it.
+ */
+export function unbracketedReadings(line) {
+  const text = String(line || '');
+  const FN = /(?<![a-z])(sin|cosec|cos|tan|sec|csc|cot|ln|log|exp|sqrt)(\s*\^\s*\d+)?\s*(?=[0-9a-z.])(?!\()/gi;
+  const TERM = /^(?:\d+(?:\.\d+)?|[a-z])(?:\s*\^\s*(?:-?\d+|[a-z]))?(?:\s*[a-z0-9.]+(?:\s*\^\s*(?:-?\d+|[a-z]))?)*/i;
+  const FIRST = /^(?:\d+(?:\.\d+)?|[a-z])(?:\s*\^\s*(?:-?\d+|[a-z]))?/i;
+  if (!FN.test(text)) return null;
+  const build = pick => {
+    let out = '', i = 0, changed = false;
+    FN.lastIndex = 0;
+    let m;
+    while ((m = FN.exec(text))) {
+      const start = m.index + m[0].length;
+      const rest = text.slice(start);
+      const run = (/^[0-9a-z.]/i.test(rest) ? (pick === 'first' ? FIRST : TERM).exec(rest) : null);
+      if (!run) continue;
+      out += text.slice(i, m.index) + m[1] + (m[2] || '') + '(' + run[0].trim() + ')';
+      i = start + run[0].length; changed = true;
+      FN.lastIndex = i;
+    }
+    return changed ? out + text.slice(i) : null;
+  };
+  const whole = build('whole'), first = build('first');
+  if (!whole || !first || whole === first) return null;
+  return [whole, first];
+}
+
+/**
+ * Is this line PROVEN false under every plausible reading? (CTO ruling on the owner's rule "a true line is never crossed".)
+ *
+ * A bare line, or a "= …" continuation, in a derivative question has two readings: (a) it equals an expression written
+ * above it, (b) it is the requested derivative. It is false only if it fails both: it is neither the derivative nor any
+ * earlier plain line of the chain. A line "∫f dx = F" in an antiderivative question is a statement about the integral:
+ * it is false when F′ is not f, whichever integrand f it is about (a true side integral is never crossed).
+ * Anything unreadable, approximated, or about another letter is NOT proven: the caller abstains with a note.
+ */
+export function lineProvenFalse(line, ctx, previousTexts = []) {
+  try {
+    if (!ctx || !line || String(line).length > MAX_LINE_CHARS) return false;
+    const v = ctx.variable;
+    // A function written without brackets ("sin 6x + 6", "ln x + 1") has two readings of how far its argument runs: abstain.
+    if (/\b(?:sin|cos|tan|sec|cosec|csc|cot|ln|log|exp|sqrt)\s+[^(\s]/i.test(String(line))) return false;
+    // A line that names a function or its derivative (f(x) = …, f'(x) = …, g′ = …) is a definition of the method, not a claim.
+    if (ctx.relation === 'antiderivative' && /^\s*(?:∴\s*)?[a-zA-Z]\s*(?:['′]\s*)?(?:\(\s*[a-z]\s*\))?\s*=/.test(String(line)) && !/^\s*[Fy]\s*(\(\s*[a-z]\s*\))?\s*=/.test(String(line))) return false;
+    const allSegs = segmentsOf(line).filter(t => t !== '');
+    const segs = allSegs.filter(t => !LABEL.test(t));
+    if (!segs.length) return false;
+    // A letter the question does not use is allowed only as a claim about something the chain has fixed: after a label (y′ =, dy/dx =)
+    // or as a bare "= …" continuation. A new letter on the left of an equals sign (A = πr², V = ∫…, u = 2x + 1, let u = …) is a definition.
+    const claim = allSegs.length > segs.length || /^\s*=/.test(String(line));
+    const fresh = segs.some(t => { const a = tryParse(t.replace(/^let\s+/i, '')); return a && [...variablesOf(a)].some(l => l !== ctx.variable && l !== 'e'); });
+    if ((fresh && !claim) || /^\s*let\b/i.test(String(line))) return false;
+    // A derivative line written in the student's own u, v labels is a formula: abstain unless it is false after their own definitions.
+    if (ctx.relation === 'derivative' && segs.some(t => FORMULA_LABEL.test(t))) return formulaProvenFalse(segs[segs.length - 1], ctx, previousTexts);
+    const read = segs.map(t => readSegment(t, ctx));
+    if (read.some(r => !r)) return false;
+    if (ctx.relation === 'antiderivative') {
+      // ∫g dx = F (= F2 …): each later segment must have g as its derivative.
+      const first = read[0];
+      if (read.length === 1 && first.kind === 'plain' && !first.approx.used) {
+        // A bare or "= …" line: it is an antiderivative of the question's integrand, or of an integrand a line above names
+        // (a side integral, or a factor pulled out: "(2x+3)^3 → …"), or it restates one of them or another line above.
+        // It is false only if it is none of these. A line with no variable (a du factor, 1/6) claims no antiderivative.
+        if (!variablesOf(first.plainAst || {}).has(v)) return false;
+        const targets = [x => valueAt(ctx.given, x, v)];
+        const restated = [];
+        for (const prior of previousTexts) {
+          const pieces = String(prior).split(/→|->/).flatMap(t => segmentsOf(t)).filter(t => t !== '' && !LABEL.test(t));
+          for (const piece of pieces) {
+            const r = readSegment(piece, ctx);
+            if (!r) { if (/∫|\\int|d\s*\/\s*d|[uvw]\b/.test(piece)) continue; return false; }
+            if (r.kind === 'operator' && r.parts[0].kind === 'integral') { const body = r.parts[0].body; targets.push(x => valueAt(body, x, v)); }
+            else if (r.kind === 'plain') { const ast = r.plainAst; targets.push(x => valueAt(ast, x, v)); restated.push(x => valueAt(ast, x, v)); }
+          }
+        }
+        if (read.length === 1 && segs.length === 1 && /^\s*[a-zA-Z]\s*(\(\s*[a-z]\s*\))?\s*=/.test(String(line)) && !/^\s*[Fy]\s*(\(\s*[a-z]\s*\))?\s*=/.test(String(line))) return false;   // "f(x) = …": a definition
+        const q = x => valueAt(first.plainAst, x, v);
+        return targets.every(t => !sameFunction(first.asFunction, t)) && restated.every(t => !sameFunction(q, t)) && (/^\s*=/.test(String(line)) || segmentsOf(line).some(t => LABEL.test(t)) || !sameFunction(q, x => valueAt(ctx.given, x, v)));   // "= f" after ∫f dx is false; "y = f" is a claim; a bare f only rewrites the integrand
+      }
+      // The FIRST line of the working that is a lone integral is the restated question: a different integrand is a mis-copy.
+      if (read.length === 1 && first.kind === 'operator' && first.parts[0].kind === 'integral' && previousTexts.length === 0 && !/^\s*=/.test(String(line))) {
+        return !sameFunction(x => valueAt(first.parts[0].body, x, v), x => valueAt(ctx.given, x, v));
+      }
+      if (read.length < 2 || first.kind !== 'operator' || first.parts[0].kind !== 'integral') return false;
+      const g = x => valueAt(first.parts[0].body, x, v);
+      for (const seg of read.slice(1)) {
+        if (seg.kind !== 'plain' || seg.approx.used) return false;
+        if (!sameFunction(seg.asFunction, g)) return true;
+      }
+      return false;
+    }
+    // Derivative question: a plain line, judged under both readings.
+    const last = read[read.length - 1];
+    if (last.kind !== 'plain' || last.approx.used || read.some(r => r.kind !== 'plain')) return false;
+    const expected = ctx.canonical ? (x => valueAt(ctx.canonical, x, v)) : null;
+    if (!expected) return false;
+    if (sameFunction(last.asFunction, expected, 1e-7)) return false;               // reading (b): it is the derivative
+    for (const prior of previousTexts) {                                            // reading (a): equal to a line above
+      const ps = segmentsOf(prior).filter(t => t !== '' && !LABEL.test(t));
+      if (!ps.length) return false;                                                 // an unreadable line above: not proven
+      const pr = readSegment(ps[ps.length - 1], ctx);
+      if (!pr) { if (!/∫|d\s*\/\s*d/.test(ps[ps.length - 1])) return false; continue; }
+      if (pr.kind === 'plain' && sameFunction(last.asFunction, pr.asFunction)) return false;
+    }
+    const given = x => valueAt(ctx.given, x, v);
+    if (sameFunction(last.asFunction, given)) return false;                          // equal to the question's own function
+    return true;
+  } catch { return false; }
+}
+
+/**
+ * A line about another quantity than the one the question asks about (CTO ruling, review of f177f682a): a definition
+ * ("let u = x^2 + 1", "A = pi r^2", "f(x) = x^3"), an assignment ("x = 2"), or the derivative of one letter with respect to
+ * another that is not the asked derivative ("dy/du = 3u^2", "dA/dr = 2 pi r", "ds/dt = 3t^2"). Such a line is never held to the
+ * answer. It is crossed only when it is a derivative of a letter the student defined on an earlier line and the engine proves it
+ * false from that definition ("y = u^3" then "dy/du = 4u^2"); proven true is a note that says so. Null: not such a line.
+ */
+export function sideLine(line, ctx, previousTexts = []) {
+  try {
+    if (!ctx || !line) return null;
+    const v = ctx.variable;
+    const text = normalize(String(line)).replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore)\s+/i, '').trim();
+    const defNote = 'This defines something the method uses, so it is not checked against the answer.';
+    if (/^let\b/i.test(text)) return { status: 'note', note: defNote };
+    const dep = new Set(['y', 'F', ctx.dependent].filter(Boolean));
+    // dN/dD = rhs
+    const d = /^d\s*([A-Za-z])\s*\/\s*d\s*([A-Za-z])\s*=\s*(.+)$/.exec(text);
+    if (d) {
+      const [, N, D, rhs] = d;
+      if (D === v && (dep.has(N))) return null;               // the asked derivative: judged as before
+      const defs = [];
+      for (const prior of previousTexts) {
+        const m = new RegExp('^\\s*(?:let\\s+)?' + N + '\\s*=\\s*(.+)$', 'i').exec(normalize(String(prior)).replace(/^∴\s*/, ''));
+        if (m && !/=/.test(m[1])) defs.push(m[1].trim());
+      }
+      const R = tryParse(rhs);
+      for (const def of defs) {
+        const E = tryParse(def);
+        if (!E || !R) continue;
+        const vars = new Set([...variablesOf(E), ...variablesOf(R)]);
+        if ([...vars].some(l => l !== D && l !== 'e') || !vars.has(D)) continue;
+        const cache = new WeakMap();
+        const same = sameFunction(x => valueAt(R, x, D), x => derivativeAt(E, x, D, cache).value, 1e-6);
+        const exact = derivativeAt(E, 1.3, D, cache).exact;
+        return same ? { status: 'note', note: `True: it follows from ${N} = ${def}.` }
+          : exact ? { status: 'break', note: `This does not follow from your own line ${N} = ${def}.` } : { status: 'note', note: defNote };
+      }
+      return { status: 'note', note: defNote };
+    }
+    // a letter (or letter(x)) = something, where the letter is not the question's own function or derivative: a definition or an assignment
+    const a = /^([A-Za-z])\s*(?:\(\s*[A-Za-z]\s*\))?\s*=\s*(.+)$/.exec(text);
+    if (a && !dep.has(a[1]) && !/=/.test(a[2].replace(/[<>≤≥!]=/g, ''))) return { status: 'note', note: defNote };
+    return null;
+  } catch { return null; }
 }
 
 /** Every diagnosis code this module can name, for the misconception ontology and its tests. */

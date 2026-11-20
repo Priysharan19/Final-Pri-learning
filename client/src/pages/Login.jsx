@@ -18,13 +18,16 @@ import { EditionByline } from '../components/BrandMark.jsx';
 import { EDITION_ID } from '../brand/edition.js';
 import { LANGUAGES, rememberSignInLanguage, setLanguage, signInLanguage, useLanguage, useT } from '../i18n/index.js';
 import { featureEnabled, INSTRUMENT_UI } from '../platform/features.js';
-import { defaultCourse, offersCourse } from '../platform/edition.js';
+import { defaultCourse, offersCourse, offeredYears, pathwayOffered, defaultOffering } from '../platform/edition.js';
+import { guestTrialAvailable } from '../guest/guestTrial.js';
 import { cloudAvailable } from '../platform/cloudTransport.js';
 import { appleSignInAvailable, rememberAppleSignInIntent } from '../platform/native/appleSignIn.js';
 import { flushSync } from 'react-dom';
 
 // The instrument build's sign-in carries a decorative plot panel (design s10);
 // the flag-off build never loads it.
+// Prithagoras only: the sign-in page offers a visitor the way back to the question they can try without an account.
+const TRY_FIRST = EDITION_ID === 'prithagoras';
 const SignInPlot = INSTRUMENT_UI ? React.lazy(() => import('../instrument/SignInScenes.jsx')) : null;
 // Lazy: the account flow is not on the offline first-run path, so it stays out
 // of the install (client/test/install-budget-check.mjs).
@@ -69,7 +72,7 @@ const YEAR_CHOOSER = SIGNUP_COURSE !== 'in';
 
 function freshProfileDraft() {
   const draft = {
-    name: '', email: '', password: '', password2: '', study: '', year: YEAR_CHOOSER ? 10 : STUDY_DEFAULT.year,
+    name: '', email: '', password: '', password2: '', study: '', year: YEAR_CHOOSER ? (defaultOffering()?.year ?? 10) : STUDY_DEFAULT.year,
     avatar: '🚀', role: '', course: SIGNUP_COURSE, pathway: 'advanced', indiaTrack: STUDY_DEFAULT.track,
     protect: false
   };
@@ -201,7 +204,7 @@ export function PasswordMeter({ verdict }) {
     <div style={{ marginTop: 10 }}>
       <div className="meter" aria-hidden="true"><i style={{ width: `${pct}%`, background: tone }} /></div>
       <p className="muted" role="status" style={{ marginTop: 6, fontSize: 12.5 }}>
-        {verdict.labelKey && <><b style={{ color: tone }}>{t(verdict.labelKey)}</b> — </>}{t(verdict.noteKey, verdict.noteVars)}
+        {verdict.labelKey && <><b style={{ color: tone }}>{t(verdict.labelKey)}</b>: </>}{t(verdict.noteKey, verdict.noteVars)}
       </p>
     </div>
   );
@@ -287,7 +290,7 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
   // Where the student was going when the card stopped them (a deep link
   // opened signed out). Read once, at mount: signing in returns them there.
   const location = useLocation();
-  const intended = useRef(location.pathname && location.pathname !== '/' ? `${location.pathname}${location.search || ''}${location.hash || ''}` : '/practice');
+  const intended = useRef(location.pathname && location.pathname !== '/' && location.pathname !== '/signin' ? `${location.pathname}${location.search || ''}${location.hash || ''}` : '/practice');
   const t = useT();
   // Resolved per render, not at module load, so a development override of the
   // flag (features.js) is honoured; a production build compiles it to a constant.
@@ -507,7 +510,7 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
    * from there; nothing of the shell is reached with an unlinked, stale or
    * unconfirmed profile.
    */
-  const finishAccount = async ({ account, name, year, track, pathway }) => {
+  const finishAccount = async ({ account, name, year, track, pathway, restoredProfile = null }) => {
     if (!account?.id) throw new Error(t('signup.genericError'));
 
     // Creating the local profile and linking the cloud account are two requests.
@@ -520,10 +523,17 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
     if (!pid) {
       const r = await api.post('/profiles', {
         name: name || account.name || 'Pri', year: Number(year), avatar: '🚀', role: 'student',
-        language: signInLanguage(), course: SIGNUP_COURSE,
+        language: signInLanguage(), course: SIGNUP_COURSE, ...(restoredProfile ? { restoring: true } : {}),
         ...(SIGNUP_COURSE === 'in' ? { indiaTrack: track || 'cbse' } : { pathway: pathway || 'advanced' })
       });
       pid = r.user.id;
+      if (restoredProfile) {
+        // The account already holds this student's profile. The row made here
+        // is only a vessel for it: the stored settings go in, and the marker
+        // tells the first sync that the stored profile outranks this row.
+        const { applyStoredProfile } = await import('../platform/accountProfileRestore.js');
+        await applyStoredProfile(pid, restoredProfile);
+      }
       accountProfileRef.current = { accountId: account.id, pid };
     }
 
@@ -596,6 +606,10 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
                 </div>
               )}
               {error && <div className="error-box" role="alert" style={{ marginTop: 12 }}>{error}</div>}
+              {/* Prithagoras: a visitor's first screen is a question (guest trial, ADR-0003); this is the way back to it. */}
+              {TRY_FIRST && profiles?.length === 0 && guestTrialAvailable() && (
+                <p className="login-try"><PageLink to="/" className="linklike" data-testid="hero-try-first">{t('login.tryFirst')}</PageLink></p>
+              )}
               <p className="muted login-note" style={{ marginTop: 22, textAlign: 'center', fontSize: 13 }}>{t('login.heroNote')}</p>
               {/* The full data statement is one tap away, not a paragraph on the screen. */}
               <details className="login-more">
@@ -778,7 +792,7 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
                       <label className="label" htmlFor="signup-year">{t('settings.schoolYear')}</label>
                       <select className="input" id="signup-year" value={form.year}
                         onChange={e => { setForm(f => ({ ...f, year: Number(e.target.value) })); setError(''); }}>
-                        {[7, 8, 9, 10, 11, 12].map(y => <option key={y} value={y}>{t('common.yearNumber', { n: y })}</option>)}
+                        {offeredYears([7, 8, 9, 10, 11, 12]).map(y => <option key={y} value={y}>{t('common.yearNumber', { n: y })}</option>)}
                       </select>
                     </div>
                     <div className="field">
@@ -794,7 +808,7 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
                       <div className="label" id="signup-pathway">{t('settings.hscPathway')}</div>
                       <div className="pathway-row" role="group" aria-labelledby="signup-pathway">
                         {[['standard', 'Standard'], ['advanced', 'Advanced'], ['ext1', 'Extension 1'], ['ext2', 'Extension 2']]
-                          .filter(([k]) => k !== 'ext2' || form.year === 12)
+                          .filter(([k]) => (k !== 'ext2' || form.year === 12) && pathwayOffered(k))
                           .map(([k, name]) => (
                             <button key={k} type="button" className={`pathway-pick ${form.pathway === k ? 'on' : ''}`}
                               aria-pressed={form.pathway === k}

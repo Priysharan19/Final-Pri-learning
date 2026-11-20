@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import Icon from '../components/Icon.jsx';
@@ -14,7 +15,10 @@ import { loadGlossary } from '../i18n/glossary.js';
 import { priNative } from '../platform/native/index.js';
 import { errorReportsEnabled, setErrorReportsEnabled } from '../platform/telemetry.js';
 import { INSTRUMENT_UI } from '../platform/features.js';
+import { offersCourse, offeredLanguages, offeredYears, pathwayOffered } from '../platform/edition.js';
 import Glyph from '../instrument/Glyph.jsx';
+import { sellsPremium, useSaleAvailable } from '../paywall/useSaleAvailable.js';
+import { resetTour } from '../lib/firstRunTour.js';
 
 // The instrument build draws a glyph beside each section name (s9); the
 // flag-off build renders exactly what it did.
@@ -140,7 +144,7 @@ function LanguageSection() {
     <div className="card">
       <h2 style={{ marginBottom: 12 }}>{t('lang.label')}</h2>
       <div className="row" role="group" aria-label={t('lang.label')}>
-        {LANGUAGES.map(l => (
+        {offeredLanguages(LANGUAGES).map(l => (
           <button key={l.id} type="button" className={`gen-opt ${chosen === l.id ? 'on' : ''}`}
             style={{ width: 160 }} lang={l.htmlLang} disabled={busy}
             aria-pressed={chosen === l.id} aria-label={t('lang.switchTo', { language: l.english })}
@@ -263,7 +267,8 @@ function CrashReportsCard({ t }) {
   );
 }
 
-const SECTIONS = [
+// One language is no choice to make: an edition that offers only English draws no Language section.
+const SECTIONS_ALL = [
   ['plan', '♛', 'settings.secPlan'],
   ['profile', '☺', 'settings.secProfile'],
   ['security', '⚿', 'settings.secSecurity'],
@@ -274,6 +279,7 @@ const SECTIONS = [
   ['data', '⇅', 'settings.secData'],
   ['help', '?', 'settings.secHelp'],
 ];
+const SECTIONS_BASE = offeredLanguages(LANGUAGES).length > 1 ? SECTIONS_ALL : SECTIONS_ALL.filter(([k]) => k !== 'language');
 
 function SecuritySection({ toast }) {
   const { user, setUser } = useApp();
@@ -320,7 +326,7 @@ function SecuritySection({ toast }) {
         <span className="set-k">{t('settings.email')}</span>
         {!editEmail ? (
           <span className="set-v" style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            {user.email || <span className="muted">{t('settings.emailNotSet')}</span>}
+            {user.email || <span className="muted">{t(user.cloudLinked ? 'settings.emailInAccount' : 'settings.emailNotSet')}</span>}
             <button className="btn btn-quiet btn-sm" aria-label={t('settings.editEmail')}
               onClick={() => { setEmail(user.email || ''); setEditEmail(true); }}><Icon name="pen" size={15} /></button>
           </span>
@@ -380,8 +386,14 @@ function SecuritySection({ toast }) {
 export default function Settings() {
   const { user, setUser, toast } = useApp();
   const t = useT();
+  const goTo = useNavigate();
   const [storageInfo, setStorageInfo] = useState(null);
-  const [active, setActive] = useState('plan');
+  // Where Premium is not on sale (the edition has no provider, or its server says it is not selling) there is no
+  // plan to show: the Plan section, with its plan wording and the line about what Premium adds, is not drawn.
+  const sells = sellsPremium(useSaleAvailable());
+  const SECTIONS = sells ? SECTIONS_BASE : SECTIONS_BASE.filter(([k]) => k !== 'plan');
+  const [activeRaw, setActive] = useState('plan');
+  const active = SECTIONS.some(([k]) => k === activeRaw) ? activeRaw : SECTIONS[0][0];
   const importRef = useRef(null);
   const secRefs = useRef({});
   useEffect(() => { api.get('/data/storage').then(setStorageInfo).catch(() => { }); }, []);
@@ -494,6 +506,7 @@ export default function Settings() {
 
         <div className="grid" style={{ gap: 18 }}>
           {/* ── Plan ── */}
+          {sells && (
           <div className="card" ref={el => secRefs.current.plan = el}>
             <h2>{t('settings.localPlan')}</h2>
             <p className="muted" style={{ margin: '4px 0 14px' }}>{t(FREE_TIER.practicePerDay === null ? 'settings.localPlanSubUncapped' : 'settings.localPlanSub', { limit: FREE_TIER.practicePerDay, exams: FREE_TIER.examsPerWindow, days: FREE_TIER.examWindowDays })}</p>
@@ -507,6 +520,7 @@ export default function Settings() {
             {/* #283: what Premium adds, worded from PLAN_CAPABILITIES — never "all features". */}
             <p className="muted" data-premium-adds style={{ margin: '10px 0 0', fontSize: 13 }}>{t('settings.premiumAdds')}</p>
           </div>
+          )}
 
           {/* ── Account information ── */}
           <div className="card">
@@ -521,7 +535,7 @@ export default function Settings() {
             {storageInfo && storageInfo.quota > 0 && (
               <div className="set-row"><span className="set-k">{t('settings.spaceUsed')}</span><span className="set-v">{t('settings.spaceOf', { used: fmtBytes(storageInfo.usage), total: fmtBytes(storageInfo.quota), percent: usagePct })}</span></div>
             )}
-            <div className="set-row"><span className="set-k">{t('settings.accounts')}</span><span className="set-v">{t('settings.accountsValue')}</span></div>
+            <div className="set-row"><span className="set-k">{t('settings.accounts')}</span><span className="set-v" data-accounts-value={user.cloudLinked ? 'linked' : 'local'}>{t(user.cloudLinked ? 'settings.accountsValueLinked' : 'settings.accountsValue')}</span></div>
           </div>
 
           {/* ── Profile ── */}
@@ -559,13 +573,13 @@ export default function Settings() {
                     <div className="field">
                       <label className="label" htmlFor="set-year">{t(form.course === 'in' ? 'settings.schoolClass' : 'settings.schoolYear')}</label>
                       <select className="input" id="set-year" value={form.year} onChange={e => setForm(f => ({ ...f, year: Number(e.target.value) }))}>
-                        {[7, 8, 9, 10, 11, 12].map(y => <option key={y} value={y}>{t(form.course === 'in' ? 'common.classNumber' : 'common.yearNumber', { n: y })}</option>)}
+                        {offeredYears([7, 8, 9, 10, 11, 12]).map(y => <option key={y} value={y}>{t(form.course === 'in' ? 'common.classNumber' : 'common.yearNumber', { n: y })}</option>)}
                       </select>
                     </div>
                     <div className="field">
                       <label className="label" htmlFor="set-course">{t('settings.syllabus')}</label>
                       <select className="input" id="set-course" value={form.course} onChange={e => setForm(f => ({ ...f, course: e.target.value }))}>
-                        {COURSES.map(([k, label, labelKey]) => <option key={k} value={k}>{labelKey ? t(labelKey) : label}</option>)}
+                        {COURSES.filter(([k]) => offersCourse(k) || k === form.course).map(([k, label, labelKey]) => <option key={k} value={k}>{labelKey ? t(labelKey) : label}</option>)}
                       </select>
                     </div>
                   </div>
@@ -574,7 +588,7 @@ export default function Settings() {
                   <div className="field">
                     <div className="label" id="set-pathway">{t('settings.hscPathway')}</div>
                     <div className="pathway-row" role="group" aria-labelledby="set-pathway">
-                      {PATHWAY_OPTS.filter(([k]) => k !== 'ext2' || form.year === 12).map(([k, name, desc]) => (
+                      {PATHWAY_OPTS.filter(([k]) => (k !== 'ext2' || form.year === 12) && pathwayOffered(k)).map(([k, name, desc]) => (
                         <button key={k} type="button" className={`pathway-pick ${form.pathway === k ? 'on' : ''}`}
                           onClick={() => setForm(f => ({ ...f, pathway: k }))}>
                           <b>{name}</b>
@@ -619,9 +633,9 @@ export default function Settings() {
           </div>
 
           {/* ── Language ── */}
-          <div ref={el => secRefs.current.language = el}>
+          {SECTIONS.some(([k]) => k === 'language') && <div ref={el => secRefs.current.language = el}>
             <LanguageSection />
-          </div>
+          </div>}
 
           {/* ── Appearance ── */}
           <div className="card" ref={el => secRefs.current.appearance = el}>
@@ -703,6 +717,12 @@ export default function Settings() {
               {t(user.course === 'in' ? 'settings.helpBodyIndia' : 'settings.helpBody')}
               {!priNative.isNativeShell() && t('settings.addToHomeScreen')}
             </p>
+            {user.cloudLinked && (
+              <p style={{ marginTop: 10 }}>
+                <button type="button" className="btn btn-ghost btn-sm" data-tour-restart
+                  onClick={() => { resetTour(user.id); goTo('/practice'); }}>{t('tour.restart')}</button>
+              </p>
+            )}
           </div>
         </div>
       </div>

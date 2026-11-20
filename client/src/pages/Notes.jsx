@@ -12,12 +12,15 @@
 // switched off by prefers-reduced-motion (Notes.css) and the content is fully
 // present without it: the reveal classes only ever hide what is already there.
 import { navigateInto } from '../instrument/viewTransition.js';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import PageLink from '../components/PageLink.jsx';
 import { MathText } from '../lib/latex.jsx';
 import { useApp } from '../App.jsx';
 import { useT } from '../i18n/index.js';
+import { livingIdsIn } from '../living/placement.india.js';
+// The living formulas load only for a chapter that has them: a chunk of their own.
+const LivingFormulas = lazy(() => import('../living/LivingFormulas.jsx'));
 import { IN_CURRICULUM, IN_CHAPTER_BY_ID, OLYMPIAD_TOPICS } from '../engine/curriculum-in.js';
 import { NOTES_GRADES, gradeOfChapter, loadNotesForGrade, loadOlympiadNotes, notesSearchText } from '../notes/notesIndex.js';
 import { studyResourcesForGrade } from '../notes/data/notes-study-resources.js';
@@ -371,7 +374,7 @@ function SearchResults({ query }) {
 function snippetFor(notes, terms) {
   if (!notes) return '';
   const fields = [
-    ...(notes.definitions || []).map(d => `${d.term} — ${d.meaning}`),
+    ...(notes.definitions || []).map(d => `${d.term}: ${d.meaning}`),
     ...(notes.formulas || []).map(f => f.label),
     ...(notes.points || []).map(p => p.back),
     ...(notes.concepts || []).map(c => c.body),
@@ -533,6 +536,12 @@ function ChapterNotes({ chapterId }) {
               {notes.formulas.map((f, i) => <Formula key={i} f={f} i={i} />)}
             </div>
           </Section>
+
+          {livingIdsIn(chapterId).length > 0 && (
+            <Section id="living" title={t('living.ui.section')}>
+              <Suspense fallback={null}><LivingFormulas ids={livingIdsIn(chapterId)} /></Suspense>
+            </Section>
+          )}
 
           {notes.points?.length > 0 && (
             <Section id="points" title={t('notes.sectionPoints')}>

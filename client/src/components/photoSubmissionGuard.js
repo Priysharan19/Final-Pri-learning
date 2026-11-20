@@ -40,10 +40,10 @@ export function pdfReceiptWarning(language, pages) {
 export function earlierSubmissionNotice(language, answer, resolved) {
   const shown = typeof answer === 'string' && answer.trim() && answer.length <= 60 && !answer.includes('\n') ? answer.trim() : '';
   if (hindi(language)) {
-    return `यह परिणाम आपके पहले जमा किए गए उत्तर${shown ? ` (“${shown}”)` : ''} का है — उसका जवाब पहले नहीं पहुँच पाया था। ` +
+    return `यह परिणाम आपके पहले जमा किए गए उत्तर${shown ? ` (“${shown}”)` : ''} का है। उसका जवाब पहले नहीं पहुँच पाया था। ` +
       (resolved ? 'आपका बदला हुआ उत्तर नहीं भेजा गया।' : 'आपका बदला हुआ उत्तर अभी नहीं भेजा गया है: उसे जाँचकर फिर से जमा करें।');
   }
-  return `This is the result for the answer you submitted earlier${shown ? ` (“${shown}”)` : ''} — its reply did not reach this device at the time. ` +
+  return `This is the result for the answer you submitted earlier${shown ? ` (“${shown}”)` : ''}. Its reply did not reach this device at the time. ` +
     (resolved ? 'Your changed answer was not sent.' : 'Your changed answer has not been sent yet: check it and press Submit to send it.');
 }
 

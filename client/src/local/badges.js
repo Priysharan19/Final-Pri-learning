@@ -24,7 +24,7 @@ export const BADGES = [
   { id: 'exam-ready', name: 'Exam Ready', icon: '📄', desc: 'Score 80%+ on a practice exam.', nameKey: 'badge.examReady.name', descKey: 'badge.examReady.desc' },
   { id: 'perfect-exam', name: 'Flawless', icon: '👑', desc: 'Score 100% on a practice exam.', nameKey: 'badge.perfectExam.name', descKey: 'badge.perfectExam.desc' },
   { id: 'rush-15', name: 'Rush Hour', icon: '⏱️', desc: 'Score 15+ in a single Rush.', nameKey: 'badge.rush15.name', descKey: 'badge.rush15.desc' },
-  { id: 'match-winner', name: 'Matchwinner', icon: '🥇', desc: 'Win a Match against a rival.', nameKey: 'badge.matchWinner.name', descKey: 'badge.matchWinner.desc' },
+  { id: 'match-winner', name: 'Matchwinner', icon: '🥇', desc: 'Win a Match against a practice bot.', nameKey: 'badge.matchWinner.name', descKey: 'badge.matchWinner.desc' },
   { id: 'penmanship', name: 'Digital Penmanship', icon: '✍️', desc: 'Have 10 handwritten answers recognised and marked.', nameKey: 'badge.penmanship.name', descKey: 'badge.penmanship.desc' },
   { id: 'scholar', name: 'Scholar', icon: '🎓', desc: 'Reach level 5.', nameKey: 'badge.scholar.name', descKey: 'badge.scholar.desc' },
   { id: 'sage', name: 'Sage', icon: '🧙', desc: 'Reach level 10.', nameKey: 'badge.sage.name', descKey: 'badge.sage.desc' },

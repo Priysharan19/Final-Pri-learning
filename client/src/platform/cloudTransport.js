@@ -40,6 +40,37 @@ function envOrigin() {
   return String(injected || vite || metaOrigin() || '').trim();
 }
 
+/**
+ * The live app shell, read from the network as a Response; or null when it cannot be read as HTML.
+ *
+ * The service worker answers every same-origin GET from its precache first, and "/" is precached, so a plain
+ * request for "/" (even with cache: 'reload') would be answered with the very shell being replaced. The request
+ * therefore carries a search string naming the live build ("/?shell=<sha>"): it never matches a precache key, and
+ * the worker does not keep a response for a path that is not a build asset (public/sw.js CACHEABLE). Used only to
+ * refresh the offline shell before a release reload (platform/freshBuild.js).
+ */
+export function liveShellUrl(origin, liveSha) {
+  return `${origin}/?shell=${encodeURIComponent(String(liveSha || '').toLowerCase())}`;
+}
+
+export async function readLiveShell(liveSha, { timeoutMs = 8000 } = {}) {
+  const loc = globalThis.location;
+  if (!loc || !/^https?:$/.test(String(loc.protocol || '')) || typeof fetch !== 'function') return null;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new DOMException('Timed out', 'TimeoutError')), Math.max(500, Math.min(20_000, Number(timeoutMs) || 8000)));
+  try {
+    const response = await fetch(liveShellUrl(loc.origin, liveSha), {
+      method: 'GET', headers: { Accept: 'text/html' }, credentials: 'same-origin', cache: 'reload', redirect: 'error', signal: controller.signal
+    });
+    if (response.status !== 200 || !/html/i.test(response.headers.get('content-type') || '')) return null;
+    return response;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function readReleaseIdentityManifest({ timeoutMs = 1500 } = {}) {
   const loc = globalThis.location;
   if (!loc || !/^https?:$/.test(String(loc.protocol || '')) || typeof fetch !== 'function') return null;
@@ -311,7 +342,7 @@ const proofList = list => list.filter(kind => typeof kind === 'string' && PROOF_
 
 export async function cloudRequest(path, {
   method = 'GET', body = undefined, idempotencyKey = null, timeoutMs = DEFAULT_TIMEOUT_MS, signal = null,
-  query = null, csv = false
+  query = null, csv = false, superseded = false, guestCsrf = null, keepalive = false
 } = {}) {
   if (!PATH.test(String(path || '')) || String(path).includes('..')) throw new Error('Cloud path is not allowed');
   const verb = String(method || 'GET').toUpperCase();
@@ -383,7 +414,12 @@ export async function cloudRequest(path, {
   const headers = { Accept: csv ? 'text/csv, application/json' : 'application/json', 'X-Pri-Request-Id': rid, 'X-Pri-Client': 'web-v1', [EDITION_HEADER]: EDITION };
   const csrf = cookie('pri_csrf');
   if (csrf && verb !== 'GET') headers['X-Pri-CSRF'] = csrf;
+  // The guest trial's own CSRF value (server/platform/guestTrial.js), given by
+  // the session reply and held in memory by platform/guestTrial.js.
+  if (typeof guestCsrf === 'string' && /^[A-Za-z0-9_-]{20,80}$/.test(guestCsrf)) headers['X-Pri-Guest-CSRF'] = guestCsrf;
   if (idempotencyKey) headers['Idempotency-Key'] = String(idempotencyKey).slice(0, 160);
+  // An automatic read the pen has outrun may be cancelled, and not billed, when this request is dropped.
+  if (superseded === true) headers['X-Pri-Read-Superseded'] = 'ok';
   if (payload !== undefined) headers['Content-Type'] = 'application/json';
 
   const controller = new AbortController();
@@ -402,6 +438,8 @@ export async function cloudRequest(path, {
       credentials: 'include',
       cache: 'no-store',
       redirect: 'error',
+      // A small request may outlive the page (a save sent as the tab closes); the browser refuses more than 64 kB.
+      ...(keepalive && byteLength(payload || '') < 60_000 ? { keepalive: true } : {}),
       signal: controller.signal
     });
     const text = await response.text();
@@ -443,6 +481,71 @@ export async function cloudRequest(path, {
       throw err;
     }
     return data;
+  } finally {
+    clearTimeout(timer);
+    if (signal) signal.removeEventListener('abort', abort);
+  }
+}
+
+// ── A file the server sends (the Extension 1 practice papers) ────────────────
+//
+// GET a path and read the body as bytes, for a PDF attachment. Web only: the
+// native bridges carry text, so inside a shell it answers CLOUD_WEB_ONLY, as a
+// query string does. Same path rule, cookie, edition declaration, redirect and
+// cache discipline as cloudRequest; bounded in bytes and time. A refusal is
+// JSON and is thrown with the same code, status and capability.
+const MAX_FILE_BYTES = 8 * 1024 * 1024;
+
+// `type`: the one media type that is accepted (a paper's PDF, or a paper's diagram as an SVG).
+export async function cloudDownload(path, { timeoutMs = 60_000, signal = null, type = 'application/pdf' } = {}) {
+  if (!['application/pdf', 'image/svg+xml'].includes(type)) throw new Error('Cloud download type is not allowed');
+  if (!PATH.test(String(path || '')) || String(path).includes('..')) throw new Error('Cloud path is not allowed');
+  if (nativeCloudAvailable()) {
+    const err = new Error('This needs Pri in a web browser for now.');
+    err.code = 'CLOUD_WEB_ONLY';
+    throw err;
+  }
+  if (!normalizeCloudOrigin() && Date.now() - lastRediscovery > 4000) {
+    lastRediscovery = Date.now();
+    await discoverCloudOrigin({ timeoutMs: 1500 });
+  }
+  const origin = normalizeCloudOrigin();
+  if (!origin) {
+    const err = new Error('Pri\'s server cannot be reached from this device right now.');
+    err.code = 'CLOUD_DISABLED';
+    throw err;
+  }
+  const rid = requestId();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new DOMException('Timed out', 'TimeoutError')), Math.max(1000, Math.min(120_000, Number(timeoutMs) || 60_000)));
+  const abort = () => controller.abort(signal?.reason || new DOMException('Aborted', 'AbortError'));
+  if (signal) {
+    if (signal.aborted) abort();
+    else signal.addEventListener('abort', abort, { once: true });
+  }
+  try {
+    const response = await fetch(`${origin}${path}`, {
+      method: 'GET',
+      headers: { Accept: `${type}, application/json`, 'X-Pri-Request-Id': rid, 'X-Pri-Client': 'web-v1', [EDITION_HEADER]: EDITION },
+      credentials: 'include',
+      cache: 'no-store',
+      redirect: 'error',
+      signal: controller.signal
+    });
+    if (!response.ok) {
+      const data = parseJson(await response.text());
+      const err = new Error(data?.error?.message || `Cloud request failed (${response.status})`);
+      err.status = response.status;
+      err.code = data?.error?.code || 'CLOUD_REQUEST_FAILED';
+      if (typeof data?.error?.capability === 'string') err.capability = data.error.capability.slice(0, 60);
+      editionRefusal(err, data);
+      err.requestId = response.headers.get('x-pri-request-id') || rid;
+      throw err;
+    }
+    if (!(response.headers.get('content-type') || '').toLowerCase().startsWith(type)) throw new Error('Cloud returned an unexpected file type');
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    if (bytes.length > MAX_FILE_BYTES) throw new Error('Cloud response exceeded safety limit');
+    return bytes;
   } finally {
     clearTimeout(timer);
     if (signal) signal.removeEventListener('abort', abort);
@@ -583,6 +686,11 @@ export const cloud = Object.freeze({
   issuePractice: body => cloudRequest('/v1/practice/issue', { method: 'POST', body }),
   // Needs no session: the question a signed-out student may start working on.
   preparePractice: body => cloudRequest('/v1/practice/prepare', { method: 'POST', body }),
+  // The guest trial (ADR-0003): web only. A visitor with no account; the server
+  // issues and marks, the device holds no key. Never reaches a paid reader.
+  guestStart: () => cloudRequest('/v1/guest/session', { method: 'POST', body: {} }),
+  guestQuestion: (body, guestCsrf) => cloudRequest('/v1/guest/question', { method: 'POST', body, guestCsrf }),
+  guestAnswer: (body, guestCsrf) => cloudRequest('/v1/guest/answer', { method: 'POST', body, guestCsrf }),
   gradePractice: (questionId, body) => cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/submit', {
     method: 'POST', body, idempotencyKey: body.submissionId,
     // A submission that carries its picture is read by the server before it
@@ -700,8 +808,8 @@ export const cloud = Object.freeze({
   // `questionId` (the server's id of the issued question) only lets the
   // server bind its read receipt to that question; the reader is sent the
   // picture alone.
-  transcribeHandwriting: (image, { signal = null, timeoutMs = 55000, questionId = null } = {}) =>
-    cloudRequest('/v1/handwriting/transcribe', { method: 'POST', body: { image, ...(questionId ? { questionId } : {}) }, signal, timeoutMs }),
+  transcribeHandwriting: (image, { signal = null, timeoutMs = 55000, questionId = null, superseded = false } = {}) =>
+    cloudRequest('/v1/handwriting/transcribe', { method: 'POST', body: { image, ...(questionId ? { questionId } : {}) }, signal, timeoutMs, superseded }),
   workingStatus: () => cloudRequest('/v1/working/status'),
   // The question is sent; the expected answer never is, and the route refuses
   // a body that carries one.

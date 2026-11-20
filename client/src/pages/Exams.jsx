@@ -18,6 +18,10 @@ import { featureEnabled } from '../platform/features.js';
 import { omittedNames } from '../local/nswExamBackend.js';
 import Working from '../instrument/Working.jsx';
 import { generatedPapersFor } from '../local/generatedPaperBackend.js';
+import Ext1Papers, { ext1PapersFor } from './Ext1Papers.jsx';
+import PracticeSets from '../paper/PracticeSets.jsx';
+import { practiceSetsFor } from '../engine/multipart/practiceSets.js';
+import { offeredYears, yearOffered, defaultOffering } from '../platform/edition.js';
 
 const CLAIM_KEYS = {
   'official-mathematics-section': 'exams.claim.officialSection',
@@ -28,7 +32,7 @@ export default function Exams() {
   const { user, refreshUser } = useApp();
   const t = useT();
   const [exams, setExams] = useState(null);
-  const [cfg, setCfg] = useState({ length: 10, minutes: 30, year: user.year });
+  const [cfg, setCfg] = useState({ length: 10, minutes: 30, year: yearOffered(user.year) ? user.year : (defaultOffering()?.year ?? user.year) });
   const [busy, setBusy] = useState(false);
   const [paper, setPaper] = useState(null);
   const [error, setError] = useState('');
@@ -113,6 +117,8 @@ export default function Exams() {
       {!paper && <h1 className="sr-only">{t('nav.exams')}</h1>}
       {generatedPapersFor(user) && <GeneratorEntry nav={nav} />}
       {user.course === 'nsw' && featureEnabled('nswExams') && <NswPapers busy={busy} start={start} />}
+      {ext1PapersFor(user) && <Ext1Papers />}
+      {practiceSetsFor(user) && <PracticeSets />}
       {hscCoursesFor(user).length > 0 && (
         <div className="card" data-hsc-link>
           <div className="card-title">{t('hsc.examsCardTitle')}</div>
@@ -128,7 +134,7 @@ export default function Exams() {
         <div className="field">
           <label className="label" htmlFor="exam-year">{t('exams.yearLevel')}</label>
           <select className="input" id="exam-year" value={cfg.year} onChange={e => setCfg(c => ({ ...c, year: Number(e.target.value) }))}>
-            {[7, 8, 9, 10, 11, 12].map(y => <option key={y} value={y}>{y === user.year ? t('exams.yearOptionYours', { n: y }) : t('common.yearNumber', { n: y })}</option>)}
+            {offeredYears([7, 8, 9, 10, 11, 12]).map(y => <option key={y} value={y}>{y === user.year ? t('exams.yearOptionYours', { n: y }) : t('common.yearNumber', { n: y })}</option>)}
           </select>
         </div>
         <div className="grid cols-2" style={{ gap: 12 }}>

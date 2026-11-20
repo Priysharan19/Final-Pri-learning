@@ -42,28 +42,46 @@ export default {
         question: 'Let $f(x)=2x-3$ and $g(x)=x^2$. Find $f(g(3))$ and $g(f(3))$.',
         steps: ['For $f(g(3))$ work inside first: $g(3)=3^2=9$.', 'Then $f(9)=2(9)-3=15$.', 'For $g(f(3))$: $f(3)=2(3)-3=3$, then $g(3)=9$.'],
         answer: '$f(g(3))=15$ and $g(f(3))=9$',
-        working: '\\begin{aligned}f(g(3))&=f(9)=2(9)-3=15\\\\g(f(3))&=g(3)=3^2=9\\end{aligned}',
+        working: [
+          { say: 'Work inside first: $g(3)=9$, then apply $f$', tex: 'f(g(3))&=f(9)=2(9)-3=15' },
+          { say: 'Now $f(3)=3$, then apply $g$', tex: 'g(f(3))&=g(3)=3^2=9' }
+        ],
         verify: { kind: 'values', pairs: [['2*3^2-3', '15'], ['(2*3-3)^2', '9']] }
       },
       {
         question: 'State the domain and range of $f(x)=\\sqrt{x-2}+1$, and find $f(11)$.',
         steps: ['The expression under the root must satisfy $x-2\\ge0$, so $x\\ge2$.', 'The square root is at least $0$, so $f(x)\\ge1$.', 'Substitute: $f(11)=\\sqrt{9}+1=4$.'],
         answer: 'Domain $x\\ge2$, range $y\\ge1$, and $f(11)=4$',
-        working: '\\begin{aligned}x-2&\\ge0\\Rightarrow x\\ge2\\\\\\sqrt{x-2}&\\ge0\\Rightarrow f(x)\\ge1\\\\f(11)&=\\sqrt{11-2}+1=4\\end{aligned}',
+        working: [
+          { say: 'The root requires a non-negative number', tex: 'x-2&\\ge0\\Rightarrow x\\ge2' },
+          { say: 'A square root is at least $0$, so add $1$', tex: '\\sqrt{x-2}&\\ge0\\Rightarrow f(x)\\ge1' },
+          { say: 'Substitute $x=11$', tex: 'f(11)&=\\sqrt{11-2}+1=4' }
+        ],
         verify: { kind: 'value', expr: 'sqrt(11-2)+1', answer: '4' }
       },
       {
         question: 'Complete the square for $y=x^2-6x+5$, state the vertex and find the $x$-intercepts.',
         steps: ['Half of $-6$ is $-3$: $x^2-6x+5=(x-3)^2-9+5$.', 'So $y=(x-3)^2-4$ and the vertex is $(3,-4)$.', 'Set $y=0$: $(x-3)^2=4$, so $x-3=\\pm2$ and $x=1$ or $x=5$.'],
         answer: '$y=(x-3)^2-4$, vertex $(3,-4)$, intercepts $x=1$ and $x=5$',
-        working: '\\begin{aligned}x^2-6x+5&=(x-3)^2-9+5\\\\&=(x-3)^2-4\\\\(x-3)^2&=4\\\\x&=3\\pm2=1\\text{ or }5\\end{aligned}',
+        working: [
+          { say: 'Complete the square (half of $-6$ is $-3$)', tex: 'x^2-6x+5&=(x-3)^2-9+5' },
+          { tex: '&=(x-3)^2-4' },
+          { say: 'Vertex from the completed square', tex: '\\text{vertex}&=(3,-4)' },
+          { say: 'Set $y=0$ for the $x$-intercepts', tex: '(x-3)^2&=4' },
+          { say: 'Take square roots of both sides', tex: 'x&=3\\pm2=1\\text{ or }5' }
+        ],
         verify: { kind: 'roots', f: 'x^2-6*x+5', answers: ['1', '5'] }
       },
       {
         question: 'For what values of $k$ does $x^2+kx+9=0$ have exactly one real root?',
         steps: ['Here $a=1$, $b=k$, $c=9$, so $\\Delta=k^2-36$.', 'One real root needs $\\Delta=0$: $k^2=36$.', 'Hence $k=6$ or $k=-6$.'],
         answer: '$k=6$ or $k=-6$',
-        working: '\\begin{aligned}\\Delta&=k^2-4(1)(9)\\\\&=k^2-36\\\\k^2-36&=0\\\\k&=\\pm6\\end{aligned}',
+        working: [
+          { say: 'Discriminant with $a=1$, $b=k$, $c=9$', tex: '\\Delta&=k^2-4(1)(9)' },
+          { tex: '&=k^2-36' },
+          { say: 'One real root needs $\\Delta=0$', tex: 'k^2-36&=0' },
+          { say: 'Take square roots', tex: 'k&=\\pm6' }
+        ],
         verify: { kind: 'roots', f: 'k^2-36', var: 'k', answers: ['6', '-6'] }
       }
     ],
@@ -116,22 +134,34 @@ export default {
       {
         question: 'The graph of $y=x^2$ is transformed to $y=2(x-3)^2-4$. Describe the transformation, state the vertex and find the $y$-intercept.',
         steps: ['Stretch vertically by a factor of $2$, then move $3$ right and $4$ down.', 'The vertex of $y=x^2$ at $(0,0)$ moves to $(3,-4)$.', 'At $x=0$: $y=2(0-3)^2-4=18-4=14$.'],
-        answer: 'Vertex $(3,-4)$ and $y$-intercept $14$',
-        working: '\\begin{aligned}\\text{vertex}&:(0,0)\\mapsto(3,-4)\\\\y(0)&=2(-3)^2-4\\\\&=18-4=14\\end{aligned}',
+        answer: 'Stretch vertically by a factor of $2$, then $3$ right and $4$ down; vertex $(3,-4)$ and $y$-intercept $14$',
+        working: [
+          { say: 'Vertex: the point $(0,0)$ moves $3$ right and $4$ down', tex: '\\text{vertex}&:(0,0)\\mapsto(3,-4)' },
+          { say: '$y$-intercept: set $x=0$', tex: 'y(0)&=2(-3)^2-4' },
+          { tex: '&=18-4=14' }
+        ],
         verify: { kind: 'value', expr: '2*(0-3)^2-4', answer: '14' }
       },
       {
         question: 'The point $(2,5)$ lies on $y=f(x)$. Find its image on $y=2f(x-1)+3$.',
         steps: ['The shift of $1$ right changes the $x$-coordinate: $2+1=3$.', 'The new $y$-coordinate is $2\\times5+3=13$.', 'The image is $(3,13)$.'],
         answer: '$(3,13)$',
-        working: '\\begin{aligned}x&:2\\mapsto2+1=3\\\\y&:5\\mapsto2(5)+3=13\\end{aligned}',
+        working: [
+          { say: 'The $x$-coordinate shifts $1$ right', tex: 'x&:2\\mapsto2+1=3' },
+          { say: 'The $y$-coordinate is doubled, then increased by $3$', tex: 'y&:5\\mapsto2(5)+3=13' }
+        ],
         verify: { kind: 'values', pairs: [['2+1', '3'], ['2*5+3', '13']] }
       },
       {
         question: 'Find the $x$-intercepts of $y=-(x+1)^2+4$.',
         steps: ['Set $y=0$: $(x+1)^2=4$.', 'Then $x+1=\\pm2$.', 'So $x=1$ or $x=-3$.'],
         answer: '$x=1$ and $x=-3$',
-        working: '\\begin{aligned}-(x+1)^2+4&=0\\\\(x+1)^2&=4\\\\x+1&=\\pm2\\\\x&=1\\text{ or }-3\\end{aligned}',
+        working: [
+          { say: 'Set $y=0$', tex: '-(x+1)^2+4&=0' },
+          { say: 'Rearrange', tex: '(x+1)^2&=4' },
+          { say: 'Take square roots of both sides', tex: 'x+1&=\\pm2' },
+          { say: 'Solve for $x$', tex: 'x&=1\\text{ or }-3' }
+        ],
         verify: { kind: 'roots', f: '-(x+1)^2+4', answers: ['1', '-3'] }
       }
     ],
@@ -188,21 +218,33 @@ export default {
         question: 'A sector has radius $6$ cm and angle $\\dfrac{\\pi}{3}$. Find its arc length and area.',
         steps: ['Arc length: $l=r\\theta=6\\times\\dfrac{\\pi}{3}=2\\pi$.', 'Area: $A=\\tfrac12r^2\\theta=\\tfrac12\\times36\\times\\dfrac{\\pi}{3}=6\\pi$.', 'Numerically, $2\\pi\\approx6.28$ cm and $6\\pi\\approx18.85$ cm$^2$.'],
         answer: 'Arc length $2\\pi\\approx6.28$ cm; area $6\\pi\\approx18.85$ cm$^2$',
-        working: '\\begin{aligned}l&=6\\times\\dfrac{\\pi}{3}=2\\pi\\\\A&=\\tfrac12(6)^2\\times\\dfrac{\\pi}{3}=6\\pi\\end{aligned}',
+        working: [
+          { say: 'Arc length $l=r\\theta$', tex: 'l&=6\\times\\dfrac{\\pi}{3}=2\\pi' },
+          { say: 'Area $A=\\dfrac12r^2\\theta$', tex: 'A&=\\dfrac12(6)^2\\times\\dfrac{\\pi}{3}=6\\pi' }
+        ],
         verify: { kind: 'values', pairs: [['6*(pi/3)', '2*pi'], ['0.5*6^2*(pi/3)', '6*pi'], ['2*pi', '6.283185307'], ['6*pi', '18.849555922']] }
       },
       {
         question: 'In a triangle, $a=7$ cm, $b=9$ cm and the included angle is $C=60^\\circ$. Find the length of side $c$.',
         steps: ['Cosine rule: $c^2=a^2+b^2-2ab\\cos C$.', 'Substitute: $c^2=49+81-2(7)(9)\\cos60^\\circ=130-63=67$.', 'So $c=\\sqrt{67}\\approx8.19$ cm.'],
         answer: '$c=\\sqrt{67}\\approx8.19$ cm',
-        working: '\\begin{aligned}c^2&=7^2+9^2-2(7)(9)\\cos60^\\circ\\\\&=49+81-63\\\\&=67\\\\c&=\\sqrt{67}\\approx8.19\\end{aligned}',
+        working: [
+          { say: 'Cosine rule with $C=60^\\circ$', tex: 'c^2&=7^2+9^2-2(7)(9)\\cos60^\\circ' },
+          { say: 'Use $\\cos60^\\circ=\\dfrac12$', tex: '&=49+81-63' },
+          { tex: '&=67' },
+          { say: 'Take the positive square root', tex: 'c&=\\sqrt{67}\\approx8.19' }
+        ],
         verify: { kind: 'value', expr: 'sqrt(7^2+9^2-2*7*9*cos(pi/3))', answer: '8.185352772' }
       },
       {
         question: 'Find the area of a triangle with two sides $8$ cm and $11$ cm and included angle $30^\\circ$.',
         steps: ['Use $A=\\tfrac12ab\\sin C$.', 'Substitute: $A=\\tfrac12(8)(11)\\sin30^\\circ$.', 'Since $\\sin30^\\circ=\\tfrac12$, $A=44\\times\\tfrac12=22$ cm$^2$.'],
         answer: '$22$ cm$^2$',
-        working: '\\begin{aligned}A&=\\tfrac12(8)(11)\\sin30^\\circ\\\\&=44\\times\\tfrac12\\\\&=22\\end{aligned}',
+        working: [
+          { say: 'Use $A=\\dfrac12ab\\sin C$', tex: 'A&=\\dfrac12(8)(11)\\sin30^\\circ' },
+          { say: 'Use $\\sin30^\\circ=\\dfrac12$', tex: '&=44\\times\\dfrac12' },
+          { tex: '&=22' }
+        ],
         verify: { kind: 'value', expr: '0.5*8*11*sin(pi/6)', answer: '22' }
       }
     ],
@@ -256,21 +298,33 @@ export default {
         question: 'Solve $2\\sin x=1$ for $0\\le x\\le2\\pi$.',
         steps: ['Isolate: $\\sin x=\\tfrac12$.', 'The reference angle is $\\dfrac{\\pi}{6}$.', 'Sine is positive in quadrants 1 and 2: $x=\\dfrac{\\pi}{6}$ and $x=\\pi-\\dfrac{\\pi}{6}=\\dfrac{5\\pi}{6}$.'],
         answer: '$x=\\dfrac{\\pi}{6}$ or $x=\\dfrac{5\\pi}{6}$',
-        working: '\\begin{aligned}\\sin x&=\\tfrac12\\\\x&=\\dfrac{\\pi}{6},\\ \\pi-\\dfrac{\\pi}{6}\\\\&=\\dfrac{\\pi}{6},\\ \\dfrac{5\\pi}{6}\\end{aligned}',
+        working: [
+          { say: 'Isolate $\\sin x$', tex: '\\sin x&=\\dfrac12' },
+          { say: 'Sine is positive in quadrants 1 and 2, reference angle $\\dfrac{\\pi}{6}$', tex: 'x&=\\dfrac{\\pi}{6},\\ \\pi-\\dfrac{\\pi}{6}' },
+          { tex: '&=\\dfrac{\\pi}{6},\\ \\dfrac{5\\pi}{6}' }
+        ],
         verify: { kind: 'roots', f: '2*sin(x)-1', answers: ['pi/6', '5*pi/6'] }
       },
       {
         question: 'Solve $2\\cos^2x-\\cos x-1=0$ for $0\\le x\\le2\\pi$.',
         steps: ['Factorise as a quadratic in $\\cos x$: $(2\\cos x+1)(\\cos x-1)=0$.', 'If $\\cos x=-\\tfrac12$, the reference angle is $\\tfrac{\\pi}{3}$ and cosine is negative in quadrants 2 and 3: $x=\\tfrac{2\\pi}{3},\\tfrac{4\\pi}{3}$.', 'If $\\cos x=1$, then $x=0$ or $x=2\\pi$.'],
         answer: '$x=0,\\ \\dfrac{2\\pi}{3},\\ \\dfrac{4\\pi}{3},\\ 2\\pi$',
-        working: '\\begin{aligned}(2\\cos x+1)(\\cos x-1)&=0\\\\\\cos x=-\\tfrac12&\\Rightarrow x=\\tfrac{2\\pi}{3},\\tfrac{4\\pi}{3}\\\\\\cos x=1&\\Rightarrow x=0,\\ 2\\pi\\end{aligned}',
+        working: [
+          { say: 'Factorise as a quadratic in $\\cos x$', tex: '(2\\cos x+1)(\\cos x-1)&=0' },
+          { say: 'Cosine is negative in quadrants 2 and 3, reference angle $\\dfrac{\\pi}{3}$', tex: '\\cos x=-\\dfrac12&\\Rightarrow x=\\dfrac{2\\pi}{3},\\dfrac{4\\pi}{3}' },
+          { say: 'Cosine equals $1$ at the ends of the interval', tex: '\\cos x=1&\\Rightarrow x=0,\\ 2\\pi' }
+        ],
         verify: { kind: 'roots', f: '2*cos(x)^2-cos(x)-1', answers: ['0', '2*pi/3', '4*pi/3', '2*pi'] }
       },
       {
         question: 'Prove that $\\dfrac{1-\\cos^2\\theta}{\\sin\\theta}=\\sin\\theta$.',
         steps: ['From $\\sin^2\\theta+\\cos^2\\theta=1$, the numerator is $1-\\cos^2\\theta=\\sin^2\\theta$.', 'So the left side is $\\dfrac{\\sin^2\\theta}{\\sin\\theta}$.', 'Cancel $\\sin\\theta$ (it is non-zero where the expression is defined): this equals $\\sin\\theta$, the right side.'],
         answer: 'The left side simplifies to $\\sin\\theta$, as required',
-        working: '\\begin{aligned}\\text{LHS}&=\\dfrac{1-\\cos^2\\theta}{\\sin\\theta}\\\\&=\\dfrac{\\sin^2\\theta}{\\sin\\theta}\\\\&=\\sin\\theta=\\text{RHS}\\end{aligned}',
+        working: [
+          { say: 'Start with the left side', tex: '\\text{LHS}&=\\dfrac{1-\\cos^2\\theta}{\\sin\\theta}' },
+          { say: 'Use $1-\\cos^2\\theta=\\sin^2\\theta$', tex: '&=\\dfrac{\\sin^2\\theta}{\\sin\\theta}' },
+          { say: 'Cancel $\\sin\\theta$ (non-zero where defined)', tex: '&=\\sin\\theta=\\text{RHS}' }
+        ],
         verify: { kind: 'equivalent', a: '(1-cos(x)^2)/sin(x)', b: 'sin(x)' }
       }
     ],
@@ -324,21 +378,36 @@ export default {
         question: 'Differentiate $f(x)=x^2$ from first principles and find the gradient at $x=3$.',
         steps: ['$\\dfrac{f(x+h)-f(x)}{h}=\\dfrac{(x+h)^2-x^2}{h}=\\dfrac{2xh+h^2}{h}=2x+h$.', 'As $h\\to0$, this tends to $2x$, so $f\'(x)=2x$.', 'At $x=3$ the gradient is $6$.'],
         answer: '$f\'(x)=2x$ and the gradient at $x=3$ is $6$',
-        working: '\\begin{aligned}\\dfrac{(x+h)^2-x^2}{h}&=\\dfrac{2xh+h^2}{h}\\\\&=2x+h\\to2x\\\\f\'(3)&=6\\end{aligned}',
+        working: [
+          { say: 'First-principles difference quotient', tex: '\\dfrac{(x+h)^2-x^2}{h}&=\\dfrac{2xh+h^2}{h}' },
+          { say: 'Cancel $h$, then let $h\\to0$', tex: '&=2x+h\\to2x' },
+          { say: 'The derivative', tex: 'f\'(x)&=2x' },
+          { say: 'Substitute $x=3$', tex: 'f\'(3)&=2(3)=6' }
+        ],
         verify: { kind: 'values', pairs: [['((3+0.0001)^2-(3-0.0001)^2)/(2*0.0001)', '6'], ['2*3', '6']] }
       },
       {
         question: 'Differentiate $y=4x^3-6x^2+5x-7$ and find the gradient at $x=2$.',
         steps: ['Differentiate each term: $12x^2-12x+5$.', 'Substitute $x=2$: $12(4)-12(2)+5=48-24+5$.', 'The gradient is $29$.'],
         answer: '$\\dfrac{dy}{dx}=12x^2-12x+5$, and the gradient at $x=2$ is $29$',
-        working: '\\begin{aligned}\\dfrac{dy}{dx}&=12x^2-12x+5\\\\\\left.\\dfrac{dy}{dx}\\right|_{x=2}&=48-24+5\\\\&=29\\end{aligned}',
+        working: [
+          { say: 'Differentiate term by term', tex: '\\dfrac{dy}{dx}&=12x^2-12x+5' },
+          { say: 'Substitute $x=2$', tex: '\\left.\\dfrac{dy}{dx}\\right|_{x=2}&=12(4)-12(2)+5' },
+          { tex: '&=48-24+5' },
+          { tex: '&=29' }
+        ],
         verify: { kind: 'value', expr: '((4*(2.0001)^3-6*(2.0001)^2+5*(2.0001)-7)-(4*(1.9999)^3-6*(1.9999)^2+5*(1.9999)-7))/0.0002', answer: '29' }
       },
       {
         question: 'Find the equation of the tangent to $y=x^2-4x+7$ at the point where $x=3$.',
         steps: ['At $x=3$, $y=9-12+7=4$, so the point is $(3,4)$.', 'The derivative is $\\dfrac{dy}{dx}=2x-4$, so the gradient is $2$.', 'Then $y-4=2(x-3)$, giving $y=2x-2$.'],
         answer: '$y=2x-2$',
-        working: '\\begin{aligned}y(3)&=9-12+7=4\\\\m&=2(3)-4=2\\\\y-4&=2(x-3)\\\\y&=2x-2\\end{aligned}',
+        working: [
+          { say: 'Find the point of tangency', tex: 'y(3)&=9-12+7=4' },
+          { say: 'Gradient from $\\dfrac{dy}{dx}=2x-4$', tex: 'm&=2(3)-4=2' },
+          { say: 'Point-gradient form', tex: 'y-4&=2(x-3)' },
+          { say: 'Rearrange', tex: 'y&=2x-2' }
+        ],
         verify: { kind: 'values', pairs: [['3^2-4*3+7', '4'], ['2*3-4', '2'], ['2*3-2', '4']] }
       }
     ],
@@ -393,21 +462,36 @@ export default {
         question: 'Solve $3^x=20$, correct to two decimal places.',
         steps: ['Take natural logarithms of both sides: $x\\ln3=\\ln20$.', 'So $x=\\dfrac{\\ln20}{\\ln3}$.', 'Evaluate: $x\\approx2.73$.'],
         answer: '$x=\\dfrac{\\ln20}{\\ln3}\\approx2.73$',
-        working: '\\begin{aligned}3^x&=20\\\\x\\ln3&=\\ln20\\\\x&=\\dfrac{\\ln20}{\\ln3}\\approx2.73\\end{aligned}',
+        working: [
+          { say: 'Equation', tex: '3^x&=20' },
+          { say: 'Take natural logarithms of both sides', tex: 'x\\ln(3)&=\\ln(20)' },
+          { say: 'Divide by $\\ln(3)$ and evaluate', tex: 'x&=\\dfrac{\\ln(20)}{\\ln(3)}\\approx2.73' }
+        ],
         verify: { kind: 'roots', f: '3^x-20', answers: ['ln(20)/ln(3)'] }
       },
       {
         question: 'Solve $\\log_2x+\\log_2(x-2)=3$.',
         steps: ['Combine: $\\log_2\\big(x(x-2)\\big)=3$, so $x(x-2)=2^3=8$.', 'Then $x^2-2x-8=0$, so $(x-4)(x+2)=0$.', 'Test $x=-2$: $\\log_2(-2)$ is undefined, so reject it. Only $x=4$ is valid.'],
         answer: '$x=4$',
-        working: '\\begin{aligned}\\log_2\\big(x(x-2)\\big)&=3\\\\x^2-2x&=8\\\\(x-4)(x+2)&=0\\\\x&=4\\ (x=-2\\text{ rejected})\\end{aligned}',
+        working: [
+          { say: 'Combine the logarithms', tex: '\\log_2\\big(x(x-2)\\big)&=3' },
+          { say: 'Convert to index form, $2^3=8$', tex: 'x(x-2)&=8' },
+          { say: 'Expand and make one side zero', tex: 'x^2-2x-8&=0' },
+          { say: 'Factorise', tex: '(x-4)(x+2)&=0' },
+          { say: 'Reject $x=-2$ since $\\log_2(-2)$ is undefined', tex: 'x&=4\\ (x=-2\\text{ rejected})' }
+        ],
         verify: { kind: 'values', pairs: [['ln(4)/ln(2)+ln(4-2)/ln(2)', '3']] }
       },
       {
         question: 'A population is $P=500e^{0.04t}$ after $t$ years. When will it reach $1000$?',
         steps: ['Set $500e^{0.04t}=1000$, so $e^{0.04t}=2$.', 'Take natural logarithms: $0.04t=\\ln2$.', 'Hence $t=\\dfrac{\\ln2}{0.04}\\approx17.3$ years.'],
         answer: '$t=\\dfrac{\\ln2}{0.04}\\approx17.3$ years',
-        working: '\\begin{aligned}500e^{0.04t}&=1000\\\\e^{0.04t}&=2\\\\0.04t&=\\ln2\\\\t&=\\dfrac{\\ln2}{0.04}\\approx17.3\\end{aligned}',
+        working: [
+          { say: 'Set the population to $1000$', tex: '500e^{0.04t}&=1000' },
+          { say: 'Divide by $500$', tex: 'e^{0.04t}&=2' },
+          { say: 'Take natural logarithms', tex: '0.04t&=\\ln(2)' },
+          { say: 'Divide by $0.04$ and evaluate', tex: 't&=\\dfrac{\\ln(2)}{0.04}\\approx17.3' }
+        ],
         verify: { kind: 'roots', f: '500*e^(0.04*t)-1000', var: 't', answers: ['ln(2)/0.04'] }
       }
     ],
@@ -461,21 +545,35 @@ export default {
         question: 'Given $P(A)=0.5$, $P(B)=0.4$ and $P(A\\cap B)=0.2$, find $P(A\\cup B)$ and $P(A\\mid B)$, and decide whether $A$ and $B$ are independent.',
         steps: ['$P(A\\cup B)=0.5+0.4-0.2=0.7$.', '$P(A\\mid B)=\\dfrac{0.2}{0.4}=0.5$.', 'Since $P(A)P(B)=0.5\\times0.4=0.2=P(A\\cap B)$ (and $P(A\\mid B)=P(A)$), the events are independent.'],
         answer: '$P(A\\cup B)=0.7$, $P(A\\mid B)=0.5$, and $A$, $B$ are independent',
-        working: '\\begin{aligned}P(A\\cup B)&=0.5+0.4-0.2=0.7\\\\P(A\\mid B)&=\\dfrac{0.2}{0.4}=0.5\\\\P(A)P(B)&=0.2=P(A\\cap B)\\end{aligned}',
+        working: [
+          { say: 'Addition rule for the union', tex: 'P(A\\cup B)&=0.5+0.4-0.2=0.7' },
+          { say: 'Conditional probability', tex: 'P(A\\mid B)&=\\dfrac{0.2}{0.4}=0.5' },
+          { say: 'Independence test: product equals the intersection, so $A$ and $B$ are independent', tex: 'P(A)P(B)&=0.2=P(A\\cap B)' }
+        ],
         verify: { kind: 'values', pairs: [['0.5+0.4-0.2', '0.7'], ['0.2/0.4', '0.5'], ['0.5*0.4', '0.2']] }
       },
       {
         question: 'A bag holds $4$ red and $6$ blue counters. Two are drawn without replacement. Find the probability that both are red, and the probability that they are different colours.',
         steps: ['Both red: $\\tfrac{4}{10}\\times\\tfrac{3}{9}=\\tfrac{12}{90}=\\tfrac{2}{15}$.', 'Red then blue: $\\tfrac{4}{10}\\times\\tfrac{6}{9}=\\tfrac{24}{90}$; blue then red is also $\\tfrac{24}{90}$.', 'Add the two paths: $\\tfrac{48}{90}=\\tfrac{8}{15}$.'],
         answer: '$P(\\text{both red})=\\tfrac{2}{15}$ and $P(\\text{different colours})=\\tfrac{8}{15}$',
-        working: '\\begin{aligned}P(RR)&=\\tfrac{4}{10}\\times\\tfrac{3}{9}=\\tfrac{2}{15}\\\\P(RB)+P(BR)&=2\\times\\tfrac{4}{10}\\times\\tfrac{6}{9}\\\\&=\\tfrac{48}{90}=\\tfrac{8}{15}\\end{aligned}',
+        working: [
+          { say: 'Both red, without replacement', tex: 'P(RR)&=\\dfrac{4}{10}\\times\\dfrac{3}{9}=\\dfrac{2}{15}' },
+          { say: 'Different colours: red then blue, or blue then red (equal probabilities)', tex: 'P(RB)+P(BR)&=2\\times\\dfrac{4}{10}\\times\\dfrac{6}{9}' },
+          { tex: '&=\\dfrac{48}{90}=\\dfrac{8}{15}' }
+        ],
         verify: { kind: 'values', pairs: [['4/10*3/9', '2/15'], ['2*(4/10)*(6/9)', '8/15']] }
       },
       {
         question: 'Test the data $4,\\,7,\\,8,\\,9,\\,10,\\,12,\\,13,\\,30$ for outliers using the $1.5\\times\\text{IQR}$ rule.',
         steps: ['The lower half is $4,7,8,9$, so $Q_1=\\tfrac{7+8}{2}=7.5$. The upper half is $10,12,13,30$, so $Q_3=\\tfrac{12+13}{2}=12.5$.', '$\\text{IQR}=12.5-7.5=5$, and $1.5\\times5=7.5$.', 'The upper fence is $12.5+7.5=20$. The value $30$ exceeds it, so $30$ is an outlier. The lower fence is $0$, so nothing is low.'],
         answer: '$Q_1=7.5$, $Q_3=12.5$, IQR $=5$; the value $30$ is an outlier',
-        working: '\\begin{aligned}Q_1&=7.5,\\quad Q_3=12.5\\\\\\text{IQR}&=5\\\\\\text{upper fence}&=12.5+1.5(5)=20\\\\30&>20\\end{aligned}',
+        working: [
+          { say: 'Quartiles from the lower and upper halves', tex: 'Q_1&=7.5,\\quad Q_3=12.5' },
+          { say: 'Interquartile range', tex: '\\text{IQR}&=5' },
+          { say: 'Upper fence', tex: '\\text{upper fence}&=12.5+1.5(5)=20' },
+          { say: 'Lower fence', tex: '\\text{lower fence}&=7.5-1.5(5)=0' },
+          { say: 'Compare the largest value with the upper fence, so $30$ is an outlier', tex: '30&>20' }
+        ],
         verify: { kind: 'values', pairs: [['(7+8)/2', '7.5'], ['(12+13)/2', '12.5'], ['12.5+1.5*(12.5-7.5)', '20']] }
       }
     ],
@@ -528,22 +626,39 @@ export default {
       {
         question: 'The depth of water at a jetty is $d(t)=5+2\\sin\\left(\\dfrac{\\pi t}{6}\\right)$ metres, $t$ hours after midnight, $0\\le t\\le12$. State the period and the maximum and minimum depths, and find when the depth is first $6$ metres.',
         steps: ['Period: $\\dfrac{2\\pi}{\\pi/6}=12$ hours. Maximum $5+2=7$ m and minimum $5-2=3$ m.', 'Set $5+2\\sin\\left(\\dfrac{\\pi t}{6}\\right)=6$, so $\\sin\\left(\\dfrac{\\pi t}{6}\\right)=\\tfrac12$.', 'Then $\\dfrac{\\pi t}{6}=\\dfrac{\\pi}{6}$ or $\\dfrac{5\\pi}{6}$, so $t=1$ or $t=5$. The first time is $t=1$, one hour after midnight.'],
-        answer: 'Period $12$ h, maximum $7$ m, minimum $3$ m; depth is $6$ m at $t=1$ and again at $t=5$',
-        working: '\\begin{aligned}T&=\\dfrac{2\\pi}{\\pi/6}=12\\\\\\sin\\dfrac{\\pi t}{6}&=\\tfrac12\\\\\\dfrac{\\pi t}{6}&=\\dfrac{\\pi}{6},\\ \\dfrac{5\\pi}{6}\\\\t&=1,\\ 5\\end{aligned}',
+        answer: 'Period $12$ h, maximum $7$ m, minimum $3$ m; the depth is first $6$ m at $t=1$ (1 am), and again at $t=5$',
+        working: [
+          { say: 'Period:', tex: 'T&=\\dfrac{2\\pi}{\\pi/6}=12' },
+          { say: 'Maximum, when the sine is $1$:', tex: 'd_{\\max}&=5+2=7' },
+          { say: 'Minimum, when the sine is $-1$:', tex: 'd_{\\min}&=5-2=3' },
+          { say: 'Set $d=6$:', tex: '5+2\\sin\\left(\\dfrac{\\pi t}{6}\\right)&=6' },
+          { say: 'Isolate the sine:', tex: '\\sin\\left(\\dfrac{\\pi t}{6}\\right)&=\\dfrac12' },
+          { say: 'First solutions for $0\\le t\\le12$:', tex: '\\dfrac{\\pi t}{6}&=\\dfrac{\\pi}{6},\\ \\dfrac{5\\pi}{6}' },
+          { say: 'Solve for $t$:', tex: 't&=1,\\ 5' }
+        ],
         verify: { kind: 'roots', f: '5+2*sin(pi*t/6)-6', var: 't', answers: ['1', '5'] }
       },
       {
         question: 'The graph of $y=2^x$ is transformed to $y=2^{x-3}+1$. State the horizontal asymptote and the $y$-intercept.',
         steps: ['The shift of $3$ right and $1$ up moves the asymptote $y=0$ to $y=1$.', 'At $x=0$: $y=2^{-3}+1=\\tfrac18+1$.', 'So the $y$-intercept is $\\tfrac98$.'],
         answer: 'Asymptote $y=1$; $y$-intercept $\\tfrac98$',
-        working: '\\begin{aligned}y&=2^{x-3}+1\\\\y(0)&=2^{-3}+1\\\\&=\\tfrac18+1=\\tfrac98\\end{aligned}',
+        working: [
+          { say: 'Transformed curve:', tex: 'y&=2^{x-3}+1' },
+          { say: 'Asymptote: $2^{x-3}\\to0$ as $x\\to-\\infty$, so the curve approaches:', tex: 'y&=1' },
+          { say: '$y$-intercept, set $x=0$:', tex: 'y(0)&=2^{-3}+1' },
+          { tex: '&=\\dfrac18+1=\\dfrac98' }
+        ],
         verify: { kind: 'value', expr: '2^(0-3)+1', answer: '9/8' }
       },
       {
         question: 'Solve $|x-3|=5$.',
         steps: ['The distance from $x$ to $3$ is $5$.', 'So $x-3=5$ or $x-3=-5$.', 'Hence $x=8$ or $x=-2$.'],
         answer: '$x=8$ or $x=-2$',
-        working: '\\begin{aligned}|x-3|&=5\\\\x-3&=5\\text{ or }x-3=-5\\\\x&=8\\text{ or }-2\\end{aligned}',
+        working: [
+          { say: 'Distance from $x$ to $3$ is $5$:', tex: '|x-3|&=5' },
+          { say: 'Two cases:', tex: 'x-3&=5\\text{ or }x-3=-5' },
+          { say: 'Add $3$:', tex: 'x&=8\\text{ or }-2' }
+        ],
         verify: { kind: 'roots', f: 'abs(x-3)-5', answers: ['8', '-2'] }
       }
     ],
@@ -554,7 +669,7 @@ export default {
       'Both cases of an absolute value equation are written and each solution is checked.'
     ],
     diagrams: [
-      { title: 'The tide $d(t)=5+2\\sin\\left(\\dfrac{\\pi t}{6}\\right)$', spec: { kind: 'function', xmin: 0, xmax: 12, ymin: 0, ymax: 8, curves: [{ expr: '5+2*sin(pi*x/6)', label: 'd(t)' }, { expr: '6', tone: 'secondary' }], asymptotes: [{ y: 5, label: 'midline' }], points: [{ x: 3, y: 7, label: '(3,\\,7)' }, { x: 9, y: 3, label: '(9,\\,3)' }, { x: 1, y: 6, label: '(1,\\,6)' }] }, note: 'The midline is $5$, the maximum $7$ is at $t=3$ and the minimum $3$ at $t=9$. The line $d=6$ meets the curve at $t=1$ and $t=5$.' },
+      { title: 'The tide $d(t)=5+2\\sin\\left(\\dfrac{\\pi t}{6}\\right)$', spec: { kind: 'function', xmin: 0, xmax: 12, ymin: 0, ymax: 8, xUnit: 'hours', yUnit: 'metres', curves: [{ expr: '5+2*sin(pi*x/6)', label: 'd(t)' }, { expr: '6', tone: 'secondary' }], asymptotes: [{ y: 5, label: 'midline' }], points: [{ x: 3, y: 7, label: '(3,\\,7)' }, { x: 9, y: 3, label: '(9,\\,3)' }, { x: 1, y: 6, label: '(1,\\,6)' }, { x: 5, y: 6, label: '(5,\\,6)' }] }, note: 'The midline is $5$, the maximum $7$ is at $t=3$ and the minimum $3$ at $t=9$. The line $d=6$ meets the curve at $t=1$ and $t=5$.' },
       { title: 'Shift $y=2^x$ right and up', spec: { kind: 'transform', base: 'exponential', show: ['h', 'k'], initial: { h: 3, k: 1 } }, note: 'With $h=3$ and $k=1$ the graph is $y=2^{x-3}+1$, with asymptote $y=1$.' }
     ],
     check: [
@@ -598,28 +713,47 @@ export default {
         question: 'For the sequence $7,\\,11,\\,15,\\,\\ldots$ find the $20$th term and the sum of the first $20$ terms.',
         steps: ['It is arithmetic with $a=7$ and $d=4$.', '$T_{20}=7+19\\times4=83$.', '$S_{20}=\\dfrac{20}{2}\\big(2\\times7+19\\times4\\big)=10\\times90=900$.'],
         answer: '$T_{20}=83$ and $S_{20}=900$',
-        working: '\\begin{aligned}T_{20}&=7+19(4)=83\\\\S_{20}&=\\dfrac{20}{2}\\big(2(7)+19(4)\\big)\\\\&=10(90)=900\\end{aligned}',
+        working: [
+          { say: 'Arithmetic with $a=7$:', tex: 'd&=11-7=4' },
+          { say: 'Twentieth term:', tex: 'T_{20}&=7+19(4)=83' },
+          { say: 'Sum of the first $20$ terms:', tex: 'S_{20}&=\\dfrac{20}{2}\\big(2(7)+19(4)\\big)' },
+          { tex: '&=10(90)=900' }
+        ],
         verify: { kind: 'values', pairs: [['7+19*4', '83'], ['20/2*(2*7+19*4)', '900']] }
       },
       {
         question: 'Find the sum of the first $8$ terms of $3+6+12+\\cdots$.',
         steps: ['It is geometric with $a=3$ and $r=2$.', 'Use $S_n=\\dfrac{a(r^n-1)}{r-1}$ with $n=8$.', '$S_8=\\dfrac{3(2^8-1)}{2-1}=3\\times255=765$.'],
         answer: '$765$',
-        working: '\\begin{aligned}S_8&=\\dfrac{3\\left(2^8-1\\right)}{2-1}\\\\&=3(255)\\\\&=765\\end{aligned}',
+        working: [
+          { say: 'Common ratio:', tex: 'r&=\\dfrac63=2' },
+          { say: 'Geometric sum with $a=3$, $n=8$:', tex: 'S_8&=\\dfrac{3\\left(2^8-1\\right)}{2-1}' },
+          { tex: '&=3(255)' },
+          { tex: '&=765' }
+        ],
         verify: { kind: 'value', expr: '3*(2^8-1)/(2-1)', answer: '765' }
       },
       {
         question: 'Find the limiting sum of $12+6+3+\\cdots$.',
         steps: ['It is geometric with $a=12$ and $r=\\tfrac{6}{12}=\\tfrac12$.', 'Since $|r|<1$, the limiting sum exists.', '$S_\\infty=\\dfrac{12}{1-\\tfrac12}=24$.'],
         answer: '$24$',
-        working: '\\begin{aligned}r&=\\tfrac{6}{12}=\\tfrac12\\\\S_\\infty&=\\dfrac{12}{1-\\tfrac12}\\\\&=24\\end{aligned}',
+        working: [
+          { say: 'Common ratio:', tex: 'r&=\\dfrac{6}{12}=\\dfrac12' },
+          { say: 'Limiting sum, since $|r|<1$:', tex: 'S_\\infty&=\\dfrac{12}{1-\\dfrac12}' },
+          { tex: '&=24' }
+        ],
         verify: { kind: 'value', expr: '12/(1-1/2)', answer: '24' }
       },
       {
         question: 'How many terms are in the arithmetic sequence $5,\\,8,\\,11,\\,\\ldots,\\,101$?',
         steps: ['Here $a=5$ and $d=3$.', 'Set $T_n=101$: $5+(n-1)\\times3=101$.', 'So $3(n-1)=96$, $n-1=32$ and $n=33$.'],
         answer: '$33$ terms',
-        working: '\\begin{aligned}5+(n-1)(3)&=101\\\\3(n-1)&=96\\\\n&=33\\end{aligned}',
+        working: [
+          { say: 'Set $T_n=101$:', tex: '5+(n-1)(3)&=101' },
+          { say: 'Subtract $5$:', tex: '3(n-1)&=96' },
+          { say: 'Divide by $3$:', tex: 'n-1&=32' },
+          { say: 'Add $1$:', tex: 'n&=33' }
+        ],
         verify: { kind: 'roots', f: '5+(n-1)*3-101', var: 'n', answers: ['33'] }
       }
     ],
@@ -645,7 +779,7 @@ export default {
     concepts: [
       { title: 'The chain rule', body: 'For a function of a function, $y=f(u)$ with $u=g(x)$, $\\dfrac{dy}{dx}=\\dfrac{dy}{du}\\times\\dfrac{du}{dx}$. Differentiate the outer function, keep the inside unchanged, then multiply by the derivative of the inside.' },
       { title: 'The product and quotient rules', body: 'For $y=uv$, $y\'=u\'v+uv\'$. For $y=\\dfrac uv$, $y\'=\\dfrac{u\'v-uv\'}{v^2}$. Quote the rule, name $u$ and $v$, and write $u\'$ and $v\'$ before substituting.' },
-      { title: 'Exponential, logarithmic and trigonometric derivatives', body: '$\\dfrac{d}{dx}e^{kx}=ke^{kx}$, $\\dfrac{d}{dx}\\ln x=\\dfrac1x$, $\\dfrac{d}{dx}\\sin kx=k\\cos kx$ and $\\dfrac{d}{dx}\\cos kx=-k\\sin kx$. With the chain rule, $\\dfrac{d}{dx}\\ln f(x)=\\dfrac{f\'(x)}{f(x)}$.' },
+      { title: 'Exponential, logarithmic and trigonometric derivatives', body: '$\\dfrac{d}{dx}e^{kx}=ke^{kx}$, $\\dfrac{d}{dx}\\ln x=\\dfrac1x$, $\\dfrac{d}{dx}\\sin kx=k\\cos kx$ and $\\dfrac{d}{dx}\\cos kx=-k\\sin kx$. With the chain rule, $\\dfrac{d}{dx}\\ln(f(x))=\\dfrac{f\'(x)}{f(x)}$.' },
       { title: 'The second derivative', body: '$f\'\'(x)$ is the derivative of $f\'(x)$. Where $f\'\'>0$ the curve is concave up and where $f\'\'<0$ it is concave down; a change of concavity is a point of inflection.' }
     ],
     definitions: [
@@ -675,28 +809,45 @@ export default {
         question: 'Differentiate $y=(3x^2+1)^4$ and find the gradient at $x=1$.',
         steps: ['Let $u=3x^2+1$, so $y=u^4$ and $\\dfrac{dy}{du}=4u^3$, $\\dfrac{du}{dx}=6x$.', 'Then $\\dfrac{dy}{dx}=4(3x^2+1)^3\\times6x=24x(3x^2+1)^3$.', 'At $x=1$: $24\\times1\\times4^3=1536$.'],
         answer: '$\\dfrac{dy}{dx}=24x(3x^2+1)^3$, gradient $1536$ at $x=1$',
-        working: '\\begin{aligned}\\dfrac{dy}{dx}&=4(3x^2+1)^3\\cdot6x\\\\&=24x(3x^2+1)^3\\\\\\left.\\dfrac{dy}{dx}\\right|_{x=1}&=24(64)=1536\\end{aligned}',
+        working: [
+          { say: 'Chain rule with $u=3x^2+1$:', tex: '\\dfrac{dy}{dx}&=4(3x^2+1)^3\\cdot6x' },
+          { tex: '&=24x(3x^2+1)^3' },
+          { say: 'Gradient at $x=1$:', tex: '\\left.\\dfrac{dy}{dx}\\right|_{x=1}&=24(64)=1536' }
+        ],
         verify: { kind: 'value', expr: '((3*(1.0001)^2+1)^4-(3*(0.9999)^2+1)^4)/0.0002', answer: '1536' }
       },
       {
         question: 'Differentiate $y=x^2e^{3x}$ and find the gradient at $x=1$.',
         steps: ['Product rule with $u=x^2$ and $v=e^{3x}$: $u\'=2x$ and $v\'=3e^{3x}$.', '$\\dfrac{dy}{dx}=2xe^{3x}+3x^2e^{3x}=xe^{3x}(2+3x)$.', 'At $x=1$: $1\\times e^3\\times5=5e^3\\approx100.4$.'],
         answer: '$\\dfrac{dy}{dx}=xe^{3x}(3x+2)$, gradient $5e^3\\approx100.4$ at $x=1$',
-        working: '\\begin{aligned}\\dfrac{dy}{dx}&=2xe^{3x}+x^2\\cdot3e^{3x}\\\\&=xe^{3x}(3x+2)\\\\\\left.\\dfrac{dy}{dx}\\right|_{x=1}&=5e^3\\end{aligned}',
+        working: [
+          { say: 'Product rule with $u=x^2$, $v=e^{3x}$:', tex: '\\dfrac{dy}{dx}&=2xe^{3x}+x^2\\cdot3e^{3x}' },
+          { tex: '&=xe^{3x}(3x+2)' },
+          { say: 'Gradient at $x=1$:', tex: '\\left.\\dfrac{dy}{dx}\\right|_{x=1}&=1\\cdot e^3(5)=5e^3' },
+          { say: 'Decimal value:', tex: '5e^3&\\approx100.4' }
+        ],
         verify: { kind: 'value', expr: '((1.0001)^2*e^(3*1.0001)-(0.9999)^2*e^(3*0.9999))/0.0002', answer: '5*e^3' }
       },
       {
         question: 'Differentiate $y=\\dfrac{x}{x^2+1}$ and find the gradient at $x=2$.',
         steps: ['Quotient rule with $u=x$, $v=x^2+1$: $u\'=1$, $v\'=2x$.', '$\\dfrac{dy}{dx}=\\dfrac{1(x^2+1)-x(2x)}{(x^2+1)^2}=\\dfrac{1-x^2}{(x^2+1)^2}$.', 'At $x=2$: $\\dfrac{1-4}{25}=-\\dfrac{3}{25}$.'],
         answer: '$\\dfrac{dy}{dx}=\\dfrac{1-x^2}{(x^2+1)^2}$, gradient $-\\dfrac{3}{25}$ at $x=2$',
-        working: '\\begin{aligned}\\dfrac{dy}{dx}&=\\dfrac{(x^2+1)-2x^2}{(x^2+1)^2}\\\\&=\\dfrac{1-x^2}{(x^2+1)^2}\\\\\\left.\\dfrac{dy}{dx}\\right|_{x=2}&=\\dfrac{-3}{25}\\end{aligned}',
+        working: [
+          { say: 'Quotient rule with $u=x$, $v=x^2+1$:', tex: '\\dfrac{dy}{dx}&=\\dfrac{(x^2+1)-2x^2}{(x^2+1)^2}' },
+          { tex: '&=\\dfrac{1-x^2}{(x^2+1)^2}' },
+          { say: 'Gradient at $x=2$:', tex: '\\left.\\dfrac{dy}{dx}\\right|_{x=2}&=\\dfrac{1-2^2}{(2^2+1)^2}' },
+          { tex: '&=-\\dfrac{3}{25}' }
+        ],
         verify: { kind: 'value', expr: '((2.0001)/((2.0001)^2+1)-(1.9999)/((1.9999)^2+1))/0.0002', answer: '-3/25' }
       },
       {
         question: 'Differentiate $y=\\ln(5x-2)$ and find the gradient at $x=1$.',
-        steps: ['Use $\\dfrac{d}{dx}\\ln f(x)=\\dfrac{f\'(x)}{f(x)}$ with $f(x)=5x-2$.', '$\\dfrac{dy}{dx}=\\dfrac{5}{5x-2}$.', 'At $x=1$ the gradient is $\\dfrac53$.'],
+        steps: ['Use $\\dfrac{d}{dx}\\ln(f(x))=\\dfrac{f\'(x)}{f(x)}$ with $f(x)=5x-2$.', '$\\dfrac{dy}{dx}=\\dfrac{5}{5x-2}$.', 'At $x=1$ the gradient is $\\dfrac53$.'],
         answer: '$\\dfrac{dy}{dx}=\\dfrac{5}{5x-2}$, gradient $\\dfrac53$ at $x=1$',
-        working: '\\begin{aligned}\\dfrac{dy}{dx}&=\\dfrac{5}{5x-2}\\\\\\left.\\dfrac{dy}{dx}\\right|_{x=1}&=\\dfrac{5}{3}\\end{aligned}',
+        working: [
+          { say: 'Use $\\dfrac{d}{dx}\\ln(f(x))=\\dfrac{f\'(x)}{f(x)}$:', tex: '\\dfrac{dy}{dx}&=\\dfrac{5}{5x-2}' },
+          { say: 'Gradient at $x=1$:', tex: '\\left.\\dfrac{dy}{dx}\\right|_{x=1}&=\\dfrac{5}{5(1)-2}=\\dfrac53' }
+        ],
         verify: { kind: 'value', expr: '(ln(5*1.0001-2)-ln(5*0.9999-2))/0.0002', answer: '5/3' }
       }
     ],
@@ -751,28 +902,48 @@ export default {
         question: 'Evaluate $\\displaystyle\\int_1^3\\left(6x^2-4x+5\\right)dx$.',
         steps: ['Antiderivative: $F(x)=2x^3-2x^2+5x$.', '$F(3)=54-18+15=51$ and $F(1)=2-2+5=5$.', 'So the integral is $51-5=46$.'],
         answer: '$46$',
-        working: '\\begin{aligned}\\int_1^3(6x^2-4x+5)\\,dx&=\\Big[2x^3-2x^2+5x\\Big]_1^3\\\\&=(54-18+15)-(2-2+5)\\\\&=51-5=46\\end{aligned}',
+        working: [
+          { say: 'Antiderivative:', tex: '\\int_1^3(6x^2-4x+5)\\,dx&=\\Big[2x^3-2x^2+5x\\Big]_1^3' },
+          { tex: '&=(54-18+15)-(2-2+5)' },
+          { tex: '&=51-5=46' }
+        ],
         verify: { kind: 'values', pairs: [['(2*3^3-2*3^2+5*3)-(2*1^3-2*1^2+5*1)', '46'], ['(3-1)/6*((6*1^2-4*1+5)+4*(6*2^2-4*2+5)+(6*3^2-4*3+5))', '46']] }
       },
       {
         question: 'Find the area under $y=e^{2x}$ from $x=0$ to $x=1$.',
         steps: ['An antiderivative of $e^{2x}$ is $\\tfrac12e^{2x}$.', 'Area $=\\tfrac12e^2-\\tfrac12e^0=\\tfrac12(e^2-1)$.', 'Numerically this is about $3.19$ square units.'],
         answer: '$\\tfrac12\\left(e^2-1\\right)\\approx3.19$ square units',
-        working: '\\begin{aligned}\\int_0^1e^{2x}\\,dx&=\\Big[\\tfrac12e^{2x}\\Big]_0^1\\\\&=\\tfrac12e^2-\\tfrac12\\\\&=\\tfrac12(e^2-1)\\approx3.19\\end{aligned}',
+        working: [
+          { say: 'Area as an integral:', tex: '\\int_0^1e^{2x}\\,dx&=\\Big[\\dfrac12e^{2x}\\Big]_0^1' },
+          { tex: '&=\\dfrac12e^2-\\dfrac12' },
+          { tex: '&=\\dfrac12(e^2-1)' },
+          { say: 'Decimal value:', tex: '\\dfrac12(e^2-1)&\\approx3.19' }
+        ],
         verify: { kind: 'values', pairs: [['(e^(2*1)-e^(2*0))/2', '(e^2-1)/2'], ['(e^2-1)/2', '3.194528049']] }
       },
       {
         question: 'Find the area enclosed by $y=x^2$ and $y=2x$.',
         steps: ['Intersections: $x^2=2x$, so $x=0$ or $x=2$.', 'On $[0,2]$ the line is above the parabola, so area $=\\int_0^2(2x-x^2)\\,dx$.', '$=\\Big[x^2-\\tfrac{x^3}{3}\\Big]_0^2=4-\\tfrac83=\\tfrac43$.'],
         answer: '$\\tfrac43$ square units',
-        working: '\\begin{aligned}A&=\\int_0^2(2x-x^2)\\,dx\\\\&=\\Big[x^2-\\tfrac{x^3}{3}\\Big]_0^2\\\\&=4-\\tfrac83=\\tfrac43\\end{aligned}',
+        working: [
+          { say: 'Intersections:', tex: 'x^2&=2x' },
+          { say: 'Solve:', tex: 'x&=0\\text{ or }2' },
+          { say: 'Line is above the parabola on $[0,2]$:', tex: 'A&=\\int_0^2(2x-x^2)\\,dx' },
+          { tex: '&=\\Big[x^2-\\dfrac{x^3}{3}\\Big]_0^2' },
+          { tex: '&=4-\\dfrac83=\\dfrac43' }
+        ],
         verify: { kind: 'values', pairs: [['(2^2-2^3/3)-(0^2-0^3/3)', '4/3'], ['(2-0)/6*((2*0-0^2)+4*(2*1-1^2)+(2*2-2^2))', '4/3']] }
       },
       {
         question: 'Use the trapezoidal rule with $4$ strips to estimate $\\displaystyle\\int_0^4x^2\\,dx$.',
         steps: ['$h=\\dfrac{4-0}{4}=1$, and the function values at $x=0,1,2,3,4$ are $0,1,4,9,16$.', 'Estimate $=\\dfrac12\\big[0+2(1+4+9)+16\\big]=\\dfrac12(44)=22$.', 'The exact value is $\\dfrac{64}{3}\\approx21.33$, so the rule overestimates, as expected for a concave-up curve.'],
         answer: '$22$',
-        working: '\\begin{aligned}h&=1\\\\\\int_0^4x^2\\,dx&\\approx\\dfrac12\\big[0+2(1+4+9)+16\\big]\\\\&=22\\end{aligned}',
+        working: [
+          { say: 'Strip width:', tex: 'h&=\\dfrac{4-0}{4}=1' },
+          { say: 'Function values at $x=0,1,2,3,4$:', tex: 'y&=0,\\ 1,\\ 4,\\ 9,\\ 16' },
+          { say: 'Trapezoidal rule:', tex: '\\int_0^4x^2\\,dx&\\approx\\dfrac12\\big[0+2(1+4+9)+16\\big]' },
+          { tex: '&=22' }
+        ],
         verify: { kind: 'value', expr: '1/2*(0+2*(1+4+9)+16)', answer: '22' }
       }
     ],
@@ -825,21 +996,37 @@ export default {
         question: 'Find and classify the stationary points of $y=x^3-6x^2+9x+1$.',
         steps: ['$y\'=3x^2-12x+9=3(x-1)(x-3)$, so $y\'=0$ at $x=1$ and $x=3$.', 'The $y$-values are $y(1)=5$ and $y(3)=1$.', '$y\'\'=6x-12$: $y\'\'(1)=-6<0$ so $(1,5)$ is a maximum; $y\'\'(3)=6>0$ so $(3,1)$ is a minimum.'],
         answer: 'Maximum at $(1,5)$ and minimum at $(3,1)$',
-        working: '\\begin{aligned}y\'&=3x^2-12x+9=3(x-1)(x-3)\\\\y\'\'&=6x-12\\\\y\'\'(1)&=-6\\ (\\max),\\quad y\'\'(3)=6\\ (\\min)\\end{aligned}',
+        working: [
+          { say: 'Derivative:', tex: 'y\'&=3x^2-12x+9=3(x-1)(x-3)' },
+          { say: 'Stationary points, $y\'=0$:', tex: 'x&=1\\text{ or }3' },
+          { say: '$y$-values:', tex: 'y(1)&=1-6+9+1=5,\\quad y(3)=27-54+27+1=1' },
+          { say: 'Second derivative:', tex: 'y\'\'&=6x-12' },
+          { say: 'Classify:', tex: 'y\'\'(1)&=-6\\ (\\max),\\quad y\'\'(3)=6\\ (\\min)' }
+        ],
         verify: { kind: 'roots', f: '((x+0.0001)^3-6*(x+0.0001)^2+9*(x+0.0001)+1-((x-0.0001)^3-6*(x-0.0001)^2+9*(x-0.0001)+1))/0.0002', answers: ['1', '3'] }
       },
       {
         question: 'A farmer has $100$ m of fencing for three sides of a rectangular paddock; the fourth side is a wall. Find the greatest possible area.',
         steps: ['Let the two sides at right angles to the wall be $x$ m. The side along the wall is $100-2x$, so $A=x(100-2x)$.', '$A\'=100-4x=0$ gives $x=25$, and $A\'\'=-4<0$, so this is a maximum.', '$A=25\\times50=1250$ m$^2$.'],
         answer: '$1250$ m$^2$, with $x=25$ m',
-        working: '\\begin{aligned}A&=x(100-2x)\\\\A\'&=100-4x=0\\Rightarrow x=25\\\\A\'\'&=-4<0\\\\A&=25(50)=1250\\end{aligned}',
+        working: [
+          { say: 'Area, with the side along the wall $100-2x$:', tex: 'A&=x(100-2x)' },
+          { say: 'Differentiate and set to zero:', tex: 'A\'&=100-4x=0\\Rightarrow x=25' },
+          { say: 'Second derivative shows a maximum:', tex: 'A\'\'&=-4<0' },
+          { say: 'Greatest area:', tex: 'A&=25(50)=1250' }
+        ],
         verify: { kind: 'roots', f: '((x+0.0001)*(100-2*(x+0.0001))-(x-0.0001)*(100-2*(x-0.0001)))/0.0002', answers: ['25'] }
       },
       {
         question: 'A particle moves with displacement $x=2t^3-9t^2+12t$ metres, $t\\ge0$ seconds. When is it at rest, and what is its acceleration then?',
         steps: ['$v=\\dfrac{dx}{dt}=6t^2-18t+12=6(t-1)(t-2)$, so $v=0$ at $t=1$ and $t=2$.', '$a=\\dfrac{dv}{dt}=12t-18$.', 'At $t=1$: $a=-6$ m/s$^2$. At $t=2$: $a=6$ m/s$^2$.'],
         answer: 'At rest at $t=1$ s ($a=-6$ m/s$^2$) and $t=2$ s ($a=6$ m/s$^2$)',
-        working: '\\begin{aligned}v&=6t^2-18t+12=6(t-1)(t-2)\\\\a&=12t-18\\\\a(1)&=-6,\\quad a(2)=6\\end{aligned}',
+        working: [
+          { say: 'Velocity:', tex: 'v&=6t^2-18t+12=6(t-1)(t-2)' },
+          { say: 'At rest, $v=0$:', tex: 't&=1\\text{ or }2' },
+          { say: 'Acceleration:', tex: 'a&=12t-18' },
+          { say: 'Evaluate at the rest times:', tex: 'a(1)&=12(1)-18=-6,\\quad a(2)=12(2)-18=6' }
+        ],
         verify: { kind: 'roots', f: '((2*(t+0.0001)^3-9*(t+0.0001)^2+12*(t+0.0001))-(2*(t-0.0001)^3-9*(t-0.0001)^2+12*(t-0.0001)))/0.0002', var: 't', answers: ['1', '2'] }
       }
     ],
@@ -894,21 +1081,35 @@ export default {
         question: 'A random variable $X$ has $P(X=1)=0.1$, $P(X=2)=0.3$, $P(X=3)=0.4$ and $P(X=4)=0.2$. Find $E(X)$, $\\text{Var}(X)$ and the standard deviation.',
         steps: ['$E(X)=1(0.1)+2(0.3)+3(0.4)+4(0.2)=2.7$.', '$E(X^2)=1(0.1)+4(0.3)+9(0.4)+16(0.2)=8.1$.', '$\\text{Var}(X)=8.1-2.7^2=0.81$, so the standard deviation is $\\sqrt{0.81}=0.9$.'],
         answer: '$E(X)=2.7$, $\\text{Var}(X)=0.81$, standard deviation $0.9$',
-        working: '\\begin{aligned}E(X)&=0.1+0.6+1.2+0.8=2.7\\\\E(X^2)&=0.1+1.2+3.6+3.2=8.1\\\\\\text{Var}(X)&=8.1-2.7^2=0.81\\end{aligned}',
+        working: [
+          { say: 'Expected value:', tex: 'E(X)&=1(0.1)+2(0.3)+3(0.4)+4(0.2)' },
+          { tex: '&=0.1+0.6+1.2+0.8=2.7' },
+          { say: 'Expected value of $X^2$:', tex: 'E(X^2)&=0.1+1.2+3.6+3.2=8.1' },
+          { say: 'Variance:', tex: '\\text{Var}(X)&=8.1-2.7^2=0.81' },
+          { say: 'Standard deviation:', tex: '\\sigma&=\\sqrt{0.81}=0.9' }
+        ],
         verify: { kind: 'values', pairs: [['1*0.1+2*0.3+3*0.4+4*0.2', '2.7'], ['1*0.1+4*0.3+9*0.4+16*0.2-2.7^2', '0.81'], ['sqrt(0.81)', '0.9']] }
       },
       {
         question: 'The function $f(x)=kx$ for $0\\le x\\le3$ (and $0$ elsewhere) is a probability density function. Find $k$ and $P(X\\le2)$.',
         steps: ['The total area is $1$: $\\int_0^3kx\\,dx=k\\left[\\tfrac{x^2}{2}\\right]_0^3=\\tfrac{9k}{2}=1$, so $k=\\tfrac29$.', '$P(X\\le2)=\\int_0^2\\tfrac29x\\,dx=\\tfrac29\\times\\tfrac{4}{2}$.', 'So $P(X\\le2)=\\tfrac49$.'],
         answer: '$k=\\tfrac29$ and $P(X\\le2)=\\tfrac49$',
-        working: '\\begin{aligned}\\int_0^3kx\\,dx&=\\tfrac{9k}{2}=1\\Rightarrow k=\\tfrac29\\\\P(X\\le2)&=\\tfrac29\\cdot\\tfrac{2^2}{2}=\\tfrac49\\end{aligned}',
+        working: [
+          { say: 'Total area is $1$:', tex: '\\int_0^3kx\\,dx&=\\dfrac{9k}{2}' },
+          { say: 'Solve for $k$:', tex: '\\dfrac{9k}{2}&=1\\Rightarrow k=\\dfrac29' },
+          { say: 'Probability as an area:', tex: 'P(X\\le2)&=\\int_0^2\\dfrac29x\\,dx' },
+          { tex: '&=\\dfrac29\\cdot\\dfrac{2^2}{2}=\\dfrac49' }
+        ],
         verify: { kind: 'values', pairs: [['(2/9)*3^2/2', '1'], ['(2/9)*2^2/2', '4/9']] }
       },
       {
         question: 'Test scores are normally distributed with mean $70$ and standard deviation $8$. Find the $z$-score of a score of $86$, and the score that has $z=-1.5$.',
         steps: ['$z=\\dfrac{86-70}{8}=2$.', 'Using $x=\\mu+z\\sigma$: $x=70+(-1.5)(8)=70-12$.', 'So the score is $58$. A score of $86$ is $2$ standard deviations above the mean.'],
         answer: '$z=2$ for a score of $86$; $z=-1.5$ is a score of $58$',
-        working: '\\begin{aligned}z&=\\dfrac{86-70}{8}=2\\\\x&=70+(-1.5)(8)=58\\end{aligned}',
+        working: [
+          { say: '$z$-score of $86$:', tex: 'z&=\\dfrac{86-70}{8}=2' },
+          { say: 'Score with $z=-1.5$, using $x=\\mu+z\\sigma$:', tex: 'x&=70+(-1.5)(8)=58' }
+        ],
         verify: { kind: 'values', pairs: [['(86-70)/8', '2'], ['70+(-1.5)*8', '58']] }
       }
     ],
@@ -963,28 +1164,44 @@ export default {
         question: '$\\$8000$ is invested at $6\\%$ per annum, compounded monthly, for $3$ years. Find the final value.',
         steps: ['Monthly rate $r=\\dfrac{0.06}{12}=0.005$ and $n=12\\times3=36$.', '$A=8000(1.005)^{36}$.', '$A\\approx\\$9573.44$.'],
         answer: '$\\$9573.44$',
-        working: '\\begin{aligned}A&=8000(1+0.005)^{36}\\\\&=8000(1.196681\\ldots)\\\\&\\approx9573.44\\end{aligned}',
+        working: [
+          { say: 'Monthly rate $0.005$, $n=36$:', tex: 'A&=8000(1+0.005)^{36}' },
+          { tex: '&=8000(1.196681\\ldots)' },
+          { tex: '&\\approx9573.44' }
+        ],
         verify: { kind: 'value', expr: '8000*(1+0.06/12)^(12*3)', answer: '9573.444198587' }
       },
       {
         question: 'A car worth $\\$35\\,000$ depreciates at $15\\%$ per year. Find its value after $4$ years.',
         steps: ['The yearly factor is $1-0.15=0.85$.', '$S=35000(0.85)^4$.', '$S\\approx\\$18\\,270.22$.'],
         answer: '$\\$18\\,270.22$',
-        working: '\\begin{aligned}S&=35000(1-0.15)^4\\\\&=35000(0.52200625)\\\\&\\approx18270.22\\end{aligned}',
+        working: [
+          { say: 'Yearly factor $0.85$:', tex: 'S&=35000(1-0.15)^4' },
+          { tex: '&=35000(0.52200625)' },
+          { tex: '&\\approx18270.22' }
+        ],
         verify: { kind: 'value', expr: '35000*0.85^4', answer: '18270.21875' }
       },
       {
         question: '$\\$500$ is deposited at the end of each quarter for $5$ years at $8\\%$ per annum compounded quarterly. Find the value of the investment at the end.',
         steps: ['Quarterly rate $r=\\dfrac{0.08}{4}=0.02$ and $n=4\\times5=20$.', '$FV=500\\times\\dfrac{1.02^{20}-1}{0.02}$.', '$FV\\approx\\$12\\,148.68$.'],
         answer: '$\\$12\\,148.68$',
-        working: '\\begin{aligned}FV&=500\\times\\dfrac{(1.02)^{20}-1}{0.02}\\\\&=500(24.2974\\ldots)\\\\&\\approx12148.68\\end{aligned}',
+        working: [
+          { say: 'Future value of an annuity, $r=0.02$, $n=20$:', tex: 'FV&=500\\times\\dfrac{(1.02)^{20}-1}{0.02}' },
+          { tex: '&=500(24.2974\\ldots)' },
+          { tex: '&\\approx12148.68' }
+        ],
         verify: { kind: 'value', expr: '500*((1.02)^20-1)/0.02', answer: '12148.684899459' }
       },
       {
         question: 'A loan of $\\$20\\,000$ is charged $6\\%$ per annum, compounded monthly, and repaid in equal monthly instalments over $5$ years. Find the monthly repayment.',
         steps: ['$r=0.005$ and $n=60$. The loan is repaid when $A_{60}=0$.', '$M=\\dfrac{20000(0.005)(1.005)^{60}}{(1.005)^{60}-1}$.', '$M\\approx\\$386.66$.'],
         answer: '$\\$386.66$ per month',
-        working: '\\begin{aligned}M&=\\dfrac{Pr(1+r)^n}{(1+r)^n-1}\\\\&=\\dfrac{20000(0.005)(1.005)^{60}}{(1.005)^{60}-1}\\\\&\\approx386.66\\end{aligned}',
+        working: [
+          { say: 'Repayment formula:', tex: 'M&=\\dfrac{Pr(1+r)^n}{(1+r)^n-1}' },
+          { tex: '&=\\dfrac{20000(0.005)(1.005)^{60}}{(1.005)^{60}-1}' },
+          { tex: '&\\approx386.66' }
+        ],
         verify: { kind: 'roots', f: '20000*1.005^60-M*(1.005^60-1)/0.005', var: 'M', answers: ['386.6560305886'] }
       }
     ],

@@ -141,6 +141,7 @@ jobs:
           # Cloud sync end to end: restore on a fresh device, automatic
           # triggers, and 409 entity-conflict recovery.
           node client/test/cloud-restore-fidelity-check.mjs
+          node client/test/returning-signin-restore-check.mjs
           node client/test/auto-sync-scheduler-check.mjs
           node client/test/sync-conflict-recovery-check.mjs
           node client/test/cloud-session-refresh-check.mjs
@@ -369,6 +370,15 @@ jobs:
           # account-scoped, capped, in the export and gone with the account.
           node server/test/resource-bookmark-sync-check.mjs 2>&1 | tee resource-bookmark.log
           node tools/ci-check-counts.mjs verify platform/resource-bookmark.log
+          # Extension 1 practice papers (Prithagoras): the manifest equals the files on disk,
+          # Premium (premium-exams) by the server's own row, Paper 01 free as the sample,
+          # Priyabhata 404, no path traversal.
+          node server/test/papers-check.mjs 2>&1 | tee papers.log
+          node tools/ci-check-counts.mjs verify platform/papers.log
+          # The generated Exam-style practice sets (server/content/papers/nsw-practice/): free to sit,
+          # offered by chapter, marked per part by the engine, no plan or re-test, no PDF, India 404.
+          node server/test/practice-sets-check.mjs 2>&1 | tee practice-sets.log
+          node tools/ci-check-counts.mjs verify platform/practice-sets.log
           # The Exam Desk (ADR-0002 §8 plan F4a): the unmarked mode — server-stamped
           # clock, one open attempt per paper, the import, never a mark — and the
           # static proof that it reaches nothing of the marking path.
@@ -387,6 +397,10 @@ jobs:
           # deleted with the account and expired after the edition's retention.
           node server/test/original-work-check.mjs 2>&1 | tee original-work.log
           node tools/ci-check-counts.mjs verify platform/original-work.log
+          # The reading floor on the submit route (owner decision 19 Nov 2026, ADR-0001 amendment): a below-floor or
+          # uncertain line is never judged, an unreadable final answer records nothing, the exclusions are exported.
+          node server/test/reading-floor-http-check.mjs 2>&1 | tee reading-floor-http.log
+          node tools/ci-check-counts.mjs verify platform/reading-floor-http.log
           # The anonymous public resource catalogue (plan F6a): off by default,
           # published rows of this server's edition only, no cookie, CORS only
           # for a listed origin, rate-limited; the signed-in library stays signed in.
@@ -521,6 +535,14 @@ jobs:
           node tools/ci-check-counts.mjs verify platform/secret-shapes.log
           node server/test/security-acceptance-check.mjs
           node server/test/abuse-limits-check.mjs
+          # ADR-0003, the guest trial: a sealed anonymous token (forgery, tamper, expiry,
+          # replay), its own CSRF header, 5 per token / 15 per address / 6 tokens per
+          # address / a process-wide ceiling, no key before the verdict, no account or
+          # paid route reachable, no rows written. And everything its picker lists is
+          # something the server issues, in both editions.
+          node server/test/guest-trial-check.mjs 2>&1 | tee guest-trial.log
+          node server/test/guest-menu-issuable-check.mjs 2>&1 | tee -a guest-trial.log
+          node tools/ci-check-counts.mjs verify platform/guest-trial.log
           # CodeQL #461: prove the recognize route's account-keyed, atomic limit
           # under simultaneous requests rather than only the serial boundary.
           node server/test/pr618-recognition-rate-concurrency-check.mjs
@@ -1009,21 +1031,40 @@ jobs:
             # The diagram kit (shared by Notes and questions) at phone width, in light and dark,
             # by keyboard, with reduced motion.
             node client/test/diagram-kit-browser-check.mjs 2>&1 | tee -a browser.log
+            # Every notes diagram, both editions, desktop and 390 px: no overlapping or on-curve labels,
+            # every reference line named (needs Chromium, so here and not in the suites shards).
+            node client/test/notes-diagram-layout-check.mjs 2>&1 | tee -a browser.log
             # Every NSW notes chapter in light and dark: no KaTeX error, one section order, CMU Serif
             # for reading, no stripe, gradient, emoji or overflow at phone width.
             node client/test/nsw-notes-visual-check.mjs 2>&1 | tee -a browser.log
+            # The living formulas (drag a number, the graph redraws) in light and dark, phone and desktop (needs Chromium, so here
+            # and not in the suites shards; the arithmetic is test:living in the shards).
+            node client/test/living-formulas-check.mjs 2>&1 | tee -a browser.log
+            # The marked page (owner's two cases and a mixed page, ink and photo, both editions, light and dark, desktop and 390 px):
+            # a real browser, so here and not in the suites shards.
+            node client/test/tour-marked-page.mjs 2>&1 | tee -a browser.log
             # Plan E5: a built Prithagoras client on a Prithagoras server shows
             # no price, plan or purchase control and reaches no store.
             node client/test/tour-paywall-edition.js 2>&1 | tee -a browser.log
             # Plan G4: a Prithagoras student sits an NSW HSC-style paper: server-owned reading
             # time (inputs disabled, nothing sent), working time, an answer-checked result, no band.
             node client/test/tour-nsw-exams.js 2>&1 | tee -a browser.log
+            # Extension 1 practice papers (Prithagoras): the section shows for an Extension 1
+            # Year 11-12 profile only; Paper 01 free, the rest Premium; real PDF downloads.
+            node client/test/tour-ext1-papers.js 2>&1 | tee -a browser.log
             # A Prithagoras NSW student's practice is issued and marked by the
             # server: the device names the profile's own course, never 'in'.
             node client/test/tour-nsw-practice-marked.js 2>&1 | tee -a browser.log
+            # ADR-0003: a visitor with no account meets the question picker first, in both
+            # editions, has up to five typed or multiple-choice questions marked by the
+            # server, and then a calm sign-up prompt; nothing of an account is touched.
+            node client/test/tour-guest-trial.js 2>&1 | tee -a browser.log
             # A failed chunk, a refused cache write or a probe that never settles must
             # end in the app or in a visible notice with Reload, never a silent splash.
             npm run test:boot 2>&1 | tee -a browser.log
+            # A returning browser moves to a new release with the real service worker: one reload when untouched,
+            # a notice when touched, build A still working when the live shell cannot be fetched.
+            node client/test/tour-fresh-release.js --no-build 2>&1 | tee -a browser.log
               ;;
             edition-prithagoras)
             # Plan E6: PRI_EDITION=prithagoras for the whole group (the step's
@@ -1063,7 +1104,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: failure-screens-${{ matrix.group }}
-          path: /tmp/pri-e2e-shots-*/*FAIL*.png
+          path: /tmp/pri-e2e-shots-*/*FAIL*
           if-no-files-found: ignore
           retention-days: 14
 

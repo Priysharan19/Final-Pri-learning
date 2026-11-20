@@ -1,6 +1,6 @@
 # Cancellation and refund policy
 
-**Last updated: 18 November 2026**
+**Last updated: 19 November 2026**
 
 Prithagoras Premium is a subscription. This page says what it costs, who takes
 the payment, how to cancel and how to ask for a refund. It has not yet been
@@ -13,6 +13,14 @@ Where GST applies to a purchase, the price you see includes it. This policy is
 not a statement that we are registered for GST, and a receipt is not a tax
 invoice unless it says it is. The subscription renews at the end of each month or
 year until you cancel it.
+
+## HSC Pass to the exams (when it is on sale)
+
+The HSC Pass to the exams is a single payment with no renewal. The app shows the
+exact price and the exact date it ends before you pay. It ends on that date by
+itself and nothing more is charged. There is nothing to cancel. If the payment
+for the pass is refunded in full, the Premium it gave ends at once. Your rights
+under the Australian Consumer Law, below, apply to it as to any other purchase.
 
 ## Who takes the payment
 
@@ -43,7 +51,7 @@ imply that a purchase cannot be refunded.
 
 ## How to ask for a refund
 
-Write to {{CONTACT_EMAIL}} from the email address on the account, with the date
+Write to prilearning19@gmail.com from the email address on the account, with the date
 of the charge. We aim to acknowledge within 48 hours and reply within 3 business
 days. Whatever we decide, you keep the rights described above. If a payment for
 the current period is refunded in full, Premium for that period ends at once.

@@ -18,7 +18,11 @@ import Practice from './pages/Practice.jsx';
 import Icon from './components/Icon.jsx';
 import { BrandWordmark, EditionByline } from './components/BrandMark.jsx';
 import { BRAND } from './brand/edition.js';
-import { parentFeaturesOffered } from './platform/edition.js';
+import { guestTrialAvailable } from './guest/guestTrial.js';
+import { parentFeaturesOffered, gamesOffered, offering, courseOffered } from './platform/edition.js';
+// Owner decision, 19 Nov 2026: the course choice for an account on a year or course the edition no longer offers is its own
+// chunk, fetched only for such an account (never in India, whose offering is none).
+const CoursePrompt = React.lazy(() => import('./components/OfferedCourse.jsx').then(m => ({ default: m.CoursePrompt })));
 import ReaderPermissionHost from './ink/ReaderPermission.jsx';
 
 // ── Routes nobody has opened yet ─────────────────────────────────────────────
@@ -35,9 +39,14 @@ import ReaderPermissionHost from './ink/ReaderPermission.jsx';
 const ProgressPage = React.lazy(() => import('./pages/Progress.jsx'));
 const Exams = React.lazy(() => import('./pages/Exams.jsx'));
 const PaperGenerator = React.lazy(() => import('./pages/PaperGenerator.jsx'));
+const PaperSitting = React.lazy(() => import('./paper/PaperSitting.jsx'));
 const ExamRoom = React.lazy(() => import('./pages/ExamRoom.jsx'));
-const Rush = React.lazy(() => import('./pages/Rush.jsx'));
-const Match = React.lazy(() => import('./pages/Match.jsx'));
+// Rapid Fire and Match are a literal in a build (vite.config.js __PRI_GAMES__): Prithagoras hides them (owner decision, 19 Nov 2026), and its
+// build then emits neither page. A Node suite or the dev server, with no literal, has them.
+/* global __PRI_GAMES__ */
+const GAMES_BUILD = typeof __PRI_GAMES__ === 'boolean' ? __PRI_GAMES__ : true;
+const Rush = GAMES_BUILD ? React.lazy(() => import('./pages/Rush.jsx')) : null;
+const Match = GAMES_BUILD ? React.lazy(() => import('./pages/Match.jsx')) : null;
 const Tasks = React.lazy(() => import('./pages/Tasks.jsx'));
 const Teach = React.lazy(() => import('./pages/Teach.jsx'));
 const History = React.lazy(() => import('./pages/History.jsx'));
@@ -77,6 +86,39 @@ const LEGAL_ROUTES_EXTRA = EDITION === 'prithagoras' ? (
 // signed-out web routes, each its own chunk: a student who opens the app never
 // downloads them.
 const Landing = React.lazy(() => import('./landing/Landing.jsx'));
+// The first screen for a visitor with no account (ADR-0003): the question picker and up to five server-marked questions.
+const GuestTry = React.lazy(() => import('./guest/GuestTry.jsx'));
+
+/**
+ * `/signin` for someone who is signed in. The sign-in page opens the student's
+ * first question itself the moment the account is confirmed (Login.jsx); this
+ * route only has to stay out of its way for that instant, then take anyone who
+ * is still here (a bookmark, the back button) to their landing page.
+ */
+function LeaveSignIn({ to }) {
+  const nav = useNavigate();
+  useEffect(() => {
+    const id = setTimeout(() => nav(to, { replace: true }), 700);
+    return () => clearTimeout(id);
+  }, [nav, to]);
+  return React.createElement(RouteLoading);
+}
+
+/**
+ * What `/` is before anyone is signed in. A device that already holds a saved
+ * profile opens on its sign-in picker, exactly as before; a device that holds
+ * none is a visitor's, and meets the question picker first.
+ */
+function FirstScreen() {
+  const [first, setFirst] = useState(null);
+  useEffect(() => {
+    let live = true;
+    api.get('/profiles').then(r => { if (live) setFirst(r?.profiles?.length ? 'device' : 'visitor'); }).catch(() => { if (live) setFirst('visitor'); });
+    return () => { live = false; };
+  }, []);
+  if (!first) return React.createElement(RouteLoading);
+  return first === 'visitor' ? <GuestTry /> : <Login />;
+}
 const PublicInfo = React.lazy(() => import('./landing/PublicInfo.jsx'));
 // The Prithagoras edition has its own NSW notes page, built from the NSW curriculum
 // model; it never loads or shows the India notes (client/test/nsw-notes-no-india-check.mjs).
@@ -179,7 +221,8 @@ const STUDENT_NAV = [
     { to: '/map', key: 'inst.tabMap', ico: I.map }, { to: '/review', key: 'inst.tabScripts', ico: I.review },
     ...(PARENT_REPORT_ON ? [{ to: '/parent-report', key: 'nav.parentReport', ico: I.progress }] : [])
   ] },
-  { label: 'nav.groupPlay', items: [{ to: '/rush', key: 'nav.rush', ico: I.rush }, { to: '/match', key: 'nav.match', ico: I.match }] },
+  // Rapid Fire and Match: not offered in Prithagoras (owner decision, 19 Nov 2026).
+  ...(GAMES_BUILD && gamesOffered() ? [{ label: 'nav.groupPlay', items: [{ to: '/rush', key: 'nav.rush', ico: I.rush }, { to: '/match', key: 'nav.match', ico: I.match }] }] : []),
   { label: 'nav.groupAccount', items: [{ to: '/settings', key: 'nav.settings', ico: I.settings }] },
 ];
 
@@ -578,6 +621,11 @@ export default function App() {
             <Route path="/welcome/marking" element={<PublicInfo page="marking" />} />
             <Route path="/welcome/syllabus" element={<PublicInfo page="syllabus" />} />
             <Route path="/welcome/teachers" element={<PublicInfo page="teachers" />} />
+            {/* The first screen is the question picker (ADR-0003). The sign-in
+                page is one click away ("Sign in") and stays the page for every
+                other address; a native shell keeps it as the first screen. */}
+            {guestTrialAvailable() && <Route path="/" element={<FirstScreen />} />}
+            <Route path="/signin" element={<Login />} />
             <Route path="*" element={<Login />} />
           </Routes>
         </React.Suspense>
@@ -709,6 +757,7 @@ export default function App() {
                     {PARENT_REPORT_ON && <Route path="/parent-report" element={studentOnly(<ParentReport />)} />}
                     {PLACEMENT_ON && <Route path="/placement" element={studentOnly(<Placement />)} />}
                     <Route path="/map" element={studentOnly(<MapPage />)} />
+                    <Route path="/signin" element={<LeaveSignIn to={roleLanding} />} />
                     <Route path="/stats" element={<Navigate to="/progress" replace />} />
                     <Route path="/badges" element={<Navigate to="/progress" replace />} />
                     <Route path="/tasks" element={studentOnly(<Tasks />, '/teach#teacher-assignments')} />
@@ -716,14 +765,16 @@ export default function App() {
                     <Route path="/exams" element={studentOnly(<Exams />)} />
                     <Route path="/paper-generator" element={studentOnly(<PaperGenerator />)} />
                     <Route path="/exams/:id" element={studentOnly(<ExamRoom />)} />
+                    <Route path="/papers/sit/:attemptId" element={studentOnly(<PaperSitting />)} />
                     <Route path="/notes" element={studentOnly(<Notes />)} />
                     <Route path="/notes/:chapterId" element={studentOnly(<Notes />)} />
                     {LIBRARY_ON && <Route path="/library" element={studentOnly(<Library />)} />}
                     {LIBRARY_ON && <Route path="/library/:id" element={studentOnly(<Library desk={DESK_ON} />)} />}
                     {DESK_ON && <Route path="/desk/import" element={studentOnly(<DeskImport />)} />}
                     {DESK_ON && <Route path="/desk/:attemptId" element={studentOnly(<DeskPage />)} />}
-                    <Route path="/rush" element={studentOnly(<Rush />)} />
-                    <Route path="/match" element={studentOnly(<Match />)} />
+                    {/* Owner decision, 19 Nov 2026: Rapid Fire and Match are hidden in Prithagoras; their URLs go Home. */}
+                    <Route path="/rush" element={GAMES_BUILD && gamesOffered() ? studentOnly(<Rush />) : <Navigate to="/" replace />} />
+                    <Route path="/match" element={GAMES_BUILD && gamesOffered() ? studentOnly(<Match />) : <Navigate to="/" replace />} />
                     <Route path="/review" element={studentOnly(<History />)} />
                     <Route path="/history" element={<Navigate to="/review" replace />} />
                     <Route path="/favorites" element={<Navigate to="/review?filter=bookmarked" replace />} />
@@ -787,6 +838,10 @@ export default function App() {
         </>
       )}
       {/* D17: asks once, before the first handwriting or photo read. */}
+      {/* Owner decision, 19 Nov 2026: a student on a year or course this edition no longer offers chooses one, once. */}
+      {offering() && user.role !== 'teacher' && (user.course || 'nsw') === 'nsw' && !courseOffered(user.year, user.year >= 11 ? (user.pathway || 'advanced') : null) && (
+        <React.Suspense fallback={null}><CoursePrompt user={user} setUser={setUser} /></React.Suspense>
+      )}
       <ReaderPermissionHost />
       <ToastLayer toasts={toasts} />
     </AppCtx.Provider>

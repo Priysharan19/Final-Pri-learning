@@ -38,7 +38,7 @@ async function pageOf(ctx) {
 }
 
 async function waitApp(page) {
-  await page.waitForSelector('.auth-wrap .hero-title, .auth-card, .shell', { timeout: 30000 });
+  await page.waitForSelector('.auth-wrap .hero-title, .auth-card, .shell, [data-guest-try]', { timeout: 30000 });
   await page.waitForFunction(
     () => ![...document.querySelectorAll('[role="status"]')]
       .some(el => (el.textContent || '').trim().startsWith('Loading')),

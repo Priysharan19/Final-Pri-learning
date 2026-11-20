@@ -158,6 +158,14 @@ export const ON_DEMAND = [
   // shows, and pdfPage.js reports that case by name.
   [/(^|\/)pdf(\.worker)?-[^/]*\.(js|mjs)$/, 'PDF renderer'],
 
+  // ~3 MB of libheif (asm.js, LGPL-3.0, unmodified) that turns an iPhone's HEIC
+  // photo into pixels on browsers that cannot open one. Fetched only when a
+  // HEIC file is chosen on such a browser (ink/photoIntake.js); Safari never
+  // asks. Choosing a HEIC for the first time with no signal is the one case
+  // this shows, and photoIntake names it ("decoder-unavailable") and leaves
+  // the file chosen, so the student can try again when connected.
+  [/(^|\/)heicDecoder-[^/]*\.js$/, 'HEIC photo converter'],
+
   // The handwriting recogniser and its 799 kB of weights — a third of the old
   // install, for the one input mode a phone without a stylus is least likely to
   // use. It is already behind an import(), so nothing on the first screen wants
@@ -183,6 +191,10 @@ export const ON_DEMAND = [
   // chunk is always requested over a live connection and cached from then on.
   // A chunk that cannot load leaves the plain step report in its place.
   [/(^|\/)AnnotatedWorking-[^/]*\.(js|css)$/, 'annotated working (shown only after online marking)'],
+
+  // The course choice for an account on a year or course the edition no longer offers (owner decision, 19 Nov 2026):
+  // App.jsx renders it only for such an account, so a build whose edition offers everything never fetches it.
+  [/(^|\/)(OfferedCourse|NotOffered)-[^/]*\.(js|css)$/, 'course choice, and the calm page for a link to a course the edition does not offer'],
   // The public landing and its plain pages (landing/): signed-out web routes
   // behind import() in App.jsx, for a visitor who has not installed anything
   // yet. A signed-in student never opens them, and an offline copy would serve
@@ -722,7 +734,8 @@ export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HAN
 //   SYLLABUS_BOARD — the syllabus board, priorities and paper readiness on the
 //   Progress page (both editions). Off in a production build: the Prithagoras
 //   board names NSW outcome codes and focus areas to students, and whether that
-//   needs NESA permission is an open question (research §5.7).
+//   needs NESA permission is an open question (research §5.7). The owner turned
+//   it on for a Prithagoras build on 18 Nov 2026 (featureStates); it stays off for Priyabhata.
 //   TUTOR_POLICY — the tutor policy's "smallest next step" panel above the hint
 //   ladder (src/engine/tutorPolicy.js, src/components/HelpPlan.jsx). Opt-in
 //   everywhere, the dev server included: turning it on is an owner decision,
@@ -730,7 +743,11 @@ export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HAN
 const OPT_IN_FLAGS = new Set(['PAST_PAPERS', 'TUTOR_POLICY']);
 const flagKey = name => name.toLowerCase().replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 export function featureStates(command, env = process.env) {
-  const on = name => (command === 'build' || OPT_IN_FLAGS.has(name) ? env[`PRI_FEATURE_${name}`] === '1' : env[`PRI_FEATURE_${name}`] !== '0');
+  // Owner decision 18 Nov 2026: the syllabus board is ON in a Prithagoras build (NESA outcome codes beside our own
+  // descriptions; the wording guard in hsc-priorities-check.mjs holds the text). PRI_FEATURE_SYLLABUS_BOARD=0 still
+  // switches it off; a Priyabhata build keeps it off until it is turned on explicitly.
+  const defaultOn = name => name === 'SYLLABUS_BOARD' && resolveEdition(env) === 'prithagoras' && env.PRI_FEATURE_SYLLABUS_BOARD !== '0';
+  const on = name => (command === 'build' || OPT_IN_FLAGS.has(name) ? env[`PRI_FEATURE_${name}`] === '1' || defaultOn(name) : env[`PRI_FEATURE_${name}`] !== '0');
   // The regional edition (client/edition.config.mjs, ADR-0002) this build
   // serves: PRI_EDITION, unset = Priyabhata. An unknown value stops the build.
   return { ...Object.fromEntries([...FEATURE_FLAGS, ...PENDING_FEATURE_FLAGS].map(name => [flagKey(name), on(name)])), instrument: INSTRUMENT_BUILD, skin: INTERFACE_SKIN, edition: resolveEdition(env) };
@@ -755,6 +772,9 @@ export function featureDefines(command, env = process.env) {
     // Which notes page this build carries: a literal, so the other edition's page and its whole notes data are
     // dead code and are not emitted (App.jsx; client/test/nsw-notes-no-india-check.mjs).
     __PRI_NOTES_PAGE__: JSON.stringify(states.edition === 'prithagoras' ? 'nsw' : 'india'),
+    // Rapid Fire and Match (owner decision, 19 Nov 2026: hidden in Prithagoras): a literal, so a build without them
+    // holds neither page, nor their chunks, in the install (App.jsx).
+    __PRI_GAMES__: JSON.stringify(editionOf(states.edition).games !== false),
     // Plan E5: false in a build of an edition with no payment provider, so its
     // bundle holds no purchase flow at all (client/src/platform/nativeBilling.js).
     __PRI_PREMIUM_ON_SALE__: JSON.stringify(editionOf(states.edition).billing.providers.length > 0),
@@ -787,7 +807,8 @@ export default defineConfig(({ command }) => {
     define: {
       ...featureDefines(command),
       __PRI_FEATURE_TUTOR__: JSON.stringify(featureTutor),
-      __PRI_PRODUCTION_BUILD__: JSON.stringify(command === 'build')
+      __PRI_PRODUCTION_BUILD__: JSON.stringify(command === 'build'),
+      __PRI_BUILD_SHA__: JSON.stringify(command === 'build' ? String(releaseIdentity.releaseSha || '') : '')
     },
     plugins: [react(), editionRecordPlugin(featureStates(command).edition, { mustLoad: command === 'build' }), editionLegalPlugin(featureStates(command).edition), editionBrand(featureStates(command).edition), editionLanguages(featureStates(command).edition), releaseIdentityManifest(releaseIdentity), featureManifest({ ...featureStates(command), tutor: featureTutor }), precache()],
     server: { port: 5173 },

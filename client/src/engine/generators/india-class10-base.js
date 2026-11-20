@@ -601,6 +601,13 @@ export const indiaClass10 = {
     const width = rc(rng, [10, 20]);
     const start = width * ri(rng, 0, 3);
     const freqs = Array.from({ length: 5 }, () => ri(rng, 2, 15));
+    // A modal class has to be unique by construction: two classes sharing the top frequency give two
+    // modes by the same formula (13 twice gave 700/19 and 65.5), and the key names only one. Bump the
+    // first of the tied classes by one; nothing extra is drawn from the rng.
+    if (diff === 2) {
+      const top = Math.max(...freqs);
+      if (freqs.filter(f => f === top).length > 1) freqs[freqs.indexOf(top)] = top + 1;
+    }
     const classes = freqs.map((f, i) => ({ lo: start + i * width, hi: start + (i + 1) * width, mid: start + i * width + width / 2, f }));
     const table = classes.map(c => `$${c.lo}$–$${c.hi}$: $${c.f}$`).join(', ');
     const N = freqs.reduce((a, b) => a + b, 0);

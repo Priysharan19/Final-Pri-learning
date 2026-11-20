@@ -5,6 +5,7 @@ import 'katex/dist/katex.min.css';
 import './latex.css';
 import { useLanguage } from '../i18n/index.js';
 import { EDITION_ID } from '../brand/edition.js';
+import { breaksToHtml } from './textBreaks.js';
 import { speakMath, speechLocale } from './mathSpeech.js';
 
 /** The one escape used on every path that reaches dangerouslySetInnerHTML.
@@ -72,10 +73,14 @@ export function MathText({ text, block = false, display = false, className }) {
         const lead = math === null ? null : /^[,.;:!?)\]]+/.exec(rest);
         flush(lead ? lead[0] : '');
         if (lead) rest = rest.slice(lead[0].length);
-        out += rest
+        out += breaksToHtml(rest
           .replace(/\\\$/g, '$')
+          // Outside a formula an escaped percent is a percent and a TeX thin space is a thin space: a prompt written
+          // "1.5\% a month" or "\$10\,000" must not show its backslashes. Inside $…$ KaTeX reads both itself.
+          .replace(/\\%/g, '%')
+          .replace(/\\,/g, ' ')
           .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-          .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+          .replace(/\*([^*]+)\*/g, '<em>$1</em>'));
       }
     });
     flush('');

@@ -11,7 +11,7 @@
 //     try — which is why the client must never put a sentence in the field;
 //   · 6 earns 3 of 3 with the working, with the unrelated notes left in, and
 //     with strict ">" where "≥" is right: this question's working is not
-//     step-checked (supportsSteps: false), so no line is judged either way;
+//     step-checked (supportsSteps: false), so no line is crossed either way (a line restating what the prompt gives may be ticked as given);
 //   · 9 with correct working earns 0 of 3: there are no method marks here;
 //   · on a question whose working IS checked, unrelated lines such as
 //     `b = {40,50,60}` are notes — never a broken line — and do not void the
@@ -90,7 +90,13 @@ try {
   for (const [label, lines] of [['with the relevant working', WORK], ['with the unrelated notes left in', [...NOTES, ...WORK]], ['with strict > where ≥ is right', STRICT], ['with no working', null]]) {
     const r = await mark(LEAST, '6', lines);
     c.deq([r.replies.length, r.last.correct, r.last.resolved, r.last.marksEarned, r.last.marksPossible], [1, true, true, 3, 3], `6 ${label}: correct, 3 of 3, on the first try`);
-    c.deq([r.last.stepReport, r.last.partial], [null, null], `6 ${label}: no line is judged — the working of this question is not checked`);
+    // Train marking 9: this question still has no Step Check and no method marks (partial stays null). A line that restates
+    // what the prompt itself gives may now be ticked as given, feedback only: so a report, when there is one, is the
+    // true-as-written report, it crosses nothing, and it carries no mark.
+    c.eq(r.last.partial, null, `6 ${label}: no method marks, the working of this question is not step-checked`);
+    c.ok(r.last.stepReport === null || (r.last.stepReport.arithmetic === true && r.last.stepReport.firstBreak === -1 && r.last.stepReport.lines.every(l => l.status === 'ok' || l.status === 'note')),
+      `6 ${label}: no line is crossed; any tick is a true-as-written tick only`);
+    if (!lines) c.eq(r.last.stepReport, null, `6 ${label}: nothing about working that was not sent`);
     c.ok(String(r.last.solution?.answerText) === '6', `6 ${label}: the worked solution is shown`);
   }
   for (const [label, lines] of [['with the correct working', WORK], ['with the notes and the correct working', [...NOTES, ...WORK]], ['with strict > working', STRICT]]) {

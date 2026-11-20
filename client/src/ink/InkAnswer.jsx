@@ -30,8 +30,10 @@ import InkCanvas from './InkCanvas.jsx';
 import NativeInkCanvas from './NativeInkCanvas.jsx';
 import { nativeInkAvailable } from './native.js';
 import { exprToLatex } from './inkLatex.js';
+import { Typeset } from '../components/Typeset.jsx';
+import { segmentsFor } from '../photo/transcript.js';
 import { ACCOUNT_BLOCKED_KEYS, inkReaderUiState, readerBlock, readerPaused, readinessIdentity, resumeReaderNow, readWithCloud, recordLocalHandwritingDiagnostics, toReading } from './cloudReader.js';
-import { retryClock } from './readerFailure.js';
+import { retryClock, retryWhen } from './readerFailure.js';
 import { useInRouterContext } from 'react-router-dom';
 import PageLink from '../components/PageLink.jsx';
 import { useApp } from '../App.jsx';
@@ -45,10 +47,13 @@ import { inkCanvasHeight, useFormFactor } from '../platform/formFactor.js';
 import { useLanguage, useT } from '../i18n/index.js';
 import MarginMarks, { stampDelay, sweepSpan } from '../instrument/MarginMarks.jsx';
 import Icon from '../components/Icon.jsx';
+import { EngineComment } from '../components/EngineComment.jsx';
+import { plainComment } from '../engine/commentTex.js';
 import './InkAnswer.css';
 import { priNative } from '../platform/native/index.js';
 import { strokeSignature, createStrokeSignature } from './strokeSignature.js';
 import { autoReadEnabled } from '../lib/autoRead.js';
+import { doubtfulSpan } from './readingShape.js';
 import { askReaderPermission, PROMPT_ANSWER, READER_PERMISSION, readerPermission } from './readerPermission.js';
 import { applyLineCorrection, confidenceFloorOf, isLowConfidence, lowConfidenceLines } from './readingCorrection.js';
 import { featureEnabled } from '../platform/features.js';
@@ -110,19 +115,23 @@ const MAX_PAGES = 4;
 /** The pen rests this long on a new line before the line above is read (liveRead). */
 export const LIVE_READ_REST_MS = 1500;
 /** The pen rests this long before the page is read on its own (autoRead). */
-export const AUTO_READ_IDLE_MS = 1300;
+export const AUTO_READ_IDLE_MS = 1600;
 /** Automatic reads of one page in one visit to a question; the server caps it too. */
 export const AUTO_READ_MAX = 12;
 
 /** The three things a reading can say about one line: it never says right or wrong. */
 const READ_STATE_KEY = { read: 'inst.readState.read', check: 'inst.readState.check', cant: 'inst.readState.cant' };
 const READ_STRIP_KEY = { read: 'inst.readStrip.read', check: 'inst.readStrip.check', cant: 'inst.readStrip.cant' };
-function readStateOf(line, floor) {
+// One state per line for every place a reading is shown: a line that is not
+// finished maths is "check" however confident the reader was (readingShape.js).
+function readStateOf(line, floor, index = 0) {
   if (!String(line?.text ?? '').trim()) return 'cant';
-  return isLowConfidence(line, floor) ? 'check' : 'read';
+  if (isLowConfidence(line, floor)) return 'check';
+  if (line?.corrected !== true && doubtfulSpan(line.text, { continuation: index > 0 })) return 'check';
+  return 'read';
 }
 
-export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, initialReading = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true, readExpired = 0, controlRef = null, checkingEarlier = false, promptAsksInequality = false, liveRead = false, feedback = false, autoRead = false, lineMarkers = null }) {
+export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, initialReading = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true, readExpired = 0, controlRef = null, checkingEarlier = false, promptAsksInequality = false, liveRead = false, feedback = false, autoRead = false, lineMarkers = null, showReading = true }) {
   const [NATIVE_INK] = useState(nativeInkAvailable);
   const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
   const [diagnostics] = useState(inkDiagnosticsVisible);
@@ -203,6 +212,12 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   const autoTimerRef = useRef(null);
   const autoCountRef = useRef(0);
   const autoTriedRef = useRef(null);
+  // The consent prompt is opened by the pause at most once per page of this card
+  // (see the autoRead block): a dismissed prompt is not reopened by more writing.
+  const autoAskedRef = useRef(false);
+  // True once a pause has passed with nothing read and nothing scheduled, so a
+  // quiet "Read now" is useful; any new stroke clears it.
+  const [autoQuiet, setAutoQuiet] = useState(false);
   const onStrokesRef = useRef(onStrokes);
   useEffect(() => { onStrokesRef.current = onStrokes; }, [onStrokes]);
   useEffect(() => {
@@ -223,7 +238,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
       lines: r.lines.map(l => l.text),
       // What the reader said about each line (confidence, its own doubt, the
       // student's correction): the card's confirmation lists the unsure ones.
-      lineMeta: r.lines.map(l => ({ conf: l.conf, doubt: l.doubt, corrected: l.corrected === true })),
+      lineMeta: r.lines.map(l => ({ conf: l.conf, doubt: l.doubt, uncertain: l.uncertain === true, corrected: l.corrected === true })),
       lineBoxes: r.lines.map(l => l.box),
       text: r.text,
       answerLine: r.lines.length ? r.lines[r.lines.length - 1].text : '',
@@ -304,14 +319,16 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     // press that opened the prompt is the press that reads, once accepted.
     if (readerPermission(asker) !== READER_PERMISSION.ACCEPTED) {
       // A live read never asks: only a press of "Read my answer" may.
-      if (auto || askingRef.current) return;
+      // (Owner decision 18 Nov 2026: a pause may open the prompt itself, once, via
+      // opts.ask. Nothing is sent until the student has pressed accept in it.)
+      if ((auto && opts?.ask !== true) || askingRef.current) return;
       askingRef.current = true;
       let permitted;
       try { permitted = await askReaderPermission(asker, { kind: 'ink' }); } finally { askingRef.current = false; }
       if (permitted !== PROMPT_ANSWER.ACCEPTED) {
         // Closing the prompt chooses nothing: "Read my answer" stays.
         if (permitted !== PROMPT_ANSWER.DISMISSED) waitFor(asker, { reason: permitted === PROMPT_ANSWER.DECLINED ? 'declined' : 'not-permitted' });
-        return;
+        return 'not-permitted';   // the caller (Mark my working) stops waiting for a reading that will not come
       }
     }
     // The page as it stands NOW is what is read: the student may have gone on
@@ -337,7 +354,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     setStatus({ kind: 'reading' });
     const pressedAt = typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now();
     const sincePress = () => (typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now()) - pressedAt;
-    readWithCloud(strokes, { user: who, signal: controller?.signal, freshReadiness: true }).finally(landed).then(outcome => {
+    readWithCloud(strokes, { user: who, signal: controller?.signal, freshReadiness: true, superseded: auto }).finally(landed).then(outcome => {
       // The page was submitted or left while the server was reading it (§09:
       // a late reading never rewrites the reading a mark was given for).
       if (seq !== readSeqRef.current || disabledRef.current) return;
@@ -434,18 +451,26 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     // superseded and cancelled.
     if (autoReadRef.current && !disabledRef.current) {
       clearTimeout(autoTimerRef.current);
+      setAutoQuiet(false);
       if (!strokes.length) autoTriedRef.current = null;
       else {
         const pageSig = signatureOfRef.current(strokes);
         if (flyingRef.current && flyingRef.current !== pageSig) abortRef.current?.abort?.();
+        const permission = readerPermission(userRef.current);
+        // A student who has not been asked yet is asked once, when the pen rests
+        // (the D17 prompt, unchanged): without that, automatic reading could never
+        // start for a new account and the only way in was a button. A student who
+        // declined is not asked again by writing.
+        const needsAsk = permission === READER_PERMISSION.UNASKED && !autoAskedRef.current;
         if (pageSig !== readRef.current && pageSig !== autoTriedRef.current && autoCountRef.current < AUTO_READ_MAX
-          && readerPermission(userRef.current) === READER_PERMISSION.ACCEPTED) {
-          autoTimerRef.current = setTimeout(() => {
+          && (permission === READER_PERMISSION.ACCEPTED || needsAsk)) {
+          autoTimerRef.current = setTimeout(async () => {
             autoTriedRef.current = signatureOfRef.current(strokesRef.current);
-            autoCountRef.current += 1;
-            readRef2.current?.({ auto: true });
+            const ask = readerPermission(userRef.current) === READER_PERMISSION.UNASKED && !autoAskedRef.current;
+            if (ask) autoAskedRef.current = true; else autoCountRef.current += 1;
+            try { await readRef2.current?.({ auto: true, ask }); } finally { setAutoQuiet(true); }
           }, AUTO_READ_IDLE_MS);
-        }
+        } else setAutoQuiet(true);
       }
     }
     setCorrecting(null);
@@ -610,15 +635,15 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   const shownEngineNote = diagnostics ? engineNote : (rec.cloud === true ? t('verdict.readOnServer') : null);
   const lineConfidenceFloor = confidenceFloorOf(rec);
   const statusLine = shownStatus?.kind === 'reading'
-    ? t(slowRead ? 'ink.serverStillReading' : 'ink.serverReading')
+    ? (showReading ? t(slowRead ? 'ink.serverStillReading' : 'ink.serverReading') : null)
     : shownStatus?.kind === 'empty'
       ? t('ink.serverEmpty')
       : shownStatus?.kind === 'allowance'
-        ? t(shownStatus.key || 'ink.waitingAllowance', { time: retryClock(shownStatus.block?.retryAt, language, user) })
+        ? t(shownStatus.key || 'ink.waitingAllowance', { time: retryClock(shownStatus.block?.retryAt, language, user), when: retryWhen(shownStatus.block?.retryAt, language, user) })
         : shownStatus?.kind === 'waiting' && autoReadRef.current && shownStatus.block?.kind === 'offline'
           ? t('ink.autoOffline')
         : shownStatus?.kind === 'waiting'
-          ? t(draftSaved ? shownStatus.key : (WAITING_WITHOUT_SAVE_CLAIM[shownStatus.key] || shownStatus.key), { time: retryClock(shownStatus.block?.retryAt, language, user) })
+          ? t(draftSaved ? shownStatus.key : (WAITING_WITHOUT_SAVE_CLAIM[shownStatus.key] || shownStatus.key), { time: retryClock(shownStatus.block?.retryAt, language, user), when: retryWhen(shownStatus.block?.retryAt, language, user) })
           : checkingEarlier
             // An earlier submission of this question is being checked again
             // (after the app was closed mid-check). The page stays writable;
@@ -628,6 +653,16 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   // "Read my answer": offered whenever there is ink that has not been read as
   // it now stands and nothing is known to stop a read. One press, one read.
   const canAskToRead = hasInk && !disabled && !shownStatus && !checkingEarlier && (!rec.lines.length || stale);
+  // Reading is automatic (owner decision, 18 Nov 2026): no primary button and no
+  // "read once, when you ask" hint. A quiet text action stays only for the pause
+  // after which nothing was read or scheduled (prompt closed, cap reached, a
+  // page already tried). With the device preference off, the button is as before.
+  const autoOn = autoReadRef.current;
+  // Owner decision, 19 Nov 2026: the reading is not shown. The page is read silently (or when the student presses
+  // Mark my working) and the typeset reading is available only on demand from the marked page. So no Read button,
+  // no "Reading..." line, no reading list and no per-line chips while `showReading` is false.
+  const showReadButton = showReading && canAskToRead && !autoOn;
+  const showQuietRead = showReading && canAskToRead && autoOn && autoQuiet;
 
   return (
     <div className={`ink-answer ${disabled ? 'ink-disabled' : ''}`} data-engine={rec.engine || undefined}>
@@ -704,14 +739,14 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
                     ))}
                     <span className={`ink-verdict ${good ? 'good' : 'bad'}`}
                       style={{ top: b.y + b.h / 2 - 14, left: b.x + b.w + 16, ...at }}
-                      title={v.note || (good ? t('ink.lineOk') : t('ink.lineBreaks'))}>{good ? <Icon name="check" size={18} /> : <Icon name="correction" size={18} />}</span>
+                      title={plainComment(v.note) || (good ? t('ink.lineOk') : t('ink.lineBreaks'))}>{good ? <Icon name="check" size={18} /> : <Icon name="correction" size={18} />}</span>
                     {bad && boxes.map((gb, gi) => (
                       <span key={`underline-${gi}`} className="ink-underline"
                         style={{ left: gb.x + 3, top: gb.y + gb.h - 3, width: Math.max(0, gb.w - 6), ...at }} />
                     ))}
                     {showNote && (
                       <span className="ink-note" style={{ left: Math.max(4, b.x - 2), top: b.y + b.h + 16 }}>
-                        <b>{t('ink.mistakeHere')}</b>{v.note ? <> — {v.note}</> : null}
+                        <b>{t('ink.mistakeHere')}</b>{v.note ? <>: <EngineComment text={v.note} /></> : null}
                       </span>
                     )}
                   </React.Fragment>
@@ -738,12 +773,12 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
             (which stays the accessible source and keeps Edit / I wrote): only
             on lines the geometry plausibly matched, the bar only from the
             reader's own confidence, the tag only from the engine's verdict. */}
-        {INSTRUMENT_PLOT && !stale && rec.lines.some(l => l.box) && (
+        {showReading && INSTRUMENT_PLOT && !stale && rec.lines.some(l => l.box) && (
           <div className="in-read-layer" aria-hidden="true" data-reading-chips={rec.lines.filter(l => l.box).length}>
             {rec.lines.map((line, li) => {
               if (!line.box) return null;
               const b = line.box;
-              const state = readStateOf(line, lineConfidenceFloor);
+              const state = readStateOf(line, lineConfidenceFloor, li);
               const low = state === 'check';
               // toReading() writes 0 when the reader gave no confidence at all,
               // so 0 is drawn as no meter rather than as an empty one.
@@ -753,12 +788,10 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
                   {low && <span className="in-read-unc" style={{ left: b.x - 6, top: b.y - 6, width: b.w + 12, height: b.h + 12 }} />}
                   <span className={`in-read is-${state}`} data-read-chip={li} data-read-state={state} style={{ top: b.y + b.h / 2 }}>
                     {state !== 'cant' && <span className="in-read-m"><MathText text={`$${exprToLatex(line.text) || '\\;'}$`} /></span>}
-                    {Number.isFinite(conf) && state !== 'cant' && (
-                      <span className="in-read-cf" data-read-confidence={Math.round(Math.max(0, Math.min(1, conf)) * 100)}>
-                        {[0, 1, 2].map(k => <i key={k} className={k < (low ? 2 : 3) ? 'on' : undefined} />)}
-                      </span>
-                    )}
-                    <span className="in-read-tg">{t(READ_STATE_KEY[state])}</span>
+                    {/* A quiet dot when the line reads cleanly; a word only where it needs a look. */}
+                    {state === 'read'
+                      ? <i className="in-read-ok" aria-hidden="true" data-read-confidence={Number.isFinite(conf) ? Math.round(Math.max(0, Math.min(1, conf)) * 100) : undefined} />
+                      : <span className="in-read-tg">{t(READ_STATE_KEY[state])}</span>}
                   </span>
                 </React.Fragment>
               );
@@ -777,7 +810,14 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
           account section of Settings holds sign-in and "send a fresh
           verification email". Kept beside the notice, not inside it, so the
           notice stays the one sentence it is announced as. */}
-      {canAskToRead && (
+      {showQuietRead && (
+        <div className="ink-status-action ink-read-action">
+          <button type="button" className="btn btn-quiet btn-sm" data-ink-read={stale ? 'again' : 'first'} data-ink-read-quiet onClick={readNow}>
+            {t(stale ? 'ink.readAgain' : 'ink.readNow')}
+          </button>
+        </div>
+      )}
+      {showReadButton && (
         <div className="ink-status-action ink-read-action">
           <button type="button" className={`btn ${stale && INSTRUMENT_PLOT ? 'btn-ghost' : 'btn-primary'}`} data-ink-read={stale ? 'again' : 'first'} onClick={readNow}>
             {t(stale ? 'ink.readAgain' : 'ink.readMyAnswer')}
@@ -809,7 +849,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
         </div>
       )}
 
-      {rec.lines.length > 0 && (
+      {showReading && rec.lines.length > 0 && (
         <div className={`ink-preview${stale ? ' is-stale' : ''}`} data-stale={stale ? 'true' : undefined}>
           <div className="ink-preview-title" id="ink-reading" tabIndex={-1} ref={readingTitleRef}>
             {t('ink.reading')}
@@ -817,8 +857,10 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
             {shownEngineNote && <span className="ink-status muted">{shownEngineNote}</span>}
             {autoReadRef.current && !stale && !disabled && (() => {
               const lines = rec.lines;
-              const state = lines.some(l => !String(l?.text ?? '').trim()) ? 'cant' : lines.some(l => isLowConfidence(l, confidenceFloorOf(rec))) ? 'check' : 'read';
-              return <span className="ink-status muted" role="status" data-auto-read-state={state}>{t(state === 'cant' ? 'ink.autoCant' : state === 'check' ? 'ink.autoReadCheck' : 'ink.autoRead')}</span>;
+              const state = lines.some(l => !String(l?.text ?? '').trim()) ? 'cant' : lines.some((l, i) => readStateOf(l, confidenceFloorOf(rec), i) === 'check') ? 'check' : 'read';
+              // Nothing to say when the page simply read; a word only when a line needs a look.
+              if (state === 'read') return <span className="sr-only" role="status" data-auto-read-state="read">{t('ink.autoRead')}</span>;
+              return <span className="ink-status muted" role="status" data-auto-read-state={state}>{t(state === 'cant' ? 'ink.autoCant' : 'ink.autoReadCheck')}</span>;
             })()}
             {stale && <span className="ink-status ink-stale" role="status" data-ink-stale={expired ? 'expired' : 'changed'}>{t(expired ? 'ink.readingExpired' : 'ink.readingStale')}</span>}
           </div>
@@ -837,12 +879,13 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
                 </span>
               )}
               {INSTRUMENT_PLOT && (() => {
-                const st = readStateOf(line, lineConfidenceFloor);
+                const st = readStateOf(line, lineConfidenceFloor, li);
+                if (st === 'read') return <span className="sr-only" data-read-state="read">{t('inst.readStateSr', { n: li + 1, state: t(READ_STATE_KEY.read) })}</span>;
                 return <span className="in-rstate" data-read-state={st}><i aria-hidden="true" />{t(READ_STATE_KEY[st])}<span className="sr-only"> {t('inst.readStateSr', { n: li + 1, state: t(READ_STATE_KEY[st]) })}</span></span>;
               })()}
-              <span className="ink-line-math"><MathText text={`$${exprToLatex(line.text) || '\\;'}$`} /></span>
+              <span className="ink-line-math">{(() => { const segs = line.corrected === true ? null : segmentsFor(line); return segs ? <Typeset text={line.text} texOf={x => exprToLatex(x) || '\\;'} segments={segs} /> : <MathText text={`$${exprToLatex(line.text) || '\\;'}$`} />; })()}</span>
               {lineVerdicts && lineVerdicts[li] && ['break', 'wrong'].includes(lineVerdicts[li].status) && lineVerdicts[li].note && (
-                <span className="sc-note" style={{ fontSize: 12.5 }}>— {lineVerdicts[li].note}</span>
+                <span className="sc-note" style={{ fontSize: 12.5 }}><EngineComment text={lineVerdicts[li].note} /></span>
               )}
               {line.corrected === true && (
                 <span className="ink-line-corrected" role="status"><Icon name="check" size={13} /> {t('ink.correctedSr', { n: li + 1 })}</span>
@@ -899,10 +942,10 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
           )}
           {INSTRUMENT_PLOT && !stale && (() => {
             const n = { read: 0, check: 0, cant: 0 };
-            rec.lines.forEach(l => { n[readStateOf(l, lineConfidenceFloor)] += 1; });
+            rec.lines.forEach((l, i) => { n[readStateOf(l, lineConfidenceFloor, i)] += 1; });
             return (
               <div className="in-strip" role="status" aria-live="polite" data-read-strip>
-                {['read', 'check', 'cant'].map(k => n[k] > 0 && (
+                {['check', 'cant'].map(k => n[k] > 0 && (
                   <span key={k} className="in-strip-i" data-read-state={k}><i aria-hidden="true" />{t(READ_STRIP_KEY[k], { n: n[k] })}</span>
                 ))}
               </div>

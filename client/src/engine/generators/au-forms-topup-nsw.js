@@ -7,7 +7,7 @@
 // sets a mark); exact keys carry no tolerance, rounded keys a tolerance well
 // under half the named unit. Variants are chosen by au-forms-apply.js.
 // ─────────────────────────────────────────────────────────────────────────────
-import { ri, rc, nz, mcq, r1, rad } from '../qhelpers.js';
+import { ri, rc, nz, mcq, r1, rad, br } from '../qhelpers.js';
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 const REJ = Symbol('reject');
@@ -609,7 +609,7 @@ const nonlinear = [
     return num(`Calculate the discriminant $b^{2} - 4ac$ for the parabola $y = ${quad(a, b, c)}$.`, D0, {
       traps: [{ value: b * b + 4 * a * c, why: 'The discriminant is $b^2 - 4ac$: subtract $4ac$, taking care with the signs of $a$ and $c$.' }, { value: b * b - 2 * a * c, why: 'It is $4ac$, not $2ac$.' }],
       hints: [`Here $a = ${a}$, $b = ${b}$ and $c = ${c}$.`, `$b^2 = ${b * b}$ and $4ac = ${4 * a * c}$.`, 'Subtract.'],
-      steps: [{ h: 'Identify', d: `$a = ${a}$, $b = ${b}$, $c = ${c}$` }, { h: 'Evaluate', d: `$${b}^2 - 4(${a})(${c}) = ${b * b} - (${4 * a * c}) = ${D0}$` }]
+      steps: [{ h: 'Identify', d: `$a = ${a}$, $b = ${b}$, $c = ${c}$` }, { h: 'Evaluate', d: `$${br(b)}^2 - 4(${a})(${c}) = ${b * b} - (${4 * a * c}) = ${D0}$` }]
     });
   }),
   V([3], (rng) => {
@@ -623,7 +623,7 @@ const nonlinear = [
     const opts = { 0: 'The parabola has no $x$-intercepts', 1: 'The parabola touches the $x$-axis at exactly one point', 2: 'The parabola crosses the $x$-axis at two points' };
     return mc(rng, `Which statement is correct for the parabola $y = ${quad(a, b, c)}$?`, opts[want], [0, 1, 2].filter(x => x !== want).map(x => ({ text: opts[x], why: `Work out $b^2 - 4ac = ${dd}$: ${dd > 0 ? 'positive means two $x$-intercepts' : dd === 0 ? 'zero means one (touching) $x$-intercept' : 'negative means none'}.` })),
       ['Use the discriminant $b^2 - 4ac$.', `$b^2 - 4ac = ${dd}$.`, 'Positive: two intercepts; zero: one; negative: none.'],
-      [{ h: 'Discriminant', d: `$${b}^2 - 4(${a})(${c}) = ${dd}$` }, { h: 'Conclusion', d: opts[want] }]);
+      [{ h: 'Discriminant', d: `$${br(b)}^2 - 4(${a})(${c}) = ${dd}$` }, { h: 'Conclusion', d: opts[want] }]);
   }),
   // d4 — exponential and hyperbolic
   V([4], rng => {

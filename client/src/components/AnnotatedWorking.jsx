@@ -12,11 +12,12 @@
 import React, { useEffect, useMemo } from 'react';
 import { MathText } from '../lib/latex.jsx';
 import Icon from './Icon.jsx';
+import { EngineComment } from './EngineComment.jsx';
 import { useT } from '../i18n/index.js';
 import { buildAnnotatedWorking, lineRange } from './annotatedWorkingModel.js';
 import './AnnotatedWorking.css';
 
-const STATUS_ICON = { checked: 'check', 'first-error': 'alert', follows: 'arrowRight', 'not-verified': 'uncertain', unread: 'uncertain' };
+const STATUS_ICON = { incomplete: 'uncertain', condition: 'check', checked: 'check', 'first-error': 'alert', follows: 'arrowRight', 'not-verified': 'uncertain', unread: 'uncertain' };
 // Every string key written out, so the catalogue checks can see each one used.
 const RULE_KEY = Object.freeze({
   'reciprocal': 'aw.rule.reciprocal',
@@ -47,9 +48,11 @@ const RULE_KEY = Object.freeze({
   'factorise': 'aw.rule.factorise',
   'difference-of-squares': 'aw.rule.differenceOfSquares',
 });
-const STATUS_KEY = Object.freeze({ checked: 'aw.status.checked', 'first-error': 'aw.status.firstError', 'not-verified': 'aw.status.notVerified', unread: 'aw.status.unread' });
+const STATUS_KEY = Object.freeze({ checked: 'aw.status.checked', 'first-error': 'aw.status.firstError', 'not-verified': 'aw.status.notVerified', unread: 'aw.status.unread', condition: 'aw.status.condition', incomplete: 'aw.status.incomplete' });
 const SCOPE_KEY = Object.freeze({ numerator: 'aw.scope.numerator', denominator: 'aw.scope.denominator', both: 'aw.scope.both' });
 const listOf = ns => ns.join(', ');
+
+export const ruleLabel = (rule, t) => (RULE_KEY[rule.rule] ? t(RULE_KEY[rule.rule]) : rule.rule);
 
 function RuleLine({ rule, t }) {
   const where = SCOPE_KEY[rule.scope] ? t(SCOPE_KEY[rule.scope]) : '';
@@ -61,15 +64,23 @@ function RuleLine({ rule, t }) {
   );
 }
 
-function CardBody({ card, model, t, renderBreakDetail }) {
+export function CardBody({ card, model, t, renderBreakDetail }) {
   if (card.status === 'unread') return <p>{t('aw.body.unread')}</p>;
+  if (card.valueChain === 'given') return <p>{t('aw.body.given')}</p>;
+  if (card.valueChain === 'verified') return <p>{t('aw.body.valueVerified')}{card.note ? <> <EngineComment text={card.note} /></> : ''}</p>;
+  // The caveat (true as written, not checked to be the right step) is said ONCE for the page, in the result's summary sentence, never on every line.
+  if (card.valueChain === 'arithmetic') return <p>{card.note ? <EngineComment text={card.note} /> : t('mp.why.arithmetic')}</p>;
+  if (card.status === 'incomplete') return <p><EngineComment text={card.note} /></p>;
+  if (card.status === 'condition') return <p>{t('aw.body.condition')}</p>;
+  // The lines of a value-chain report that were not verified share one reason, said once below the cards.
+  if (card.status === 'not-verified' && model.unverified) return null;
   if (card.status === 'not-verified') return <p>{t('aw.body.notVerified')}</p>;
   if (card.status === 'first-error') {
     return (
       <>
         <p>{card.n > 1 ? t('aw.body.firstError', { n: card.n - 1 }) : t('aw.body.firstErrorStart')}</p>
-        {card.diagnosis?.title && <p className="aw-diag"><b>{card.diagnosis.title}</b>{card.diagnosis.message ? <> — {card.diagnosis.message}</> : null}</p>}
-        {!card.diagnosis && card.note && <p className="aw-diag">{card.note}</p>}
+        {card.diagnosis?.title && <p className="aw-diag"><b>{card.diagnosis.title}</b>{card.diagnosis.message ? <>: <EngineComment text={card.diagnosis.message} /></> : null}</p>}
+        {!card.diagnosis && card.note && <p className="aw-diag"><EngineComment text={card.note} /></p>}
         {card.diagnosis?.fix && <p className="aw-fix">{card.diagnosis.fix}</p>}
         {renderBreakDetail && card.previousText ? renderBreakDetail(card.previousText, card.text) : null}
       </>
@@ -116,6 +127,8 @@ export function AnnotatedComments({ model, renderBreakDetail = null }) {
           </li>
         ))}
       </ol>
+      {/* said once for the list, not on every line */}
+      {model.cards.some(c => c.valueChain === 'arithmetic') && <p className="aw-note" data-aw-arithmetic-once>{t('aw.body.arithmetic')}</p>}
     </section>
   );
 }
@@ -132,7 +145,8 @@ export function AnnotatedEvaluation({ model }) {
       </div>
       {attempt && <p className="aw-attempt" data-aw-attempt={attempt}>{t('aw.eval.markedAgain', { n: attempt })}</p>}
       {marks?.receiptId && <p className="aw-receipt">{t('aw.eval.receipt', { id: marks.receiptId })}</p>}
-      <p className="aw-provenance">{t(source === 'handwriting' ? 'aw.eval.provenanceInk' : 'aw.eval.provenanceTyped')}</p>
+      <p className="aw-provenance">{t(model.onlyArithmetic ? (source === 'handwriting' ? 'aw.eval.provenanceArithmeticInk' : 'aw.eval.provenanceArithmetic') : model.noneChecked ? (source === 'handwriting' ? 'aw.eval.provenanceNoneInk' : 'aw.eval.provenanceNone') : model.allChecked === false ? (source === 'handwriting' ? 'aw.eval.provenanceSomeInk' : 'aw.eval.provenanceSome') : (source === 'handwriting' ? 'aw.eval.provenanceInk' : 'aw.eval.provenanceTyped'))}</p>
+      {model.unverified && <p className="aw-unverified" data-aw-unverified={model.unverified.lines.join(',')}>{t('aw.eval.unverifiedRun', { list: listOf(model.unverified.lines), count: model.unverified.lines.length })}</p>}
       <p className="aw-summary">{t(summary.key, { ...summary.vars, count: summary.vars.rules ?? summary.vars.checked })}</p>
       {followThrough.length > 0 && <p className="aw-follow" data-aw-follow-through={followThrough.join(',')}>{t('aw.eval.followThrough', { list: lineRange(followThrough), count: followThrough.length })}</p>}
       {jumps.length > 0 && <p className="aw-jumps">{t('aw.eval.jumps', { list: listOf(jumps), count: jumps.length })}</p>}

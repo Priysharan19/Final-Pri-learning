@@ -14,15 +14,20 @@
 // This file imports the engine only (client/src/engine, which the production
 // image ships — see Dockerfile and production-runtime-image-check.mjs). It
 // must never import a server module: the worker has no store and no secrets.
-import { checkAnswer, stepCheck, methodMarks } from '../../client/src/engine/checker.js';
+import { derivedMetaOff } from '../../client/src/engine/derivedMetaOff.js';
+import { checkAnswer, stepCheck, methodMarks, claimFreeReport } from '../../client/src/engine/checker.js';
 import { markObjective, markMultiCorrect } from '../../client/src/engine/indiaExams.js';
 import { markMatrixMatch } from '../../client/src/engine/matrixMatch.js';
-import { markGraphSketch, readFeatureSet, sketchMethodCredit } from '../../client/src/engine/graphFeatures.js';
+import { markGraphSketch, readFeatureSet, sketchMethodCredit, sketchVerdicts } from '../../client/src/engine/graphFeatures.js';
 import { markGeometry } from '../../client/src/engine/geometryFacts.js';
 import { checkProof } from '../../client/src/engine/proofSteps.js';
 // The policy is plain data the pool puts into every operation (D12). This
 // module reads no environment itself: markingPolicy.js imports nothing.
 import { policyOf } from './markingPolicy.js';
+import { stepCheckArithmetic } from '../../client/src/engine/arithmeticLines.js';
+import { questionFacts } from '../../client/src/engine/questionFacts.js';
+import { missingSteps } from '../../client/src/engine/missingSteps.js';
+import { infoOf as arithmeticInfo, cleanStatement } from '../../client/src/engine/arithmeticLines.js';
 import { annotateMilestones } from '../../client/src/engine/milestones.js';
 import { awardBoardScheme, matchBoardPoints } from '../../client/src/engine/boardScheme.js';
 import { answerForm, effectiveSymbols, firstFinalAttempt, planGivens, readClaimForm } from './finalAttempt.js';
@@ -31,6 +36,7 @@ import { answerForm, effectiveSymbols, firstFinalAttempt, planGivens, readClaimF
 // questions, answer keys and stage meta remain server-private.
 export function stepMetaFor(q) {
   if (q.stepcheck) return q.stepcheck;
+  if (derivedMetaOff(q)) return null;   // answer only until the family has a structured meta
   const a = q.answer;
   if (!a) return null;
   if (q.answerType === 'expression' && a.expr) return { kind: 'expression', canonical: a.expr };
@@ -54,7 +60,10 @@ export function stepMetaFor(q) {
     }
   }
   if (q.answerType === 'set' && Array.isArray(a.values) && a.values.length) {
-    return { kind: 'equation', variable: 'x', solutions: a.values };
+    // The letter the question asks for ("Find all values of $k$ ..."), not a guessed x: working in another letter is a side
+    // calculation, never a claim about this answer.
+    const asked = String(q.prompt || '').match(/\b(?:values?|solutions?|roots?)\s+of\s+\$([A-Za-z])\$/i);
+    return { kind: 'equation', variable: asked ? asked[1] : 'x', solutions: a.values };
   }
   return null;
 }
@@ -76,13 +85,69 @@ export function marksPossibleFor(q) {
   return Math.max(1, Math.min(maxMarks, keySteps.length || 1));
 }
 
-export function stepEvidence(q, answer, steps, result) {
+/** The true-as-written report for a working (engine/arithmeticLines.js), or null when it cannot be made. */
+function trueAsWritten(q, steps, opts) {
+  try {
+    const facts = opts && Object.hasOwn(opts, 'facts') ? opts.facts : questionFacts(q);
+    return stepCheckArithmetic(steps, { latex: opts && Array.isArray(opts.latex) ? opts.latex : null, facts });
+  } catch { return null; }
+}
+
+/**
+ * FEEDBACK ONLY, run after every mark is computed (nothing reads its result but the result card). A question with a
+ * Step Check leaves the lines it does not cover unjudged, though some of them are true as written (live, 20 November
+ * 2026: four true lines of an integral came back "not checked"). For each such line the true-as-written report's TICK
+ * is copied over; it says the line is true as written, never that it is the right step, and it is never a mark.
+ *   · only a line the topic report left a note (never one it ticked, crossed or marked as following a slip);
+ *   · nothing at or after the topic report's first break; a cross is never copied;
+ *   · lines are matched by index AND identical text, or the fold is skipped entirely.
+ * Returns the report itself when nothing is folded.
+ */
+export function foldTrueAsWritten(report, arithmetic) {
+  if (!report || !arithmetic || !Array.isArray(report.lines) || !Array.isArray(arithmetic.lines) || report.lines.length !== arithmetic.lines.length) return report;
+  if (report.lines.some((l, i) => String(l?.text ?? '').trim() !== String(arithmetic.lines[i]?.text ?? '').trim())) return report;
+  const brk = report.lines.findIndex(l => l?.status === 'break');
+  const limit = brk >= 0 ? brk : report.lines.length;
+  let folded = 0;
+  const lines = report.lines.map((l, i) => {
+    const a = arithmetic.lines[i];
+    const unjudged = l?.status === 'note' && (l.state === undefined || l.state === 'unverified' || l.state === 'unread') && l.note !== 'Follows from the earlier slip.';
+    if (i >= limit || !unjudged || a?.status !== 'ok' || a.state !== 'arithmetic') return l;
+    folded++;
+    return { text: l.text, status: 'ok', state: 'arithmetic', note: a.note, valueChain: a.valueChain };
+  });
+  if (!folded) return report;
+  // The report is now one that judges each line on its own (a state on every line), so the card says WHICH lines were checked.
+  const stated = lines.map(l => ({ ...l, state: l.state || (l.status === 'ok' ? 'verified' : l.status === 'break' ? 'wrong' : l.unreadable ? 'unread' : 'unverified') }));
+  const at = st => stated.flatMap((l, k) => (l.state === st ? [k + 1] : []));
+  const unverified = at('unverified'), unread = at('unread');
+  return {
+    ...report, lines: stated, source: 'value-chain', folded: true,
+    summary: {
+      ...(report.summary || {}), total: stated.length, checked: stated.filter(l => l.status === 'ok').length,
+      given: at('given'), verified: at('verified'), arithmetic: at('arithmetic'), conditions: at('condition'), wrong: at('wrong'), unverified, unread,
+      reason: unverified.length ? (report.summary?.reason || 'Pri could not tie these lines to anything it can prove about this question, so it did not mark them.') : null
+    }
+  };
+}
+
+export function stepEvidence(q, answer, steps, result, opts = null) {
   const meta = stepMetaFor(q);
   let report = result.stepReport || null;
   if (meta && steps && !report) {
     // The prompt lets a true line about another unknown of the question be
     // verified against the system it gives, instead of being left unjudged.
     try { report = stepCheck(meta, steps, { prompt: q.prompt }); } catch { report = null; }
+  }
+  // No Step Check for this question: the arithmetic on each line is still checked (engine/arithmeticLines.js).
+  // That report proves only that stated numbers are equal; it reaches no mark below (meta is null there).
+  if (!meta && steps && !report && typeof steps === 'string' && !OBJECTIVE.has(q.answerType) && !Array.isArray(q.boardScheme)) {
+    // What the question's own prompt gives (engine/questionFacts.js: read from `prompt` alone, never the answer or the
+    // solution) lets a line that copies it, or sets up what it asks for, be ticked. `opts.facts` overrides it (the audit
+    // measures with and without); it is never the typed final answer, which is not parsed here.
+    report = trueAsWritten(q, steps, opts);
+    // Nothing judged (no line was arithmetic): the reply says nothing about the lines, as before.
+    if (report && !report.lines.some(l => l.status === 'ok' || l.status === 'break')) report = null;
   }
   let partial = null;
   // A blank final-answer box may still carry verified mathematical method
@@ -116,7 +181,53 @@ export function stepEvidence(q, answer, steps, result) {
   // (matchBoardPoints). A right answer with junk, repeated or no working is
   // worth the answer point alone, never the printed marks (D25 delta review).
   const board = Array.isArray(q.boardScheme) ? boardAward(q, meta, report, result.correct === true) : null;
-  try { if (report) report = annotateMilestones(q, report); } catch { /* the report stands */ }
+  // Feedback only, after every mark: the topic check's CROSS on a definition, a label or a bare margin number is shown as a note,
+  // and the lines after it are judged as if it were absent (checker.claimFreeReport). Every mark, `correct`, method mark and
+  // board tick above was computed from the report the topic check made, unchanged. `opts.claims === false` is the test switch.
+  if (meta && steps && typeof steps === 'string' && report && report.arithmetic !== true && !(opts && opts.claims === false)) {
+    try {
+      const shown = claimFreeReport(meta, steps, { prompt: q.prompt }, report);
+      if (shown !== report) { report = shown; }
+    } catch { /* the report stands */ }
+  }
+  // An arithmetic report keeps to arithmetic: no milestone tick is added to it, so its wording stays true of every tick.
+  try { if (report && report.arithmetic !== true) report = annotateMilestones(q, report); } catch { /* the report stands */ }
+  // Feedback only (see foldTrueAsWritten): after every mark above, so no mark, partial or milestone reads it.
+  if (meta && steps && typeof steps === 'string' && !OBJECTIVE.has(q.answerType) && !Array.isArray(q.boardScheme) && !(opts && opts.fold === false)) {
+    try {
+      const needs = !report || (Array.isArray(report.lines) && report.lines.some(l => l?.status === 'note'));
+      if (needs) {
+        const arithmetic = trueAsWritten(q, steps, opts);
+        if (!report) { if (arithmetic && arithmetic.lines.some(l => l.status === 'ok' || l.status === 'break')) report = arithmetic; }
+        else report = foldTrueAsWritten(report, arithmetic);
+      }
+    } catch { /* the report stands */ }
+  }
+  // A true-as-written tick on a line that ends at the student's own WRONG answer (`so 10^1 = 10` when the answer is 30)
+  // reads as "this is right". The arithmetic is; the value was not accepted (it may be wrong, or right in a form or unit
+  // the question did not accept: the note claims only what is true in both cases). Such a tick becomes that note.
+  try {
+    // The submitted answer is read only when it is a plain number: nothing a student types into the answer box is
+    // parsed or evaluated here (what an answer costs to mark must not depend on what is written in it).
+    const typed = typeof answer === 'string' ? answer.trim() : '';
+    const given = /^-?\d{1,15}(?:\.\d{1,10})?$/.test(typed) ? { value: Number(typed) } : null;
+    if (report && result.correct === false && given && Array.isArray(report.lines)) {
+      let changed = false;
+      const lines = report.lines.map(l => {
+        if (l?.status !== 'ok' || l.state !== 'arithmetic') return l;
+        const sides = String(l.text).replace(/[≈≃]/g, '=').split('=').map(x => x.trim()).filter(Boolean);
+        let last = null;
+        try { last = arithmeticInfo(cleanStatement(sides[sides.length - 1] || '')); } catch { last = null; }
+        if (!last || last.value === undefined || Math.abs(last.value - given.value) > 1e-9 * Math.max(1, Math.abs(given.value))) return l;
+        changed = true;
+        return { text: l.text, status: 'note', state: 'unverified', unverified: true, note: 'The arithmetic on this line is right, but this value was not accepted as the answer.' };
+      });
+      if (changed) report = { ...report, lines };
+    }
+  } catch { /* the report stands */ }
+  // Feedback only, for an answer that is not right: the steps of the worked solution whose values are nowhere on the
+  // page (engine/missingSteps.js). Computed after every mark above; nothing reads it but the result card.
+  try { if (report && result.correct !== true && typeof steps === 'string') { const gap = missingSteps(q, steps); if (gap) report = { ...report, missing: gap.missing, stepsFound: gap.found, stepsReadable: gap.total }; } } catch { /* the report stands */ }
   return board ? { stepReport: report, partial, board } : { stepReport: report, partial };
 }
 
@@ -328,6 +439,20 @@ export function reviewEvidence(q, lines) {
   } catch { return silent; }
 }
 
+/**
+ * A sketch answer's per-feature verdicts for the reply that RESOLVES the question (graphFeatures.sketchVerdicts), carried on
+ * the result as `sketch`. Display only: the mark is `result.correct` from the marker. The reply for an open try never reads it.
+ */
+function sketchReport(q, answer, result) {
+  const g = q?.answerType === 'graph-sketch' ? q.answer?.graph : null;
+  const set = g?.spec && g?.scheme ? readFeatureSet(answer) : null;
+  if (!set) return result;
+  try {
+    const r = sketchVerdicts(g.spec, set, g.scheme, { resolved: true, tol: g.tol });
+    return { ...result, sketch: { awarded: r.awarded, possible: r.possible, verdicts: r.verdicts.map(({ feature, verdict, detail, wentWrong, correct }) => ({ feature, verdict, ...(detail ? { detail } : {}), ...(wentWrong ? { wentWrong } : {}), ...(correct ? { correct } : {}) })) } };
+  } catch { return result; }
+}
+
 // ── The operations a worker serves ──────────────────────────────────────────
 // Each takes its plain-data arguments and `emit`, which reports a completed
 // stage to the request thread BEFORE the next stage starts. If the deadline
@@ -351,12 +476,12 @@ export const MARKER_OPS = Object.freeze({
    * under its transaction and asks again if it turns out to need evidence that
    * was not computed. Blank working costs nothing, so it is always "computed".
    */
-  practice({ q, answer, working, evidenceIfWrong, policy }, emit) {
-    const result = checkAnswer(q, answer);
+  practice({ q, answer, working, workingLatex, evidenceIfWrong, policy }, emit) {
+    const result = sketchReport(q, answer, checkAnswer(q, answer));
     emit({ result });
     const wanted = result.correct || evidenceIfWrong || !String(working || '').trim();
     if (!wanted) return { result, evidence: null };
-    const evidence = stepEvidence(q, answer, working, result);
+    const evidence = stepEvidence(q, answer, working, result, Array.isArray(workingLatex) ? { latex: workingLatex } : null);
     // Final answer only: the step report stays, the method mark does not.
     return { result, evidence: policyOf({ policy }).methodMarks ? evidence : { stepReport: evidence.stepReport, partial: null, ...(evidence.board ? { board: evidence.board } : {}) } };
   },

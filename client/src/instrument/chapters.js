@@ -6,6 +6,8 @@
 // mathematics; a chapter the table does not recognise gets the plain function
 // plot. Nothing here reads or changes marks: it is identity only.
 
+import { offeredChapters } from '../engine/curriculumAvailability.js';
+
 export const CHAPTER_COLOURS = ['--in-c2', '--in-c5', '--in-c1', '--in-c4', '--in-c3', '--in-c6', '--in-c7', '--in-c8'];
 
 export const colourFor = index => CHAPTER_COLOURS[((index % CHAPTER_COLOURS.length) + CHAPTER_COLOURS.length) % CHAPTER_COLOURS.length];
@@ -48,14 +50,30 @@ export function chapterEvidence(row, accuracyClaim, floor) {
   return { attempts, correct, accuracy: claim.enough ? claim.value : null, mastery };
 }
 
-/** The student's own syllabus within /curriculum: their CBSE class, or their JEE stream. */
+/**
+ * The student's own syllabus within /curriculum: their CBSE class, or their JEE
+ * stream, or their NSW year. A chapter with no question at any level is left
+ * out (owner decision 2026-11-18): the Index, the Map, the command bar, the
+ * report head and History all draw only what can be practised.
+ */
+const OFFERED = new WeakMap();
+function offeredScope(scope) {
+  if (!scope) return null;
+  if (!OFFERED.has(scope)) {
+    const out = { ...scope };
+    if (Array.isArray(scope.chapters)) out.chapters = offeredChapters(scope.chapters);
+    if (Array.isArray(scope.subtopics)) out.subtopics = offeredChapters(scope.subtopics);
+    OFFERED.set(scope, out);
+  }
+  return OFFERED.get(scope);
+}
 export function scopeFor(curriculum, user) {
   if (!curriculum || !user) return null;
   const track = user.indiaTrack || (isIndian(user) ? 'cbse' : null);
-  if (!track || track === 'cbse') return (curriculum.years || []).find(s => Number(s.year) === Number(user.year)) || null;
-  return (curriculum.streams || []).find(s => s.track === track && (s.year == null || Number(s.year) === Number(user.year)))
+  if (!track || track === 'cbse') return offeredScope((curriculum.years || []).find(s => Number(s.year) === Number(user.year)) || null);
+  return offeredScope((curriculum.streams || []).find(s => s.track === track && (s.year == null || Number(s.year) === Number(user.year)))
     || (curriculum.streams || []).find(s => s.track === track)
-    || null;
+    || null);
 }
 
 /** The track a practice link carries: an Indian track, or none outside India. */

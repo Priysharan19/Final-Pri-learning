@@ -149,8 +149,8 @@ export default {
       },
       {
         question: 'Write $z=1+\\sqrt3\\,i$ in modulus-argument form.',
-        steps: ['The modulus is $|z|=\\sqrt{1+3}=2$.', 'The point is in the first quadrant and $\\tan\\theta=\\sqrt3$, so $\\theta=\\tfrac\\pi3$.', 'So $z=2\\left(\\cos\\tfrac\\pi3+i\\sin\\tfrac\\pi3\\right)$.'],
-        answer: '$z=2\\left(\\cos\\tfrac\\pi3+i\\sin\\tfrac\\pi3\\right)$',
+        steps: ['The modulus is $|z|=\\sqrt{1+3}=2$.', 'The point is in the first quadrant and $\\tan\\theta=\\sqrt3$, so $\\theta=\\tfrac\\pi3$.', 'So $z=2\\left(\\cos\\left(\\tfrac\\pi3\\right)+i\\sin\\left(\\tfrac\\pi3\\right)\\right)$.'],
+        answer: '$z=2\\left(\\cos\\left(\\tfrac\\pi3\\right)+i\\sin\\left(\\tfrac\\pi3\\right)\\right)$',
         verify: { kind: 'values', pairs: [['sqrt(1^2+3)', '2'], ['atan(sqrt(3))', 'pi/3'], ['2*cos(pi/3)', '1'], ['2*sin(pi/3)', 'sqrt(3)']] }
       },
       {
@@ -187,7 +187,7 @@ export default {
       { front: 'In a definite integral by parts, where do the limits go?', back: 'On the $uv$ term as well as the remaining integral.' }
     ],
     mistakes: [
-      { wrong: '$\\displaystyle\\int\\frac{dx}{x^2+9}=\\ln(x^2+9)+C$.', right: 'The numerator is not the derivative of the denominator. The answer is $\\tfrac13\\tan^{-1}\\tfrac x3+C$.' },
+      { wrong: '$\\displaystyle\\int\\frac{dx}{x^2+9}=\\ln(x^2+9)+C$.', right: 'The numerator is not the derivative of the denominator. The answer is $\\tfrac13\\tan^{-1}\\left(\\tfrac x3\\right)+C$.' },
       { wrong: 'In $\\int x e^x\\,dx$, taking $u=e^x$ and $dv=x\\,dx$.', right: 'That gives $\\tfrac12x^2e^x-\\int\\tfrac12x^2e^x\\,dx$, which is harder than the integral you started with. Take $u=x$ so that it differentiates to $1$.' },
       { wrong: 'Dropping the $uv$ term in a definite integral by parts.', right: 'Evaluate $\\left[uv\\right]$ between the limits and subtract the remaining integral.' }
     ],
@@ -200,8 +200,8 @@ export default {
       },
       {
         question: 'Evaluate $\\displaystyle\\int_2^3\\frac{dx}{(x-1)(x+2)}$.',
-        steps: ['Split: $\\dfrac{1}{(x-1)(x+2)}=\\dfrac13\\left(\\dfrac1{x-1}-\\dfrac1{x+2}\\right)$. Check at $x=3$: $\\tfrac1{10}=\\tfrac13\\left(\\tfrac12-\\tfrac15\\right)$.', 'Integrate: $\\dfrac13\\left[\\ln(x-1)-\\ln(x+2)\\right]_2^3$.', '$=\\dfrac13\\bigl[(\\ln2-\\ln5)-(\\ln1-\\ln4)\\bigr]=\\dfrac13\\ln\\dfrac85$.'],
-        answer: '$\\tfrac13\\ln\\tfrac85$',
+        steps: ['Split: $\\dfrac{1}{(x-1)(x+2)}=\\dfrac13\\left(\\dfrac1{x-1}-\\dfrac1{x+2}\\right)$. Check at $x=3$: $\\tfrac1{10}=\\tfrac13\\left(\\tfrac12-\\tfrac15\\right)$.', 'Integrate: $\\dfrac13\\left[\\ln(x-1)-\\ln(x+2)\\right]_2^3$.', '$=\\dfrac13\\bigl[(\\ln2-\\ln5)-(\\ln1-\\ln4)\\bigr]=\\dfrac13\\ln\\left(\\dfrac85\\right)$.'],
+        answer: '$\\tfrac13\\ln\\left(\\tfrac85\\right)$',
         verify: { kind: 'values', pairs: [['(1/3)*(1/2-1/5)', '1/10'], ['(1/3)*(ln(2)-ln(5)-(ln(1)-ln(4)))', '(1/3)*ln(8/5)']] }
       },
       {
@@ -251,13 +251,13 @@ export default {
       },
       {
         question: 'A particle falls from rest with $\\ddot x=10-0.1v^2$. Find its terminal velocity, and its speed after it has fallen $10$ m.',
-        steps: ['At terminal velocity $10-0.1v^2=0$, so $v^2=100$ and $v=10$.', 'Use $v\\dfrac{dv}{dx}=10-0.1v^2$ and integrate: $x=\\dfrac1{0.2}\\ln\\dfrac{10}{10-0.1v^2}$.', 'Set $x=10$: $\\ln\\dfrac{10}{10-0.1v^2}=2$, so $10-0.1v^2=10e^{-2}$.', 'Then $v^2=100(1-e^{-2})$ and $v=10\\sqrt{1-e^{-2}}\\approx9.3$.'],
+        steps: ['At terminal velocity $10-0.1v^2=0$, so $v^2=100$ and $v=10$.', 'Use $v\\dfrac{dv}{dx}=10-0.1v^2$ and integrate: $x=\\dfrac1{0.2}\\ln\\left(\\dfrac{10}{10-0.1v^2}\\right)$.', 'Set $x=10$: $\\ln\\left(\\dfrac{10}{10-0.1v^2}\\right)=2$, so $10-0.1v^2=10e^{-2}$.', 'Then $v^2=100(1-e^{-2})$ and $v=10\\sqrt{1-e^{-2}}\\approx9.3$.'],
         answer: 'Terminal velocity $10$; speed $10\\sqrt{1-e^{-2}}\\approx9.3$ after $10$ m',
         verify: { kind: 'values', pairs: [['sqrt(10/0.1)', '10'], ['sqrt(100*(1-e^(-2)))', '10*sqrt(1-e^(-2))'], ['(1/(2*0.1))*ln(10/(10-0.1*100*(1-e^(-2))))', '10']] }
       },
       {
-        question: 'A particle moves with $x=4\\cos3t$. Show that its motion is simple harmonic and find its period, maximum speed and maximum acceleration.',
-        steps: ['Differentiate twice: $\\dot x=-12\\sin3t$ and $\\ddot x=-36\\cos3t=-9x$, so $\\ddot x=-n^2x$ with $n=3$.', 'The period is $\\dfrac{2\\pi}{3}$.', 'The amplitude is $a=4$, so the maximum speed is $na=12$ and the maximum acceleration is $n^2a=36$.'],
+        question: 'A particle moves with $x=4\\cos(3t)$. Show that its motion is simple harmonic and find its period, maximum speed and maximum acceleration.',
+        steps: ['Differentiate twice: $\\dot x=-12\\sin(3t)$ and $\\ddot x=-36\\cos(3t)=-9x$, so $\\ddot x=-n^2x$ with $n=3$.', 'The period is $\\dfrac{2\\pi}{3}$.', 'The amplitude is $a=4$, so the maximum speed is $na=12$ and the maximum acceleration is $n^2a=36$.'],
         answer: 'Period $\\tfrac{2\\pi}{3}$; maximum speed $12$; maximum acceleration $36$',
         verify: { kind: 'values', pairs: [['-36*cos(3*0.5)+9*4*cos(3*0.5)', '0'], ['3*4', '12'], ['3^2*4', '36'], ['2*pi/3', '2*pi/3']] }
       }

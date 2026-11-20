@@ -487,63 +487,61 @@ enum JourneySelfCheck {
         await nextQuestion();
         if (!byLabel('Write: answer by handwriting')) { passed.push('no-write-tab'); continue; }
         const escrow = await oracle({ kind: 'answer' });
-        if (!escrow.supported) { passed.push(escrow.answerType || escrow.reason || 'unstatable'); continue; }
+        // The confident scripted misread must be genuinely different from
+        // the issued answer, including equivalent decimal spellings of 7.
+        if (!escrow.supported || !/^-?\d+$/.test(escrow.text) || Number(escrow.text) === Number(escrow.readerText)) { passed.push(escrow.answerType || escrow.reason || 'unstatable'); continue; }
         const id = qid();
         at = 'write'; await writeMode();
         const echoed = await writeOnNativeSurface();
         at = 'saved'; await inkSavedTruthfully(id);
-        // Reading is asked for (owner decision): writing and saving send nothing.
-        at = 'unread'; await sleep(1500);
-        if (q('.ink-preview .ink-line')) throw new Error('the page was read without Read my answer being pressed');
-        at = 'read'; (await waitFor(() => q('[data-ink-read]'), 20000)).click();
-        // D17: the first read of a profile meets the one-time prompt naming
-        // OpenAI. Nothing is read while it is open; the accept is the go-ahead.
+        // The accepted Nov 18/19 interaction reads silently after the pen
+        // rests. D17 still requires explicit permission, and no grading can
+        // happen until the student presses Mark my working.
         at = 'permission';
-        let permission = 'accepted earlier on this device';
         let kept = {};
         try { kept = JSON.parse(localStorage.getItem('pri-reader-permission-v1') || '{}') || {}; } catch (e) { kept = {}; }
         if (!Object.values(kept).some(r => r && r.choice === 'accepted' && r.version === 1)) {
           const sheet = await waitFor(() => q('[data-reader-permission-sheet="ink"]'), 20000);
           if (!/OpenAI/.test(sheet.textContent || '')) throw new Error('the prompt before the first read does not name OpenAI');
-          await sleep(1000);
-          if (q('.ink-preview .ink-line')) throw new Error('the page was read while the permission prompt was open');
+          if ((await oracle({ kind: 'readerCount' })).count !== 0) throw new Error('provider contacted before permission');
+          assertUnmarked('permission prompt');
           q('[data-reader-permission="accept"]').click();
-          permission = 'asked first, naming OpenAI (D17), and accepted';
         }
-        at = 'reading';
-        try { await waitFor(() => q('.ink-preview .ink-line'), 60000); }
-        catch (e) {
-          // Say what the page shows instead of a reading: the reader's status
-          // line, a prompt still open, the recorded permission, the Read button.
-          let record = null;
-          try { record = localStorage.getItem('pri-reader-permission-v1'); } catch (x) { record = 'unreadable'; }
-          throw new Error('no reading in 60 s: status "' + seen('.ink-answer .ink-status-line').slice(0, 160) + '" sheet=' + (q('[data-reader-permission-sheet]') ? 'open' : 'closed') +
-            ' read=' + (q('[data-ink-read]') ? 'offered' : 'absent') + ' retry=' + (q('[data-ink-retry-reading]') ? 'offered' : 'absent') + ' permission=' + String(record).slice(0, 120) + ' online=' + navigator.onLine);
-        }
-        const lines = [...document.querySelectorAll('.ink-preview .ink-line')].map(n => ({ text: n.getAttribute('data-text'), low: n.classList.contains('ink-line-low') }));
-        if (lines.length !== 1 || lines[0].text !== escrow.readerText) throw new Error('transcript ' + JSON.stringify(lines) + ', the stand-in reader answered ' + JSON.stringify(escrow.readerText));
-        if (!lines[0].low || !q('.ink-line .ink-correct-btn')) throw new Error('a doubtful line is not editable');
-        assertUnmarked('reading');
-        inkEscrow = escrow; graded.push({ id, server: escrow.serverQuestionId, mode: 'ink' });
-        return echoed + ' strokes read by the server (synthetic reader) after the permission prompt (' + permission + '): transcript ' + JSON.stringify(lines[0].text) + ', doubtful, editable';
+        at = 'silent reading';
+        await waitFor(() => q('.ws-actions .status-line')?.getAttribute('data-work-state') === 'read', 60000);
+        if ((await oracle({ kind: 'readerCount' })).count < 1) throw new Error('no actual synthetic provider request');
+        if (allVis('.ink-preview .ink-line, [data-confirm-reading], [data-mp-reading]').length) throw new Error('reading exposed before marking');
+        assertUnmarked('silent reading');
+        at = 'first mark';
+        const mark = submitBtn();
+        if (!mark || !/Mark my working/i.test(mark.textContent || '')) throw new Error('the approved marking action is absent');
+        const got = await checked(pressSubmit);
+        if (got !== 'evaluated' || q('.eval-card')?.getAttribute('data-outcome') !== 'incorrect') throw new Error('the confident misread was not marked as the wrong answer: ' + got);
+        at = 'read after mark';
+        (await waitFor(() => allVis('[data-mp-see-page]')[0], 20000)).click();
+        const line = await waitFor(() => allVis('[data-mp-reading="1"]')[0], 20000);
+        if (line.getAttribute('data-text') !== escrow.readerText || !allVis('[data-mp-edit-line="1"]').length) throw new Error('the marked reading differs from the provider or cannot be corrected');
+        inkEscrow = escrow; graded.push({ id, server: escrow.serverQuestionId, mode: 'ink-misread' });
+        return echoed + ' strokes silently read after permission, no pre-mark result, first server mark wrong; on-demand reading ' + JSON.stringify(escrow.readerText) + ' is editable';
       }
       throw new Error('no handwriting question with a statable numeric answer in 12: ' + passed.join(','));
     });
     await step('inkCorrectedMarked', async () => {
       if (!inkEscrow) throw new Error('no server reading to correct');
-      at = 'correct'; q('.ink-line .ink-correct-btn').click();
-      setValue(await waitFor(() => q('.ink-line form.ink-correct input')), inkEscrow.text); await sleep(200);
-      q('.ink-line form.ink-correct button[type=submit]').click();
-      await waitFor(() => { const l = q('.ink-line[data-corrected="true"]'); return l && l.getAttribute('data-text') === inkEscrow.text; });
-      at = 'submit';
-      let got = null;
-      for (let press = 0; press < 3 && got !== 'evaluated'; press++) {
-        got = await checked(pressSubmit);
-        if (got !== 'confirm') break;
-      }
-      if (got !== 'evaluated') throw new Error('expected an evaluation, got ' + got + ': ' + seen('.verdict, .ws-check').slice(0, 110));
-      if (q('.eval-card').getAttribute('data-outcome') !== 'correct' || !fullMarks()) throw new Error('outcome ' + q('.eval-card').getAttribute('data-outcome') + ' marks ' + JSON.stringify(seen('.eval-marks')));
-      return 'corrected transcript marked by the server: ' + fullMarks();
+      const oldId = qid();
+      at = 'correct'; (await waitFor(() => allVis('[data-mp-edit-line="1"]')[0])).click();
+      setValue(await waitFor(() => q('[data-mp-edit-input="1"]')), inkEscrow.text);
+      at = 'mark again'; q('[data-mp-mark-again]').click();
+      // A finished written page is never edited in place. Redo issues the
+      // same question again, carries the corrected ink, and marks the new
+      // attempt through the real server.
+      await waitFor(() => qid() && qid() !== oldId, 30000);
+      await waitFor(() => q('.eval-card[data-outcome="correct"]') && fullMarks(), 45000);
+      if (q('[data-grade-unavailable]')) throw new Error('the corrected attempt has no authoritative marks');
+      const repeated = await oracle({ kind: 'answer' });
+      if (!repeated.supported || repeated.text !== inkEscrow.text || repeated.serverQuestionId === inkEscrow.serverQuestionId) throw new Error('the corrected page did not use a newly issued copy of the same answer');
+      graded.push({ id: qid(), server: repeated.serverQuestionId, mode: 'ink' });
+      return 'new server attempt on the corrected original handwriting: ' + fullMarks();
     });
     const historyVerdicts = async ids => {
       await route('/review');
@@ -552,11 +550,11 @@ enum JourneySelfCheck {
       return ids.map(id => [...document.querySelectorAll('.hist-row[data-question-id="' + id + '"] .hist-verdict .sr-only')].map(n => n.textContent.trim()).join('+') || 'missing');
     };
     await step('historyRecorded', async () => {
-      if (graded.length !== 2) throw new Error('only ' + graded.length + ' question(s) were marked');
+      if (graded.length !== 3) throw new Error('expected typed, original misread and corrected attempt; only ' + graded.length + ' question(s) were marked');
       localStorage.setItem('pri-journey-graded', JSON.stringify(graded));
       const verdicts = await historyVerdicts(graded.map(g => g.id));
-      if (verdicts.join() !== 'Correct,Correct') throw new Error('History shows ' + verdicts.join());
-      return 'History: typed Correct, handwritten Correct ' + JSON.stringify(graded.map(g => g.server));
+      if (verdicts.join() !== 'Correct,Incorrect,Correct') throw new Error('History shows ' + verdicts.join());
+      return 'History: typed Correct, original reading Incorrect, corrected handwriting Correct ' + JSON.stringify(graded.map(g => g.server));
     });
     return JSON.stringify(steps);
     """#
@@ -586,33 +584,32 @@ enum JourneySelfCheck {
         at = 'write'; await writeMode();
         const echoed = await writeOnNativeSurface();
         at = 'saved'; await inkSavedTruthfully(id);
-        at = 'read'; (await waitFor(() => q('[data-ink-read]'), 20000)).click();
         at = 'permission'; const sheet = await waitFor(() => q('[data-reader-permission-sheet="ink"]'), 20000);
         if (!/OpenAI/.test(sheet.textContent || '')) throw new Error('the prompt before the first read does not name OpenAI');
-        await sleep(1000);
-        if (q('.ink-preview .ink-line')) throw new Error('the page was read while the permission prompt was open');
+        assertUnmarked('permission prompt');
         q('[data-reader-permission="accept"]').click();
-        at = 'reading';
-        try { await waitFor(() => q('.ink-preview .ink-line') || q('[data-ink-retry-reading]'), 120000); } catch (e) { throw new Error('no reading in 120 s: status "' + seen('.ink-answer .ink-status-line').slice(0, 160) + '"'); }
-        if (!q('.ink-preview .ink-line')) throw new Error('the deployed reader refused: "' + seen('.ink-answer .ink-status-line').slice(0, 160) + '"');
-        const lines = [...document.querySelectorAll('.ink-preview .ink-line')].map(n => n.getAttribute('data-text'));
+        at = 'silent reading';
+        await waitFor(() => q('.ws-actions .status-line')?.getAttribute('data-work-state') === 'read', 120000);
+        if (allVis('.ink-preview .ink-line, [data-confirm-reading], [data-mp-reading]').length) throw new Error('reading exposed before marking');
+        assertUnmarked('silent reading');
         inkId = id;
-        return echoed + ' strokes; after the D17 prompt the deployed reader returned ' + lines.length + ' line(s): ' + JSON.stringify(lines).slice(0, 60);
+        return echoed + ' strokes; the deployed reader settled after D17 permission without exposing a transcript or mark';
       }
       throw new Error('no handwriting question in 12: ' + passed.join(','));
     });
     await step('stagingConfirmedMarked', async () => {
       if (!inkId) throw new Error('nothing was read to confirm');
-      // The student's own final answer when the reading proposes none.
-      const field = q('[data-ink-final-answer]');
-      if (field && !field.value) { setValue(field, '7'); await sleep(300); }
-      let got = null;
-      for (let press = 0; press < 3 && !['evaluated', 'miss'].includes(got); press++) {
+      // No pre-mark transcript or confirmation screen in the approved flow.
+      // An unreadable final answer still requires the student's own typed text.
+      let got = await checked(pressSubmit, 90000);
+      if (!['evaluated', 'miss'].includes(got)) {
+        const field = q('[data-ink-final-answer]');
+        if (!field) throw new Error('the reader did not produce a markable result: ' + got);
+        if (!field.value) { setValue(field, '7'); await sleep(300); }
         got = await checked(pressSubmit, 90000);
-        if (got !== 'confirm') break;
       }
-      if (!['evaluated', 'miss'].includes(got)) throw new Error('expected the deployed server to mark the confirmed reading, got ' + got + ': ' + seen('.verdict, .ws-check').slice(0, 120));
-      return 'the deployed server marked the confirmed reading: ' + (got === 'evaluated' ? (q('.eval-card').getAttribute('data-outcome') + ' ' + seen('.eval-marks')) : '"' + seen('.verdict .verdict-title') + '", a try left');
+      if (!['evaluated', 'miss'].includes(got)) throw new Error('expected the deployed server to mark the work, got ' + got + ': ' + seen('.verdict').slice(0, 120));
+      return 'the deployed server marked the work: ' + (got === 'evaluated' ? (q('.eval-card').getAttribute('data-outcome') + ' ' + seen('.eval-marks')) : 'a try left');
     });
     await step('stagingHistory', async () => {
       if (!inkId) throw new Error('no handwritten attempt to find');
@@ -641,13 +638,13 @@ enum JourneySelfCheck {
     await step('historyAfterRelaunch', async () => {
       at = 'gate'; await signedInHome();
       const graded = JSON.parse(localStorage.getItem('pri-journey-graded') || '[]');
-      if (graded.length !== 2) throw new Error('the marking launch recorded ' + graded.length + ' result(s)');
+      if (graded.length !== 3) throw new Error('the marking launch recorded ' + graded.length + ' result(s)');
       at = 'history'; await route('/review');
       await waitFor(() => location.pathname === '/review' && q('.hist-row'), 30000);
       await sleep(800);
       const verdicts = graded.map(g => [...document.querySelectorAll('.hist-row[data-question-id="' + g.id + '"] .hist-verdict .sr-only')].map(n => n.textContent.trim()).join('+') || 'missing');
-      if (verdicts.join() !== 'Correct,Correct') throw new Error('after relaunch History shows ' + verdicts.join());
-      return 'both server-marked results in History after relaunch';
+      if (verdicts.join() !== 'Correct,Incorrect,Correct') throw new Error('after relaunch History shows ' + verdicts.join());
+      return 'all three immutable server-marked results in History after relaunch';
     });
     return JSON.stringify(steps);
     """#

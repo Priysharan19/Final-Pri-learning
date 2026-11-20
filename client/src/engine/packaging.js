@@ -10,13 +10,20 @@
  * line: ACTIVE_PACKAGING_ID.
  *
  * Two packagings are defined:
- *   · 'd19-d20'      — owner defaults D19 / D20 (docs/release/
- *                      V1_DECISIONS_2026-11-01.md). ACTIVE: today's behaviour.
- *   · 'value-2026-11' — the PROPOSAL in docs/product/packaging-2026-11.md:
+ *   · 'value-2026-11' — ACTIVE. Owner-approved in chat on 2026-11-18 (recorded
+ *                      in docs/product/packaging-2026-11.md, "Owner decision"):
  *                      practice uncapped on Free (marking work is the daily
- *                      allowance instead), more marked handwriting and photo
- *                      answers on both plans. NOT active until the owner
- *                      approves it; the doc records that decision.
+ *                      allowance instead), 5 marked handwriting reads and 5
+ *                      question photos a day on Free, 50 and 50 on Premium.
+ *                      The proposal said 10 and 100; the owner lowered them
+ *                      because the measured cost (US$0.0046 per read on
+ *                      average, US$0.0103 for a full page, 2026-11-18,
+ *                      docs/operations/recognition-cost.md) put 100 a day at
+ *                      about US$62 per student per month in the worst case.
+ *                      Price is unchanged.
+ *   · 'd19-d20'      — owner defaults D19 / D20 (docs/release/
+ *                      V1_DECISIONS_2026-11-01.md). SUPERSEDED on 2026-11-18,
+ *                      kept defined so the comparison and the tests can name it.
  *
  * It lives in the engine folder because that is the only client source the
  * production server image carries (see examAllowance.js). It must not read
@@ -30,30 +37,30 @@
 export const PACKAGINGS = Object.freeze({
   'd19-d20': Object.freeze({
     id: 'd19-d20',
-    status: 'current',
+    status: 'superseded',
     free: Object.freeze({
       practicePerDay: 20,
       readsPerDay: 5,
       examsPerWindow: 1,
       examWindowDays: 30
     }),
-    premium: Object.freeze({ readsPerDay: 25 })
+    premium: Object.freeze({ readsPerDay: 50 })
   }),
   'value-2026-11': Object.freeze({
     id: 'value-2026-11',
-    status: 'proposed',
+    status: 'current',
     free: Object.freeze({
       practicePerDay: null,
-      readsPerDay: 10,
+      readsPerDay: 5,
       examsPerWindow: 1,
       examWindowDays: 30
     }),
-    premium: Object.freeze({ readsPerDay: 100 })
+    premium: Object.freeze({ readsPerDay: 50 })
   })
 });
 
 /** The packaging this build and this server enforce. Owner-approved only. */
-export const ACTIVE_PACKAGING_ID = 'd19-d20';
+export const ACTIVE_PACKAGING_ID = 'value-2026-11';
 
 export function packagingOf(id) {
   if (!Object.hasOwn(PACKAGINGS, id)) throw new Error(`Unknown packaging ${JSON.stringify(id)}`);

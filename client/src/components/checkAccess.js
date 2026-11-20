@@ -27,7 +27,10 @@ export const CHECK_REFUSAL = Object.freeze({
   // make it a twenty-first, and the server refused to issue it. The work is
   // kept; it comes back at midnight, or Premium removes the cap. A retry will
   // not change the day, and the next question is capped the same way.
-  FREE_CAP: 'free-cap'
+  FREE_CAP: 'free-cap',
+  // Owner decision, 19 Nov 2026 (Prithagoras): the server answered with a fault of its own (a 500). That is
+  // not "check your connection": the work is kept and trying again is safe.
+  SERVER_FAULT: 'server-fault'
 });
 
 // The server answered, but not with a receipt this device can trust. That is
@@ -56,6 +59,7 @@ export function checkRefusal(error) {
   if (code === 'SIGN_IN_TO_CHECK' || code === 'AUTH_REQUIRED' || code === 'PRACTICE_ACCOUNT_MISMATCH' || code === 'CSRF_REJECTED') return CHECK_REFUSAL.SIGN_IN;
   if (code === 'PLACEMENT_RESTART_REQUIRED') return CHECK_REFUSAL.RESTART;
   if (code === 'FREE_CAP_REACHED' && status === 402) return CHECK_REFUSAL.FREE_CAP;
+  if (code === 'SERVER_FAULT') return CHECK_REFUSAL.SERVER_FAULT;
   if (code === 'RECONNECT_TO_CHECK' || code === 'CLOUD_DISABLED') return CHECK_REFUSAL.RECONNECT;
   if (code === 'QUESTION_CHECK_UNAVAILABLE') return CHECK_REFUSAL.QUESTION;
   if (code === 'QUESTION_NOT_SERVER_ISSUED' || code === 'QUESTION_PREPARED_EXPIRED') return CHECK_REFUSAL.NEW_QUESTION;
@@ -84,7 +88,8 @@ const COPY = Object.freeze({
   [CHECK_REFUSAL.NEW_QUESTION]: { titleKey: 'check.newQuestionTitle', hintKey: 'check.newQuestionHint', action: 'next' },
   [CHECK_REFUSAL.TEACHER_QUESTION]: { titleKey: 'check.teacherTitle', hintKey: 'check.teacherHint', action: 'none' },
   [CHECK_REFUSAL.RESTART]: { titleKey: 'check.restartTitle', hintKey: 'check.restartHint', action: 'restart' },
-  [CHECK_REFUSAL.FREE_CAP]: { titleKey: 'check.freeCapTitle', hintKey: 'check.freeCapHint', action: 'premium' }
+  [CHECK_REFUSAL.FREE_CAP]: { titleKey: 'check.freeCapTitle', hintKey: 'check.freeCapHint', action: 'premium' },
+  [CHECK_REFUSAL.SERVER_FAULT]: { titleKey: 'check.serverFaultTitle', hintKey: 'check.serverFaultHint', action: 'retry' }
 });
 
 /**

@@ -86,7 +86,11 @@ const SITES = {
   'pages/Favorites.jsx': 1,
   'pages/PracticeBase.jsx': 1,
   // The Paper Generator: the options load and the question-bank check
-  'pages/PaperGenerator.jsx': 2
+  'pages/PaperGenerator.jsx': 2,
+  // The Extension 1 papers list on the Exams page (Prithagoras): the catalogue load
+  'pages/Ext1Papers.jsx': 1,
+  // Sitting a practice paper in the app: the sitting loads from the server
+  'paper/PaperSitting.jsx': 1
 };
 const sites = [];
 for (const f of sources.filter(f => f !== 'instrument/Working.jsx')) {

@@ -122,7 +122,7 @@ for (const b of NSW_EXAM_BLUEPRINTS) {
   check(five.marks === five.included.reduce((n, slot) => n + slot.marks, 0) && five.marks < b.totalMarks && five.workingMin === scaledMinutes(b.workingMin, five.marks, b.totalMarks) && five.workingMin < b.workingMin,
     `its marks (${five.marks}) and working time (${five.workingMin} min) are scaled to what it examines`);
   const title = nswPaperTitle(b, five);
-  check(title === `${b.label} · Practice paper — 5 of 6 Year 12 outcomes` && !/HSC|trial/i.test(title), `a partial paper is titled by its coverage, never HSC or trial: "${title}"`);
+  check(title === `${b.label} · Practice paper: 5 of 6 Year 12 outcomes` && !/HSC|trial/i.test(title), `a partial paper is titled by its coverage, never HSC or trial: "${title}"`);
   // An omitted Year 11 outcome lowers nothing in the floor but is still omitted.
   const y11gap = blueprintRelease(b, forms(NSW_MIN_FORMS_PER_SLOT, new Set(['ME1-11-05'])), y12);
   check(y11gap.released && !y11gap.full && y11gap.year12.covered === 6 && y11gap.omittedOutcomes.join() === 'ME1-11-05', 'a Year 11 gap leaves the Year 12 floor whole but is still omitted and named');
@@ -155,7 +155,7 @@ for (const b of NSW_EXAM_BLUEPRINTS) {
     check(r.included.length === 0 && r.omittedOutcomes.length > 0, `pinned: ${b.id} sets nothing and lists its gaps (${r.omittedOutcomes.length})`);
   }
 }
-check(NSW_EXAM_POOL.length === 463, `the pool the pins were taken on: 463 approved forms (got ${NSW_EXAM_POOL.length})`);
+check(NSW_EXAM_POOL.length === 530, `the pool the pins were taken on: 530 approved forms (got ${NSW_EXAM_POOL.length})`);
 
 // On G3's pool, released exactly above the floor (no hand-entered list).
 for (const b of NSW_EXAM_BLUEPRINTS) {
@@ -324,6 +324,9 @@ for (const { form, marks } of sweepForms.values()) {
     let q;
     try { q = generateQuestion(form.generator, form.difficulty, s * 7919 + form.difficulty * 31); } catch { continue; }
     if (!nswIssuable(q, form.generator)) continue;
+    // An NSW paper never sets a sketch: its marks go feature by feature, which is not final-answer marking
+    // (server/platform/exams.js nswFinalAnswerOnly refuses it), so the paper sweep has no sketch to mark.
+    if (q.answerType === 'graph-sketch') continue;
     sweep.questions++;
     const key = keyInput(q);
     const id = `${form.generator}|${form.difficulty} seed ${s * 7919 + form.difficulty * 31}`;

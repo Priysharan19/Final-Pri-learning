@@ -45,22 +45,26 @@ import OtpInput, { OTP_LENGTH } from './OtpInput.jsx';
 import { priNative } from '../platform/native/index.js';
 import { isNetworkFailure, signInErrorCopy } from './signInErrors.js';
 import { readOnboardingAuthority } from './onboardingAuthority.js';
-import { parentFeaturesOffered } from '../platform/edition.js';
+import { parentFeaturesOffered, defaultCourse, phoneDialCode, smsOffered } from '../platform/edition.js';
+import { planStoredProfile } from '../platform/accountProfileRestore.js';
 import { EDITION_ID } from '../brand/edition.js';
+import { offeredYears, pathwayOffered, defaultOffering } from '../platform/edition.js';
 
 export { isNetworkFailure, signInErrorCopy };
 import './SignUpFlow.css';
 
-const CLASSES = [7, 8, 9, 10, 11, 12];
+const CLASSES = offeredYears([7, 8, 9, 10, 11, 12]);
 const AGES = [11, 12, 13, 14, 15, 16, 17];
 // Prithagoras: the NSW Stage 6 maths courses a Year 11 or 12 student picks from.
 // Course names, written the same in every language (the profile's `pathway`).
+// Owner decision, 19 Nov 2026: Prithagoras offers Advanced and Extension 1 only
+// (the edition table `offering`); the others stay in the catalogue.
 const AU_PATHWAYS = [
   { key: 'standard', label: 'Standard' },
   { key: 'advanced', label: 'Advanced' },
   { key: 'ext1', label: 'Extension 1' },
   { key: 'ext2', label: 'Extension 2' }
-];
+].filter(option => pathwayOffered(option.key));
 const TRACKS = [
   // Examination names, written the same in every language (as in Login.jsx).
   { key: 'cbse', label: 'CBSE' },
@@ -102,7 +106,10 @@ export default function SignUpFlow({
 }) {
   const t = useT();
   const tx = useTx();
-  const inline = variant === 'inline';
+  // `gate` is `inline` inside the activation gate: the gate's own card names the
+  // page and says why, so this card adds no heading or lead of its own.
+  const inline = variant === 'inline' || variant === 'gate';
+  const bare = variant === 'gate';
   const [step, setStep] = useState('method');
   const [direction, setDirection] = useState('forward');
   const [channel, setChannel] = useState('email');
@@ -140,12 +147,25 @@ export default function SignUpFlow({
   const sending = useRef(false);
   const finishing = useRef(false);
   const [pathway, setPathway] = useState('advanced');
+  // The stored profile of a returning account (see signedIn); null otherwise.
+  const restored = useRef(null);
+  // Whether the account's stored profile has been asked for in this sign-in (a guardian-pending child cannot be asked yet).
+  const storedAsked = useRef(false);
+  const [readRetry, setReadRetry] = useState(null);
   const available = cloudAvailable();
 
   const needsParent = !!consent?.required && consent.state !== 'given';
   const newAccount = !!ticket || !!pendingSocial;
 
   useEffect(() => { onStep?.(step); }, [step, onStep]);
+  // Owner decision, 19 Nov 2026: a new Prithagoras student starts on Year 12,
+  // Mathematics Advanced (the edition table `offering`); the two choices are
+  // one tap each.
+  useEffect(() => {
+    const d = defaultOffering();
+    if (step === 'class' && d && year === null && !inline) { setYear(d.year); setPathway(d.pathway); }
+  }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     // The landing screen keeps its own focus on first paint; every later step
     // moves focus to its heading so a screen reader hears where it is.
@@ -169,7 +189,7 @@ export default function SignUpFlow({
     // default — asking for a code then says whatever is true.
     cloud.otpChannels().then(result => {
       if (!live || !result?.channels) return;
-      setChannels({ email: result.channels.email !== false, sms: result.channels.sms === true });
+      setChannels({ email: result.channels.email !== false, sms: result.channels.sms === true && smsOffered() });
     }).catch(() => {});
     return () => { live = false; };
   }, [available]);
@@ -212,7 +232,7 @@ export default function SignUpFlow({
   };
 
   const cleanDestination = () => (channel === 'email' ? destination.trim().toLowerCase() : destination.trim());
-  const shownDestination = () => (channel === 'sms' ? `+91 ${destination.trim()}` : destination.trim());
+  const shownDestination = () => (channel === 'sms' ? `${phoneDialCode()} ${destination.trim()}` : destination.trim());
   const profile = () => ({ name: name.trim(), year: year == null ? undefined : String(year), isAdult: age === null ? undefined : age >= 18, age: age === null ? undefined : age, role: 'student' });
   const detailsReady = () => !!name.trim() && age !== null && (inline || year !== null);
 
@@ -328,17 +348,48 @@ export default function SignUpFlow({
     } finally { verifying.current = false; }
   }
 
+  function applyStored(stored) {
+    restored.current = stored;
+    if (stored.name && !name.trim()) setName(stored.name);
+    setYear(stored.year);
+    if (stored.pathway) setPathway(stored.pathway);
+    if (stored.indiaTrack) setTrack(stored.indiaTrack);
+  }
+
+  async function retryStoredRead() {
+    const again = readRetry;
+    if (!again) return;
+    setReadRetry(null); setError('');
+    await signedIn(again);
+  }
+
   async function signedIn(result) {
+    // Nothing of an earlier sign-in survives into this one: a different account must never inherit its profile.
+    restored.current = null; storedAsked.current = false; setReadRetry(null);
     setAccount(result.account);
     const state = result.guardianConsent || null;
     setConsent(state);
     if (!name.trim() && result.account?.name) setName(result.account.name);
     setBusy('');
     const parent = !!state?.required && state.state !== 'given';
-    // A returning student on a device with no profile yet: the class sets up
-    // this device, and is the only thing asked. Inside a page the profile
-    // exists, so nothing more is asked at all.
-    if (!inline && year === null) { go('class'); return; }
+    // A returning student on a device with no profile yet. Their account
+    // already holds their profile: it is read first and the device is set up
+    // from it, so nothing is asked twice and nothing stored is replaced by a
+    // blank one. The class is asked only when the server truly holds none.
+    // Inside a page the profile exists, so nothing more is asked at all.
+    // A child whose guardian has not approved yet cannot sync (the server refuses the pull), so nothing
+    // is stored to read yet: the class is asked, then the parent step. Once the guardian has approved,
+    // finish() asks for the stored profile before the device makes one of its own.
+    if (!inline && year === null && parent) { go('class'); return; }
+    if (!inline && year === null) {
+      const plan = await planStoredProfile(result.account?.id, { course: defaultCourse() });
+      // "Could not ask" is never "has none": the card stays signed in and offers to ask again.
+      if (plan.status === 'failed') { setReadRetry(result); fail(plan.error); return; }
+      storedAsked.current = true;
+      if (plan.status === 'restore') {
+        applyStored(plan.stored);
+      } else { go('class'); return; }
+    }
     if (parent) { go('parent'); return; }
     await finish(result.account);
   }
@@ -487,6 +538,19 @@ export default function SignUpFlow({
           setError(tLater('signup.parentStillWaiting'));
           return;
         }
+        // A guardian-pending child could not be asked for a stored profile at sign-in; the approval is in, so ask once now.
+        if (!inline && !storedAsked.current && !restored.current) {
+          const plan = await planStoredProfile(signedInAccount.id, { course: defaultCourse() });
+          if (plan.status === 'failed') { fail(plan.error); return; }
+          storedAsked.current = true;
+          if (plan.status === 'restore') applyStored(plan.stored);
+        }
+        const stored = restored.current;
+        if (stored) {
+          await onFinish({ account: signedInAccount, name: stored.name || name.trim() || signedInAccount?.name || '', year: stored.year, track: stored.indiaTrack || track,
+            ...(EDITION_ID === 'prithagoras' && stored.year >= 11 ? { pathway: stored.pathway || pathway } : {}), restoredProfile: stored });
+          return;
+        }
         await onFinish({ account: signedInAccount, name: name.trim() || signedInAccount?.name || '', year: year || 9, track, ...(EDITION_ID === 'prithagoras' && year >= 11 ? { pathway } : {}) });
       } catch (err) { fail(err); }
       finally { setBusy(''); }
@@ -517,7 +581,7 @@ export default function SignUpFlow({
       <>
         {/* On the landing screen the page's own heading ("Welcome to Pri
             Learning") is this card's title; inside a page it names itself. */}
-        {inline
+        {inline && !bare
           ? <>{heading('signup.signinTitle')}<p className="signup-lead">{t('signup.inlineLead')}</p></>
           : <h2 className="sr-only" tabIndex={-1} ref={headingRef} id="signup-step-title">{t('signup.signinTitle')}</h2>}
         {!available && <p className="signup-hint" role="status">{t('signup.cloudUnavailable')}</p>}
@@ -536,7 +600,7 @@ export default function SignUpFlow({
         <form className="signup-form" noValidate onSubmit={e => { e.preventDefault(); void sendCode(); }}>
           <label className="label" htmlFor="signup-destination">{isSms ? t('signup.phoneLabel') : t('signup.emailLabel')}</label>
           <div className={isSms ? 'signup-phone' : ''}>
-            {isSms && <span className="signup-cc" aria-hidden="true">+91</span>}
+            {isSms && <span className="signup-cc" aria-hidden="true">{phoneDialCode()}</span>}
             <input className="input" id="signup-destination" value={destination} disabled={!available} autoFocus={!isSms}
               type={isSms ? 'tel' : 'email'} inputMode={isSms ? 'tel' : 'email'} autoCapitalize="none" autoCorrect="off" spellCheck={false}
               autoComplete={isSms ? 'tel-national' : 'email'} maxLength={isSms ? 16 : 254}
@@ -674,8 +738,8 @@ export default function SignUpFlow({
     body = (
       <>
         {heading('signup.classTitle')}
-        <div className="signup-choices signup-choices-6" role="group" aria-label={t('signup.classLabel')}>
-          {CLASSES.map(c => choice(year === c, String(c), () => { setYear(c); if (c < 11) setTrack('cbse'); }, `signup-class-${c}`))}
+        <div className={`signup-choices signup-choices-${CLASSES.length}`} role="group" aria-label={t('signup.classLabel')}>
+          {CLASSES.map(c => choice(year === c, au ? t('common.yearNumber', { n: c }) : String(c), () => { setYear(c); if (c < 11) setTrack('cbse'); }, `signup-class-${c}`))}
         </div>
         {au && year !== null && year >= 11 && (
           <>
@@ -731,7 +795,7 @@ export default function SignUpFlow({
           )}
           <label className="label" htmlFor="signup-parent-destination">{parentSms ? t('signup.parentPhoneLabel') : t('signup.parentEmailLabel')}</label>
           <div className={parentSms ? 'signup-phone' : ''}>
-            {parentSms && <span className="signup-cc" aria-hidden="true">+91</span>}
+            {parentSms && <span className="signup-cc" aria-hidden="true">{phoneDialCode()}</span>}
             <input className="input" id="signup-parent-destination" value={parentDestination}
               type={parentSms ? 'tel' : 'email'} inputMode={parentSms ? 'tel' : 'email'} autoComplete="off" autoCapitalize="none" maxLength={parentSms ? 16 : 254}
               aria-describedby={error ? errorId : undefined}
@@ -795,7 +859,7 @@ export default function SignUpFlow({
   const showBack = !!backTarget || (step === 'method' && !!onCancel);
 
   return (
-    <div className={`signup-flow signup-${variant}`} data-signup-step={step} data-signin-card={variant} data-testid="signin-card">
+    <div className={`signup-flow signup-${variant}`} data-signup-step={step} data-signin-card={inline ? 'inline' : variant} data-testid="signin-card">
       {showBack && (
         <div className="signup-top">
           <button type="button" className="signup-back" aria-label={t(step === 'method' ? 'signup.close' : 'signup.back')}
@@ -809,6 +873,7 @@ export default function SignUpFlow({
         {body}
         {notice && <p className="signup-hint signup-notice-line" role="status" data-testid="signup-notice">{notice}</p>}
         {error && <div className="error-box signup-error" role="alert" id={errorId} data-testid="signup-error">{error}</div>}
+        {error && readRetry && <button type="button" className="btn btn-secondary" data-testid="signup-retry-read" onClick={() => { void retryStoredRead(); }}>{t('common.tryAgain')}</button>}
         {busy === 'finish' && <p className="signup-hint" role="status">{t(inline ? 'signup.signingIn' : 'signup.settingUp')}</p>}
       </div>
     </div>
@@ -860,7 +925,7 @@ function ParentHome({ t, heading }) {
         <form className="signup-form" onSubmit={request}>
           <label className="label" htmlFor="signup-withdraw-phone">{t('signup.withdrawPhone')}</label>
           <div className="signup-phone">
-            <span className="signup-cc" aria-hidden="true">+91</span>
+            <span className="signup-cc" aria-hidden="true">{phoneDialCode()}</span>
             <input className="input" id="signup-withdraw-phone" type="tel" inputMode="tel" autoComplete="tel-national" value={phone} maxLength={16}
               onChange={e => setPhone(e.target.value)} />
           </div>

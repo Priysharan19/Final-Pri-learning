@@ -44,8 +44,8 @@ ok(!/बिना इंटरनेट/.test(hi['login.heroSub']) && /Pri क�
 // ── 3 · The editor footer names who reads, accurately ────────────────────────
 const card = read('client/src/components/QuestionCard.jsx');
 ok(!/t\('verdict\.inkEngine'\)/.test(card), 'no editor footer says "Pri Ink Engine"');
-ok(/startsWith\('cloud'\) \? t\('verdict\.inkReadByServer'\) : t\('verdict\.inkReadByServerPending'\)/.test(card),
-  'pen mode says the server reads before a reading and "read by" only after one');
+ok(/startsWith\('cloud'\) \? t\('verdict\.inkReadByServer'\) : autoReadOn \? t\('ink\.footerAuto'\) : t\('verdict\.inkReadByServerPending'\)/.test(card),
+  'pen mode says the server reads before a reading (or that reading is automatic) and "read by" only after one');
 ok(typeof en['verdict.inkReadByServerPending'] === 'string' && typeof hi['verdict.inkReadByServerPending'] === 'string',
   'the before-a-reading label exists in English and Hindi');
 

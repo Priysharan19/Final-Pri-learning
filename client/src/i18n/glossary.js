@@ -20,6 +20,7 @@
 // it is turned on.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useSyncExternalStore } from 'react';
+import { offersLanguage } from '../platform/edition.js';
 
 // ── Loading ──────────────────────────────────────────────────────────────────
 // Own chunk, like the Hindi catalogue: an install that never opens the bridge
@@ -302,6 +303,9 @@ export function termsIn(text) {
  */
 export function useGlossary(enabled) {
   const loaded = useSyncExternalStore(subscribe, readTerms, readTerms);
-  if (enabled && !loaded) void loadGlossary();
-  return enabled ? loaded : null;
+  // The NCERT Hindi terms belong to an edition that offers Hindi. A Prithagoras
+  // profile restored from a backup that had the bridge on still shows English only.
+  const on = enabled && offersLanguage('hi');
+  if (on && !loaded) void loadGlossary();
+  return on ? loaded : null;
 }

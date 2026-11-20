@@ -985,11 +985,11 @@ async function run() {
     const topic = await nextQuestion({ mode: 'topic', subtopic: topicId, difficulty: 3 });
     eq('topic mode serves the topic asked for', topic.question.subtopic, topicId);
     eq('topic mode honours the difficulty', topic.question.difficulty, 3);
-    // 99 is clamped to D4. The server issues no D4 for this topic (y10-quadratics:
-    // server/platform/nswBanks.js), so the clamped level is answered with the
-    // levels that exist; a topic whose D4 is issued serves it.
-    eq('an out-of-range difficulty is clamped, and a level the server does not issue is refused by name',
-      await POST('/practice/next', { mode: 'topic', subtopic: topicId, difficulty: 99 }).then(() => 'served', e => `${e.code} D${e.detail?.difficultyRequested}`), 'DIFFICULTY_UNAVAILABLE D4');
+    // 99 is clamped to D4. The tolerance fixes (engine/answerBand.js) issued y10-quadratics D4, so the clamped
+    // level is now served; the refusal of a level the server does not issue by name is held by nsw-offer-check
+    // (y8-equations D1, y8-linear D4, both refused with no draft).
+    eq('an out-of-range difficulty is clamped to D4, which this topic now issues',
+      await POST('/practice/next', { mode: 'topic', subtopic: topicId, difficulty: 99 }).then(r => `served D${r.question.difficulty}`, e => `${e.code} D${e.detail?.difficultyRequested}`), 'served D4');
     eq('an out-of-range difficulty is clamped to a level that is issued', (await nextQuestion({ mode: 'topic', subtopic: 'y10-simeq', difficulty: 99 })).question.difficulty, 4);
 
     const missable = await answerableQuestion({ mode: 'topic', subtopic: topicId });
@@ -1736,7 +1736,7 @@ async function run() {
     setLineCheckTransportForTests(async body => { lcCalls.push(body); return lcReply; });
     const lcQ = await answerableQuestion({ mode: 'topic', subtopic: topicId });
     const lcId = lcQ.question.id;
-    lcReply = { lineCheck: { status: 'unchecked', message: 'Couldn’t check your working this time — try again.' } };
+    lcReply = { lineCheck: { status: 'unchecked', message: 'Couldn’t check your working this time. Try again.' } };
     const lcSilent = await POST(`/practice/${lcId}/tutor/line-check`, { lines: ['x = 1'] });
     eq('a line check that did not run says so and charges nothing', [lcSilent.lineCheck?.status, (await idb.get('questions', lcId)).tutorLevel || 0], ['unchecked', 0]);
     lcReply = { lineCheck: { status: 'ok', message: 'Your lines match the method so far. Next: Substitute.' } };
@@ -1753,7 +1753,11 @@ async function run() {
     // the build and on the server unless each turns it on; then forwarded to the
     // server's own issued question, charging nothing on the device.
     {
-      const hpQ = await answerableQuestion({ mode: 'topic', subtopic: topicId });
+      // A chapter this suite has not practised before. The plan's first choice depends on the student's history in the chapter
+      // ("faded" support after earlier attempts), and the draw of earlier questions in topicId is the server's own, not seedable from
+      // the device: on topicId the history, and so the plan, differed from run to run. A fresh chapter has no history, so the
+      // plan for its first help request is fixed: the smallest hint rung, a nudge, charged.
+      const hpQ = await answerableQuestion({ mode: 'topic', subtopic: 'y10-surds', difficulty: 2 });
       const priorOverrides = globalThis.__PRI_FEATURE_OVERRIDES__;
       await rejects('the help plan is dark unless the build turns it on', POST(`/practice/${hpQ.question.id}/help-plan`, { helpRequested: true }), { status: 404 });
       globalThis.__PRI_FEATURE_OVERRIDES__ = { ...(priorOverrides || {}), tutorPolicy: true };

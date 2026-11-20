@@ -157,7 +157,7 @@ function assessBySolutionSet({ ast, previousAst, previousTrusted, meta, variable
         const diagnosis = domainSolutionDiagnosis({ variable, a: prev, b: cur });
         return { status: 'break', trusted: false, note: diagnosis.message, diagnosis };
       }
-      return { status: 'ok', trusted: true, implied: true, note: `True of every solution above, and it also allows ${variable} = ${listRoots(added)}, which the line above does not — check each value against the question.` };
+      return { status: 'ok', trusted: true, implied: true, note: `True of every solution above, and it also allows ${variable} = ${listRoots(added)}, which the line above does not. Check each value against the question.` };
     }
     // One case of the absolute value (Q = P or -Q = P) is a branch: valid to
     // write down whatever its sign condition then decides.

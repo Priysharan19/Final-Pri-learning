@@ -43,8 +43,9 @@
 import { deflateSync } from 'node:zlib';
 import { randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
-import { handwrite, pressRead } from './fakeServerReader.js';
+import { handwrite, markWorking, readingIsNotShown } from './fakeServerReader.js';
 import { directFormsOnly } from '../src/engine/generators/index.js';
+import { CONTENT_VERSION } from '../src/engine/contentIdentity.js';   // a prepared token carries the content version it was minted under
 
 const EVIDENCE = 'SYNTHETIC-READER EVIDENCE';
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
@@ -94,12 +95,6 @@ const photoRows = page => page.evaluate(() => new Promise(done => {
   };
 }));
 const webStorageText = page => page.evaluate(() => JSON.stringify(Object.fromEntries(Object.keys(localStorage).map(k => [k, localStorage.getItem(k)]))) + JSON.stringify(Object.fromEntries(Object.keys(sessionStorage).map(k => [k, sessionStorage.getItem(k)]))));
-const lineState = page => page.evaluate(() => [...document.querySelectorAll('[data-photo-line]')].map(li => ({
-  text: li.querySelector('input')?.value ?? '', out: li.getAttribute('data-excluded') === 'true',
-  check: li.getAttribute('data-check') === 'true', edited: li.getAttribute('data-edited') === 'true',
-  note: li.querySelector('.photo-line-note')?.innerText?.trim() || ''
-})));
-
 /** The page's own issue request, answered by the real server binding the desk's sealed token. */
 // Installed before the profile exists. Creating and signing in the profile
 // lands on /practice, which issues a question at once for the default topic;
@@ -117,7 +112,7 @@ async function serveOwnersQuestion(ctx, online) {
     // is a direct one; only a request seen to be binding a token is left alone.
     if (body && body.prepared !== undefined) return route.continue();
     const prepared = encryptDeliveryToken(JSON.stringify({
-      g: OWNER.generator, d: OWNER.difficulty, s: OWNER.seed, m: 'practice', x: Date.now() + 60 * 60 * 1000, n: randomUUID()
+      g: OWNER.generator, d: OWNER.difficulty, s: OWNER.seed, m: 'practice', x: Date.now() + 60 * 60 * 1000, n: randomUUID(), c: CONTENT_VERSION
     }), 'practice-prepared-v1');
     const accountId = body?.account ?? online.account?.id;
     if (!accountId) return route.continue();
@@ -167,33 +162,45 @@ export const ownerPageFlow = {
       // ── the photo is attached and read ─────────────────────────────────────
       await page.getByRole('button', { name: /answer with a photo/i }).click();
       await page.locator('.editor-body input[type="file"]').setInputFiles({ name: 'page.png', mimeType: 'image/png', buffer: PNG });
-      // Attaching is not asking for a read (owner decision): the photo is
-      // previewed and kept; nothing is sent until "Read my photo" is pressed.
-      const readMine = page.locator('[data-photo-read]');
-      await readMine.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+      // Owner decision, 19 Nov 2026: the reading is not shown; one press marks the working on the student's own page.
+      // Attaching is not asking for a read: the photo is previewed and kept; nothing is sent until "Mark my working" is pressed,
+      // and there is no "Read my photo" step, no line list, no exclusions and no proposed answer to review before marking.
+      await page.locator('.photo-thumb img').waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
       await page.waitForFunction(() => document.querySelector('.ws-actions .status-line')?.getAttribute('data-work-state') !== 'saving', null, { timeout: 15000 }).catch(() => {});
       await page.waitForTimeout(1500);
       const pageReads = () => online.practiceCalls(/^\/v1\/(?:handwriting\/transcribe|practice\/[^/]+\/recognize)$/);
       const pageReadsBefore = (await pageReads()).length;
-      const hint = (await page.locator('[data-photo-unread]').innerText().catch(() => '')).replace(/\s+/g, ' ');
-      await check(`attach only: 0 provider calls — the photo is previewed with "Read my photo", and the page says truthfully when it is sent to the AI reading service [${EVIDENCE}]`,
-        reader.requests.length === readsBefore && await readMine.isVisible() && /^data:image\//.test(await page.locator('.photo-thumb img').getAttribute('src').catch(() => '') || '') &&
-          await page.locator('[data-photo-lines]').count() === 0 && /has not been sent anywhere/.test(hint) && /sent once to Pri’s AI reading service/.test(hint) &&
-          await page.locator('.ws-actions .btn-primary').isDisabled(),
-        `provider +${reader.requests.length - readsBefore}; hint ${JSON.stringify(hint)}`);
-      await page.reload({ waitUntil: 'domcontentloaded' });
-      await readMine.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
-      await page.waitForTimeout(1500);
-      await check(`attach, then reload: 0 provider calls — the same photo is back, still unread, with "Read my photo" [${EVIDENCE}]`,
-        reader.requests.length === readsBefore && await readMine.isVisible() && await shownId(page) === qid && await page.locator('[data-photo-lines]').count() === 0,
+      await check(`attach only: 0 provider calls — the photo is previewed, with no Read button and no reading of it on screen [${EVIDENCE}]`,
+        reader.requests.length === readsBefore && await page.locator('[data-photo-read], [data-photo-lines], [data-reading-review]').count() === 0 &&
+          /^data:image\//.test(await page.locator('.photo-thumb img').getAttribute('src').catch(() => '') || '') &&
+          await page.getByRole('button', { name: /^Mark my working/ }).count() === 1,
         `provider +${reader.requests.length - readsBefore}`);
-      // An impatient double press: one read.
-      await page.evaluate(() => { const b = document.querySelector('[data-photo-read]'); b.click(); b.click(); });
-      await page.locator('[data-photo-lines]').waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
-      await page.waitForTimeout(800);
-      await check(`Read my photo, pressed twice in one moment: exactly 1 provider call and 1 page request [${EVIDENCE}]`,
-        reader.requests.length === readsBefore + 1 && (await pageReads()).length === pageReadsBefore + 1, `provider +${reader.requests.length - readsBefore}; page requests +${(await pageReads()).length - pageReadsBefore}`);
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await page.locator('.photo-thumb img').waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+      await page.waitForTimeout(1500);
+      await check(`attach, then reload: 0 provider calls — the same photo is back, still unread [${EVIDENCE}]`,
+        reader.requests.length === readsBefore && await shownId(page) === qid && await page.locator('.photo-thumb img').count() === 1 && await page.locator('[data-photo-lines]').count() === 0,
+        `provider +${reader.requests.length - readsBefore}`);
       const thumb = await page.locator('.photo-thumb img').getAttribute('src').catch(() => null);
+      const status = page.locator('.ws-actions .status-line');
+      await check('the status line says the photo is saved on this device — after the readback, and it is true',
+        await until(page, async () => /saved on this device/i.test(await status.innerText())) && (await photoRows(page))?.length === 1,
+        `${JSON.stringify(await status.innerText())} rows ${JSON.stringify(await photoRows(page))}`);
+      const rows = await photoRows(page);
+      await check('the draft is one row bound to this profile and question; the photo is in no web storage',
+        rows?.length === 1 && rows[0].id.endsWith(`:photo:${qid}`) && rows[0].id.startsWith(`${rows[0].pid}:`) &&
+          !/data:image|least value|40,50,60/.test(await webStorageText(page)), JSON.stringify(rows));
+
+      // ── one press (an impatient double press: one read, one mark) ──────────
+      const ledgerBefore = online.platform.ledger(account.id);
+      const submitCalls = () => online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/);
+      const submitsBefore = (await submitCalls()).length;
+      await page.evaluate(() => { const b = [...document.querySelectorAll('button')].find(x => /^Mark my working/.test(x.textContent || '')); b.click(); b.click(); });
+      await page.waitForSelector('[data-marked-page], .eval-card', { timeout: 40000 }).catch(() => {});
+      await page.waitForTimeout(800);
+      await check(`Mark my working, pressed twice in one moment: exactly 1 provider call, 1 page request and 1 mark [${EVIDENCE}]`,
+        reader.requests.length === readsBefore + 1 && (await submitCalls()).length === submitsBefore + 1,
+        `provider +${reader.requests.length - readsBefore}; page requests +${(await pageReads()).length - pageReadsBefore}; marks +${(await submitCalls()).length - submitsBefore}`);
       const sent = reader.requests.slice(readsBefore);
       await check(`the photo is read once, answer-blind: one request, one picture, nothing of the question [${EVIDENCE}]`,
         sent.length === 1 && sent.every(r => {
@@ -201,108 +208,25 @@ export const ownerPageFlow = {
           const words = JSON.stringify(parts.filter(p => p.type !== 'input_image'));
           return parts.filter(p => p.type === 'input_image').length === 1 && !words.includes(prompt.slice(0, 24)) && !/real function|\(x ?\+ ?3\)/i.test(words);
         }), `${sent.length} provider request(s)`);
-      let lines = await lineState(page);
-      await check('every line the reader returned is on screen, in order — nothing is discarded',
-        lines.length === 9 && NOTES.every((text, i) => lines[i].text === text) && /least value ⇒ 6\./.test(lines[8].text), JSON.stringify(lines.map(l => l.text)));
-      await check('the five lines of set notes above the restated question are left out by default: struck through, labelled, still visible',
-        lines.slice(0, 5).every(l => l.out && /left out/i.test(l.note)) && lines.slice(5).every(l => !l.out) &&
-          await page.locator('[data-photo-left-out="5"]').isVisible() && /5 lines were left out because they look like other work/i.test(await page.locator('[data-photo-left-out]').innerText()),
-        JSON.stringify(lines.map(l => l.out)));
-      await check('the strict signs are shown as the reader returned them — ">" is not turned into "≥" for the student',
-        lines[6].text === '(x+3)² > 0' && lines[7].text === '(x+3)² + 6 > 6' && !/≥/.test(lines[6].text + lines[7].text), JSON.stringify([lines[6].text, lines[7].text]));
-      await check('the line the reader doubted says "Check this line" as a doubt about the reading (≥ or >), not about the maths',
-        lines[6].check && /Check this line: the reader was not sure \(≥ or >\)/.test(lines[6].note) && !lines[7].check &&
-          /doubt about how the page was read, not about your maths/i.test(await page.locator('[data-photo-reading-doubt]').innerText().catch(() => '')),
-        JSON.stringify(lines[6]));
-      const answerField = page.locator('[data-final-answer]');
-      await check('the answer field holds "6" — the mathematics of the last line, not the sentence "least value ⇒ 6."',
-        await answerField.inputValue() === '6' && await answerField.isEditable() &&
-          await page.locator('[data-photo-answer-note="proposed"]').isVisible() && /taken from line 9/i.test(await page.locator('[data-photo-answer-note]').innerText()),
-        JSON.stringify(await answerField.inputValue()));
-      await check('reading marks nothing: no question recognised or graded until Submit is pressed',
-        (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/(recognize|submit)/)).length === 0 && await page.locator('.eval-card, .verdict-bad').count() === 0);
-      const status = page.locator('.ws-actions .status-line');
-      await check('the status line says the photo and its reading are saved on this device — after the readback, and it is true',
-        await until(page, async () => /Photo and reading saved on this device/.test(await status.innerText())) && (await photoRows(page))?.length === 1,
-        `${JSON.stringify(await status.innerText())} rows ${JSON.stringify(await photoRows(page))}`);
-      const rows = await photoRows(page);
-      await check('the draft is one row bound to this profile and question; the photo is in no web storage',
-        rows?.length === 1 && rows[0].id.endsWith(`:photo:${qid}`) && rows[0].id.startsWith(`${rows[0].pid}:`) &&
-          !/data:image|least value|40,50,60/.test(await webStorageText(page)), JSON.stringify(rows));
-
-      // ── bring the notes back, then leave them out again ────────────────────
-      await page.locator('[data-photo-include-all]').click();
-      lines = await lineState(page);
-      await check('"Include them" brings all five back in one action, and the answer is still 6 (not a number from the notes)',
-        lines.every(l => !l.out) && await answerField.inputValue() === '6' && await page.locator('[data-photo-left-out]').count() === 0, JSON.stringify(lines.map(l => l.out)));
-      for (let i = 0; i < 5; i += 1) await page.locator(`[data-photo-line="${i}"] [data-photo-line-toggle]`).click();
-      lines = await lineState(page);
-      await check('each line can be left out again by the student, one tap each',
-        lines.slice(0, 5).every(l => l.out) && lines.slice(5).every(l => !l.out) && await answerField.inputValue() === '6', JSON.stringify(lines.map(l => l.out)));
-
-      // ── the student corrects > to ≥ on one line ────────────────────────────
-      const seventh = page.locator('[data-photo-line="6"] input');
-      await seventh.fill('(x+3)^2 >= 0');
-      await page.locator('[data-final-answer]').focus();
-      lines = await lineState(page);
-      await check('line 7 is corrected from > to ≥ by the student: shown as ≥, marked "Corrected by you", no longer asking',
-        lines[6].text === '(x+3)² ≥ 0' && lines[6].edited && !lines[6].check && /Corrected by you/.test(lines[6].note) && lines[7].text === '(x+3)² + 6 > 6', JSON.stringify(lines[6]));
-      await until(page, async () => /Photo and reading saved on this device/.test(await status.innerText()));
-
-      // ── reload mid-way ─────────────────────────────────────────────────────
-      const readsBeforeReload = reader.requests.length;
-      await page.waitForTimeout(600);
-      await page.reload({ waitUntil: 'domcontentloaded' });
-      await page.waitForSelector('.q-prompt', { timeout: 30000 });
-      await page.locator('[data-photo-lines]').waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
-      lines = await lineState(page);
-      await check('after a reload: the same question, the same photo, Photo mode',
-        await shownId(page) === qid && await mathText('.q-prompt') === prompt && await page.locator('.photo-thumb img').getAttribute('src').catch(() => null) === thumb &&
-          await page.locator('[data-photo-restored]').isVisible());
-      await check('the corrected line, the five exclusions and the answer 6 are all restored',
-        lines.length === 9 && lines[6].text === '(x+3)² ≥ 0' && lines[6].edited && lines.slice(0, 5).every(l => l.out) && lines.slice(5).every(l => !l.out) &&
-          await page.locator('[data-final-answer]').inputValue() === '6', JSON.stringify(lines.map(l => [l.text, l.out, l.edited])));
-      await page.waitForTimeout(1500);
-      await check('restoring costs no read: the reader was not asked again',
-        reader.requests.length === readsBeforeReload, `${reader.requests.length - readsBeforeReload} provider request(s) after the reload`);
-      await check('and the status line says saved again only after its own readback',
-        await until(page, async () => /Photo and reading saved on this device/.test(await page.locator('.ws-actions .status-line').innerText())));
-
-      // ── Submit ─────────────────────────────────────────────────────────────
-      const ledgerBefore = online.platform.ledger(account.id);
-      const callsBeforeSubmit = reader.requests.length;
-      const separateBeforeSubmit = (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/(recognize|recognition\/[^/]+\/confirm)$/)).length;
-      await pressSubmit(page);
-      await page.waitForSelector('.eval-card', { timeout: 40000 }).catch(() => {});
-      const graded = (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/)).at(-1);
-      // Submit is one request (#506): the photo travels with /submit and the
-      // server reads it — reusing the read it kept, with every per-line doubt
-      // intact, and paying nothing — and writes the receipts beside the mark.
-      const separate = (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/(recognize|recognition\/[^/]+\/confirm)$/)).length;
-      const reading = graded?.json?.reading;
-      const answered = online.recognitionProof(reading?.receipt);
-      const providerRead = online.recognitionProof(answered?.parentReceipt) || answered;
-      const keptRead = online.keptReadResults().find(r => (r.lines || []).length === 9) || null;
-      const kept = keptRead?.lines || [];
-      await check('the receipt read at Submit reuses the kept read — +0 provider calls — and the kept read still carries each line\'s doubt, layout gap and confidence',
-        graded?.status === 200 && /^data:image\//.test(graded.body?.image || '') && separate === separateBeforeSubmit && reading?.reused === true &&
-          reader.requests.length === callsBeforeSubmit && providerRead?.providerNeedsConfirmation === true && kept.length === 9 &&
-          kept[6].text === '(x+3)^2 > 0' && kept[6].uncertain === true && kept[6].doubt === '>= or >' && kept[7].uncertain === false && kept[7].doubt === null &&
-          kept[5].gapBefore === true && kept[4].gapBefore === false && kept.every(l => l.confidence === 0.88) && keptRead.needsConfirmation === true,
-        JSON.stringify({ status: graded?.status, reading, separate: separate - separateBeforeSubmit, calls: reader.requests.length - callsBeforeSubmit, l6: kept[6], l5: kept[5] }));
-      await check('Submit sends the answer "6" in Photo mode with the four kept lines as working — the corrected line, and none of the set notes',
-        graded?.body?.answer === '6' && graded.body.mode === 'photo' &&
-          graded.body.steps === 'f(x) = (x+3)^2 + 6\n(x+3)^2 >= 0\n(x+3)^2 + 6 > 6\nleast value => 6.' && !/40,50,60|final:/.test(graded.body.steps),
-        JSON.stringify(graded?.body));
-      await check('the server marks it: correct, 3 of 3, resolved, with the worked solution',
-        graded?.status === 200 && graded.json?.authoritative === true && graded.json.correct === true && graded.json.resolved === true &&
-          graded.json.marksEarned === 3 && graded.json.marksPossible === 3 && !!graded.json.solution, JSON.stringify({ status: graded?.status, correct: graded?.json?.correct, marks: [graded?.json?.marksEarned, graded?.json?.marksPossible] }));
+      const graded = (await submitCalls()).at(-1);
+      const hidden = await readingIsNotShown(page, ['(x+3)^2 + 6 > 6', 'least value => 6.']);
+      await check('the typed reading is not on screen after marking either: it is on demand only',
+        hidden.structure.length === 0 && hidden.leaked.length === 0 && await page.locator('[data-photo-line]').count() === 0, JSON.stringify(hidden));
+      await check('Submit sends the photo in Photo mode, and the question\'s own set notes are not part of the working',
+        graded?.status === 200 && /^data:image\//.test(graded.body?.image || '') && graded.body.mode === 'photo' && !/40,50,60|final:/.test(`${graded.body?.steps || ''}${graded.body?.answer || ''}`),
+        JSON.stringify({ ...graded?.body, image: undefined }));
+      await check('the server marks it: authoritative and resolved on this one press (the owner\'s page, correct, 3 of 3, with the worked solution)',
+        graded?.status === 200 && graded.json?.authoritative === true && graded.json.resolved === true &&
+          graded.json.correct === true && graded.json.marksEarned === 3 && graded.json.marksPossible === 3 && !!graded.json.solution,
+        JSON.stringify({ status: graded?.status, correct: graded?.json?.correct, resolved: graded?.json?.resolved, marks: [graded?.json?.marksEarned, graded?.json?.marksPossible], reading: graded?.json?.reading }));
       const ledger = online.platform.ledger(account.id, graded?.json?.questionId);
       await check('one attempt is recorded for the account, and the card shows it as marked',
-        ledger.completions === ledgerBefore.completions + 1 && ledger.thisDone === 1 && await page.locator('.eval-card').isVisible() &&
-          await page.locator('.ws-actions .status-line').getAttribute('data-work-state') === 'submitted');
+        ledger.completions === ledgerBefore.completions + 1 && ledger.thisDone === 1 && await page.locator('[data-marked-page], .eval-card').first().isVisible() &&
+          await page.locator('.ws-actions .status-line').getAttribute('data-work-state') === 'submitted',
+        JSON.stringify({ ledger, state: await page.locator('.ws-actions .status-line').getAttribute('data-work-state') }));
       await check('once marked, nothing of the photo stays on the device',
         await until(page, async () => (await photoRows(page))?.length === 0), JSON.stringify(await photoRows(page)));
+      void thumb;
       await check('no provider was reached but the scripted reader', reader.refused.length === 0, JSON.stringify(reader.refused));
     } finally {
       reader.lines = null;
@@ -320,55 +244,34 @@ async function webkitGeneric({ page, check, mathText, online, reader, account, p
   const readsBefore = reader.requests.length;
   await page.getByRole('button', { name: /answer with a photo/i }).click();
   await page.locator('.editor-body input[type="file"]').setInputFiles({ name: 'page.png', mimeType: 'image/png', buffer: PNG });
-  await page.locator('[data-photo-read]').waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
-  await page.locator('[data-photo-read]').click();
-  await page.locator('[data-photo-lines]').waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
-  // Replacing the photo drops its reading; the new photo is not read until asked.
+  await page.locator('.photo-thumb img').waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+  // Replacing the photo drops the first; the new photo is not read until marked. (Owner decision, 19 Nov 2026: the reading is
+  // not shown; one press of Mark my working marks the working on the student's own page.)
   {
-    const afterFirstRead = reader.requests.length;
     await page.locator('.editor-body input[type="file"]').setInputFiles({ name: 'page-2.png', mimeType: 'image/png', buffer: PNG2 });
-    await page.locator('[data-photo-read]').waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelector('.photo-thumb img')?.naturalWidth === 2, null, { timeout: 30000 }).catch(() => {});
     await page.waitForTimeout(1500);
-    await check(`replace the photo: the previous reading is gone and 0 provider calls are made until "Read my photo" is pressed [${EVIDENCE}]`,
-      reader.requests.length === afterFirstRead && await page.locator('[data-photo-lines]').count() === 0 && await page.locator('[data-photo-read]').isVisible() &&
-        await page.locator('.ws-actions .btn-primary').isDisabled(), `provider +${reader.requests.length - afterFirstRead}`);
-    await page.locator('[data-photo-read]').click();
-    await page.locator('[data-photo-lines]').waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
-    await check(`and the replacement is read once when asked: 1 provider call [${EVIDENCE}]`, reader.requests.length === afterFirstRead + 1, `provider +${reader.requests.length - afterFirstRead}`);
+    await check(`replace the photo: 0 provider calls are made until "Mark my working" is pressed, and no reading is shown [${EVIDENCE}]`,
+      reader.requests.length === readsBefore && await page.locator('[data-photo-lines], [data-photo-read]').count() === 0, `provider +${reader.requests.length - readsBefore}`);
   }
-  let lines = await lineState(page);
-  await check(`each photo was read once when asked (two photos, two calls) and every line is on screen, strict signs as returned [${EVIDENCE}]`,
-    reader.requests.length === readsBefore + 2 && lines.length === 9 && lines[6].text === '(x+3)² > 0' && lines[8].text === 'least value ⇒ 6.', JSON.stringify(lines.map(l => l.text)));
-  await check('the doubted line says "Check this line" as a doubt about the reading', lines[6].check && /reader was not sure \(≥ or >\)/.test(lines[6].note), JSON.stringify(lines[6]));
-  const answerField = page.locator('[data-final-answer]');
-  await check('the answer field holds "6", not the sentence', await answerField.inputValue() === '6', JSON.stringify(await answerField.inputValue()));
-  for (let i = 0; i < 5; i += 1) await page.locator(`[data-photo-line="${i}"] [data-photo-line-toggle]`).click();
-  await page.locator('[data-photo-line="6"] input').fill('(x+3)^2 >= 0');
-  await answerField.focus();
-  lines = await lineState(page);
-  await check('lines are left out one tap each, and a line is corrected from > to ≥',
-    lines.slice(0, 5).every(l => l.out) && lines.slice(5).every(l => !l.out) && lines[6].text === '(x+3)² ≥ 0' && lines[6].edited, JSON.stringify(lines.map(l => [l.text, l.out])));
   const status = page.locator('.ws-actions .status-line');
   await check('saved on this device, by readback: one sealed row, no photo in web storage',
-    await until(page, async () => /Photo and reading saved on this device/.test(await status.innerText())) && (await photoRows(page))?.length === 1 && !/data:image/.test(await webStorageText(page)));
+    await until(page, async () => /saved on this device/i.test(await status.innerText())) && (await photoRows(page))?.length === 1 && !/data:image/.test(await webStorageText(page)));
   const thumb = await page.locator('.photo-thumb img').getAttribute('src').catch(() => null);
-  const readsBeforeReload = reader.requests.length;
   await page.waitForTimeout(600);
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.q-prompt', { timeout: 30000 });
-  await page.locator('[data-photo-lines]').waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
-  lines = await lineState(page);
+  await page.locator('.photo-thumb img').waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
   await page.waitForTimeout(1200);
-  await check('after a reload: the same question and photo, the corrected line, the exclusions and the answer, with no second read',
+  await check('after a reload: the same question and photo, with no read',
     await shownId(page) === qid && await mathText('.q-prompt') === prompt && await page.locator('.photo-thumb img').getAttribute('src').catch(() => null) === thumb &&
-      lines.length === 9 && lines[6].text === '(x+3)² ≥ 0' && lines.slice(0, 5).every(l => l.out) && await page.locator('[data-final-answer]').inputValue() === '6' &&
-      reader.requests.length === readsBeforeReload, JSON.stringify({ lines: lines.map(l => [l.text, l.out]), reads: reader.requests.length - readsBeforeReload }));
-  await pressSubmit(page);
+      reader.requests.length === readsBefore, JSON.stringify({ reads: reader.requests.length - readsBefore }));
+  await markWorking(page);
   await until(page, async () => (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/)).length > 0, 40000);
   const graded = (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/)).at(-1);
-  await check('Submit sends "6" in Photo mode with the four kept lines, and the server answers authoritatively (this is not the owner\'s question, so the verdict itself is not asserted)',
-    graded?.body?.answer === '6' && graded.body.mode === 'photo' && graded.body.steps === 'f(x) = (x+3)^2 + 6\n(x+3)^2 >= 0\n(x+3)^2 + 6 > 6\nleast value => 6.' &&
-      graded.status === 200 && graded.json?.authoritative === true && typeof graded.json.correct === 'boolean', JSON.stringify({ body: graded?.body, status: graded?.status }));
+  await check('one press reads the photo once (picture only) and the server answers authoritatively in Photo mode (this is not the owner\'s question, so the verdict itself is not asserted)',
+    reader.requests.length === readsBefore + 1 && graded?.body?.mode === 'photo' && graded.status === 200 && graded.json?.authoritative === true && typeof graded.json.correct === 'boolean',
+    JSON.stringify({ reads: reader.requests.length - readsBefore, status: graded?.status }));
   void account;
 }
 
@@ -415,15 +318,29 @@ export const usageLimitFlow = {
       const status = page.locator('.ws-actions .status-line');
 
       // ── first read: inside the ceiling ─────────────────────────────────────
+      // Owner decision, 19 Nov 2026: the reading is not shown; one press marks the working on the student's own page.
+      // CTO ruling: that first press is the one authoritative attempt, so the first (paid) read is also a mark.
       await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '7');
-      await pressRead(page);
-      await check(`the first read works: one press, one request, and the reading is shown [${EVIDENCE}]`,
-        await until(page, async () => await page.locator('.ink-preview .ink-line').count() === 1, 20000) && transcribes.length === 1 && refusals.length === 0,
+      await markWorking(page);
+      await page.waitForSelector('[data-marked-page], .eval-card', { timeout: 30000 }).catch(() => {});
+      await check(`the first read works: one press, one request, and the page is marked [${EVIDENCE}]`,
+        transcribes.length === 1 && refusals.length === 0 && await page.locator('[data-marked-page], .eval-card').count() >= 1,
         `${transcribes.length} request(s), ${refusals.length} refusal(s)`);
+      const marksAfterFirst = (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/(recognize|submit)/)).length;
 
       // ── second read: the server's ceiling ──────────────────────────────────
+      // The first question is answered; the next written question takes the second press.
+      for (let skips = 0; skips < 14; skips += 1) {
+        const leaving = await shownId(page);
+        await page.locator('.ctx-next').click();
+        await page.waitForFunction(id => document.querySelector('.qpage[data-question-id]')?.getAttribute('data-question-id') !== id, leaving, { timeout: 30000 });
+        await settle();
+        if (await page.locator('.qpage').first().getAttribute('data-mode') !== 'mcq' && await page.getByRole('button', { name: 'Answer by handwriting' }).count()) break;
+      }
+      await page.getByRole('button', { name: 'Answer by handwriting' }).click().catch(() => {});
+      await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
       await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '1', { x: 160 });
-      await pressRead(page);     // "Read again" for the changed page
+      await markWorking(page);
       const inkStatus = page.locator('.ink-status-line');
       await check('the second read is refused by the server\'s own ceiling: 503 PAID_CAPACITY_REACHED, with when it resets',
         await until(page, async () => refusals.length === 1, 20000) && refusals[0].body?.error?.code === 'PAID_CAPACITY_REACHED' &&
@@ -437,7 +354,7 @@ export const usageLimitFlow = {
         await until(page, async () => await status.getAttribute('data-work-state') === 'usage-limit') && /^Saved on this device/.test((await status.innerText()).trim()),
         `${await status.getAttribute('data-work-state')} · ${JSON.stringify(await status.innerText())}`);
       await check('nothing was marked and no try was spent by the refusal',
-        (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/(recognize|submit)/)).length === 0 && await page.locator('.eval-card, .verdict-bad').count() === 0 && online.platform.ledger(account.id).completions === 0);
+        (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/(recognize|submit)/)).length === marksAfterFirst && await page.locator('[data-marked-page], .eval-card, .verdict-bad').count() === 0 && online.platform.ledger(account.id).completions === 1);
 
       // ── no request storm ───────────────────────────────────────────────────
       const sentAtRefusal = transcribes.length;
@@ -470,7 +387,7 @@ export const usageLimitFlow = {
       const graded = (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/)).at(-1);
       await check('the typed answer is marked by the server on the first try, with full marks: the refusals spent nothing',
         graded?.status === 200 && graded.body?.mode === 'typed' && graded.json?.authoritative === true && graded.json.correct === true && graded.json.resolved === true &&
-          graded.json.marksEarned === graded.json.marksPossible && online.platform.ledger(account.id).completions === 1,
+          graded.json.marksEarned === graded.json.marksPossible && online.platform.ledger(account.id).completions === 2,
         JSON.stringify({ status: graded?.status, mode: graded?.body?.mode, correct: graded?.json?.correct, marks: [graded?.json?.marksEarned, graded?.json?.marksPossible] }));
       await check('typing needed no read: the request count did not move', transcribes.length === sentAtRefusal + 1, `${transcribes.length}`);
       await check('no provider was reached but the scripted reader, and only once', reader.refused.length === 0, JSON.stringify(reader.refused));

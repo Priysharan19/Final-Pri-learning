@@ -197,6 +197,21 @@ eq(toleranceFor(3, null), null, 'no policy → the default band (numsClose)');
   ok(!/official CBSE marking scheme|guaranteed accuracy|100% accurate/i.test(doc), 'the policy document makes no unsupported accuracy or officialness claim');
 }
 
+
+// "exactly" counts occurrences as often as it asks for an exact value: only the second is an exact-value demand.
+{
+  const { asksForExactValue } = await import('../src/engine/checker-core.js');
+  const cases = [
+    ['Evaluate $\\sin 30°$ exactly.', true], ['Find the exact gradient.', true],
+    ['A die is rolled $4$ times. Find the probability that a six appears exactly once.', false],
+    ['A coin is tossed 3 times; find $P(\\text{heads})$ if it lands heads exactly twice.', false],
+    ['Find the chance of a six exactly thrice in 5 rolls.', false],
+    ['Exactly two of the five are red. Find the probability.', false],
+    ['The change is exactly the same as before.', false]
+  ];
+  for (const [prompt, want] of cases) ok(asksForExactValue({ prompt }) === want, `"exactly" reads as ${want ? 'an exact-value demand' : 'a count'}: ${prompt.slice(0, 50)}`);
+}
+
 console.log(failures.length
   ? `TOLERANCE POLICY: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
   : `TOLERANCE POLICY: PASS — ${pass}/${pass} checks — default exact/relative bands, authored tol, percent, exact form, converted angles, and the NTA two-decimal and nearest-integer rules, each at its boundary on both sides.`);

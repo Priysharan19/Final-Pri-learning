@@ -482,14 +482,14 @@ function intervalDiagnosis(source, candidate) {
 
 export function assessRelationChainLine({ text, meta = null } = {}) {
   const candidate = typeof text === 'string' ? parseRelationChain(text) : text;
-  if (!candidate) return { status: 'note', trusted: false, chain: null, note: 'Skipped — I couldn’t parse this chained inequality safely.' };
+  if (!candidate) return { status: 'note', trusted: false, chain: null, note: 'Skipped: I couldn’t parse this chained inequality safely.' };
   const sourceText = meta?.source || meta?.canonical;
   const source = sourceText ? parseRelationChain(sourceText) : null;
   if (!source || source.pairs.length !== candidate.pairs.length) {
     return { status: 'note', trusted: false, chain: candidate, note: 'Pri needs an authored chained inequality with the same number of comparisons before it can verify this line.' };
   }
   if (meta?.requireProgress && compactChainText(text) === compactChainText(sourceText)) {
-    return { status: 'note', trusted: false, chain: candidate, note: 'Starting inequality recognised — make a valid transformation throughout the chain.' };
+    return { status: 'note', trusted: false, chain: candidate, note: 'Starting inequality recognised: make a valid transformation throughout the chain.' };
   }
 
   let allPairwise = true;

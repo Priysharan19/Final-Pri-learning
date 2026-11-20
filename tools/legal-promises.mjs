@@ -78,6 +78,79 @@ const INDIA_PROMISES = [
         code: /'readerPermission\.leadInk':[^\n]*OpenAI/
       }
     ]
+  },
+  {
+    id: 'Original handwriting kept 2 years, then deleted automatically',
+    notice: 'docs/legal/privacy.md',
+    says: /2\s+years\s+\(730\s+days\)/,
+    needs: [
+      {
+        what: 'the 730-day retention for both editions',
+        files: ['server/platform/originalWork.js'],
+        code: /ORIGINAL_RETENTION_MS\s*=\s*Object\.freeze\(\{\s*priyabhata:\s*730\s*\*\s*DAY,\s*prithagoras:\s*730\s*\*\s*DAY\s*\}\)/
+      },
+      {
+        what: 'a housekeeping purge of expired originals',
+        files: ['server/platform/housekeeping.js'],
+        code: /DELETE FROM attempt_originals WHERE expires_at/
+      },
+      {
+        what: 'the originals in the account export',
+        files: ['server/platform/accounts.js'],
+        code: /SELECT \* FROM attempt_originals WHERE account_id=\?/
+      }
+    ]
+  },
+  {
+    id: 'A teacher sees an original only for work the student hands in',
+    notice: 'docs/legal/privacy.md',
+    says: /hand\s+in\s+work\s+to\s+your\s+class\s+teacher/,
+    needs: [
+      {
+        what: 'the hand-in check on the teacher\'s original-work route',
+        files: ['server/platform/originalWork.js'],
+        code: /const handedIn = items\.some/
+      },
+      {
+        what: 'a visibility list that never opens papers not handed in',
+        files: ['server/platform/classroom.js'],
+        code: /'papers-not-handed-in'/
+      }
+    ]
+  },
+  {
+    id: 'Automatic reading can be turned off in Settings',
+    notice: 'docs/legal/privacy.md',
+    says: /Settings\s+→\s+Reading\s+my\s+handwriting/,
+    needs: [
+      {
+        what: 'the device switch for automatic reading',
+        files: ['client/src/lib/autoRead.js'],
+        code: /export function setAutoRead/
+      },
+      {
+        what: 'a Settings section named Reading my handwriting',
+        files: ['client/src/i18n/strings.en.js'],
+        code: /'autoRead\.title': "Reading my handwriting"/
+      }
+    ]
+  },
+  {
+    id: 'Distress is met with the region\'s support line, not an AI',
+    notice: 'docs/legal/privacy.md',
+    says: /support\s+line\s+for\s+your\s+region/,
+    needs: [
+      {
+        what: 'the distress reply that skips the model',
+        files: ['server/platform/tutorSafety.js'],
+        code: /export function distressReply/
+      },
+      {
+        what: 'the support lines named in the notice (Tele-MANAS 14416, Kids Helpline 1800 55 1800)',
+        files: ['server/platform/tutorSafety.js'],
+        code: /number: '14416'[\s\S]*number: '1800 55 1800'/
+      }
+    ]
   }
 ];
 

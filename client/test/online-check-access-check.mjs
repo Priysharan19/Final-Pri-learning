@@ -124,8 +124,10 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
 {
   const kinds = Object.values(CHECK_REFUSAL);
   // The eleventh is the free day's cap (#537): the server refused to issue the
-  // question that a check would have bound, so nothing was marked.
-  eq(kinds.length, 11, 'eleven reasons are named');
+  // question that a check would have bound, so nothing was marked. The twelfth is the
+  // server's own fault (a 500), named in Prithagoras (owner walk-through, 19 Nov 2026):
+  // not "check your connection", the working is kept and trying again is safe.
+  eq(kinds.length, 12, 'twelve reasons are named');
   const used = new Set(['check.needsAccount', 'check.signInAction', 'check.signInAgainAction', 'check.sessionEnded', 'check.signInActionPlain', 'check.draftNotice', 'check.legacyNotice', 'check.teacherNotice', 'check.draftAction', 'check.draftConfirm', 'check.draftConfirmAction', 'check.draftKeep', 'check.draftStillUnmarkable', 'check.restartAction']);
   // A timed game (Rapid Fire, Match) is refused at its start with the same reasons.
   for (const context of ['answer', 'exam', 'game', 'placement']) {
@@ -358,7 +360,8 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
       ok(html.indexOf('data-check-needs-account') < html.indexOf('ws-actions') && html.indexOf('data-check-needs-account') > html.indexOf('ws-tools'), `${mode}: placed with the work, directly above the Submit bar`);
       // The Instrument's primary button carries its scan glyph and an
       // aria-hidden shortcut hint around the label: the label is what it says.
-      ok(primaryLabel(html) === en['verdict.submit'], `${mode}: Submit is still the primary action (${JSON.stringify(primaryLabel(html))})`);
+      // Written working and a photo are marked with one press of "Mark my working"; a typed answer is submitted.
+      ok(primaryLabel(html) === en[mode === 'type' ? 'verdict.submit' : 'verdict.markMyWorking'], `${mode}: the one primary action is still there (${JSON.stringify(primaryLabel(html))})`);
       ok(!/eval-card|verdict-title|data-outcome|solution-panel|eval-marks/.test(html), `${mode}: no verdict, marks or solution on an unchecked question`);
       ok(/data-phase="answering"/.test(html), `${mode}: the card is open for work`);
       const linked = card(signedIn, mode);
@@ -564,7 +567,7 @@ ok(/this one is a repeat/.test(en['practice.repeatNote']) && /will not count tow
   const deliver = between('async function deliver(', '/** The submit, reveal or walkthrough did not go through');
   ok(/if \(!diagnostic && !matchingGradeResponse\(r, question\.id, body\.submissionId\)\) \{[\s\S]{0,400}?throw new Error\(gradingReceiptMismatch\(language\)\);/.test(deliver), 'a practice submit is valid only as a matched server receipt');
   ok(/settleFailedSubmission\(question\.id, e, \{ definitive: definitiveSubmissionRefusal\(e\)[\s\S]{0,120}?\}\);\s*if \(fate === 'cleared'\) pendingRef\.current = null;/.test(deliver) &&
-    !/clearPendingSubmission\(question\.id\)/.test(deliver.slice(deliver.indexOf('} catch (e) {'))),
+    !/clearPendingSubmission\(question\.id\)/.test(deliver.slice(deliver.indexOf('} catch (e) {')).replace(/if \(e\?\.code === 'FINAL_ANSWER_UNREADABLE'\) \{[\s\S]*?\n      \}\n/, '')),
     'only a definitive refusal drops the submission key');
   ok(/refuseCheck\(e, 'submit'\);/.test(deliver), 'every other failure becomes the refused-check state');
   const caught = deliver.slice(deliver.indexOf('} catch (e) {'));

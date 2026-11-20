@@ -154,7 +154,7 @@ export function setReadingQuestion(serverQuestionId) {
 const attestedOf = response => (typeof response?.receipt === 'string' && typeof response?.transcription?.text === 'string'
   ? Object.freeze({ receipt: response.receipt, text: response.transcription.text }) : null);
 
-function transcribeOnce(transport, image, { signal = null, now = Date.now() } = {}) {
+function transcribeOnce(transport, image, { signal = null, now = Date.now(), superseded = false } = {}) {
   const memory = readMemory(transport);
   const questionId = readingQuestion;
   const key = `${questionId || ''}|${pictureKey(image)}`;
@@ -166,7 +166,7 @@ function transcribeOnce(transport, image, { signal = null, now = Date.now() } = 
   if (!flight) {
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
     flight = { waiters: 0, controller, promise: null };
-    flight.promise = Promise.resolve().then(() => transport.transcribeHandwriting(image, { signal: controller?.signal ?? null, ...(questionId ? { questionId } : {}) }))
+    flight.promise = Promise.resolve().then(() => transport.transcribeHandwriting(image, { signal: controller?.signal ?? null, ...(questionId ? { questionId } : {}), ...(superseded ? { superseded: true } : {}) }))
       .then(response => {
         // Remembered only when the reader stood behind it. A reading it
         // doubted may be asked for again: a second look can be a better one.
@@ -422,6 +422,7 @@ export function toReading(transcription, localReading, { confidenceFloor = null 
       text: line.text,
       box: alignable ? localLines[i]?.box : undefined,
       conf: transcription.lines[i]?.confidence ?? transcription.confidence ?? 0,
+      ...(Array.isArray(transcription.lines[i]?.segments) && transcription.lines[i].segments.length ? { segments: transcription.lines[i].segments } : {}),
       // The reader's own doubt about this line ("≥ or ≠"), kept as the photo path keeps it.
       ...(transcription.lines[i]?.uncertain === true ? { uncertain: true } : {}),
       ...(typeof transcription.lines[i]?.doubt === 'string' && transcription.lines[i].doubt.trim()
@@ -454,6 +455,8 @@ export async function readWithCloud(strokes, {
   // True on the first read after the account changed (signed in, verified,
   // consented): the server is asked again however fresh the cached answer is.
   freshReadiness = false,
+  // True for an automatic read: the pen may outrun it, so a dropped request cancels it unbilled.
+  superseded = false,
   // D17: the student's own yes, asked once, before anything is sent.
   permission = askReaderPermission
 } = {}) {
@@ -485,7 +488,7 @@ export async function readWithCloud(strokes, {
 
   const started = Date.now();
   try {
-    const response = await transcribeOnce(transport, raster.dataUrl, { signal });
+    const response = await transcribeOnce(transport, raster.dataUrl, { signal, superseded: superseded === true });
     const transcription = response?.transcription;
     recordCloudDiagnostics({
       available: true,

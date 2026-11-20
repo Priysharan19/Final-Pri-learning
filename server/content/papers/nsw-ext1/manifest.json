@@ -1,0 +1,293 @@
+{
+  "version": 1,
+  "edition": "prithagoras",
+  "course": "nsw-ext1",
+  "papers": [
+    {
+      "id": "ext1-2027-p01",
+      "title": "Practice Paper 01",
+      "course": "nsw-ext1",
+      "yearLevel": 12,
+      "marks": 70,
+      "workingTime": "2 hours",
+      "sample": true,
+      "hasGuidelines": true,
+      "paper": {
+        "file": "ext1-2027-p01.pdf",
+        "sha256": "b2404d1c07bf13fae414931f6c3290966fec565313e70b7e0daae19ca6996643",
+        "bytes": 146243,
+        "pages": 19
+      },
+      "guidelines": {
+        "file": "ext1-2027-p01-guidelines.pdf",
+        "sha256": "0da22070f5a493e42937465a1e0af9de5699b017bfeddca261920ae0c35d65c5",
+        "bytes": 122995,
+        "pages": 14
+      }
+    },
+    {
+      "id": "ext1-2027-p02",
+      "title": "Practice Paper 02",
+      "course": "nsw-ext1",
+      "yearLevel": 12,
+      "marks": 70,
+      "workingTime": "2 hours",
+      "sample": false,
+      "hasGuidelines": true,
+      "paper": {
+        "file": "ext1-2027-p02.pdf",
+        "sha256": "00ca316b6e24507871180f921c8deb3d9af97bee3cb9ecd4144760513301b10a",
+        "bytes": 140172,
+        "pages": 18
+      },
+      "guidelines": {
+        "file": "ext1-2027-p02-guidelines.pdf",
+        "sha256": "192b96f7fc11bfde38cd20e54efab6938b7f64b7bd69b59e351ec633a9a07a0c",
+        "bytes": 111731,
+        "pages": 12
+      }
+    },
+    {
+      "id": "ext1-2027-p03",
+      "title": "Practice Paper 03",
+      "course": "nsw-ext1",
+      "yearLevel": 12,
+      "marks": 70,
+      "workingTime": "2 hours",
+      "sample": false,
+      "hasGuidelines": true,
+      "paper": {
+        "file": "ext1-2027-p03.pdf",
+        "sha256": "f66ca26dca2459700ce12e84751ac5386ebd446f66640c96ca70d21def76127b",
+        "bytes": 143229,
+        "pages": 17
+      },
+      "guidelines": {
+        "file": "ext1-2027-p03-guidelines.pdf",
+        "sha256": "5892ab8daeeb03c436ce0c99feb2df289a9bb3532c3b3ffe97ae9d6e637dadff",
+        "bytes": 104671,
+        "pages": 11
+      }
+    },
+    {
+      "id": "ext1-2027-p04",
+      "title": "Practice Paper 04",
+      "course": "nsw-ext1",
+      "yearLevel": 12,
+      "marks": 70,
+      "workingTime": "2 hours",
+      "sample": false,
+      "hasGuidelines": true,
+      "paper": {
+        "file": "ext1-2027-p04.pdf",
+        "sha256": "2299a614eeaa35172da2ee0c3f4a069be52a4df03aec4652904eaed5bed5968a",
+        "bytes": 160793,
+        "pages": 18
+      },
+      "guidelines": {
+        "file": "ext1-2027-p04-guidelines.pdf",
+        "sha256": "a8f8f7a2f29b92ae1e6902063050aba48ff2fae12b592ce6e3eeee95d7e26fca",
+        "bytes": 108691,
+        "pages": 11
+      }
+    },
+    {
+      "id": "ext1-2027-p05",
+      "title": "Practice Paper 05",
+      "course": "nsw-ext1",
+      "yearLevel": 12,
+      "marks": 70,
+      "workingTime": "2 hours",
+      "sample": false,
+      "hasGuidelines": true,
+      "paper": {
+        "file": "ext1-2027-p05.pdf",
+        "sha256": "9cb7029d65026f04e61f216b63bba8960bf9aa9f0d46d46eb316e116549e1376",
+        "bytes": 159631,
+        "pages": 18
+      },
+      "guidelines": {
+        "file": "ext1-2027-p05-guidelines.pdf",
+        "sha256": "a9e9bd05b312c980ff155651980602c3665324db21b28329596d86155fcb24f2",
+        "bytes": 104248,
+        "pages": 11
+      }
+    },
+    {
+      "id": "ext1-2027-p06",
+      "title": "Practice Paper 06",
+      "course": "nsw-ext1",
+      "yearLevel": 12,
+      "marks": 70,
+      "workingTime": "2 hours",
+      "sample": false,
+      "hasGuidelines": true,
+      "paper": {
+        "file": "ext1-2027-p06.pdf",
+        "sha256": "4a5cb6482986db03af30cda1dd27a13a5ce12d965f156407950b631bad7b3ac8",
+        "bytes": 146838,
+        "pages": 17
+      },
+      "guidelines": {
+        "file": "ext1-2027-p06-guidelines.pdf",
+        "sha256": "5787f22222f1c64ab20b67538d047389094f9f837d677ff8bd80b22c3a78b3a8",
+        "bytes": 105417,
+        "pages": 12
+      }
+    },
+    {
+      "id": "ext1-2027-p07",
+      "title": "Practice Paper 07",
+      "course": "nsw-ext1",
+      "yearLevel": 12,
+      "marks": 70,
+      "workingTime": "2 hours",
+      "sample": false,
+      "hasGuidelines": true,
+      "paper": {
+        "file": "ext1-2027-p07.pdf",
+        "sha256": "abba6ec12707c8383e458ea0fa841307272006f543c814d847d03bf3e198a3fb",
+        "bytes": 145645,
+        "pages": 17
+      },
+      "guidelines": {
+        "file": "ext1-2027-p07-guidelines.pdf",
+        "sha256": "a149aa1bd95ab27b5327fffc46661d7c5711b1a0913dbfb9411365e22f899fde",
+        "bytes": 101449,
+        "pages": 11
+      }
+    },
+    {
+      "id": "ext1-2027-p08",
+      "title": "Practice Paper 08",
+      "course": "nsw-ext1",
+      "yearLevel": 12,
+      "marks": 70,
+      "workingTime": "2 hours",
+      "sample": false,
+      "hasGuidelines": true,
+      "paper": {
+        "file": "ext1-2027-p08.pdf",
+        "sha256": "4ae3fc7819fcbe320c04589310d9c586087d87703d3590473ae5e961d12ad56d",
+        "bytes": 148083,
+        "pages": 18
+      },
+      "guidelines": {
+        "file": "ext1-2027-p08-guidelines.pdf",
+        "sha256": "06de9e3969af6cd122d553cd5610683d3a605b9d549d7a00ffb3efbd089f4462",
+        "bytes": 107060,
+        "pages": 12
+      }
+    },
+    {
+      "id": "ext1-2027-p09",
+      "title": "Practice Paper 09",
+      "course": "nsw-ext1",
+      "yearLevel": 12,
+      "marks": 70,
+      "workingTime": "2 hours",
+      "sample": false,
+      "hasGuidelines": true,
+      "paper": {
+        "file": "ext1-2027-p09.pdf",
+        "sha256": "ccfa93ff19386e901d7fbf8299db0439062171b4e72833e8f52216c5167cc8ee",
+        "bytes": 130451,
+        "pages": 14
+      },
+      "guidelines": {
+        "file": "ext1-2027-p09-guidelines.pdf",
+        "sha256": "7db933e815281f3cdc54a5168bbff2faa97d7ff01c1f34a28ff5c6dd35ef09cc",
+        "bytes": 96833,
+        "pages": 10
+      }
+    },
+    {
+      "id": "ext1-2027-p10",
+      "title": "Practice Paper 10",
+      "course": "nsw-ext1",
+      "yearLevel": 12,
+      "marks": 70,
+      "workingTime": "2 hours",
+      "sample": false,
+      "hasGuidelines": true,
+      "paper": {
+        "file": "ext1-2027-p10.pdf",
+        "sha256": "697647da1aefc7c1765cbaa892711bce7cbb0f0c493a95047ecfabf9db4c5a0c",
+        "bytes": 158747,
+        "pages": 16
+      },
+      "guidelines": {
+        "file": "ext1-2027-p10-guidelines.pdf",
+        "sha256": "45c77c6ea4062047e5892d4a1cfa81bec9b28c1c181020630f42cfba904aebed",
+        "bytes": 98237,
+        "pages": 9
+      }
+    },
+    {
+      "id": "ext1-2027-p11",
+      "title": "Practice Paper 11",
+      "course": "nsw-ext1",
+      "yearLevel": 12,
+      "marks": 70,
+      "workingTime": "2 hours",
+      "sample": false,
+      "hasGuidelines": true,
+      "paper": {
+        "file": "ext1-2027-p11.pdf",
+        "sha256": "e2f9b2164f6691ca4313286e6d468293091f460a61bb2280e28312eab6d00bef",
+        "bytes": 140532,
+        "pages": 15
+      },
+      "guidelines": {
+        "file": "ext1-2027-p11-guidelines.pdf",
+        "sha256": "4ad92e9d3946f61c72cf383921afdfc96d5aa7a402f5d782f9f0989adbd3073d",
+        "bytes": 99831,
+        "pages": 10
+      }
+    },
+    {
+      "id": "ext1-2027-p12",
+      "title": "Practice Paper 12",
+      "course": "nsw-ext1",
+      "yearLevel": 12,
+      "marks": 70,
+      "workingTime": "2 hours",
+      "sample": false,
+      "hasGuidelines": true,
+      "paper": {
+        "file": "ext1-2027-p12.pdf",
+        "sha256": "3b3d5f3cb20f8c2075be8bf5f4d94434484334862e8b85b1fa59b7f92c3581dc",
+        "bytes": 166354,
+        "pages": 15
+      },
+      "guidelines": {
+        "file": "ext1-2027-p12-guidelines.pdf",
+        "sha256": "c1f40798fc16951377239adcc0feecd6c89cf006581b3ac8db1fa12bfc92aaad",
+        "bytes": 97380,
+        "pages": 9
+      }
+    },
+    {
+      "id": "ext1-2027-p13",
+      "title": "Practice Paper 13",
+      "course": "nsw-ext1",
+      "yearLevel": 12,
+      "marks": 70,
+      "workingTime": "2 hours",
+      "sample": false,
+      "hasGuidelines": true,
+      "paper": {
+        "file": "ext1-2027-p13.pdf",
+        "sha256": "bc485862499a3f5f89121b0de2e685f8ea65888db62ec9615477bca1b50ed592",
+        "bytes": 170560,
+        "pages": 20
+      },
+      "guidelines": {
+        "file": "ext1-2027-p13-guidelines.pdf",
+        "sha256": "301ea77bbeb4adcfacbcc5043f08267e62ab319cf8e4bf181156cb66d935a794",
+        "bytes": 182155,
+        "pages": 22
+      }
+    }
+  ]
+}

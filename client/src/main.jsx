@@ -6,6 +6,8 @@ import './theme.css';
 import './theme-state.css';
 import './ink/interactionGuard.js';
 import App from './App.jsx';
+import { selectNamePool } from './engine/qhelpers.js';
+import { EDITION } from './platform/edition.js';
 // The Instrument is the one student interface (client/interface.config.mjs), so
 // its stylesheets are part of the boot stylesheet, after theme.css which they
 // override: the shell, and the Map, Report and Scripts tabs. A tab opened for
@@ -28,6 +30,7 @@ import EditionMismatch from './components/EditionMismatch.jsx';
 import { scheduleOfflineWarm } from './local/offlineWarm.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { installReleaseIdentityDiagnostics } from './platform/releaseIdentity.js';
+import { watchFreshBuild } from './platform/freshBuild.js';
 import { priNative } from './platform/native/index.js';
 import { captureInvite } from './platform/referral.js';
 import { installFormFactorAttributes } from './platform/formFactor.js';
@@ -119,6 +122,9 @@ if (LAN_DEV) {
     }
   })();
 }
+
+// The names in question text follow the build's edition (engine/qhelpers.js).
+selectNamePool(EDITION);
 
 const root = createRoot(document.getElementById('root'));
 if (GUARDIAN_MODE || DELETE_REQUEST_MODE || ACCOUNT_ACTION_MODE || PARENT_EMAIL_MODE) bootPhase('render');
@@ -218,4 +224,7 @@ if ('serviceWorker' in navigator && import.meta.env.PROD && !priNative.bundledAs
   // build is asked for once the page is rendered and the thread is idle, so it
   // never competes with the load a student is watching.
   scheduleOfflineWarm(window);
+  // A returning browser is moved onto the live build: once, before the
+  // student has touched anything, or by a notice they choose to follow.
+  watchFreshBuild(window);
 }

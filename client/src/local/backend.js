@@ -2,6 +2,7 @@
 // Pri Learning · Local backend — the entire platform running on this device.
 // Implements every API the UI uses against IndexedDB. No network required.
 // ─────────────────────────────────────────────────────────────────────────────
+import { derivedMetaOff } from '../engine/derivedMetaOff.js';
 import {
   get, put, del, add, all, byIndex, rawByIndex, atomicBatch, uuid, wipeProfile,
   requestPersistentStorage, storageEstimate,
@@ -16,7 +17,7 @@ import { translate } from '../i18n/core.js';
 import { DEFAULT_THEME_PREF, THEME_PREFS, cleanThemePref } from '../lib/theme.js';
 import {
   CURRICULUM, STREAM_CURRICULUM, PATHWAYS, streamSubtopics, SUBTOPIC_BY_ID, subtopicsForYear,
-  scopeForYear, DIFF_LABELS, dotpointsFor, dotpointById, dotpointAt
+  scopeForYear, DIFF_LABELS, DIFF_WORDS, dotpointsFor, dotpointById, dotpointAt
 } from '../engine/curriculum.js';
 import {
   cleanIndiaTrack, indiaTrack, indiaCourseLabel, indiaScope, indiaChapter,
@@ -35,6 +36,8 @@ import { IN_CHAPTERS, OLYMPIAD_TOPICS } from '../engine/curriculum-in.js';
 import { evidenceProgress } from '../engine/progressEvidence.js';
 import { generateQuestion } from '../engine/generators/index.js';
 import { HINT_RUNGS, rungLevelOf, nextRungAfter, markWeightAfter, helpUnitsAfter } from '../engine/hintLadder.js';
+import { offeredScope } from '../engine/offering.js';
+import { hintsFree, walkthroughFixes, yearOffered, pathwayOffered, courseOffered, offering } from '../platform/edition.js';
 import { contentRefOf, contentHashOf, drawDistinct } from '../engine/contentIdentity.js';
 import { checkAnswer, stepCheck, methodMarks } from '../engine/checker.js';
 import { authoredRegion, formatRegion, formatMatrix, formatVector } from '../engine/answer-forms.js';
@@ -715,7 +718,7 @@ async function requireProfile() {
   const p = await currentProfile();
   if (!p) { const e = new Error('No profile selected'); e.status = 401; throw e; }
   if (p.auth && !hasDataKey(p.id)) {
-    throw Object.assign(new Error('This profile is protected — enter its password.'), { status: 401, needsPassword: true, profileId: p.id });
+    throw Object.assign(new Error('This profile is protected. Enter its password.'), { status: 401, needsPassword: true, profileId: p.id });
   }
   return p;
 }
@@ -810,7 +813,7 @@ const lockedFor = (p, now) => Math.max(0, (p?.lockedUntil || 0) - now);
 function lockedError(ms) {
   const secs = Math.ceil(ms / 1000);
   const when = secs > 90 ? `${Math.ceil(secs / 60)} minutes` : `${secs} seconds`;
-  return Object.assign(new Error(`Too many wrong passwords — try again in ${when}.`), { status: 429, locked: true, retryAfterMs: ms });
+  return Object.assign(new Error(`Too many wrong passwords. Try again in ${when}.`), { status: 429, locked: true, retryAfterMs: ms });
 }
 
 /**
@@ -834,7 +837,7 @@ async function withPassword(pid, password, after) {
       await put('profiles', p);
       const left = lockedFor(p, now);
       if (left) throw lockedError(left);
-      throw Object.assign(new Error('Wrong password — try again.'), { status: 401, needsPassword: true, triesLeft: MAX_FAILS - p.failCount });
+      throw Object.assign(new Error('Wrong password. Try again.'), { status: 401, needsPassword: true, triesLeft: MAX_FAILS - p.failCount });
     }
 
     p.failCount = 0;
@@ -1188,9 +1191,14 @@ const INDIA_WHY = {
  * India Progress. Everything either mode needs is a chapter with an id and a
  * strand, which both spines provide.
  */
+/** The difficulty as the student reads it: the words only where the edition offers a plain list (Prithagoras), the D-coded label elsewhere. */
+const diffLabelOf = d => (offering() ? DIFF_WORDS[d] : DIFF_LABELS[d]);
+
+const notOffered = () => Object.assign(new Error('That year or course is not offered yet.'), { status: 400, code: 'COURSE_NOT_OFFERED' });
+
 async function practicePoolFor(profile, now = Date.now()) {
   if (profile.course !== 'in') {
-    const { own, revision } = scopeForYear(profile.year, pathwayOf(profile));
+    const { own, revision } = offeredScope(scopeForYear(profile.year, pathwayOf(profile)));
     // Rapid Fire and Match draw only from subtopics the server issues
     // (engine/nswOffer.js); a scope with none has nothing to play.
     const entries = [...own, ...revision].filter(s => nswIssuedLevels(s.id).length > 0);
@@ -1494,12 +1502,12 @@ export function namedDifficultyOf(requested) {
 export function difficultyUnavailable(requested, available, scope = {}) {
   const levels = [...new Set((available || []).map(Number).filter(d => Number.isInteger(d) && d !== requested))].sort((a, b) => a - b);
   return Object.assign(
-    new Error(`There are no questions at ${DIFF_LABELS[requested] || `D${requested}`} for this ${scope.dotpoint != null ? 'dot point' : 'topic'} yet.`),
+    new Error(`There are no questions at ${diffLabelOf(requested) || `D${requested}`} for this ${scope.dotpoint != null ? 'dot point' : 'topic'} yet.`),
     {
       status: 409, code: 'DIFFICULTY_UNAVAILABLE',
       detail: {
-        difficultyRequested: requested, requestedLabel: DIFF_LABELS[requested] || `D${requested}`,
-        available: levels.map(d => ({ difficulty: d, label: DIFF_LABELS[d] || `D${d}` })),
+        difficultyRequested: requested, requestedLabel: diffLabelOf(requested) || `D${requested}`,
+        available: levels.map(d => ({ difficulty: d, label: diffLabelOf(d) || `D${d}` })),
         subtopic: scope.subtopic ?? null, dotpoint: scope.dotpoint ?? null, track: scope.track ?? null
       }
     }
@@ -1882,7 +1890,7 @@ function criteriaFor(q) {
   if (!keySteps.length) return [{ mark: 1, text: translate('msg.correctFinal') }];
   return keySteps.map((s, i) => ({
     mark: 1,
-    text: i === keySteps.length - 1 ? `${s.h} — leading to the correct answer` : s.h
+    text: i === keySteps.length - 1 ? `${s.h}, leading to the correct answer` : s.h
   }));
 }
 
@@ -1893,15 +1901,28 @@ function criteriaFor(q) {
  */
 function stepMetaFor(q) {
   if (q.stepcheck) return q.stepcheck;
+  if (derivedMetaOff(q)) return null;   // answer only until the family has a structured meta
   const a = q.answer;
   if (!a) return null;
   if (q.answerType === 'expression' && a.expr) return { kind: 'expression', canonical: a.expr };
   if (q.answerType === 'numeric' && a.value !== undefined) {
     const m = (q.answerPrefix || '').match(/^([a-z])\s*=$/i);
     if (m) return { kind: 'equation', variable: m[1], solutions: [a.value] };
+    // Kept identical to the server's stepMetaFor (server/platform/markerOps.js), the marker's authority: a
+    // numeric prompt that is one plain single-variable equation is checked as that equation.
+    const source = String(q.prompt || '').match(/^\s*\$([^$]+)\$\s*$/);
+    const equation = source?.[1]?.trim();
+    if (equation && /^[0-9a-z\s+*/().=\-]+$/i.test(equation) &&
+        equation.split('=').length === 2 && Number.isFinite(Number(a.value))) {
+      const symbols = [...new Set((equation.match(/[a-z]/gi) || []).map(v => v.toLowerCase()))];
+      if (symbols.length === 1) return { kind: 'equation', variable: symbols[0], solutions: [a.value], source: equation };
+    }
   }
   if (q.answerType === 'set' && Array.isArray(a.values) && a.values.length) {
-    return { kind: 'equation', variable: 'x', solutions: a.values };
+    {
+      const asked = String(q.prompt || '').match(/\b(?:values?|solutions?|roots?)\s+of\s+\$([A-Za-z])\$/i);
+      return { kind: 'equation', variable: asked ? asked[1] : 'x', solutions: a.values };
+    }
   }
   return null;
 }
@@ -1929,6 +1950,12 @@ function safeLostMarks(list) {
   }).filter(Boolean);
 }
 
+const SKETCH_ASK = ['xIntercepts', 'yIntercept', 'turning', 'vertical', 'horizontal'];
+/** The features a sketch form asks for, from the closed list the form knows how to take. */
+function safeSketchAsk(list) {
+  return (Array.isArray(list) ? list : []).filter((k, i, all) => SKETCH_ASK.includes(k) && all.indexOf(k) === i);
+}
+
 function sanitize(q, row) {
   if (q.multipart) {
     return {
@@ -1954,8 +1981,10 @@ function sanitize(q, row) {
     dotpoint: inChapter ? inDp : (dp ? dp.id : null),
     dotpointText: inChapter && inDp != null ? inChapter.dotpoints[inDp] : (dp ? dp.text : null),
     dotpointIndex: inChapter ? inDp : (dp ? dp.ordinal : null),
-    difficulty: q.difficulty, diffLabel: DIFF_LABELS[q.difficulty] || 'Custom',
+    difficulty: q.difficulty, diffLabel: diffLabelOf(q.difficulty) || 'Custom',
     prompt: q.prompt, answerType: q.answerType, mcqOptions: q.mcqOptions,
+    // Which features a graph-sketch answer form asks for: names only, never values.
+    ...(q.answerType === 'graph-sketch' ? { sketchAsk: safeSketchAsk(q.sketchAsk) } : {}),
     figure: safeFigure(q.figure), code: s?.code || null,
     // A previous-year question carries its sitting and its sources with it, so
     // the card can say "JEE Advanced 2025 · Paper 1 · Q12" and mean it.
@@ -2151,6 +2180,16 @@ function solutionOf(q) {
  * first delivery and the replay cannot move a mark that already stands.
  */
 /** The explanation a submission was answered with, as stored with its record. */
+/**
+ * What the server's reading floor said about the page (ADR-0001 amendment 19 Nov 2026): the lines it left out as "couldn't
+ * read" and that nothing was confirmed by the student. Display only; never a mark.
+ */
+function readingFloorOf(reading) {
+  if (!reading || typeof reading !== 'object' || !Array.isArray(reading.excludedLines)) return {};
+  return { reading: { studentConfirmed: false, excludedLines: reading.excludedLines.filter(Number.isInteger).slice(0, 80),
+    lineStates: Array.isArray(reading.lineStates) ? reading.lineStates.slice(0, 80).map(x => (x === 'not-read' ? 'not-read' : 'judged')) : [] } };
+}
+
 function replayRecord({ feedback, stepReport, partial, diagnosis }) {
   return {
     feedback: feedback ?? null,
@@ -2257,6 +2296,7 @@ async function replaySubmission(p, row, q, submissionId, requestDigest, answer, 
     diagnosis: diagnosis || null,
     misconception: await namedTrap(p.id, owner, recorded.trapHit || null),
     solution: row.serverQuestionId ? row.serverReceipt.solution || null : solutionOf(q),
+    ...(row.serverQuestionId ? readingFloorOf(row.serverReceipt?.reading) : {}),
     // Replayed mark explanations come from the same immutable server receipt.
     ...(row.serverQuestionId && row.serverReceipt?.markRows ? { markRows: row.serverReceipt.markRows } : {}),
     ...(row.serverQuestionId ? {
@@ -2641,6 +2681,7 @@ function safePayload(src) {
   if (ref.contentId) { out.contentId = ref.contentId; out.contentVersion = ref.contentVersion; }
   if (ref.contentHash) out.contentHash = ref.contentHash;
   out.figure = safeFigure(src.figure);
+  if (src.answerType === 'graph-sketch') out.sketchAsk = safeSketchAsk(src.sketchAsk);
   out.mcqOptions = src.mcqOptions === undefined ? undefined : safeOptions(src.mcqOptions);
   out.steps = safeSteps(src.steps);
   out.hints = (Array.isArray(src.hints) ? src.hints : []).slice(0, 8).map(h => sanitizeText(h, 500));
@@ -3134,7 +3175,7 @@ const routes = {
     // Profile creation is an authority boundary, not just a form handler. Reject
     // contradictory explicit identity before anything is written rather than
     // silently cleaning a JEE/Class mismatch into a different learner.
-    const requestedYear = body.year === undefined ? 9 : Number(body.year);
+    const requestedYear = body.year === undefined ? (offering()?.defaultYear ?? 9) : Number(body.year);
     if (!Number.isInteger(requestedYear) || requestedYear < 7 || requestedYear > 12) {
       throw Object.assign(new Error('Choose a supported class or year from 7 to 12.'), { status: 400 });
     }
@@ -3158,6 +3199,12 @@ const routes = {
     }
     if (requestedCourse === 'nsw' && body.pathway === 'ext2' && requestedYear !== 12) {
       throw Object.assign(new Error('Mathematics Extension 2 is only supported for Year 12.'), { status: 400 });
+    }
+    // Owner decision, 19 Nov 2026: a new student can only start on an offered year and course.
+    // A profile restored from the student's own account is a vessel for what the account holds: it keeps
+    // its stored year and course (the student chooses an offered one on sign-in), never refused here.
+    if (requestedCourse === 'nsw' && body.restoring !== true && offering() && !courseOffered(requestedYear, requestedYear >= 11 ? (body.pathway || 'advanced') : null)) {
+      throw notOffered();
     }
 
     const p = {
@@ -3213,7 +3260,7 @@ const routes = {
       setCurrentPid(id);
       return { user: await publicUser(p) };
     }
-    if (!password) throw Object.assign(new Error('This profile is protected — enter its password.'), { status: 401, needsPassword: true });
+    if (!password) throw Object.assign(new Error('This profile is protected. Enter its password.'), { status: 401, needsPassword: true });
     const opened = await withPassword(id, password, openProfileData);
     setCurrentPid(id);
     opened.lastActiveAt = Date.now();
@@ -3271,7 +3318,7 @@ const routes = {
     // Putting a first password on an open profile is a one-way door — there is
     // nothing on this device that could reset it — so it is never silent.
     if (confirm !== true) {
-      throw Object.assign(new Error('A password can’t be reset if it’s forgotten — this profile’s work would be gone for good.'), { status: 400, needsConfirm: true });
+      throw Object.assign(new Error('A password can’t be reset if it’s forgotten: this profile’s work would be gone for good.'), { status: 400, needsConfirm: true });
     }
     return serialize(p.id, async () => {
       const pw = String(next);
@@ -3305,6 +3352,16 @@ const routes = {
   'PATCH /me': async (body) => {
     const p = await requireProfile();
     const original = { ...p };
+    // Owner decision, 19 Nov 2026: a year or pathway this edition does not offer cannot be chosen
+    // (a student already on one keeps it, and their history, until they pick an offered course).
+    if ((body.year !== undefined || body.pathway !== undefined) && (body.course ?? p.course ?? 'nsw') === 'nsw') {
+      const nextYear = body.year !== undefined ? Math.min(12, Math.max(7, Number(body.year) || p.year)) : p.year;
+      const nextPathway = nextYear >= 11 ? (body.pathway ?? p.pathway ?? 'advanced') : null;
+      if (offering() && (body.year !== undefined && !yearOffered(nextYear) || body.pathway !== undefined && nextYear >= 11 && !pathwayOffered(nextPathway))) {
+        throw notOffered();
+      }
+    }
+    const wasCourse = { year: p.year, pathway: p.pathway ?? null };
     if (body.name !== undefined) p.name = String(body.name).trim().slice(0, 40) || p.name;
     if (body.year !== undefined) p.year = Math.min(12, Math.max(7, Number(body.year) || p.year));
     if (body.pathway !== undefined && p.course === 'nsw') p.pathway = cleanPathway(body.pathway, p.year) || (p.year >= 11 ? 'advanced' : null);
@@ -3331,6 +3388,9 @@ const routes = {
       if (p.course === 'nsw') p.pathway = cleanPathway(p.pathway, p.year) || (p.year >= 11 ? 'advanced' : null);
       else p.pathway = null;
     }
+    // The one-time re-choice (components/OfferedCourse.jsx) keeps what the student was on, on the profile (no schema change).
+    if (offering() && p.course === 'nsw' && !p.previousCourse && !courseOffered(wasCourse.year, wasCourse.year >= 11 ? (wasCourse.pathway || 'advanced') : null)
+        && courseOffered(p.year, p.year >= 11 ? (p.pathway || 'advanced') : null)) p.previousCourse = { ...wasCourse, at: Date.now() };
     if (body.avatar !== undefined) p.avatar = String(body.avatar).slice(0, 4);
     if (body.handwriting !== undefined) p.handwriting = !!body.handwriting;
     // Server-side handwriting reading is off unless the student turns it on:
@@ -3436,7 +3496,9 @@ const routes = {
         generated: issued.length > 0
       };
     });
-    const years = CURRICULUM.map(y => ({
+    // Owner decision, 19 Nov 2026: Prithagoras offers Years 11 and 12 only (the edition table
+    // `offering`); the other years stay in the catalogue, hidden. India (offering null) is unchanged.
+    const years = CURRICULUM.filter(y => yearOffered(y.year)).map(y => ({
       year: y.year, title: y.title, caption: y.caption,
       courseLabel: courseLabel(p.course || 'nsw', y.year),
       subtopics: y.subtopics.map(s => {
@@ -3453,7 +3515,7 @@ const routes = {
     }));
     // Senior pathway streams: appended as extra sections for Years 11–12
     const pw = pathwayOf(p);
-    const streamKeys = p.year >= 11
+    const streamKeys = p.year >= 11 && pathwayOffered(pw)
       ? (pw === 'standard' ? ['standard-11', 'standard-12']
         : pw === 'ext1' ? ['ext1-11', 'ext1-12']
         : pw === 'ext2' ? ['ext1-11', 'ext1-12', 'ext2-12'] : [])
@@ -3768,7 +3830,7 @@ const routes = {
     }
     await put('questions', row);
     return { hint: typeof r?.hint === 'string' ? r.hint : null, rung: r?.rung || asked, level, thin: r?.thin === true,
-      remaining: Math.max(0, HINT_RUNGS.length - level), markWeight: markWeightAfter(level), next: nextRungAfter(level) };
+      remaining: Math.max(0, HINT_RUNGS.length - level), markWeight: markWeightAfter(level, hintsFree()), next: nextRungAfter(level) };
   },
 
   // ---- AI tutor (vision item 3) ----
@@ -4229,7 +4291,7 @@ const routes = {
       row.pendingGrade = null;
       await put('questions', row);
       return { ...certified,
-        correct: false, resolved: false, triesLeft: 1, feedback: feedback || translate('msg.notQuite'), stepReport, partial, diagnosis: stepReport?.diagnosis || null, misconception: await namedTrap(p.id, evidenceKeyOf(row, q), trapHit), ...(submissionId ? { submissionId } : {}) };
+        correct: false, resolved: false, triesLeft: 1, feedback: feedback || translate('msg.notQuite'), stepReport, partial, ...readingFloorOf(authoritative.reading), diagnosis: stepReport?.diagnosis || null, misconception: await namedTrap(p.id, evidenceKeyOf(row, q), trapHit), ...(submissionId ? { submissionId } : {}) };
     }
     if (result.invalid && !resolvedNow) {
       row.pendingGrade = null;
@@ -4273,6 +4335,7 @@ const routes = {
       diagnosis: stepReport?.diagnosis || null,
       misconception: await namedTrap(p.id, evidenceKeyOf(row, q), trapHit),
       solution: authoritative.solution || null,
+      ...readingFloorOf(authoritative.reading),
       // The server's mark as CBSE-style step rows (server/platform/markRows.js):
       // display only, passed through as the server sent them.
       markRows: authoritative.markRows || null,
@@ -4416,7 +4479,7 @@ const routes = {
     const minutes = Math.round(Math.min(90, Math.max(10, Number(body?.minutes) || (length * 3))));
     const year = Math.min(12, Math.max(7, Math.round(Number(body?.year) || p.year)));
     const examPw = year >= 11 ? (cleanPathway(p.pathway, year) || 'advanced') : null;
-    const subtopics = examPw ? scopeForYear(year, examPw).own : subtopicsForYear(year);
+    const subtopics = examPw ? offeredScope(scopeForYear(year, examPw)).own : subtopicsForYear(year);
     const diffs = [];
     for (let i = 0; i < length; i++) { const t = i / length; diffs.push(t < 0.2 ? 1 : t < 0.6 ? 2 : t < 0.9 ? 3 : 4); }
     // A paper weighted by the HSC 2027 priorities (Prithagoras, Year 12 only):
@@ -4576,7 +4639,7 @@ const routes = {
     const p = await requireProfile();
     const e = await get('exams', params.id);
     if (!e || e.pid !== p.id) throw Object.assign(new Error('Exam not found'), { status: 404 });
-    if (e.pendingFinish) throw Object.assign(new Error('This paper has been submitted and is waiting to be marked — it can no longer change.'), { status: 409, code: 'EXAM_SUBMITTED_PENDING' });
+    if (e.pendingFinish) throw Object.assign(new Error('This paper has been submitted and is waiting to be marked. It can no longer change.'), { status: 409, code: 'EXAM_SUBMITTED_PENDING' });
     const saved = saveExamResponses(e, body || {});
     await put('exams', e);
     // Saved on the device; the server's copy follows a moment later and is
@@ -4752,7 +4815,7 @@ const routes = {
     const days = await activityFor(pid);
     let lastPred = null;
     const trajectory = days.map(d => { if (d.predicted != null) lastPred = d.predicted; return { date: d.date, predicted: lastPred }; }).filter(d => d.predicted != null);
-    const { own, revision } = scopeForYear(p.year, pathwayOf(p));
+    const { own, revision } = offeredScope(scopeForYear(p.year, pathwayOf(p)));
     const strandAgg = {};
     for (const s of [...own, ...revision]) {
       const st = ratings[s.id];
@@ -4886,7 +4949,7 @@ const routes = {
       };
     }
     const pred = predictMark(ratings, p.year, now, pathwayOf(p));
-    const { own } = scopeForYear(p.year, pathwayOf(p));
+    const { own } = offeredScope(scopeForYear(p.year, pathwayOf(p)));
     const rows = own.map(s => {
       const st = ratings[s.id];
       const m = st ? Math.round(100 * masteryOf(st.rating, st.attempts, st.last_at, now)) : 0;
@@ -5922,7 +5985,7 @@ function tutorRequest(p, row, q, solution, { level, locale, work, captions, reso
 }
 
 function assertPracticeRow(row) {
-  if (isExamRow(row)) throw examQuestionLocked('This question belongs to an exam paper — answer it in the exam room.');
+  if (isExamRow(row)) throw examQuestionLocked('This question belongs to an exam paper. Answer it in the exam room.');
 }
 
 async function assertReviewableRow(row) {
@@ -6180,6 +6243,7 @@ async function resumableQuestion(profile, body = {}) {
     ? Math.min(4, Math.max(1, Number(body.difficulty))) : null;
 
   const scope = { track: body.track, pyqOnly: body.pyqOnly === true, explicit: !!subtopic };
+  const askedDotpoint = subtopic && body.dotpoint != null && body.dotpoint !== '' ? dotpointOf(subtopic, body.dotpoint) : null;
   const candidates = rows.filter(r => {
     if (!r || r.answered || r.discardedAt || r.examId || r.mode === 'rush' || r.mode === 'match') return false;
     if (!atNamedLevel(r)) return false;
@@ -6190,6 +6254,9 @@ async function resumableQuestion(profile, body = {}) {
     const actual = r.india?.chapterId || r.payload?.subtopic || r.subtopic;
     if (String(actual || '') !== subtopic) return false;
     if (difficulty !== null && Number(r.difficulty) !== difficulty) return false;
+    // A request that names a dot point resumes only a question that belongs to it, so choosing
+    // a dot point on the practice page is answered with one from that dot point.
+    if (askedDotpoint && !r.india && !dotpointsCredited(r.payload).includes(askedDotpoint.id)) return false;
     return true;
   }).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
@@ -6210,7 +6277,8 @@ function resumedQuestionResponse(row) {
 }
 
 // ── Entitlement gates ────────────────────────────────────────────────────────
-// The free tier (20 practice questions a day, one exam simulation per 30 days)
+// The free tier (practice uncapped under value-2026-11, owner decision 2026-11-18 — 20 a
+// day under the superseded d19-d20 — and one exam simulation per 30 days)
 // and the Premium-only JEE Advanced track are enforced at the dispatcher, so a
 // smart-practice call, a retry from History and a teacher task all meet the same
 // rule on the same device-local counter. The route bodies stay pure builders.
@@ -6291,6 +6359,8 @@ function checkUnavailable(reason, cause = null) {
     'sign-in': [401, 'SIGN_IN_TO_CHECK', translate('msg.check.signIn')],
     offline: [503, 'RECONNECT_TO_CHECK', translate('msg.check.offline')],
     unavailable: [503, 'QUESTION_CHECK_UNAVAILABLE', translate('msg.check.unavailable')],
+    // Owner decision, 19 Nov 2026 (Prithagoras): the server answered with a fault of its own (a 500).
+    fault: [503, 'SERVER_FAULT', translate('msg.check.fault')],
     // Opened with no connection: it was never the server's question.
     draft: [409, 'QUESTION_NOT_SERVER_ISSUED', translate('msg.check.draft')],
     expired: [409, 'QUESTION_PREPARED_EXPIRED', translate('msg.check.expired')]
@@ -6333,6 +6403,8 @@ const SERVER_MODES = ['practice', 'review', 'task', 'rush', 'match'];
 function unreachable(cause) {
   if (cause?.status === 401) return checkUnavailable('sign-in', cause);
   if (cause?.status === 403 || cause?.status === 426) return checkUnavailable('refused', cause);
+  // A server that answered with a 500 of its own is not "check your connection" (walk-through fix, Prithagoras).
+  if (walkthroughFixes() && cause?.status >= 500 && cause.status !== 503 && cause?.code !== 'CLOUD_DISABLED') return checkUnavailable('fault', cause);
   if (cause?.code === 'CLOUD_DISABLED' || !cause?.status || cause.status >= 500 || cause.status === 429 || cause.status === 408) {
     return checkUnavailable('offline', cause);
   }
@@ -6426,6 +6498,8 @@ async function serveQuestion(pid, asked, localDraft) {
       const gate = serverGateRefusal(cause);
       if (gate) throw gate;
       if (nsw && SERVER_BANK_REFUSALS.has(cause?.code)) throw practiceNotOffered();
+      // Owner decision, 19 Nov 2026: a year or course the server does not offer is refused, never drafted.
+      if (cause?.code === 'COURSE_NOT_OFFERED') throw cause;
       /* not issuable right now: prepared or draft below */
     }
   }
@@ -6436,6 +6510,7 @@ async function serveQuestion(pid, asked, localDraft) {
     }
   } catch (cause) {
     if (nsw && SERVER_BANK_REFUSALS.has(cause?.code)) throw practiceNotOffered();
+    if (cause?.code === 'COURSE_NOT_OFFERED') throw cause;
     /* no server: an offline draft */
   }
   // Requests cancelled because the page is navigating away fail exactly like a
@@ -6631,6 +6706,12 @@ async function gradeOnServer(row, body, submissionId, requestDigest, { receiptFl
     }
     // Student corrections cannot forge a provider receipt. The server saves
     // the original reading and the explicit correction under a second token.
+    // A reading the reader doubted is NOT confirmed on the student's behalf (owner decision 19 Nov 2026): this
+    // fallback path (a page too large to travel with the submission) cannot apply the line-by-line floor, so a
+    // doubted reading is refused as an unreadable answer rather than marked.
+    if (read.transcription.needsConfirmation === true && !(body.answerTyped === true)) {
+      throw Object.assign(new Error('Pri could not read your final answer.'), { status: 200, code: 'FINAL_ANSWER_UNREADABLE' });
+    }
     if (read.transcription.text !== String(body.answer) || read.transcription.needsConfirmation === true) {
       const corrected = await viaServer(() => cloud.confirmPracticeRecognition(row.serverQuestionId, receipt, String(body.answer)));
       if (!corrected?.receipt) throw new Error('The corrected reading was not acknowledged by the server.');
@@ -6649,6 +6730,8 @@ async function gradeOnServer(row, body, submissionId, requestDigest, { receiptFl
         // make the attempt count as supported.
         // (the live step coach also records its reads on row.assistance)
         ...(Number(row.tutorLevel) > 0 || row.assistance?.stepCoach?.reads > 0 ? { deviceHelp: true } : {}),
+        // A final answer the student typed themselves, beside the picture (the reading floor judges the rest).
+        ...(picture && body.answerTyped === true ? { answerTyped: true } : {}),
         ...(original ? { original } : {})
       };
   // `at` lets a sync pull tell a grade in flight from one abandoned after the
@@ -6724,6 +6807,13 @@ async function gradeOnServer(row, body, submissionId, requestDigest, { receiptFl
       await put('questions', row).catch(() => {});
     } else if (refusal && typeof refusal === 'object') delete refusal.beforeMarking;
     throw refusal;
+  }
+  // The server could not read the final answer line (its reading floor, ADR-0001 amendment 19 Nov 2026): nothing was
+  // marked or recorded and no try was spent. The question stays exactly as it was; the card asks for the line again.
+  if (acknowledged?.code === 'FINAL_ANSWER_UNREADABLE' && acknowledged.questionId === row.serverQuestionId) {
+    row.pendingGrade = null;
+    await put('questions', row).catch(() => {});
+    throw Object.assign(new Error('Pri could not read your final answer.'), { status: 200, code: 'FINAL_ANSWER_UNREADABLE' });
   }
   if (acknowledged?.authoritative !== true || acknowledged.questionId !== row.serverQuestionId ||
       acknowledged.submissionId !== submissionId || typeof acknowledged.attemptId !== 'string' ||

@@ -21,6 +21,8 @@ process.env.NODE_ENV = 'test';
 process.env.PRI_PLATFORM_DB = join(scratch, 'platform.db');
 process.env.PRI_AUTH_DELIVERY_KEY = 'c4'.repeat(32);
 process.env.PRI_EDITION = 'prithagoras';
+// owner decision, 19 Nov 2026: CATALOGUE suite for generated papers; it lifts the offering in its own test process (nsw-offering-check.mjs holds the refusals).
+process.env.PRI_OFFERING = 'catalogue';
 delete process.env.PRI_PUBLIC_ORIGIN;
 delete process.env.PRI_METHOD_MARKS;
 
@@ -182,9 +184,9 @@ try {
   c.deq([fresh.status, fresh.data.repeats], [200, 0], 'and none of the fresh paper is a repeat');
 
   // An insufficient bank: refused, with the nearest valid paper, and nothing sealed or padded.
-  const thin = { year: 9, topics: ['y9-simint'], marks: 20, mix: 'challenge', seed: 3 };
+  const thin = { year: 8, topics: ['y8-linear'], marks: 20, mix: 'challenge', seed: 3 };
   const refused = await check(b.jar, thin);
-  c.deq([refused.status, refused.data.error?.code], [409, 'PAPER_BANK_INSUFFICIENT'], 'a topic whose banks issue no hard questions cannot fill a Challenge paper');
+  c.deq([refused.status, refused.data.error?.code], [409, 'PAPER_BANK_INSUFFICIENT'], 'a topic whose banks issue too few hard questions (y8-linear has no D4) cannot fill a Challenge paper');
   c.ok(refused.data.error.nearest === null || (refused.data.error.nearest.marks <= 20 && ['foundation', 'standard'].includes(refused.data.error.nearest.mix)), 'the reply offers the nearest valid paper, or none');
   const nearest = refused.data.error.nearest;
   if (nearest) {

@@ -20,11 +20,15 @@ import './support/hermetic.mjs';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { CONTENT_VERSION } from '../../client/src/engine/contentIdentity.js';   // a prepared token carries the content version it was minted under
 import { randomUUID } from 'node:crypto';
 
 const scratch = mkdtempSync(join(tmpdir(), 'pri-premium-content-'));
 process.env.NODE_ENV = 'test';                  // fixed seeds: the same trap on demand
-delete process.env.PRI_FREE_PRACTICE_PER_DAY;   // the shipped default, 20
+// Owner decision 2026-11-18: the active packaging leaves free practice uncapped,
+// so the cap this suite proves a twin is refused at is the deployment's own,
+// set to the value the free plan used to ship (d19-d20: 20 a day).
+process.env.PRI_FREE_PRACTICE_PER_DAY = '20';
 process.env.PRI_PLATFORM_DB = join(scratch, 'platform.db');
 process.env.PRI_AUTH_DELIVERY_KEY = '5d'.repeat(32);
 process.env.PRI_AUTH_EMAIL_PROVIDER = 'test';
@@ -38,7 +42,7 @@ const { encryptDeliveryToken } = await import('../platform/deliveryCrypto.js');
 const h = await startApp({ engine: requestedEngine() });
 const c = checks();
 const DAY = 24 * 60 * 60 * 1000;
-const LIMIT = FREE_PRACTICE_ALLOWANCE.perDay;
+const LIMIT = 20; // the deployment cap set above
 const ADVANCED = 'jee-advanced-c11-binomial-theorem';
 const ARCHIVE = 'pyq-jee-advanced-c11-conic-sections';
 const PERCENT = 'c8-percentage-reasoning'; // seed 4242, D2: a 30% rise, with a trap value (an India bank, D15)
@@ -54,7 +58,7 @@ const counted = async accountId => {
   return row ? Number(JSON.parse(row.response_json).issued) : 0;
 };
 const eventOf = async id => { const row = await h.db.get("SELECT id,payload_json FROM learning_events WHERE kind='graded-attempt' AND entity_id=?", [id]); return row ? { eventId: row.id, ...JSON.parse(row.payload_json) } : null; };
-const preparedToken = (g, d = 3) => encryptDeliveryToken(JSON.stringify({ g, d, s: 7, m: 'practice', x: Date.now() + 60 * 60 * 1000, n: randomUUID() }), 'practice-prepared-v1');
+const preparedToken = (g, d = 3) => encryptDeliveryToken(JSON.stringify({ g, d, s: 7, m: 'practice', x: Date.now() + 60 * 60 * 1000, n: randomUUID(), c: CONTENT_VERSION }), 'practice-prepared-v1');
 const premiumRefusal = r => r.status === 402 && r.data?.error?.code === 'PREMIUM_REQUIRED' && r.data.error.capability === 'jee-advanced-content';
 
 /** A question this account resolved wrong under a diagnosed trap: a filed notebook entry. */

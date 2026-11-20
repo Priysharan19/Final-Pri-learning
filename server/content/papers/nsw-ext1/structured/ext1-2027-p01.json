@@ -1,0 +1,2795 @@
+{
+ "format": "pri-paper-v1",
+ "id": "ext1-2027-p01",
+ "paperNumber": 1,
+ "title": "Practice Paper 1",
+ "course": "nsw-ext1",
+ "edition": "prithagoras",
+ "year": 2027,
+ "totalMarks": 70,
+ "readingTime": "10 minutes",
+ "workingTime": "2 hours",
+ "markingScheme": {
+  "status": "draft",
+  "note": "The marking guideline as written by the author. Not approved for criterion marks.",
+  "digest": "649e9f8145aaebf4e00177fa9aa2c1f391c700541b150ceda37721e509b0df56"
+ },
+ "sections": [
+  {
+   "id": "I",
+   "title": "Section I",
+   "marks": 10,
+   "minutes": 15,
+   "instructions": "Attempt Questions 1 to 10. Allow about 15 minutes for this section.",
+   "questions": [
+    {
+     "id": "q1",
+     "number": 1,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "What is the remainder when $x^{100}$ is divided by $(x - 1)^2$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q1",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$1$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$100x - 99$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$99x - 98$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$100x + 1$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "B"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Write $x^{100} = (x - 1)^2Q(x) + ax + b$. Putting $x = 1$ gives $a + b = 1$. Differentiating, $100x^{99} = 2(x - 1)Q(x) + (x - 1)^2Q'(x) + a$, and $x = 1$ gives $a = 100$. So $b = -99$ and the remainder is $100x - 99$."
+        }
+       ],
+       "classification": {
+        "content": "Remainders; multiple zeros; differentiation",
+        "outcomes": [
+         "ME1-11-02"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q2",
+     "number": 2,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The diagram shows a regular polygon with 12 sides and one of the triangles that can be formed by joining three of its vertices."
+      },
+      {
+       "k": "fig",
+       "name": "figdodec"
+      },
+      {
+       "k": "p",
+       "t": "How many of the triangles that can be formed in this way are acute-angled?"
+      }
+     ],
+     "figures": [
+      "figdodec"
+     ],
+     "parts": [
+      {
+       "id": "q2",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "40"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "60"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "100"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "120"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "A"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The vertices lie on a circle, and an angle of the triangle is acute exactly when the arc opposite it is less than a semicircle. Going around the circle, the three arcs between the chosen vertices contain $p$, $q$ and $r$ sides, where $p + q + r = 12$, and the triangle is acute-angled exactly when $p, q, r \\le 5$. The ordered possibilities are $(2, 5, 5)$ in 3 orders, $(3, 4, 5)$ in 6 orders and $(4, 4, 4)$: 10 in all. Choosing the starting vertex in 12 ways counts each triangle 3 times, so the number is $\\dfrac{12 \\times 10}{3} = 40$."
+        }
+       ],
+       "classification": {
+        "content": "Counting techniques; circle geometry",
+        "outcomes": [
+         "ME1-11-04"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q3",
+     "number": 3,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "Which of the following is the graph of $y = \\sin^{-1}(\\cos x) + \\cos^{-1}(\\sin x)$ for $0 \\le x \\le 2\\pi$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q3",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figQ3OptA"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figQ3OptB"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figQ3OptC"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figQ3OptD"
+          }
+         ]
+        }
+       ],
+       "figureOptions": true,
+       "key": {
+        "type": "mcq",
+        "answer": "B"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Since $\\sin^{-1}u + \\cos^{-1}u = \\frac{\\pi}{2}$, $\\ y = \\pi - \\left[\\cos^{-1}(\\cos x) + \\sin^{-1}(\\sin x)\\right]$. For $0 \\le x \\le \\frac{\\pi}{2}$ both terms in the bracket equal $x$, so $y = \\pi - 2x$. For $\\frac{\\pi}{2} \\le x \\le \\pi$ they are $x$ and $\\pi - x$, so $y = 0$. For $\\pi \\le x \\le \\frac{3\\pi}{2}$ they are $2\\pi - x$ and $\\pi - x$, so $y = 2x - 2\\pi$. For $\\frac{3\\pi}{2} \\le x \\le 2\\pi$ they are $2\\pi - x$ and $x - 2\\pi$, so $y = \\pi$. The graph falls from $\\pi$ to 0, stays at 0, rises to $\\pi$ and stays at $\\pi$."
+        }
+       ],
+       "classification": {
+        "content": "Graphs of inverse trigonometric functions; complementary angles",
+        "outcomes": [
+         "ME1-12-03",
+         "ME1-11-03"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q4",
+     "number": 4,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The triangle $ABC$ is equilateral with sides of length 3, and $P$ is a point on the circle that passes through $A$, $B$ and $C$."
+      },
+      {
+       "k": "fig",
+       "name": "figcirc"
+      },
+      {
+       "k": "p",
+       "t": "What is the value of $PA^2 + PB^2 + PC^2$?"
+      }
+     ],
+     "figures": [
+      "figcirc"
+     ],
+     "parts": [
+      {
+       "id": "q4",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "9"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "12"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "15"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "18"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "D"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Take the centre $O$ as origin, with position vectors $\\underset{\\sim}{a}, \\underset{\\sim}{b}, \\underset{\\sim}{c}, \\underset{\\sim}{p}$, each of length $R$. By symmetry $\\underset{\\sim}{a} + \\underset{\\sim}{b} + \\underset{\\sim}{c} = \\underset{\\sim}{0}$. Then $PA^2 + PB^2 + PC^2 = 3\\left|\\underset{\\sim}{p}\\right|^2 + \\left|\\underset{\\sim}{a}\\right|^2 + \\left|\\underset{\\sim}{b}\\right|^2 + \\left|\\underset{\\sim}{c}\\right|^2 - 2\\,\\underset{\\sim}{p}\\cdot\\left(\\underset{\\sim}{a} + \\underset{\\sim}{b} + \\underset{\\sim}{c}\\right) = 6R^2$. The circle has radius $R = \\dfrac{3}{2\\sin 60^\\circ} = \\sqrt3$, so the value is 18 for every position of $P$."
+        }
+       ],
+       "classification": {
+        "content": "Vectors in two dimensions; scalar product",
+        "outcomes": [
+         "ME1-12-02"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q5",
+     "number": 5,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The random variable $X$ has a binomial distribution with $n = 20$ and probability of success $p$. It is given that $P(X = 7) = P(X = 8)$."
+      },
+      {
+       "k": "p",
+       "t": "What is the value of $p$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q5",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{8}{21}$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{3}{8}$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{2}{5}$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{8}{13}$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "A"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$\\dfrac{P(X = 8)}{P(X = 7)} = \\dfrac{\\binom{20}{8}}{\\binom{20}{7}} \\times \\dfrac{p}{1 - p} = \\dfrac{13}{8} \\times \\dfrac{p}{1 - p}$. Setting this equal to 1 gives $13p = 8 - 8p$, so $p = \\dfrac{8}{21}$."
+        }
+       ],
+       "classification": {
+        "content": "Binomial distribution; binomial coefficients",
+        "outcomes": [
+         "ME1-12-06"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q6",
+     "number": 6,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The diagram shows the slope field of the differential equation $\\dfrac{dy}{dx} = x - y$."
+      },
+      {
+       "k": "fig",
+       "name": "figfield"
+      },
+      {
+       "k": "p",
+       "t": "Which of the following is true of the solution curve that passes through the point $(0, -2)$?"
+      }
+     ],
+     "figures": [
+      "figfield"
+     ],
+     "parts": [
+      {
+       "id": "q6",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "It has a minimum turning point on the line $y = x$."
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "It has a maximum turning point on the line $y = x$."
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "It has no stationary points and it is concave up for all $x$."
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "It has no stationary points and it is concave down for all $x$."
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "D"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The line $y = x - 1$ is a solution curve, since its gradient is 1 and $x - (x - 1) = 1$. Solution curves cannot cross, so the curve through $(0, -2)$ stays below this line, where $\\dfrac{dy}{dx} = x - y > 1$. So there are no stationary points. Also $\\dfrac{d^2y}{dx^2} = 1 - \\dfrac{dy}{dx} < 0$, so the curve is concave down for all $x$. (A stationary point would have to lie on $y = x$, which is above the line $y = x - 1$.)"
+        }
+       ],
+       "classification": {
+        "content": "Slope fields; solution curves; concavity",
+        "outcomes": [
+         "ME1-12-05"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q7",
+     "number": 7,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "How many real solutions does the equation $\\sin^{-1}(\\sin x) = \\dfrac{x}{5}$ have?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q7",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "3"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "5"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "7"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "9"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "B"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The graph of $y = \\sin^{-1}(\\sin x)$ is a zigzag of line segments of gradient $\\pm1$ through $\\left(\\frac{\\pi}{2}, \\frac{\\pi}{2}\\right)$, $\\left(\\frac{3\\pi}{2}, -\\frac{\\pi}{2}\\right)$, $\\left(\\frac{5\\pi}{2}, \\frac{\\pi}{2}\\right)$, …, and it is odd. For $x > 0$ the line $y = \\frac{x}{5}$ meets the segment $y = \\pi - x$ at $x = \\frac{5\\pi}{6}$ and passes exactly through the peak $\\left(\\frac{5\\pi}{2}, \\frac{\\pi}{2}\\right)$; beyond that the line is above $\\frac{\\pi}{2}$. With $x = 0$ and the two negative solutions, there are 5 solutions."
+        }
+       ],
+       "classification": {
+        "content": "Inverse trigonometric functions; graphical solution of equations",
+        "outcomes": [
+         "ME1-12-03",
+         "ME1-11-01"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q8",
+     "number": 8,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "What is the value of $\\displaystyle\\int_{-1}^{1} x^2\\cos^{-1}x\\,dx$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q8",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$0$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{\\pi}{6}$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{\\pi}{3}$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{2\\pi}{3}$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "C"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Let $I$ be the integral. The substitution $x = -u$ and the identity $\\cos^{-1}(-u) = \\pi - \\cos^{-1}u$ give $I = \\displaystyle\\int_{-1}^{1}u^2\\left(\\pi - \\cos^{-1}u\\right)du = \\dfrac{2\\pi}{3} - I$. Hence $I = \\dfrac{\\pi}{3}$."
+        }
+       ],
+       "classification": {
+        "content": "Integration by substitution; symmetry of inverse trigonometric functions",
+        "outcomes": [
+         "ME1-12-04",
+         "ME1-12-03"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q9",
+     "number": 9,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The diagram shows the curve $x = \\sin t$, $y = \\sin 2t$, where $0 \\le t \\le 2\\pi$."
+      },
+      {
+       "k": "fig",
+       "name": "figeight"
+      },
+      {
+       "k": "p",
+       "t": "What is the area of the shaded loop?"
+      }
+     ],
+     "figures": [
+      "figeight"
+     ],
+     "parts": [
+      {
+       "id": "q9",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac43$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac32$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{\\pi}{2}$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac83$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "A"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "For $0 \\le t \\le \\frac{\\pi}{2}$, $y = 2\\sin t\\cos t = 2x\\sqrt{1 - x^2}$, and the lower half of the loop is its reflection in the $x$-axis. The area is $2\\displaystyle\\int_0^1 2x\\sqrt{1 - x^2}\\,dx = 2\\left[-\\tfrac23\\left(1 - x^2\\right)^{\\frac32}\\right]_0^1 = \\dfrac43$."
+        }
+       ],
+       "classification": {
+        "content": "Parametric form; areas; integration by substitution",
+        "outcomes": [
+         "ME1-11-01",
+         "ME1-12-04"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q10",
+     "number": 10,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "Some of the integers from 1 to 20 are chosen."
+      },
+      {
+       "k": "p",
+       "t": "What is the smallest number of integers that must be chosen to be certain that two of the chosen integers differ by exactly 4?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q10",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "11"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "12"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "13"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "14"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "C"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Split the integers into the four chains $1, 5, 9, 13, 17$; $\\ 2, 6, 10, 14, 18$; $\\ 3, 7, 11, 15, 19$; $\\ 4, 8, 12, 16, 20$. Two integers differ by 4 exactly when they are neighbours in a chain. At most 3 integers can be chosen from a chain of 5 with no two neighbours, so 12 integers can be chosen with no two differing by 4 (for example $1, 9, 17, 2, 10, 18, \\ldots$). If 13 are chosen, some chain contains at least 4 of them, and two of those are neighbours. So the answer is 13."
+        }
+       ],
+       "classification": {
+        "content": "The pigeonhole principle",
+        "outcomes": [
+         "ME1-11-04"
+        ]
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "II",
+   "title": "Section II",
+   "marks": 60,
+   "minutes": 105,
+   "instructions": "Attempt Questions 11 to 14. Allow about 1 hour and 45 minutes for this section. Show relevant mathematical reasoning and/or calculations.",
+   "questions": [
+    {
+     "id": "q11",
+     "number": 11,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q11a",
+       "label": "(a)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Let $P(x) = x^3 - 18x^2 + 104x - k$, where $k$ is a real number."
+        },
+        {
+         "k": "p",
+         "t": "Whenever $P(x)$ has three distinct real zeros $a$, $b$ and $c$, these zeros are the side lengths of a triangle, and the area of the triangle is"
+        },
+        {
+         "k": "math",
+         "t": "\\sqrt{s(s - a)(s - b)(s - c)}, \\qquad\\text{where } s = \\frac{a + b + c}{2}."
+        },
+        {
+         "k": "p",
+         "t": "**(Do NOT prove these two facts.)**"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q11a-i",
+         "label": "(i)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find all values of $k$ for which $P(x)$ has three distinct real zeros."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct set of values with justification"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the stationary values of $P(x)$, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the $x$-coordinates of the stationary points, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$P'(x) = 3x^2 - 36x + 104 = 0$ when $x = 6 \\pm \\dfrac{2}{\\sqrt3}$. Since the leading coefficient is positive, $P$ has a local maximum at $x = 6 - \\dfrac{2}{\\sqrt3}$ and a local minimum at $x = 6 + \\dfrac{2}{\\sqrt3}$, and $P$ has three distinct real zeros if and only if the local maximum value is positive and the local minimum value is negative."
+          },
+          {
+           "k": "p",
+           "t": "Now $x^3 - 18x^2 + 104x - 192 = (x - 4)(x - 6)(x - 8)$, and with $x = 6 + u$ this is $u(u - 2)(u + 2) = u^3 - 4u$. So $P(6 + u) = u^3 - 4u + 192 - k$. When $u = \\mp\\dfrac{2}{\\sqrt3}$, $\\ u^3 - 4u = \\pm\\left(\\dfrac{8}{\\sqrt3} - \\dfrac{8}{3\\sqrt3}\\right) = \\pm\\dfrac{16}{3\\sqrt3} = \\pm\\dfrac{16\\sqrt3}{9}$."
+          },
+          {
+           "k": "p",
+           "t": "The conditions are $\\dfrac{16\\sqrt3}{9} + 192 - k > 0$ and $-\\dfrac{16\\sqrt3}{9} + 192 - k < 0$, that is, $\\left|k - 192\\right| < \\dfrac{16\\sqrt3}{9}$."
+          }
+         ],
+         "classification": {
+          "content": "Zeros and coefficients of polynomials; stationary points; cosine rule",
+          "outcomes": [
+           "ME1-11-02",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q11a-ii",
+         "label": "(ii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the area of the triangle in terms of $k$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct area"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds $s = 9$, or recognises that $(s - a)(s - b)(s - c) = P(s)$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The sum of the zeros is $a + b + c = 18$, so $s = 9$. Since $P(x) = (x - a)(x - b)(x - c)$,"
+          },
+          {
+           "k": "math",
+           "t": "(s - a)(s - b)(s - c) = P(9) = 729 - 1458 + 936 - k = 207 - k."
+          },
+          {
+           "k": "p",
+           "t": "Hence the area is $\\sqrt{9(207 - k)} = 3\\sqrt{207 - k}$."
+          }
+         ],
+         "classification": {
+          "content": "Zeros and coefficients of polynomials; stationary points; cosine rule",
+          "outcomes": [
+           "ME1-11-02",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "3*sqrt(207-k)",
+          "display": "3\\sqrt{207-k}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p01.py: Heron's formula on numeric roots of x^3-18x^2+104x-k for 30 random k in range; max err 7e-15"
+        },
+        {
+         "id": "q11a-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the exact value of $k$ for which the triangle is right-angled."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct value with justification"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Shows that the hypotenuse is $\\sqrt{58}$, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds $a^2 + b^2 + c^2 = 116$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$a^2 + b^2 + c^2 = (a + b + c)^2 - 2(ab + bc + ca) = 324 - 208 = 116$ for every $k$."
+          },
+          {
+           "k": "p",
+           "t": "If the triangle is right-angled with hypotenuse $c$ then $a^2 + b^2 = c^2$, so $2c^2 = 116$ and $c = \\sqrt{58}$. Hence $P\\left(\\sqrt{58}\\right) = 0$:"
+          },
+          {
+           "k": "math",
+           "t": "58\\sqrt{58} - 18 \\times 58 + 104\\sqrt{58} - k = 0, \\qquad\\text{so}\\qquad k = 162\\sqrt{58} - 1044."
+          },
+          {
+           "k": "p",
+           "t": "This value is approximately $189.76$, which satisfies the condition in part (i) ($192 - \\frac{16\\sqrt3}{9} \\approx 188.92$). Then $\\sqrt{58}$ is a side, and the other two sides satisfy $a^2 + b^2 = 116 - 58 = c^2$, so the triangle is right-angled. Hence $k = 162\\sqrt{58} - 1044$."
+          }
+         ],
+         "classification": {
+          "content": "Zeros and coefficients of polynomials; stationary points; cosine rule",
+          "outcomes": [
+           "ME1-11-02",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "value",
+         "key": {
+          "type": "numeric",
+          "value": 189.75524314995323,
+          "display": "162\\sqrt{58}-1044"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p01.py: scan of the whole admissible k range for a^2+b^2=c^2 via numeric roots + bisection: exactly one solution 189.75524315"
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": []
+      },
+      {
+       "id": "q11b",
+       "label": "(b)",
+       "marks": 7,
+       "prompt": [],
+       "parts": [
+        {
+         "id": "q11b-i",
+         "label": "(i)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Prove by mathematical induction that, for all integers $n \\ge 1$,"
+          },
+          {
+           "k": "math",
+           "t": "(n + 1)(n + 2)(n + 3) \\times \\cdots \\times (2n) = 2^n \\times 1 \\times 3 \\times 5 \\times \\cdots \\times (2n - 1)."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct proof"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Verifies the base case and makes substantial progress with the inductive step"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Verifies the base case, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "When $n = 1$, the left-hand side is $2$ and the right-hand side is $2^1 \\times 1 = 2$, so the statement is true for $n = 1$."
+          },
+          {
+           "k": "p",
+           "t": "Assume that the statement is true for $n = k$, that is, $(k + 1)(k + 2) \\times \\cdots \\times (2k) = 2^k \\times 1 \\times 3 \\times \\cdots \\times (2k - 1)$."
+          },
+          {
+           "k": "p",
+           "t": "For $n = k + 1$ the left-hand side is"
+          },
+          {
+           "k": "math",
+           "t": "\\begin{aligned}\n(k + 2)(k + 3) \\times \\cdots \\times (2k)(2k + 1)(2k + 2) &= \\bigl[(k + 1)(k + 2) \\times \\cdots \\times (2k)\\bigr] \\times \\frac{(2k + 1)(2k + 2)}{k + 1}\\\\\n&= 2^k \\times 1 \\times 3 \\times \\cdots \\times (2k - 1) \\times 2(2k + 1)\\\\\n&= 2^{k+1} \\times 1 \\times 3 \\times \\cdots \\times (2k - 1)(2k + 1),\n\\end{aligned}"
+          },
+          {
+           "k": "p",
+           "t": "which is the statement for $n = k + 1$. Hence, by mathematical induction, the statement is true for all integers $n \\ge 1$."
+          }
+         ],
+         "classification": {
+          "content": "Proof by mathematical induction; counting techniques; probability",
+          "outcomes": [
+           "ME1-12-01",
+           "ME1-11-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q11b-ii",
+         "label": "(ii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "In the first round of a tournament, $2n$ players are split into $n$ pairs, and the two players in each pair play each other. Show that the number of ways in which the players can be split into pairs is $1 \\times 3 \\times 5 \\times \\cdots \\times (2n - 1)$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Obtains $\\dfrac{(2n)!}{2^n\\,n!}$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Arrange the $2n$ players in a line, in $(2n)!$ ways, and pair the 1st with the 2nd, the 3rd with the 4th, and so on. Each way of splitting the players into pairs arises from $2^n \\times n!$ of these arrangements (the two players in each pair in either order, and the $n$ pairs in any order). So the number of ways is"
+          },
+          {
+           "k": "math",
+           "t": "\\frac{(2n)!}{2^n\\,n!} = \\frac{(n + 1)(n + 2) \\times \\cdots \\times (2n)}{2^n} = 1 \\times 3 \\times 5 \\times \\cdots \\times (2n - 1), \\quad\\text{by part (i)}."
+          }
+         ],
+         "classification": {
+          "content": "Proof by mathematical induction; counting techniques; probability",
+          "outcomes": [
+           "ME1-12-01",
+           "ME1-11-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q11b-iii",
+         "label": "(iii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "The $2n$ players have different rankings, and in every game the player with the higher ranking wins. The pairs are chosen at random. Let $p_n$ be the probability that the $n$ winners in the first round are the $n$ highest-ranked players. Find $p_n$, and show that $p_n \\le \\left(\\dfrac23\\right)^{n-1}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct probability and a correct proof of the inequality"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds $p_n$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The $n$ highest-ranked players all win exactly when each of them is paired with one of the $n$ lowest-ranked players (if two of them were paired, one would lose). The highest-ranked $n$ can be matched with the lowest-ranked $n$ in $n!$ ways, so by part (ii)"
+          },
+          {
+           "k": "math",
+           "t": "p_n = \\frac{n!}{1 \\times 3 \\times 5 \\times \\cdots \\times (2n - 1)} = \\frac11 \\times \\frac23 \\times \\frac35 \\times \\cdots \\times \\frac{n}{2n - 1}."
+          },
+          {
+           "k": "p",
+           "t": "For $k \\ge 2$, $\\ \\dfrac{k}{2k - 1} \\le \\dfrac23$, because $3k \\le 4k - 2$. The first factor is 1 and each of the other $n - 1$ factors is at most $\\dfrac23$, so $p_n \\le \\left(\\dfrac23\\right)^{n-1}$."
+          }
+         ],
+         "classification": {
+          "content": "Proof by mathematical induction; counting techniques; probability",
+          "outcomes": [
+           "ME1-12-01",
+           "ME1-11-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "2^n*(n!)^2/(2n)!",
+          "display": "p_n=\\dfrac{2^n(n!)^2}{(2n)!}=\\dfrac{n!}{1\\times3\\times\\cdots\\times(2n-1)}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p01.py: exhaustive enumeration of all pairings n=1..5 (winners = top n gives 1,2/3,2/5,8/35,8/63); inequality checked n<=79"
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": []
+      }
+     ]
+    },
+    {
+     "id": "q12",
+     "number": 12,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q12a",
+       "label": "(a)",
+       "marks": 7,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A prize of $1 is offered for solving a puzzle. Each of $n + 1$ contestants, one of whom is Alice, solves the puzzle with probability $p$, independently of the others, where $0 < p < 1$ and $n \\ge 1$ is an integer. The prize is shared equally among the contestants who solve the puzzle. Let $q = 1 - p$."
+        }
+       ],
+       "parts": [
+        {
+         "id": "q12a-i",
+         "label": "(i)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Let $E$ dollars be the expected value of the amount that Alice wins. Show that $E = \\dfrac{1 - q^{\\,n+1}}{n + 1}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes the expected value as a sum and uses $\\binom{n}{k}\\frac{1}{k + 1} = \\frac{1}{n + 1}\\binom{n + 1}{k + 1}$, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes a correct expression for the expected value as a sum, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Alice wins $\\dfrac{1}{k + 1}$ dollars if she solves the puzzle and exactly $k$ of the other $n$ contestants solve it. The number of the others who solve it has a binomial distribution, so the expected value is"
+          },
+          {
+           "k": "math",
+           "t": "E = p\\sum_{k=0}^{n}\\binom{n}{k}p^kq^{\\,n-k} \\times \\frac{1}{k + 1}."
+          },
+          {
+           "k": "p",
+           "t": "Now $\\dbinom{n}{k}\\dfrac{1}{k + 1} = \\dfrac{n!}{(k + 1)!\\,(n - k)!} = \\dfrac{1}{n + 1}\\dbinom{n + 1}{k + 1}$, so"
+          },
+          {
+           "k": "math",
+           "t": "E = \\frac{1}{n + 1}\\sum_{k=0}^{n}\\binom{n + 1}{k + 1}p^{k+1}q^{\\,n-k} = \\frac{1}{n + 1}\\left[(p + q)^{n+1} - q^{\\,n+1}\\right] = \\frac{1 - q^{\\,n+1}}{n + 1},"
+          },
+          {
+           "k": "p",
+           "t": "since the sum contains every term of the expansion of $(p + q)^{n+1}$ except $q^{\\,n+1}$."
+          }
+         ],
+         "classification": {
+          "content": "Binomial distribution; expected value; binomial coefficients; inequalities using calculus",
+          "outcomes": [
+           "ME1-12-06",
+           "ME1-11-04",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q12a-ii",
+         "label": "(ii)",
+         "marks": 1,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Explain how the result of part (i) can be obtained without evaluating a sum."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct explanation"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The whole prize is paid out unless nobody solves the puzzle, which has probability $q^{\\,n+1}$. So the expected total amount paid out is $1 - q^{\\,n+1}$ dollars. The $n + 1$ contestants are in identical situations, so each has the same expected winnings, and these add up to the expected total. Hence each expects $\\dfrac{1 - q^{\\,n+1}}{n + 1}$ dollars."
+          }
+         ],
+         "classification": {
+          "content": "Binomial distribution; expected value; binomial coefficients; inequalities using calculus",
+          "outcomes": [
+           "ME1-12-06",
+           "ME1-11-04",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "proof-explain",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q12a-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "The expected number of the other contestants who solve the puzzle is $np$."
+          },
+          {
+           "k": "p",
+           "t": "Let $S$ dollars be the expected value of the amount that Alice wins, given that she solves the puzzle. Show that $S > \\dfrac{1}{1 + np}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct proof"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Reduces the inequality to $1 - (n + 1)q^n + nq^{\\,n+1} > 0$, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the expected value given that Alice solves the puzzle, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$S = \\displaystyle\\sum_{k=0}^{n}\\binom{n}{k}p^kq^{\\,n-k}\\frac{1}{k + 1} = \\frac{E}{p} = \\frac{1 - q^{\\,n+1}}{(n + 1)p}$, from part (i)."
+          },
+          {
+           "k": "p",
+           "t": "We need $\\left(1 - q^{\\,n+1}\\right)(1 + np) > (n + 1)p$. With $p = 1 - q$,"
+          },
+          {
+           "k": "math",
+           "t": "\\begin{aligned}\n\\left(1 - q^{\\,n+1}\\right)(n + 1 - nq) - (n + 1)(1 - q) &= q - (n + 1)q^{\\,n+1} + nq^{\\,n+2}\\\\\n&= q\\left[1 - (n + 1)q^n + nq^{\\,n+1}\\right].\n\\end{aligned}"
+          },
+          {
+           "k": "p",
+           "t": "Let $A(x) = 1 - (n + 1)x^n + nx^{n+1}$. Then $A(1) = 0$ and $A'(x) = -n(n + 1)x^{n-1}(1 - x) < 0$ for $0 < x < 1$. So $A$ is decreasing on $0 \\le x \\le 1$, and $A(q) > A(1) = 0$ for $0 < q < 1$."
+          },
+          {
+           "k": "p",
+           "t": "Hence $\\left(1 - q^{\\,n+1}\\right)(1 + np) > (n + 1)p$, that is, $S > \\dfrac{1}{1 + np}$."
+          }
+         ],
+         "classification": {
+          "content": "Binomial distribution; expected value; binomial coefficients; inequalities using calculus",
+          "outcomes": [
+           "ME1-12-06",
+           "ME1-11-04",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": []
+      },
+      {
+       "id": "q12b",
+       "label": "(b)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Two pulleys have radii $R$ and $r$, where $R \\ge r$, and their centres are a distance $d$ apart, where $d > R + r$. A tight belt passes around the pulleys. The first diagram shows an open belt and the second diagram shows a crossed belt."
+        },
+        {
+         "k": "fig",
+         "name": "figbeltO"
+        },
+        {
+         "k": "fig",
+         "name": "figbeltX"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q12b-i",
+         "label": "(i)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the length of the open belt in terms of $R$, $r$ and $d$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct length with justification"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the length of a straight section and the angle of contact on one pulley, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the length of a straight section, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Let the centres be $A$ (radius $R$) and $B$ (radius $r$), and let a straight section touch the pulleys at $T$ and $U$. The radii $AT$ and $BU$ are perpendicular to $TU$, so they are parallel. Let $N$ be the point on $AT$ with $BN \\parallel UT$. Then $BNTU$ is a rectangle, $AN = R - r$ and"
+          },
+          {
+           "k": "math",
+           "t": "TU = BN = \\sqrt{d^2 - (R - r)^2}."
+          },
+          {
+           "k": "p",
+           "t": "Let $\\alpha = \\angle ABN$, so $\\sin\\alpha = \\dfrac{R - r}{d}$. The radius $AT$ makes an angle $\\dfrac{\\pi}{2} - \\alpha$ with $AB$, and the same is true of $BU$. So the belt is in contact with the larger pulley over an angle $2\\pi - 2\\left(\\dfrac{\\pi}{2} - \\alpha\\right) = \\pi + 2\\alpha$ at its centre, and with the smaller pulley over an angle $2\\left(\\dfrac{\\pi}{2} - \\alpha\\right) = \\pi - 2\\alpha$. The length of the belt is"
+          },
+          {
+           "k": "math",
+           "t": "2\\sqrt{d^2 - (R - r)^2} + R(\\pi + 2\\alpha) + r(\\pi - 2\\alpha) = 2\\sqrt{d^2 - (R - r)^2} + \\pi(R + r) + 2(R - r)\\sin^{-1}\\!\\left(\\frac{R - r}{d}\\right)."
+          }
+         ],
+         "classification": {
+          "content": "Inverse trigonometric functions; circle geometry; differentiation",
+          "outcomes": [
+           "ME1-12-03",
+           "ME1-12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "2*sqrt(d^2-(R-r)^2)+pi*(R+r)+2*(R-r)*asin((R-r)/d)",
+          "display": "2\\sqrt{d^2-(R-r)^2}+\\pi(R+r)+2(R-r)\\sin^{-1}\\!\\left(\\dfrac{R-r}{d}\\right)"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p01.py: convex-hull perimeter of two sampled discs (40000-gon) and explicit tangent geometry at 6 random (R,r,d); max err 1.7e-8"
+        },
+        {
+         "id": "q12b-ii",
+         "label": "(ii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that the length of the crossed belt depends on $R$ and $r$ only through the value of $R + r$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the length of a straight section of the crossed belt, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Let a straight section touch the larger pulley at $T$ and the smaller pulley at $U$. Again $AT \\parallel BU$, but now $A$ and $B$ are on opposite sides of $TU$. Produce $AT$ to $N$ so that $TN = r$. Then $BNTU$ is a rectangle, $AN = R + r$ and $TU = BN = \\sqrt{d^2 - (R + r)^2}$."
+          },
+          {
+           "k": "p",
+           "t": "Let $\\gamma = \\angle ABN$, so $\\sin\\gamma = \\dfrac{R + r}{d}$. Each of the radii $AT$ and $BU$ makes an angle $\\dfrac{\\pi}{2} - \\gamma$ with the line $AB$, and the belt is in contact with each pulley over an angle $2\\pi - 2\\left(\\dfrac{\\pi}{2} - \\gamma\\right) = \\pi + 2\\gamma$. The length is"
+          },
+          {
+           "k": "math",
+           "t": "2\\sqrt{d^2 - (R + r)^2} + (R + r)\\left[\\pi + 2\\sin^{-1}\\!\\left(\\frac{R + r}{d}\\right)\\right],"
+          },
+          {
+           "k": "p",
+           "t": "which depends on $R$ and $r$ only through $R + r$."
+          }
+         ],
+         "classification": {
+          "content": "Inverse trigonometric functions; circle geometry; differentiation",
+          "outcomes": [
+           "ME1-12-03",
+           "ME1-12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q12b-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "The pulleys of a machine can be changed so that $R = c + u$ and $r = c - u$, where $c$ and $d$ are fixed and $0 \\le u < c$. By part (ii), one crossed belt fits every such pair of pulleys."
+          },
+          {
+           "k": "p",
+           "t": "Show that the length of the open belt increases as $u$ increases, and find the exact amount by which the open belt for $u = 1$ is longer than the open belt for $u = 0$ when $d = 4$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration and the correct exact value"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Shows that $\\dfrac{dL}{du} = 4\\sin^{-1}\\!\\left(\\dfrac{2u}{d}\\right)$, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes $L$ in terms of $u$ and attempts to differentiate, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Let $L$ be the length of the open belt. With $R + r = 2c$ and $R - r = 2u$, part (i) gives $L = 2\\sqrt{d^2 - 4u^2} + 2\\pi c + 4u\\sin^{-1}\\!\\left(\\dfrac{2u}{d}\\right)$. Then"
+          },
+          {
+           "k": "math",
+           "t": "\\frac{dL}{du} = \\frac{-8u}{\\sqrt{d^2 - 4u^2}} + 4\\sin^{-1}\\!\\left(\\frac{2u}{d}\\right) + 4u \\times \\frac{\\frac{2}{d}}{\\sqrt{1 - \\frac{4u^2}{d^2}}} = 4\\sin^{-1}\\!\\left(\\frac{2u}{d}\\right),"
+          },
+          {
+           "k": "p",
+           "t": "since the last term equals $\\dfrac{8u}{\\sqrt{d^2 - 4u^2}}$. This is positive for $u > 0$, so $L$ increases as $u$ increases. (An open belt that fits equal pulleys is too short for every other pair.)"
+          },
+          {
+           "k": "p",
+           "t": "When $d = 4$: $\\ L(1) - L(0) = \\left[2\\sqrt{12} + 2\\pi c + 4\\sin^{-1}\\tfrac12\\right] - \\left[8 + 2\\pi c\\right] = 4\\sqrt3 + \\dfrac{2\\pi}{3} - 8$."
+          }
+         ],
+         "classification": {
+          "content": "Inverse trigonometric functions; circle geometry; differentiation",
+          "outcomes": [
+           "ME1-12-03",
+           "ME1-12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "value",
+         "key": {
+          "type": "numeric",
+          "value": 1.0225983326687036,
+          "display": "4\\sqrt{3}+\\dfrac{2\\pi}{3}-8"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p01.py: convex-hull belt lengths (c=1.5,d=4,u=1 minus u=0) = 1.0225983 vs closed form 1.0225983"
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figbeltO",
+        "figbeltX"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "q13",
+     "number": 13,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q13a",
+       "label": "(a)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "The size of a fish stock at time $t$ years is $x$ units. When the stock is fished at a constant rate of $h$ units per year, it changes according to"
+        },
+        {
+         "k": "math",
+         "t": "\\frac{dx}{dt} = x(1 - x) - h."
+        },
+        {
+         "k": "p",
+         "t": "The stock is *wiped out* when $x$ reaches 0. The diagram shows the graph of $y = x(1 - x)$ and three possible values of $h$."
+        },
+        {
+         "k": "fig",
+         "name": "figfish"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q13a-i",
+         "label": "(i)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Suppose that $h = \\dfrac14$. Find the time at which a stock with $x = \\dfrac14$ when $t = 0$ is wiped out, and show that a stock with $x > \\dfrac12$ when $t = 0$ is never wiped out."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration of both results"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Solves the differential equation and establishes one result, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes $\\dfrac{dx}{dt} = -\\left(x - \\frac12\\right)^2$ and separates the variables, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{dx}{dt} = x - x^2 - \\dfrac14 = -\\left(x - \\dfrac12\\right)^2$. For $x \\ne \\dfrac12$, $\\displaystyle\\int\\frac{-dx}{\\left(x - \\frac12\\right)^2} = \\int dt$, so $\\dfrac{1}{x - \\frac12} = t + C$."
+          },
+          {
+           "k": "p",
+           "t": "If $x = \\dfrac14$ when $t = 0$ then $C = -4$ and $x = \\dfrac12 + \\dfrac{1}{t - 4}$. This decreases from $\\dfrac14$ for $0 \\le t < 4$, and $x = 0$ when $\\dfrac{1}{t - 4} = -\\dfrac12$, that is, when $t = 2$."
+          },
+          {
+           "k": "p",
+           "t": "If $x = x_0 > \\dfrac12$ when $t = 0$ then $C = \\dfrac{1}{x_0 - \\frac12} > 0$, and $x = \\dfrac12 + \\dfrac{1}{t + C} > \\dfrac12$ for all $t \\ge 0$. So the stock is never wiped out."
+          }
+         ],
+         "classification": {
+          "content": "Modelling with differential equations; inverse trigonometric functions; limits",
+          "outcomes": [
+           "ME1-12-05",
+           "ME1-12-03"
+          ]
+         },
+         "figures": [],
+         "answerType": "value",
+         "key": {
+          "type": "numeric",
+          "value": 2,
+          "display": "2"
+         },
+         "autoMarks": 1,
+         "answerSuffix": "years",
+         "keyChecks": "verified by tools/papers/verify/p01.py: RK4 of dx/dt=x(1-x)-1/4 from x(0)=1/4 hits 0 at t=2.000000; x0>1/2 never wiped out"
+        },
+        {
+         "id": "q13a-ii",
+         "label": "(ii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Suppose that $h > \\dfrac14$, and let $a = \\sqrt{h - \\dfrac14}$. The stock has size $x_0$ when $t = 0$. Find the time $T$ at which the stock is wiped out, and deduce that every stock, however large, is wiped out in less than $\\dfrac{\\pi}{a}$ years."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct time and the deduction"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the correct time, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes $\\dfrac{dx}{dt} = -\\left[\\left(x - \\frac12\\right)^2 + a^2\\right]$ and separates the variables, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{dx}{dt} = -\\left[\\left(x - \\dfrac12\\right)^2 + a^2\\right] < 0$, so $x$ decreases and $\\dfrac{dt}{dx} = \\dfrac{-1}{\\left(x - \\frac12\\right)^2 + a^2}$. Hence"
+          },
+          {
+           "k": "math",
+           "t": "T = \\int_{0}^{x_0}\\frac{dx}{\\left(x - \\frac12\\right)^2 + a^2} = \\frac1a\\left[\\tan^{-1}\\!\\left(\\frac{x - \\frac12}{a}\\right)\\right]_0^{x_0} = \\frac1a\\left[\\tan^{-1}\\!\\left(\\frac{2x_0 - 1}{2a}\\right) + \\tan^{-1}\\!\\left(\\frac{1}{2a}\\right)\\right]."
+          },
+          {
+           "k": "p",
+           "t": "Each inverse tangent is less than $\\dfrac{\\pi}{2}$, so $T < \\dfrac1a\\left(\\dfrac{\\pi}{2} + \\dfrac{\\pi}{2}\\right) = \\dfrac{\\pi}{a}$ for every $x_0$."
+          }
+         ],
+         "classification": {
+          "content": "Modelling with differential equations; inverse trigonometric functions; limits",
+          "outcomes": [
+           "ME1-12-05",
+           "ME1-12-03"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13a-iii",
+         "label": "(iii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Suppose that $x_0 = \\dfrac14$. Show that, as $h$ decreases towards $\\dfrac14$, the time $T$ in part (ii) approaches the time found in part (i)."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes $T$ in a form such as $\\dfrac1a\\left[\\tan^{-1}4a - \\tan^{-1}2a\\right]$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "With $x_0 = \\dfrac14$, $\\ T = \\dfrac1a\\left[\\tan^{-1}\\!\\left(\\dfrac{1}{2a}\\right) - \\tan^{-1}\\!\\left(\\dfrac{1}{4a}\\right)\\right]$. For $u > 0$, $\\tan^{-1}\\dfrac1u = \\dfrac{\\pi}{2} - \\tan^{-1}u$, so"
+          },
+          {
+           "k": "math",
+           "t": "T = \\frac{\\tan^{-1}4a - \\tan^{-1}2a}{a} = 4 \\times \\frac{\\tan^{-1}4a}{4a} - 2 \\times \\frac{\\tan^{-1}2a}{2a}."
+          },
+          {
+           "k": "p",
+           "t": "As $u \\to 0$, $\\dfrac{\\tan^{-1}u}{u} \\to 1$ (put $u = \\tan\\theta$: $\\dfrac{\\theta}{\\tan\\theta} = \\dfrac{\\theta}{\\sin\\theta} \\times \\cos\\theta \\to 1$). As $h \\to \\dfrac14$ from above, $a \\to 0$, so $T \\to 4 - 2 = 2$, which is the time found in part (i)."
+          }
+         ],
+         "classification": {
+          "content": "Modelling with differential equations; inverse trigonometric functions; limits",
+          "outcomes": [
+           "ME1-12-05",
+           "ME1-12-03"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figfish"
+       ]
+      },
+      {
+       "id": "q13b",
+       "label": "(b)",
+       "marks": 7,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A vessel is formed by rotating a curve in the first quadrant, which starts at the origin $O$, about the $y$-axis. Water drains from the vessel through a small hole at $O$. When the depth of the water is $h$, the radius of the water surface is $x$ and the volume of water is decreasing at the rate $k\\sqrt{h}$, where $k$ is a positive constant."
+        },
+        {
+         "k": "fig",
+         "name": "figvessel"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q13b-i",
+         "label": "(i)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that $\\dfrac{dh}{dt} = -\\dfrac{k\\sqrt{h}}{\\pi x^2}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Shows that $\\dfrac{dV}{dh} = \\pi x^2$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "When the depth is $h$, the volume of water is $V = \\pi\\displaystyle\\int_0^h x^2\\,dy$, where $x$ is the radius of the vessel at height $y$. Hence $\\dfrac{dV}{dh} = \\pi x^2$, with $x$ the radius at height $h$. By the chain rule,"
+          },
+          {
+           "k": "math",
+           "t": "-k\\sqrt{h} = \\frac{dV}{dt} = \\frac{dV}{dh} \\times \\frac{dh}{dt} = \\pi x^2\\,\\frac{dh}{dt}, \\qquad\\text{so}\\qquad \\frac{dh}{dt} = -\\frac{k\\sqrt{h}}{\\pi x^2}."
+          }
+         ],
+         "classification": {
+          "content": "Volumes of solids of revolution; related rates of change; differential equations",
+          "outcomes": [
+           "ME1-12-05",
+           "ME1-12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13b-ii",
+         "label": "(ii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "In an ancient water clock, the vessel is shaped so that the depth of the water decreases at a constant rate $c$. Find the equation of the curve that is rotated to form such a vessel."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct equation"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Uses $\\dfrac{dh}{dt} = -c$ in part (i), or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "We need $\\dfrac{k\\sqrt{h}}{\\pi x^2} = c$ at every depth $h$, where $x$ is the radius at height $h$. So every point $(x, y)$ of the curve satisfies $k\\sqrt{y} = \\pi cx^2$, that is,"
+          },
+          {
+           "k": "math",
+           "t": "y = \\frac{\\pi^2c^2}{k^2}\\,x^4."
+          }
+         ],
+         "classification": {
+          "content": "Volumes of solids of revolution; related rates of change; differential equations",
+          "outcomes": [
+           "ME1-12-05",
+           "ME1-12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "pi^2*c^2*x^4/k^2",
+          "display": "y=\\dfrac{\\pi^2c^2}{k^2}x^4"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p01.py: built the vessel numerically (x^2=k sqrt(y)/(pi c)) and confirmed dh/dt=-k sqrt(h)/V'(h)=-c at three depths; the key is the expression for y (the engine reads 'y = ...' as the right-hand side)"
+        },
+        {
+         "id": "q13b-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "A designer wants a vessel in which the depth of the water halves in every minute, at every depth."
+          },
+          {
+           "k": "p",
+           "t": "Show that $x^4y$ would have to be constant along the curve that is rotated. Show also that, however small the positive number $\\varepsilon$ is, the part of such a vessel between the heights $y = \\varepsilon$ and $y = H$ would hold less than $\\dfrac{2k\\sqrt{H}}{\\ln 2}$ units of water, with $t$ measured in minutes."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration of both results"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Shows that $x^4y$ is constant, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Obtains $\\dfrac{dh}{dt} = -h\\ln 2$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "If the depth halves in every minute then $h = h_0 \\times 2^{-t} = h_0e^{-t\\ln 2}$, so $\\dfrac{dh}{dt} = -\\lambda h$, where $\\lambda = \\ln 2$."
+          },
+          {
+           "k": "p",
+           "t": "By part (i), $\\dfrac{k\\sqrt{h}}{\\pi x^2} = \\lambda h$ at every depth, so every point of the curve satisfies $x^2 = \\dfrac{k}{\\pi\\lambda\\sqrt{y}}$, that is, $x^4y = \\dfrac{k^2}{\\pi^2\\lambda^2}$, a constant."
+          },
+          {
+           "k": "p",
+           "t": "The volume between the heights $\\varepsilon$ and $H$ is"
+          },
+          {
+           "k": "math",
+           "t": "\\pi\\int_\\varepsilon^H x^2\\,dy = \\frac{k}{\\lambda}\\int_\\varepsilon^H y^{-\\frac12}\\,dy = \\frac{2k}{\\lambda}\\left(\\sqrt{H} - \\sqrt{\\varepsilon}\\right) < \\frac{2k\\sqrt{H}}{\\ln 2}."
+          },
+          {
+           "k": "p",
+           "t": "(The vessel becomes wider without limit near the bottom, but it holds only a bounded amount of water, and it never empties.)"
+          }
+         ],
+         "classification": {
+          "content": "Volumes of solids of revolution; related rates of change; differential equations",
+          "outcomes": [
+           "ME1-12-05",
+           "ME1-12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figvessel"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "q14",
+     "number": 14,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q14a",
+       "label": "(a)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A ball is projected from a point $O$ on horizontal ground with speed $V$ at an angle $\\theta$ to the horizontal, and it lands at the point $A$. At time $t$ after projection the ball is at the point $P$ with position vector"
+        },
+        {
+         "k": "math",
+         "t": "Vt\\cos\\theta\\,\\underset{\\sim}{i} + \\left(Vt\\sin\\theta - \\tfrac12gt^2\\right)\\underset{\\sim}{j}"
+        },
+        {
+         "k": "p",
+         "t": "relative to $O$, where $g$ is the acceleration due to gravity. **(Do NOT prove this.)**"
+        },
+        {
+         "k": "p",
+         "t": "A camera at $O$ and a camera at $A$ both follow the ball. While the ball is in flight, $OP$ and $AP$ make angles $\\phi$ and $\\psi$ with the ground, as shown."
+        },
+        {
+         "k": "fig",
+         "name": "figcam"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q14a-i",
+         "label": "(i)",
+         "marks": 1,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that $\\tan\\phi = \\tan\\theta - \\dfrac{gt}{2V\\cos\\theta}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$\\tan\\phi = \\dfrac{y}{x} = \\dfrac{Vt\\sin\\theta - \\frac12gt^2}{Vt\\cos\\theta} = \\tan\\theta - \\dfrac{gt}{2V\\cos\\theta}$."
+          }
+         ],
+         "classification": {
+          "content": "Projectile motion; trigonometric identities; rates of change; quadratic inequalities",
+          "outcomes": [
+           "ME1-12-02",
+           "ME1-11-03",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14a-ii",
+         "label": "(ii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that $\\tan\\phi + \\tan\\psi = \\tan\\theta$ throughout the flight."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds $OA$ or the time of flight and writes an expression for $\\tan\\psi$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The ball lands when $Vt\\sin\\theta = \\frac12gt^2$, that is, at time $T = \\dfrac{2V\\sin\\theta}{g}$, and $OA = VT\\cos\\theta$. Since $V\\sin\\theta = \\frac12gT$,"
+          },
+          {
+           "k": "math",
+           "t": "\\tan\\psi = \\frac{y}{OA - x} = \\frac{t\\left(\\frac12gT - \\frac12gt\\right)}{V\\cos\\theta\\,(T - t)} = \\frac{gt}{2V\\cos\\theta}."
+          },
+          {
+           "k": "p",
+           "t": "Adding the result of part (i), $\\tan\\phi + \\tan\\psi = \\tan\\theta$."
+          }
+         ],
+         "classification": {
+          "content": "Projectile motion; trigonometric identities; rates of change; quadratic inequalities",
+          "outcomes": [
+           "ME1-12-02",
+           "ME1-11-03",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14a-iii",
+         "label": "(iii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find, in terms of $\\phi$, the rate at which the camera at $O$ is turning, and deduce that the two cameras are turning at the same rate only when the ball is at its highest point."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration and deduction"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the rate of turning of the camera at $O$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Differentiating the result of part (i) with respect to $t$, $\\ \\sec^2\\phi\\,\\dfrac{d\\phi}{dt} = -\\dfrac{g}{2V\\cos\\theta}$, so $\\phi$ decreases at the rate $\\dfrac{g\\cos^2\\phi}{2V\\cos\\theta}$. Similarly, from $\\tan\\psi = \\dfrac{gt}{2V\\cos\\theta}$, $\\psi$ increases at the rate $\\dfrac{g\\cos^2\\psi}{2V\\cos\\theta}$."
+          },
+          {
+           "k": "p",
+           "t": "The rates are equal when $\\cos^2\\phi = \\cos^2\\psi$. As $\\phi$ and $\\psi$ are acute (or zero), this happens only when $\\phi = \\psi$, so $\\tan\\phi = \\tan\\psi = \\frac12\\tan\\theta$ by part (ii). Then $\\dfrac{gt}{2V\\cos\\theta} = \\dfrac{\\sin\\theta}{2\\cos\\theta}$, so $t = \\dfrac{V\\sin\\theta}{g} = \\dfrac{T}{2}$, which is when the ball is at its highest point."
+          }
+         ],
+         "classification": {
+          "content": "Projectile motion; trigonometric identities; rates of change; quadratic inequalities",
+          "outcomes": [
+           "ME1-12-02",
+           "ME1-11-03",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "g*cos(phi)^2/(2*V*cos(theta))",
+          "display": "\\dfrac{g\\cos^2\\phi}{2V\\cos\\theta}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p01.py: numeric d(phi)/dt vs -g cos^2(phi)/(2V cos theta) at 40 random points; this is the magnitude (phi decreases); engine rejects a leading minus sign"
+        },
+        {
+         "id": "q14a-iv",
+         "label": "(iv)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Suppose that $\\tan\\theta > 2$. Find, in simplest form, the length of time for which $\\angle OPA$ is acute."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct length of time in simplest form"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Obtains a correct quadratic inequality in $t$ or in $\\tan\\psi$, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Shows that $\\angle OPA$ is acute when $\\tan\\phi\\tan\\psi > 1$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$\\angle OPA = \\pi - \\phi - \\psi$, which is acute when $\\phi > \\dfrac{\\pi}{2} - \\psi$. For $0 < t < T$ both angles are acute, so this is equivalent to $\\tan\\phi > \\cot\\psi$, that is, to $\\tan\\phi\\tan\\psi > 1$."
+          },
+          {
+           "k": "p",
+           "t": "Let $u = \\tan\\psi = \\dfrac{gt}{2V\\cos\\theta}$. By part (ii) the condition is $u(\\tan\\theta - u) > 1$, that is, $u^2 - u\\tan\\theta + 1 < 0$. As $\\tan\\theta > 2$, this quadratic has two real zeros, which differ by $\\sqrt{\\tan^2\\theta - 4}$, and the inequality holds between them. (Both zeros lie between 0 and $\\tan\\theta$, so these times are during the flight.) Since $t = \\dfrac{2V\\cos\\theta}{g}\\,u$, the length of time is"
+          },
+          {
+           "k": "math",
+           "t": "\\frac{2V\\cos\\theta}{g}\\sqrt{\\tan^2\\theta - 4} = \\frac{2V}{g}\\sqrt{\\sin^2\\theta - 4\\cos^2\\theta} = \\frac{2V}{g}\\sqrt{1 - 5\\cos^2\\theta}."
+          }
+         ],
+         "classification": {
+          "content": "Projectile motion; trigonometric identities; rates of change; quadratic inequalities",
+          "outcomes": [
+           "ME1-12-02",
+           "ME1-11-03",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "2*V/g*sqrt(1-5*cos(theta)^2)",
+          "display": "\\dfrac{2V}{g}\\sqrt{1-5\\cos^2\\theta}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p01.py: dot-product sign scan and bisection of the interval where angle OPA is acute, 25 random (g,V,theta) with tan(theta)>2; max err 1.8e-15"
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figcam"
+       ]
+      },
+      {
+       "id": "q14b",
+       "label": "(b)",
+       "marks": 7,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A committee has $2m - 1$ members, where $m \\ge 2$. Each member, independently of the others, reaches the correct decision with probability $p$. The committee decides by majority vote. Let $M(p)$ be the probability that the decision of the committee is correct."
+        }
+       ],
+       "parts": [
+        {
+         "id": "q14b-i",
+         "label": "(i)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that $M'(p) = (2m - 1)\\dbinom{2m - 2}{m - 1}\\,p^{m-1}(1 - p)^{m-1}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Differentiates the sum and rewrites the coefficients so that terms cancel, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes $M(p)$ as a sum of binomial probabilities, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Let $n = 2m - 1$ and $q = 1 - p$. The decision is correct when at least $m$ members are correct, so"
+          },
+          {
+           "k": "math",
+           "t": "M(p) = \\sum_{j=m}^{n}\\binom{n}{j}p^jq^{\\,n-j}, \\qquad M'(p) = \\sum_{j=m}^{n}\\binom{n}{j}\\left[jp^{j-1}q^{\\,n-j} - (n - j)p^jq^{\\,n-j-1}\\right]."
+          },
+          {
+           "k": "p",
+           "t": "Now $j\\dbinom{n}{j} = n\\dbinom{n - 1}{j - 1}$ and $(n - j)\\dbinom{n}{j} = n\\dbinom{n - 1}{j}$ (the latter is 0 when $j = n$). So"
+          },
+          {
+           "k": "math",
+           "t": "M'(p) = n\\sum_{j=m}^{n}\\left[a_j - a_{j+1}\\right], \\qquad\\text{where } a_j = \\binom{n - 1}{j - 1}p^{j-1}q^{\\,n-j} \\text{ and } a_{n+1} = 0."
+          },
+          {
+           "k": "p",
+           "t": "The sum telescopes to $a_m$, so $M'(p) = n\\dbinom{n - 1}{m - 1}p^{m-1}q^{\\,n-m} = (2m - 1)\\dbinom{2m - 2}{m - 1}p^{m-1}(1 - p)^{m-1}$."
+          }
+         ],
+         "classification": {
+          "content": "Binomial distribution; binomial coefficients; calculus and inequalities",
+          "outcomes": [
+           "ME1-12-06",
+           "ME1-11-04",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14b-ii",
+         "label": "(ii)",
+         "marks": 1,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Deduce the value of $\\displaystyle\\int_0^1 x^{m-1}(1 - x)^{m-1}\\,dx$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct value with justification"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$M(0) = 0$ and $M(1) = 1$, so $\\displaystyle\\int_0^1 M'(p)\\,dp = 1$. By part (i), $\\ \\displaystyle\\int_0^1 x^{m-1}(1 - x)^{m-1}\\,dx = \\dfrac{1}{(2m - 1)\\binom{2m - 2}{m - 1}}$."
+          }
+         ],
+         "classification": {
+          "content": "Binomial distribution; binomial coefficients; calculus and inequalities",
+          "outcomes": [
+           "ME1-12-06",
+           "ME1-11-04",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "1/((2*m-1)*nCr(2*m-2,m-1))",
+          "display": "\\dfrac{1}{(2m-1)\\binom{2m-2}{m-1}}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p01.py: mpmath quadrature of x^(m-1)(1-x)^(m-1) on [0,1] for m=2..11"
+        },
+        {
+         "id": "q14b-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that if $\\dfrac12 < p < 1$ then the committee is more likely to be correct than a single member is."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct proof"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Shows that $M(p) - p$ is zero at $p = \\frac12$ and $p = 1$ and that its derivative is decreasing, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Shows that $M\\left(\\frac12\\right) = \\frac12$, or considers the derivative of $M(p) - p$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Let $g(p) = M(p) - p$. When $p = \\dfrac12$, a majority for the correct decision and a majority for the wrong decision are equally likely, and one of them occurs because the number of members is odd. So $M\\left(\\dfrac12\\right) = \\dfrac12$ and $g\\left(\\dfrac12\\right) = 0$. Also $g(1) = 0$."
+          },
+          {
+           "k": "p",
+           "t": "By part (i), $g'(p) = c\\,\\bigl[p(1 - p)\\bigr]^{m-1} - 1$, where $c > 0$. For $\\dfrac12 \\le p \\le 1$ the quantity $p(1 - p)$ decreases as $p$ increases, and $m - 1 \\ge 1$, so $g'(p)$ is decreasing, and $g'(1) = -1 < 0$."
+          },
+          {
+           "k": "p",
+           "t": "If $g'\\left(\\dfrac12\\right) \\le 0$ then $g'(p) < 0$ for $\\dfrac12 < p \\le 1$ and $g(1) < g\\left(\\dfrac12\\right)$, which is false. So $g'\\left(\\dfrac12\\right) > 0$, and there is one value $p_0$ such that $g'(p) > 0$ for $\\dfrac12 \\le p < p_0$ and $g'(p) < 0$ for $p_0 < p \\le 1$. Hence $g$ increases from 0 and then decreases to 0, so $g(p) > 0$ for $\\dfrac12 < p < 1$. That is, $M(p) > p$."
+          }
+         ],
+         "classification": {
+          "content": "Binomial distribution; binomial coefficients; calculus and inequalities",
+          "outcomes": [
+           "ME1-12-06",
+           "ME1-11-04",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": []
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "figures": [
+  "figdodec",
+  "figQ3OptA",
+  "figQ3OptB",
+  "figQ3OptC",
+  "figQ3OptD",
+  "figcirc",
+  "figfield",
+  "figeight",
+  "figbeltO",
+  "figbeltX",
+  "figfish",
+  "figvessel",
+  "figcam"
+ ]
+}

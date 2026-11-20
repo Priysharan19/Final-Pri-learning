@@ -31,6 +31,7 @@ export const EDITION_SUITES = [
   'client/test/brand-usage-check.mjs',
   'client/test/brand-assets-check.mjs',
   'client/test/edition-client-check.mjs',
+  'client/test/offering-check.mjs',
   'client/test/aurora-skin-check.mjs',
   'client/test/working-indicator-check.mjs',
   'client/test/i18n-coverage-check.mjs',
@@ -42,6 +43,7 @@ export const EDITION_SUITES = [
   'client/test/account-action-guardian-erase-check.mjs',
   // NSW curriculum, practice banks and exams; the library and the Exam Desk.
   'client/test/nsw-curriculum-check.mjs',
+  'client/test/syllabus-board-check.mjs',
   'client/test/nsw-bank-quality-check.mjs',
   'client/test/nsw-offer-check.mjs',
   'client/test/nsw-exams-check.mjs',
@@ -50,6 +52,7 @@ export const EDITION_SUITES = [
   'client/test/desk-import-check.mjs',
   'client/test/export-file-check.mjs',
   'client/test/edition-terms-check.mjs',
+  'client/test/au-no-india-surface-check.mjs',
   'client/test/diagram-kit-i18n-check.mjs',
   'client/test/value-packaging-check.mjs',
   'client/test/progress-export-check.mjs',
@@ -61,6 +64,8 @@ export const EDITION_SUITES = [
   'server/test/billing-edition-check.mjs',
   'server/test/edition-ai-budgets-check.mjs',
   'server/test/nsw-practice-check.mjs',
+  'server/test/nsw-offering-check.mjs',
+  'server/test/hint-charge-edition-check.mjs',
   'server/test/in-outcome-identity-check.mjs',
   'server/test/nsw-exam-check.mjs',
   'server/test/desk-check.mjs',
@@ -74,6 +79,7 @@ export const EDITION_SUITES = [
 export const EXEMPT = {
   'client/test/a11y-gate.mjs': 'a browser walk: the CI browser shard "edition-prithagoras" runs it on a Prithagoras build and server',
   'client/test/a11y-check.mjs': 'the walk a11y-gate.mjs runs (exempt above for the same reason)',
+  'client/test/legal-owner-review-check.mjs': 'reads the Indian and the Australian notices side by side from the repository and compares them with both editions\' table entries; it does not depend on PRI_EDITION (it runs once in test:legal)',
   'client/test/brand-build-check.mjs': 'builds both editions itself (--both) in the "Client build and offline-first boundary" job'
 };
 

@@ -23,7 +23,10 @@ import PageLink from '../components/PageLink.jsx';
 import { useApp } from '../App.jsx';
 import { api } from '../api.js';
 import { useT } from '../i18n/index.js';
+import { defaultCourse } from '../platform/edition.js';
+import { localeOf, timezoneOf } from '../lib/locale.js';
 import { cloudRequest } from '../platform/cloudTransport.js';
+import { sellsPremium, useSaleAvailable } from '../paywall/useSaleAvailable.js';
 import { blueprintLabel } from '../lib/blueprintKeys.js';
 import { chancesValues, chapterMatrix, headline, paperQuery, trendGeometry } from './insightsView.js';
 import './insights.css';
@@ -71,10 +74,10 @@ function Coverage({ coverage, covered, total, t }) {
   );
 }
 
-function Trend({ trend, t, locale }) {
+function Trend({ trend, t, locale, timeZone }) {
   const g = useMemo(() => trendGeometry(trend), [trend]);
   if (!trend.length) return <p className="in-note">{t('insights.trendNone')}</p>;
-  const day = at => new Date(at).toLocaleDateString(locale, { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' });
+  const day = at => new Date(at).toLocaleDateString(locale, { day: 'numeric', month: 'short', timeZone });
   return (
     <figure className="ins-trend" data-trend-weeks={trend.length}>
       <svg viewBox={`0 0 ${g.width} ${g.height}`} role="img" aria-labelledby="ins-trend-cap" preserveAspectRatio="none">
@@ -107,7 +110,7 @@ function Trend({ trend, t, locale }) {
   );
 }
 
-function Forecast({ data, t, locale }) {
+function Forecast({ data, t, locale, timeZone, sells }) {
   const paper = blueprintLabel(t, data.paper?.id, data.paper?.label);
   if (!data.premium) {
     return (
@@ -115,9 +118,11 @@ function Forecast({ data, t, locale }) {
         <h2 className="sc-label" id="ins-fc">{t('insights.forecastTitle')}</h2>
         <p className="sub">{paper}</p>
         <Coverage coverage={data.coverage} covered={data.coveredMarks} total={data.paper?.totalMarks} t={t} />
-        <p className="ins-premium" data-premium-gate="forecast">
-          {t('insights.forecastPremium')} <PageLink to="/premium" state={{ from: 'insights' }}>{t('insights.seePremium')}</PageLink>
-        </p>
+        {sells && (
+          <p className="ins-premium" data-premium-gate="forecast">
+            {t('insights.forecastPremium')} <PageLink to="/premium" state={{ from: 'insights' }}>{t('insights.seePremium')}</PageLink>
+          </p>
+        )}
       </section>
     );
   }
@@ -135,7 +140,7 @@ function Forecast({ data, t, locale }) {
       <p className="ins-sentence" data-forecast-sentence>{t(h.key, h.values)}</p>
       <Coverage coverage={f.coverage} covered={f.coveredMarks} total={f.totalMarks} t={t} />
       <h3 className="sc-label">{t('insights.trendTitle')}</h3>
-      <Trend trend={data.trend || []} t={t} locale={locale} />
+      <Trend trend={data.trend || []} t={t} locale={locale} timeZone={timeZone} />
       {f.priorities?.length > 0 && (
         <>
           <h3 className="sc-label">{t('insights.movesMost')}</h3>
@@ -154,9 +159,9 @@ function Forecast({ data, t, locale }) {
   );
 }
 
-function Habit({ row, names, t, locale }) {
+function Habit({ row, names, t, locale, timeZone }) {
   const c = chancesValues(row);
-  const when = at => new Date(at).toLocaleDateString(locale, { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' });
+  const when = at => new Date(at).toLocaleDateString(locale, { day: 'numeric', month: 'short', timeZone });
   return (
     <li className="ins-habit" data-habit={row.id}>
       <div className="ins-habit-head">
@@ -206,17 +211,19 @@ function Matrix({ habits, names, t }) {
   );
 }
 
-function Dna({ data, names, t, locale }) {
+function Dna({ data, names, t, locale, timeZone, sells }) {
   if (!data.premium) {
     return (
       <section className="ins-sheet" aria-labelledby="ins-dna" data-insights-dna="free">
         <h2 className="sc-label" id="ins-dna">{t('insights.dnaTitle')}</h2>
-        <p>{data.habitCount
+        <p data-insights-empty={data.answered ? undefined : 'new'}>{data.habitCount
           ? t('insights.dnaFreeCount', { count: data.habitCount, n: data.habitCount })
-          : t('insights.dnaNone', { count: data.answered, n: data.answered })}</p>
-        <p className="ins-premium" data-premium-gate="dna">
-          {t('insights.dnaPremium')} <PageLink to="/premium" state={{ from: 'insights' }}>{t('insights.seePremium')}</PageLink>
-        </p>
+          : data.answered ? t('insights.dnaNone', { count: data.answered, n: data.answered }) : t('insights.dnaEmpty')}</p>
+        {sells && (
+          <p className="ins-premium" data-premium-gate="dna">
+            {t('insights.dnaPremium')} <PageLink to="/premium" state={{ from: 'insights' }}>{t('insights.seePremium')}</PageLink>
+          </p>
+        )}
       </section>
     );
   }
@@ -225,8 +232,8 @@ function Dna({ data, names, t, locale }) {
       <h2 className="sc-label" id="ins-dna">{t('insights.dnaTitle')}</h2>
       <p className="in-note">{t('insights.dnaLead', { count: data.answered, n: data.answered })}</p>
       {data.habits.length
-        ? <ul className="ins-habits">{data.habits.map(h => <Habit key={h.id} row={h} names={names} t={t} locale={locale} />)}</ul>
-        : <p>{t('insights.dnaNone', { count: data.answered, n: data.answered })}</p>}
+        ? <ul className="ins-habits">{data.habits.map(h => <Habit key={h.id} row={h} names={names} t={t} locale={locale} timeZone={timeZone} />)}</ul>
+        : <p data-insights-empty={data.answered ? undefined : 'new'}>{data.answered ? t('insights.dnaNone', { count: data.answered, n: data.answered }) : t('insights.dnaEmpty')}</p>}
       <Matrix habits={data.habits} names={names} t={t} />
       {data.oneOffs?.length > 0 && <p className="in-note">{t('insights.oneOffs', { count: data.oneOffs.length, n: data.oneOffs.length })}</p>}
       <p className="in-note">{t('insights.dnaHonesty')}</p>
@@ -234,16 +241,18 @@ function Dna({ data, names, t, locale }) {
   );
 }
 
-function RootGap({ data, names, t }) {
+function RootGap({ data, names, t, sells }) {
   const name = id => names[id] || id;
   if (!data.premium) {
     return (
       <section className="ins-sheet" aria-labelledby="ins-gap" data-insights-gap="free">
         <h2 className="sc-label" id="ins-gap">{t('insights.gapTitle')}</h2>
         <p>{data.gapCount ? t('insights.gapFreeCount', { count: data.gapCount, n: data.gapCount }) : t('insights.gapNone')}</p>
-        <p className="ins-premium" data-premium-gate="gap">
-          {t('insights.gapPremium')} <PageLink to="/premium" state={{ from: 'insights' }}>{t('insights.seePremium')}</PageLink>
-        </p>
+        {sells && (
+          <p className="ins-premium" data-premium-gate="gap">
+            {t('insights.gapPremium')} <PageLink to="/premium" state={{ from: 'insights' }}>{t('insights.seePremium')}</PageLink>
+          </p>
+        )}
       </section>
     );
   }
@@ -279,30 +288,38 @@ function RootGap({ data, names, t }) {
 export default function Insights() {
   const { user } = useApp();
   const t = useT();
-  const locale = typeof document !== 'undefined' && document.documentElement.lang === 'hi' ? 'hi-IN' : 'en-IN';
+  const regional = user?.course || defaultCourse();
+  const locale = typeof document !== 'undefined' && document.documentElement.lang === 'hi' ? 'hi-IN' : localeOf(regional);
+  const timeZone = timezoneOf(user?.timezone ? user : regional);
   const q = paperQuery(user);
   const names = useChapterNames();
+  // An upsell is drawn only where Premium is really on sale: the edition sells it AND its server says it is selling
+  // (the same answer the Premium screen reads), so an edition with nothing on sale shows no plan or price.
+  const sells = sellsPremium(useSaleAvailable());
   const [forecast, setForecast] = useState({ status: q ? 'loading' : 'none' });
   const [dna, setDna] = useState({ status: 'loading' });
-  const [gap, setGap] = useState({ status: 'loading' });
+  // The root-gap reading follows the India prerequisite graph; a Prithagoras server refuses it (422
+  // PRACTICE_BANK_OUTSIDE_CURRICULUM), so an NSW learner's page never asks for it.
+  const hasRootGap = regional === 'in';
+  const [gap, setGap] = useState({ status: hasRootGap ? 'loading' : 'none' });
 
   useEffect(() => {
     let live = true;
     if (q) loadForecast(q).then(data => live && setForecast({ status: 'ready', data }), err => live && setForecast({ status: 'error', code: err?.code }));
     loadHabits().then(data => live && setDna({ status: 'ready', data }), err => live && setDna({ status: 'error', code: err?.code }));
-    loadRootGap().then(data => live && setGap({ status: 'ready', data }), err => live && setGap({ status: 'error', code: err?.code }));
+    if (hasRootGap) loadRootGap().then(data => live && setGap({ status: 'ready', data }), err => live && setGap({ status: 'error', code: err?.code }));
     return () => { live = false; };
-  }, [q]);
+  }, [q, hasRootGap]);
 
   return (
     <div className="ins-page">
       <h1>{t('insights.title')}</h1>
       <p className="in-note">{t('insights.lead')}</p>
-      {forecast.status !== 'none' && <Load state={forecast} t={t}>{data => <Forecast data={data} t={t} locale={locale} />}</Load>}
-      <Load state={dna} t={t}>{data => <Dna data={data} names={names} t={t} locale={locale} />}</Load>
-      {gap.status === 'error' && gap.code === 'PRACTICE_BANK_OUTSIDE_CURRICULUM'
+      {forecast.status !== 'none' && <Load state={forecast} t={t}>{data => <Forecast data={data} t={t} locale={locale} timeZone={timeZone} sells={sells} />}</Load>}
+      <Load state={dna} t={t}>{data => <Dna data={data} names={names} t={t} locale={locale} timeZone={timeZone} sells={sells} />}</Load>
+      {gap.status === 'none' || (gap.status === 'error' && gap.code === 'PRACTICE_BANK_OUTSIDE_CURRICULUM')
         ? null
-        : <Load state={gap} t={t}>{data => <RootGap data={data} names={names} t={t} />}</Load>}
+        : <Load state={gap} t={t}>{data => <RootGap data={data} names={names} t={t} sells={sells} />}</Load>}
     </div>
   );
 }

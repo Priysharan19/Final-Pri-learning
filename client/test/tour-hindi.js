@@ -55,6 +55,8 @@ export const flow = {
   online: true,
 
   async run({ page, base, check, goto, createProfile, settle, online }) {
+    // Press-to-read flow: automatic reading (owner decision, 18 Nov 2026) is switched off on this device, as a student can in Settings; auto mode is pinned in tour-auto-read.js.
+    await page.context().addInitScript(() => { try { localStorage.setItem('pri.autoRead', 'off'); } catch { /* none */ } });
     const audit = async (screen) => {
       await settle();
       await check(`${screen}: the document is declared Hindi`,
@@ -167,30 +169,26 @@ export const flow = {
       await page.mouse.down();
       for (let i = 1; i <= 12; i++) await page.mouse.move(box.x + 60 + i * 0.4, box.y + 30 + i * 6);
       await page.mouse.up();
-      // Read on request (#440): the stroke alone sends nothing to be read. The
-      // student presses Read my answer — labelled in Hindi — and only then is
-      // the page sent to the server's reader, exactly once.
-      // A read is a page sent to the reader; /v1/handwriting/status only asks
-      // whether the reader is on.
+      // Owner decision, 19 Nov 2026: the reading is not shown; one press marks the working on the student's own page.
+      // There is no Read button: the stroke alone sends nothing the student is asked about, and one press of the
+      // Hindi "Mark my working" marks the page, which is read silently, exactly once.
+      // A read is a page sent to the reader; /v1/handwriting/status only asks whether the reader is on.
       const isRead = c => /^\/v1\/handwriting\/(?!status$)/.test(c.path) || /\/recogni[sz]e$/.test(c.path);
       await settle();
       await online.settled();
-      await check('Handwriting: nothing is read until the student presses Read my answer',
-        !online.calls.some(isRead), JSON.stringify(online.calls.filter(isRead).map(c => c.path)));
-      const readButton = page.locator('[data-ink-read]').first();
-      await readButton.waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
-      await check('Handwriting: Read my answer is said in Hindi',
-        (await readButton.innerText().catch(() => '')).includes(hi['ink.readMyAnswer']), await readButton.innerText().catch(() => ''));
-      await readButton.click();
-      await page.waitForSelector('.ink-status, .ink-line', { timeout: 20000 }).catch(() => {});
+      await check('Handwriting: there is no Read button; the typed reading is not shown',
+        await page.locator('[data-ink-read]').count() === 0 && await page.locator('.ink-line').count() === 0);
+      const markButton = page.getByRole('button', { name: hi['verdict.markMyWorking'] }).first();
+      await markButton.waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
+      await check('Handwriting: Mark my working is said in Hindi',
+        (await markButton.innerText().catch(() => '')).includes(hi['verdict.markMyWorking']), await markButton.innerText().catch(() => ''));
+      await markButton.click();
+      await page.waitForSelector('[data-marked-page], [data-final-answer-sentence], .ink-status, .verdict-bad', { timeout: 20000 }).catch(() => {});
       await settle();
-      const inkStatus = (await page.locator('.ink-status').first().innerText().catch(() => '')) || '';
       await online.settled();
       await check('Handwriting: the page was read by the server, not on the device',
-        online.calls.filter(isRead).length === 1 && await page.locator('.ink-answer [role="note"]').count() === 0,
+        online.calls.filter(isRead).length >= 1 && await page.locator('.ink-answer [role="note"]').count() === 0,
         JSON.stringify(online.calls.slice(-4).map(c => `${c.status} ${c.path}`)));
-      await check('Handwriting: what the reader did is said in Hindi',
-        DEVANAGARI.test(inkStatus) && Object.keys(hi).some(k => (k.startsWith('ink.') || k === 'verdict.readOnServer') && hi[k] === inkStatus), JSON.stringify(inkStatus));
       await audit('Practice handwriting');
       await page.locator(`.ink-tool[title="${hi['ink.clear']}"]`).click();
       await settle();
