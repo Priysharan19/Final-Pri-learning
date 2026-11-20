@@ -138,3 +138,25 @@ test('environment approval bound to actual run and separate reviewer',async()=>{
   const f=githubFixture(); const o=await observeEnvironmentApproval({candidate:b,digest:hash,runId:50,ownerId:1,reviewerId:2,read:f.read});assert.equal(o.environmentReviewerId,2);
   for(const mutate of [x=>x.environmentRun.run_attempt=2,x=>x.environmentRun.display_title='wrong',x=>x.history[0].user.id=1,x=>x.history[0].state='rejected',x=>x.history.length=0]) { const y=githubFixture();mutate(y);await assert.rejects(observeEnvironmentApproval({candidate:b,digest:hash,runId:50,ownerId:1,reviewerId:2,read:y.read})); }
 });
+
+import { observeIndiaCoreHost, freeLaunchProblems } from '../scripts/release-promotion-host.mjs';
+function hostFixture() {
+  const billing = { display:{currency:'INR',monthly:null,annual:null,trialDays:null}, products:Object.fromEntries(['appleMonthly','appleAnnual','googleMonthly','googleAnnual','webMonthly','webAnnual'].map(k=>[k,null])), webCheckout:{configured:false} };
+  const paths = { '/v1/health':{releaseIdentity:{releaseSha:b},edition:'priyabhata'}, '/v1/ready':{releaseSha:b,ready:true}, '/release.json':{releaseSha:b}, '/features.json':{edition:'priyabhata'}, '/v1/billing/config':billing };
+  const metadata = {environment:'staging',service:'pri-learning-staging',sha:b,state:'SUCCESS',id:'fixture-host-deployment',engine:'postgres'};
+  const fetchImpl = async url=>({status:200,json:async()=>structuredClone(paths[new URL(url).pathname])});
+  const verifyImpl = async opts=>{assert.equal(opts.edition,'priyabhata');assert.equal(opts.requireHandwriting,true);assert.equal(opts.authEmailProven,true);for(const path of Object.keys(paths)) await opts.fetchImpl(opts.origin+path); return {ok:true};};
+  return {billing,paths,metadata,fetchImpl,verifyImpl};
+}
+test('existing verifier composed with exact India free-launch host reads',async()=>{const f=hostFixture(); const o=await observeIndiaCoreHost({candidate:b,role:'staging',...f});assert.equal(o.deploymentId,'fixture-host-deployment');assert.equal(o.healthSha,b);assert.deepEqual(freeLaunchProblems(f.billing),[]);});
+for(const [name,mutate] of Object.entries({
+  'wrong deployment source':f=>f.metadata.sha=a,
+  'wrong edition':f=>f.paths['/features.json'].edition='prithagoras',
+  'wrong readiness SHA':f=>f.paths['/v1/ready'].releaseSha=a,
+  'paid product advertised':f=>f.billing.products.appleMonthly='fixture-priced',
+  'missing paid product evidence':f=>delete f.billing.products.googleAnnual,
+  'price advertised':f=>f.billing.display.monthly=199,
+  'web checkout enabled':f=>f.billing.webCheckout.configured=true
+})) test('host denies '+name,async()=>{const f=hostFixture();mutate(f);await assert.rejects(observeIndiaCoreHost({candidate:b,role:'staging',...f}));});
+test('host denies existing verifier failure',async()=>{const f=hostFixture();await assert.rejects(observeIndiaCoreHost({candidate:b,role:'staging',...f,verifyImpl:async()=>({ok:false})}));});
+test('GitHub denies unresolved changes from another reviewer',async()=>{const f=githubFixture();f.reviews.push({id:31,state:'CHANGES_REQUESTED',submitted_at:earlier,commit_id:head,user:{id:3,type:'User',login:'other-reviewer'}});await assert.rejects(observeGitHubRelease({candidate:b,expectedOld:a,read:f.read}),/changes requested/);});

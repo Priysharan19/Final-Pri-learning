@@ -65,9 +65,11 @@ export async function preparePromotion({ manifest, approvals, trust, readObserva
   const dossier = await buildDossier({ ...dossierOptions, sha: manifest.candidate });
   const github = await observeGitHubRelease({ candidate: manifest.candidate, expectedOld: manifest.expectedOld, read });
   const observed = await readObservations(manifest.candidate, dossier, github.provenance);
+  const { observeIndiaCoreHost } = await import('./release-promotion-host.mjs');
+  const staging = await observeIndiaCoreHost({ candidate: manifest.candidate, role: 'staging', metadata: observed.stagingDeployment });
   const environment = await observeEnvironmentApproval({ candidate: manifest.candidate, digest: intentDigest(manifest), runId, ownerId: trust.owner.id, reviewerId: trust.reviewer.id, read });
   const evidenceDigest = releaseEvidenceDigest(github.provenance, observed.externalEvidenceDigest);
-  return validatePromotion({ manifest, approvals, trust, observed: { ...observed, ...github, ...environment, dossier, evidenceDigest } });
+  return validatePromotion({ manifest, approvals, trust, observed: { ...observed, ...github, ...environment, staging, dossier, evidenceDigest } });
 }
 
 // Deliberately hard-disabled, even if env vars or record fields request activation.

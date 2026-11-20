@@ -50,6 +50,7 @@ export async function observeGitHubRelease({ candidate, expectedOld, read = read
   latest(own,'.github/workflows/codeql.yml',p.head.sha,p.head.ref,['pull_request']);
   const latestReviews = new Map();
   for (const review of reviews.filter(v => ['APPROVED','CHANGES_REQUESTED','DISMISSED'].includes(v.state)).sort((a,b) => Date.parse(a.submitted_at)-Date.parse(b.submitted_at) || a.id-b.id)) latestReviews.set(review.user?.id,review);
+  insist(![...latestReviews.values()].some(v => v.state === 'CHANGES_REQUESTED'), 'unresolved changes requested');
   let independent = null;
   for (const v of latestReviews.values()) {
     if (v.state !== 'APPROVED' || v.commit_id !== p.head.sha || v.user?.type !== 'User' || !Number.isSafeInteger(v.user.id) || v.user.id === p.user.id || !/^[A-Za-z0-9-]+$/.test(v.user.login || '') || !(Date.parse(v.submitted_at) <= Date.parse(p.merged_at))) continue;
