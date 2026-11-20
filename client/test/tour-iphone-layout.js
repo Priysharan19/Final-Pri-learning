@@ -305,16 +305,18 @@ export const flow = {
     await goto('/settings');
     await settle();
     await setInsets(page, INSETS);
+    const target = await page.locator('.set-menu-item').first().getAttribute('data-settings-target');
     await page.locator('.set-menu-item').first().click();
     await page.waitForTimeout(900);
-    const plan = await page.evaluate(() => {
-      const card = document.querySelector('.settings-grid .grid > .card');
+    const plan = await page.evaluate((target) => {
+      // Check the exact section that the visible menu opened. India has no Plan menu during free launch.
+      const card = document.querySelector(`[data-settings-section="${target}"]`);
       const top = (document.querySelector('.topbar') || document.querySelector('[data-instrument-bar]')).getBoundingClientRect().bottom;
       const nav = document.querySelector('.mobilenav').getBoundingClientRect().top;
       const rows = [...card.querySelectorAll('.set-row')].map(r => r.getBoundingClientRect());
       return { cardTop: Math.round(card.getBoundingClientRect().top), topbar: Math.round(top), nav: Math.round(nav), lastRow: Math.round(rows.at(-1)?.bottom) };
-    });
-    await check('Settings: the Plan section opens below the top bar', plan.cardTop >= plan.topbar, JSON.stringify(plan));
+    }, target);
+    await check('Settings: the selected section opens below the top bar', plan.cardTop >= plan.topbar, JSON.stringify({ target, ...plan }));
     await toEnd(page);
     await page.waitForTimeout(300);
     const foot = await page.evaluate(() => {

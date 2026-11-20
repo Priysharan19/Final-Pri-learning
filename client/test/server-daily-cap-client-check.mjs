@@ -75,7 +75,7 @@ same('the refusal is the gate error the paywall explains: capability, count and 
   ['unlimited-practice', SERVER_CAP, SERVER_CAP, undefined]);
 same('it says when the day turns over, in the server\'s calendar', [capped?.resetsAt, capped?.timeZone], [practiceDay(Date.now()).end, 'Asia/Kolkata']);
 same('and that the server, not the device, refused it', [capped?.reason, capped?.server, capped?.refreshRequired], ['server-refused', true, false]);
-ok('the refusal is plain copy a student can act on', /free practice questions/.test(capped?.message || '') && /midnight/.test(capped?.message || '') && /Premium/.test(capped?.message || ''), capped?.message);
+ok('the refusal is plain copy a student can act on', /3 practice questions/.test(capped?.message || '') && /midnight/.test(capped?.message || '') && !/Premium/.test(capped?.message || ''), capped?.message);
 same('the device asked the server once and did not fall back to a prepared question', [authority.traffic.issue - issuesBefore, authority.traffic.prepare - preparesBefore], [1, 0]);
 same('and stored no question for the refusal', questionRows(asha.id).length, rowsBefore);
 same('the device\'s own count did not move on a refusal', (await GET('/me')).user.usage.practice.used, SERVER_CAP);
@@ -91,7 +91,7 @@ const bindRefused = await refused('submitting it under the capped account is ref
 same('the refusal proves nothing was marked', [bindRefused?.beforeMarking, bindRefused?.code, authority.traffic.grade - gradesBefore], [true, 'FREE_CAP_REACHED', 0]);
 const row = questionRows(asha.id).find(r => r.id === prepared.question.id);
 same('the row is still the prepared question, unbound, unanswered and kept', [!!row, !!row?.prepared, !!row?.serverQuestionId, row?.answered || 0, row?.tries || 0], [true, true, false, 0, 0]);
-same('the card names it as the free cap, with Premium as the way through', checkRefusal(bindRefused), CHECK_REFUSAL.FREE_CAP);
+same('the card names the free cap without implying a purchase is required', checkRefusal(bindRefused), CHECK_REFUSAL.FREE_CAP);
 same('nothing was marked on the server for this account', (await authority.db.get("SELECT COUNT(*) AS n FROM idempotency_keys WHERE account_id=? AND scope='practice-grade'", [authority.accountOf(asha.id).accountId])).n, 0);
 
 // ── C · a second device on the same account ──────────────────────────────────
