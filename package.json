@@ -306,7 +306,7 @@
     "verify:deployment": "node tools/verify-deployment.mjs",
     "test:deploy": "node tools/deployment-contract.test.mjs && node tools/verify-deployment.test.mjs && node tools/verify-region-isolation.test.mjs",
     "test:apple:not-on-sale": "node client/test/apple-billing-not-on-sale-check.mjs",
-    "test:release:prep": "node tools/release-prep.test.mjs && node scripts/device-matrix-record.mjs validate && node tools/governance-text.test.mjs && node client/test/q4-release-negative-controls.mjs && node client/test/release-source-policy-consistency-check.mjs && node tools/release-alert-drill.test.mjs",
+    "test:release:prep": "node tools/release-prep.test.mjs && node scripts/device-matrix-record.mjs validate && node tools/governance-text.test.mjs && node client/test/q4-release-negative-controls.mjs && node client/test/release-source-policy-consistency-check.mjs && node tools/release-alert-drill.test.mjs && node --test tools/release-promotion.test.mjs",
     "engine:benchmark": "node scripts/engine-benchmark.mjs",
     "test:marker:correct": "node client/test/correct-answer-sweep-check.mjs",
     "test:marker:step14": "node server/test/step14-decimal-authenticated-check.mjs && node server/test/step14-false-credit-persistence-check.mjs && node server/test/step14-point-authenticated-check.mjs && node server/test/step14-set-authenticated-check.mjs && node server/test/step14-units-authenticated-check.mjs",
