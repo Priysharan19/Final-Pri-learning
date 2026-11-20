@@ -253,13 +253,16 @@ for (const script of ['scripts/iphone-journey.mjs', 'scripts/native-bridge-selfc
 {
   const wf = src('.github/workflows/native-ink.yml');
   const at = s => { const i = wf.indexOf(s); return i < 0 ? Infinity : i; };
-  ok(/ci-provision-simulators\.mjs --boot ipad/.test(wf), 'the lane provisions both families and boots only the iPad the first simulator steps use');
+  ok(/family: \[ipad, iphone\]/.test(wf) && /fail-fast: false\s+max-parallel: 1/.test(wf) &&
+    /if: matrix.family == 'ipad'\n\s+run: node scripts\/ci-provision-simulators\.mjs --boot ipad/.test(wf) &&
+    /if: matrix.family == 'iphone'\n\s+run: node scripts\/ci-provision-simulators\.mjs --boot iphone/.test(wf),
+    'the lane runs both families independently and boots only each selected family');
   ok(at('xcodebuild -scheme PriLearning') < at('node scripts/ink-native-check.mjs'), 'the one Swift build runs before the native self-check');
   ok(at('xcodebuild -scheme PriLearning') < at('node scripts/native-bridge-selfcheck.mjs --family ipad'), 'and before the first bridge self-check');
   ok(/scripts\/ink-native-check\.mjs --app "\$PRI_SIM_APP"/.test(wf), 'the native self-check installs the already built app instead of building a second time');
   ok(/native-bridge-selfcheck\.mjs --family ipad --app "\$PRI_SIM_APP"/.test(wf) && /native-bridge-selfcheck\.mjs --family iphone --app "\$PRI_SIM_APP"/.test(wf),
     'both bridge self-checks reuse the built app');
-  ok((wf.match(/xcodebuild -scheme PriLearning/g) || []).length === 1, 'the workflow contains exactly one xcodebuild of the package');
+  ok((wf.match(/xcodebuild -scheme PriLearning/g) || []).length === 1, 'each family job builds the package exactly once');
   ok(/'scripts\/simulator-fleet\.mjs'/.test(wf), 'the shared simulator rule is in the lane\'s path filter');
 }
 
@@ -273,10 +276,12 @@ for (const script of ['scripts/iphone-journey.mjs', 'scripts/native-bridge-selfc
       `${script}: picks a simulator through the shared pinned-runtime selector`);
   }
   const wf = src('.github/workflows/native-journey-ios27.yml');
-  const sequence = [...wf.matchAll(/--family (ipad|iphone)/g)].map(x => x[1]);
-  const firstPhone = sequence.indexOf('iphone');
-  ok(firstPhone > 0 && sequence.slice(firstPhone).every(f => f === 'iphone'),
-    `iOS 27: both iPad bridge and journey finish before the first iPhone boot (${sequence.join(' → ')})`);
+  // Each matching family runs a complete journey on its own runner; no
+  // runtime switch or cancellation of its sibling after a failed assertion.
+  ok(/family: \[ipad, iphone\]/.test(wf) && /fail-fast: false\s+max-parallel: 1/.test(wf) &&
+    /name: iPad journey[^\n]*\n\s+if: matrix.family == 'ipad'/.test(wf) &&
+    /name: iPhone certification journey[^\n]*\n\s+if: matrix.family == 'iphone'/.test(wf),
+    'iOS 27: both complete journeys are isolated, one runner at a time, without sibling cancellation');
   ok((wf.match(/timeout-minutes: 35/g) || []).length >= 1 && (wf.match(/timeout-minutes: 25/g) || []).length >= 1,
     'iOS 27: the full journeys retain bounded step limits and never weaken their assertions');
 }
