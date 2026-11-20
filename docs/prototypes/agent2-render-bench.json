@@ -1,0 +1,83 @@
+[
+  {
+    "environment": "desktop-chromium",
+    "nodes": 10,
+    "frames": 58,
+    "medianFrameMs": 16.7,
+    "p95FrameMs": 16.8,
+    "maxFrameMs": 16.8,
+    "mode": "Headless emulation, wheel-zoom rendering; not a physical device benchmark"
+  },
+  {
+    "environment": "desktop-chromium",
+    "nodes": 40,
+    "frames": 57,
+    "medianFrameMs": 16.7,
+    "p95FrameMs": 16.7,
+    "maxFrameMs": 16.8,
+    "mode": "Headless emulation, wheel-zoom rendering; not a physical device benchmark"
+  },
+  {
+    "environment": "desktop-chromium",
+    "nodes": 84,
+    "frames": 57,
+    "medianFrameMs": 16.7,
+    "p95FrameMs": 16.7,
+    "maxFrameMs": 16.8,
+    "mode": "Headless emulation, wheel-zoom rendering; not a physical device benchmark"
+  },
+  {
+    "environment": "throttled-tablet-chromium",
+    "nodes": 10,
+    "frames": 57,
+    "medianFrameMs": 16.7,
+    "p95FrameMs": 16.8,
+    "maxFrameMs": 16.8,
+    "mode": "Headless emulation, wheel-zoom rendering; not a physical device benchmark"
+  },
+  {
+    "environment": "throttled-tablet-chromium",
+    "nodes": 40,
+    "frames": 57,
+    "medianFrameMs": 16.7,
+    "p95FrameMs": 16.7,
+    "maxFrameMs": 16.8,
+    "mode": "Headless emulation, wheel-zoom rendering; not a physical device benchmark"
+  },
+  {
+    "environment": "throttled-tablet-chromium",
+    "nodes": 84,
+    "frames": 57,
+    "medianFrameMs": 16.7,
+    "p95FrameMs": 16.8,
+    "maxFrameMs": 16.8,
+    "mode": "Headless emulation, wheel-zoom rendering; not a physical device benchmark"
+  },
+  {
+    "environment": "mobile-webkit",
+    "nodes": 10,
+    "frames": 58,
+    "medianFrameMs": 17,
+    "p95FrameMs": 18,
+    "maxFrameMs": 19,
+    "mode": "Headless emulation, wheel-zoom rendering; not a physical device benchmark"
+  },
+  {
+    "environment": "mobile-webkit",
+    "nodes": 40,
+    "frames": 57,
+    "medianFrameMs": 17,
+    "p95FrameMs": 18,
+    "maxFrameMs": 19,
+    "mode": "Headless emulation, wheel-zoom rendering; not a physical device benchmark"
+  },
+  {
+    "environment": "mobile-webkit",
+    "nodes": 84,
+    "frames": 57,
+    "medianFrameMs": 17,
+    "p95FrameMs": 19,
+    "maxFrameMs": 23,
+    "mode": "Headless emulation, wheel-zoom rendering; not a physical device benchmark"
+  }
+]
