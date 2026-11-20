@@ -59,11 +59,15 @@ export function validatePromotion({ manifest: m, observed: o, approvals, trust, 
 // Read-only composition with the existing release dossier, not a replacement.
 // Activation will need the trusted observation adapter, including authenticated
 // protected-environment approval and immutable artifact/backup provenance.
-export async function preparePromotion({ manifest, approvals, trust, readObservations, dossierOptions }) {
+export async function preparePromotion({ manifest, approvals, trust, readObservations, dossierOptions, runId, read }) {
   const { buildDossier } = await import('./release-dossier.mjs');
+  const { observeGitHubRelease, observeEnvironmentApproval, releaseEvidenceDigest } = await import('./release-promotion-github.mjs');
   const dossier = await buildDossier({ ...dossierOptions, sha: manifest.candidate });
-  const observed = await readObservations(manifest.candidate, dossier);
-  return validatePromotion({ manifest, approvals, trust, observed: { ...observed, dossier } });
+  const github = await observeGitHubRelease({ candidate: manifest.candidate, expectedOld: manifest.expectedOld, read });
+  const observed = await readObservations(manifest.candidate, dossier, github.provenance);
+  const environment = await observeEnvironmentApproval({ candidate: manifest.candidate, digest: intentDigest(manifest), runId, ownerId: trust.owner.id, reviewerId: trust.reviewer.id, read });
+  const evidenceDigest = releaseEvidenceDigest(github.provenance, observed.externalEvidenceDigest);
+  return validatePromotion({ manifest, approvals, trust, observed: { ...observed, ...github, ...environment, dossier, evidenceDigest } });
 }
 
 // Deliberately hard-disabled, even if env vars or record fields request activation.

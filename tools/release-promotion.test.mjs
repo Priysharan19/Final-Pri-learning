@@ -83,3 +83,58 @@ test('postdeploy failure freezes, no automatic rollback', () => {
   assert.deepEqual(deploymentVerdict(b, p), { ok: true, freeze: false, autoRollback: false });
   for (const change of [{ webSha: a }, { deploymentState: 'FAILED' }, { schemaCompatible: false }, { studentSmoke: false }, { persistenceVerified: false }]) assert.deepEqual(deploymentVerdict(b, { ...p, ...change }), { ok: false, freeze: true, autoRollback: false });
 });
+
+// GitHub REST fixtures: observations must be independently reconstructed from
+// API payloads, rather than allowing submitted records to assert green flags.
+import { observeGitHubRelease, observeEnvironmentApproval, releaseEvidenceDigest } from '../scripts/release-promotion-github.mjs';
+const repoId = 1341661316, head = 'd'.repeat(40), earlier = '2026-11-19T22:00:00Z', merged = '2026-11-19T23:00:00Z', after = '2026-11-19T23:30:00Z';
+function githubFixture() {
+  const repos = { repository: { id: repoId }, head_repository: { id: repoId } };
+  function run(id,path,sha = b,branch = 'main',event = 'push',time = after) { return { ...repos, id, workflow_id: id, path: '.github/workflows/' + path + '.yml', head_sha: sha, head_branch: branch, event, status: 'completed', conclusion: 'success', updated_at: time, created_at: time }; }
+  const runs = [run(1,'ci'),run(2,'codeql'),run(3,'deployment-image'),run(4,'main-integrity'),run(5,'release-staging-proof',b,'main','workflow_run','2026-11-19T23:40:00Z')];
+  const prRuns = [run(6,'ci',head,'task/train-fixture','pull_request',earlier),run(7,'codeql',head,'task/train-fixture','pull_request',earlier)];
+  const checkNames = ['Suites, coverage and accuracy gates','Production account, sync and commercial schema','Browser suites (end-to-end and accessibility)','Client build and offline-first boundary','Build container and prove persistent health'];
+  const checks = checkNames.map((name,i)=>({id:20+i,name,head_sha:b,app:{slug:'github-actions'},status:'completed',conclusion:'success'}));
+  const reviews = [{id:30,user:{id:2,type:'User',login:'reviewer-fixture'},state:'APPROVED',submitted_at:earlier,commit_id:head}];
+  const artifacts = [{id:40,name:'staging-proof-5',expired:false,digest:'sha256:' + hash}];
+  const environmentRun = {...run(50,'production-promotion',b,'main','workflow_dispatch'),run_attempt:1,status:'in_progress',actor:{id:1},triggering_actor:{id:1},display_title:'Production Promotion · ' + hash};
+  const history = [{environments:[{name:'production'}],state:'approved',user:{id:2,type:'User'}}];
+  const data = {
+    'branches/main':{name:'main',protected:true,commit:{sha:b}}, 'branches/deploy/production':{name:'deploy/production',protected:true,commit:{sha:a}},
+    ['compare/'+a+'...'+b]:{status:'ahead',merge_base_commit:{sha:a},behind_by:0,ahead_by:1},
+    ['commits/'+b+'/pulls?per_page=100']:[{number:9,user:{id:1},merge_commit_sha:b,merged_at:merged,base:{ref:'main',repo:{id:repoId}},head:{sha:head,ref:'task/train-fixture',repo:{id:repoId}}}],
+    ['actions/runs?head_sha='+b+'&per_page=100']:{total_count:runs.length,workflow_runs:runs},
+    ['actions/runs?head_sha='+head+'&event=pull_request&per_page=100']:{total_count:prRuns.length,workflow_runs:prRuns},
+    ['commits/'+b+'/check-runs?filter=latest&per_page=100']:{total_count:checks.length,check_runs:checks},
+    'pulls/9/reviews?per_page=100':reviews,'collaborators/reviewer-fixture/permission':{permission:'write',user:{id:2}},
+    'actions/runs/5/artifacts?per_page=100':{total_count:1,artifacts},'actions/runs/50':environmentRun,'actions/runs/50/approvals':history
+  };
+  const read = async p => { assert.ok(Object.hasOwn(data,p), 'unexpected read ' + p); return structuredClone(data[p]); };
+  return {data,runs,prRuns,checks,reviews,artifacts,environmentRun,history,read};
+}
+test('read-only GitHub verifies exact train, check contexts, independent review and artifact', async()=>{
+  const f=githubFixture(); const o=await observeGitHubRelease({candidate:b,expectedOld:a,read:f.read});
+  assert.equal(o.provenance.reviewId,30); assert.equal(o.provenance.artifact,40);
+  assert.notEqual(releaseEvidenceDigest(o.provenance,hash),releaseEvidenceDigest(o.provenance,'e'.repeat(64)));
+});
+for(const [name,mutate] of Object.entries({
+  'source branch no longer frozen':f=>f.data['branches/main'].commit.sha=a,
+  'staging workflow spoofed':f=>f.runs[4].head_repository.id=99,
+  'required check skipped':f=>f.checks[0].conclusion='skipped',
+  'check from another app':f=>f.checks[0].app.slug='untrusted',
+  'late train workflow completion':f=>f.prRuns[0].updated_at=after,
+  'failed train workflow':f=>f.prRuns[1].conclusion='failure',
+  'review by author':f=>f.reviews[0].user.id=1,
+  'review on stale head':f=>f.reviews[0].commit_id=a,
+  'review after merge':f=>f.reviews[0].submitted_at=after,
+  'comment not approval':f=>f.reviews[0].state='COMMENTED',
+  'Main Integrity red':f=>f.runs[3].conclusion='failure',
+  'staging proof skipped':f=>f.runs[4].conclusion='skipped',
+  'expired proof artifact':f=>f.artifacts[0].expired=true,
+  'absent artifact digest':f=>delete f.artifacts[0].digest,
+  'truncated evidence':f=>f.data['actions/runs?head_sha='+b+'&per_page=100'].total_count=999
+})) test('GitHub rejects '+name,async()=>{const f=githubFixture();mutate(f);await assert.rejects(observeGitHubRelease({candidate:b,expectedOld:a,read:f.read}));});
+test('environment approval bound to actual run and separate reviewer',async()=>{
+  const f=githubFixture(); const o=await observeEnvironmentApproval({candidate:b,digest:hash,runId:50,ownerId:1,reviewerId:2,read:f.read});assert.equal(o.environmentReviewerId,2);
+  for(const mutate of [x=>x.environmentRun.run_attempt=2,x=>x.environmentRun.display_title='wrong',x=>x.history[0].user.id=1,x=>x.history[0].state='rejected',x=>x.history.length=0]) { const y=githubFixture();mutate(y);await assert.rejects(observeEnvironmentApproval({candidate:b,digest:hash,runId:50,ownerId:1,reviewerId:2,read:y.read})); }
+});
