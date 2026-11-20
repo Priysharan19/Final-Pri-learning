@@ -26,6 +26,8 @@
 
 import { installBrowserEnv, resetStorage } from './backend-check.mjs';
 
+process.env.NODE_ENV = 'test';
+process.env.PRI_TEST_PAID_MODE = '1'; // retain paid-content denial regressions
 installBrowserEnv();
 resetStorage();
 // Online-only grading (owner decision 2026-10-10): showing a solution needs a

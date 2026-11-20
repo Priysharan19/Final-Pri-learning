@@ -33,7 +33,7 @@ if (!process.env.PRI_TEST_LEGACY_PACKAGING) {
   if (JSON.stringify([active.practicePerDay, active.examsPerWindow, active.examWindowDays]) !== '[null,1,30]') bad.push(`active free tier is ${JSON.stringify(active)}, not [null,1,30]`);
   if (bad.length) { console.error(`ENTITLEMENT ENFORCEMENT: FAIL — ${bad.join('; ')}`); process.exit(1); }
   const child = spawnSync(process.execPath, ['--import', fileURLToPath(new URL('./support/legacy-packaging.mjs', import.meta.url)), fileURLToPath(import.meta.url)],
-    { stdio: 'inherit', env: { ...process.env, PRI_TEST_LEGACY_PACKAGING: '1' } });
+    { stdio: 'inherit', env: { ...process.env, PRI_TEST_LEGACY_PACKAGING: '1', NODE_ENV: 'test', PRI_TEST_PAID_MODE: '1' } });
   process.exit(child.status ?? 1);
 }
 const { installBrowserEnv, resetStorage, rawRows } = await import('./backend-check.mjs');
