@@ -103,7 +103,7 @@ for (const f of FORBIDDEN_SURFACES) ok(`${f} never links to Premium`, !PREMIUM_L
   const REFERRAL_UI = /InviteFriend|claimPendingInvite|captureInvite/;
   for (const f of FORBIDDEN_SURFACES) ok(`${f} never shows or claims an invite`, !REFERRAL_UI.test(read(f)));
   const panel = read('src/components/CloudAccountPanel.jsx');
-  ok('the invite section is in the account panel only, for an admitted account on the web', /\{canSync && !nativeShell && <InviteFriend \/>\}/.test(panel));
+  ok('the invite section is in the account panel only, for an admitted account on the web outside free launch', /\{!FREE_LAUNCH && canSync && !nativeShell && <InviteFriend \/>\}/.test(panel));
   const ref = read('src/platform/referral.js');
   ok('a store app neither captures nor claims an invite', /if \(!loc \|\| !web\(\)\) return null;/.test(ref) && /if \(!web\(\) \|\| !cloudAvailable\(\)\) return null;/.test(ref));
   ok('the invite is claimed only after this profile is admitted', /if \(!user\?\.id \|\| activated\?\.profileId !== user\.id\) return;\s*claimPendingInvite\(\)/.test(read('src/App.jsx')));
