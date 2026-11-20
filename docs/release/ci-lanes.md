@@ -62,6 +62,7 @@ So the split is safe only if no lane-gated job is ever a required context. The p
 | `pri-agent-governance.yml` | everywhere | governance: mission ledger, risk class, independent-review markers |
 | `pri-agent-concurrency.yml` | everywhere | governance: writer admission contract |
 | `pri-agent-concurrency-adversarial.yml` | everywhere | governance: adversarial admission |
+| `pri-trusted-app-contract.yml` | everywhere | governance: fail-closed trusted-App unit and isolated PostgreSQL proof; **not** an independent verifier or merge authorization |
 | `deployment-image.yml` | everywhere | security and data: production container headers, persistent storage, release identity |
 | `data-durability.yml` | everywhere | data loss: backup restore rollback |
 | `person1-intelligence.yml` | everywhere | marking and handwriting authority contract |

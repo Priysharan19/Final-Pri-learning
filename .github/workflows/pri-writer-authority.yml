@@ -1,0 +1,100 @@
+name: Pri Authoritative Writer Admission
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Signed writer grant/checkpoint/release/revoke or issue-only recovery (independent approval required)
+        required: true
+        type: choice
+        options: [GRANT, RENEW, RELEASE, REVOKE, RECONCILE]
+      issue_number:
+        description: Canonical open mission issue
+        required: true
+        type: number
+      pr_number:
+        description: Exact mission source pull request (required for GRANT/RENEW/RELEASE)
+        required: false
+        type: number
+      head_sha:
+        description: Exact 40-character source PR commit (required for GRANT/RENEW/RELEASE)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+# A global Actions concurrency group can evict an already-pending REVOKE
+# when a new operation queues. Do not use it for security-critical revocations.
+# Serialization is instead the non-force Git compare-and-swap; collisions
+# MUST fail visibly and require a fresh, independently approved dispatch.
+
+jobs:
+  authorize:
+    name: Independent protected writer transaction
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: pri-writer-admission
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: Require independently approved protected-main workflow
+        shell: bash
+        env:
+          DISPATCH_REF: ${{ github.ref }}
+          DISPATCH_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test "$DISPATCH_REF" = refs/heads/main
+          test "$DISPATCH_SHA" = "$(git rev-parse HEAD)"
+      # A live signer transaction must use the SAME durable serial authority
+      # as the exclusive merger. A protected environment approval alone does
+      # not establish the revocation/merge interlock. Keep fail closed.
+      - name: Refuse signer activation without independent certification
+        env:
+          PRI_SIGNER_RUNTIME_CERTIFIED: ${{ vars.PRI_SIGNER_RUNTIME_CERTIFIED }}
+        run: |
+          set -euo pipefail
+          test "$PRI_SIGNER_RUNTIME_CERTIFIED" = approved-external-authority-v1 || {
+            echo 'SIGNER_BLOCKED: shared transaction runtime not certified'
+            exit 1
+          }
+          # Even a manually populated variable cannot activate this job until
+          # the signed authority CLI has the actual shared Postgres lock.
+          echo 'SIGNER_BLOCKED: shared-lock implementation not yet wired'
+          exit 1
+      # App installation token is scoped to THIS repo. An approved GitHub
+      # ruleset grants only this app narrow non-force ref update authority.
+      # Never put this key/token into pull_request jobs.
+      - name: Obtain dedicated signer App identity
+        id: signer-app
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ vars.PRI_SIGNER_APP_ID }}
+          private-key: ${{ secrets.PRI_SIGNER_APP_PRIVATE_KEY }}
+          owner: Priysharan19
+          repositories: Final-Pri-learning
+          permission-contents: write
+          permission-issues: write
+          permission-pull-requests: read
+          permission-administration: read
+          permission-actions: read
+
+      - name: Apply signed non-fast-forward CAS, reconcile issue, verify ledger
+        env:
+          PRI_AUTHORITY_GENESIS_SHA: ${{ vars.PRI_AUTHORITY_GENESIS_SHA }}
+          GITHUB_TOKEN: ${{ steps.signer-app.outputs.token }}
+          PRI_ADMISSION_PRIVATE_KEY: ${{ secrets.PRI_ADMISSION_PRIVATE_KEY }}
+          PRI_REQUEST_OPERATION: ${{ inputs.operation }}
+          PRI_REQUEST_ISSUE_NUMBER: ${{ inputs.issue_number }}
+          PRI_REQUEST_PR_NUMBER: ${{ inputs.pr_number }}
+          PRI_REQUEST_HEAD_SHA: ${{ inputs.head_sha }}
+        run: node scripts/pri-admission-github.mjs transact

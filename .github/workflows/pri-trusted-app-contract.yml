@@ -1,0 +1,102 @@
+name: Pri Trusted App Controller Contract (non-authoritative)
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/reliability/**'
+      - '.github/workflows/pri-trusted-app-contract.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/reliability/**'
+      - '.github/workflows/pri-trusted-app-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    # This is a candidate-source unit test, NEVER an independently trusted
+    # merge-authorization status. The production App has a different identity.
+    name: Trusted App unit contract (NOT merge authorization)
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: Validate syntax and cryptographic fail-closed controls
+        run: |
+          set -euo pipefail
+          node --check scripts/reliability/pri-trusted-check-publisher.mjs
+          node scripts/reliability/pri-trusted-check-publisher-check.mjs
+          node scripts/reliability/pri-serial-merge-controller-check.mjs
+          node scripts/reliability/pri-github-app-transport-check.mjs
+          node scripts/reliability/pri-signer-provisioning-check.mjs
+          node --check scripts/reliability/pri-webhook-ingress.mjs
+          node scripts/pri-fleet.mjs simulate-guard reliability \
+            scripts/reliability/pri-trusted-check-publisher.mjs \
+            scripts/reliability/pri-trusted-check-publisher-check.mjs \
+            scripts/reliability/pri-serial-merge-controller.mjs \
+            scripts/reliability/pri-serial-merge-controller-check.mjs \
+            scripts/reliability/pri-postgres-control-store.mjs \
+            scripts/reliability/pri-postgres-control-store-check.mjs \
+            scripts/reliability/pri-webhook-ingress.mjs \
+            scripts/reliability/pri-webhook-ingress-check.mjs \
+            scripts/reliability/pri-github-app-transport.mjs \
+            scripts/reliability/pri-github-app-transport-check.mjs \
+            scripts/reliability/pri-signer-provisioning-check.mjs \
+            .github/workflows/pri-writer-authority.yml \
+            scripts/reliability/sql/001_trusted_merger.sql \
+            scripts/reliability/PHASE4_ACTIVATION_GATES.md \
+            .github/workflows/pri-trusted-app-contract.yml
+
+  postgres-proof:
+    # Disposable runner database, NOT a Pri Learning student/production database.
+    name: Isolated PostgreSQL controller proof (NOT activation)
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: pri_governor_proof
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-disposable-postgres-only
+        ports:
+          - 55439:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d pri_governor_proof"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 8
+    env:
+      PGUSER: postgres
+      PGPASSWORD: ci-disposable-postgres-only
+      PRI_ISOLATED_TEST_POSTGRES_URL: postgresql://127.0.0.1:55439/pri_governor_proof
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - name: Install isolated controller PostgreSQL client
+        run: npm ci --prefix server --ignore-scripts --no-audit --no-fund
+      - name: Apply isolated schema and adversarial tests
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import {readFileSync} from 'node:fs';
+          import {createRequire} from 'node:module';
+          const require=createRequire(new URL('./server/package.json',import.meta.url));
+          const {Client}=require('pg');
+          const conn=new Client({connectionString:process.env.PRI_ISOLATED_TEST_POSTGRES_URL});
+          await conn.connect();
+          await conn.query(readFileSync('scripts/reliability/sql/001_trusted_merger.sql','utf8'));
+          await conn.end();
+          console.log('PASS: isolated PostgreSQL schema applied');
+          NODE
+          node scripts/reliability/pri-postgres-control-store-check.mjs
+          node scripts/reliability/pri-webhook-ingress-check.mjs

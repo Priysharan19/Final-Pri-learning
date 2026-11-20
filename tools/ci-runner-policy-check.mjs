@@ -583,6 +583,7 @@ export const LANE_EVERYWHERE = Object.freeze({
   'pri-agent-governance.yml': 'governance: mission ledger, R-class and independent-review markers',
   'pri-agent-concurrency.yml': 'governance: writer admission contract',
   'pri-agent-concurrency-adversarial.yml': 'governance: adversarial admission',
+  'pri-trusted-app-contract.yml': 'governance: non-authoritative trusted-App and isolated PostgreSQL contract regression tests',
   'deployment-image.yml': 'security and data: production container headers, persistent storage and release identity',
   'data-durability.yml': 'data loss: backup restore rollback',
   'person1-intelligence.yml': 'marking and handwriting authority contract',
