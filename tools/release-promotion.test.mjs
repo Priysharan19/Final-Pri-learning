@@ -160,3 +160,17 @@ for(const [name,mutate] of Object.entries({
 })) test('host denies '+name,async()=>{const f=hostFixture();mutate(f);await assert.rejects(observeIndiaCoreHost({candidate:b,role:'staging',...f}));});
 test('host denies existing verifier failure',async()=>{const f=hostFixture();await assert.rejects(observeIndiaCoreHost({candidate:b,role:'staging',...f,verifyImpl:async()=>({ok:false})}));});
 test('GitHub denies unresolved changes from another reviewer',async()=>{const f=githubFixture();f.reviews.push({id:31,state:'CHANGES_REQUESTED',submitted_at:earlier,commit_id:head,user:{id:3,type:'User',login:'other-reviewer'}});await assert.rejects(observeGitHubRelease({candidate:b,expectedOld:a,read:f.read}),/changes requested/);});
+
+import { runPromotionAttempt } from '../scripts/release-promotion.mjs';
+const approvedFixture = () => validatePromotion(fixture());
+function attemptFixture() {
+  const events = []; let writes = 0, observations = 0;
+  const proof = {deploymentState:'SUCCESS',service:'Final-Pri-learning',environment:'production',deploymentId:'fixture-success',deploymentSha:b,healthSha:b,readySha:b,webSha:b,ready:true,schemaCompatible:true,persistenceVerified:true,studentSmoke:true};
+  return { events, proof, writes:()=>writes, observations:()=>observations, prepare:async()=>approvedFixture(), write:async()=>{writes++;return b;}, observe:async()=>{observations++;return proof;}, audit:async e=>{events.push(e.phase);}, freeze:async()=>{events.push('ALERT');} };
+}
+test('operator performs one verified pointer transition and audit sequence',async()=>{const f=attemptFixture(); const result=await runPromotionAttempt(f); assert.equal(result.ok,true);assert.equal(f.writes(),1);assert.equal(f.observations(),1);assert.deepEqual(f.events,['PREPARED','POINTER_CONFIRMED','DEPLOYMENT_VERIFIED']);});
+test('operator never writes if preflight or initial audit fails',async()=>{for(const broken of ['prepare','audit']){const f=attemptFixture();await assert.rejects(runPromotionAttempt({...f,[broken]:async()=>{throw Error('fixture failure');}}));assert.equal(f.writes(),0);}});
+test('operator freezes on deployment mismatch without retry or rollback',async()=>{const f=attemptFixture();f.proof.webSha=a;await assert.rejects(runPromotionAttempt(f),/stopped and frozen/);assert.equal(f.writes(),1);assert.deepEqual(f.events,['PREPARED','POINTER_CONFIRMED','ALERT','FROZEN']);});
+test('operator freezes on uncertain write without deployment verification',async()=>{const f=attemptFixture();let calls=0;await assert.rejects(runPromotionAttempt({...f,write:async()=>{calls++;throw Error('uncertain');}}),/stopped and frozen/);assert.equal(calls,1);assert.equal(f.observations(),0);assert.deepEqual(f.events,['PREPARED','ALERT','FROZEN']);});
+test('operator still audits when alert fails and exposes manual incident action',async()=>{const f=attemptFixture();f.proof.ready=false;await assert.rejects(runPromotionAttempt({...f,freeze:async()=>{throw Error('alert failure');}}),/manual incident action/);assert.deepEqual(f.events,['PREPARED','POINTER_CONFIRMED','FROZEN']);});
+test('operator cannot invoke real production credential issuer while disabled',()=>{let opened=0;assert.throws(()=>promoteProduction({openWriter:()=>{opened++;}}),/disabled/);assert.equal(opened,0);});

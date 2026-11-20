@@ -72,8 +72,80 @@ export async function preparePromotion({ manifest, approvals, trust, readObserva
   return validatePromotion({ manifest, approvals, trust, observed: { ...observed, ...github, ...environment, staging, dossier, evidenceDigest } });
 }
 
-// Deliberately hard-disabled, even if env vars or record fields request activation.
-export function promoteProduction() { fail('production promotion disabled: independent review and administrator activation required'); }
+// Deliberately hard-disabled. A separate reviewed activation must establish the
+// protected environment, trusted runtime and the scoped App token issuer.
+const PRODUCTION_ACTIVATED = false;
+const PRODUCTION_REMOTE = 'https://github.com/Priysharan19/Final-Pri-learning.git';
+export function promoteProduction(options = {}) {
+  require(PRODUCTION_ACTIVATED, 'production promotion disabled: independent review and administrator activation required');
+  return options.withReleaseLock(() => runPromotionAttempt({
+    prepare: () => preparePromotion(options),
+    write: approved => writeProductionPointer(approved, options),
+    observe: async approved => {
+      const { observeIndiaCoreHost } = await import('./release-promotion-host.mjs');
+      const facts = await options.waitForProduction(approved.candidate);
+      const proof = await observeIndiaCoreHost({ candidate: approved.candidate, role: 'production', metadata: facts.deployment });
+      return { ...proof, studentSmoke: facts.studentSmoke === true };
+    },
+    audit: options.audit,
+    freeze: options.freezeAndAlert
+  }));
+}
+
+// The same state transition used in the disposable rehearsal. A failed audit
+// before the write blocks it. After an attempted write, every uncertainty
+// freezes releases and asks the operator to assess recovery. No automatic
+// retry, ref reversal, database restore or guessed success.
+export async function runPromotionAttempt({ prepare, write, observe, audit, freeze }) {
+  require([prepare, write, observe, audit, freeze].every(f => typeof f === 'function'), 'missing trusted release operator adapter');
+  const approved = await prepare();
+  require(approved && SHA.test(approved.candidate) && SHA.test(approved.expectedOld) && approved.candidate !== approved.expectedOld && DIGEST.test(approved.digest), 'invalid approved release intent');
+  const event = phase => ({ phase, candidate: approved.candidate, expectedOld: approved.expectedOld, digest: approved.digest, at: new Date().toISOString() });
+  await audit(event('PREPARED'));
+  let phase = 'POINTER_ATTEMPT';
+  try {
+    require(await write(approved) === approved.candidate, 'pointer not verified');
+    phase = 'POINTER_CONFIRMED';
+    await audit(event(phase));
+    const proof = await observe(approved);
+    require(deploymentVerdict(approved.candidate, proof).ok, 'deployment verification failed');
+    phase = 'DEPLOYMENT_VERIFIED';
+    await audit({ ...event(phase), deploymentId: proof.deploymentId });
+    return { ok: true, ...approved, deploymentId: proof.deploymentId };
+  } catch {
+    // Both calls are attempted even if the other throws. Do not log raw provider
+    // errors or credentials; a failed alert is itself an operator-visible stop.
+    const record = { ...event('FROZEN'), failedPhase: phase, autoRollback: false };
+    const outcomes = await Promise.allSettled([Promise.resolve().then(() => freeze(record)), Promise.resolve().then(() => audit(record))]);
+    fail(outcomes.some(r => r.status === 'rejected') ? 'release stopped; freeze/alert or audit failed: manual incident action required' : 'release stopped and frozen; independent rollback assessment required');
+  }
+}
+
+// No production operation is reachable while PRODUCTION_ACTIVATED is false.
+// The protected job must supply a fresh read-only credential and mint the
+// narrowly scoped, expiring installation token only after prepare + audit.
+async function writeProductionPointer(approved, { readToken, openWriter }) {
+  const temp = mkdtempSync(join(realpathSync(tmpdir()), 'pri-release-source-'));
+  const askpass = join(temp, 'askpass');
+  const credential = t => typeof t === 'string' && /^[A-Za-z0-9_]+$/.test(t) && t.length >= 20;
+  const gitWith = token => args => execFileSync('git', args, { cwd: temp, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 120000, env: { PATH: process.env.PATH, HOME: temp, LC_ALL: 'C', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null', GIT_TERMINAL_PROMPT: '0', GIT_ASKPASS: askpass, PRI_RELEASE_TOKEN: token } }).trim();
+  let writer = null;
+  try {
+    require(credential(readToken) && typeof openWriter === 'function', 'missing read-only credential or protected token issuer');
+    writeFileSync(askpass, '#!/bin/sh\ncase "$1" in *Username*) printf "%s\\n" x-access-token ;; *Password*) printf "%s\\n" "$PRI_RELEASE_TOKEN" ;; *) exit 1 ;; esac\n', { mode: 0o700 });
+    const readGit = gitWith(readToken);
+    readGit(['init', '--bare', '--quiet']);
+    readGit(['fetch', '--no-tags', '--no-recurse-submodules', PRODUCTION_REMOTE, 'refs/heads/main:refs/heads/release-source', TARGET + ':refs/heads/previous-prod']);
+    require(readGit(['rev-parse', 'refs/heads/release-source']) === approved.candidate && readGit(['rev-parse', 'refs/heads/previous-prod']) === approved.expectedOld, 'source or pointer shifted after approval');
+    readGit(['merge-base', '--is-ancestor', approved.expectedOld, approved.candidate]);
+    writer = await openWriter(approved);
+    require(credential(writer?.token) && writer.repository === REPO && writer.permissions?.contents === 'write' && typeof writer.close === 'function' && iso(writer.expiresAt) > Date.now() && iso(writer.expiresAt) - Date.now() <= MAX_INTENT, 'missing scoped short-lived release token');
+    return exactGitPush({ git: gitWith(writer.token), remote: PRODUCTION_REMOTE, target: TARGET, approved });
+  } finally {
+    try { if (typeof writer?.close === 'function') await writer.close(); }
+    finally { rmSync(temp, { recursive: true, force: true }); }
+  }
+}
 
 // Real Git transport rehearsal ONLY, confined to local temporary repositories.
 // The pre-push hook validates the old OID advertised by receive-pack. The Git
@@ -86,14 +158,24 @@ export function rehearsePromotion({ source, remote, manifest, observed, approval
   source = contained(source); remote = contained(remote);
   const git = (args, cwd = source) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
   require(git(['rev-parse', '--is-bare-repository'], remote) === 'true', 'fixture receiver must be bare');
-  require(git(['rev-parse', FIXTURE], remote) === approved.expectedOld, 'fixture pointer race');
+  exactGitPush({ git, remote, target: FIXTURE, approved });
+  return approved;
+}
+
+// Private shared transport. The approved old OID must match both a fresh
+// advertisement and the pre-push hook. receive-pack checks that same old OID
+// within the ref transaction. There is no force flag or retry path.
+function exactGitPush({ git, remote, target, approved }) {
+  require(target === FIXTURE || target === TARGET, 'unexpected ref target');
+  const pointer = () => git(['ls-remote', '--refs', remote, target]);
+  require(pointer() === approved.expectedOld + '\t' + target, 'pointer race');
   git(['merge-base', '--is-ancestor', approved.expectedOld, approved.candidate]);
-  const hooks = mkdtempSync(join(temp, 'pri-promotion-hook-'));
+  const hooks = mkdtempSync(join(realpathSync(tmpdir()), 'pri-promotion-hook-'));
   try {
-    writeFileSync(join(hooks, 'pre-push'), '#!/bin/sh\nset -eu\ncount=0\nwhile read -r local_ref local_oid remote_ref remote_oid; do\n  [ "$local_oid" = "' + approved.candidate + '" ] && [ "$remote_ref" = "' + FIXTURE + '" ] && [ "$remote_oid" = "' + approved.expectedOld + '" ] || exit 1\n  count=$((count+1))\ndone\n[ "$count" -eq 1 ]\n', { mode: 0o700 });
-    git(['-c', 'core.hooksPath=' + hooks, 'push', '--porcelain', '--no-follow-tags', '--recurse-submodules=no', remote, approved.candidate + ':' + FIXTURE]);
-    require(git(['rev-parse', FIXTURE], remote) === approved.candidate, 'fixture post-push identity mismatch');
-    return approved;
+    writeFileSync(join(hooks, 'pre-push'), '#!/bin/sh\nset -eu\ncount=0\nwhile read -r local_ref local_oid remote_ref remote_oid; do\n  [ "$local_oid" = "' + approved.candidate + '" ] && [ "$remote_ref" = "' + target + '" ] && [ "$remote_oid" = "' + approved.expectedOld + '" ] || exit 1\n  count=$((count+1))\ndone\n[ "$count" -eq 1 ]\n', { mode: 0o700 });
+    git(['-c', 'core.hooksPath=' + hooks, 'push', '--porcelain', '--no-follow-tags', '--recurse-submodules=no', remote, approved.candidate + ':' + target]);
+    require(pointer() === approved.candidate + '\t' + target, 'post-push identity mismatch');
+    return approved.candidate;
   } finally { rmSync(hooks, { recursive: true, force: true }); }
 }
 
