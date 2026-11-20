@@ -509,7 +509,8 @@ enum JourneySelfCheck {
         }
         at = 'silent reading';
         await waitFor(() => q('.ws-actions .status-line')?.getAttribute('data-work-state') === 'read', 60000);
-        if ((await oracle({ kind: 'readerCount' })).count < 1) throw new Error('no actual synthetic provider request');
+        const reads = (await oracle({ kind: 'readerCount' })).count;
+        if (!Number.isInteger(reads) || reads < 1) throw new Error('no actual synthetic provider request');
         if (allVis('.ink-preview .ink-line, [data-confirm-reading], [data-mp-reading]').length) throw new Error('reading exposed before marking');
         assertUnmarked('silent reading');
         at = 'first mark';
@@ -586,7 +587,18 @@ enum JourneySelfCheck {
         at = 'saved'; await inkSavedTruthfully(id);
         at = 'permission'; const sheet = await waitFor(() => q('[data-reader-permission-sheet="ink"]'), 20000);
         if (!/OpenAI/.test(sheet.textContent || '')) throw new Error('the prompt before the first read does not name OpenAI');
-        assertUnmarked('permission prompt');
+        let beganReading = false;
+        const observeRead = () => {
+          const state = q('.ws-actions .status-line')?.getAttribute('data-work-state');
+          if (state === 'reading' || state === 'read' || allVis('.ink-preview .ink-line').length) beganReading = true;
+        };
+        const guard = new MutationObserver(observeRead);
+        guard.observe(document.body, { subtree: true, attributes: true, childList: true, characterData: true });
+        try {
+          observeRead(); await sleep(1000); observeRead();
+          if (beganReading) throw new Error('the page was read while the permission prompt was open');
+          assertUnmarked('permission prompt');
+        } finally { guard.disconnect(); }
         q('[data-reader-permission="accept"]').click();
         at = 'silent reading';
         await waitFor(() => q('.ws-actions .status-line')?.getAttribute('data-work-state') === 'read', 120000);
@@ -601,6 +613,8 @@ enum JourneySelfCheck {
       if (!inkId) throw new Error('nothing was read to confirm');
       // No pre-mark transcript or confirmation screen in the approved flow.
       // An unreadable final answer still requires the student's own typed text.
+      const initialField = q('[data-ink-final-answer]');
+      if (initialField && !initialField.value) { setValue(initialField, '7'); await sleep(300); }
       let got = await checked(pressSubmit, 90000);
       if (!['evaluated', 'miss'].includes(got)) {
         const field = q('[data-ink-final-answer]');
