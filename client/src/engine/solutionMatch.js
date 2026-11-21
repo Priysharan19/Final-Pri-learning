@@ -21,7 +21,7 @@
 // Anything else stays exactly as it was.
 import { texToPlain } from './texToPlain.js';
 import { plainTex } from './checker.js';
-import { parse, normalize, variablesOf, evaluate, exprEquivalent, withEvaluationBudget } from './expr.js';
+import { evaluate, exprEquivalent, withEvaluationBudget } from './expr.js';
 import { infoOf, cleanStatement, exactForm } from './arithmeticLines.js';
 
 const PAGE_BUDGET = 120000;

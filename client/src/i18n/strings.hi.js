@@ -2891,6 +2891,7 @@ export default {
   'marks.lost.repeat': 'पंक्ति {line}: कोई अंक नहीं। यह पहले लिखा हुआ चरण फिर से लिखती है।',
   'marks.lost.answer': 'अंतिम उत्तर: उत्तर का अंक कटा। अंतिम मान हल नहीं है।',
   'marks.lost.answerCarried': 'अंतिम उत्तर: उत्तर का अंक कटा। अंतिम मान में पंक्ति {breakLine} की गलती आगे चली आई है।',
+  'marks.lost.fromCheckable': "विधि अंक उन पंक्तियों से गिने जाते हैं जिन्हें Pri इस प्रश्न की विधि से जाँच सका।",
   'marks.rule.equationBroken': 'सही हल अब इस समीकरण को संतुष्ट नहीं करता',
   'marks.rule.expressionBroken': 'यह पंक्ति पिछले व्यंजक के तुल्य नहीं है',
   'marks.rule.valueWrong': 'यह मान मूल समीकरण को संतुष्ट नहीं करता',
