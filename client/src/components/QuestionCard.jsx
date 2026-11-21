@@ -50,7 +50,7 @@ import { CheckRefusal, CheckSignIn, SignInChoices } from './CheckRefusal.jsx';
 import { awardStepMarks, marksSentenceKey } from '../engine/cbseMarking.js';
 import { checkWorkingWithCloud, CLOUD_WORKING_ENGINE, mergeVerdicts, misconceptionProposal, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
 import { createStrokeSignature } from '../ink/strokeSignature.js';
-import { annotationsLive, inkLineVerdicts, photoFingerprint, revisionKey, sameLines, workingEvidence, workingEvidenceCopy } from './attemptEvidence.js';
+import { annotationsLive, inkLineVerdicts, photoFingerprint, revisionKey, sameLines, workingEvidence, workingEvidenceCopy, lostMarksForPage } from './attemptEvidence.js';
 import { misconceptionById } from '../engine/misconceptions.js';
 import { practiceWorkState } from '../platform/workState.js';
 import { HINT_RUNGS, RUNG_COST, markWeightAfter } from '../engine/hintLadder.js';
@@ -3341,7 +3341,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               {attemptViaInk && !checkRefused && !previousAttempt && <div className="eval-provenance" data-provenance="handwriting" style={{ padding: '6px 0 0', border: 0 }}>{t('verdict.readByAiMarkedByEngine')}</div>}
               {!previousAttempt && state.res?.authoritative !== true && state.res?.partial &&
                 <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>{state.res.partial.note}</div>}
-              {!previousAttempt && state.res?.authoritative !== true && state.res?.partial && <LostMarks lost={state.res.partial.lost} t={t} />}
+              {!previousAttempt && state.res?.authoritative !== true && state.res?.partial && <LostMarks lost={state.res.partial.lost} res={state.res} t={t} />}
               {!previousAttempt && state.res.stepReport && <StepReport report={state.res.stepReport} />}
               {!previousAttempt && !checkRefused && !state.res?.readerBlock && <div className="verdict-next">{state.res?.conflict ? t('verdict.nextAfterConflict') : t(technicalRetry ? 'verdict.nextTechnical' : invalidRetry ? 'verdict.nextUnreadable'
                 : markedLineFix ? 'verdict.nextFix' : 'verdict.nextTryAgain')}</div>}
@@ -3451,7 +3451,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>{res.partial.note}</div>}
                 {res.partial && !verdictGood &&
                   (!serverAuthoritative || showCommittedMethodAwardNote(res, committedGrade)) &&
-                  <LostMarks lost={res.partial.lost} t={t} />}
+                  <LostMarks lost={res.partial.lost} res={res} t={t} />}
                 {/* The answer that was marked is the one the student confirmed. */}
                 {judged?.viaInk && !isWorking && !res.revealed && String(judged.answer).trim() !== '' && (
                   <div data-submitted-answer={judged.answer}>
@@ -3741,11 +3741,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
  */
 const LOST_KEY = /^marks\.lost\.[a-zA-Z]+$/;
 const RULE_KEY = /^(?:marks\.rule\.[a-zA-Z]+|misconception\.[a-zA-Z]+\.name)$/;
-function LostMarks({ lost, t }) {
-  const rows = Array.isArray(lost) ? lost.filter(l => l && LOST_KEY.test(String(l.key))) : [];
-  if (!rows.length) return null;
+function LostMarks({ lost, res = null, t }) {
+  const page = lostMarksForPage({ lost, stepReport: res?.stepReport, markingReport: res?.markingReport });
+  const rows = page.rows.filter(l => l && LOST_KEY.test(String(l.key)));
+  if (!rows.length && !page.fromCheckable) return null;
   return (
     <ul className="lost-marks muted" style={{ marginTop: 6, paddingLeft: 18, fontSize: 13 }} aria-label={t('marks.lost.heading')}>
+      {page.fromCheckable && <li data-lost-key="marks.lost.fromCheckable">{t('marks.lost.fromCheckable')}</li>}
       {rows.map((l, i) => (
         <li key={i} data-lost-line={l.line} data-lost-key={l.key}>{t(l.key, { ...(l.vars || {}), rule: RULE_KEY.test(String(l.ruleKey)) ? t(l.ruleKey) : '' })}</li>
       ))}

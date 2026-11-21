@@ -175,6 +175,17 @@ ok(/<DotpointChip phone active=\{activeDotpoint\}/.test(base), 'on a phone the c
 ok(/api\.get\('\/curriculum'\)/.test(base) && !/server\.|app\.(get|post)/.test(picker), 'it reads the existing curriculum reply and adds no route');
 ok(/data-served-dotpoint/.test(base) && /serve\.dotpoint === activeDotpoint\.id/.test(base), 'the header names a dot point only when the question was delivered from it');
 ok(/data-dotpoint-all/.test(base) && /difficultyGap\.dotpoint && showAllDotpoints/.test(base), 'the empty states offer All dot points');
+// a refused dot-point request is the "not offered" state on every edition, and the picker's empty state (with its All dot points
+// action) is what the student sees: never a different question, never a generic error
+{
+  const { isContentEmpty } = await import(`${SRC}lib/contentServe.js`);
+  const backend = read('../src/local/backend.js');
+  ok(isContentEmpty('PRACTICE_NOT_OFFERED'), 'practiceNotOffered() (409 PRACTICE_NOT_OFFERED) is a content-empty state');
+  const gates = backend.match(/\(nsw \|\| dotpoint\) && SERVER_BANK_REFUSALS\.has\(cause\?\.code\)\) throw practiceNotOffered\(\)/g) || [];
+  eq(gates.length, 2, 'both the issue path and the prepared path refuse a dot-point request on every edition, not only NSW');
+  ok(!/if \(nsw && SERVER_BANK_REFUSALS/.test(backend), 'no path refuses only for NSW');
+  ok(/error && !capped && isContentEmpty\(errorCode\)[\s\S]{0,600}showAllDotpoints && <button[^>]*data-dotpoint-all/.test(base), 'the empty state renders the All dot points action for a content-empty error');
+}
 ok(!/curriculum-nsw/.test(picker + read('../src/lib/practiceDotpoints.js') + base), 'no NSW curriculum module is imported');
 ok(/\.dp-pick-row select \{[^}]*min-width: 0/.test(css) && /\.dp-chip \{[^}]*max-width/.test(css), 'select and chip shrink instead of scrolling sideways');
 ok(!/gradient|box-shadow|border-left/.test((css.match(/\.dp-[^{]*\{[^}]*\}/g) || []).join('')), 'no new decoration');

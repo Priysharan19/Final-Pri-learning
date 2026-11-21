@@ -14,7 +14,10 @@ export const CONTENT_EMPTY_CODES = Object.freeze([
   'INDIA_TARGET_UNCOVERED',
   'INDIA_TRACK_UNCOVERED',
   'INDIA_TOPIC_NOT_FOUND',
-  'CONTENT_EMPTY'
+  'CONTENT_EMPTY',
+  // The server issues nothing for what was asked (a dot point it has no question for, a topic outside its bank): the page's
+  // own empty state, with its "All dot points" way forward, never a generic error (local/backend.js practiceNotOffered).
+  'PRACTICE_NOT_OFFERED'
 ]);
 
 export function isContentEmpty(code) {

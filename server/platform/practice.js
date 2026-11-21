@@ -1579,7 +1579,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // method-mark switch says: its lines are still reported, as feedback.
       const finalAnswerOnly = q._marking === FINAL_ANSWER_MARKING;
       const counted = resolved && finalAnswerOnly ? { stepReport: evidence.stepReport || null, partial: null } : evidence;
-      const { stepReport, partial } = resolved ? counted : { stepReport: null, partial: null };
+      const { stepReport, partial, markingReport } = resolved ? counted : { stepReport: null, partial: null };
       const notRead = resolved && workingNotRead && working.trim() !== '';
       // After the engine's step check, never before it, and rules only (the model arm is unreachable here).
       const lineInterpretation = resolved && !invalid && !notRead
@@ -1661,6 +1661,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         // What the marked page draws: the engine's report with the interpreter's line verdicts folded in (feedback only;
         // `partial` and every mark above were computed from the engine's report alone).
         stepReport: invalid ? null : reportWithInterpretation({ stepReport, lineInterpretation, working }), partial: invalid ? null : partial,
+        // The report that decided `partial`, only when the displayed one differs (markerOps.stepEvidence): stored with the reply.
+        ...(resolved && !invalid && markingReport ? { markingReport } : {}),
         ...(resolved && !invalid && lineInterpretation ? { lineInterpretation } : {}), ...(resolved ? {
           solution: solutionFor(q, result.sketch),
           // Supplemental aggregate marking: no per-step allocations are invented.
