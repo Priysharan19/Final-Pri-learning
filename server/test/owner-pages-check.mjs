@@ -36,14 +36,14 @@ const TAN17 = ['Days remaining: 119days', '8 y = 2x(4-x)', 'Area = ∫_0^4 2x(4-
 const TAN8 = ['8 y = 3/tan x', 'y° = 3[tan x]^-1', 'y′ = -3[tan x]^-2 x sec^2 x', '= -3sin x/cos^2 x x 1/cos^2 x', '= -3sin x/cos^3 x', 'y′(π/6) = -3sin(π/6) x 1/[cos(π/6)]^3', '= -3 x 1/2 x 1/(√3)^3 x 2^3', '= -8 x 4/(3√3) = -4/√3 = -4√3/3'];
 
 const Q = {
-  areaExact: gen('y12-integration', 3, 4), areaNear: gen('y12-integration', 3, 1), integStep: gen('y12-integration', 1, 12), integPlain: gen('y12-integration', 1, 27),
+  areaExact: gen('y12-integration', 3, 337), areaNear: gen('y12-integration', 3, 437), integStep: gen('y12-integration', 1, 12), integPlain: gen('y12-integration', 1, 27),
   appdiff128: gen('y12-appdiff', 1, 128), appdiff387: gen('y12-appdiff', 1, 387), appdiff19: gen('y12-appdiff', 1, 19), appdiffPlain: gen('y12-appdiff', 2, 41),
   vec58: gen('me12-vectors', 1, 58), vec367: gen('me12-vectors', 1, 367), vecPlain: gen('me12-vectors', 1, 35),
   trig48: gen('y12-trigcalc', 3, 48), trig99: gen('y12-trigcalc', 1, 99)
 };
 ok(stepMetaFor(Q.areaExact) === null && stepMetaFor(Q.integPlain) === null && stepMetaFor(Q.vecPlain) === null && stepMetaFor(Q.trig48) === null, 'the no-Step-Check questions have no topic meta');
 ok(!!stepMetaFor(Q.integStep) && !!stepMetaFor(Q.vec58) && !!stepMetaFor(Q.trig99), 'the Step Check questions have a topic meta');
-ok(/y = 2x\(4 - x\)/.test(Q.areaExact.prompt) && Math.abs(Q.areaExact.answer.value - 64 / 3) < 1e-3, `y12-integration d3 seed 4 is exactly y = 2x(4 - x), area 64/3 (${Q.areaExact.prompt})`);
+ok(/y = 2x\(4 - x\)/.test(Q.areaExact.prompt) && Math.abs(Q.areaExact.answer.value - 64 / 3) < 1e-3, `y12-integration d3 seed 337 (the question seed 4 drew before the Advanced variety forms) is exactly y = 2x(4 - x), area 64/3 (${Q.areaExact.prompt})`);
 
 // ── the area page, IMG_0501: nothing changes (the pinned ticks stay, nothing is crossed) ─────────────────────────────
 for (const [name, q] of [['exact', Q.areaExact], ['near', Q.areaNear], ['Step Check', Q.integStep]]) {

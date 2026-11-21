@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `a1a7dbd68458a1b92ac8832b530a54bbcdbab339e3f1331bc7961b1d9e1c3743` (`docs/marking/hsc-examiner-certification-dossier.md`).
+Dossier digest: `f53e08a00d3d4c278de58d344b85ca5180eb8df2c631d0890123979c8b8cce30` (`docs/marking/hsc-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -2888,14 +2888,14 @@ Final answer: -6, 7
 
 ## `nsw-final:y12-integration/D3` — seed 1009
 
-> Find the area enclosed between the curve $y = 4x(6 - x)$ and the x-axis, correct to 3 decimal places where needed.
+> Find the area under the curve $y = (5x + 2)^{3}$ from $x = 0$ to $x = 2$. Give the answer as a fraction in simplest form if needed.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `144` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `144.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `145` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `145` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `1036` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `1036.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `1037` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `1037` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-integration/D4` — seed 1009
 
@@ -3020,14 +3020,14 @@ Final answer: -6, 7
 
 ## `nsw-final:y12-series/D3` — seed 1009
 
-> A geometric sequence has first term $4$ and common ratio $3$. Find the $6$th term.
+> The terms of the geometric sequence $7, 21, 63, \\ldots$ keep growing. Which term is the first to exceed $2,000$? (Give the term number $n$.)
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `972` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `972.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `973` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `973` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `7` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `7.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `8` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `8` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-series/D4` — seed 1009
 
@@ -3053,47 +3053,47 @@ Final answer: -6, 7
 
 ## `nsw-final:y12-financial/D2` — seed 1009
 
-> \\$2,000.00 is deposited at the **start** of each year for 3 years into an account paying $6\\%$ p.a. compounded annually. What is the balance at the end of the third year, to the nearest cent?
+> A prize pays \\$2,000 at the end of each year for 6 years. Money can earn 6% p.a., compounded annually. What single amount, paid today, has the same value as the prize? Give your answer to the nearest cent.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `674923/100` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `674923/100` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `675023/100` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `675023/100` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `196693/20` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `196693/20` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `196713/20` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `196713/20` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-financial/D3` — seed 1009
 
-> \\$4,200.00 is deposited at the **end** of each year for $15$ years, earning $6\\%$ p.a. compounded annually. Using the annuity formula $FV = a\\dfrac{(1+r)^n - 1}{r}$, find the future value to the nearest dollar.
+> Two plans earn 5% p.a., compounded annually. Plan A deposits \\$1,500 at the end of each year for 12 years. Plan B deposits a single amount of \\$11,000 today and leaves it for 12 years. How much more is the better plan worth at the end of 12 years? Give your answer to the nearest dollar.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `97759` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `97759.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `97760` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `97760` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `4121` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `4121.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `4122` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `4122` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-financial/D4` — seed 1009
 
-> A \\$21,100.00 loan charges interest at $12\\%$ p.a. compounded **monthly** (1\\% per month), with repayments of \\$550.00 at the end of each month. Find the balance owing after the **second** repayment, to the nearest cent.
+> A loan of \\$10,000 has interest of 7.2% p.a. charged monthly on the reducing balance. A repayment of \\$250 is made at the end of each month. Let $A_k$ be the balance owing just after the $k$th repayment. Find $A_5$, to the nearest cent.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `2041861/100` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `2041861/100` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `2041961/100` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `2041961/100` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `903853/100` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `903853/100` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `903953/100` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `903953/100` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-stats/D1` — seed 1009
 
-> A discrete random variable $X$ has $P(X=0) = 0.3$, $P(X=1) = 0.3$, $P(X=2) = 0.2$, $P(X=3) = 0.2$. Find $E(X)$.
+> The distribution of $X$ is shown.  $\\begin{array}{c\|cccc} x & 4 & 5 & 6 & 9 \\\\ \\hline P(X = x) & 0.3 & 0.1 & 0.3 & 0.3 \\end{array}$  Find $\\text{Var}(X)$, correct to 2 decimal places.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `13/10` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `13/10` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `23/10` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `23/10` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `99/25` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `99/25` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `124/25` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `124/25` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-stats/D2` — seed 1009
 
@@ -3108,25 +3108,25 @@ Final answer: -6, 7
 
 ## `nsw-final:y12-stats/D3` — seed 1009
 
-> Test scores are normally distributed with mean $75$ and standard deviation $6$. Find the **z-score** of a mark of $72$.
+> A score of 57 has a $z$-score of $1$ in a distribution with a standard deviation of 6. Find the mean of the distribution.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `-1/2` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `-1/2` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `1/2` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `1/2` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `51` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `51.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `52` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `52` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-stats/D4` — seed 1009
 
-> Heights are normally distributed with mean $75$ and standard deviation $5$. Using the empirical (68–95–99.7) rule, what **percentage** of values lie between $70$ and $75$?
+> The empirical rule (68%, 95%, 99.7%) gives reliable approximations only for data that are roughly bell-shaped. For which of these data sets is it appropriate?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `34` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `34.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `35` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `35` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `2` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. Option 2 is “The weights of apples from an orchard (a symmetric, bell-shaped histogram)”. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. Option 0 is “The number of hours students spend on a hobby each week, where most report 0 hou”. |
+| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-motion/D1` — seed 1009
 
@@ -5383,223 +5383,223 @@ Final answer: -3, -2, 2, 4
 
 ## `nsw-final:y11-functions-more/D1` — seed 1009
 
-> What is the smallest value of $x$ in the domain of $f(x) = \\sqrt{3x - 12}$?
+> Which function is defined for every real number $x$?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `4` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `4.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `5` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `5` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `3` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. Option 3 is “$f(x) = \\dfrac{1}{x^2 + 6}$”. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. Option 0 is “$f(x) = \\sqrt{x - 3}$”. |
+| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-functions-more/D2` — seed 1009
 
-> Find the minimum value of the function $f(x) = 3(x - 1)^2 - 2$. (It is the lowest value in its range.)
+> Find the minimum value of the function $f(x) = 2(x + 1)^2 - 1$. (It is the lowest value in its range.)
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `-2` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `-2.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `-1` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `-1` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `-1` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `-1.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-functions-more/D3` — seed 1009
 
-> $f(x) = 5x + 2$. Find $f^{-1}(2)$, the value of $x$ for which $f(x) = 2$.
+> $f(x) = \\sqrt{x}$ and $g(x) = -x - 2$. Find the largest value of $x$ in the domain of $f(g(x))$. Give the answer as a fraction in simplest form if needed.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `0` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `0.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `1` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `1` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `-2` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `-2.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `-1` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `-1` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-functions-more/D4` — seed 1009
 
-> $f(x) = 4x + 2$ and $g(x) = 3x$. Find $f(g(2))$.
+> $f(x) = \\dfrac{1}{x - 2}$ and $g(x) = 4x - 1$. One real value of $x$ is NOT in the domain of $f(g(x))$. What is it? Give the answer as a fraction in simplest form if needed.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `26` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `26.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `27` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `27` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `3/4` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `4/4` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `4/4` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-transform/D1` — seed 1009
 
-> The point $(3, 2)$ lies on the graph of $y = f(x)$. Find the image of this point on the graph of $y = f(x + 1) - 1$.
+> The parabola $y = (x - 1)^2 - 1$ is translated 1 unit left and 2 units up. Find the coordinates of the vertex of the image.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `(2, 1)` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| correct | `(0, 1)` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `(3, 1)` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `(3, 1)` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| common wrong | `(1, 1)` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(1, 1)` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-transform/D2` — seed 1009
 
-> The point $(3, 2)$ lies on the graph of $y = f(x)$. Find the image of this point on the graph of $y = -f(x)$.
+> The parabola $y = -(x + 1)^2 - 1$ has its vertex at $(-1, -1)$. The parabola is reflected in the $y$-axis. Find the vertex of the image.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `(3, -2)` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| correct | `(1, -1)` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `(4, -2)` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `(4, -2)` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| common wrong | `(2, -1)` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(2, -1)` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-transform/D3` — seed 1009
 
-> The point $(6, 2)$ lies on the graph of $y = f(x)$. Find the image of this point on the graph of $y = 2f\\left(\\dfrac{x}{2}\\right)$.
+> The graph of $y = x^3$ is translated 1 unit left and then stretched vertically by a factor of $4$. Write the equation of the image in the form $y = \\ldots$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `(12, 4)` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `(13, 4)` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `(13, 4)` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `4*(x+1)^3` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `(4*(x+1)^3)` | yes | 2/2 | 2/2 | The same expression written with brackets. |
+| common wrong | `(4*(x+1)^3) + 1` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(4*(x+1)^3) + 1` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-transform/D4` — seed 1009
 
-> The point $(3, 2)$ lies on the graph of $y = f(x)$. The graph is reflected in the $y$-axis, then stretched vertically by a factor of $2$, then moved $2$ units up. Find the image of the point.
+> The function $f$ has domain $4 \\le x \\le 12$. The function $g$ is defined by $g(x) = f\\big(-2(x + 1)\\big)$. What is the greatest value of $x$ in the domain of $g$?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `(-3, 6)` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `(-2, 6)` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `(-2, 6)` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `-3` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `-3.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `-2` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `-2` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-trig-ident/D1` — seed 1009
 
-> Simplify $5\\sin^2\\theta + 5\\cos^2\\theta + 7$ to a single number.
+> Which one of these statements is true for every angle $\\beta$ for which it is defined?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `12` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `12.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `13` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `13` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `3` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. Option 3 is “$\\sin^2 \\beta = 1 - \\cos^2 \\beta$”. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. Option 0 is “$\\sin \\beta + \\cos \\beta = 1$”. |
+| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-trig-ident/D2` — seed 1009
 
-> Solve $\\sin\\theta = \\tfrac{\\sqrt3}{2}$ for $0^\\circ \\le \\theta \\le 360^\\circ$. Give the smaller of the two solutions, in degrees.
+> The equation $\\cos\\theta = -\\dfrac{\\sqrt3}{2}$ has solutions $150^\\circ$ and $210^\\circ$ for $0^\\circ \\le \\theta \\le 360^\\circ$. What is the acute reference angle?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `60` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `60.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `61` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `61` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `30` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `30.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `31` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `31` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-trig-ident/D3` — seed 1009
 
-> How many solutions does $\\sin\\theta = \\tfrac12$ have for $0^\\circ \\le \\theta \\le 360^\\circ$?
+> How many solutions does $4\\cos\\theta = 2$ have for $0^\\circ \\le \\theta \\le 360^\\circ$?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `2` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `2.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `3` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `3` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `2` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `2.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `3` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `3` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-trig-ident/D4` — seed 1009
 
-> Solve $\\sin\\theta = \\tfrac{\\sqrt3}{2}$ for $0^\\circ \\le \\theta \\le 360^\\circ$. Give the larger of the two solutions, in degrees.
+> Solve $2\\cos^2\\theta - 3\\cos\\theta - 2 = 0$ for $0^\\circ \\le \\theta \\le 360^\\circ$. Give every solution in degrees.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `120` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `120.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `121` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `121` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `120, 240` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `121, 240` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `121, 240` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-explog-more/D1` — seed 1009
 
-> Evaluate $\\log_{5} 25 + \\log_{5} 25$.
+> A logarithm to an unknown base $x$ satisfies $\\log_{x} 512 = 3$. What is $x$?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `4` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `4.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `5` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `5` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `8` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `8.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `9` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `9` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-explog-more/D2` — seed 1009
 
-> Solve $5^x = 625$ for $x$.
+> Solve $6^{x} = 64$. Give $x$ correct to 2 decimal places.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `4` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `4.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `5` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `5` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `58/25` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `58/25` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `83/25` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `83/25` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-explog-more/D3` — seed 1009
 
-> Evaluate $\\ln\\left(e^{7}\\right) + \\ln 1$.
+> Given that $\\log_{7} 2 = p$ and $\\log_{7} 3 = q$, write $\\log_{7} 294$ in terms of $p$ and $q$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `7` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `7.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `8` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `8` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `(1)*p+(1)*q+(2)` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `((1)*p+(1)*q+(2))` | yes | 3/3 | 3/3 | The same expression written with brackets. |
+| common wrong | `((1)*p+(1)*q+(2)) + 1` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `((1)*p+(1)*q+(2)) + 1` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-explog-more/D4` — seed 1009
 
-> Solve $\\log_{5} x = 4$ for $x$.
+> Given that $\\log_{7} 2 = p$ and $\\log_{7} 3 = q$, write $\\log_{7} \\left(\\dfrac{3}{14}\\right)$ in terms of $p$ and $q$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `625` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `625.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `626` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `626` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `(-1)*p+(1)*q+(-1)` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `((-1)*p+(1)*q+(-1))` | yes | 3/3 | 3/3 | The same expression written with brackets. |
+| common wrong | `((-1)*p+(1)*q+(-1)) + 1` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `((-1)*p+(1)*q+(-1)) + 1` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-data-sets/D1` — seed 1009
 
-> Find the mean of the data: 34, 42, 34, 42, 32, 44.
+> Class A has 21 students with a mean test mark of 61. Class B has 15 students with a mean test mark of 76. Find the mean test mark of all 36 students together.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `38` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `38.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `39` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `39` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `269/4` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `269/4` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `273/4` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `273/4` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-data-sets/D2` — seed 1009
 
-> Nine scores in order are 3, 19, 23, 26, 27, 38, 39, 42, 43. Find the median.
+> The 7 values 11, 34, 39, 43, 44, 60, 67 are in order. A new value, 32, is added to the set. What is the new median?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `27` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `27.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `28` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `28` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `41` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `41.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `42` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `42` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-data-sets/D3` — seed 1009
 
-> A data set has 6 values, half equal to $31$ and half equal to $45$. Find its standard deviation (the population standard deviation, $\\sigma$).
+> Set P is 43, 44, 45, 46, 47. Set Q is 37, 42, 45, 46, 53. Without calculating, which set has the larger standard deviation?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `7` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `7.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `8` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `8` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `2` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. Option 2 is “Set Q”. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. Option 0 is “It depends on the mean”. |
+| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-data-sets/D4` — seed 1009
 
-> A data set has mean $38$ and standard deviation $7$. Every value is multiplied by $3$ and then $7$ is added. What is the standard deviation of the new data?
+> Group A has 7 values, mean $48$ and standard deviation $1$. Group B has 5 values, the same mean $48$, and standard deviation $2$. The groups are combined. What is the variance of the combined 12 values?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `21` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `21.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `22` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `22` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `9/4` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `9/4` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `13/4` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `13/4` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms11-linear/D1` — seed 1009
 
