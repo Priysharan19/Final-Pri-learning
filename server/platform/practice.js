@@ -586,6 +586,13 @@ async function chooseQuestionFor(db, accountId, request, now, { draw = () => ran
  * may start working on before signing in, and the sealed token that lets one
  * account turn it into an issued question later.
  */
+/** What the client sees of a stored grade reply: `markingReport` stays in the record; the reply says only THAT it differs. */
+function clientVisibleGrade(response) {
+  if (!response || typeof response !== 'object' || !response.markingReport) return response;
+  const { markingReport, ...visible } = response;
+  return { ...visible, markingReportDiffers: true };
+}
+
 export function createPracticePrepareRoute(db, { banks = bankPolicy(), env = process.env } = {}) {
   db = asStore(db);
   return [rateLimit(db, 'practice-prepare', { limit: 90, windowMs: 60 * 60 * 1000 }), asyncHandler(async (req, res) => {
@@ -1402,7 +1409,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       const [forecast, cooling, consentBlockedBefore] = await Promise.all([
         gate(), markerCooldownUntil(db, accountId), consentBlockedNow(db, accountId)]);
       if (forecast.status) return refuse(forecast);
-      if (forecast.response) return res.status(200).json(forecast.response);
+      if (forecast.response) return res.status(200).json(clientVisibleGrade(forecast.response));
       // An account that has just had several entries stopped at the deadline
       // waits (markerPool.js MARKER_COOLDOWN). A committed receipt is replayed
       // above regardless: recovering a reply costs no marking.
@@ -1579,7 +1586,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // method-mark switch says: its lines are still reported, as feedback.
       const finalAnswerOnly = q._marking === FINAL_ANSWER_MARKING;
       const counted = resolved && finalAnswerOnly ? { stepReport: evidence.stepReport || null, partial: null } : evidence;
-      const { stepReport, partial } = resolved ? counted : { stepReport: null, partial: null };
+      const { stepReport, partial, markingReport } = resolved ? counted : { stepReport: null, partial: null };
       const notRead = resolved && workingNotRead && working.trim() !== '';
       // After the engine's step check, never before it, and rules only (the model arm is unreachable here).
       const lineInterpretation = resolved && !invalid && !notRead
@@ -1661,6 +1668,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         // What the marked page draws: the engine's report with the interpreter's line verdicts folded in (feedback only;
         // `partial` and every mark above were computed from the engine's report alone).
         stepReport: invalid ? null : reportWithInterpretation({ stepReport, lineInterpretation, working }), partial: invalid ? null : partial,
+        // The report that decided `partial`, only when the displayed one differs (markerOps.stepEvidence): stored with the reply.
+        ...(resolved && !invalid && markingReport ? { markingReport } : {}),
         ...(resolved && !invalid && lineInterpretation ? { lineInterpretation } : {}), ...(resolved ? {
           solution: solutionFor(q, result.sketch),
           // Supplemental aggregate marking: no per-step allocations are invented.
@@ -1796,7 +1805,9 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       }, { accountScope: accountId, lock: syncLockKey(accountId) }));
       if (outcome.again) { evidenceForced = evidenceForced || outcome.needEvidence === true; continue; }
       if (outcome.status) return refuse(outcome);
-      return res.status(200).json(outcome.response);
+      // The stored record (and the replay read from it) keeps `markingReport`; the client is told only THAT the displayed
+      // report differs from the one that decided the marks, never what the report said.
+      return res.status(200).json(clientVisibleGrade(outcome.response));
     }
     // The question kept changing under three attempts to commit one mark.
     // Nothing was written; the same submission key retries safely.

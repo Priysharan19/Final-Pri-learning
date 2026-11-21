@@ -139,7 +139,16 @@ try {
   // Edition copy: the syllabus proof point is the edition's.
   ok(L.syllabusKey('prithagoras') === 'landing.proofSyllabusAu' && L.syllabusKey('priyabhata') === 'landing.proofSyllabusIn', 'each edition has its own syllabus proof point');
   const enS = (await import('../src/i18n/strings.en.js')).default;
-  ok(enS['landing.proofSyllabusAu'] === 'Built on the NSW Mathematics Advanced 2024 syllabus, first HSC 2027.', 'the Prithagoras syllabus line, exactly');
+  ok(enS['landing.proofSyllabusAu'] === 'Built on the NSW Mathematics Advanced and Extension 1 2024 syllabuses, Years 11 and 12, first HSC 2027.', 'the Prithagoras syllabus line, exactly');
+  // Launch audit, 22 Nov 2026: what the Prithagoras landing and plain pages claim is what the edition does. Years 11 and 12, Advanced and
+  // Extension 1 only; the reading is not confirmed before marking (ADR-0001 amendment 2026-11-19); a line the engine cannot judge is labelled.
+  const { AU_STRINGS } = await import('../src/i18n/strings.au.js');
+  const auPublic = Object.entries({ ...enS, ...AU_STRINGS }).filter(([k]) => /^(landing\.(?!proofSyllabusIn|syllabus\.in)|pricing\.why\.youConfirm|login\.(heroSub|welcomeSub)|scn\.label\.hand)/.test(k)).map(([k, v]) => [k, String(v)]);
+  ok(auPublic.length > 40, 'the Prithagoras public strings were collected');
+  ok(auPublic.every(([, v]) => !/every line (is )?checked|checked line by line|marked line by line/i.test(v) || /where it can/i.test(v)), 'no Prithagoras public string says every line is checked');
+  ok(auPublic.every(([, v]) => !/you confirm (the reading|what we read|or correct)|confirm what we read|before anything is (marked|checked)/i.test(v)), 'no Prithagoras public string says the reading is confirmed before marking');
+  ok(/Extension 1/.test(enS['landing.proofSyllabusAu']), 'the Prithagoras syllabus line names Extension 1');
+  ok(/Extension 1/.test(enS['landing.syllabus.au']) && /Years 11 and 12/.test(enS['landing.syllabus.au']) && !/Years? 7 (to|-) ?10|Stage 6 Standard/.test(Object.values({ ...enS, ...AU_STRINGS }).filter(v => typeof v === 'string' && /Prithagoras/.test(v)).join(' ')), 'the Prithagoras syllabus page states Years 11 and 12 Advanced and Extension 1 and claims no other course');
   ok(/CBSE/.test(enS['landing.proofSyllabusIn']) && /NCERT/.test(enS['landing.proofSyllabusIn']), 'the Priyabhata line names CBSE and NCERT');
 
   // See why, drawn with the real component, on the engine's view.
