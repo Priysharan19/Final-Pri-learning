@@ -12,7 +12,6 @@
 //
 //   verified       the engine proved the line true (named rule, or the question's own solution)
 //   from-question  the line restates something the question gave
-//   condition      a stated condition (nothing to check)
 //   arithmetic     the line is TRUE AS WRITTEN. The engine did not say it is the right step for the question.
 //   first-error    the engine's first error (exactly one per answer at most)
 //
@@ -22,7 +21,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { annotateWorking } from '../../../client/src/engine/stepJustify.js';
 
-export const COMMENTED_STATES = Object.freeze(['verified', 'from-question', 'condition', 'arithmetic', 'first-error']);
+export const COMMENTED_STATES = Object.freeze(['verified', 'from-question', 'arithmetic', 'first-error']);
 export const MAX_COMMENT_LINES = 40;
 
 const text = v => String(v ?? '');
@@ -36,7 +35,6 @@ export function finalStateOf(l, { isFirstBreak = false } = {}) {
   switch (l.state) {
     case 'arithmetic': return 'arithmetic';
     case 'given': return 'from-question';
-    case 'condition': return 'condition';
     case 'verified': case undefined: case null: return 'verified';
     default: return null;   // incomplete, unverified, unread, wrong-without-break ...
   }

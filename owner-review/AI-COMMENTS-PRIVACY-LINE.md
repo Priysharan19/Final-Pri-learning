@@ -10,11 +10,12 @@ with this file). Until the notices carry these sentences, `PRI_FEATURE_LINE_COMM
 Only after the question is resolved, only when the server variable is on, and only for a marked answer that has at least one line the
 engine gave a tick or a cross to, the server sends the AI provider (OpenAI, the same provider that reads handwriting):
 
-* the question text (and its mark total);
+* the question text;
 * the text of each commented line of the student's working (typed text, or the text Pri read from handwriting; never an image);
 * for each such line the engine's state and its own one-line reason or note;
-* the released worked solution (the steps and the final answer the student is already shown), unless every commented line is an
-  arithmetic tick, in which case no solution is sent;
+* the line directly above each commented line (also the student's text);
+* (the released worked solution is NOT sent: since the structured redesign of 22 November 2026 the model returns only a template
+  choice and maths copied from the line, and the sentence is written by the server);
 * the edition wording and the language.
 
 It does not send: a name, an email, an account or device id, the marks, the student's history, a handwriting image or photo.

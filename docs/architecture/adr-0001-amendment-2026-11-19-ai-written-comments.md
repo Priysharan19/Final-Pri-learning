@@ -25,15 +25,19 @@ every verdict, and whether each proposed sentence may be shown.* A comment the e
 
 ## The rules that make that safe (enforced in code after generation)
 
-`server/platform/lineComments/constraints.js`: (a) a comment on an engine-verified line may not say or imply it is
-wrong; (b) a comment on the first error agrees with the engine's reason and cannot move the error; (d) every mathematical
-expression is extracted and checked (equalities must hold, a value attributed to the answer must equal the key, "your
-line" must be the student's line); (e) nothing is revealed before the question resolves (on main the model is not even
-called then); (f) no praise inflation, no neatness or notation-style remarks, no hedging filler, no em dashes, no emoji,
-12 to 45 words; **(g) a line the engine ticked only as TRUE AS WRITTEN (state `arithmetic`) is never called the right
-step, method or move for the question**: the engine did not check that, so a comment that says it is dropped. A line the
-engine matched to the question's own solution (state `verified`) may name the step. The states and marks are inputs to
-this layer and never outputs.
+**Revised 22 November 2026 (second independent review): the model no longer writes sentences.** Free prose filtered by
+word lists leaked in classes no filter closes (a verdict contradicted by tone, instructions, answer leaks, the student's own
+line becoming vocabulary). The design is now STRUCTURED: for each commented line the model returns only
+`{ line, template, slots }`; the server renders the sentence from a reviewed catalogue
+(`server/platform/lineComments/catalogue.js`, 31 templates, English and Hindi) and the validated slots
+(`structured.js`). Enum slots (`action`, `rule`, `relation`, `feature`) are ids from closed lists; maths slots (`result`,
+`value`, `expected`, `written`) are ONE `$...$` span that passes `texSafe.cleanLatex`, holds no words, and whose
+normalised tokens are a contiguous run of line N's text, the engine's note for line N or the line directly above (for a
+cross, `expected` only from the engine's note or the line above). The student's line is a source of maths only, never of
+words. Which templates a line may use depends on the ENGINE's state: an `arithmetic` tick (true as written) can use only the
+equality templates, by construction, so a comment can never call it the right step. Anything invalid (unknown or
+wrong-state template, extra field, bad slot, two entries for a line) gives that line no AI comment and the engine's own
+sentence stays. The released solution is no longer sent to the provider.
 
 ## Where it applies on main (the port of 22 November 2026)
 
@@ -64,15 +68,7 @@ wording is the owner's to approve and is NOT yet in `docs/legal/**`**: it is a p
 handwriting consent sheet does not cover comments (it says the question and answer are not sent). The "not reviewed by a
 lawyer" banner stays.
 
-## Validation (allowlist), retention
-
-A comment is shown only if everything in it is expected (`server/platform/lineComments/allowlist.js`, reviewed vocabulary in
-`vocabulary.js`): every prose word is in the vocabulary or in the question, the engine's note for the line, the line itself
-or the released solution; no URL, address, markup or foreign script; no marks talk; a crossed line carries no positive-verdict
-word and a ticked line no negative one; an arithmetic tick uses a smaller vocabulary and says nothing about the line's role;
-every `$...$` span passes `texSafe.cleanLatex`; a value or expression may come only from the line, the engine's note for it
-or the line above. Anything else is dropped and the engine's sentence shows. The page draws a comment only if its maths
-spans pass the same gate on the device.
+## Retention
 
 **Retention.** A comment is stored with the attempt under scope `practice-line-comments` (the comment text, the text of
 the student's line it was written for, the model name and the time), for as long as the attempt's other records (90 days

@@ -9,7 +9,9 @@
 > `{enabled:false}` when off and the client stops asking for the session; (4) an arithmetic-only request carries no
 > worked solution. The eval tool and its results (`tools/line-comments-eval`, the corpus runs and the measured table below)
 > stay on branch `task/line-comments` (98691867e) and were NOT re-run: the figures below belong to the older integration.
-> The privacy wording is a proposal only (`owner-review/AI-COMMENTS-PRIVACY-LINE.md`).
+> **Superseded in part, 22 November 2026:** the model no longer writes sentences; it returns `{ line, template, slots }` and the
+> server renders from a reviewed catalogue (see the ADR amendment). The free-prose constraints (a) to (g) described below no longer
+> exist. The privacy wording is a proposal only (`owner-review/AI-COMMENTS-PRIVACY-LINE.md`).
 
 
 Status: built, **off by default** (`PRI_FEATURE_LINE_COMMENTS`). Decision record:

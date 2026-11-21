@@ -82,7 +82,6 @@ export function createLineCommentsHandler({ db, env = process.env, deps }) {
     const rs = grade.reading?.lineStates;
     const readStates = Array.isArray(rs) && rs.length === grade.stepReport.lines.length ? rs : null;
     const view = questionView(q, { marks: marksPossibleFor(q) });
-    const solution = solutionFor(q);
     const edition = editionName(serverEdition(env));
     const wantModel = lineCommentsEnabled(env) && lineCommentsConfig(env).usable;
     let allowance = null; let reservation = null; let note = null; let spent = false;
@@ -107,7 +106,7 @@ export function createLineCommentsHandler({ db, env = process.env, deps }) {
     try {
       out = await generateLineComments({
         stepReport: grade.stepReport, readStates,
-        question: view, solution, edition, language, resolved: grade.resolved === true, env,
+        question: view, edition, language, resolved: grade.resolved === true, env,
         authorize, useModel: wantModel && allowance?.allowed === true, now
       });
     } catch (error) {
