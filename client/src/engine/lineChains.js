@@ -18,7 +18,7 @@
 //      NOT equal to the line above (see slipWarning). It is used to tick nothing below it.
 import { _forChains as FC, _internals as SM, noteStep, noteValue, NOTE_GIVEN } from './solutionMatch.js';
 import { infoOf, cleanStatement, exactForm } from './arithmeticLines.js';
-import { evaluate, withEvaluationBudget } from './expr.js';
+import { evaluate, parse, normalize, withEvaluationBudget } from './expr.js';
 
 const BUDGET = 120000;
 const MAX_LINES = 20;
@@ -197,6 +197,55 @@ function expandBrackets(text) {
   return bad || /\]_/.test(out) ? null : out;
 }
 
+
+// ── a substitution is judged by its structure ────────────────────────────────────────────────────────────────────────
+// `t = 4: 6(16) + 8(4) + 5` is the substitution of 4 into `6t^2 + 8t + 5`: term by term, a sub-term may be written as its value (`6(16)`, `96`),
+// in other bracket style, with × or juxtaposition, and a sum in any order. Anything else that merely reaches the same number is not a substitution.
+const unwrapG = n => { while (n && n.t === 'group') n = n.v; return n; };
+const hasLetter = (n, v) => !!n && typeof n === 'object' && ((n.t === 'var' && (v === undefined || n.v === v)) || ['l', 'r', 'v', 'arg'].some(k => n[k] && typeof n[k] === 'object' && hasLetter(n[k], v)));
+const anyLetter = n => hasLetter(n);
+function sumTermsOf(n, sign = 1, out = []) {
+  n = unwrapG(n);
+  if (n && n.t === 'bin' && (n.op === '+' || n.op === '-')) { sumTermsOf(n.l, sign, out); sumTermsOf(n.r, n.op === '-' ? -sign : sign, out); }
+  else if (n && n.t === 'neg') sumTermsOf(n.v, -sign, out);
+  else out.push({ sign, node: n });
+  return out;
+}
+function substitutes(src, stu, name, a, depth) {
+  src = unwrapG(src); stu = unwrapG(stu);
+  if (!src || !stu) return false;
+  const value = n => { try { const y = evaluate(n, { [name]: a }); return typeof y === 'number' && Number.isFinite(y) ? y : null; } catch { return null; } };
+  const isSum = n => n.t === 'bin' && (n.op === '+' || n.op === '-');
+  if (isSum(src)) {
+    if (depth > 0 && !anyLetter(stu)) { const x = value(src), y = value(stu); if (x !== null && y !== null && close(x, y)) return true; }
+    const A = sumTermsOf(src), B = sumTermsOf(stu);
+    if (A.length !== B.length || A.length > 8) return false;
+    const used = new Array(B.length).fill(false);
+    const place = k => {
+      if (k === A.length) return true;
+      for (let j = 0; j < B.length; j++) {
+        if (used[j] || B[j].sign !== A[k].sign) continue;
+        used[j] = true;
+        if (substitutes(A[k].node, B[j].node, name, a, 1) && place(k + 1)) return true;
+        used[j] = false;
+      }
+      return false;
+    };
+    return place(0);
+  }
+  if (depth > 0 && !anyLetter(stu)) { const x = value(src), y = value(stu); return x !== null && y !== null && close(x, y); }
+  if (!hasLetter(src, name)) { const x = value(src), y = value(stu); return !anyLetter(stu) && x !== null && y !== null && close(x, y); }
+  if (src.t === 'var') return !anyLetter(stu) && value(stu) !== null && close(value(stu), a);
+  if (src.t === 'neg' && stu.t === 'neg') return substitutes(src.v, stu.v, name, a, depth + 1);
+  if (src.t === 'bin' && stu.t === 'bin' && src.op === stu.op) {
+    if (substitutes(src.l, stu.l, name, a, depth + 1) && substitutes(src.r, stu.r, name, a, depth + 1)) return true;
+    return src.op === '*' && substitutes(src.l, stu.r, name, a, depth + 1) && substitutes(src.r, stu.l, name, a, depth + 1);
+  }
+  if (src.t === 'call' && stu.t === 'call' && src.fn === stu.fn) return substitutes(src.arg, stu.arg, name, a, depth + 1);
+  return false;
+}
+const astOf = text => { try { return parse(normalize(cleanStatement(tidy(text)))); } catch { return null; } };
+
 // ── the pass ─────────────────────────────────────────────────────────────────────────────────────────────────────────
 const readLine = text => { try { return SM.readStudent(studentPre(text)); } catch { return null; } };
 /** A line the strict reader refuses because of letters in a vector or point name (`S = P + QR`): its sides, for the line below to continue. */
@@ -230,7 +279,7 @@ function run(q, report, warn) {
   if (brk >= 0) stop = Math.min(stop, brk);
   const out = report.lines.slice();
   const env = new Map(world.env);
-  let cur = -1, matched = 0, warned = 0, above = null;
+  let cur = -1, matched = 0, warned = 0, followed = 0, above = null, bad = false;   // bad: the line above was warned or contradicted and is not ticked
   const hist = [];   // every earlier line that could be read, nearest last
   const knownSubs = FC.knownSubstitutions(q);
 
@@ -241,6 +290,8 @@ function run(q, report, warn) {
   for (let i = 0; i < lines.length && i < stop; i++) {
     const l = lines[i];
     const prevAbove = above;
+    const prevBad = bad;
+    bad = false;
     above = null;
     if (!l || typeof l.text !== 'string') continue;
     const judged = l.status === 'ok';
@@ -254,6 +305,11 @@ function run(q, report, warn) {
       const vec = (() => { try { return evalVec(studentPre(last), env); } catch { return null; } })();
       return { s, last, info, vec, label: s.parts.length >= 2 && !s.continuation ? s.parts[0] : null, sides: s.parts, hasEq: s.parts.length >= 2, text: l.text, status: st };
     };
+    if (judged && warn && prevBad && l.state === 'arithmetic' && /^\s*=/.test(l.text) && /equals the line above|line above, written another way/.test(String(l.note))) {
+      followed++; bad = true;
+      out[i] = { text: l.text, status: 'note', state: 'unverified', unverified: true, note: 'Follows from the line above, which Pri could not confirm.', slipFollow: true };
+      continue;
+    }
     if (judged) { const st = stepOf(l); if (st !== null && st > cur) cur = st; above = describe(); if (above) hist.push(above); continue; }
     if (!unjudged) continue;
     let tick = null;
@@ -268,10 +324,10 @@ function run(q, report, warn) {
     }
     let w = null;
     if (warn) { try { w = slipWarning(l, s, prevAbove) || substitutionWarning(l, s, hist); } catch { w = null; } }
-    if (w) { warned++; out[i] = { text: l.text, status: 'note', state: 'unverified', unverified: true, note: w.note, slipWarning: true }; continue; }   // a warned line ticks nothing below it
-    above = describe(); if (above) hist.push(above);
+    if (w) { warned++; bad = true; out[i] = { text: l.text, status: 'note', state: 'unverified', unverified: true, note: w.note, slipWarning: true }; continue; }   // a warned line ticks nothing below it
+    if (contradicted(s)) bad = true; else { above = describe(); if (above) hist.push(above); }
   }
-  if (!matched && !warned) return { report, matched: 0, warned: 0 };
+  if (!matched && !warned && !followed) return { report, matched: 0, warned: 0 };
 
   function tickLine(l, s0, up) {
     const text = l.text;
@@ -352,7 +408,7 @@ function run(q, report, warn) {
     // only a WORD label (`hyp = √(8^2 + 15^2)`) is set aside: a one-letter label says which quantity the value belongs to, and is not read here
     if (parts.length === 2 && /^[A-Za-z]{2,6}$/.test(parts[0]) && !FN_NAME.test(parts[0])) { valueParts = [parts[1]]; label = true; }
     const nums = valueParts.map(FC.numericOf);
-    if ((!ctx || knownSubs.has(`${ctx.name}|${ctx.value}`)) && nums.every(x => x !== null) && nums.every(x => close(x, nums[0])) && nontrivial([valueParts[valueParts.length - 1]]) && /[-+*/^(!]/.test(valueParts[valueParts.length - 1].replace(/^-/, '')) && (!s.continuation || (up && up.info && up.info.value !== undefined && Math.abs(up.info.value - nums[0]) <= 1e-3 * Math.max(1, Math.abs(nums[0]))))) {
+    if ((!ctx || (knownSubs.has(`${ctx.name}|${ctx.value}`) && structurallyASubstitution(ctx, valueParts[valueParts.length - 1]))) && nums.every(x => x !== null) && nums.every(x => close(x, nums[0])) && nontrivial([valueParts[valueParts.length - 1]]) && /[-+*/^(!]/.test(valueParts[valueParts.length - 1].replace(/^-/, '')) && (!s.continuation || (up && up.info && up.info.value !== undefined && Math.abs(up.info.value - nums[0]) <= 1e-3 * Math.max(1, Math.abs(nums[0]))))) {
       const value = nums[0];
       const hi = cur >= 0 ? cur + 1 + (ctx || label ? 1 : 0) : (label || ctx ? 0 : 1);
       const lo = cur >= 0 ? cur : 0;
@@ -414,6 +470,37 @@ function run(q, report, warn) {
   }
 
   // ── Part B · a slip in symbolic working ──
+
+  /** The written expression is the substitution of ctx.value into the page's own judged line, or into an expression of the worked solution. */
+  function structurallyASubstitution(ctx, expr) {
+    const stu = astOf(expr);
+    if (!stu || anyLetter(stu)) return false;
+    const sources = [];
+    for (const h of hist) if (h.status === 'ok' && h.info && h.info.vars && h.info.vars.length === 1 && h.info.vars[0] === ctx.name) sources.push(astOf(h.last));
+    for (const st of world.stepStmts) for (const part of st.parts) { const info = SM.readSide(part); if (info && info.vars && info.vars.length === 1 && info.vars[0] === ctx.name) sources.push(astOf(part)); }
+    // a bare letter is a label, not an expression to substitute into
+    return sources.some(src => src && !['var', 'num', 'const'].includes(unwrapG(src).t) && substitutes(src, stu, ctx.name, ctx.value, 0));
+  }
+
+  /** A line the question's facts or the worked solution contradict: the same label or the same object with another value. */
+  function contradicted(s) {
+    if (!s || s.multi || s.ctx || s.continuation) return false;
+    if (s.parts.length >= 2) {
+      const lab = FC.labelOf(s.parts[0]);
+      const lastPart = s.parts[s.parts.length - 1];
+      if (lab) {
+        const rest = SM.readSide(lastPart);
+        const sts = sol.labelled.filter(st => FC.sameLabel(lab, st.label));
+        if (rest && sts.length && !sts.some(st => SM.sameSidePublic(rest, st.info, lastPart, st.last))) return true;
+      }
+      try {
+        const ev = s.parts.map(x => evalVec(studentPre(x), env));
+        if (ev.every(Boolean) && ev.some(x => !sameV(x, ev[0]))) return true;
+      } catch { /* not a vector line */ }
+    }
+    return false;
+  }
+
   function slipWarning(l, s, up) { return slipWarningOf(l, s, up); }
 
   /** A substitution `t = 4: expr` whose expression is not what ANY earlier line of the page gives at t = 4: a note, never a cross. */
@@ -448,7 +535,7 @@ function run(q, report, warn) {
   const { arithmetic: _a, ...rest } = report;
   const anyOk = stated.some(x => x.solutionMatch === true || x.status === 'ok');
   return {
-    matched, warned,
+    matched, warned: warned + followed,
     report: {
       ...(report.arithmetic === true && !anyOk ? report : rest), lines: stated, source: 'value-chain', ...(matched ? { solutionMatched: true } : {}),
       summary: {

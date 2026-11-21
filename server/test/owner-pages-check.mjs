@@ -222,7 +222,8 @@ ok(!acode(STAT).includes('X'), `the page itself, as written, is never crossed by
   ok(L.map(l => l.status).join() === 'note,note,note,note,note,note,ok,note', `the tan page: statuses are as before (${L.map(l => l.status)})`);
   ok(L.every(l => l.slipWarning !== true), 'the tan page: lines 3, 4, 5, 6 and 8 carry no warning, because each reading is ambiguous');
   // the same slip written without the lone x: it IS warned
-  const clean = W(['y = 3/tan(x)', "y' = -3(tan(x))^(-2)(sec(x))^2", '= -3(tan(x))^(-2)(sec(x))^2', '= -3sin(x)/(cos(x))^2/(cos(x))^2']);
+  const q2 = gen('y11-diff', 2, 11);   // a question with no y′ statement of its own, so the page's y′ line is not contradicted
+  const clean = (stepEvidence(q2, '', ['y = 3/tan(x)', "y' = -3(tan(x))^(-2)(sec(x))^2", '= -3(tan(x))^(-2)(sec(x))^2', '= -3sin(x)/(cos(x))^2/(cos(x))^2'].join('\n'), { correct: false }, { slipWarnings: true }).stepReport?.lines || []);
   // a warning needs a continuation under a continuation that was ticked: here line 3 repeats line 2, line 4 is the false rewrite (it is -3 sin/cos^4, not -3/sin^2)
   ok(clean[3].slipWarning === true && /^This is not equal to the line above for every value of x \(for example at x = [-\d.]+: [-\d.]+ against [-\d.]+\)\. Check this step\.$/.test(clean[3].note), `a false rewrite with no ambiguous x is warned (${clean[3].note})`);
   ok(clean[3].status === 'note', 'a warned line is a note');

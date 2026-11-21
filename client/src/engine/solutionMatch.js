@@ -350,7 +350,6 @@ function run(q, report) {
   const lines = report.lines.slice(0, MAX_LINES);
   const sol = readSolution(q);
   const prompt = readPrompt(q);
-  const known = knownSubstitutions(q);
   let stop = Number.isInteger(report.firstBreak) && report.firstBreak >= 0 ? report.firstBreak : Infinity;
   const brk = lines.findIndex(l => l?.status === 'break');
   if (brk >= 0) stop = Math.min(stop, brk);
@@ -397,11 +396,11 @@ function run(q, report) {
         const first = each.find(x => x.hit);
         if (first) hit = first.hit; else tick = { state: 'given', note: NOTE_GIVEN };
       }
-    } else if (!tick && s.parts.length >= 2 && !s.continuation) hit = matchEquation(s.parts, sol, s.ctx);
+    } else if (!tick && s.parts.length >= 2 && !s.continuation && !s.ctx) hit = matchEquation(s.parts, sol, s.ctx);   // a substitution line is judged structurally by engine/lineChains.js
     if (hit) { tick = tick || { state: 'verified', note: noteStep(hit), step: hit.step }; prevAbove.hit = hit; }
     // c / d · a value the solution reaches, in order
     // a substitution `name = a:` counts only where the question or its solution substitutes that name at that value
-    if (!tick && !s.multi && (!s.ctx || known.has(`${s.ctx.name}|${s.ctx.value}`))) {
+    if (!tick && !s.multi && !s.ctx) {   // a line `name = a: …` is judged structurally by engine/lineChains.js
       const nums = s.parts.map(numericOf);
       const value = nums.every(v => v !== null) && nums.every(v => close(v, nums[0])) ? nums[0] : null;
       // a numeric continuation must agree with the line above (ln1 = 0, then `= 1`, is not one chain)
