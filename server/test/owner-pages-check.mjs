@@ -211,5 +211,27 @@ ok(!acode(STAT).includes('X'), `the page itself, as written, is never crossed by
   }
 }
 
+// ── the slip warning on the tan page, and the slash column page (22 November 2026) ─────────────────────────────────────────────────
+{
+  const q = gen('y12-diff', 3, 7);
+  const W = page => (stepEvidence(q, '', page.join('\n'), { correct: false }, { slipWarnings: true }).stepReport?.lines || []);
+  const L = W(TAN8);
+  // line 3 is unchanged (a note: it may be a derivative of the definition or of the equation 8y = 3/tan x).
+  // line 4 and 5 are false against the line above but are left plain notes: each carries a lone x between factors (`x x 1/cos^2 x`, `cos^3 x`) that may be a times sign or a letter,
+  // so the warning stays silent. line 6 is a value of line 5, not a continuation, and line 8 is glued (`-8 x 4/(3√3)`, the reader's 3 for 8): plain notes.
+  ok(L.map(l => l.status).join() === 'note,note,note,note,note,note,ok,note', `the tan page: statuses are as before (${L.map(l => l.status)})`);
+  ok(L.every(l => l.slipWarning !== true), 'the tan page: lines 3, 4, 5, 6 and 8 carry no warning, because each reading is ambiguous');
+  // the same slip written without the lone x: it IS warned
+  const q2 = gen('y11-diff', 2, 11);   // a question with no y′ statement of its own, so the page's y′ line is not contradicted
+  const clean = (stepEvidence(q2, '', ['y = 3/tan(x)', "y' = -3(tan(x))^(-2)(sec(x))^2", '= -3(tan(x))^(-2)(sec(x))^2', '= -3sin(x)/(cos(x))^2/(cos(x))^2'].join('\n'), { correct: false }, { slipWarnings: true }).stepReport?.lines || []);
+  // a warning needs a continuation under a continuation that was ticked: here line 3 repeats line 2, line 4 is the false rewrite (it is -3 sin/cos^4, not -3/sin^2)
+  ok(clean[3].slipWarning === true && /^This is not equal to the line above for every value of x \(for example at x = [-\d.]+: [-\d.]+ against [-\d.]+\)\. Check this step\.$/.test(clean[3].note), `a false rewrite with no ambiguous x is warned (${clean[3].note})`);
+  ok(clean[3].status === 'note', 'a warned line is a note');
+  ok(clean.every(l => l.status !== 'break'), 'a warning is never a cross');
+  // the slash column page
+  const V = stepEvidence(q, '', ['|4a+3b|', '= |4[-5,-1]+3[-2,4]|', '= |[-20 - 6/-4 + 12]|', '196', '+64', '260', '= |[14/8]| = sqrt(14^2+8^2)', '= sqrt(260)'].join('\n'), { correct: false }).stepReport.lines;
+  ok(V[2].status === 'ok' && V[6].status === 'note' && V[6].vectorWarning === true && V.every(l => l.status !== 'break'), `the slash column page: the column line ticks, |[14/8]| is a warning note, nothing is crossed (${V.map(l => l.status)})`);
+}
+
 console.log(`OWNER PAGES: ${fail ? 'FAIL' : 'PASS'} — ${pass}/${pass + fail} checks — the owner's reader text through the real marking code: comma vectors, the vector slip as a warning note, a side sum never crossed, the degree sign for a prime, the tan page; nothing true crossed, nothing false ticked`);
 if (fail) process.exit(1);
