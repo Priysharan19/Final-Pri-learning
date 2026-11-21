@@ -167,10 +167,6 @@ process.env.PRI_EDITION = 'prithagoras';
   check('Exams does not offer the generic "Sit a practice paper" card to an NSW student (the server refuses that kind of paper)', () => {
     assert.match(exams, /user\.course !== 'nsw' && <div className="card">/);
   });
-  check('an NSW student with no paper entry on offer (nswExams off, nothing else) gets a sentence and a way on, never an empty Exams page', () => {
-    assert.match(exams, /data-exams-none/);
-    assert.match(exams, /user\.course === 'nsw' && !generatedPapersFor\(user\) && !\(featureEnabled\('nswExams'\)\) && !ext1PapersFor\(user\) && !practiceSetsFor\(user\)/);
-  });
   const { settleChoice } = await import('../src/guest/guestMenu.js');
   check('the Home question picker opens on the student\'s own course (Extension 1 stays Extension 1)', () => {
     assert.equal(settleChoice('prithagoras', {}, { defaultYear: 12, defaultCourse: 'ext1' }).course, 'ext1');

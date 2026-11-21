@@ -119,11 +119,6 @@ export default function Exams() {
       {user.course === 'nsw' && featureEnabled('nswExams') && <NswPapers busy={busy} start={start} />}
       {ext1PapersFor(user) && <Ext1Papers />}
       {practiceSetsFor(user) && <PracticeSets />}
-      {/* Never an empty page: an NSW student with no paper entry on offer (the generator, the NSW papers behind the nswExams flag, the Extension 1 papers, the practice sets) is told where practice lives. */}
-      {user.course === 'nsw' && !generatedPapersFor(user) && !(featureEnabled('nswExams')) && !ext1PapersFor(user) && !practiceSetsFor(user) && (
-        <div className="card" data-exams-none><p className="sub" style={{ margin: 0 }}>{t('exams.nswNone')}</p>
-          <button className="btn btn-ghost" style={{ marginTop: 12 }} onClick={() => nav('/')}>{t('exams.nswNoneAction')}</button></div>
-      )}
       {hscCoursesFor(user).length > 0 && (
         <div className="card" data-hsc-link>
           <div className="card-title">{t('hsc.examsCardTitle')}</div>

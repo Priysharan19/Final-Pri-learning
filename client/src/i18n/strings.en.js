@@ -1872,8 +1872,6 @@ export default {
   // ── Exams.jsx ──────────────────────────────────────────────────────────────
   'exams.openFailed': 'Could not open this paper.',
   'exams.formatNotReady': 'This exam format is not ready yet.',
-  'exams.nswNone': 'No papers are open for your course yet. You can still practise by topic from the Index.',
-  'exams.nswNoneAction': 'Open the Index',
   'exams.sitPaperTitle': 'Sit a practice paper',
   'exams.sitPaperBody': 'A generated practice paper with a progressive difficulty profile. No hints, one shot, full worked solutions afterwards.',
   'exams.yearLevel': 'Year level',
