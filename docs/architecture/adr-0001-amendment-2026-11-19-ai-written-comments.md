@@ -64,6 +64,22 @@ wording is the owner's to approve and is NOT yet in `docs/legal/**`**: it is a p
 handwriting consent sheet does not cover comments (it says the question and answer are not sent). The "not reviewed by a
 lawyer" banner stays.
 
+## Validation (allowlist), retention
+
+A comment is shown only if everything in it is expected (`server/platform/lineComments/allowlist.js`, reviewed vocabulary in
+`vocabulary.js`): every prose word is in the vocabulary or in the question, the engine's note for the line, the line itself
+or the released solution; no URL, address, markup or foreign script; no marks talk; a crossed line carries no positive-verdict
+word and a ticked line no negative one; an arithmetic tick uses a smaller vocabulary and says nothing about the line's role;
+every `$...$` span passes `texSafe.cleanLatex`; a value or expression may come only from the line, the engine's note for it
+or the line above. Anything else is dropped and the engine's sentence shows. The page draws a comment only if its maths
+spans pass the same gate on the device.
+
+**Retention.** A comment is stored with the attempt under scope `practice-line-comments` (the comment text, the text of
+the student's line it was written for, the model name and the time), for as long as the attempt's other records (90 days
+from the last write, as for every `idempotency_keys` row). It is part of the account export, and account deletion removes it
+with the account (`ON DELETE CASCADE`; tested in `server/test/line-comments-check.mjs`). A refusal (allowance, ceiling) or a
+provider failure is not stored, so a later request is served.
+
 ## Residual risk
 
 The comments are judged only on a synthetic corpus and by a second model (not by a person) before release; no real

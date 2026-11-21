@@ -7,12 +7,23 @@
 // A comment is matched to a card by line number AND by the line's text: when the card is not the line the server
 // commented on, or is not a tick or the first error, nothing is drawn. Nothing is guessed.
 
+import { cleanLatex } from '../engine/texSafe.js';
+
+/** The same gate the engine's own typeset text passes (texSafe.cleanLatex): a comment with ANY maths span that fails is not drawn at all. */
+export function commentTexIsSafe(text) {
+  const s = String(text ?? '');
+  const parts = s.split('$');
+  if (parts.length % 2 === 0) return false;                       // an unpaired dollar
+  for (let i = 1; i < parts.length; i += 2) if (cleanLatex(parts[i]) === null) return false;
+  return !parts.some((p, i) => i % 2 === 0 && p.includes(String.fromCharCode(92)));   // no backslash in the prose
+}
+
 const SHOWN = new Set(['checked', 'condition', 'first-error']);
 
 /** @returns {Map<number, object>} card number -> comment */
 export function commentsByCard(cards, comments) {
   const out = new Map();
-  const list = Array.isArray(comments) ? comments.filter(c => c && c.source === 'ai' && typeof c.text === 'string' && c.text && Number.isInteger(c.n)) : [];
+  const list = Array.isArray(comments) ? comments.filter(c => c && c.source === 'ai' && typeof c.text === 'string' && c.text && Number.isInteger(c.n) && commentTexIsSafe(c.text)) : [];
   if (!list.length || !Array.isArray(cards)) return out;
   for (const c of list) {
     const card = cards.find(k => k && k.n === c.n);

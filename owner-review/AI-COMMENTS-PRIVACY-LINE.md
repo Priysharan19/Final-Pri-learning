@@ -1,8 +1,9 @@
-# Proposed privacy wording for AI-written marking comments (OWNER TO APPROVE)
+# Proposed privacy wording for AI-written marking comments (owner-approved wording, not yet live)
 
-Status: **a proposal only. No live legal document, notice or consent sheet has been changed.**
-Legal wording is the owner's to approve. **`PRI_FEATURE_LINE_COMMENTS` must not be set to 1 on any site until the owner has approved
-the wording below (or different wording) and it is live in `docs/legal/**` and, if the owner decides it, the consent sheet.**
+Status: **approved by the owner as worded on 22 November 2026; the flag may be set once this text is live.**
+The text is **NOT yet live**: adding it to `docs/legal/**` also needs a guardian-notice version decision
+(`CONSENT_NOTICE_VERSION` and `ACCEPTED_CONSENT_NOTICE_VERSIONS` in `server/platform/guardianConsent.js`; see the report that came
+with this file). Until the notices carry these sentences, `PRI_FEATURE_LINE_COMMENTS` must stay unset.
 
 ## What the feature sends, and when
 

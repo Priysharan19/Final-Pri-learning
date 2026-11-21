@@ -78,5 +78,5 @@ export function buildLineStates({ stepReport, readStates = null } = {}) {
       });
     } else lines.push({ ...base, state, reason: base.note });
   });
-  return { lines, firstError: firstBreak >= 0 ? firstBreak + 1 : 0 };
+  return { lines, firstError: firstBreak >= 0 ? firstBreak + 1 : 0, allTexts: texts };
 }

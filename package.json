@@ -160,7 +160,7 @@
     "test:reading:floor": "node server/test/reading-floor-check.mjs",
     "test:marked:page": "node client/test/marked-page-check.mjs && node client/test/marked-page-honesty-check.mjs",
     "test:line-interpreter": "node server/test/line-interpreter-check.mjs && node server/test/line-interpreter-overlay-check.mjs && node server/test/step-fold-check.mjs && node server/test/owner-pages-check.mjs && node server/test/solution-match-check.mjs",
-    "test:line-comments": "node server/test/line-comments-check.mjs",
+    "test:line-comments": "node server/test/line-comments-check.mjs && node server/test/line-comments-validator-check.mjs",
     "eval:line-interpreter": "node tools/line-interpreter-eval/run.mjs",
     "test:instrument:plot": "node client/test/student-plot-check.mjs",
     "test:marker:rubrics": "node client/test/marker-working-rubrics-check.mjs",

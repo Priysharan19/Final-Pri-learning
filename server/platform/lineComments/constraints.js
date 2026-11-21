@@ -27,6 +27,7 @@
 // None of this can change a state or a mark: the states and marks are inputs
 // here, never outputs.
 // ─────────────────────────────────────────────────────────────────────────────
+import { allowlistViolations } from './allowlist.js';
 import { mathSpans, proseOf, checkSpan, latexToPlain, squash, valueClaim, numbersIn, sameNumber, canonStmt, canonSlices, lineTex } from './math.js';
 
 export const COMMENT_KINDS = Object.freeze(['explains-correct', 'explains-error', 'next-step', 'could-not-check']);
@@ -38,7 +39,7 @@ export const OPENERS = Object.freeze({
   'first-error': ['Close', 'Not yet', 'Check this'], follows: ['Close', 'Not yet', 'Check this'],
   'not-checked': ['Check this', 'Looks right', 'Close'], 'not-read': ['Check this']
 });
-export const RULES = Object.freeze(['a', 'b', 'c', 'd', 'e', 'f', 'g']);
+export const RULES = Object.freeze(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'j', 'k']);
 
 /** The kinds a state may carry. */
 export const KINDS_FOR_STATE = Object.freeze({
@@ -279,6 +280,7 @@ export function violationsOf(comment, ctx) {
       }
     }
   }
+  for (const v of allowlistViolations(comment, ctx)) if (!out.some(x => x.code === v.code)) out.push(v);
   return out;
 }
 

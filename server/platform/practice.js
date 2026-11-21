@@ -11,7 +11,8 @@
 // their offline grades as server grades. The client transport integration is
 // a separate mandatory release gate.
 import { interpretAfterStepCheck, reportWithInterpretation } from './lineInterpreter/overlay.js';
-import { createLineCommentsHandler } from './lineComments/route.js';
+import { createLineCommentsHandler, notEnabledBody as lineCommentsNotEnabled } from './lineComments/route.js';
+import { lineCommentsEnabled } from './lineComments/provider.js';
 import { createHash, randomInt, randomUUID } from 'node:crypto';
 import { asyncRouter, asyncHandler } from './asyncRouter.js';
 import { asStore } from './store.js';
@@ -1854,7 +1855,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
 
   // The comments written on a marked answer (lineComments/route.js): after the engine, from the server's own stored reply.
   // Dark: answers `enabled: false` unless the server sets PRI_FEATURE_LINE_COMMENTS=1.
-  router.post('/:id/line-comments', rateLimit(db, 'practice-line-comments', { limit: 240, windowMs: 60 * 60 * 1000 }),
+  // The switch is checked FIRST: off, nothing runs after it (no rate-limit row, no read, nothing stored).
+  router.post('/:id/line-comments', (req, res, next) => (lineCommentsEnabled(env) ? next() : res.status(200).json(lineCommentsNotEnabled())), rateLimit(db, 'practice-line-comments', { limit: 240, windowMs: 60 * 60 * 1000 }),
     createLineCommentsHandler({ db, env, deps: { UUID, reject, MAX_AGE, solutionFor, marksPossibleFor, serverEdition } }));
 
   // ── The tutor policy's smallest next step (helpPlan.js) ─────────────────

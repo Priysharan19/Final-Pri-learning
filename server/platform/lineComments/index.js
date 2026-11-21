@@ -50,7 +50,7 @@ export async function generateLineComments({
   useModel = true, now = Date.now(), score = null
 }) {
   const stats = emptyStats();
-  const { lines } = buildLineStates({ stepReport, readStates });
+  const { lines, allTexts } = buildLineStates({ stepReport, readStates });
   const studentLines = lines.map(l => l.text);
   const at = new Date(now).toISOString();
   const result = comments => ({ version: COMMENTS_VERSION, comments, stats, edition, language, generatedAt: at });
@@ -93,7 +93,7 @@ export async function generateLineComments({
 
   const byIndex = new Map();
   for (const c of reply.comments) if (c && Number.isInteger(c.index) && !byIndex.has(c.index)) byIndex.set(c.index, c);
-  const ctx = { question, solution, studentLines, resolved, language, edition, states: lines };
+  const ctx = { question, solution, studentLines, allStudentLines: allTexts, resolved, language, edition, states: lines };
   const out = [];
   for (const line of lines) {
     stats.modelLines += 1;

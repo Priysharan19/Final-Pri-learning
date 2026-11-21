@@ -125,6 +125,12 @@ export function createLineCommentsHandler({ db, env = process.env, deps }) {
       // Kept for the account's own export and for operations; never the key or the prompt.
       provenance: { model: out.stats.model, calls: out.stats.calls, status: out.stats.status, accepted: out.stats.accepted, rejected: out.stats.rejected, spent }
     };
+    // A refusal (allowance, ceiling) or a provider failure is NOT remembered: a later request, after the allowance
+    // renews or the provider is back, is served. Nothing is stored for it.
+    if (note || /^(error|refused)/.test(out.stats.status)) {
+      await db.run('DELETE FROM idempotency_keys WHERE account_id=? AND scope=? AND key=?', [accountId, COMMENTS_SCOPE, key]);
+      return res.status(200).json(publicBody(stored, { questionId: qid, attemptId }));
+    }
     await db.run('UPDATE idempotency_keys SET response_json=?, request_digest=?, created_at=? WHERE account_id=? AND scope=? AND key=?',
       [JSON.stringify(stored), linesDigest, now, accountId, COMMENTS_SCOPE, key]);
     return res.status(200).json(publicBody(stored, { questionId: qid, attemptId }));
