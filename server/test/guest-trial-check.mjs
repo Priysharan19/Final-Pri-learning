@@ -32,7 +32,8 @@ const { requestedEngine } = await import('./support/engine.mjs');
 const { decryptDeliveryToken } = await import('../platform/deliveryCrypto.js');
 const { generateQuestion, loadAllBanks } = await import('../../client/src/engine/generators/index.js');
 const { answerTextFor } = await import('../platform/practice.js');
-const { GUEST_LIMIT, GUEST_DEFAULTS, GUEST_CSRF_HEADER } = await import('../platform/guestTrial.js');
+const { GUEST_LIMIT, GUEST_DEFAULTS, GUEST_CSRF_HEADER, guestSteps, closingStepOf, formIndexOf, formCountOf } = await import('../platform/guestTrial.js');
+const { encryptDeliveryToken } = await import('../platform/deliveryCrypto.js');
 await loadAllBanks();
 
 const h = await startApp({ engine: requestedEngine(), guest: { limits: { minAnswerMs: 0, mintDayLimit: 100, ipDayLimit: 1000 } } });
@@ -116,10 +117,13 @@ try {
 
   // ── one verdict per question ────────────────────────────────────────────────
   const wrong = await post('/v1/guest/answer', { sealed: q1.data.sealed, answer: '987654321' }, g.jar, g.headers);
-  c.deq([wrong.status, wrong.data.resolved, wrong.data.correct], [200, true, false], 'a wrong answer is marked wrong');
-  c.eq(wrong.data.answer, key1.text, 'and only now is the answer shown');
+  c.deq([wrong.status, wrong.data.resolved, wrong.data.correct, wrong.data.retry], [200, false, false, true], 'a first wrong answer is marked wrong and leaves the question open for one more try');
+  c.ok(!('answer' in wrong.data) && wrong.data.step && typeof wrong.data.step.h === 'string' && wrong.data.shown === 1 && wrong.data.total >= 2, 'the answer stays closed and the first worked step is released');
+  const secondTry = await post('/v1/guest/answer', { sealed: q1.data.sealed, answer: '987654322' }, g.jar, g.headers);
+  c.deq([secondTry.status, secondTry.data.resolved, secondTry.data.correct], [200, true, false], 'a second wrong answer closes the question');
+  c.eq(secondTry.data.answer, key1.text, 'and only now is the answer shown');
   const again = await post('/v1/guest/answer', { sealed: q1.data.sealed, answer: key1.text }, g.jar, g.headers);
-  c.eq(again.data?.error?.code, 'GUEST_ALREADY_ANSWERED', 'the same question cannot be answered again (no second guess, no replay)');
+  c.eq(again.data?.error?.code, 'GUEST_ALREADY_ANSWERED', 'the same question cannot be answered a third time (no more guesses, no replay)');
   c.eq((await post('/v1/guest/answer', { sealed: q1.data.sealed, answer: key1.text }, other.jar, other.headers)).status, 403, 'a ticket cannot be answered under another guest\'s token');
   c.eq((await post('/v1/guest/answer', { sealed: 'v1.a.b.c', answer: '1' }, g.jar, g.headers)).status, 400, 'a forged ticket is refused');
   c.eq((await post('/v1/guest/answer', { sealed: q1.data.sealed, answer: key1.text }, g.jar, {})).status, 403, 'answering needs the CSRF header');
@@ -187,7 +191,7 @@ try {
     const fast = await fpost('/v1/guest/answer', { sealed: a1.data.sealed, answer: '1' }, jar, hd);
     c.deq([fast.status, fast.data.error.code], [429, 'GUEST_TOO_FAST'], 'an answer faster than a person can read the question is refused (and no verdict is given)');
     offset += GUEST_DEFAULTS.minAnswerMs + 500;
-    c.eq((await fpost('/v1/guest/answer', { sealed: a1.data.sealed, answer: '1' }, jar, hd)).data.resolved, true, 'after the think time it is marked');
+    c.eq(typeof (await fpost('/v1/guest/answer', { sealed: a1.data.sealed, answer: '1' }, jar, hd)).data.correct, 'boolean', 'after the think time it is marked');
     const a2 = await fpost('/v1/guest/question', ASK(), jar, hd);
     c.eq(a2.status, 201, 'the second question of the process-wide two');
     const a3 = await fpost('/v1/guest/question', ASK(), jar, hd);
@@ -265,21 +269,194 @@ try {
         const hd = { [GUEST_CSRF_HEADER]: sess.data.csrf };
         const qq = await v.at('/v1/guest/question', ASK(), jar, '203.0.113.30', hd);
         const key = answerKeyOf(qq.data.sealed);
-        const wrong = key.text + '9';
+        const wrong = key.text + '9', wrong2 = key.text + '8';
         const one = await v.at('/v1/guest/answer', { sealed: qq.data.sealed, answer: wrong }, jar, '203.0.113.30', hd);
         const again = await v.at('/v1/guest/answer', { sealed: qq.data.sealed, answer: wrong }, jar, '203.0.113.30', hd);
-        c.deq([one.data.resolved, one.data.correct, again.status, again.data.resolved, again.data.correct, again.data.remaining], [true, false, 200, true, false, one.data.remaining], 'the same answer sent again after a lost reply gets the same verdict');
+        c.deq([one.data.resolved, one.data.retry, again.status, again.data.resolved, again.data.retry, again.data.step.h, again.data.remaining], [false, true, 200, false, true, one.data.step.h, one.data.remaining], 'the same answer sent again after a lost reply gets the same verdict (and the retry is not spent)');
         c.eq((await v.at('/v1/guest/session', {}, jar, '203.0.113.30')).data.remaining, one.data.remaining, 'and spends nothing');
+        const retry = await v.at('/v1/guest/answer', { sealed: qq.data.sealed, answer: wrong2 }, jar, '203.0.113.30', hd);
+        c.deq([retry.status, retry.data.resolved, retry.data.correct, retry.data.answer], [200, true, false, key.text], 'a different answer is the one retry, and it closes the question');
+        const lostRetry = await v.at('/v1/guest/answer', { sealed: qq.data.sealed, answer: wrong2 }, jar, '203.0.113.30', hd);
+        c.deq([lostRetry.status, lostRetry.data.resolved, lostRetry.data.replayed], [200, true, true], 'a lost reply to the retry is re-fetched without a third marking');
         const other = await v.at('/v1/guest/answer', { sealed: qq.data.sealed, answer: key.text }, jar, '203.0.113.30', hd);
         c.deq([other.status, other.data.error.code], [409, 'GUEST_ALREADY_ANSWERED'], 'a different answer to a closed question is not marked');
         const jar2 = {}; const sess2 = await v.at('/v1/guest/session', {}, jar2, '203.0.113.30');
-        const stranger = await v.at('/v1/guest/answer', { sealed: qq.data.sealed, answer: wrong }, jar2, '203.0.113.30', { [GUEST_CSRF_HEADER]: sess2.data.csrf });
+        const stranger = await v.at('/v1/guest/answer', { sealed: qq.data.sealed, answer: wrong2 }, jar2, '203.0.113.30', { [GUEST_CSRF_HEADER]: sess2.data.csrf });
         c.eq(stranger.status, 403, 'another token cannot re-fetch it');
         offset += GUEST_DEFAULTS.verdictRetryMs + 1000;
-        const late = await v.at('/v1/guest/answer', { sealed: qq.data.sealed, answer: wrong }, jar, '203.0.113.30', hd);
+        const late = await v.at('/v1/guest/answer', { sealed: qq.data.sealed, answer: wrong2 }, jar, '203.0.113.30', hd);
         c.eq(late.status, 409, 'after the short window the question is closed for good');
       } finally { await v.app.close(); }
     } finally { if (env === undefined) delete process.env.PRI_CLIENT_IP_HEADER; else process.env.PRI_CLIENT_IP_HEADER = env; }
+  }
+
+  // ── worked steps after a wrong answer, one retry, and "one like it" ─────────
+  {
+    const steps = (t, sealed, step, extra = {}) => post('/v1/guest/steps', { sealed, step }, t.jar, extra.headers || t.headers);
+    const answer = (t, sealed, text) => post('/v1/guest/answer', { sealed, answer: text }, t.jar, t.headers);
+    const wrongOf = text => text + '7';
+    // A token and a question whose first step does not state the answer (a few forms have no steps and behave as before).
+    const issue = async (generator = GENERATORS[0], difficulty = 2, minClose = 2) => {
+      for (let tries = 0; tries < 20; tries++) {
+        const t = await start();
+        for (let i = 0; i < 5; i++) {
+          const r = await question(t, { generator, difficulty });
+          if (r.status !== 201) break;
+          const k = answerKeyOf(r.data.sealed);
+          k.q._generator = generator;
+          const list = guestSteps(k.q);
+          if (list.length >= 2 && closingStepOf(k.q, list) >= minClose) return { t, r, k, list, sealed: r.data.sealed, closeAt: closingStepOf(k.q, list) };
+        }
+      }
+      throw new Error('no question with worked steps');
+    };
+
+    const A = await issue(GENERATORS[0], 2, 3);
+    const before = (await post('/v1/guest/session', {}, A.t.jar)).data.remaining;
+    // nothing before the first submission
+    const early = await steps(A.t, A.sealed, 1);
+    c.deq([early.status, early.data.error.code], [409, 'GUEST_NOT_ANSWERED'], 'no step is released before the first submission');
+    c.ok(!JSON.stringify(early.data).includes(A.list[0].h), 'and the refusal carries no step text');
+    c.eq((await post('/v1/guest/question', ASK({ like: A.sealed }), A.t.jar, A.t.headers)).data.error?.code, 'GUEST_NOT_ANSWERED', '"one like it" is refused for a question that has not been answered');
+    c.ok(!JSON.stringify(A.r.data).includes(A.list[0].d), 'the issued question carries no step');
+
+    // the first wrong answer: first step only, answer closed, nothing spent
+    const w = await answer(A.t, A.sealed, wrongOf(A.k.text));
+    c.deq([w.data.resolved, w.data.correct, w.data.retry, w.data.shown, w.data.step.h, w.data.step.d], [false, false, true, 1, A.list[0].h, A.list[0].d], 'a wrong answer releases the first worked step and keeps the question open');
+    c.ok(!('answer' in w.data), 'and does not release the answer');
+    c.eq(w.data.remaining, before, 'the wrong answer spends nothing more than the question did');
+    c.deq(Object.keys(w.data.step).sort(), ['d', 'h'], 'a step is a heading and its working, nothing else');
+
+    // steps are released in order, one request at a time, bound to the device
+    c.eq((await steps(A.t, A.sealed, 3)).data.error?.code, 'GUEST_STEP_ORDER', 'step 3 cannot be asked for before step 2');
+    const again1 = await steps(A.t, A.sealed, 1);
+    c.deq([again1.status, again1.data.step.h, again1.data.resolved], [200, A.list[0].h, false], 'a step already released is re-read for free');
+    const s2 = await steps(A.t, A.sealed, 2);
+    c.deq([s2.status, s2.data.shown, s2.data.total, s2.data.step.d, 'answer' in s2.data], [200, 2, A.list.length, A.list[1].d, false], 'step 2 follows, with no answer');
+    c.eq((await steps(A.t, A.sealed, A.list.length + 2)).data.error?.code, 'GUEST_STEP_ORDER', 'a step past the answer is refused');
+    c.eq((await steps(A.t, A.sealed, 14)).status, 400, 'and so is a step number no question has');
+    const stranger = await start();
+    c.eq((await steps(stranger, A.sealed, 2)).status, 403, 'another device cannot ask for this ticket\'s steps');
+    c.eq((await steps(A.t, A.sealed, 3, { headers: {} })).status, 403, 'steps need the CSRF header');
+    c.eq((await post('/v1/guest/steps', { sealed: A.sealed, step: 2, extra: 1 }, A.t.jar, A.t.headers)).status, 400, 'unknown fields are refused');
+    c.eq((await post('/v1/guest/steps', { sealed: A.sealed, step: '2' }, A.t.jar, A.t.headers)).status, 400, 'the step is a whole number');
+
+    // the retry, once, before the answer is released; a right retry is "after a step"
+    const rt = await answer(A.t, A.sealed, A.k.text);
+    c.deq([rt.data.resolved, rt.data.correct, rt.data.assisted, rt.data.answer], [true, true, true, A.k.text], 'the retry is marked, right, and recorded as after a worked step');
+    c.eq((await answer(A.t, A.sealed, wrongOf(A.k.text))).data.error?.code, 'GUEST_ALREADY_ANSWERED', 'a retry cannot be replayed: the question is closed');
+    c.eq(rt.data.remaining, before, 'a retry spends nothing');
+    c.eq((await post('/v1/guest/session', {}, A.t.jar)).data.remaining, before, 'the day\'s allowance is the same after the steps and the retry');
+    const late = await steps(A.t, A.sealed, 3);
+    c.ok(late.status === 200 || late.data.error?.code === 'GUEST_STEP_ORDER', 'steps of a closed question are still read in order');
+
+    // a first-time right answer is not assisted
+    const B = await issue();
+    const ok = await answer(B.t, B.sealed, B.k.text);
+    c.deq([ok.data.resolved, ok.data.correct, ok.data.assisted], [true, true, false], 'a right answer first time is not assisted');
+
+    // the answer released ends the retry: by the step after the last, or by the step that states it
+    const C = await issue();
+    await answer(C.t, C.sealed, wrongOf(C.k.text));
+    let last = null;
+    const freeSteps = [];
+    for (let k = 2; k < C.closeAt; k++) { last = await steps(C.t, C.sealed, k); freeSteps.push(last.data.resolved === false && !('answer' in last.data)); }
+    c.ok(freeSteps.every(Boolean), 'every step before the one that gives the answer is released without it');
+    c.eq(await answer(C.t, C.sealed, wrongOf(wrongOf(C.k.text))).then(r => r.data.resolved), true, 'until the answer is released the retry is still open (this one is spent on a wrong answer)');
+    const C2 = await issue();
+    await answer(C2.t, C2.sealed, wrongOf(C2.k.text));
+    for (let k = 2; k < C2.closeAt; k++) await steps(C2.t, C2.sealed, k);
+    c.eq(C2.closeAt === 1 + C2.list.length || /=|\\Rightarrow|⇒/.test(C2.list[C2.closeAt - 1]?.d || ''), true, 'the closing step is the answer after the last step, or a step that ends on the answer');
+    const reveal = await steps(C2.t, C2.sealed, C2.closeAt);
+    c.deq([reveal.status, reveal.data.resolved, reveal.data.answer], [200, true, C2.k.text], 'the step that releases the answer closes the question');
+    const tooLate = await answer(C2.t, C2.sealed, C2.k.text);
+    c.deq([tooLate.status, tooLate.data.error.code], [409, 'GUEST_ALREADY_ANSWERED'], 'a retry after the answer was released is refused');
+    c.eq((await steps(C2.t, C2.sealed, C2.closeAt)).data.resolved, true, 'and the released step can be read again');
+
+    // a second wrong answer closes it with the answer; there is no third
+    const D = await issue();
+    await answer(D.t, D.sealed, wrongOf(D.k.text));
+    const d2 = await answer(D.t, D.sealed, wrongOf(wrongOf(D.k.text)));
+    c.deq([d2.data.resolved, d2.data.correct, d2.data.answer, d2.data.assisted], [true, false, D.k.text, false], 'a wrong retry closes the question and shows the answer');
+    c.eq((await answer(D.t, D.sealed, D.k.text)).data.error?.code, 'GUEST_ALREADY_ANSWERED', 'no third answer');
+
+    // an unreadable entry is not a verdict and does not spend the retry
+    const E = await issue();
+    await answer(E.t, E.sealed, wrongOf(E.k.text));
+    const unreadable = await answer(E.t, E.sealed, '((((');
+    c.ok(unreadable.data.invalid === true && !('answer' in unreadable.data), 'an unreadable retry shows nothing');
+    c.eq((await answer(E.t, E.sealed, E.k.text)).data.correct, true, 'and the retry is still open afterwards');
+
+    // retries and steps never give extra questions: five questions, each stepped and retried, then the sixth is refused
+    const F = await start();
+    for (let i = 0; i < 5; i++) {
+      const r = await question(F);
+      c.eq(r.status, 201, `allowance: question ${i + 1} of 5 is issued`);
+      const w1 = await answer(F, r.data.sealed, '987654321');
+      if (w1.data.retry) { await steps(F, r.data.sealed, 2); await answer(F, r.data.sealed, '987654320'); }
+    }
+    const sixth2 = await question(F);
+    c.deq([sixth2.status, sixth2.data.error.code], [429, 'GUEST_LIMIT_REACHED'], 'after five questions, however many steps and retries, the sixth is refused');
+
+    // a one-step solution, or a first step that states the answer, is not given a retry
+    const fake = (stepsList, answerValue) => ({ answerType: 'numeric', answer: { value: answerValue, canonicalInput: String(answerValue) }, steps: stepsList });
+    c.deq(guestSteps(fake([{ h: 'Solve', d: '$x = 4$' }], 4)), [], 'one step: no retry');
+    const ends = list => closingStepOf(fake(list, 1), list);
+    c.deq([ends([{ h: 'a', d: '$3 + 2x = 1$' }, { h: 'b', d: '$x = 1$' }, { h: 'c', d: '$y = 2$' }]), ends([{ h: 'a', d: '$2x = 1$' }, { h: 'b', d: '$x + 1 = 2$' }]), ends([{ h: 'a', d: '$2x = 1$' }, { h: 'b', d: '$x - 1 = -1 \\Rightarrow x = 1$' }])], [2, 3, 2], 'the step whose working ends on the answer is the one that releases it; an intermediate equation that happens to end on the same number is not');
+    c.deq(guestSteps(fake([{ h: 'Solve', d: '$x = 4$' }, { h: 'Check', d: '$4 + 1 = 5$' }], 4)), [], 'a first step that ends on the answer: no retry');
+    c.eq(guestSteps(fake([{ h: 'Subtract', d: '$2x = 8$' }, { h: 'Divide', d: '$x = 4$' }], 4)).length, 2, 'a first step that stops short of the answer is released');
+    c.deq(guestSteps(fake([{ h: 'a', d: 'b', figure: '<svg/>' }, { h: 'c', d: 'd' }], 99)).map(x => Object.keys(x).sort()), [['d', 'h'], ['d', 'h']], 'a figure is never part of a guest step');
+
+    // a stale content version is refused as before, for a step and for "one like it"
+    const stale = tk => encryptDeliveryToken(JSON.stringify({ ...JSON.parse(decryptDeliveryToken(tk, 'guest-question-v1')), c: '2020.01.01' }), 'guest-question-v1');
+    const G = await issue();
+    await answer(G.t, G.sealed, wrongOf(G.k.text));
+    const staleSteps = await steps(G.t, stale(G.sealed), 2);
+    c.deq([staleSteps.status, staleSteps.data.error.code], [410, 'GUEST_QUESTION_EXPIRED'], 'a ticket of other content gets 410 for a step');
+    const staleAnswer = await answer(G.t, stale(G.sealed), G.k.text);
+    c.eq(staleAnswer.status, 410, 'and for a retry');
+    c.eq((await post('/v1/guest/question', ASK({ like: stale(G.sealed) }), G.t.jar, G.t.headers)).status, 410, 'and for "one like it"');
+
+    // think time and the per-address route limit still bind the new route
+    const hs = await startApp({ engine: requestedEngine(), guest: { limits: { mintDayLimit: 100, ipDayLimit: 100, routeHourLimit: 6 } } });
+    try {
+      const sp = (path, body, jar, headers = {}) => hs.request(path, { method: 'POST', jar, body, headers });
+      const jar = {}; const sess = await sp('/v1/guest/session', {}, jar); const hd = { [GUEST_CSRF_HEADER]: sess.data.csrf };
+      const qq = await sp('/v1/guest/question', ASK(), jar, hd);
+      const fast = await sp('/v1/guest/steps', { sealed: qq.data.sealed, step: 1 }, jar, hd);
+      c.deq([fast.status, fast.data.error.code], [429, 'GUEST_TOO_FAST'], 'steps asked faster than a person can read the question are refused');
+      let limited = null;
+      for (let i = 0; i < 8 && !limited; i++) { const r = await sp('/v1/guest/steps', { sealed: qq.data.sealed, step: 1 }, jar, hd); if (r.status === 429 && r.data.error.code === 'RATE_LIMITED') limited = r; }
+      c.ok(limited && limited.headers.get('retry-after'), 'the per-address route limit counts step requests');
+    } finally { await hs.close(); }
+
+    // "one like it": a different form when the skill has one; costs one question; refused at the limit and when it is not this question's skill
+    const multi = 'c7-integer-operations-current';
+    c.ok(formCountOf(multi) > 1, 'the probe skill has more than one form');
+    c.deq([formCountOf(GENERATORS[0]), formIndexOf(GENERATORS[0], 12345)], [1, 0], 'a skill with one form says so');
+    let formsSeen = new Set(); for (let seed = 1; seed < 300; seed++) formsSeen.add(formIndexOf(multi, seed * 104729));
+    c.ok(formsSeen.size > 1, 'the form index varies with the seed');
+    const L1 = await issue(multi, 2);
+    await answer(L1.t, L1.sealed, wrongOf(L1.k.text));
+    const usedBefore = (await post('/v1/guest/session', {}, L1.t.jar)).data.used;
+    const prevForm = formIndexOf(multi, L1.k.t.s);
+    let differing = 0, total = 0, noLike = null;
+    const like = await post('/v1/guest/question', ASK({ generator: multi, difficulty: 2, like: L1.sealed }), L1.t.jar, L1.t.headers);
+    c.eq(like.status, 201, '"one like it" issues a question');
+    c.ok(like.data.like.differentForm === true && formIndexOf(multi, answerKeyOf(like.data.sealed).t.s) !== prevForm, 'in a different form than the one answered');
+    c.eq(like.data.remaining, 5 - (usedBefore + 1), 'and costs exactly one of the day\'s questions');
+    c.eq((await post('/v1/guest/question', ASK({ generator: GENERATORS[0], difficulty: 2, like: L1.sealed }), L1.t.jar, L1.t.headers)).status, 400, '"one like it" must be the same skill and level as the question answered');
+    const single = await issue(GENERATORS[0], 2);
+    await answer(single.t, single.sealed, wrongOf(single.k.text));
+    const likeSingle = await post('/v1/guest/question', ASK({ like: single.sealed }), single.t.jar, single.t.headers);
+    c.deq([likeSingle.status, likeSingle.data.like.differentForm], [201, false], 'a skill with one form still offers another question and says it is not a different form');
+    c.ok(answerKeyOf(likeSingle.data.sealed).t.s !== single.k.t.s, 'a different question');
+    const full = await start();
+    let lastSealed = null;
+    for (let i = 0; i < 5; i++) { const r = await question(full, { generator: multi, difficulty: 2 }); lastSealed = r.data.sealed; }
+    await answer(full, lastSealed, '987654321');
+    const none = await post('/v1/guest/question', ASK({ generator: multi, difficulty: 2, like: lastSealed }), full.jar, full.headers);
+    c.deq([none.status, none.data.error.code], [429, 'GUEST_LIMIT_REACHED'], '"one like it" is refused when no question is left today');
   }
 
   // ── expiry ──────────────────────────────────────────────────────────────────

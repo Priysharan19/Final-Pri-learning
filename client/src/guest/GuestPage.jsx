@@ -26,6 +26,7 @@ import { EDITION } from '../platform/edition.js';
 import { rememberedChoice, rememberChoice } from './QuestionPicker.jsx';
 import { coursesFor, chaptersFor, guestYears, guestTarget, settleChoice, PICKER_FORMS } from './guestMenu.js';
 import { startGuest, askGuest, answerGuest } from './guestTrial.js';
+import { useWorked, WorkedSteps, WorkedControls, hasMore } from './WorkedHelp.jsx';
 import './guest.css';
 
 const DEFAULT_LIMIT = 5;
@@ -43,22 +44,28 @@ function Mark({ right }) {
   );
 }
 
-/** Today's questions as squares: marked right, marked wrong, used (before this page opened, or left unanswered), open now, or still to come. */
+/** Today's questions as squares: right first time, right after a hint or a worked step, not yet right, used (before this page opened, or left unanswered), open now, or still to come. */
 function Tally({ limit, used, log, t }) {
   const before = used - log.length;                    // questions used that this page did not see
   const cells = Array.from({ length: limit }, (_, i) => {
     if (i >= used) return 'left';
     const mine = log[i - before];
-    return mine === 'open' ? 'now' : mine === 'right' || mine === 'wrong' ? mine : 'used';
+    return mine === 'open' ? 'now' : ['right', 'assisted', 'wrong'].includes(mine) ? mine : 'used';
   });
-  const right = cells.filter(c => c === 'right').length;
-  const wrong = cells.filter(c => c === 'wrong').length;
+  const count = k => cells.filter(c => c === k).length;
+  const [first, after, notYet] = [count('right'), count('assisted'), count('wrong')];
   return (
-    <p className="gp-tally" data-guest-left>
+    <div className="gp-tally" data-guest-left>
       <span className="gp-squares" aria-hidden="true">{cells.map((c, i) => <i key={i} className={`is-${c}`} />)}</span>
-      <span>{t('guest.leftToday', { n: limit - used, count: limit - used })}</span>
-      {(right + wrong) > 0 && <span className="sr-only">{t('guest.tallySr', { right, wrong })}</span>}
-    </p>
+      <p className="gp-left">{t('guest.leftToday', { n: limit - used, count: limit - used })}</p>
+      {(first + after + notYet) > 0 && (
+        <ul className="gp-tally-sum" data-guest-tally aria-label={t('guest.tallyLabel')}>
+          {first > 0 && <li data-tally="right">{t('guest.tallyFirst', { n: first })}</li>}
+          {after > 0 && <li data-tally="assisted">{t('guest.tallyAfter', { n: after })}</li>}
+          {notYet > 0 && <li data-tally="wrong">{t('guest.tallyNot', { n: notYet })}</li>}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -106,7 +113,7 @@ export default function GuestPage() {
   const t = useT();
   const nav = useNavigate();
   const [choice, setChoice] = useState(() => settleChoice(EDITION, rememberedChoice(EDITION), { defaultYear: DEFAULT_YEAR }));
-  const [stage, setStage] = useState('opening'); // opening | choose | question | verdict | signup
+  const [stage, setStage] = useState('opening'); // opening | choose | question | worked (a wrong first answer, one try left) | verdict | signup
   const [choosing, setChoosing] = useState(false);
   const [limit, setLimit] = useState(DEFAULT_LIMIT);
   const [remaining, setRemaining] = useState(null);
@@ -115,7 +122,11 @@ export default function GuestPage() {
   const [answer, setAnswer] = useState('');
   const [option, setOption] = useState(null);
   const [verdict, setVerdict] = useState(null);
-  const [log, setLog] = useState([]);              // every question this page was issued: open | right | wrong | skipped
+  const [log, setLog] = useState([]);              // every question this page was issued: open | right | assisted | wrong | skipped
+  const [retrying, setRetrying] = useState(false);   // the one retry, after a worked step, is being typed
+  const [firstAnswer, setFirstAnswer] = useState(''); // the wrong first answer, kept on the page
+  const [firstOption, setFirstOption] = useState(null);
+  const { worked, asking, trouble, open: openWorked, close: closeWorked, more: moreWorked, clear: clearWorked } = useWorked();
   const [problem, setProblem] = useState(null);
   const [hint, setHint] = useState(false);
   const [why, setWhy] = useState('limit');
@@ -144,7 +155,7 @@ export default function GuestPage() {
   const prompt = reason => { setWhy(reason); setChoosing(false); land.current = 'head'; setStage(s => { if (s !== 'signup') cameFrom.current = s === 'opening' ? 'choose' : s; return 'signup'; }); };
   const leavePrompt = () => { land.current = 'head'; setChoosing(true); setStage(cameFrom.current); };
 
-  const start = useCallback(async (picked, { arrival = false } = {}) => {
+  const start = useCallback(async (picked, { arrival = false, like = null } = {}) => {
     setProblem(null);
     if (picked.form === 'written') return prompt('written');
     if (flying.current) return;
@@ -153,10 +164,11 @@ export default function GuestPage() {
     try {
       const target = guestTarget(EDITION, picked);
       if (!target) throw Object.assign(new Error('not offered'), { reason: 'none' });
-      const out = await askGuest({ generator: target.generator, difficulty: target.difficulty, curriculum: 'nsw', form: picked.form });
+      const out = await askGuest({ generator: target.generator, difficulty: target.difficulty, curriculum: 'nsw', form: picked.form, like });
       setAsked(picked); setItem(out); setRemaining(out.remaining); if (out.limit) setLimit(out.limit);
       setLog(l => [...l.map(m => (m === 'open' ? 'skipped' : m)), 'open']);
       setAnswer(''); setOption(null); setVerdict(null); setHint(false); setChoosing(false);
+      clearWorked(); setRetrying(false); setFirstAnswer(''); setFirstOption(null);
       // A fine pointer means a keyboard is at hand: the visitor can type at once. A phone keeps its keyboard down until asked.
       const typed = out.question?.answerType !== 'mcq';
       // On arrival the heading takes focus so a screen reader says "Question n of 5" first; later questions go to the answer.
@@ -169,7 +181,7 @@ export default function GuestPage() {
       if (!arrival && ['limit', 'address', 'busy', 'account'].includes(r)) prompt(r);
       else { if (!arrival || r === 'none') setProblem(ERROR_KEY[r] || 'guest.offline'); setStage(s => (s === 'opening' ? 'choose' : s)); if (!arrival) setChoosing(true); }
     } finally { flying.current = false; setBusy(false); }
-  }, []);
+  }, [clearWorked]);
 
   // Arrival. Untouched day and a page someone is looking at: draw the first question now. Otherwise the chooser.
   useEffect(() => {
@@ -187,47 +199,76 @@ export default function GuestPage() {
   useEffect(() => {
     const where = land.current; land.current = null;
     if (where === 'answer') answerRef.current?.focus({ preventScroll: true });
+    else if (where === 'option') document.querySelector('[data-gp-option]:not(:disabled)')?.focus({ preventScroll: true });
     else if (where === 'head') headRef.current?.focus({ preventScroll: false });
-  }, [stage, item, choosing]);
+  }, [stage, item, choosing, retrying]);
 
   const q = item?.question;
   const mcq = q?.answerType === 'mcq';
   const given = mcq ? (option === null ? '' : String(option)) : answer.trim();
   const marked = stage === 'verdict';
+  const editable = stage === 'question' || (stage === 'worked' && retrying);
+  const settled = marked || (stage === 'worked' && !retrying);   // the answer on the page has its mark
 
   const check = async e => {
     e?.preventDefault();
-    if (!given || busy || marked) return;
+    if (!given || busy || !editable) return;
     setBusy(true); setProblem(null);
     try {
       const out = await answerGuest({ sealed: item.sealed, answer: given });
       if (out.invalid) setProblem('guest.unreadable');
-      else {
-        setVerdict(out); setLog(l => [...l.slice(0, -1), out.correct ? 'right' : 'wrong']);
+      else if (out.resolved === false && out.retry) {
+        // A first wrong answer on a question with worked steps: the first step, the answer kept, one more try.
+        openWorked(out); setVerdict(null); setFirstAnswer(given); setFirstOption(mcq ? option : null); setRetrying(false);
+        setLog(l => [...l.slice(0, -1), 'wrong']);
         if (typeof out.remaining === 'number') setRemaining(out.remaining);
-        setStage('verdict');
+        setStage('worked');
+      } else {
+        const assisted = out.correct === true && (out.assisted === true || hint);
+        if (stage === 'worked') closeWorked(out);
+        setVerdict({ ...out, assisted, byStep: out.assisted === true });
+        setLog(l => [...l.slice(0, -1), out.correct ? (assisted ? 'assisted' : 'right') : 'wrong']);
+        if (typeof out.remaining === 'number') setRemaining(out.remaining);
+        setRetrying(false); setStage('verdict');
       }
     } catch (error) {
       setProblem(ERROR_KEY[error.reason] || 'guest.offline');
-      if (error.reason === 'expired') { setItem(null); setLog(l => l.map(m => (m === 'open' ? 'skipped' : m))); setStage('choose'); }
+      if (error.reason === 'expired') { setItem(null); setLog(l => l.map(m => (m === 'open' ? 'skipped' : m))); clearWorked(); setStage('choose'); }
     } finally { setBusy(false); }
   };
 
+  const startRetry = () => {
+    setRetrying(true); setProblem(null); setAnswer(''); setOption(null);
+    land.current = mcq ? 'option' : 'answer';
+  };
+  // The next step, or the answer as the step after the last: that closes the question (no retry after it).
+  const showMore = async () => {
+    const out = await moreWorked(item.sealed);
+    if (out && out.answer != null && stage === 'worked') {
+      setVerdict({ resolved: true, correct: false, answer: out.answer, assisted: false, moreForms: worked?.moreForms === true });
+      if (typeof out.remaining === 'number') setRemaining(out.remaining);
+      setRetrying(false); land.current = 'head'; setStage('verdict');
+    }
+  };
+
   const next = () => (remaining === 0 ? prompt('limit') : start(asked));
+  const likeIt = () => (remaining === 0 ? prompt('limit') : start(asked, { like: item?.sealed }));
   const openChooser = () => { land.current = 'head'; setProblem(null); setChoosing(true); };
-  const closeChooser = () => { land.current = marked ? 'head' : (mcq ? 'head' : 'answer'); setProblem(null); setChoosing(false); };
+  const closeChooser = () => { land.current = !editable ? 'head' : (mcq ? 'head' : 'answer'); setProblem(null); setChoosing(false); };
 
   const left = remaining ?? limit;
   const used = limit - left;
-  const showChooser = stage === 'choose' || (choosing && (stage === 'question' || stage === 'verdict'));
-  const open = Boolean(q) && stage === 'question';
+  const showChooser = stage === 'choose' || (choosing && (stage === 'question' || stage === 'worked' || stage === 'verdict'));
+  const open = Boolean(q) && (stage === 'question' || stage === 'worked');
   // The question on the page is the newest one used; the chooser is choosing the one after it.
   const number = q && !showChooser ? Math.max(1, used) : Math.min(limit, used + 1);
-  const shown = (stage === 'question' || stage === 'verdict') && !showChooser ? asked : choice;
+  const shown = (stage === 'question' || stage === 'worked' || stage === 'verdict') && !showChooser ? asked : choice;
   const chapterName = chaptersFor(EDITION, shown?.year, shown?.course).find(c => c.id === shown?.chapter)?.name || '';
   const preview = !mcq && answer.trim() ? numberTex(answer.trim()) : '';
   const typeset = preview.startsWith('$') ? preview : '';
   const correctIndex = mcq && verdict?.answer != null ? q.mcqOptions.findIndex(o => String(o) === String(verdict.answer)) : -1;
+  // After the working, a new question like this one is offered when the answer was missed or needed help.
+  const offerLike = marked && verdict && (!verdict.correct || verdict.assisted);
 
   return (
     <div className="auth-wrap gt gp" data-guest-try data-guest-page data-stage={stage}>
@@ -259,7 +300,7 @@ export default function GuestPage() {
                   <div><dt>{t('picker.level')}</dt><dd>{shown.difficulty != null ? t(`difficulty.${shown.difficulty}`) : ''}</dd></div>
                 </dl>
               )}
-              {(stage === 'question' || stage === 'verdict') && !showChooser && (
+              {(stage === 'question' || stage === 'worked' || stage === 'verdict') && !showChooser && (
                 <button type="button" className="gp-link" data-guest-change aria-expanded="false" aria-controls="gp-chooser" onClick={openChooser}>{t('guest.changeTopic')}</button>
               )}
             </aside>
@@ -305,14 +346,14 @@ export default function GuestPage() {
                 <div className={`gp-prompt${arrived ? ' is-arriving' : ''}`} id="gp-prompt" lang="en"><MathText block text={q.prompt} /></div>
                 <form onSubmit={check} className="gp-answer">
                   {mcq ? (
-                    <fieldset className="gp-options" disabled={marked || busy}>
+                    <fieldset className="gp-options" disabled={!editable || busy}>
                       <legend>{t('guest.optionsLabel')}</legend>
                       {q.mcqOptions.map((opt, i) => (
-                        <label key={i} className={`gt-option gp-option${option === i ? ' on' : ''}${marked && i === correctIndex ? ' is-right' : ''}${marked && option === i && i !== correctIndex ? ' is-wrong' : ''}`}>
-                          <input type="radio" name="gp-option" value={i} checked={option === i} onChange={() => setOption(i)} />
+                        <label key={i} className={`gt-option gp-option${option === i ? ' on' : ''}${marked && i === correctIndex ? ' is-right' : ''}${(settled && option === i && i !== correctIndex) || (retrying && firstOption === i) ? ' is-wrong' : ''}`}>
+                          <input type="radio" name="gp-option" data-gp-option value={i} checked={option === i} disabled={retrying && firstOption === i} onChange={() => setOption(i)} />
                           <span className="gp-key" aria-hidden="true">{'ABCD'[i]}</span>
                           <span lang="en"><MathText text={opt} /></span>
-                          {marked && (i === correctIndex || option === i) && <Mark right={i === correctIndex} />}
+                          {((marked && (i === correctIndex || option === i)) || (settled && !marked && option === i) || (retrying && firstOption === i)) && <Mark right={marked && i === correctIndex} />}
                         </label>
                       ))}
                     </fieldset>
@@ -321,10 +362,10 @@ export default function GuestPage() {
                       <label htmlFor="gt-answer">{t('guest.answerLabel')}</label>
                       <div className="gp-typed-row">
                         {q.answerPrefix && <span className="gp-affix" lang="en"><MathText text={affixTex(q.answerPrefix)} /></span>}
-                        <input id="gt-answer" ref={answerRef} className="input gp-input" value={answer} readOnly={marked || busy} aria-readonly={marked || busy || undefined} maxLength={200}
+                        <input id="gt-answer" ref={answerRef} className="input gp-input" value={answer} readOnly={!editable || busy} aria-readonly={!editable || busy || undefined} maxLength={200}
                           aria-describedby="gp-prompt" onChange={e => setAnswer(e.target.value)} autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
                         {q.answerSuffix && <span className="gp-affix" lang="en"><MathText text={q.answerSuffix} /></span>}
-                        {!marked && <button type="submit" className="btn btn-primary gp-check" disabled={!given || busy} data-guest-check>{busy ? t('guest.checking') : t('guest.check')}</button>}
+                        {editable && <button type="submit" className="btn btn-primary gp-check" disabled={!given || busy} data-guest-check>{busy ? t('guest.checking') : t('guest.check')}</button>}
                       </div>
                       {/* The working line: what was typed, set out as maths, large, on a ruled line; once marked it carries the mark. */}
                       <p className="gp-working" data-guest-reads>
@@ -332,28 +373,51 @@ export default function GuestPage() {
                         {typeset
                           ? <span className="gp-line" lang="en"><MathText text={typeset} /></span>
                           : <span className="gp-how">{marked ? answer : t('guest.howToType')}</span>}
-                        {marked && verdict && <Mark right={verdict.correct} />}
+                        {settled && <Mark right={marked && verdict?.correct === true} />}
                       </p>
+                      {retrying && firstAnswer && (
+                        <p className="gp-first" data-guest-first-answer><span className="gp-reads-k">{t('guest.firstAnswer')}</span> <span className="gp-line-sm" lang="en"><MathText text={numberTex(firstAnswer)} /></span><Mark right={false} /></p>
+                      )}
                     </div>
                   )}
-                  {!marked && (mcq || (Array.isArray(q.hints) && q.hints[0] && !hint)) && (
+                  {editable && (mcq || (stage === 'question' && Array.isArray(q.hints) && q.hints[0] && !hint)) && (
                     <div className="gp-actions">
                       {mcq && <button type="submit" className="btn btn-primary gp-check" disabled={!given || busy} data-guest-check>{busy ? t('guest.checking') : t('guest.check')}</button>}
-                      {Array.isArray(q.hints) && q.hints[0] && !hint && <button type="button" className="gp-link" onClick={() => setHint(true)}>{t('guest.hint')}</button>}
+                      {stage === 'question' && Array.isArray(q.hints) && q.hints[0] && !hint && <button type="button" className="gp-link" onClick={() => setHint(true)}>{t('guest.hint')}</button>}
                     </div>
                   )}
                 </form>
                 {hint && q.hints?.[0] && <p className="gp-hint" lang="en"><MathText text={String(q.hints[0].text ?? q.hints[0])} /></p>}
                 {problem && <p className="gp-problem" role="alert" data-guest-problem>{t(problem)}</p>}
+                {stage === 'worked' && worked && (
+                  <>
+                    <p className="gp-verdict-line gp-worked-line" role="status" data-guest-verdict="wrong" data-guest-stage="worked"><Mark right={false} />{t('guest.notQuite')}</p>
+                    {!retrying && <p className="gp-quiet gp-worked-lede">{t('guest.firstStepLede')}</p>}
+                  </>
+                )}
+                {(stage === 'worked' || stage === 'verdict') && worked && worked.steps.length > 0 && (
+                  <WorkedSteps steps={worked.steps} heading={t('guest.stepsHeading')} label={n => t('guest.stepLabel', { n })} idPrefix="gp" />
+                )}
+                {stage === 'worked' && worked && (
+                  <WorkedControls worked={worked} phase="worked" retrying={retrying} asking={asking} trouble={trouble} onRetry={startRetry} onMore={showMore} t={t} prefix="gp" />
+                )}
                 {marked && verdict && (
-                  <div className="gp-verdict" role="status" data-guest-verdict={verdict.correct ? 'correct' : 'wrong'}>
-                    <p className="gp-verdict-line"><Mark right={verdict.correct} />{verdict.correct ? t('guest.correct') : t('guest.notQuite')}</p>
+                  <div className="gp-verdict" role="status" data-guest-verdict={verdict.correct ? 'correct' : 'wrong'} data-guest-assisted={verdict.assisted ? (verdict.byStep ? 'step' : 'hint') : undefined}>
+                    <p className="gp-verdict-line"><Mark right={verdict.correct} />{verdict.correct ? (verdict.assisted ? t(verdict.byStep ? 'guest.correctAfterStep' : 'guest.correctAfterHint') : t('guest.correct')) : t('guest.notQuite')}</p>
                     {verdict.answer && (
                       <p className="gp-working gp-verdict-answer"><span className="gp-reads-k">{t('guest.theAnswerIs')}</span> <span className="gp-line"><ServerAnswer text={verdict.answer} q={q} /></span></p>
                     )}
-                    <div className="gp-actions">
-                      <button type="button" className="btn btn-primary" data-guest-next onClick={next} disabled={busy} autoFocus>{remaining === 0 ? t('guest.createAccount') : t('guest.next')}</button>
-                    </div>
+                  </div>
+                )}
+                {marked && verdict && worked && hasMore(worked) && (
+                  <WorkedControls worked={worked} phase="closed" retrying={false} asking={asking} trouble={trouble} onMore={showMore} t={t} prefix="gp" />
+                )}
+                {marked && verdict && (
+                  <div className="gp-actions gp-after" data-guest-after>
+                    {offerLike && remaining === 0 && <p className="gp-quiet gp-nolike" data-guest-no-like>{t('guest.noLikeLeft')}</p>}
+                    <button type="button" className="btn btn-primary" data-guest-next={!offerLike || remaining === 0 ? '' : undefined} data-guest-like={offerLike && remaining !== 0 ? '' : undefined} onClick={offerLike ? likeIt : next} disabled={busy} autoFocus={!worked || !hasMore(worked)}>
+                      {remaining === 0 ? t('guest.createAccount') : offerLike ? t(verdict.moreForms ? 'guest.likeIt' : 'guest.likeItTopic') : t('guest.next')}
+                    </button>
                   </div>
                 )}
               </section>

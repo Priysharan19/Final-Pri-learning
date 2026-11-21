@@ -21,6 +21,18 @@
 // hold a count and a window start. Nothing else; the existing housekeeping
 // sweep deletes each row a day after its window opens.
 //
+// After a wrong answer (the worked-step flow): the first verdict on a question
+// that has worked steps does not reveal the answer. It returns the first step,
+// and the question stays open for ONE more answer, for as long as the answer has
+// not been released. Further steps are released one request at a time by
+// /steps, in order; asking for the step after the last is what releases the
+// answer, and that closes the question. The state is three keyed counters on the
+// question (a wrong verdict, steps released, closed); the ticket stays sealed
+// and stateless, so a device cannot move it. Steps are never released before a
+// first verdict, a retry is a second verdict that closes the question, and
+// neither a step nor a retry spends a unit of the day's allowance: only a
+// question does.
+//
 // What a guest can never reach: an account, a session, a sync, a history, the
 // handwriting or photo reader (a paid provider), a hint beyond the first
 // authored one, a question that is premium, or the answer key before a verdict.
@@ -43,7 +55,8 @@ import { consumeRateLimit, clientIdentity } from './security.js';
 import { tagPolicy } from './routePolicy.js';
 import { encryptDeliveryToken, decryptDeliveryToken, guestKey } from './deliveryCrypto.js';
 import { bankPolicy, sealForEdition } from './editionBanks.js';
-import { generateQuestion } from '../../client/src/engine/generators/index.js';
+import { generateQuestion, formDrawShares } from '../../client/src/engine/generators/index.js';
+import { makeRng } from '../../client/src/engine/qhelpers.js';
 import { subtopicOfferedIn } from '../../client/src/engine/offeringRules.js';
 import { editionOffering } from './edition.js';
 import { premiumCapabilityForGenerator } from '../../client/src/engine/practiceAllowance.js';
@@ -79,7 +92,7 @@ export const GUEST_DEFAULTS = Object.freeze({
   prefixDayLimit: 60,
   prefixMintDayLimit: 24,
   // Per address and hour, across all guest routes (the route limiter below).
-  routeHourLimit: 120,
+  routeHourLimit: 240,
   // A question cannot be answered faster than a person can read it. Scripts
   // that issue-and-answer in a loop pay this wait on every question.
   minAnswerMs: 2000,
@@ -92,6 +105,61 @@ export const GUEST_DEFAULTS = Object.freeze({
   // Search for a question of the asked-for form (typed / choice).
   formDraws: 60
 });
+
+/** The most worked steps a guest question can release. */
+const MAX_STEPS = 12;
+
+/**
+ * Which form of its skill a seed draws: 0 is the direct form, 1... the extra
+ * forms, by the engine's own share table and stream (engine/generators/index.js
+ * pickForm). A skill with one form has only 0. Used only to offer "one like it"
+ * in a different form; it never touches a mark.
+ */
+export function formIndexOf(generator, seed) {
+  const shares = formDrawShares(generator);
+  if (!shares) return 0;
+  let at = makeRng((seed ^ 0x2f6b9c1d) >>> 0)();
+  for (let i = 0; i < shares.length; i++) {
+    if (at < shares[i]) return i;
+    at -= shares[i];
+  }
+  return shares.length - 1;
+}
+export const formCountOf = generator => formDrawShares(generator)?.length || 1;
+
+const bareText = text => String(text ?? '').replace(/\\(?:Rightarrow|rightarrow|implies|therefore)/g, '⇒').replace(/\\(?:dfrac|frac|left|right)/g, '').replace(/[\s$]/g, '').replace(/[−–]/g, '-').replace(/\.$/, '').toLowerCase();
+const escapeRe = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/**
+ * Whether a step's working ends on the answer: its last equation is the answer ("k = 1", "-2 + k = -1 ⇒ k = 1", or the answer alone).
+ * Such a step is the answer, whatever it is headed, so showing it ends the question as the answer does.
+ */
+function statesAnswer(step, answerText) {
+  const d = bareText(step?.d), key = bareText(answerText);
+  if (!d || !key) return false;
+  const value = key.replace(/^[a-z]'?(\([a-z0-9]\))?=/, '');
+  if (d === key || d === value) return true;
+  return new RegExp(`(^|[⇒;,])[a-z][^=+\\-*/^]{0,7}=${escapeRe(value)}$`).test(d);
+}
+
+/** The worked steps a guest may be shown: heading and working only (a figure is not part of the trial), or [] when there is no safe first step. */
+export function guestSteps(q) {
+  const steps = Array.isArray(q?.steps) ? q.steps : [];
+  let out = steps.filter(x => x && typeof x.h === 'string' && typeof x.d === 'string').map(x => ({ h: x.h.slice(0, 400), d: x.d.slice(0, 1200) }));
+  // A step that only restates the question is not the first useful step.
+  const asked = bareText(q?.prompt);
+  while (out.length && bareText(out[0].d).length >= 3 && asked.includes(bareText(out[0].d))) out = out.slice(1);
+  out = out.slice(0, MAX_STEPS);
+  if (out.length < 2) return [];   // a one-step solution is the answer itself: no retry is offered
+  // A first step whose working ends on the answer is not a step toward it: the question resolves as it always did.
+  if (statesAnswer(out[0], answerTextFor(q))) return [];
+  return out;
+}
+
+/** The 1-based step at which the answer is released: the first step that states it, else the answer after the last step. */
+export function closingStepOf(q, steps = guestSteps(q)) {
+  const at = steps.findIndex(step => statesAnswer(step, answerTextFor(q)));
+  return at === -1 ? steps.length + 1 : at + 1;
+}
 
 const FORMS = new Set(['any', 'typed', 'choice']);
 const GENERATOR = /^[a-z][a-z0-9]{0,11}-[a-z0-9][a-z0-9-]{1,95}$/;
@@ -241,13 +309,25 @@ export function createGuestTrialRouter(db, { env = process.env, banks = bankPoli
   // ── A question ─────────────────────────────────────────────────────────────
   router.post('/question', perAddress, guestCsrf, asyncHandler(async (req, res) => {
     const body = req.body;
-    const allowed = new Set(['generator', 'difficulty', 'curriculum', 'form']);
+    const allowed = new Set(['generator', 'difficulty', 'curriculum', 'form', 'like']);
     if (!plain(body) || Object.keys(body).some(k => !allowed.has(k))) return reject(res, 400, 'GUEST_INVALID', 'Choose a chapter, a level and a type of question.');
     const generator = typeof body.generator === 'string' ? body.generator : '';
     const difficulty = Number.isInteger(body.difficulty) ? body.difficulty : NaN;
     const form = body.form === undefined ? 'any' : body.form;
     if (!GENERATOR.test(generator) || !(difficulty >= 1 && difficulty <= 4) || !FORMS.has(form) || body.curriculum !== banks.curriculum) {
       return reject(res, 400, 'GUEST_INVALID', 'Choose a chapter, a level and a type of question.');
+    }
+    // "One like it": a new question on the same skill and level in a different form than one this device has
+    // answered. The earlier question must be this device's own and answered (a verdict has been given on it).
+    let like = null;
+    if (body.like !== undefined) {
+      if (typeof body.like !== 'string' || body.like.length > 2000) return reject(res, 400, 'GUEST_INVALID', 'Choose a chapter, a level and a type of question.');
+      const opened = openTicket(req, res, body.like, { think: false });
+      if (!opened) return undefined;
+      if (opened.ticket.g !== generator || opened.ticket.d !== difficulty) return reject(res, 400, 'GUEST_QUESTION_INVALID', 'This question is not valid.');
+      const k = names(opened.ticket);
+      if (!(await live(k.done, opened.now)) && !(await live(k.wrong, opened.now))) return reject(res, 409, 'GUEST_NOT_ANSWERED', 'Answer the question first.');
+      like = { form: formIndexOf(generator, opened.ticket.s), seed: opened.ticket.s };
     }
     // An edition's own banks only; and nothing premium or archival for a guest.
     if (!banks.issues(generator)) return reject(res, banks.outside.status, banks.outside.code, banks.outside.message);
@@ -258,7 +338,8 @@ export function createGuestTrialRouter(db, { env = process.env, banks = bankPoli
     }
     await ensureBanks();
     // Choose first (CPU, no state), then spend a unit only for a question that will really be served.
-    let q = null;
+    let q = null, sameForm = false, fallback = null;
+    const forms = formCountOf(generator);
     try {
       for (let i = 0; i < L.formDraws && !q; i++) {
         const seed = randomInt(0x80000000);
@@ -271,8 +352,12 @@ export function createGuestTrialRouter(db, { env = process.env, banks = bankPoli
         candidate._generator = generator;
         candidate._practiceMode = 'practice';
         if (!sealForEdition(candidate, banks)) continue;
+        if (like && (candidate.seed === like.seed)) continue;
+        // A different form when the skill has one; otherwise (or when none turns up) the best that is a different question.
+        if (like && forms > 1 && formIndexOf(generator, candidate.seed) === like.form) { fallback = fallback || candidate; continue; }
         q = candidate;
       }
+      if (!q && fallback) { q = fallback; sameForm = true; }
     } catch { q = null; }
     if (!q) return reject(res, 422, 'GUEST_NO_QUESTION', 'There is no question of that kind at this level yet.');
 
@@ -301,62 +386,90 @@ export function createGuestTrialRouter(db, { env = process.env, banks = bankPoli
     // Only the first authored hint is ever offered to a guest.
     if (Array.isArray(publicQ.hints)) publicQ.hints = publicQ.hints.slice(0, 1);
     res.set('Cache-Control', 'no-store');
-    return res.status(201).json({ question: publicQ, sealed, expiresAt: now + L.questionTtlMs, limit: L.limit, remaining: mine.remaining });
+    return res.status(201).json({ question: publicQ, sealed, expiresAt: now + L.questionTtlMs, limit: L.limit, remaining: mine.remaining, ...(like ? { like: { differentForm: forms > 1 && !sameForm } } : {}) });
   }));
 
-  // ── One verdict per question ───────────────────────────────────────────────
+  // ── The ticket of an issued question ───────────────────────────────────────
+  // Sealed, bound to this device, unexpired, of this server's content, and (for a
+  // verdict or a step) not asked faster than a person can read. Sends the refusal
+  // itself and resolves null, or resolves { ticket, now }.
+  const openTicket = (req, res, sealed, { think = true } = {}) => {
+    let ticket;
+    try { ticket = JSON.parse(decryptDeliveryToken(sealed, QUESTION_CONTEXT)); } catch { ticket = null; }
+    const now = clock();
+    if (!plain(ticket) || typeof ticket.n !== 'string' || !UUID.test(ticket.n) || !GENERATOR.test(String(ticket.g)) || !Number.isInteger(ticket.d) || !Number.isSafeInteger(ticket.s)) {
+      reject(res, 400, 'GUEST_QUESTION_INVALID', 'This question is not valid.'); return null;
+    }
+    // Bound to the device that was issued it: a question cannot be answered under another guest's token.
+    if (ticket.t !== req.guest.id) { reject(res, 403, 'GUEST_QUESTION_INVALID', 'This question is not valid.'); return null; }
+    if (!(ticket.x > now)) { reject(res, 410, 'GUEST_QUESTION_EXPIRED', 'This question has expired. Start another.'); return null; }
+    // Issued under other content than this server serves: its seed would draw a different question. Refused as an expired one is.
+    if ((typeof ticket.c === 'string' ? ticket.c : UNVERSIONED_TOKEN_CONTENT_VERSION) !== CONTENT_VERSION) { reject(res, 410, 'GUEST_QUESTION_EXPIRED', 'This question has expired. Start another.'); return null; }
+    if (think && now - ticket.i < L.minAnswerMs) { reject(res, 429, 'GUEST_TOO_FAST', 'Take a moment to read the question, then answer.', { retryAfterMs: L.minAnswerMs - (now - ticket.i) }); return null; }
+    if (!banks.issues(ticket.g)) { reject(res, banks.outside.status, banks.outside.code, banks.outside.message); return null; }
+    return { ticket, now };
+  };
+  const rebuild = async ticket => {
+    await ensureBanks();
+    let q;
+    try { q = generateQuestion(ticket.g, ticket.d, ticket.s, undefined, null); } catch { q = null; }
+    if (!q) return null;
+    q._generator = ticket.g;
+    q._practiceMode = 'practice';
+    return sealForEdition(q, banks) ? q : null;
+  };
+  // The keyed counters of one question: closed, first verdict wrong (the one retry is open), steps released.
+  const names = ticket => ({
+    done: `guest-done:${scramble(`q:${ticket.n}`)}`,
+    wrong: `guest-wrong:${scramble(`q:${ticket.n}`)}`,
+    steps: `guest-steps:${scramble(`q:${ticket.n}`)}`
+  });
+  const live = (bucket, now) => db.get('SELECT count FROM rate_limits WHERE bucket=? AND window_start>?', [bucket, now - DAY]);
+  const stepBody = (q, steps, shown) => ({ shown, total: steps.length, step: shown >= 1 && shown <= steps.length ? steps[shown - 1] : null, endsNext: shown < closingStepOf(q, steps) && shown + 1 >= closingStepOf(q, steps), moreForms: formCountOf(q._generator) > 1 });
+
+  // ── One verdict per question, and one more after a worked step ─────────────
   router.post('/answer', perAddress, guestCsrf, asyncHandler(async (req, res) => {
     const body = req.body;
     if (!plain(body) || Object.keys(body).some(k => !['sealed', 'answer'].includes(k)) || typeof body.sealed !== 'string' || body.sealed.length > 2000
       || typeof body.answer !== 'string' || body.answer.length > 200 || /[\u0000-\u0008\u000b\u000e-\u001f]/.test(body.answer)) {
       return reject(res, 400, 'GUEST_INVALID', 'Send the question and a short answer.');
     }
-    let ticket;
-    try { ticket = JSON.parse(decryptDeliveryToken(body.sealed, QUESTION_CONTEXT)); } catch { ticket = null; }
-    const now = clock();
-    if (!plain(ticket) || typeof ticket.n !== 'string' || !UUID.test(ticket.n) || !GENERATOR.test(String(ticket.g)) || !Number.isInteger(ticket.d) || !Number.isSafeInteger(ticket.s)) {
-      return reject(res, 400, 'GUEST_QUESTION_INVALID', 'This question is not valid.');
-    }
-    // Bound to the device that was issued it: a question cannot be answered under another guest's token.
-    if (ticket.t !== req.guest.id) return reject(res, 403, 'GUEST_QUESTION_INVALID', 'This question is not valid.');
-    if (!(ticket.x > now)) return reject(res, 410, 'GUEST_QUESTION_EXPIRED', 'This question has expired. Start another.');
-    // Issued under other content than this server serves: its seed would draw a different question. Refused as an expired one is.
-    if ((typeof ticket.c === 'string' ? ticket.c : UNVERSIONED_TOKEN_CONTENT_VERSION) !== CONTENT_VERSION) return reject(res, 410, 'GUEST_QUESTION_EXPIRED', 'This question has expired. Start another.');
-    if (now - ticket.i < L.minAnswerMs) return reject(res, 429, 'GUEST_TOO_FAST', 'Take a moment to read the question, then answer.', { retryAfterMs: L.minAnswerMs - (now - ticket.i) });
-    if (!banks.issues(ticket.g)) return reject(res, banks.outside.status, banks.outside.code, banks.outside.message);
-    // A closed question is closed; and an unreadable entry may be retried only a few times.
-    const closed = await db.get('SELECT 1 AS x FROM rate_limits WHERE bucket=? AND window_start>?', [`guest-done:${scramble(`q:${ticket.n}`)}`, now - DAY]);
+    const opened = openTicket(req, res, body.sealed);
+    if (!opened) return undefined;
+    const { ticket, now } = opened;
+    const key = names(ticket);
+    // A closed question is closed; the first verdict, if it was wrong, left the question open for one more.
+    const closed = await live(key.done, now);
+    const firstWrong = await live(key.wrong, now);
     // A verdict lost in transit: the same token sending the same answer again, for
     // a short while after the claim, is told the same verdict. This is a read of
     // a keyed bit written with the claim; the question is not marked a second time.
-    const replayBucket = `guest-ver:${scramble(`q:${ticket.n}:t:${req.guest.id}:a:${body.answer.trim()}`)}`;
-    if (closed) {
-      const kept = await db.get('SELECT count FROM rate_limits WHERE bucket=? AND window_start>?', [replayBucket, now - L.verdictRetryMs]);
-      if (kept && (Number(kept.count) === 1 || Number(kept.count) === 2)) {
-        let q;
-        try { q = generateQuestion(ticket.g, ticket.d, ticket.s, undefined, null); } catch { q = null; }
-        if (q) {
-          q._generator = ticket.g;
-          q._practiceMode = 'practice';
-          if (sealForEdition(q, banks)) {
-            res.set('Cache-Control', 'no-store');
-            const left = await view(req.guest, now);
-            return res.status(200).json({ resolved: true, correct: Number(kept.count) === 1, answer: answerTextFor(q), remaining: left.remaining, limit: L.limit, replayed: true });
-          }
+    // v1 = the first verdict (1 right, 2 wrong and closed, 3 wrong and open for a retry); v2 = the retry's (1 right, 2 wrong).
+    const replayName = (v, answer) => `guest-ver:${scramble(`q:${ticket.n}:t:${req.guest.id}:${v === 1 ? '' : `v${v}:`}a:${answer}`)}`;
+    const trimmed = body.answer.trim();
+    const first = await db.get('SELECT count FROM rate_limits WHERE bucket=? AND window_start>?', [replayName(1, trimmed), now - L.verdictRetryMs]);
+    const second = closed ? await db.get('SELECT count FROM rate_limits WHERE bucket=? AND window_start>?', [replayName(2, trimmed), now - L.verdictRetryMs]) : null;
+    const replayCount = Number(second?.count || 0) ? { v: 2, n: Number(second.count) } : Number(first?.count || 0) ? { v: 1, n: Number(first.count) } : null;
+    if (replayCount && (replayCount.n === 1 || replayCount.n === 2 || (replayCount.v === 1 && replayCount.n === 3 && !closed))) {
+      const q = await rebuild(ticket);
+      if (q) {
+        res.set('Cache-Control', 'no-store');
+        const left = await view(req.guest, now);
+        if (replayCount.n === 3) {
+          const steps = guestSteps(q);
+          return res.status(200).json({ resolved: false, correct: false, retry: true, ...stepBody(q, steps, 1), remaining: left.remaining, limit: L.limit, replayed: true });
         }
+        return res.status(200).json({ resolved: true, correct: replayCount.n === 1, answer: answerTextFor(q), assisted: replayCount.v === 2 && replayCount.n === 1, moreForms: formCountOf(ticket.g) > 1, remaining: left.remaining, limit: L.limit, replayed: true });
       }
-      return reject(res, 409, 'GUEST_ALREADY_ANSWERED', 'This question has already been answered.');
     }
-    const attempts = await consumeRateLimit(db, `guest-try:${scramble(`q:${ticket.n}`)}`, { limit: L.unreadableTries + 1, windowMs: DAY }, now);
+    if (closed) return reject(res, 409, 'GUEST_ALREADY_ANSWERED', 'This question has already been answered.');
+    const retrying = !!firstWrong;
+    // The entry the marker could not read at all: a few tries, then the question closes. The retry has its own few.
+    const attempts = await consumeRateLimit(db, `${retrying ? 'guest-try2' : 'guest-try'}:${scramble(`q:${ticket.n}`)}`, { limit: L.unreadableTries + 1, windowMs: DAY }, now);
     if (!attempts.allowed) return reject(res, 409, 'GUEST_ALREADY_ANSWERED', 'This question has already been answered.');
 
-    await ensureBanks();
-    let q;
-    try { q = generateQuestion(ticket.g, ticket.d, ticket.s, undefined, null); } catch { q = null; }
+    const q = await rebuild(ticket);
     if (!q) return reject(res, 422, 'GUEST_QUESTION_INVALID', 'This question is not valid.');
-    q._generator = ticket.g;
-    q._practiceMode = 'practice';
-    if (!sealForEdition(q, banks)) return reject(res, 422, 'GUEST_QUESTION_INVALID', 'This question is not valid.');
 
     const marked = await markerPool().run('practice', { q, answer: body.answer, working: '', evidenceIfWrong: false }, { key: `guest:${req.guest.id}` });
     res.set('Cache-Control', 'no-store');
@@ -369,13 +482,68 @@ export function createGuestTrialRouter(db, { env = process.env, banks = bankPoli
       // Not a verdict and nothing about the answer key: the entry could not be read.
       return res.status(200).json({ invalid: true, resolved: false, feedback: typeof result.feedback === 'string' ? result.feedback.slice(0, 300) : null });
     }
-    // A verdict: claim the question exactly once, then reveal the answer (it is closed).
-    const claim = await consumeRateLimit(db, `guest-done:${scramble(`q:${ticket.n}`)}`, { limit: 1, windowMs: DAY }, now);
+    const correct = result.correct === true;
+    const steps = !retrying && !correct ? guestSteps(q) : [];
+    if (steps.length) {
+      // A first wrong verdict on a question with worked steps: the answer stays closed, the first step is released, one retry is open.
+      const claim = await consumeRateLimit(db, key.wrong, { limit: 1, windowMs: DAY }, now);
+      if (!claim.allowed) return reject(res, 409, 'GUEST_ALREADY_ANSWERED', 'This question has already been answered.');
+      await consumeRateLimit(db, key.steps, { limit: steps.length + 1, windowMs: DAY }, now);
+      await db.run('INSERT INTO rate_limits(bucket, window_start, count) VALUES (?, ?, 3) ON CONFLICT(bucket) DO NOTHING', [replayName(1, trimmed), now]);
+      const mine = await view(req.guest, now);
+      return res.status(200).json({ resolved: false, correct: false, retry: true, ...stepBody(q, steps, 1), remaining: mine.remaining, limit: L.limit });
+    }
+    // A verdict that closes the question: claim it exactly once, then reveal the answer.
+    const claim = await consumeRateLimit(db, key.done, { limit: 1, windowMs: DAY }, now);
     if (!claim.allowed) return reject(res, 409, 'GUEST_ALREADY_ANSWERED', 'This question has already been answered.');
     // One keyed bit (1 right, 2 wrong) under a name only this token and this entry can recompute, kept for the retry window only.
-    await db.run('INSERT INTO rate_limits(bucket, window_start, count) VALUES (?, ?, ?) ON CONFLICT(bucket) DO NOTHING', [replayBucket, now, result.correct === true ? 1 : 2]);
+    await db.run('INSERT INTO rate_limits(bucket, window_start, count) VALUES (?, ?, ?) ON CONFLICT(bucket) DO NOTHING', [replayName(retrying ? 2 : 1, trimmed), now, correct ? 1 : 2]);
     const mine = await view(req.guest, now);
-    return res.status(200).json({ resolved: true, correct: result.correct === true, answer: answerTextFor(q), remaining: mine.remaining, limit: L.limit });
+    return res.status(200).json({ resolved: true, correct, answer: answerTextFor(q), assisted: retrying && correct, moreForms: formCountOf(ticket.g) > 1, remaining: mine.remaining, limit: L.limit });
+  }));
+
+  // ── The worked steps, one request at a time ────────────────────────────────
+  // Only for a question that has had a verdict (wrong, with its one retry still
+  // open, or closed). Step k is released only after step k-1; the step after the
+  // last is the answer, and releasing it, or any step that states it, closes the question (no retry after).
+  // Asking again for a step already released re-reads it and costs nothing.
+  router.post('/steps', perAddress, guestCsrf, asyncHandler(async (req, res) => {
+    const body = req.body;
+    if (!plain(body) || Object.keys(body).some(k => !['sealed', 'step'].includes(k)) || typeof body.sealed !== 'string' || body.sealed.length > 2000
+      || !Number.isInteger(body.step) || body.step < 1 || body.step > MAX_STEPS + 1) {
+      return reject(res, 400, 'GUEST_INVALID', 'Send the question and the step you are on.');
+    }
+    const opened = openTicket(req, res, body.sealed);
+    if (!opened) return undefined;
+    const { ticket, now } = opened;
+    const key = names(ticket);
+    const closed = await live(key.done, now);
+    const firstWrong = await live(key.wrong, now);
+    if (!closed && !firstWrong) return reject(res, 409, 'GUEST_NOT_ANSWERED', 'Answer the question first. The working follows your answer.');
+    const q = await rebuild(ticket);
+    if (!q) return reject(res, 422, 'GUEST_QUESTION_INVALID', 'This question is not valid.');
+    const steps = guestSteps(q);
+    if (!steps.length) return reject(res, 409, 'GUEST_NO_STEPS', 'There is no worked solution for this question here.');
+    if (body.step > steps.length + 1) return reject(res, 409, 'GUEST_STEP_ORDER', 'That step is not next.');
+    const row = await live(key.steps, now);
+    const released = Number(row?.count) || 0;
+    res.set('Cache-Control', 'no-store');
+    if (body.step > released + 1) return reject(res, 409, 'GUEST_STEP_ORDER', 'Show the steps in order.');
+    if (body.step === released + 1) {
+      const took = await consumeRateLimit(db, key.steps, { limit: steps.length + 1, windowMs: DAY }, now);
+      const count = steps.length + 1 - took.remaining;
+      if (!took.allowed || count !== body.step) {
+        if (took.allowed) await db.run('UPDATE rate_limits SET count = count - 1 WHERE bucket = ? AND count > 0', [key.steps]);
+        return reject(res, 409, 'GUEST_STEP_ORDER', 'Show the steps in order.');
+      }
+    }
+    if (body.step >= closingStepOf(q, steps)) {
+      // The answer, or the step that states it: it closes the question (the claim is idempotent for one already closed).
+      await consumeRateLimit(db, key.done, { limit: 1, windowMs: DAY }, now);
+      const mine = await view(req.guest, now);
+      return res.status(200).json({ resolved: true, answer: answerTextFor(q), ...stepBody(q, steps, body.step), remaining: mine.remaining, limit: L.limit });
+    }
+    return res.status(200).json({ resolved: !!closed, ...stepBody(q, steps, body.step) });
   }));
 
   return router;
