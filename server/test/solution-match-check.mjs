@@ -295,10 +295,76 @@ const MUTATIONS = {
   ok(crossed === 0, `battery: no cross (${crossed})`);
   ok(fewer === 0, `battery: never fewer ticks than before (${fewer})`);
   ok(after > before, `battery: more ticks than before (${before} -> ${after})`);
+  ok(after >= 110, `battery: at least 110 of 145 lines ticked (${after})`);
+  ok(noReportNow === 0, `battery: every page has a report now (${noReportNow} without)`);
   const byTopic = {};
   for (const p of per) { byTopic[p.g] ??= { before: 0, after: 0, n: 0 }; byTopic[p.g].before += p.before; byTopic[p.g].after += p.after; byTopic[p.g].n += p.n; }
   const weakest = Object.entries(byTopic).sort((x, y) => x[1].after / x[1].n - y[1].after / y[1].n).slice(0, 5).map(([g, v]) => `${g} ${v.before}->${v.after}/${v.n}`);
   console.log(`battery: ${total} lines, ticks ${before} -> ${after} (${(100 * before / total).toFixed(0)}% -> ${(100 * after / total).toFixed(0)}%), pages with no report ${noReport} -> ${noReportNow}; weakest: ${weakest.join(', ')}`);
+}
+
+// ── e · a slip warning never lands on a true line (Part B) ───────────────────
+//   the battery's 145 correct lines, and thousands of correct continuation lines built from the worked solutions of many generators: every
+//   identity the solution itself writes (expansions, factorisations, common denominators) and each side rewritten in equivalent forms
+{
+  const warnOf = (q, lines) => { const r = stepEvidence(q, '', lines.join('\n'), { correct: false }, { slipWarnings: true }).stepReport; return (r?.lines || []).filter(l => l.slipWarning === true).length; };
+  // the battery, correct by construction
+  const cases = JSON.parse(fs.readFileSync(new URL('./fixtures/solution-match-battery.json', import.meta.url), 'utf8'));
+  let batteryWarnings = 0, batteryLines = 0;
+  for (const c of cases) { const q = generate(c.generator, c.d, c.seed); if (!q) continue; batteryLines += c.lines.length; batteryWarnings += warnOf(q, c.lines); }
+  ok(batteryLines === 145 && batteryWarnings === 0, `slip warning: 0 warnings on the battery's ${batteryLines} correct lines (${batteryWarnings})`);
+  // equivalent forms: each is the same function of the same letters by construction
+  const forms = e => {
+    const out = [`1*(${e})`, `(${e})/1`, `2*(${e})/2`, `-(-(${e}))`, `(${e})+0`, `0+(${e})`, `(${e})*(1)`];
+    if (/(?<![A-Za-z])x(?![A-Za-z])/.test(e)) out.push(`(${e})+x-x`, `(${e})*(x+1)/(x+1)`);
+    if (/tan\(([^()]+)\)/.test(e)) out.push(e.replace(/tan\(([^()]+)\)/, 'sin($1)/cos($1)'));
+    if (/sec\(([^()]+)\)/.test(e)) out.push(e.replace(/sec\(([^()]+)\)/, '1/cos($1)'));
+    if (/cos\(([^()]+)\)\^2/.test(e)) out.push(e.replace(/cos\(([^()]+)\)\^2/, '(1-sin($1)^2)'));
+    return out;
+  };
+  const sidesOfPlain = p => p.split(/(?<![<>!])=(?!=)/).map(x => x.trim()).filter(Boolean);
+  let lines = 0, pagesBuilt = 0, warnings = 0, solutionChains = 0;
+  const gensSeen = new Set(), bad = [];
+  for (let round = 0; round < 6 && lines < 4500; round++) {
+    for (const id of ids) {
+      const q = generate(id, 1 + (round % 4), 5 + round * 11 + (id.length % 7));
+      if (!q || OBJ.has(q.answerType) || Array.isArray(q.boardScheme) || q.answerType === 'graph-sketch') continue;
+      const page = [], truth = [];   // page lines; every `= …` continuation is equal to the line above
+      for (const w of workedLines(q)) {
+        const sides = sidesOfPlain(w);
+        if (sides.length < 2) continue;
+        const infos = sides.map(x => I.readSide(x));
+        const exprs = sides.map((x, k) => ({ x, info: infos[k] })).filter(t => t.info && t.info.vars && t.info.vars.length && !/[<>≈]|,/.test(t.x));
+        for (let k = 1; k < exprs.length; k++) {
+          if (!I.sameSidePublic(exprs[k - 1].info, exprs[k].info, exprs[k - 1].x, exprs[k].x)) continue;
+          // a chain the solution writes itself: the first side, then each equal side
+          page.push(k === 1 ? exprs[0].x : null);
+          page.push(`= ${exprs[k].x}`); truth.push(exprs[k].x); solutionChains++;
+        }
+        const base = exprs.length ? exprs[exprs.length - 1].x : null;
+        if (base) { page.push(base); let prevLine = base; for (const f of forms(base)) { page.push(`= ${f}`); prevLine = f; } void prevLine; }
+      }
+      const clean = page.filter(Boolean).slice(0, 20);
+      if (clean.length < 2) continue;
+      const n = clean.filter(x => x.startsWith('=') && /[A-Za-zθπ]/.test(x)).length;
+      lines += n; pagesBuilt++; gensSeen.add(id);
+      const w = warnOf(q, clean);
+      if (w) { warnings += w; if (bad.length < 3) bad.push(`${id}: ${clean.slice(0, 4).join(' / ')}`); }
+    }
+  }
+  ok(lines >= 3000 && gensSeen.size >= 150, `slip warning proof: ${lines} correct continuation lines in ${pagesBuilt} pages from ${gensSeen.size} generators`);
+  ok(warnings === 0, `slip warning: 0 warnings on correct continuation lines (${warnings}: ${bad.join(' | ')})`);
+  console.log(`slip warning: ${batteryLines} battery lines and ${lines} correct continuation lines (${solutionChains} identities the solutions write) from ${gensSeen.size} generators, ${batteryWarnings + warnings} warnings`);
+  // and it does fire on a real slip, and says what it should
+  const q = generate('y12-diff', 3, 7);
+  const r = stepEvidence(q, '', ['A = (4t+2)(4t+1)', '= 16t^2 + 12t + 2', '= 16t^2 + 13t + 2'].join('\n'), { correct: false }, { slipWarnings: true }).stepReport;
+  const L = r.lines;
+  ok(L[2].status === 'note' && L[2].slipWarning === true && /^This is not equal to the line above for every value of t \(for example at t = [-\d.]+: [-\d.]+ against [-\d.]+\)\. Check this step\.$/.test(L[2].note), `a slip line warns, as a note (${L[2].status}: ${L[2].note})`);
+  ok(L.every(l => l.status !== 'break'), 'a warning is never a cross');
+  const none = ['x^2 - 4 = 0', '= (x-2)(x+2)'], eqn = ['2x + 3 = 11', '2x = 8'], ambig = ['y = 3/tan x', "y' = -3[tan x]^-2 x sec^2 x", '= -3sin x/cos^2 x x 1/cos^2 x'], deriv = ['y = x^2', '= 2x'];
+  for (const [name, pg] of [['an equation then its factorised side', none], ['two equation steps', eqn], ['a lone x that may be a times sign', ambig], ['a derivative under its function', deriv]]) ok(warnOf(q, pg) === 0, `no warning: ${name}`);
+  const off = stepEvidence(q, '', ['A = (4t+2)(4t+1)', '= 16t^2 + 12t + 2', '= 16t^2 + 13t + 2'].join('\n'), { correct: false }).stepReport;
+  ok(!off.lines.some(l => l.slipWarning), 'the warning is a switch of its own: not part of the default pass');
 }
 
 // ── d · budget, answer-blindness, the shape of a tick ────────────────────────

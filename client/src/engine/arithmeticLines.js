@@ -44,6 +44,7 @@ const SOFT_NOTE = 'Not checked: this line may use a rounded value, so it is not 
 const MISREAD_NOTE = 'Not checked: this line may have been misread, so it is not marked.';
 // `y' = e^x(x^2) + e^x(2x) = e^x(x^2 + 2x)`: a derivative mark in front of a worked chain labels the chain like `Area =` does.
 // What is judged is the chain after it (a tick says those sides are equal, never that the label is the right derivative).
+const SUBSTITUTION_PREFIX = /^[A-Za-z]\s*=\s*-?[\dπ√(][-+*/().\dπ√ ]{0,23}?\s*:\s*(?=\S)/;
 const DERIVATIVE_LABEL = /^(?:[A-Za-z]['′]{1,2}(?:\(\s*[a-z]\s*\))?|d(?:\^?2|²)?[a-z]?\/d[a-z](?:\^?2|²)?)\s*=\s*(?=[^=]*=\s*\S)/;
 const FUNCTION_WORDS = /\b(?:sin|cos|tan|sec|cosec|csc|cot|ln|log|asin|acos|atan|arcsin|arccos|arctan)\b/i;
 
@@ -109,7 +110,7 @@ function valueOf(side) {
 //     ∫_-2^4 12x dx, [6x^2]_-2^4. Limits are small marks that are easily
 //     misread, which is the other reason such a line is never crossed.
 const NOT_PROVED = 'Not checked: Pri cannot tell from this line alone whether it is true.';
-const LIM = '(\\{[^{}]*\\}|-?\\d+(?:\\.\\d+)?|-?(?:pi|π|e))';
+const LIM = '(\\{[^{}]*\\}|\\([^()]*\\)|-?\\d+(?:\\.\\d+)?|-?(?:pi|π|e))';
 const BRACKET_EVAL = new RegExp(`\\[([^\\[\\]]+)\\]_${LIM}\\^${LIM}`, 'g');
 const INTEGRAL = new RegExp(`∫_${LIM}\\^${LIM}\\s*(.+?)\\s*d([a-z])(?![a-z])`, 'g');
 const closeLoose = (a, b) => Math.abs(a - b) <= 1e-7 * Math.max(1, Math.abs(a), Math.abs(b));
@@ -128,12 +129,14 @@ export function infoOf(side) {
 const at = (info, v, x) => { try { const y = info.value !== undefined ? info.value : evaluate(info.ast, { [v]: x }); return typeof y === 'number' && Number.isFinite(y) ? y : null; } catch { return null; } };
 
 /** Replace every definite integral and bracket evaluation by its value; null when one cannot be worked out. */
+// An integrand or bracket body is read with a function's bare argument bracketed (`2sin2x`, `cos4x`), then as written.
+const readBody = body => { let c = null; try { c = infoOf(cleanStatement(body)); } catch { c = null; } return c || infoOf(body); };
 function workOutCalculus(text) {
   let failed = false, used = false;
   const limit = raw => { const info = infoOf(raw.replace(/^\{|\}$/g, '').replace(/π/g, 'pi')); return info && info.value !== undefined ? info.value : null; };
   const put = v => { used = true; return `(${String(Number(v.toPrecision(15)))})`; };
   let out = text.replace(INTEGRAL, (_, lo, hi, body, v) => {
-    const a = limit(lo), b = limit(hi), f = infoOf(body);
+    const a = limit(lo), b = limit(hi), f = readBody(body);
     if (a === null || b === null || !f || (f.vars && (f.vars.length !== 1 || f.vars[0] !== v))) { failed = true; return _; }
     const n = 2000, h = (b - a) / n;
     let sum = 0;
@@ -141,7 +144,7 @@ function workOutCalculus(text) {
     return put(sum * h / 3);
   });
   out = out.replace(BRACKET_EVAL, (_, body, lo, hi) => {
-    const a = limit(lo), b = limit(hi), f = infoOf(body);
+    const a = limit(lo), b = limit(hi), f = readBody(body);
     if (a === null || b === null || !f || (f.vars && f.vars.length !== 1)) { failed = true; return _; }
     const v = f.vars ? f.vars[0] : 'x', top = at(f, v, b), bottom = at(f, v, a);
     if (top === null || bottom === null) { failed = true; return _; }
@@ -628,7 +631,7 @@ const POINTS = [-2.3, -1.1, 0.7, 1.6, 2.9];
 
 export function cleanStatement(text) {
   return bracketFunctions(text.replace(/\s*\.\s*$/, '').replace(/[−–—]/g, '-').replace(/[×·]/g, '*').replace(/÷/g, '/')
-    .replace(/(\d|\))\s+x\s+(?=\d|\()/gi, '$1*').replace(/\[([^\[\],;_]*)\](?![_^])/g, '($1)'));
+    .replace(/(\d|\)|!)\s+x\s+(?=\d|\()/gi, '$1*').replace(/\[([^\[\],;_]*)\](?![_^])/g, '($1)'));
 }
 
 /** Put the page's definitions into a side. Returns { text, used } or null when a letter stays that is neither defined nor `free`. */
@@ -1383,7 +1386,45 @@ function commaVectorsAsColumns(src, carried) {
   if (!(scalar || between || equal || bars)) return src;
   return src.replace(COMMA_BRACKET, whole => (found.some(m => m[0] === whole) ? whole.replace(/,/g, ';') : whole));
 }
-const arithmeticText = s => s.replace(/[−–—]/g, '-').replace(/[×·]/g, '*').replace(/÷/g, '/').replace(/(\d|\))\s+x\s+(?=\d|\()/gi, '$1*').replace(/\[([^\[\],;_|]*)\](?![_^])/g, '($1)');
+// The reader also writes a column with a SLASH between its components (`|[14/8]|`, `|[-20 - 6/-4 + 12]|`, 21 November 2026, live). A bracket
+// holding exactly one `/` between two numeric expressions is read as a 2-component column ONLY inside magnitude bars, or as an operand of a
+// scalar multiple or a sum on a line that also has a comma or semicolon vector, and ONLY when the fraction reading is not true of the line
+// while the vector reading is (a tick), or the vector reading is the one that can be compared with an earlier vector line (the warning note).
+// Both readings true, or the fraction reading true, leaves the line exactly as it was. Tick only, like every vector reading.
+const SLASH_BRACKET = /\[([^\[\],;|/]+)\/([^\[\],;|/]+)\]/g;
+function slashVectorsAsColumns(src, carried, ref) {
+  if (!src.includes('[') || !src.includes('/') || NOT_A_VECTOR_LINE.test(src)) return src;
+  const found = [...src.matchAll(SLASH_BRACKET)].filter(m => /\d/.test(m[1]) && /\d/.test(m[2]) && NUMERIC_COMPONENT.test(m[1]) && NUMERIC_COMPONENT.test(m[2]));
+  if (!found.length || found.some(m => /[A-Za-z]\s*$/.test(src.slice(0, m.index)))) return src;
+  const otherVector = /\[[^\[\]|]*[,;][^\[\]|]*\]/.test(src);
+  const inBars = m => { const b = src.slice(0, m.index).split('|').length - 1, a = src.slice(m.index + m[0].length).split('|').length - 1; return b % 2 === 1 && a >= 1; };
+  const scalar = m => /(?<![\w.)\]])\d+(?:\.\d+)?\s*[*×·x]?\s*$/i.test(src.slice(0, m.index)) || /^\s*[+\-−–]/.test(src.slice(m.index + m[0].length)) || /[+\-−–]\s*(?:\d+(?:\.\d+)?\s*[*×·x]?\s*)?$/i.test(src.slice(0, m.index));
+  if (!found.every(m => inBars(m) || (otherVector && scalar(m)))) return src;
+  const candidate = src.replace(SLASH_BRACKET, whole => (found.some(m => m[0] === whole) ? whole.replace('/', ';') : whole));
+  const bits = candidate.replace(/\s*\.\s*$/, '').split('=').map(x => x.trim());
+  const cont = bits[0] === '' && bits.length >= 2;
+  const written = cont ? bits.slice(1) : bits;
+  if (!written.every(Boolean)) return src;
+  let vectors;
+  try { vectors = written.map(vectorSide); } catch { return src; }
+  if (vectors.some(x => !x)) return src;
+  const above = cont && written.length === 1 && carried && (carried.vec ? { vec: carried.vec } : carried.value !== undefined ? { num: carried.value } : null);
+  const all = above ? [above, ...vectors] : vectors;
+  const vecTrue = all.length >= 2 && all.every(x => sameVectorSide(x, all[0]));
+  // the fraction reading of the same line: true only when every side is a number and they agree (bars and brackets of components are not numbers)
+  let fracTrue = false;
+  try {
+    const raw = src.replace(/\s*\.\s*$/, '').split('=').map(x => x.trim());
+    const rc = raw[0] === '' && raw.length >= 2, rw = rc ? raw.slice(1) : raw;
+    const nv = rw.map(x => (x && !/\|/.test(x) ? valueOf(arithmeticText(x)) : null));
+    const base = rc && carried && carried.value !== undefined ? [carried.value, ...nv] : nv;
+    fracTrue = base.length >= 2 && base.every(v => v !== null && closeLoose(v, base[0]));
+  } catch { fracTrue = false; }
+  if (fracTrue) return src;
+  const comparable = !!(ref && cont && written.length >= 1 && !!ref.value.vec === !!vectors[0].vec);
+  return vecTrue || comparable ? candidate : src;
+}
+const arithmeticText = s => s.replace(/[−–—]/g, '-').replace(/[×·]/g, '*').replace(/÷/g, '/').replace(/(\d|\)|!)\s+x\s+(?=\d|\()/gi, '$1*').replace(/\[([^\[\],;_|]*)\](?![_^])/g, '($1)');
 function vectorTerms(s) {
   const terms = [];
   let depth = 0, bar = false, cur = '', sign = 1;
@@ -1466,7 +1507,10 @@ function stepCheckArithmeticWithinBudget(workingText, prep = null, tickOnly = fa
     // the `=` line below is tick only, like a line of letters.
     // (a word in front of `=`, such as `Area = …`, labels the line like `Area: …`; a full stop or semicolon may end it)
     const src0 = line.replace(/\s*[;.]\s*$/, '').replace(/^(?!(?:sin|cos|tan|sec|cosec|csc|cot|ln|log|sqrt|exp|abs|pi|ans|answer|lhs|rhs)\b)[A-Za-z]{3,14}\s*=\s*(?=\S)/i, '').replace(/^[A-Za-z][A-Za-z ]{1,24}:\s*(?=\S)/, '').replace(/^(?:LHS|RHS|L\.H\.S\.?|R\.H\.S\.?)\s*=\s*(?=\S)/i, '').replace(DERIVATIVE_LABEL, '')
-      .replace(/\s*(?:\/\/|∎|□)\s*$/, '').replace(/\s*=\s*(?:LHS|RHS|L\.H\.S\.?|R\.H\.S\.?)\s*$/i, '');
+      .replace(/\s*(?:\/\/|∎|□)\s*$/, '').replace(/\s*=\s*(?:LHS|RHS|L\.H\.S\.?|R\.H\.S\.?)\s*$/i, '')
+      // `t = 4: 6(16) + 8(4) + 5`: the substitution in front is set aside like any other label (a line that follows it is held to the expression). Tick only (see `substituted`).
+      .replace(SUBSTITUTION_PREFIX, '');
+    const substituted = SUBSTITUTION_PREFIX.test(line);
     // Owner, 19 November 2026 (a sign slip a competitor caught: `a(2) = (4 - 8 + 2)e^(-2) = 2e^(-2) > 0 so …`):
     //   · a value of a function in front of a worked chain (`a(2) = … = …`) is a label for the chain;
     //   · words after the chain are set aside; `> 0` or `< 0` after it is kept as a claim about the chain's value,
@@ -1480,6 +1524,7 @@ function stepCheckArithmeticWithinBudget(workingText, prep = null, tickOnly = fa
     const beforeComma = src;
     src = commaVectorsAsColumns(src, carried);
     const commaForm = src !== beforeComma;
+    src = slashVectorsAsColumns(src, carried, vectorRef);
     // Plain arithmetic only, with one more case (owner, 19 November: `… = log 3 + log 2 + log 5` then `= log(3 + 2 + 5)`):
     // a line of letters whose LAST side is a worked expression of plain numbers. The `=` line below it rewrites that
     // expression, so it is held to it. A bare number left by such a line (`t = 5` then `= 20`) stays tick only.
@@ -1541,7 +1586,7 @@ function stepCheckArithmeticWithinBudget(workingText, prep = null, tickOnly = fa
     }
     const text0 = src.replace(/\s*\.\s*$/, '').replace(/[−–—]/g, '-').replace(/[×·]/g, '*').replace(/÷/g, '/').replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore|thus)\s+/i, '')
       // `Ans = 72` continues the line above; `6 x 12` between two numbers is a times sign; square brackets group.
-      .replace(ANS_LABEL, '').replace(/(\d|\))\s+x\s+(?=\d|\()/gi, '$1*')
+      .replace(ANS_LABEL, '').replace(/(\d|\)|!)\s+x\s+(?=\d|\()/gi, '$1*')
       .replace(/\[([^\[\],;_]*)\](?![_^])/g, '($1)');
     const ansLine = ANS_LABEL.test(src.replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore|thus)\s+/i, ''));
     // A root with an index, √[3]{…}, is not read: its bracket is not a grouping.
@@ -1701,7 +1746,7 @@ function stepCheckArithmeticWithinBudget(workingText, prep = null, tickOnly = fa
       : continuation && before && k >= 1 && allValues.slice(1, k).every(v => close(v, allValues[0]))
       ? `The line above comes to ${shown(allValues[0])}, but this line gives ${shown(allValues[k])}.`
       : `${mathSpan(allSides[0])} comes to ${shown(allValues[0])}, but this line gives ${shown(allValues[k])}.`;
-    if (tickOnly) return note(line, NOT_PROVED, { readingFalse: true });
+    if (tickOnly || substituted) return note(line, NOT_PROVED, { readingFalse: true });
     diagnosis = { code: 'arithmetic-not-equal', title: 'The two sides of this line are not equal', message, fix: 'Work this line out again, one operation at a time.', confidence: 'high' };
     firstBreak = i;
     out.push({ text: line, status: 'break', note: message, diagnosis });

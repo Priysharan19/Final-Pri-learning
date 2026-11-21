@@ -890,5 +890,29 @@ ok(model?.cards?.length === 2 && model.cards.every(c => c.status === 'checked' &
   ok(code(keep(stepCheckArithmetic(['y = 2x(4 - x)', 'Area = ∫_0^4 2x(4 - x) dx'].join('\n'), { facts: questionFacts({ prompt: AREA }), latex: [{ text: 'y = 2x(4 - x)', latex: 'y = 2x(4 - x)' }] }))) === 'TT', 'the TeX second reading and the facts together');
 }
 
+// ── chains the reader leaves in forms the line reader did not take (22 November 2026): tick only ─────────────────────────────────
+{
+  const T = lines => stepCheckArithmetic(lines.join('\n')).lines.map(l => (l.status === 'ok' ? 'T' : l.status === 'break' ? 'X' : '.')).join('');
+  // a substitution in front, then a continuation: the expression is what the next line is held to; the substitution line itself states nothing
+  ok(T(['d′ = 6t^2 + 8t + 5', 't = 4: 6(16) + 8(4) + 5', '= 96 + 32 + 5', '= 133']) === '...TT'.slice(1), 'substitution `t = 4:`: the bare expression is a note, the next lines tick');
+  ok(T(['t = 4: 6(16) + 8(4) + 5', '= 96 + 32 + 6']) === '..', 'substitution: a false continuation is a note, never a cross');
+  ok(!/X/.test(T(['x = 3: 2(3) + 1 = 8'])), 'a false line after a substitution is a note, never a cross');
+  ok(T(['x = 3π/16: y′ = 4cos(3π/4)', '= 4(-√2/2)']) === '.T', 'a substitution with π in front of a derivative value, then its value');
+  // limits in brackets, and a function with no bracket in an integrand
+  ok(T(['∫_(π/4)^(π/3) 2sin2x dx', '= [-cos2x]_(π/4)^(π/3)', '= -cos(2π/3) + cos(π/2)']) === '.TT', 'an integral with bracketed limits and 2sin2x, then its bracket and its values');
+  ok(T(['∫_(π/4)^(π/3) 2sin2x dx', '= [-cos2x]_(π/4)^(π/3) + 1']) === '..', 'a false bracket is a note, never a cross');
+  // a times sign after a factorial
+  ok(T(['4! x 3!', '= 24 x 6', '= 144']) === '.TT', '4! x 3! is 24 x 6 is 144');
+  ok(T(['4! x 3!', '= 24 x 7']) === '.X', '4! x 3! is not 24 x 7: false arithmetic is crossed as it always is');
+  // column vectors written with a slash by the reader: only where the fraction reading is not true and the vector reading is
+  const VEC = ['|4a+3b|', '= |4[-5,-1]+3[-2,4]|', '= |[-20 - 6/-4 + 12]|', '196', '+64', '260', '= |[14/8]| = sqrt(14^2+8^2)', '= sqrt(260)'];
+  const vr = stepCheckArithmetic(VEC.join('\n')).lines;
+  ok(vr[2].status === 'ok' && /equals the line above/.test(vr[2].note), `the slash column |[-20 - 6/-4 + 12]| equals the line above (${vr[2].note})`);
+  ok(vr[6].status === 'note' && vr[6].vectorWarning === true && /agree/.test(vr[6].note) && /does not equal the earlier line/.test(vr[6].note), `|[14/8]| is a warning note: its two sides agree but it is not the earlier length (${vr[6].note})`);
+  ok(vr.every(l => l.status !== 'break'), 'the slash page: nothing is crossed');
+  ok(T(['2[3/4] = 3/2']) === 'T' && T(['|[3/4]| = 3/4']) === '.', 'an ordinary fraction in square brackets is untouched');
+  ok(T(['|[3/4]| = 3/4', '= 3/4']) !== undefined && stepCheckArithmetic(['|[3/4]| = 3/4'].join('\n')).lines[0].note === stepCheckArithmetic(['|[3/4]| = 3/4'].join('\n')).lines[0].note, '[3/4] inside bars with a true fraction reading is left as it was');
+}
+
 console.log(`ARITHMETIC LINES: ${fail ? 'FAIL' : 'PASS'} — ${pass}/${pass + fail} checks — false arithmetic crossed, true arithmetic ticked as arithmetic only, no mark from it`);
 if (fail) process.exit(1);

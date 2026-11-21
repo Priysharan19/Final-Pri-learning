@@ -38,7 +38,7 @@ const closeLoose = (a, b) => Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), 
 const SPLIT_EQ = /(?<![<>!])=(?!=)/;
 
 // ── a label is a named quantity, not an expression ───────────────────────────
-const LABEL = /^(Δ|[A-Za-z]|[A-Z]{2})('{0,2})(_[A-Za-z0-9]+)?(?:\(([^()]{1,8})\))?$/;
+const LABEL = /^(Δ|θ|α|β|γ|φ|[A-Za-z]|[A-Z]{2})('{0,2})(_[A-Za-z0-9]+)?(?:\(([^()]{1,8})\))?$/;
 const DERIV = /^d\^?2?[a-z]\/d[a-z]\^?2?$/;
 function labelOf(side) {
   const t = tidy(side).replace(/\s+/g, '').replace(/[{}]/g, '');
@@ -56,8 +56,8 @@ const sameLabel = (a, b) => a.name === b.name && ((a.arg === null && b.arg === n
 // ── reading maths from the worked solution ───────────────────────────────────
 function spanToPlain(span) {
   let t = String(span);
-  for (let g = 0; g < 4 && /\^\s*\{[^{}]*\}/.test(t); g++) t = t.replace(/\^\s*\{([^{}]*)\}/g, '^($1)');
-  t = t.replace(/\\[dt]frac/g, '\\frac').replace(/\\(?:displaystyle|,|;|!|quad|qquad)/g, ' ').replace(/\\prime/g, "'").replace(/\\Delta/g, 'Δ');
+  for (let g = 0; g < 4 && !/\\int/.test(t) && /\^\s*\{[^{}]*\}/.test(t); g++) t = t.replace(/\^\s*\{([^{}]*)\}/g, '^($1)');
+  t = t.replace(/_\{\\text\{([A-Za-z0-9]+)\}\}/g, '_$1').replace(/\\[dt]frac/g, '\\frac').replace(/\\(?:displaystyle|,|;|!|quad|qquad| )/g, ' ').replace(/\\prime/g, "'").replace(/\\Delta/g, 'Δ');
   // a rounded value is not a statement of equality: keep what comes before it
   t = t.replace(/\\(?:big|Big|bigg|Bigg)[lr]?/g, '').replace(/\\(arcsin|arccos|arctan|sin|cos|tan|sec|csc|cosec|cot|ln|log|exp)(?![A-Za-z])/g, '$1').replace(/\\theta/g, 'θ');
   t = t.split(/\\approx|\\simeq|\\Rightarrow|\\therefore|\\text|\\mathrm|\\mid/)[0];
@@ -433,3 +433,5 @@ function run(q, report) {
 }
 export const _setFunctionsUnused = q => { FUNCS = functionNames(q); };
 export const _internals = { readSolution, readStudent, matchEquation, spanToPlain, conditionOf, readSide, sameSidePublic: sameSide };
+// For engine/lineChains.js (the pass that runs after this one).
+export const _forChains = { statementsOfSpans, numericOf, canon, labelOf, topLevelPieces, sameLabel, setFunctions: q => { FUNCS = functionNames(q); } };
