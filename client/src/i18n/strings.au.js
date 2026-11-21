@@ -16,9 +16,9 @@ export const AU_STRINGS = Object.freeze({
   'msg.classOnly': 'Year {n}',
   'inst.mapTitleScope': '{scope} Mathematics',
   'inst.mapProvenance': 'Prerequisite links are Pri’s own teaching map, not a NESA publication.',
-  'login.heroSub': 'Maths practice for NSW students: your working marked line by line, with worked solutions. Answers are checked by Pri’s server, so checking needs a Pri account and a connection.',
+  'login.heroSub': 'Maths practice for NSW students, with worked solutions. Pri checks the lines of your working it can, and says so when it cannot. Answers are checked by Pri’s server, so checking needs a Pri account and a connection.',
   'login.brandKicker': 'NSW Years 11 and 12 · Advanced and Extension 1',
-  'login.welcomeSub': 'Practise for the HSC. Your working is checked line by line.',
+  'login.welcomeSub': 'Practise for the HSC. Pri checks the lines of your working it can, and says so when it cannot.',
   'login.heroNote': 'Answers are checked by Pri’s server, so checking needs a connection. Five questions a day need no account. No ads.',
   'login.point1': 'Generated practice questions for NSW Mathematics',
   'settings.freeCourses': 'NSW Mathematics',
@@ -83,6 +83,21 @@ export const AU_STRINGS = Object.freeze({
   'tutor.intro': 'Help comes in three levels, in order. Opening a level is free.',
   // Owner decision, 19 Nov 2026: the paid tier is called "HSC Pass" in Prithagoras copy. The words that say "Premium" are renamed at lookup
   // (i18n/tierName.js, applied in i18n/core.js to every string not overridden here); the capability ids keep their names.
+  // Launch audit, 22 Nov 2026: public claims made true to what the edition does. The reading is no longer confirmed before marking
+  // (ADR-0001 amendment 2026-11-19), a line the engine cannot judge is labelled and never ticked, and the mark is for the final answer.
+  'landing.docTitle': '{brand}: your working, checked where it can be',
+  'landing.title': 'Your working, checked where it can be.',
+  'landing.sub': 'Write your working by hand. {brand} reads it, and a maths engine checks the lines it can and shows where one first goes wrong. A line it cannot check is labelled, not ticked.',
+  'landing.proofEngine': 'A maths engine checks the lines it can verify and labels the rest. AI never decides your mark.',
+  'landing.proofConfirm': 'You can see what was read from each line of your handwriting, and correct it.',
+  'landing.demo.ask': 'Line {n}: did you write {a} or {b}? In Pri you can see what was read after your work is marked, and correct it.',
+  'landing.demo.confirm': 'It’s {a}',
+  'landing.marking.p2': '{brand} reads your handwriting. Once your work is marked, it shows what it read on each line, and you can correct a reading and have the work marked again.',
+  'landing.marking.p3': 'A maths engine on our server checks each line against the line before, where it can. A line it verifies is Checked. The first line that stops being true is the First error, and the lines after it are shown as following from it.',
+  'landing.marking.p4': 'A line the engine can’t prove is labelled Not verified. It is never ticked, and AI never decides your mark. The mark is for your final answer; the line checks are feedback.',
+  'landing.teachers.p1': 'Every mark {brand} gives comes from the maths engine. Where it can check your working, it shows the line where the working first goes wrong.',
+  'pricing.why.youConfirm': 'You can see how Pri read your handwriting and correct it. A model’s reading never sets a mark.',
+  'scn.label.hand': 'Handwriting read, and checked where it can be',
   'picker.year': 'Year',
   'picker.course': 'Course'
 });
