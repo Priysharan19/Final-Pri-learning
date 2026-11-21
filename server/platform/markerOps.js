@@ -30,6 +30,7 @@ import { missingSteps } from '../../client/src/engine/missingSteps.js';
 import { infoOf as arithmeticInfo, cleanStatement } from '../../client/src/engine/arithmeticLines.js';
 import { annotateMilestones } from '../../client/src/engine/milestones.js';
 import { solutionMatch } from '../../client/src/engine/solutionMatch.js';
+import { lineChains } from '../../client/src/engine/lineChains.js';
 import { awardBoardScheme, matchBoardPoints } from '../../client/src/engine/boardScheme.js';
 import { answerForm, effectiveSymbols, firstFinalAttempt, planGivens, readClaimForm } from './finalAttempt.js';
 
@@ -231,6 +232,12 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
       const base = report || trueAsWritten(q, steps, opts);
       const matched = base ? solutionMatch(q, base) : null;
       if (matched && matched.matched > 0) report = matched.report;
+    } catch { /* the report stands */ }
+    // Feedback only, after solutionMatch: chains, integrals, vectors and a slip warning (engine/lineChains.js). Never a mark, never a cross.
+    try {
+      const base2 = report || trueAsWritten(q, steps, opts);
+      const more = base2 && !(opts && opts.fold === false) ? lineChains(q, base2, { warn: !!(opts && opts.slipWarnings === true) }) : null;
+      if (more && (more.matched > 0 || more.warned > 0)) report = more.report;
     } catch { /* the report stands */ }
   }
   // A true-as-written tick on a line that ends at the student's own WRONG answer (`so 10^1 = 10` when the answer is 30)
@@ -519,7 +526,7 @@ export const MARKER_OPS = Object.freeze({
     emit({ result });
     const wanted = result.correct || evidenceIfWrong || !String(working || '').trim();
     if (!wanted) return { result, evidence: null };
-    const evidence = stepEvidence(q, answer, working, result, Array.isArray(workingLatex) ? { latex: workingLatex } : null);
+    const evidence = stepEvidence(q, answer, working, result, { slipWarnings: true, ...(Array.isArray(workingLatex) ? { latex: workingLatex } : {}) });
     // Final answer only: the step report stays, the method mark does not.
     return { result, evidence: policyOf({ policy }).methodMarks ? evidence : { stepReport: evidence.stepReport, partial: null, ...(evidence.board ? { board: evidence.board } : {}) } };
   },

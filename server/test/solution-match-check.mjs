@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import { stepEvidence } from '../platform/markerOps.js';
 import * as G from '../../client/src/engine/generators/index.js';
 import { evaluate } from '../../client/src/engine/expr.js';
-import { solutionMatch, _internals as I } from '../../client/src/engine/solutionMatch.js';
+import { solutionMatch, _internals as I, _forChains as FCH } from '../../client/src/engine/solutionMatch.js';
 
 const OBJ = new Set(['mcq', 'multi-mcq', 'matrix-match']);
 let pass = 0, fail = 0;
@@ -295,10 +295,184 @@ const MUTATIONS = {
   ok(crossed === 0, `battery: no cross (${crossed})`);
   ok(fewer === 0, `battery: never fewer ticks than before (${fewer})`);
   ok(after > before, `battery: more ticks than before (${before} -> ${after})`);
+  ok(after >= 110, `battery: at least 110 of 145 lines ticked (${after})`);
+  ok(noReportNow === 0, `battery: every page has a report now (${noReportNow} without)`);
   const byTopic = {};
   for (const p of per) { byTopic[p.g] ??= { before: 0, after: 0, n: 0 }; byTopic[p.g].before += p.before; byTopic[p.g].after += p.after; byTopic[p.g].n += p.n; }
   const weakest = Object.entries(byTopic).sort((x, y) => x[1].after / x[1].n - y[1].after / y[1].n).slice(0, 5).map(([g, v]) => `${g} ${v.before}->${v.after}/${v.n}`);
   console.log(`battery: ${total} lines, ticks ${before} -> ${after} (${(100 * before / total).toFixed(0)}% -> ${(100 * after / total).toFixed(0)}%), pages with no report ${noReport} -> ${noReportNow}; weakest: ${weakest.join(', ')}`);
+}
+
+// ── e · a slip warning never lands on a true line (Part B) ───────────────────
+//   the battery's 145 correct lines, and thousands of correct continuation lines built from the worked solutions of many generators: every
+//   identity the solution itself writes (expansions, factorisations, common denominators) and each side rewritten in equivalent forms
+{
+  const warnOf = (q, lines) => { const r = stepEvidence(q, '', lines.join('\n'), { correct: false }, { slipWarnings: true }).stepReport; return (r?.lines || []).filter(l => l.slipWarning === true).length; };
+  // the battery, correct by construction
+  const cases = JSON.parse(fs.readFileSync(new URL('./fixtures/solution-match-battery.json', import.meta.url), 'utf8'));
+  let batteryWarnings = 0, batteryLines = 0;
+  for (const c of cases) { const q = generate(c.generator, c.d, c.seed); if (!q) continue; batteryLines += c.lines.length; batteryWarnings += warnOf(q, c.lines); }
+  ok(batteryLines === 145 && batteryWarnings === 0, `slip warning: 0 warnings on the battery's ${batteryLines} correct lines (${batteryWarnings})`);
+  // equivalent forms: each is the same function of the same letters by construction
+  const forms = e => {
+    const out = [`1*(${e})`, `(${e})/1`, `2*(${e})/2`, `-(-(${e}))`, `(${e})+0`, `0+(${e})`, `(${e})*(1)`];
+    if (/(?<![A-Za-z])x(?![A-Za-z])/.test(e)) out.push(`(${e})+x-x`, `(${e})*(x+1)/(x+1)`);
+    if (/tan\(([^()]+)\)/.test(e)) out.push(e.replace(/tan\(([^()]+)\)/, 'sin($1)/cos($1)'));
+    if (/sec\(([^()]+)\)/.test(e)) out.push(e.replace(/sec\(([^()]+)\)/, '1/cos($1)'));
+    if (/cos\(([^()]+)\)\^2/.test(e)) out.push(e.replace(/cos\(([^()]+)\)\^2/, '(1-sin($1)^2)'));
+    return out;
+  };
+  const sidesOfPlain = p => p.split(/(?<![<>!])=(?!=)/).map(x => x.trim()).filter(Boolean);
+  let lines = 0, pagesBuilt = 0, warnings = 0, solutionChains = 0;
+  const gensSeen = new Set(), bad = [];
+  for (let round = 0; round < 6 && lines < 4500; round++) {
+    for (const id of ids) {
+      const q = generate(id, 1 + (round % 4), 5 + round * 11 + (id.length % 7));
+      if (!q || OBJ.has(q.answerType) || Array.isArray(q.boardScheme) || q.answerType === 'graph-sketch') continue;
+      const page = [], truth = [];   // page lines; every `= …` continuation is equal to the line above
+      for (const w of workedLines(q)) {
+        const sides = sidesOfPlain(w);
+        if (sides.length < 2) continue;
+        const infos = sides.map(x => I.readSide(x));
+        const exprs = sides.map((x, k) => ({ x, info: infos[k] })).filter(t => t.info && t.info.vars && t.info.vars.length && !/[<>≈]|,/.test(t.x));
+        for (let k = 1; k < exprs.length; k++) {
+          if (!I.sameSidePublic(exprs[k - 1].info, exprs[k].info, exprs[k - 1].x, exprs[k].x)) continue;
+          // a chain the solution writes itself: the first side, then each equal side
+          page.push(k === 1 ? exprs[0].x : null);
+          page.push(`= ${exprs[k].x}`); truth.push(exprs[k].x); solutionChains++;
+        }
+        const base = exprs.length ? exprs[exprs.length - 1].x : null;
+        if (base) { page.push(base); let prevLine = base; for (const f of forms(base)) { page.push(`= ${f}`); prevLine = f; } void prevLine; }
+      }
+      const clean = page.filter(Boolean).slice(0, 20);
+      if (clean.length < 2) continue;
+      const n = clean.filter(x => x.startsWith('=') && /[A-Za-zθπ]/.test(x)).length;
+      lines += n; pagesBuilt++; gensSeen.add(id);
+      const w = warnOf(q, clean);
+      if (w) { warnings += w; if (bad.length < 3) bad.push(`${id}: ${clean.slice(0, 4).join(' / ')}`); }
+    }
+  }
+  ok(lines >= 3000 && gensSeen.size >= 150, `slip warning proof: ${lines} correct continuation lines in ${pagesBuilt} pages from ${gensSeen.size} generators`);
+  ok(warnings === 0, `slip warning: 0 warnings on correct continuation lines (${warnings}: ${bad.join(' | ')})`);
+  console.log(`slip warning: ${batteryLines} battery lines and ${lines} correct continuation lines (${solutionChains} identities the solutions write) from ${gensSeen.size} generators, ${batteryWarnings + warnings} warnings`);
+  // and it does fire on a real slip, and says what it should
+  const q = generate('y12-diff', 3, 7);
+  const r = stepEvidence(q, '', ['A = (4t+2)(4t+1)', '= 16t^2 + 12t + 2', '= 16t^2 + 13t + 2'].join('\n'), { correct: false }, { slipWarnings: true }).stepReport;
+  const L = r.lines;
+  ok(L[2].status === 'note' && L[2].slipWarning === true && /^This is not equal to the line above for every value of t \(for example at t = [-\d.]+: [-\d.]+ against [-\d.]+\)\. Check this step\.$/.test(L[2].note), `a slip line warns, as a note (${L[2].status}: ${L[2].note})`);
+  ok(L.every(l => l.status !== 'break'), 'a warning is never a cross');
+  const none = ['x^2 - 4 = 0', '= (x-2)(x+2)'], eqn = ['2x + 3 = 11', '2x = 8'], ambig = ['y = 3/tan x', "y' = -3[tan x]^-2 x sec^2 x", '= -3sin x/cos^2 x x 1/cos^2 x'], deriv = ['y = x^2', '= 2x'];
+  for (const [name, pg] of [['an equation then its factorised side', none], ['two equation steps', eqn], ['a lone x that may be a times sign', ambig], ['a derivative under its function', deriv]]) ok(warnOf(q, pg) === 0, `no warning: ${name}`);
+  const off = stepEvidence(q, '', ['A = (4t+2)(4t+1)', '= 16t^2 + 12t + 2', '= 16t^2 + 13t + 2'].join('\n'), { correct: false }).stepReport;
+  ok(!off.lines.some(l => l.slipWarning), 'the warning is a switch of its own: not part of the default pass');
+}
+
+// ── f · review round: tuples are never numbers, a substitution is checked, a warning needs a chain ────────────
+{
+  const tick = (q, lines, k, o = {}) => { const r = stepEvidence(q, '', lines.join('\n'), { correct: false }, o).stepReport; return r?.lines?.[k] ?? null; };
+  const noTick = (l, why) => ok(!l || l.status !== 'ok' || !/value at step|Matches step|restates/.test(String(l.note)), why);
+  // a comma list is read component by component, never as its sum
+  const circle = generate('c11-circle-jee-reasoning', 1, 7);
+  noTick(tick(circle, ['(x-3)^2+(y+3)^2=1', '(4, -3)'], 1), `a wrong centre (4, -3) is not ticked as the value 1 (${tick(circle, ['(x-3)^2+(y+3)^2=1', '(4, -3)'], 1)?.note})`);
+  const vec = generate('me12-vectors', 1, 3);
+  const v2 = tick(vec, ['P(-3,1) Q(-4,-5) R(3,0)', 'QR = (7,6)', '= (7,6)'], 2);
+  ok(!v2 || !/76/.test(String(v2.note)), `= (7,6) is compared with the tuple above, never read as 76 (${v2?.note})`);
+  noTick(tick(vec, ['[0, 7/4]'], 0), 'an interval [0, 7/4] is not the number 1.75');
+  ok(I.readSide('(7,6)') === null && I.readSide('[0, 7/4]') === null && I.readSide('(4, -3)') === null, 'a bracketed comma list is never one number');
+  // 300+ tuple lines whose components sum or concatenate to a solution value: none is ticked
+  let tuples = 0, tupleTicks = 0;
+  for (const id of ids) {
+    const q = generate(id, 2, 9);
+    if (!q || OBJ.has(q.answerType) || Array.isArray(q.boardScheme) || q.answerType === 'graph-sketch') continue;
+    const vals = I.readSolution(q).values.map(x => x.v).filter(v => Number.isInteger(v) && Math.abs(v) < 1e6).slice(0, 2);
+    const worked = workedLines(q).slice(0, 1);
+    for (const v of vals) for (const t of [`(${v + 3}, -3)`, `(${v - 1}, 1)`, `[${v + 2}; -2]`, `(${String(Math.abs(v))[0]}, ${String(Math.abs(v)).slice(1) || 0})`]) {
+      const page = [...worked, t];
+      const r = stepEvidence(q, '', page.join('\n'), { correct: false }, { slipWarnings: true }).stepReport;
+      const l = r?.lines?.[page.length - 1];
+      tuples++;
+      if (l && l.status === 'ok' && !/equals the line above/.test(l.note) ) tupleTicks++;
+    }
+  }
+  ok(tuples >= 300 && tupleTicks === 0, `tuple lines that sum or join to a solution value: ${tuples} built, ${tupleTicks} ticked`);
+  // a substitution counts only where the solution substitutes that name at that value, and only for the expression it gives there
+  const diff = generate('y11-diff', 2, 11);
+  const base = ['d = 2t^3 + 4t^2 + 5t', 'd′ = 6t^2 + 8t + 5'];
+  noTick(tick(diff, [...base, 't = 5: 6(16) + 8(4) + 5'], 2), 'a substitution at t = 5 is not the solution\'s value at step 2');
+  noTick(tick(diff, [...base, 't = 7: 6(16) + 8(4) + 5'], 2), 'a substitution at t = 7 is not ticked');
+  ok(tick(diff, [...base, 't = 4: 6(16) + 8(4) + 5'], 2)?.status === 'ok', 'the substitution t = 4 with the right expression still ticks');
+  const bad = [...base, 't = 4: 6(25) + 8(4) + 5', '= 150 + 32 + 5', '= 187'];
+  const lb = stepEvidence(diff, '', bad.join('\n'), { correct: false }, { slipWarnings: true }).stepReport.lines;
+  ok(lb[2].status === 'note' && lb[2].slipWarning === true && /^This is not what the line above gives at t = 4 \(133 against 187\)\. Check the substitution\.$/.test(lb[2].note), `a wrong substituted expression is warned (${lb[2].note})`);
+  ok(lb.every(l => l.status !== 'break') && lb.slice(3).every(l => l.status !== 'ok' || l.state === 'arithmetic'), 'a chain under it keeps the plain true-as-written tick and nothing is crossed');
+  const lg = stepEvidence(diff, '', [...base, 't = 4: 6(16) + 8(4) + 5', '= 96 + 32 + 5', '= 133'].join('\n'), { correct: false }, { slipWarnings: true }).stepReport.lines;
+  ok(!lg.some(l => l.slipWarning), 'a true substitution is not warned');
+  // a warning needs a continuation of a chain, never two full statements with one label; a restricted-domain rewrite is not a slip
+  const wq = generate('y12-diff', 3, 7);
+  const warns = pg => (stepEvidence(wq, '', pg.join('\n'), { correct: false }, { slipWarnings: true }).stepReport?.lines || []).filter(l => l.slipWarning).length;
+  const same = [['y = 2x + 1', 'y = 3x - 4'], ['x = 2y + 1', 'x = 3y - 1'], ['y = x^2', 'y = x^2 + 3'], ['f(x) = x^2', 'f(x) = x^3'], ['A = 3x^2', 'A = 5x'], ['d = 3t', 'd = 2t^2'], ['y = x^2', '= x^2 + 3'], ['y = x^2', '= x^2', 'y = x^2 + 3']];
+  for (const pg of same) ok(warns(pg) === 0, `no warning on ${pg.join(' / ')}`);
+  const dom = [['√(x^2)', '= √(x^2)', '= x'], ['(x^2)^(1/2)', '= (x^2)^(1/2)', '= x'], ['√(x^2 y^2)', '= √(x^2 y^2)', '= xy'], ['arccos(cos(x))', '= arccos(cos(x))', '= x']];
+  for (const pg of dom) ok(warns(pg) === 0, `no warning on the domain rewrite ${pg.join(' / ')}`);
+  ok(warns(['A = (4t+2)(4t+1)', '= 16t^2 + 12t + 2', '= 16t^2 + 13t + 2']) === 1 && warns(['y = 3x^2 + 6x', '= 3x(x+2)', '= 3x(x+3)']) === 1, 'a true slip in a chain still warns');
+  // the slash column needs another vector on the page
+  ok(tick(wq, ['|[3/4]| = 5'], 0)?.status !== 'ok', '|[3/4]| = 5 with no vector on the page is left as before');
+  // second review: a substitution is judged by structure, a continuation of a wrong or warned line is not ticked
+  const dq = generate('y11-diff', 2, 11), dbase = ['d = 2t^3 + 4t^2 + 5t', 'd′ = 6t^2 + 8t + 5'];
+  const valueTick = (q, lines) => /value at step|Matches step/.test(String(tick(q, lines, lines.length - 1)?.note)) && tick(q, lines, lines.length - 1)?.status === 'ok';
+  for (const bad of ['t = 4: 6(8) + 8(10) + 5', 't = 4: 3(44) + 1']) ok(!valueTick(dq, [...dbase, bad]), `a right value with the wrong structure is not a substitution: ${bad}`);
+  ok(!valueTick(generate('c7-letter-pattern-reasoning', 1, 5), ['n+2', 'n = 4: (4)+7 + 1']) && !valueTick(generate('c11-ellipse-hyperbola-jee-reasoning', 1, 3), ['c = 2: 2 + 1']) && !valueTick(generate('c11-parabola-jee-reasoning', 2, 13), ['a = -1: -1 + 1']), 'the three other reviewer cases are not ticked');
+  for (const good of ['t = 4: 6(4)^2 + 8(4) + 5', 't = 4: 6(16) + 8(4) + 5', 't = 4: 96 + 32 + 5', 't = 4: 5 + 8(4) + 6(4)^2']) ok(valueTick(dq, [...dbase, good]), `the substitution still ticks: ${good}`);
+  let structural = 0, structuralTicks = 0;
+  for (const id of ids) {
+    const q = generate(id, 2, 9);
+    if (!q || OBJ.has(q.answerType) || Array.isArray(q.boardScheme) || q.answerType === 'graph-sketch') continue;
+    const [name, a] = [...FCH.knownSubstitutions(q)][0]?.split('|') ?? [];
+    if (!name) continue;
+    const worked = workedLines(q).slice(0, 2);
+    for (const v of I.readSolution(q).values.map(x => x.v).filter(Number.isInteger).slice(0, 2)) for (const e of [`${v - 1} + 1`, `${v + 3} - 3`, `2(${v}) - ${v}`, `${v + 1} - 1 + 0`]) {
+      const page = [...worked, `${name} = ${a}: ${e}`];
+      structural++;
+      if (valueTick(q, page)) structuralTicks++;
+    }
+  }
+  ok(structural >= 300 && structuralTicks === 0, `right value, wrong structure after a substitution prefix: ${structural} lines, ${structuralTicks} ticked`);
+  const cont = pg => { const r = stepEvidence(vec, '', pg.join('\n'), { correct: false }, { slipWarnings: true }).stepReport; return r?.lines ?? []; };
+  ok(cont(['P(-3,1) Q(-4,-5) R(3,0)', 'QR = (7,6)', '= (7,6)'])[2]?.status !== 'ok', 'a continuation of a contradicted vector line is not ticked');
+  const wr = stepEvidence(dq, '', [...dbase, 't = 4: 6(25) + 8(4) + 5', '= 150 + 32 + 5', '= 187'].join('\n'), { correct: false }, { slipWarnings: true }).stepReport.lines;
+  ok(wr[2].slipWarning === true && wr.slice(3).every(l => l.status === 'note' && l.note === 'Follows from the line above, which Pri could not confirm.'), 'the continuations of a warned line are notes that say so');
+  const ay = generate('y12-appdiff', 2, 5);
+  const ar = stepEvidence(ay, '', ['y = 2x^2 + 13x - 8', 'y′ = 4x + 14', '= 4x + 14'].join('\n'), { correct: false }, { slipWarnings: true }).stepReport.lines;
+  ok(ar[2].status !== 'ok', `a chain after a contradicted labelled line is not ticked (${ar.map(l => l.status)})`);
+  // every worked line, consecutive, with warnings on: full statements are never warned
+  let consecutive = 0, cw = 0;
+  for (const id of ids) {
+    const q = generate(id, 2, 13);
+    if (!q || OBJ.has(q.answerType) || Array.isArray(q.boardScheme) || q.answerType === 'graph-sketch') continue;
+    const wl = workedLines(q).slice(0, 20);
+    if (wl.length < 2) continue;
+    consecutive += wl.length - 1;
+    cw += (stepEvidence(q, '', wl.join('\n'), { correct: false }, { slipWarnings: true }).stepReport?.lines || []).filter(l => l.slipWarning).length;
+  }
+  ok(consecutive >= 500 && cw === 0, `consecutive worked statements (${consecutive} lines): ${cw} warnings`);
+  // identity with the pass ON and warnings ON: marks identical, only notes become ticks or warnings
+  let pages = 0, diffs = [];
+  for (let round = 0; round < 6; round++) for (const id of ids) {
+    const q = generate(id, 1 + (round % 4), 3 + round * 7);
+    if (!q || OBJ.has(q.answerType) || Array.isArray(q.boardScheme) || q.answerType === 'graph-sketch') continue;
+    let wl = workedLines(q).slice(0, 20);
+    if (wl.length < 2) continue;
+    if (round % 2) wl[1] = wl[1].replace(/\d/, c => String((Number(c) + 1) % 10));
+    const w = wl.join('\n');
+    const a = stepEvidence(q, '', w, { correct: false }, { slipWarnings: true }), b = stepEvidence(q, '', w, { correct: false }, { solutionMatch: false });
+    pages++;
+    if (JSON.stringify(a.partial) !== JSON.stringify(b.partial) || JSON.stringify(a.board ?? null) !== JSON.stringify(b.board ?? null)) diffs.push(`${id}: marks`);
+    const x = a.stepReport, y = b.stepReport;
+    if (!y) continue;
+    if (!x || x.firstBreak !== y.firstBreak || x.lines.length !== y.lines.length) { diffs.push(`${id}: shape`); continue; }
+    x.lines.forEach((l, i) => { const o = y.lines[i]; if (l.status === 'break' && o.status !== 'break') diffs.push(`${id}: cross`); if (l.slipFollow === true) { if (o.status !== 'ok') diffs.push(`${id}: followed ${o.status}`); } else if (!(l.solutionMatch === true || l.slipWarning === true) && (l.status !== o.status || l.note !== o.note)) diffs.push(`${id}: line ${i + 1}`); else if (l.slipWarning === true && o.status !== 'note') diffs.push(`${id}: warned ${o.status}`); });
+  }
+  ok(pages >= 1000 && diffs.length === 0, `identity with the pass and warnings on: ${pages} pages, ${diffs.length} differences ${diffs.slice(0, 3).join(' | ')}`);
 }
 
 // ── d · budget, answer-blindness, the shape of a tick ────────────────────────
