@@ -380,7 +380,7 @@ export default function IndexPage() {
         <section className="in-quick qp-home" aria-labelledby="in-quick-title" data-instrument-quickstart>
           <h2 id="in-quick-title">{t('picker.homeTitle')}</h2>
           <p className="in-note">{t('picker.homeHint')}</p>
-          <QuestionPicker edition={EDITION} defaultYear={user.year} forms={[]} idPrefix="hq"
+          <QuestionPicker edition={EDITION} defaultYear={user.year} defaultCourse={user.year >= 11 ? user.pathway || null : null} forms={[]} idPrefix="hq"
             onStart={choice => nav(practiceHref({ subtopic: choice.chapter, difficulty: choice.difficulty, track: EDITION === 'priyabhata' ? choice.course : null }))} />
         </section>
       )}

@@ -749,7 +749,7 @@ export default {
   'verdict.answerAriaWithUnit': 'आपका उत्तर {unit} में',
   'verdict.answerPlaceholder': 'आपका उत्तर…',
   'verdict.readsAs': 'यह ऐसा पढ़ा जा रहा है',
-  'verdict.showWorkingToggle': 'हल दिखाइए: हर पंक्ति जाँची जाती है',
+  'verdict.showWorkingToggle': 'अपना हल दिखाइए',
   'verdict.workingPartialAria': 'आपका हल: हर पंक्ति में एक चरण',
   'verdict.workingPartialPlaceholder': 'हर पंक्ति में एक चरण, जैसे\n2x + 3 = 13\n2x = 10\nx = 5',
   'verdict.finalNumberTitle': 'यहाँ अंतिम उत्तर एक संख्या है।',

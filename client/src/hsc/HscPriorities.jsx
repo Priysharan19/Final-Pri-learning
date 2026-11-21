@@ -146,7 +146,7 @@ export default function HscPriorities({ user, courses, curriculum }) {
                   {p.styles.length > 0 && <div className="muted" style={{ fontSize: 12.5 }}>{t('hsc.likelyStyles', { styles: styleText(t, p) })}</div>}
                   <div className="muted" style={{ fontSize: 12.5 }}>{t('hsc.yourPractice')} <Evidence row={row} /></div>
                   <details style={{ marginTop: 4 }}>
-                    <summary style={{ cursor: 'pointer', fontSize: 12.5 }}>{t('hsc.why')}<span className="sr-only"> {p.focusArea}</span></summary>
+                    <summary className="tap-row" style={{ cursor: 'pointer', fontSize: 12.5 }}>{t('hsc.why')}<span className="sr-only"> {p.focusArea}</span></summary>
                     <Reasons p={p} paperMarks={result.paperMarks} />
                   </details>
                 </div>
@@ -163,13 +163,13 @@ export default function HscPriorities({ user, courses, curriculum }) {
 
       <div className="card">
         <details>
-          <summary style={{ cursor: 'pointer' }}><span className="card-title" style={{ margin: 0 }}>{t('hsc.methodTitle')}</span></summary>
+          <summary className="tap-row" style={{ cursor: 'pointer' }}><span className="card-title" style={{ margin: 0 }}>{t('hsc.methodTitle')}</span></summary>
           <p style={{ fontSize: 13.5 }}>{t('hsc.method1', { from: years[0], to: years[years.length - 1] })}</p>
           <p style={{ fontSize: 13.5 }}>{t('hsc.method2', { history: pct(result.weights.history), sample: pct(result.weights.sample), syllabus: pct(result.weights.syllabus) })}</p>
           <p style={{ fontSize: 13.5 }}>{result.history.beatsBaselines ? t('hsc.method3Beats') : t('hsc.method3Baseline')}</p>
           <p style={{ fontSize: 13.5 }}>{t('hsc.method4')}</p>
           {untagged.map(u => <p key={u.year} className="muted" style={{ fontSize: 13 }}>{t('hsc.untagged', { year: u.year })}</p>)}
-          <p style={{ fontSize: 13.5 }}>
+          <p className="tap-row" style={{ fontSize: 13.5 }}>
             <a href={NESA_PAPERS[course]} target="_blank" rel="noopener noreferrer">{t('hsc.nesaPapers')}</a>
           </p>
         </details>

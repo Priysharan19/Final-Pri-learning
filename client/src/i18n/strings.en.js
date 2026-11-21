@@ -685,7 +685,7 @@ export default {
   'verdict.answerAriaWithUnit': 'Your answer in {unit}',
   'verdict.answerPlaceholder': 'Your answer…',
   'verdict.readsAs': 'reads as',
-  'verdict.showWorkingToggle': 'Show working: every line is checked',
+  'verdict.showWorkingToggle': 'Show your working',
   'verdict.workingPartialAria': 'Your working: one step per line',
   'verdict.workingPartialPlaceholder': 'One step per line, e.g.\n2x + 3 = 13\n2x = 10\nx = 5',
   'verdict.finalNumberTitle': 'The final answer here is a number.',

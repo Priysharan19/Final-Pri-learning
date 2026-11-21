@@ -11,14 +11,29 @@
 // without an override here or a reasoned entry in its allowlist.
 // ─────────────────────────────────────────────────────────────────────────────
 export const AU_STRINGS = Object.freeze({
+  // Australian spelling: the shared catalogue says Favorites (en-US).
+  'favorites.title': 'Favourites',
+  'favorites.emptyTitle': 'No favourites yet',
+  'favorites.remove': 'Remove from favourites',
+  'favorites.removeOn': 'Remove this {topic} question from favourites',
+  'verdict.favorite': 'Favourite',
+  'verdict.favoriteThis': 'Favourite this question',
+  'verdict.savedToFavorites': 'Saved to Favourites',
+  'verdict.removedFromFavorites': 'Removed from Favourites',
+  'verdict.favoriteNeedsAnswer': 'Answer the question first, then favourite it from History.',
+  // Plain wording for the students' own account screens (the shared text spoke to developers).
+  'settings.helpBody': 'Every subtopic tracks a skill rating that moves with each answer. Harder questions move it more. Smart Practice targets ~70% success, weaves in spaced reviews before topics fade, and the mark estimate covers only the parts of the paper you have actually practised. Handwritten answers are read by Pri’s server reader when you are online, then the final answer is marked by the same engine as typed answers. Hints and retries still earn credit, just a little less.',
+  'cloud.intro': 'Your profile stays on this device. Connecting a {brand} account is what lets Pri’s server check your answers, and adds sync between your devices and your HSC Pass plan; it does not replace the profile on this device or its encryption keys.',
+  'cloudSecurity.providersUnavailable': 'Linked sign-in methods could not be loaded just now.',
+  'cloudSecurity.socialNote': 'Linking Google or Apple needs a fresh sign-in with that provider. {brand} never accepts a typed provider ID or an unverified email in its place.',
   'common.classNumber': 'Year {n}',
   'msg.classTitle': 'Year {n} · {title}',
   'msg.classOnly': 'Year {n}',
   'inst.mapTitleScope': '{scope} Mathematics',
   'inst.mapProvenance': 'Prerequisite links are Pri’s own teaching map, not a NESA publication.',
-  'login.heroSub': 'Maths practice for NSW students: your working marked line by line, with worked solutions. Answers are checked by Pri’s server, so checking needs a Pri account and a connection.',
+  'login.heroSub': 'Maths practice for NSW students: your answer checked, and your working read line by line where the question allows it, with worked solutions. Answers are checked by Pri’s server, so checking needs a Pri account and a connection.',
   'login.brandKicker': 'NSW Years 11 and 12 · Advanced and Extension 1',
-  'login.welcomeSub': 'Practise for the HSC. Your working is checked line by line.',
+  'login.welcomeSub': 'Practise for the HSC. Pri checks your answer and, where the question allows it, your working line by line.',
   'login.heroNote': 'Answers are checked by Pri’s server, so checking needs a connection. Five questions a day need no account. No ads.',
   'login.point1': 'Generated practice questions for NSW Mathematics',
   'settings.freeCourses': 'NSW Mathematics',

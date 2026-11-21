@@ -140,5 +140,50 @@ process.env.PRI_EDITION = 'prithagoras';
   check(`${made} issued NSW questions across every cell carry no Indian name, currency, place or exam`, () => assert.deepEqual([...found], []));
 }
 
+// ── QA sweep, 22 Nov 2026: the day-before-launch walk of the Prithagoras screens ──────────────────────────────────────────
+{
+  const { AU_STRINGS } = await import('../src/i18n/strings.au.js');
+  const EN = (await import('../src/i18n/strings.en.js')).default;
+  const HI = (await import('../src/i18n/strings.hi.js')).default;
+  const au = { ...EN, ...AU_STRINGS };
+  check('no student-facing string says "every line is checked" (a question without a working checker marks the answer only)', () => {
+    for (const [k, v] of Object.entries(au)) if (typeof v === 'string' && !k.startsWith('mp.') && k !== 'landing.proofEngine') assert.ok(!/every line is checked/i.test(v), `${k}: ${v}`);  // (the marked page's own sentences are shown only when the engine did check every line; landing.proofEngine qualifies itself in the same sentence and is reported to the owner)
+    assert.ok(!/हर पंक्ति जाँची जाती है/.test(HI['verdict.showWorkingToggle']));
+  });
+  check('the Prithagoras welcome copy promises line-by-line checking only where the question allows it', () => {
+    for (const k of ['login.welcomeSub', 'login.heroSub']) assert.match(au[k], /where the question allows it/, k);
+    assert.ok(!/Your working is checked line by line\./.test(au['login.welcomeSub']));
+  });
+  check('Australian spelling: Favourite, never Favorite, on every Prithagoras favourite string', () => {
+    for (const [k, v] of Object.entries(au)) if (/favorite/i.test(k) || /favou?rite/i.test(String(v))) assert.ok(!/[Ff]avorite/.test(String(v)), `${k}: ${v}`);
+  });
+  check('Settings account screens carry no developer wording on Prithagoras (production identity UI, provider subject, authenticated sync)', () => {
+    for (const k of ['cloud.intro', 'cloudSecurity.socialNote', 'cloudSecurity.providersUnavailable']) assert.ok(!/production identity UI|provider subject|authenticated cross-device|Provider status unavailable/.test(au[k]), k);
+  });
+  check('the Settings help text says the final answer is marked, not each working line, on Prithagoras', () => {
+    assert.ok(!/line by line/.test(au['settings.helpBody']));
+  });
+  const exams = code('pages/Exams.jsx');
+  check('Exams does not offer the generic "Sit a practice paper" card to an NSW student (the server refuses that kind of paper)', () => {
+    assert.match(exams, /user\.course !== 'nsw' && <div className="card">/);
+  });
+  const { settleChoice } = await import('../src/guest/guestMenu.js');
+  check('the Home question picker opens on the student\'s own course (Extension 1 stays Extension 1)', () => {
+    assert.equal(settleChoice('prithagoras', {}, { defaultYear: 12, defaultCourse: 'ext1' }).course, 'ext1');
+    assert.equal(settleChoice('prithagoras', {}, { defaultYear: 12 }).course, 'advanced');
+    assert.equal(settleChoice('prithagoras', { course: 'advanced' }, { defaultYear: 12, defaultCourse: 'ext1' }).course, 'advanced');
+  });
+  const css = f => readFileSync(fileURLToPath(new URL(`../src/${f}`, here)), 'utf8');
+  check('the history row\'s level column is wide enough for "Intermediate" (it overlapped the question text)', () => {
+    assert.match(css('instrument/ledger.css'), /\.in-led-main \{\s*display: grid; grid-template-columns: 10px (9\d|1\d\d)px /);
+  });
+  check('the legal pages have a gutter before the shell exists, and a settings label keeps its words whole on a phone', () => {
+    const theme = css('theme.css');
+    assert.match(theme, /#root > \.qpage \{ padding: calc\(24px/);
+    assert.match(theme, /\.set-row \.set-k \{ flex: 0 0 auto; max-width: 46%; overflow-wrap: normal/);
+    assert.match(theme, /\.legal-body \{ overflow-wrap: anywhere; \}/);
+  });
+}
+
 if (failures.length) { console.error(failures.join('\n')); console.error(`AU NO INDIA SURFACE: FAIL ${failures.length}`); process.exit(1); }
 console.log(`AU NO INDIA SURFACE: PASS — ${pass} checks`);
