@@ -116,12 +116,25 @@ try {
   c.eq((await post('/v1/guest/question', ASK({ generator: 'pyq-jee-advanced-sets' }), g.jar, g.headers)).status > 399, true, 'premium and archive content is refused');
 
   // ── one verdict per question ────────────────────────────────────────────────
+  // The first question's seed is the server's own choice. A few forms of this generator have a worked solution whose
+  // first step already states the answer: those give no retry and close on the first wrong answer (as they always did).
+  // Both shapes are asserted, the same number of checks each, so the count does not depend on the draw.
+  key1.q._generator = GENERATORS[0];
+  const teaches = guestSteps(key1.q).length > 0;
   const wrong = await post('/v1/guest/answer', { sealed: q1.data.sealed, answer: '987654321' }, g.jar, g.headers);
-  c.deq([wrong.status, wrong.data.resolved, wrong.data.correct, wrong.data.retry], [200, false, false, true], 'a first wrong answer is marked wrong and leaves the question open for one more try');
-  c.ok(!('answer' in wrong.data) && wrong.data.step && typeof wrong.data.step.h === 'string' && wrong.data.shown === 1 && wrong.data.total >= 2, 'the answer stays closed and the first worked step is released');
-  const secondTry = await post('/v1/guest/answer', { sealed: q1.data.sealed, answer: '987654322' }, g.jar, g.headers);
-  c.deq([secondTry.status, secondTry.data.resolved, secondTry.data.correct], [200, true, false], 'a second wrong answer closes the question');
-  c.eq(secondTry.data.answer, key1.text, 'and only now is the answer shown');
+  if (teaches) {
+    c.deq([wrong.status, wrong.data.resolved, wrong.data.correct, wrong.data.retry], [200, false, false, true], 'a first wrong answer is marked wrong and leaves the question open for one more try');
+    c.ok(!('answer' in wrong.data) && wrong.data.step && typeof wrong.data.step.h === 'string' && wrong.data.shown === 1 && wrong.data.total >= 2, 'the answer stays closed and the first worked step is released');
+    const secondTry = await post('/v1/guest/answer', { sealed: q1.data.sealed, answer: '987654322' }, g.jar, g.headers);
+    c.deq([secondTry.status, secondTry.data.resolved, secondTry.data.correct], [200, true, false], 'a second wrong answer closes the question');
+    c.eq(secondTry.data.answer, key1.text, 'and only now is the answer shown');
+  } else {
+    c.deq([wrong.status, wrong.data.resolved, wrong.data.correct, wrong.data.retry], [200, true, false, undefined], 'a wrong answer on a question with no step to teach from is marked wrong and closes it');
+    c.ok(!('step' in wrong.data), 'no worked step is released for it');
+    const secondTry = await post('/v1/guest/answer', { sealed: q1.data.sealed, answer: '987654322' }, g.jar, g.headers);
+    c.ok([200, 409].includes(secondTry.status) && secondTry.data?.correct !== true, 'a second entry cannot reopen it');
+    c.eq(wrong.data.answer, key1.text, 'and the answer is shown with the verdict');
+  }
   const again = await post('/v1/guest/answer', { sealed: q1.data.sealed, answer: key1.text }, g.jar, g.headers);
   c.eq(again.data?.error?.code, 'GUEST_ALREADY_ANSWERED', 'the same question cannot be answered a third time (no more guesses, no replay)');
   c.eq((await post('/v1/guest/answer', { sealed: q1.data.sealed, answer: key1.text }, other.jar, other.headers)).status, 403, 'a ticket cannot be answered under another guest\'s token');
@@ -267,8 +280,13 @@ try {
       try {
         const jar = {}; const sess = await v.at('/v1/guest/session', {}, jar, '203.0.113.30');
         const hd = { [GUEST_CSRF_HEADER]: sess.data.csrf };
-        const qq = await v.at('/v1/guest/question', ASK(), jar, '203.0.113.30', hd);
-        const key = answerKeyOf(qq.data.sealed);
+        // The seed is the server's choice and a few forms give no step to teach from: draw (at most the five a guest has) until one does.
+        let qq, key;
+        for (let i = 0; i < 5; i++) {
+          qq = await v.at('/v1/guest/question', ASK(), jar, '203.0.113.30', hd);
+          key = answerKeyOf(qq.data.sealed); key.q._generator = GENERATORS[0];
+          if (guestSteps(key.q).length) break;
+        }
         const wrong = key.text + '9', wrong2 = key.text + '8';
         const one = await v.at('/v1/guest/answer', { sealed: qq.data.sealed, answer: wrong }, jar, '203.0.113.30', hd);
         const again = await v.at('/v1/guest/answer', { sealed: qq.data.sealed, answer: wrong }, jar, '203.0.113.30', hd);
