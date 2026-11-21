@@ -207,6 +207,25 @@ export function figParabola({ a = 1, h = 0, k = 0, xInts = null, showVertex = tr
   return svgWrap(inner, W, H, 'Parabola on coordinate axes');
 }
 
+// ── Graph of a polyline through labelled points ──────────────────────────────
+/** points: [[x, y], ...] joined in order, each labelled with its coordinates; the axes carry whole-number ticks. */
+export function figPolyline(points, { xr, yr }) {
+  const W = 340, H = 250, L = 34, R = 18, T = 20, B = 30;
+  const X = x => L + ((x - xr[0]) / (xr[1] - xr[0])) * (W - L - R);
+  const Y = y => H - B - ((y - yr[0]) / (yr[1] - yr[0])) * (H - T - B);
+  const stepOf = span => (span > 12 ? 2 : 1);
+  let inner = line(X(xr[0]), Y(0), X(xr[1]), Y(0)) + line(X(0), Y(yr[0]), X(0), Y(yr[1]));
+  for (let x = Math.ceil(xr[0]); x <= xr[1]; x += stepOf(xr[1] - xr[0])) if (x !== 0) inner += line(X(x), Y(0) - 3, X(x), Y(0) + 3) + txt(X(x), Y(0) + 15, x, { size: 11.5 });
+  for (let y = Math.ceil(yr[0]); y <= yr[1]; y += stepOf(yr[1] - yr[0])) if (y !== 0) inner += line(X(0) - 3, Y(y), X(0) + 3, Y(y)) + txt(X(0) - 7, Y(y) + 4, y, { size: 11.5, anchor: 'end' });
+  inner += `<polyline points="${points.map(p => `${NUM(X(p[0]))},${NUM(Y(p[1]))}`).join(' ')}" stroke="${ACCENT}" stroke-width="2.2"/>`;
+  points.forEach((p, i) => {
+    const prev = points[i - 1], next = points[i + 1];
+    const above = (!prev || p[1] >= prev[1]) && (!next || p[1] >= next[1]);
+    inner += `<circle cx="${NUM(X(p[0]))}" cy="${NUM(Y(p[1]))}" r="3.4" fill="${ACCENT}" stroke="none"/>` + txt(X(p[0]), Y(p[1]) + (above ? -9 : 16), `(${p[0]}, ${p[1]})`, { size: 11.5 });
+  });
+  return svgWrap(inner, W, H, 'Graph of a function with its labelled points');
+}
+
 // ── Bearings diagram ─────────────────────────────────────────────────────────
 /** One leg from O at a true bearing; N arrow, angle arc from north. */
 export function figBearing({ bearing = 120, dist = '40 km', to = 'B' } = {}) {
