@@ -102,7 +102,6 @@ const ORACLES = {
   'fc-int-expsub': (s) => ({ pi: s.tanForm ? simpson(x => (s.k * Math.exp(x)) / (1 + Math.exp(2 * x)), 0, Math.log(Math.sqrt(3))) : simpson(x => (s.k * Math.exp(x)) / Math.sqrt(1 - Math.exp(2 * x)), -Math.log(2), -0.5 * Math.log(2)) }),
   'fc-int-xsq': (s) => ({ pi: s.sinForm ? simpson(x => (s.k * x) / Math.sqrt(1 - x ** 4), 0, Math.SQRT1_2) : simpson(x => (s.k * x) / (1 + x ** 4), 0, 1) }),
   'fc-int-area': (s) => ({ value: simpson(x => s.k / (s.a * s.a + x * x), 0, s.a * Math.sqrt(3)), tol: 0.0005 }),
-  'fc-int-square-tan': (s) => ({ pi: simpson(x => 1 / (x * x + 2 * s.b * x + s.b * s.b + s.c * s.c), -s.b, s.c - s.b) }),
   'fc-sub-mcq': (s) => {
     const f = s.sinCase ? x => Math.cos(x) / (1 + Math.sin(x) ** 2) : x => Math.exp(x) / (1 + Math.exp(2 * x));
     const gs = s.sinCase ? [Math.sin, Math.cos, x => 1 + Math.sin(x) ** 2, Math.tan] : [Math.exp, x => Math.exp(2 * x), x => 1 + Math.exp(2 * x), x => x];
@@ -161,7 +160,8 @@ const ORACLES = {
   'vec-sum-diff': (s) => ({ value: (s.a[0] + s.b[0]) * (s.a[0] - s.b[0]) + (s.a[1] + s.b[1]) * (s.a[1] - s.b[1]) }),
   'vec-lambda': (s) => { const l = s.a[0] / s.b[0]; return { value: s.a[1] === l * s.b[1] ? l : NaN }; },
   // ── induction ──
-  'ind-rhs-next': (s) => ({ expr: { vars: ['k'], points: intPts(['k']), want: e => sumTo(s.F, e.k + 1) } }),
+  // option 0 is the statement (the formula with n = k + 1); option 1, the unsubstituted work, is equal in value but is not the statement, so it is keyed wrong; option 2 differs in value
+  'ind-rhs-next': (s) => { const F = s.F, S = n => sumTo(F, n), sound = [1, 2, 3, 4].every(k => S(k) + F.term(k + 1) === S(k + 1) && S(k) + 1 !== S(k + 1)); return { truth: i => i === 0 && sound }; },
   'ind-lhs-next': (s) => { const F = s.F, m = s.m, S = n => sumTo(F, n), T = i => F.term(i), vals = [S(m) + T(m + 1), S(m) + T(m), S(m) + T(m + 2), S(m + 1) + T(m + 1)]; return { truth: i => vals[i] === S(m + 1) }; },
   'ind-factor-out': (s) => {
     const F = s.F;
@@ -197,6 +197,8 @@ const ORACLES = {
 
 // ── the sweep ────────────────────────────────────────────────────────────────
 const evalKey = (expr, env) => evaluate(parse(expr), env);
+const gcdI = (a, b) => { while (b) [a, b] = [b, a % b]; return Math.abs(a); };
+const REDUCED_FORMS = new Set(['fc-int-sin-limits', 'fc-int-find-k', 'fc-int-factor']);
 const tally = new Map();
 for (const bank of [all]) {
   for (const [gen, variants] of Object.entries(bank)) {
@@ -216,6 +218,20 @@ for (const bank of [all]) {
           ok(!/—/.test(JSON.stringify(q)), `${where}: no em dash`);
           const bad = JSON.stringify(q).match(/undefined|NaN|\[object|Infinity/);
           ok(!bad, `${where}: text hygiene (${bad})`);
+          // wording lint (an external review found these in served text): no bare leading \cdot, no coefficient 1, no "+ -", no unreduced fraction in the named forms, never a base 1
+          for (const [where2, str] of [['prompt', q.prompt], ...(q.mcqOptions || []).map((o, i) => [`option ${i}`, o]), ...q.hints.map((h, i) => [`hint ${i + 1}`, h]), ...q.steps.map((s, i) => [`step ${i + 1}`, `${s.h} ${s.d}`]), ['key', q.answerType === 'expression' ? q.answer.expr : '']]) {
+            const L = String(str);
+            ok(!/(^|[$=({+\-,]\s*)\\cdot/.test(L), `${where}: ${where2} has a bare leading \\cdot: ${L}`);
+            ok(!/(^|[^\d.\w\\^_])1(?=[a-zA-Z]|\\sqrt|\\pi)/.test(L), `${where}: ${where2} prints a coefficient 1: ${L}`);
+            if (where2 !== 'key') ok(!/\+\s*[-\u2212]/.test(L), `${where}: ${where2} has "+ -": ${L}`);
+            if (sp.form === 'ind-div-mk') ok(!/(^|[^\d.\w])1\^/.test(L), `${where}: ${where2} has a base 1: ${L}`);
+            if (REDUCED_FORMS.has(sp.form)) {
+              for (const m of L.matchAll(/\\[dt]frac\{(\d+)[^{}]*\}\{(\d+)\}|(\d+)\/(\d+)/g)) {
+                const n = Number(m[1] ?? m[3]), d = Number(m[2] ?? m[4]);
+                ok(gcdI(n, d) === 1, `${where}: ${where2} has the unreduced fraction ${m[0]}: ${L}`);
+              }
+            }
+          }
           // the first three hints never print the key
           const ks = text(keyString(q));
           if (q.answerType !== 'mcq' && ks.length >= 4) ok(!q.hints.slice(0, 3).some(h => text(h).includes(ks)), `${where}: a hint before the last prints the key ${ks}`);
@@ -254,6 +270,7 @@ for (const bank of [all]) {
               else ok(Number.isFinite(v) && near(v, E.want(e), 1e-6), `${where}: key ${v} vs independent ${E.want(e)} at ${JSON.stringify(e)}`);
             }
           } else if (o.truth || o.mcqValue !== undefined || o.signs !== undefined) {
+            if (q.answerType !== 'mcq') { ok(false, `${where}: the oracle expects a multiple-choice question`); continue; }
             const texts = q.__texts;
             ok(Array.isArray(texts) && texts.length >= 2, `${where}: option record`);
             const keyedText = q.mcqOptions[q.answer.correctIndex];
@@ -285,4 +302,6 @@ for (const bank of [all]) {
 // every form was drawn
 const forms = [...tally.keys()];
 console.log(`EXT1 BANK FORMS: ${failures.length ? 'FAIL' : 'PASS'} - ${checks} checks over ${forms.length} forms (${[...tally.values()].reduce((a, b) => a + b, 0)} draws, ${SEEDS} seeds per difficulty), keys re-derived by an independent route`);
-if (failures.length) { for (const f of failures.slice(0, 40)) console.log('  ✗', f); console.log(`  ... ${failures.length} failure(s)`); process.exit(1); }
+if (failures.length) {
+  // one line per distinct failure shape (seed and digits normalised), so a systematic fault is not buried under 300 repeats of itself
+  const shown = new Set(); for (const f of failures) { const k = f.replace(/seed \d+/, '').replace(/\d+/g, '#'); if (!shown.has(k) && shown.size < 40) { shown.add(k); console.log('  ✗', f); } } console.log(`  ... ${failures.length} failure(s)`); process.exit(1); }

@@ -105,6 +105,14 @@ const asinTex = String.raw`\sin^{-1}`;
 const atanTex = String.raw`\tan^{-1}`;
 const C = (n, k) => { let r = 1; for (let i = 1; i <= k; i++) r = (r * (n - k + i)) / i; return Math.round(r); };
 const frac = (n, d) => (d === 1 ? `${n}` : String.raw`\dfrac{${n}}{${d}}`);
+/** n/d in lowest terms. */
+const fr = (n, d) => { const g = gcd(n, d); return frac(n / g, d / g); };
+/** (a * sqrt(r)) / d in lowest terms; a coefficient of 1 is not printed. */
+/** x over a, with the denominator left out when it is 1. */
+const xover = a => (a === 1 ? 'x' : String.raw`\dfrac{x}{${a}}`);
+/** (n * pi) / d in lowest terms. */
+const cpi = (n, d) => { const g = gcd(n, d), n1 = n / g, d1 = d / g, top = n1 === 1 ? String.raw`\pi` : String.raw`${n1}\pi`; return d1 === 1 ? top : String.raw`\dfrac{${top}}{${d1}}`; };
+const rad = (a, r, d) => { const g = gcd(a, d), a1 = a / g, d1 = d / g, top = a1 === 1 ? String.raw`\sqrt${r}` : String.raw`${a1}\sqrt${r}`; return d1 === 1 ? top : String.raw`\dfrac{${top}}{${d1}}`; };
 
 // ═══════════════════════════ me12-further-calc ═══════════════════════════════
 // Cell dot points: D1 = 0 (differentiate inverse sine), D2 = 1 (inverse tangent), D3 and D4 = 2 (integrate).
@@ -370,8 +378,8 @@ const calcForms = [
   }),
   // limits that do not start at 0
   V([3], rng => {
-    const a = ri(rng, 1, 4), k = ri(rng, 2, 9), A = a === 1 ? '' : String(a);
-    const L = { h: [String.raw`\dfrac{${a}}{2}`, String.raw`\dfrac12`, 6], s2: [String.raw`\dfrac{${A}\sqrt2}{2}`, String.raw`\dfrac{\sqrt2}{2}`, 4], s3: [String.raw`\dfrac{${A}\sqrt3}{2}`, String.raw`\dfrac{\sqrt3}{2}`, 3] };
+    const a = ri(rng, 1, 4), k = ri(rng, 2, 9);
+    const L = { h: [fr(a, 2), String.raw`\dfrac12`, 6], s2: [rad(a, 2, 2), String.raw`\dfrac{\sqrt2}{2}`, 4], s3: [rad(a, 3, 2), String.raw`\dfrac{\sqrt3}{2}`, 3] };
     const [lo, hi] = rc(rng, [['h', 's3'], ['s2', 's3'], ['h', 's2']]);
     const den = Math.round(1 / (1 / L[hi][2] - 1 / L[lo][2]));
     return spec(exactQ(String.raw`Evaluate $\displaystyle\int_{${L[lo][0]}}^{${L[hi][0]}}\dfrac{${k}}{\sqrt{${a * a}-x^2}}\,dx$. The answer is $c\pi$: type $c$ as a fraction in lowest terms (not $\pi$).`, k, den, {
@@ -379,13 +387,13 @@ const calcForms = [
       traps: [{ value: k / L[hi][2], why: 'Subtract the value at the lower limit: it is not zero here.' }, { value: k / (L[hi][2] + L[lo][2]), why: 'The definite integral is the value at the upper limit **minus** the value at the lower limit.' }],
       hints: [
         String.raw`The integrand is $\dfrac{k}{\sqrt{a^2-x^2}}$ with $a = ${a}$: use $\int\dfrac{dx}{\sqrt{a^2-x^2}} = ${asinTex}\dfrac{x}{a}$.`,
-        String.raw`Neither limit is $0$. Work out $\dfrac{x}{${a}}$ at each limit.`,
+        String.raw`Neither limit is $0$. Work out $${xover(a)}$ at each limit.`,
         String.raw`Use the exact angles whose sine is $\dfrac12$, $\dfrac{\sqrt2}{2}$ and $\dfrac{\sqrt3}{2}$.`,
-        String.raw`$${k}\left(\dfrac{\pi}{${L[hi][2]}} - \dfrac{\pi}{${L[lo][2]}}\right) = \dfrac{${k}\pi}{${den}}$.`],
+        String.raw`$${k}\left(\dfrac{\pi}{${L[hi][2]}} - \dfrac{\pi}{${L[lo][2]}}\right) = ${cpi(k, den)}$.`],
       steps: [
-        { h: 'Antiderivative', d: String.raw`$${k}\left[${asinTex}\dfrac{x}{${a}}\right]$ between the two limits` },
-        { h: 'Arguments at the limits', d: String.raw`$\dfrac{x}{${a}}$ is $${L[lo][1]}$ at the lower limit and $${L[hi][1]}$ at the upper limit` },
-        { h: 'Subtract', d: String.raw`$${k}\left(\dfrac{\pi}{${L[hi][2]}} - \dfrac{\pi}{${L[lo][2]}}\right) = \dfrac{${k}\pi}{${den}}$` }]
+        { h: 'Antiderivative', d: String.raw`$${k}\left[${asinTex}${xover(a)}\right]$ between the two limits` },
+        { h: 'Arguments at the limits', d: String.raw`$${xover(a)}$ is $${L[lo][1]}$ at the lower limit and $${L[hi][1]}$ at the upper limit` },
+        { h: 'Subtract', d: String.raw`$${k}\left(\dfrac{\pi}{${L[hi][2]}} - \dfrac{\pi}{${L[lo][2]}}\right) = ${cpi(k, den)}$` }]
     }), 'fc-int-sin-limits', { a, k, lo: L[lo][2], hi: L[hi][2] });
   }),
   // a value that is not a multiple of pi
@@ -411,16 +419,16 @@ const calcForms = [
   // find the constant from the value of the integral
   V([3], rng => {
     const a = ri(rng, 1, 4), c = ri(rng, 1, 5), k = 6 * c;
-    return spec(numQ(String.raw`It is given that $\displaystyle\int_0^{${a === 1 ? '\\tfrac12' : String.raw`\tfrac{${a}}{2}`}}\dfrac{k}{\sqrt{${a * a}-x^2}}\,dx = ${c === 1 ? '' : c}\pi$. Find the constant $k$.`, k, {
+    return spec(numQ(String.raw`It is given that $\displaystyle\int_0^{${a % 2 === 0 ? a / 2 : a === 1 ? '\\tfrac12' : String.raw`\tfrac{${a}}{2}`}}\dfrac{k}{\sqrt{${a * a}-x^2}}\,dx = ${c === 1 ? '' : c}\pi$. Find the constant $k$.`, k, {
       dp: 2, prefix: 'k =',
       traps: [{ value: c, why: String.raw`$${asinTex}\dfrac12 = \dfrac{\pi}{6}$, so the integral equals $\dfrac{k\pi}{6}$, not $k\pi$.` }, { value: c / 6, why: String.raw`Solve $\dfrac{k\pi}{6} = ${c}\pi$ for $k$: multiply by $6$, do not divide.` }],
       hints: [
-        String.raw`Integrate with $${asinTex}\dfrac{x}{${a}}$ and keep $k$ as a factor.`,
+        String.raw`Integrate with $${asinTex}${xover(a)}$ and keep $k$ as a factor.`,
         String.raw`The upper limit gives $${asinTex}\dfrac12$.`,
         'Write the integral as a multiple of $\\pi$, then equate with the given value.',
         `$\\dfrac{k\\pi}{6} = ${c === 1 ? '' : c}\\pi$ gives $k = ${k}$.`],
       steps: [
-        { h: 'Integrate', d: String.raw`$k\left[${asinTex}\dfrac{x}{${a}}\right]_0^{${a}/2}$` },
+        { h: 'Integrate', d: String.raw`$k\left[${asinTex}${xover(a)}\right]_0^{${a % 2 === 0 ? a / 2 : `${a}/2`}}$` },
         { h: 'Limits', d: String.raw`$k\left(${asinTex}\dfrac12 - 0\right) = \dfrac{k\pi}{6}$` },
         { h: 'Solve', d: `$\\dfrac{k\\pi}{6} = ${c === 1 ? '' : c}\\pi$, so $k = ${k}$` }]
     }), 'fc-int-find-k', { a, c });
@@ -430,7 +438,7 @@ const calcForms = [
   // factor a perfect square out of the root
   V([4], rng => {
     const r = ri(rng, 2, 5), s = ri(rng, 1, 3);
-    const [lim, limTex, ang] = rc(rng, [['h', String.raw`\dfrac{${s}}{2}`, 6], ['r2', String.raw`\dfrac{${s}\sqrt2}{2}`, 4], ['r3', String.raw`\dfrac{${s}\sqrt3}{2}`, 3]]);
+    const [lim, limTex, ang] = rc(rng, [['h', fr(s, 2), 6], ['r2', rad(s, 2, 2), 4], ['r3', rad(s, 3, 2), 3]]);
     const A = r * r * s * s, B = r * r;
     return spec(exactQ(String.raw`Evaluate $\displaystyle\int_0^{${limTex}}\dfrac{dx}{\sqrt{${A}-${B}x^2}}$. The answer is $c\pi$: type $c$ as a fraction in lowest terms (not $\pi$).`, 1, ang * r, {
       dp: 2, prefix: 'c =',
@@ -438,11 +446,11 @@ const calcForms = [
       hints: [
         `The coefficient of $x^2$ is not $1$. Factor $${B}$ out of **both** terms under the root.`,
         String.raw`$\sqrt{${A}-${B}x^2} = \sqrt{${B}}\sqrt{${s * s}-x^2}$: take $\sqrt{${B}}$ outside the integral as $\dfrac{1}{\sqrt{${B}}}$.`,
-        String.raw`Integrate $\dfrac{1}{\sqrt{${s * s}-x^2}}$ to $${asinTex}\dfrac{x}{${s}}$ and substitute the limit.`,
+        String.raw`Integrate $\dfrac{1}{\sqrt{${s * s}-x^2}}$ to $${asinTex}${xover(s)}$ and substitute the limit.`,
         String.raw`$\dfrac{1}{${r}}\cdot\dfrac{\pi}{${ang}} = \dfrac{\pi}{${ang * r}}$.`],
       steps: [
         { h: 'Factor', d: String.raw`$\sqrt{${A}-${B}x^2} = ${r}\sqrt{${s * s}-x^2}$` },
-        { h: 'Standard integral', d: String.raw`$\dfrac{1}{${r}}\left[${asinTex}\dfrac{x}{${s}}\right]_0^{${limTex}}$` },
+        { h: 'Standard integral', d: String.raw`$\dfrac{1}{${r}}\left[${asinTex}${xover(s)}\right]_0^{${limTex}}$` },
         { h: 'Limit', d: String.raw`$${asinTex}\left(\dfrac{\text{limit}}{${s}}\right) = \dfrac{\pi}{${ang}}$, so the value is $\dfrac{\pi}{${ang * r}}$` }]
     }), 'fc-int-factor', { r, s, lim });
   }),
@@ -523,24 +531,6 @@ const calcForms = [
         { h: 'Value', d: String.raw`$\dfrac{${k}}{${a}}\cdot\dfrac{\pi}{3} \approx ${r3(v)}$` }]
     }), 'fc-int-area', { a, k });
   }),
-  // complete the square, tangent form
-  V([4], rng => {
-    const b = nz(rng, -4, 4), c = ri(rng, 1, 3), n = b * b + c * c, lo = -b, hi = c - b;
-    const quad = `x^2 ${sg(2 * b)}x ${sg(n)}`;
-    return spec(exactQ(String.raw`Evaluate $\displaystyle\int_{${lo}}^{${hi}}\dfrac{dx}{${quad}}$. The answer is $c\pi$: type $c$ as a fraction in lowest terms (not $\pi$).`, 1, 4 * c, {
-      dp: 2, prefix: 'c =',
-      traps: [{ value: 1 / 4, why: String.raw`Complete the square: the denominator is $(x ${sg(b)})^2 + ${c * c}$, so $a = ${c}$ and the antiderivative has the factor $\dfrac{1}{${c}}$.` }, { value: 1 / (4 * c * c), why: String.raw`The factor is $\dfrac{1}{a}$ with $a = ${c}$, not $\dfrac{1}{a^2}$.` }],
-      hints: [
-        'The denominator is not of the form $a^2 + x^2$ yet. Complete the square.',
-        `$${quad} = (x ${sg(b)})^2 + ${c * c}$: let $u = x ${sg(b)}$.`,
-        'Change the limits to values of $u$ and use the $\\tan^{-1}$ integral.',
-        String.raw`$\dfrac{1}{${c}}\left[${atanTex}\dfrac{u}{${c}}\right]_0^{${c}} = \dfrac{1}{${c}}\cdot\dfrac{\pi}{4}$.`],
-      steps: [
-        { h: 'Complete the square', d: `$${quad} = (x ${sg(b)})^2 + ${c * c}$` },
-        { h: 'Substitute', d: `$u = x ${sg(b)}$: the limits become $0$ and $${c}$` },
-        { h: 'Integrate', d: String.raw`$\dfrac{1}{${c}}\left[${atanTex}\dfrac{u}{${c}}\right]_0^{${c}} = \dfrac{\pi}{${4 * c}}$` }]
-    }), 'fc-int-square-tan', { b, c });
-  }),
   // which substitution
   V([4], rng => {
     const sinCase = rng() < 0.5;
@@ -561,19 +551,20 @@ const calcForms = [
   // split the numerator: a log part and an inverse tangent part
   V([4], rng => {
     const p = rc(rng, [2, 4, 6]), q = ri(rng, 1, 5), v = (p / 2) * Math.log(2) + (q * Math.PI) / 4;
+    const P2 = p / 2 === 1 ? '' : p / 2, Q = q === 1 ? '' : q;
     rej(!safe3(v));
     return spec(numQ(String.raw`Evaluate $\displaystyle\int_0^1\dfrac{${p}x + ${q}}{1+x^2}\,dx$, correct to 3 decimal places.`, r3(v), {
       dp: 2, tol: 0.0005,
-      traps: [{ value: r3((q * Math.PI) / 4), why: String.raw`The term $\dfrac{${p}x}{1+x^2}$ is not zero: it is of the form $\dfrac{f'(x)}{f(x)}$ and integrates to a logarithm.` }, { value: r3((p / 2) * Math.log(2)), why: String.raw`The constant part $\dfrac{${q}}{1+x^2}$ also contributes: it integrates to $${q}${atanTex}x$.` }],
+      traps: [{ value: r3((q * Math.PI) / 4), why: String.raw`The term $\dfrac{${p}x}{1+x^2}$ is not zero: it is of the form $\dfrac{f'(x)}{f(x)}$ and integrates to a logarithm.` }, { value: r3((p / 2) * Math.log(2)), why: String.raw`The constant part $\dfrac{${q}}{1+x^2}$ also contributes: it integrates to $${Q}${atanTex}x$.` }],
       hints: [
         'Split the numerator into two integrals with the same denominator.',
         String.raw`One integrand is $\dfrac{${p}x}{1+x^2}$: the numerator is a multiple of the derivative of $1 + x^2$.`,
         String.raw`The other is $\dfrac{${q}}{1+x^2}$, a standard $${atanTex}$ form. Integrate each and use a calculator for the decimal.`,
-        `The value is $${p / 2}\\ln 2 + \\dfrac{${q}\\pi}{4} \\approx ${r3(v)}$.`],
+        `The value is $${P2}\\ln 2 + ${cpi(q, 4)} \\approx ${r3(v)}$.`],
       steps: [
         { h: 'Split', d: String.raw`$\int_0^1\dfrac{${p}x}{1+x^2}\,dx + \int_0^1\dfrac{${q}}{1+x^2}\,dx$` },
-        { h: 'Logarithm part', d: String.raw`$${p / 2}\left[\ln(1+x^2)\right]_0^1 = ${p / 2}\ln 2$` },
-        { h: 'Inverse tangent part', d: String.raw`$${q}\left[${atanTex}x\right]_0^1 = \dfrac{${q}\pi}{4}$` },
+        { h: 'Logarithm part', d: String.raw`$${P2}\left[\ln(1+x^2)\right]_0^1 = ${P2}\ln 2$` },
+        { h: 'Inverse tangent part', d: String.raw`$${Q}\left[${atanTex}x\right]_0^1 = ${cpi(q, 4)}$` },
         { h: 'Add', d: `$${r3((p / 2) * Math.log(2))} + ${r3((q * Math.PI) / 4)} \\approx ${r3(v)}$` }]
     }), 'fc-int-split', { p, q });
   })
@@ -881,17 +872,17 @@ const fnForms = [
     return spec(numQ(`$f$ is a one-to-one function with $f(${p}) = ${q}$ and $f(${r}) = ${s}$. Evaluate $f^{-1}(${q}) + f^{-1}(${s})$.`, p + r, {
       dp: 0,
       traps: [{ value: q + s, why: `$f^{-1}(${q})$ is the **input** that $f$ sends to $${q}$, not the output.` }, { value: p * q + r * s, why: 'Add the two inputs: do not multiply by the outputs.' }],
-      hints: ['A one-to-one function and its inverse reverse each other: if $f(a) = b$ then $f^{-1}(b) = a$.', `Use $f(${p}) = ${q}$ to find $f^{-1}(${q})$.`, `Use $f(${r}) = ${s}$ to find $f^{-1}(${s})$.`, `$f^{-1}(${q}) + f^{-1}(${s}) = ${p} + ${r} = ${p + r}$.`],
-      steps: [{ h: 'First', d: `$f(${p}) = ${q}$, so $f^{-1}(${q}) = ${p}$` }, { h: 'Second', d: `$f(${r}) = ${s}$, so $f^{-1}(${s}) = ${r}$` }, { h: 'Add', d: `$${p} + ${r} = ${p + r}$` }]
+      hints: ['A one-to-one function and its inverse reverse each other: if $f(a) = b$ then $f^{-1}(b) = a$.', `Use $f(${p}) = ${q}$ to find $f^{-1}(${q})$.`, `Use $f(${r}) = ${s}$ to find $f^{-1}(${s})$.`, `$f^{-1}(${q}) + f^{-1}(${s}) = ${p} ${sg(r)} = ${p + r}$.`],
+      steps: [{ h: 'First', d: `$f(${p}) = ${q}$, so $f^{-1}(${q}) = ${p}$` }, { h: 'Second', d: `$f(${r}) = ${s}$, so $f^{-1}(${s}) = ${r}$` }, { h: 'Add', d: `$${p} ${sg(r)} = ${p + r}$` }]
     }), 'fn-reverse-pairs', { p, q, r, s });
   }),
   V([1], rng => {
     const a = ri(rng, 2, 7), b = nz(rng, -9, 9), t = nz(rng, -5, 6), c = a * t + b;
     return spec(numQ(`The function $f(x) = ax ${sg(b)}$ has $f^{-1}(${c}) = ${t}$. Find the constant $a$.`, a, {
       dp: 0, prefix: 'a =',
-      traps: [{ value: (c + b) / t, why: `Check the sign when moving $${b}$: $f(${t}) = ${c}$ means $${t}a ${sg(b)} = ${c}$.` }, { value: c / t, why: `The constant $${b}$ also contributes: $${t}a ${sg(b)} = ${c}$.` }].filter(x => x.value !== a),
-      hints: [`$f^{-1}(${c}) = ${t}$ means the input $${t}$ gives the output $${c}$.`, `So $f(${t}) = ${c}$.`, `Substitute into $ax ${sg(b)}$ and solve for $a$.`, `$${t}a ${sg(b)} = ${c}$ gives $a = ${a}$.`],
-      steps: [{ h: 'Reverse the statement', d: `$f(${t}) = ${c}$` }, { h: 'Equation', d: `$${t}a ${sg(b)} = ${c}$` }, { h: 'Solve', d: `$a = ${a}$` }]
+      traps: [{ value: (c + b) / t, why: `Check the sign when moving $${b}$: $f(${t}) = ${c}$ means $${co(t, 'a')} ${sg(b)} = ${c}$.` }, { value: c / t, why: `The constant $${b}$ also contributes: $${co(t, 'a')} ${sg(b)} = ${c}$.` }].filter(x => x.value !== a),
+      hints: [`$f^{-1}(${c}) = ${t}$ means the input $${t}$ gives the output $${c}$.`, `So $f(${t}) = ${c}$.`, `Substitute into $ax ${sg(b)}$ and solve for $a$.`, `$${co(t, 'a')} ${sg(b)} = ${c}$ gives $a = ${a}$.`],
+      steps: [{ h: 'Reverse the statement', d: `$f(${t}) = ${c}$` }, { h: 'Equation', d: `$${co(t, 'a')} ${sg(b)} = ${c}$` }, { h: 'Solve', d: `$a = ${a}$` }]
     }), 'fn-find-constant', { a, b, t });
   }),
 
@@ -907,11 +898,11 @@ const fnForms = [
   }),
   V([3], rng => {
     const a = rc(rng, [1, 2, 3, 5]), b = nz(rng, -6, 6), t = ri(rng, 0, 5), c = a * 2 ** t + b;
-    return spec(numQ(`For $f(x) = ${a === 1 ? '' : a}\\cdot 2^{x} ${sg(b)}$, evaluate $f^{-1}(${c})$.`, t, {
+    return spec(numQ(`For $f(x) = ${a === 1 ? '' : `${a}\\cdot `}2^{x} ${sg(b)}$, evaluate $f^{-1}(${c})$.`, t, {
       dp: 0,
       traps: [{ value: (c - b) / a, why: `That is $2^{x}$, not $x$: undo the power with a logarithm to base $2$.` }, { value: t + 1, why: `Check the arithmetic: $2^{x} = ${2 ** t}$ gives a single value of $x$.` }],
       hints: [`$f^{-1}(${c})$ is the $x$ for which $f(x) = ${c}$.`, 'Undo the added constant and the multiplier to isolate $2^{x}$.', 'Then ask: which power of $2$ is that?', `$2^{x} = ${2 ** t}$, so $x = ${t}$.`],
-      steps: [{ h: 'Equation', d: `$${a === 1 ? '' : a}\\cdot 2^{x} ${sg(b)} = ${c}$` }, { h: 'Isolate the power', d: `$2^{x} = ${2 ** t}$` }, { h: 'Solve', d: `$x = ${t}$` }]
+      steps: [{ h: 'Equation', d: `$${a === 1 ? '' : `${a}\\cdot `}2^{x} ${sg(b)} = ${c}$` }, { h: 'Isolate the power', d: `$2^{x} = ${2 ** t}$` }, { h: 'Solve', d: `$x = ${t}$` }]
     }), 'fn-exp-eval', { a, b, c });
   }),
   V([3], rng => {
@@ -920,7 +911,7 @@ const fnForms = [
     return spec(numQ(`The graphs of $y = f(x)$ and $y = f^{-1}(x)$ for $f(x) = ${lin(a, b)}$ meet at exactly one point. Find its $x$-coordinate.`, s, {
       dp: 0, prefix: 'x =',
       traps: [{ value: -b / a, why: 'That is the $x$-intercept of $f$. The graphs of $f$ and $f^{-1}$ meet where $f(x) = x$, on the line $y = x$.' }, { value: b, why: `Solve $${lin(a, b)} = x$: collect the $x$ terms on one side.` }].filter(t => t.value !== s),
-      hints: ['The graph of $f^{-1}$ is the reflection of the graph of $f$ in the line $y = x$.', 'A point where the two graphs meet is unchanged by the reflection, so it lies on $y = x$.', `So solve $f(x) = x$, that is $${lin(a, b)} = x$.`, `$${a - 1}x = ${-b}$, so $x = ${s}$.`],
+      hints: ['The graph of $f^{-1}$ is the reflection of the graph of $f$ in the line $y = x$.', 'A point where the two graphs meet is unchanged by the reflection, so it lies on $y = x$.', `So solve $f(x) = x$, that is $${lin(a, b)} = x$.`, `$${co(a - 1, 'x')} = ${-b}$, so $x = ${s}$.`],
       steps: [{ h: 'Reflection in y = x', d: 'Common points of $f$ and $f^{-1}$ lie on $y = x$' }, { h: 'Equation', d: `$${lin(a, b)} = x$` }, { h: 'Solve', d: `$x = ${s}$` }]
     }), 'fn-fixed-point', { a, b });
   }),
@@ -1090,13 +1081,19 @@ const sumLine = (F, upper) => `\\sum_{i=1}^{${upper}}${F.kind === 'lin' || F.kin
 
 // ═══ the forms; each takes the dot point the host generator assigns it ═════════
 /** The right-hand side with only the first n replaced by k + 1 (the common slip), or for a power the denominator dropped. */
-const partial = F => (F.kind === 'geo' ? `${F.r}^(k+1)-1` : F.baseExpr.replace('n', '(k+1)').replace(/n/g, '(k)'));
+const partialTex = F => (F.kind === 'geo' ? `${F.r}^{k+1}-1` : F.baseTex.replace('n', '(k+1)').replace(/n/g, 'k'));
+// Multiple choice, not an expression: an expression check accepts anything algebraically equal, so the unsubstituted
+// work (the right side of P(k) plus the new term) would be accepted as "P(k+1)". As an option it is a named mistake.
 const iRhsNext = dp => V([1], rng => {
   const F = family(rng, ['lin', 'sq', 'pr', 'cube', 'geo']);
-  return spec(exprQ(`The statement $P(n)$ is $${F.claim}$ for all integers $n \\ge 1$. In the inductive step we must prove $P(k+1)$. Write the **right-hand side of $P(k+1)$** as an expression in $k$ (replace $n$ by $k + 1$; you need not expand).`, F.rhsExpr('k+1'), {
-    dp, hint: 'e.g. (k+3)(2k-1)/4',
-    traps: [{ expr: `${F.rhsExpr('k')}+1`, why: '$P(k+1)$ is the **same formula** with $n$ replaced by $k + 1$ everywhere; it is not the formula for $k$ with $1$ added.' }, { expr: partial(F), why: 'Replace $n$ in **every** place it appears, not only the first.' }],
-    hints: ['$P(k+1)$ is the statement $P(n)$ with $n = k + 1$.', 'Every $n$ in the right-hand side becomes $k + 1$.', 'Put brackets round $k + 1$ so that products and powers are read correctly.', `The right-hand side of $P(k+1)$ is $${F.rhsTex('k+1')}$.`],
+  const ok = `$${F.rhsTex('k+1')}$`;
+  const ds = [
+    { text: `$${F.rhsTex('k')} + ${F.T('k+1')}$`, why: 'That is the right side of $P(k)$ plus the next term: it is the working of the inductive step. The statement $P(k+1)$ is the formula with $n$ replaced by $k + 1$, which is what the step must reach.' },
+    { text: `$${F.rhsTex('k')} + 1$`, why: '$P(k+1)$ is the **same formula** with $n$ replaced by $k + 1$ everywhere; it is not the formula for $k$ with $1$ added.' },
+    { text: `$${partialTex(F)}$`, why: 'Replace $n$ in **every** place it appears, not only the first.' }];
+  return spec(mcQ(rng, `The statement $P(n)$ is $${F.claim}$ for all integers $n \\ge 1$. In the inductive step we must prove $P(k+1)$. Which expression is the **right-hand side of $P(k+1)$**, that is, the right-hand side of $P(n)$ with $n$ replaced by $k + 1$?`, ok, ds, {
+    dp,
+    hints: ['$P(k+1)$ is the statement $P(n)$ with $n = k + 1$.', 'Every $n$ in the right-hand side becomes $k + 1$.', 'The statement is the formula itself: adding the next term to the right side of $P(k)$ is the working of the step, not the statement.', `The right-hand side of $P(k+1)$ is $${F.rhsTex('k+1')}$.`],
     steps: [{ h: 'State P(n)', d: `$${F.claim}$` }, { h: 'Replace n by k + 1', d: `Right-hand side: $${F.rhsTex('k+1')}$` }, { h: 'Use', d: 'This is the target the inductive step must reach.' }]
   }), 'ind-rhs-next', { kind: F.kind, F: F });
 });
@@ -1168,7 +1165,7 @@ const iDivM = dp => V([2, 3], rng => {
 });
 
 const iDivMk = dp => V([3], rng => {
-  const a = ri(rng, 3, 9), b = ri(rng, 1, a - 2), d = a - b;
+  const a = ri(rng, 4, 9), b = ri(rng, 2, a - 2), d = a - b;
   return spec(exprQ(`In an induction proof that $${a}^{n} - ${b}^{n}$ is divisible by $${d}$ for all integers $n \\ge 1$, the assumption is $${a}^{k} - ${b}^{k} = ${d}p$ for some integer $p$. Then $${a}^{k+1} - ${b}^{k+1} = ${a}(${a}^{k} - ${b}^{k}) + (\\ldots)$. Write $${a}^{k+1} - ${b}^{k+1}$ in terms of $p$ and $k$.`, `${a * d}*p + ${d}*${b}^k`, {
     dp, hint: 'e.g. 15p + 4*3^k',
     traps: [{ expr: `${a * d}*p`, why: `$${a}^{k+1} - ${b}^{k+1} = ${a}\\left(${a}^{k} - ${b}^{k}\\right) + ${b}^{k}(${a} - ${b})$: the second part is not zero.` }, { expr: `${a * d}*p + ${b}^k`, why: `The leftover is $${b}^{k}(${a} - ${b}) = ${d}\\times ${b}^{k}$: keep the factor $${d}$.` }],

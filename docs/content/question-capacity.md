@@ -12,7 +12,7 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | --- | --- | --- | --- | --- | --- |
 | `me12-trigeq` | 4 | 408 | 34 | — | instances |
 | `ms11-time-location` | 4 | 511 | 3 | — | instances + forms |
-| `me12-further-calc` | 4 | 887 | 16 | — | instances |
+| `me12-further-calc` | 4 | 871 | 20 | — | instances |
 | `me11-binomial` | 4 | 919 | 11 | — | instances |
 | `ms12-annuity` | 4 | 1.8k | 2 | — | instances + forms |
 | `ms11-managing-exact` | 4 | 1.8k | 1 | — | instances + forms |

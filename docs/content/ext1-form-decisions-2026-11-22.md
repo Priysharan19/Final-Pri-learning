@@ -47,11 +47,10 @@ Extension 1 papers. The induction forms here test one real step of constructing 
 | D4 | `fc-int-expsub` | Choose u = e^x; change limits through logarithms; choose tan⁻¹ or sin⁻¹; subtract two angles. |
 | D4 | `fc-int-xsq` | Choose u = x²; keep the factor ½; change limits; choose tan⁻¹ or sin⁻¹. |
 | D4 | `fc-int-area` | Set up an area as an integral; identify a; integrate; evaluate at a√3; round. |
-| D4 | `fc-int-square-tan` | Complete the square; substitute u = x + b; change limits; keep the factor 1/c. |
 | D4 | `fc-sub-mcq` | Choose which substitution gives 1/(1+u²) and absorbs the numerator. (multiple choice) |
 | D4 | `fc-int-split` | Split a numerator into an f′/f part and a tan⁻¹ part; integrate each; add as decimals. |
 
-D4 needs more decisions than D2 (substitution and limit change, completing the square, splitting) where
+D4 needs more decisions than D2 (substitution and limit change, splitting) where
 D2 asks for one rule applied once or twice.
 
 ## me11-binomial
@@ -119,7 +118,7 @@ an inequality step needs. The same forms are served by both generators where the
 
 | Level | Form | Decisions the student makes |
 | --- | --- | --- |
-| D1 | `ind-rhs-next` | State the right side of P(k+1) by replacing n everywhere (expression). |
+| D1 | `ind-rhs-next` | State the right side of P(k+1) by replacing n everywhere (multiple choice; the unsubstituted sum is a distractor, because an expression check would accept it). |
 | D1 | `ind-lhs-next` | Build the left side of P(k+1) from P(k): the (k+1)th term, not the kth, not twice. (multiple choice) |
 | D1 | `ind-base-case` | Choose the correct base case for a statement that starts above 1: first value, correct arithmetic. (multiple choice) |
 | D2 | `ind-factor-out` | After adding the new term, take out the common factor (k+1) and find what remains (expression). |
@@ -135,9 +134,9 @@ an inequality step needs. The same forms are served by both generators where the
 
 ## Syllabus caution
 
-The writer is not certain that these two are inside the NSW Extension 1 (2024) syllabus as examinable
-content, and they are placed at D4 only: `fc-int-square-tan` (completing the square before an inverse
-trigonometric integral) and `fc-int-split` (splitting a numerator into a logarithmic and an inverse
+The writer is not certain that this is inside the NSW Extension 1 (2024) syllabus as examinable
+content, and it is placed at D4 only: `fc-int-split` (splitting a numerator into a logarithmic and an inverse
 tangent part; the standard form is in Extension 1, the combined exercise may be Extension 2 depth).
-`fc-tan-second` (a second derivative of an inverse tangent) and the chain-rule composites with inverse
+The form `fc-int-square-tan` (completing the square before an inverse trigonometric integral) was removed
+after review: it is outside Extension 1. `fc-tan-second` (a second derivative of an inverse tangent) and the chain-rule composites with inverse
 trigonometric functions are also worth a teacher's check against the syllabus.
