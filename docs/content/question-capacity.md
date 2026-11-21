@@ -6,14 +6,14 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 
 ## Prithagoras
 
-133 skills measured; **114** meet both targets; **19** are below at least one.
+133 skills measured; **112** meet both targets; **21** are below at least one.
 
 | Skill (generator) | Cells | Distinct instances | Structural forms (proxy) | Tagged forms | Below target |
 | --- | --- | --- | --- | --- | --- |
-| `me12-further-calc` | 4 | 42 | 2 | — | instances + forms |
-| `me11-binomial` | 4 | 127 | 2 | — | instances + forms |
 | `me12-trigeq` | 4 | 408 | 34 | — | instances |
 | `ms11-time-location` | 4 | 511 | 3 | — | instances + forms |
+| `me12-further-calc` | 4 | 887 | 16 | — | instances |
+| `me11-binomial` | 4 | 919 | 11 | — | instances |
 | `ms12-annuity` | 4 | 1.8k | 2 | — | instances + forms |
 | `ms11-managing-exact` | 4 | 1.8k | 1 | — | instances + forms |
 | `me11-comb` | 4 | 2.4k | 82 | — | instances |
@@ -22,15 +22,16 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `me12-calc` | 4 | 4.8k | 18 | — | instances |
 | `ms11-energy` | 4 | 5.1k | 1 | — | instances + forms |
 | `y11-trig-ident` | 4 | 5.2k | 70 | — | instances |
+| `me12-induction-forms` | 4 | 6.0k | 19 | 5: context, direct, missing-parameter, multi-step, reverse | instances |
 | `ms12-loans` | 4 | 6.0k | 2 | — | instances + forms |
 | `y11-explog-more` | 4 | 6.3k | 126 | — | instances |
 | `y12-financial` | 4 | 6.7k | 15 | — | instances |
 | `ms11-linear` | 4 | 7.2k | 2 | — | instances + forms |
 | `ms11-measure-more` | 4 | 8.5k | 1 | — | instances + forms |
+| `me12-induction` | 4 | 8.7k | 42 | — | instances |
 | `ms11-earning` | 4 | 9.4k | 26 | — | instances |
 | `y9-algebra` | 4 | 10.4k | 54 | — | — |
 | `y9-nonlinear-a` | 4 | 10.6k | 26 | — | — |
-| `me12-induction` | 4 | 10.7k | 34 | — | — |
 | `me12-projectile-forms` | 4 | 10.9k | 48 | 5: context, direct, multi-step, representation, reverse | — |
 | `y10-indices-neg` | 4 | 11.1k | 15 | — | — |
 | `mex-proof` | 4 | 11.2k | 30 | — | — |
@@ -41,7 +42,6 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `y11-trigfunc` | 4 | 12.3k | 210 | — | — |
 | `me11-trigid` | 4 | 12.5k | 84 | — | — |
 | `y11-functions` | 4 | 12.8k | 51 | — | — |
-| `me12-induction-forms` | 4 | 12.8k | 9 | 5: context, direct, missing-parameter, multi-step, reverse | — |
 | `ms12-rates` | 4 | 12.9k | 34 | — | — |
 | `y10-quadratics` | 4 | 14.5k | 52 | — | — |
 | `y12-integration` | 4 | 15.1k | 104 | — | — |
@@ -102,9 +102,9 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `y12-fin-exact` | 4 | 43.6k | 8 | 5: context, direct, missing-parameter, multi-step, reverse | — |
 | `y12-random-var` | 4 | 44.1k | 9 | 5: context, direct, missing-parameter, multi-step, reverse | — |
 | `ms12-algebraic` | 4 | 44.4k | 17 | — | — |
-| `me11-functions` | 4 | 44.9k | 94 | — | — |
 | `y9-surface-area` | 4 | 45.0k | 11 | — | — |
 | `y12-trigcalc` | 4 | 45.3k | 200 | — | — |
+| `me11-functions` | 4 | 52.5k | 94 | — | — |
 | `y10-stats` | 4 | 53.9k | 15 | — | — |
 | `y9-simint` | 4 | 54.0k | 149 | — | — |
 | `ms12-networks` | 4 | 54.3k | 1318 | — | — |
@@ -117,6 +117,7 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `y10-functions` | 4 | 68.1k | 39 | — | — |
 | `ms12-normal-exact` | 4 | 68.4k | 169 | — | — |
 | `y8-rates` | 4 | 73.4k | 42 | — | — |
+| `me12-vectors-forms` | 4 | 77.0k | 9 | 5: context, direct, missing-parameter, multi-step, representation | — |
 | `y7-angles` | 4 | 77.3k | 14 | — | — |
 | `me12-vectors` | 4 | 79.3k | 56 | — | — |
 | `ms11-relfreq` | 4 | 84.9k | 53 | — | — |
@@ -132,7 +133,6 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `ms11-formulas` | 4 | 155.3k | 18 | — | — |
 | `me11-poly` | 4 | 160.9k | 558 | — | — |
 | `mex-vectors` | 4 | 227.2k | 50 | — | — |
-| `me12-vectors-forms` | 4 | 250.8k | 6 | 5: context, direct, missing-parameter, multi-step, representation | — |
 | `y9-data-inquiry` | 4 | 256.8k | 273 | — | — |
 | `y11-data-sets` | 4 | 256.8k | 34 | — | — |
 | `y11-sine-cosine-rule` | 4 | 268.5k | 12 | — | — |
