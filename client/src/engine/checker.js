@@ -2470,8 +2470,12 @@ export function stepCheck(meta, workingText, options = null) {
 //      question uses (a letter in the prompt's maths, or the meta's own unknown or function name). `x = 5` for an
 //      equation in x, and `y = 3x^2` as the answer to "differentiate y = x^3", stay judged.
 //   B  a bare number, fraction or surd with no relation sign and no leading `=`.
+//   C  plain arithmetic on numbers with NO relation sign at all (`196 + 64 / 260`, a margin sum the reader merged into one line):
+//      digits, operators, brackets and spaces only. It states nothing, so it is treated like a bare number.
 const A_NOTE = 'Not checked: this line defines or labels something; Pri did not check it against this question.';
 const B_NOTE = 'Not checked: a number on its own is not a claim; Pri did not check it against this question.';
+const C_NOTE = 'Not checked: a sum on its own is not a claim; Pri did not check it against this question.';
+const SIDE_SUM = /^[\d\s.+*\/×÷^()-]+$/;
 const BARE_NUMBER = /^-?(?:\d+(?:\.\d+)?(?:\s*\/\s*\d+(?:\.\d+)?)?|\d*\s*√\s*\d+)$/;
 const NOT_LABELS = /^(?:ans|answer|solution|sol|result|final|value|so|hence|therefore)$/i;
 function namesOfQuestion(meta, prompt) {
@@ -2493,6 +2497,8 @@ function namesOfQuestion(meta, prompt) {
 function notAClaim(text, names, words) {
   const t = String(text).trim().replace(/[−–—]/g, '-').replace(/\s*\.\s*$/, '');
   if (BARE_NUMBER.test(t)) return B_NOTE;
+  // C: no relation sign of any kind, numbers and arithmetic signs only, at least one digit and one operator.
+  if (!/[=<>≤≥≈⇒]/.test(t) && SIDE_SUM.test(t) && /\d/.test(t) && /[+*\/×÷^-]/.test(t.replace(/^-/, ''))) return C_NOTE;
   const m = /^([A-Za-z][A-Za-z ]{0,24}?)(?:\(\s*[a-z]\s*\))?('{0,2})\s*=\s*([^=]+)$/.exec(t);
   if (!m || !m[3].trim()) return null;
   const head = m[1].trim();

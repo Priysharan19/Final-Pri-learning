@@ -10,6 +10,8 @@
 //   3  D            the question's own name and unknown stay judged; a wrong bare final value is a note and earns no method mark;
 //                   a correct bare final value still ticks
 //   4  THE OWNER'S PAGE on an expression-kind and an equation-kind y12-integration question
+//   5  C (21 November 2026): a line of plain arithmetic with NO relation sign (`196 +64 / 260`, a margin sum the reader merged into one line) is
+//      treated like a bare number: a note, never the first break; the same identity, and the same "only change" rule, over such lines
 import { stepEvidence, stepMetaFor } from '../platform/markerOps.js';
 import * as G from '../../client/src/engine/generators/index.js';
 import { transcriptsFor } from '../../tools/understanding-audit/corpus.mjs';
@@ -19,10 +21,12 @@ const ok = (c, m) => { if (c) pass++; else { fail++; console.error('FAIL:', m); 
 await G.loadAllBanks();
 const A_NOTE = 'Not checked: this line defines or labels something; Pri did not check it against this question.';
 const B_NOTE = 'Not checked: a number on its own is not a claim; Pri did not check it against this question.';
+const C_NOTE = 'Not checked: a sum on its own is not a claim; Pri did not check it against this question.';
 const run = (q, lines, on) => stepEvidence(q, '', lines.join('\n'), { correct: false }, { fold: false, claims: on });
 const code = r => (r?.stepReport?.lines || []).map(l => (l.status === 'ok' ? 'T' : l.status === 'break' ? 'X' : '.')).join('');
 // a line that could be a definition, a label or a bare number (a loose test, independent of the rule's own)
-const candidate = t => { const x = String(t).trim().replace(/\s*\.\s*$/, ''); return /^-?[\d.]+(?:\s*\/\s*[\d.]+)?$/.test(x) || /^-?\d*\s*√\s*\d+$/.test(x) || /^[A-Za-z][A-Za-z ]{0,24}?(?:\(\s*[a-z]\s*\))?'{0,2}\s*=[^=]+$/.test(x); };
+const sum = x => !/[=<>≤≥≈⇒]/.test(x) && /^[\d\s.+*\/×÷^()-]+$/.test(x) && /\d/.test(x) && /[+*\/×÷^-]/.test(x.replace(/^-/, ''));
+const candidate = t => { const x = String(t).trim().replace(/\s*\.\s*$/, ''); return sum(x) || /^-?[\d.]+(?:\s*\/\s*[\d.]+)?$/.test(x) || /^-?\d*\s*√\s*\d+$/.test(x) || /^[A-Za-z][A-Za-z ]{0,24}?(?:\(\s*[a-z]\s*\))?'{0,2}\s*=[^=]+$/.test(x); };
 
 // every family that issues a Step Check
 const ids = Object.keys(G.GENERATORS).sort();
@@ -40,7 +44,7 @@ const families = new Set(cases.map(c => c.id));
 ok(families.size >= 40, `${families.size} Step Check families enumerated`);
 
 let pages = 0, plainPages = 0, claimPages = 0, plainDiff = 0, changed = 0, lineDiff = 0, markedDiff = 0;
-const EXTRA = [['7 + 8 = 15'], ['y = 2x(4 - x)'], ['16/3'], ['Area = ∫_0^4 2x(4 - x) dx'], ['u = 2x + 3', '12'], ['f(x) = x^2 + 1']];
+const EXTRA = [['7 + 8 = 15'], ['y = 2x(4 - x)'], ['16/3'], ['Area = ∫_0^4 2x(4 - x) dx'], ['u = 2x + 3', '12'], ['f(x) = x^2 + 1'], ['196 +64 / 260'], ['196 + 64'], ['(3 + 4) * 2'], ['3 + 4 > 6'], ['x + 1']];
 for (const { id, q } of cases) {
   const ts = transcriptsFor(q).slice(0, 3);
   for (const t of ts) {
@@ -63,7 +67,7 @@ for (const { id, q } of cases) {
       changed++;
       const A = on.stepReport, B = off.stepReport;
       if (!A || !B || A.lines.length !== B.lines.length) { lineDiff++; if (lineDiff < 4) console.error('shape differs', id, page); continue; }
-      const removed = A.lines.flatMap((l, i) => ((l.note === A_NOTE || l.note === B_NOTE) && B.lines[i].status !== 'ok' && l.status === 'note' ? [i] : []));
+      const removed = A.lines.flatMap((l, i) => ((l.note === A_NOTE || l.note === B_NOTE || l.note === C_NOTE) && B.lines[i].status !== 'ok' && l.status === 'note' ? [i] : []));
       // lines the rule did not touch must equal the report of the page without the removed lines
       const rest = page.filter((_, i) => !removed.includes(i));
       let ref; try { ref = run(q, rest, false); } catch { ref = null; }
