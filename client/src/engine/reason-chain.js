@@ -440,7 +440,8 @@ export function chainDiagnosis(fromText, fromAst, fromValue, toText, toValue) {
       title: 'A value changed between lines',
       message: `${fmt(toValue)} does not follow: the working above reached ${fmt(fromValue)}.`,
       fix: 'Carry the value the working reached, or redo the step that changed it.',
-      confidence: 'high'
+      confidence: 'high',
+      expected: fromValue, written: toValue, expectedFrom: 'line-above'
     };
   }
   // A formula in letters (`a + (n - 1)d = 35`) is wrong once its values are put in.
@@ -457,7 +458,9 @@ export function chainDiagnosis(fromText, fromAst, fromValue, toText, toValue) {
     title: 'Arithmetic slip',
     message,
     fix: 'Redo this one calculation, then carry the rest of the working forward.',
-    confidence: 'high'
+    confidence: 'high',
+    // Structured facts (never parsed from the message): the value of the computed side, and the value the student wrote.
+    expected: fromValue, written: toValue, expectedFrom: 'computed-side'
   };
 }
 

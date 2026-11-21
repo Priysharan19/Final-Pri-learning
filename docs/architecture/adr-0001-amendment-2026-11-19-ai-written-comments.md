@@ -1,85 +1,41 @@
-# ADR-0001 amendment, 19 November 2026: marking comments are written by AI, under the engine's rules
+# ADR-0001 amendment, 19 November 2026 (revised 22 November 2026): marking comments are written by the ENGINE, not by AI
 
-Status: **decided by the owner; implemented behind the SERVER variable `PRI_FEATURE_LINE_COMMENTS` (off by default in every
-environment; only the exact value `1` turns it on); ported onto main 22 November 2026 and shipped switched off.** Design, safety argument and measured results:
-`docs/product/line-comments-design-2026-11-19.md`.
+Status: **the AI-written option is NOT shipped.** This amendment began (19 November) as a decision to let a model write the
+sentence beside a marked line, under the engine's rules. It is superseded. No provider is called for comments, there is no
+feature flag, no route, no stored comment, no allowance and no privacy-notice change.
+
+## What happened
+
+The branch `task/line-comments` (98691867e) built the feature with a model writing free prose and a validator holding it to
+the engine's states. Three independent reviews on 22 November 2026 each found sentences the validator showed that the engine
+had not established: a verdict contradicted by tone ("the cross is a mistake"), a line called the right step when the engine
+had only found it true as written, instructions, answer leaks, the student's own line becoming vocabulary. A phrase
+blocklist, a word allowlist and finally a structured `{ template, slots }` reply each closed the earlier holes and left
+the same class: **every remaining hole was a choice the model makes that the server cannot verify** (which of two values is the
+expected one, which rule was used, what the line is for).
 
 ## Decision
 
-Owner, 18 and 19 November 2026: "i am absolutely fine with ai writing the marking comments, as long as it does a good
-job" and "especially longer specific comments are a must".
+A model cannot be constrained to say only verified things, so **no model writes marking comments.** The comment beside a line is
+built by the engine from a reviewed template catalogue (English and Hindi) and filled **only from structured facts the engine
+itself produced**: the line's state; the rule the engine itself identified; the worked-solution step it matched; the value
+both sides come to; and for a cross the value the working reached (`diagnosis.expected`) and the value the line gives
+(`diagnosis.written`). No fact is parsed from a note or message string. Where the engine has no structured fact, the engine's own
+sentence is shown exactly as before. The wording varies by a stable hash of the line, so the same line always reads the same.
 
-## What changes in "AI proposes, the deterministic engine decides"
-
-The sentence stays true for **marks and verdicts**. It was previously read as also covering every word the student
-sees on the marked page. That reading is relaxed in one place only:
-
-| | before | now |
-|---|---|---|
-| a mark | engine only | engine only (unchanged) |
-| a tick, a cross, "first error", "follows from the error", "couldn't check" | engine only | engine only (unchanged) |
-| the sentence beside a line | engine-authored fixed wording | **written by a model, then constrained by the engine** (or, when the model fails, is refused or breaks a rule, no comment: the page keeps the engine's own sentence, which is what it shows today) |
-
-"AI proposes, the engine decides" therefore now reads: *the model proposes the words; the engine decides every mark,
-every verdict, and whether each proposed sentence may be shown.* A comment the engine's rules reject is never shown.
-
-## The rules that make that safe (enforced in code after generation)
-
-**Revised 22 November 2026 (second independent review): the model no longer writes sentences.** Free prose filtered by
-word lists leaked in classes no filter closes (a verdict contradicted by tone, instructions, answer leaks, the student's own
-line becoming vocabulary). The design is now STRUCTURED: for each commented line the model returns only
-`{ line, template, slots }`; the server renders the sentence from a reviewed catalogue
-(`server/platform/lineComments/catalogue.js`, 31 templates, English and Hindi) and the validated slots
-(`structured.js`). Enum slots (`action`, `rule`, `relation`, `feature`) are ids from closed lists; maths slots (`result`,
-`value`, `expected`, `written`) are ONE `$...$` span that passes `texSafe.cleanLatex`, holds no words, and whose
-normalised tokens are a contiguous run of line N's text, the engine's note for line N or the line directly above (for a
-cross, `expected` only from the engine's note or the line above). The student's line is a source of maths only, never of
-words. Which templates a line may use depends on the ENGINE's state: an `arithmetic` tick (true as written) can use only the
-equality templates, by construction, so a comment can never call it the right step. Anything invalid (unknown or
-wrong-state template, extra field, bad slot, two entries for a line) gives that line no AI comment and the engine's own
-sentence stays. The released solution is no longer sent to the provider.
-
-## Where it applies on main (the port of 22 November 2026)
-
-A comment is asked for only a line with a FINAL engine verdict, a tick or a cross with a state (`verified`,
-`from-question`, `condition` tick, `arithmetic`, `first-error`): never a note that says Pri could not check the line, a
-line that follows from the first error, an incomplete line, a line the reading floor left out or a warning note. Those
-keep the engine's own sentence. A comment that fails any rule, a provider failure, a refused allowance or ceiling, and
-the flag being off all give the same result: **no comment, and the page shows exactly the engine's own sentences**. The
-engine's own sentence is never replaced by the model's; the comment sits under it.
+* Code: `client/src/engine/lineCommentary.js` (pure, importable by the server), wired in `MarkedPage.jsx` and
+  `AnnotatedWorking.jsx` for every student with no setting.
+* Structured facts added (feedback only, no verdict changed): `fact` on a solution-matched tick (`step`, `heading`) and on an
+  arithmetic tick (`value`), and `expected` / `written` / `expectedFrom` on the diagnosis created in `reason-chain.js`
+  (`chainDiagnosis`), `arithmeticLines.js` (`arithmetic-not-equal`) and `vectorChain.js` (`vector-chain-not-equal`).
+* Held by `server/test/line-commentary-check.mjs` (generated pages over every generator family: maths only from the line's
+  facts, verdict matches state, an arithmetic tick only equality sentences, expected/written never swapped, a rule named only when
+  the engine named it, no word outside the catalogue, Hindi for every template, deterministic).
+* The owner's pages, old sentence beside new: `owner-review/ENGINE-COMMENTS-SAMPLES.md`.
 
 ## Unchanged
 
-* The handwriting reader stays **answer-blind**. The comment layer is not the reader: it runs after the working has been
-  read and marked, and it is the only model call that may see the worked solution, because it is explaining marked work.
-  The reader's request is byte-identical (tested).
-* Marking is online-only and server-authoritative. Nothing is checked, marked or revealed signed out or offline.
-* Credentials stay in server environment variables. Student text is untrusted data, never instructions.
-* The spend ceiling (`PRI_PAID_CALLS_*`) and a per-account allowance (kind `comments`, one unit per marked answer) sit in
-  front of every call; a refusal of either shows the engine's own comments, never an error.
-
-## Disclosure
-
-The marked page says, once, only when a model comment is shown, in quiet type: "Written by AI. Marks and ticks are decided by Pri's maths engine." Each
-comment is stored with the attempt, marked as AI-written (model, time) or engine-written, and appears in the account
-export. The privacy notices must say that marked working and the question are sent to the AI provider to write comments. **That
-wording is the owner's to approve and is NOT yet in `docs/legal/**`**: it is a proposal in
-`owner-review/AI-COMMENTS-PRIVACY-LINE.md`, and the flag must not be turned on before it is approved. The existing
-handwriting consent sheet does not cover comments (it says the question and answer are not sent). The "not reviewed by a
-lawyer" banner stays.
-
-## Retention
-
-**Retention.** A comment is stored with the attempt under scope `practice-line-comments` (the comment text, the text of
-the student's line it was written for, the model name and the time), for as long as the attempt's other records (90 days
-from the last write, as for every `idempotency_keys` row). It is part of the account export, and account deletion removes it
-with the account (`ON DELETE CASCADE`; tested in `server/test/line-comments-check.mjs`). A refusal (allowance, ceiling) or a
-provider failure is not stored, so a later request is served.
-
-## Residual risk
-
-The comments are judged only on a synthetic corpus and by a second model (not by a person) before release; no real
-student has read one. A comment can still be **wrong in a way the checks cannot see** (for example a true-looking
-explanation of why a line is right that is not the real reason). The engine's rules bound the harm: it cannot change a
-mark or a verdict, cannot call a verified line wrong, cannot move the first error, cannot reveal an answer early. The
-owner reads a 40-comment sample (`owner-review/line-comments-sample.md`) before the flag is turned on.
+"AI proposes, the deterministic engine decides." The handwriting reader stays answer-blind; marking stays online-only and
+server-authoritative; no new provider use, no new data leaves the server, no privacy or consent text changes. An AI-written
+comment option is **not** a deferred feature to switch on: reopening it would need a new decision and would have to answer the
+three reviews' finding (a model's choices cannot be verified by the server).

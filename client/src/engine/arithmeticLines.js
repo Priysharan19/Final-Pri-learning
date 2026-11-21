@@ -1659,7 +1659,7 @@ function stepCheckArithmeticWithinBudget(workingText, prep = null, tickOnly = fa
       if (!calc.used && !named) named = trigStepName(texts[0], texts[1]);
       if (!calc.used) lastSides.set(out.length, written[written.length - 1]);
       if (all.every(x => x.value !== undefined)) lastValue.set(out.length, all[0].value);
-      out.push({ text: line, status: 'ok', state: 'arithmetic', note: named ? `${why} It matches ${named}.` : why, valueChain: { rule: 'true-as-written' } });
+      out.push({ text: line, status: 'ok', state: 'arithmetic', note: named ? `${why} It matches ${named}.` : why, valueChain: { rule: 'true-as-written' }, ...(number && !named ? { fact: { kind: cont && carried ? 'equals-line-above' : 'both-sides', tex: exactForm(number.value).tex } } : {}) });
       return;
     }
     const approx = /≈|≃|~/.test(text);
@@ -1679,7 +1679,7 @@ function stepCheckArithmeticWithinBudget(workingText, prep = null, tickOnly = fa
       if (agrees) {
         prev = { ...prev, calculus: true }; lastSides.set(out.length, sides[sides.length - 1]); lastValue.set(out.length, carried.value);
         const trig = carried.text ? trigStepName(carried.text, sides[0]) : '';   // sin 30° then = 1/2
-        out.push({ text: line, status: 'ok', state: 'arithmetic', note: `This equals the line above: ${shown(carried.value)}.${trig ? ` It matches ${trig}.` : ''}`, valueChain: { rule: 'true-as-written' } });
+        out.push({ text: line, status: 'ok', state: 'arithmetic', note: `This equals the line above: ${shown(carried.value)}.${trig ? ` It matches ${trig}.` : ''}`, valueChain: { rule: 'true-as-written' }, ...(trig ? {} : { fact: { kind: 'equals-line-above', tex: exactForm(carried.value).tex } }) });
         return;
       }
       return note(line, NOT_PROVED);
@@ -1712,7 +1712,7 @@ function stepCheckArithmeticWithinBudget(workingText, prep = null, tickOnly = fa
       const trig = continuation && before && before.text ? trigStepName(before.text, sides[0]) : '';   // sin 30° then = 1/2
       const why = (continuation && before ? `This equals the line above: ${shown(allValues[0])}.` : `Both sides come to ${shown(allValues[0])}.`) + (trig ? ` It matches ${trig}.` : '');
       lastSides.set(out.length, allSides[allSides.length - 1]); lastValue.set(out.length, allValues[0]);
-      out.push({ text: line, status: 'ok', state: 'arithmetic', note: why, valueChain: { rule: 'arithmetic' } });
+      out.push({ text: line, status: 'ok', state: 'arithmetic', note: why, valueChain: { rule: 'arithmetic' }, ...(trig ? {} : { fact: { kind: continuation && before ? 'equals-line-above' : 'both-sides', tex: exactForm(allValues[0]).tex } }) });
       return;
     }
     if (soft) return note(line, SOFT_NOTE);
@@ -1749,7 +1749,9 @@ function stepCheckArithmeticWithinBudget(workingText, prep = null, tickOnly = fa
       ? `The line above comes to ${shown(allValues[0])}, but this line gives ${shown(allValues[k])}.`
       : `${mathSpan(allSides[0])} comes to ${shown(allValues[0])}, but this line gives ${shown(allValues[k])}.`;
     if (tickOnly || substituted) return note(line, NOT_PROVED, { readingFalse: true });
-    diagnosis = { code: 'arithmetic-not-equal', title: 'The two sides of this line are not equal', message, fix: 'Work this line out again, one operation at a time.', confidence: 'high' };
+    diagnosis = { code: 'arithmetic-not-equal', title: 'The two sides of this line are not equal', message, fix: 'Work this line out again, one operation at a time.', confidence: 'high',
+      // Structured facts (never parsed from the message): the value the working reached, and the value this line gives.
+      expectedTex: exactForm(allValues[0]).tex, writtenTex: exactForm(allValues[k]).tex, expectedFrom: continuation && before && k >= 1 ? 'line-above' : 'left-side' };
     firstBreak = i;
     out.push({ text: line, status: 'break', note: message, diagnosis });
     prev = null;

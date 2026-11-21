@@ -1,50 +1,9 @@
-# Proposed privacy wording for AI-written marking comments (owner-approved wording, not yet live)
+# Privacy wording for AI-written comments: NOT NEEDED
 
-Status: **approved by the owner as worded on 22 November 2026; the flag may be set once this text is live.**
-The text is **NOT yet live**: adding it to `docs/legal/**` also needs a guardian-notice version decision
-(`CONSENT_NOTICE_VERSION` and `ACCEPTED_CONSENT_NOTICE_VERSIONS` in `server/platform/guardianConsent.js`; see the report that came
-with this file). Until the notices carry these sentences, `PRI_FEATURE_LINE_COMMENTS` must stay unset.
+Status, 22 November 2026: **no privacy or consent change is needed, and none is made**, because no AI writes marking comments.
 
-## What the feature sends, and when
-
-Only after the question is resolved, only when the server variable is on, and only for a marked answer that has at least one line the
-engine gave a tick or a cross to, the server sends the AI provider (OpenAI, the same provider that reads handwriting):
-
-* the question text;
-* the text of each commented line of the student's working (typed text, or the text Pri read from handwriting; never an image);
-* for each such line the engine's state and its own one-line reason or note;
-* the line directly above each commented line (also the student's text);
-* (the released worked solution is NOT sent: since the structured redesign of 22 November 2026 the model returns only a template
-  choice and maths copied from the line, and the sentence is written by the server);
-* the edition wording and the language.
-
-It does not send: a name, an email, an account or device id, the marks, the student's history, a handwriting image or photo.
-Nothing is sent while a question is open (before it resolves). The comments are stored with the attempt and appear in the account export.
-
-## Is it covered by the existing consent?
-
-**No. It needs its own line.** The current consent sheet ("Before Pri reads your writing", `readerPermission.*` in
-`client/src/i18n/strings.en.js`) covers only reading handwriting or a photo. It says "To read your handwriting, Pri's server sends a
-picture of it to OpenAI" and, importantly for this feature, "For handwriting, only a picture drawn from your strokes is sent: not the
-question, not the answer, not your name." Comments send **the question, the worked solution and the text of the working**, to the same
-provider, and they also apply to **typed** answers, which never see that sheet. So the sheet's own sentence ("not the question, not the
-answer") would be untrue for comments if they were presented as covered by it. The consent sheet is not changed here.
-
-## Proposed sentences (as added to the privacy notices by the original branch)
-
-### English, India edition (`docs/legal/privacy.md`) and Australia edition (`docs/legal/au/privacy.md`)
-
-> **The comments on your marked working are written by AI.** To write them, your marked working and the question are sent to the same AI provider, OpenAI. The comments explain each line; they never change your marks, which our maths engine decides.
-
-### Hindi (`docs/legal/privacy.hi.md`)
-
-> **आपके जाँचे गए हल की टिप्पणियाँ कृत्रिम बुद्धि लिखती है।** इन्हें लिखने के लिए आपका जाँचा गया हल और प्रश्न उसी कृत्रिम बुद्धि सेवा, OpenAI, को भेजे जाते हैं। टिप्पणियाँ हर पंक्ति को समझाती हैं; वे आपके अंक कभी नहीं बदलतीं, जो हमारा गणित इंजन तय करता है।
-
-### Suggested additions the owner may want (not in the original branch)
-
-* "The worked solution is sent as well, only after a question is finished." (the original sentence omits the solution)
-* A retention sentence matching the reader's: "OpenAI is asked not to store it, but says it may keep it for up to 30 days to check for
-  misuse, and does not use it to train its models by default." (copy from `readerPermission.keep`; confirm with the provider's terms)
-* Whether this needs a separate opt-in, or may sit in the privacy notice alone (a legal decision, for a minor's account especially).
-
-The "not reviewed by a lawyer" banner on the notices stays until counsel has read them.
+The owner approved a proposed sentence for the privacy notices on 22 November 2026 for the case that a model wrote comments. That
+feature is not shipped (see `docs/architecture/adr-0001-amendment-2026-11-19-ai-written-comments.md`): the comments are written by the
+engine from a reviewed catalogue, with no provider call and no new data leaving the server. The live notices, the guardian
+notice version and the handwriting consent sheet are unchanged. This file is kept only so the earlier approval is not lost: if an AI-written
+option were ever reopened, the wording and the guardian-notice version decision would be needed then.

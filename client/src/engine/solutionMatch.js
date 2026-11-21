@@ -383,7 +383,7 @@ function run(q, report) {
     if (!tick && s.continuation && !s.ctx && s.parts.length === 1 && carried && matched.has(i - 1) && numericOf(s.parts[0]) === null) {
       const h = matchEquation([carried.raw, s.parts[0]], sol, null);
       // the same statement the line above matched, so the two are one chain
-      if (h && above && above.hit && above.hit.step === h.step) { tick = { state: 'verified', note: noteStep(h), step: h.step }; hit = h; }
+      if (h && above && above.hit && above.hit.step === h.step) { tick = { state: 'verified', note: noteStep(h), step: h.step, heading: h.heading }; hit = h; }
     }
     if (!tick && s.multi) {
       // several statements on one line: the line is ticked only when EVERY one qualifies (restates the question, or matches a step)
@@ -397,7 +397,7 @@ function run(q, report) {
         if (first) hit = first.hit; else tick = { state: 'given', note: NOTE_GIVEN };
       }
     } else if (!tick && s.parts.length >= 2 && !s.continuation && !s.ctx) hit = matchEquation(s.parts, sol, s.ctx);   // a substitution line is judged structurally by engine/lineChains.js
-    if (hit) { tick = tick || { state: 'verified', note: noteStep(hit), step: hit.step }; prevAbove.hit = hit; }
+    if (hit) { tick = tick || { state: 'verified', note: noteStep(hit), step: hit.step, heading: hit.heading }; prevAbove.hit = hit; }
     // c / d · a value the solution reaches, in order
     // a substitution `name = a:` counts only where the question or its solution substitutes that name at that value
     if (!tick && !s.multi && !s.ctx) {   // a line `name = a: …` is judged structurally by engine/lineChains.js
@@ -425,7 +425,7 @@ function run(q, report) {
     matched.add(i);
     if (Number.isInteger(tick.step)) cur = Math.max(cur, tick.step);
     matchedCount++;
-    out[i] = { text: l.text, status: 'ok', state: tick.state, note: tick.note, solutionMatch: true };
+    out[i] = { text: l.text, status: 'ok', state: tick.state, note: tick.note, solutionMatch: true, ...(Number.isInteger(tick.step) ? { fact: { kind: 'solution-step', step: tick.step + 1, heading: typeof tick.heading === 'string' ? tick.heading : null } } : {}) };
   }
   if (!matchedCount) return { report, matched: 0, step: cur };
   const stated = out.map(l => ({ ...l, state: l.state || (l.status === 'ok' ? 'verified' : l.status === 'break' ? 'wrong' : l.unreadable ? 'unread' : 'unverified') }));
