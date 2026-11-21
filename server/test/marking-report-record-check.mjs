@@ -67,9 +67,9 @@ console.log(`  record: ${pages} pages, mismatches ${before} -> ${after}, marking
   const lost = [{ line: 3, key: 'marks.lost.break', vars: { line: 3 } }, { line: 4, key: 'marks.lost.afterBreak', vars: { line: 4, breakLine: 3 } }, { line: 5, key: 'marks.lost.restated', vars: { line: 5 } }, { line: 5, key: 'marks.lost.answer', vars: { line: 5 } }];
   const shownNote = { lines: [{ status: 'ok' }, { status: 'ok' }, { status: 'note' }, { status: 'ok' }, { status: 'ok' }] };
   const shownBreak = { lines: [{ status: 'ok' }, { status: 'ok' }, { status: 'break' }, { status: 'ok' }, { status: 'ok' }] };
-  const a = lostMarksForPage({ lost, stepReport: shownNote, markingReport: { lines: [] } });
+  const a = lostMarksForPage({ lost, stepReport: shownNote, markingReportDiffers: true });
   ok(a.fromCheckable === true && a.rows.map(r => r.key).join() === 'marks.lost.restated,marks.lost.answer', 'a slip the page shows as a note is not pointed at; the other rows stay');
-  const b = lostMarksForPage({ lost, stepReport: shownBreak, markingReport: { lines: [] } });
+  const b = lostMarksForPage({ lost, stepReport: shownBreak, markingReportDiffers: true });
   ok(b.fromCheckable === false && b.rows.length === 4, 'a slip the page does show keeps its rows');
   const c = lostMarksForPage({ lost, stepReport: shownNote });
   ok(c.fromCheckable === false && c.rows === lost, 'without markingReport nothing changes');

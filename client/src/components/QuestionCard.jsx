@@ -3742,7 +3742,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
 const LOST_KEY = /^marks\.lost\.[a-zA-Z]+$/;
 const RULE_KEY = /^(?:marks\.rule\.[a-zA-Z]+|misconception\.[a-zA-Z]+\.name)$/;
 function LostMarks({ lost, res = null, t }) {
-  const page = lostMarksForPage({ lost, stepReport: res?.stepReport, markingReport: res?.markingReport });
+  const page = lostMarksForPage({ lost, stepReport: res?.stepReport, markingReportDiffers: res?.markingReportDiffers === true });
   const rows = page.rows.filter(l => l && LOST_KEY.test(String(l.key)));
   if (!rows.length && !page.fromCheckable) return null;
   return (

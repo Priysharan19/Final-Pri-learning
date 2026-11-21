@@ -521,7 +521,7 @@ export const MARKER_OPS = Object.freeze({
     if (!wanted) return { result, evidence: null };
     const evidence = stepEvidence(q, answer, working, result, Array.isArray(workingLatex) ? { latex: workingLatex } : null);
     // Final answer only: the step report stays, the method mark does not.
-    return { result, evidence: policyOf({ policy }).methodMarks ? evidence : { stepReport: evidence.stepReport, partial: null, ...(evidence.board ? { board: evidence.board } : {}), ...(evidence.markingReport ? { markingReport: evidence.markingReport } : {}) } };
+    return { result, evidence: policyOf({ policy }).methodMarks ? evidence : { stepReport: evidence.stepReport, partial: null, ...(evidence.board ? { board: evidence.board } : {}) } };
   },
   /** One examination response: the answer stage, then (method marks on) the working stage. */
   exam({ q, given, working, grid, policy }, emit) {

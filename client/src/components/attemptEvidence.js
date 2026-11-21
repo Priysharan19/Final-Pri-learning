@@ -219,16 +219,17 @@ export function transcriptIsAnswer(transcript, answerGiven) {
 
 /**
  * The marks-lost list beside the lines, made honest where the marks and the page differ. When the marks were decided on a
- * report that the displayed one no longer matches (`markingReport`, server/platform/markerOps.js), a row that points at a
+ * report that the displayed one no longer matches (`markingReport`, kept in the stored record; the reply says `markingReportDiffers`; server/platform/markerOps.js), a row that points at a
  * mistake on a line the page does not show as a mistake would send the student to a slip they cannot see. Those rows are
- * replaced by one sentence that is true of both; every other row stays. Without `markingReport` nothing changes.
+ * replaced by one sentence that is true of both; every other row stays. Without `markingReportDiffers` nothing changes.
  */
 const POINTS_AT_A_SLIP = { 'marks.lost.break': 'line', 'marks.lost.anotherBreak': 'line', 'marks.lost.afterBreak': 'breakLine', 'marks.lost.carried': 'breakLine', 'marks.lost.answerCarried': 'breakLine' };
-export function lostMarksForPage({ lost, stepReport = null, markingReport = null } = {}) {
+export function lostMarksForPage({ lost, stepReport = null, markingReportDiffers = false } = {}) {
   const rows = Array.isArray(lost) ? lost : [];
-  if (!markingReport) return { rows, fromCheckable: false };
+  if (!markingReportDiffers) return { rows, fromCheckable: false };
   const shown = Array.isArray(stepReport?.lines) ? stepReport.lines : [];
   const shownBreak = n => shown[Number(n) - 1]?.status === 'break';
+  // A row without a line number cannot be placed on the page, so it is dropped by design.
   const kept = rows.filter(l => !(l && POINTS_AT_A_SLIP[l.key] && !shownBreak(l.vars?.[POINTS_AT_A_SLIP[l.key]])));
   return { rows: kept, fromCheckable: kept.length !== rows.length };
 }
