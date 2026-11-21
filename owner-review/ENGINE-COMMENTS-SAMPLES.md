@@ -50,5 +50,5 @@ Rule names below are shown as `Rule <id>`; the page uses the interface’s own r
 |---|---|---|---|---|
 | 1 | `3 + 4 = 7` | tick | Both sides come to 7. | The value of both sides is 7. |
 | 2 | `= 7` | tick | This equals the line above: 7. | Same value as the line above: 7. |
-| 3 | `10 - 6 = 14` | cross | 10 - 6 comes to 4, but this line gives 14. | Both sides should come to 4, but this side comes to 14. |
+| 3 | `10 - 6 = 14` | cross | 10 - 6 comes to 4, but this line gives 14. | This line gives 14, but 10 - 6 comes to 4. |
 | 4 | `= 14` | note | Follows from the earlier slip. | (unchanged) |

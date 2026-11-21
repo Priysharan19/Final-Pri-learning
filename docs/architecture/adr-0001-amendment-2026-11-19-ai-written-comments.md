@@ -19,18 +19,25 @@ expected one, which rule was used, what the line is for).
 A model cannot be constrained to say only verified things, so **no model writes marking comments.** The comment beside a line is
 built by the engine from a reviewed template catalogue (English and Hindi) and filled **only from structured facts the engine
 itself produced**: the line's state; the rule the engine itself identified; the worked-solution step it matched; the value
-both sides come to; and for a cross the value the working reached (`diagnosis.expected`) and the value the line gives
-(`diagnosis.written`). No fact is parsed from a note or message string. Where the engine has no structured fact, the engine's own
+both sides come to; and for a cross the values the engine established, as the engine's own TeX (`expectedTex` / `writtenTex` on a
+cross that continues the line above; `sides`, the first two sides that disagree with each one's text, value and whether it is a
+bare number, on a plain arithmetic cross). A cross whose two sides are both computed expressions never names an "expected"
+value, because either side may be the slip; a log line that is false under both readings carries no value. A worked-solution tick that
+matched only on a value (no statement matched) says only that this is the value at that step, never that the line is the step. No
+fact is parsed from a note or message string. Where the engine has no structured fact, the engine's own
 sentence is shown exactly as before. The wording varies by a stable hash of the line, so the same line always reads the same.
 
 * Code: `client/src/engine/lineCommentary.js` (pure, importable by the server), wired in `MarkedPage.jsx` and
   `AnnotatedWorking.jsx` for every student with no setting.
-* Structured facts added (feedback only, no verdict changed): `fact` on a solution-matched tick (`step`, `heading`) and on an
-  arithmetic tick (`value`), and `expected` / `written` / `expectedFrom` on the diagnosis created in `reason-chain.js`
-  (`chainDiagnosis`), `arithmeticLines.js` (`arithmetic-not-equal`) and `vectorChain.js` (`vector-chain-not-equal`).
+* Structured facts added (feedback only, no verdict changed, additive JSON only: no schema or migration, and they ride in the
+  already-stored `diagnosis` / `fact` objects): `fact` on a solution-matched tick (`step`, `heading`; or `step`, `valueOnly`, `tex`
+  for a value-only match) and on an arithmetic tick (`kind`, `tex`); on the diagnosis created in `reason-chain.js`
+  (`chainDiagnosis`) and `vectorChain.js` (`vector-chain-not-equal`) `expected` / `written` / `expectedFrom`; in `arithmeticLines.js`
+  (`arithmetic-not-equal`) `expectedTex` / `writtenTex` / `expectedFrom: 'line-above'`, or `expectedFrom: 'sides'` with `sides`.
 * Held by `server/test/line-commentary-check.mjs` (generated pages over every generator family: maths only from the line's
-  facts, verdict matches state, an arithmetic tick only equality sentences, expected/written never swapped, a rule named only when
-  the engine named it, no word outside the catalogue, Hindi for every template, deterministic).
+  facts, verdict matches state, an arithmetic tick only equality sentences, expected/written never swapped, a value-only tick never said to be a step, no "should" or "both" on a cross
+  between sides, a rule named only when the engine named it, no word outside the catalogue, Hindi for every template with no English
+  step heading, deterministic).
 * The owner's pages, old sentence beside new: `owner-review/ENGINE-COMMENTS-SAMPLES.md`.
 
 ## Unchanged

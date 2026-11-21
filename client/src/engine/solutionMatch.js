@@ -413,7 +413,7 @@ function run(q, report) {
         let m = null;
         if (cur >= 0) m = sol.values.find(x => close(x.v, value) && x.step >= cur && x.step <= cur + WINDOW) || null;
         // (in order, never anywhere: the step must be the one the last recognised line reached, or the next)
-        if (m && (!s.continuation || prevOk) && (!bareSmall || (s.continuation && matched.has(i - 1)) || (isFinal && m.step === sol.final.step))) tick = { state: 'verified', note: noteValue(m, value), step: m.step };
+        if (m && (!s.continuation || prevOk) && (!bareSmall || (s.continuation && matched.has(i - 1)) || (isFinal && m.step === sol.final.step))) tick = { state: 'verified', note: noteValue(m, value), step: m.step, valueOnly: true, tex: exactForm(value).tex };
       }
     }
     if (!tick) continue;
@@ -425,7 +425,10 @@ function run(q, report) {
     matched.add(i);
     if (Number.isInteger(tick.step)) cur = Math.max(cur, tick.step);
     matchedCount++;
-    out[i] = { text: l.text, status: 'ok', state: tick.state, note: tick.note, solutionMatch: true, ...(Number.isInteger(tick.step) ? { fact: { kind: 'solution-step', step: tick.step + 1, heading: typeof tick.heading === 'string' ? tick.heading : null } } : {}) };
+    out[i] = { text: l.text, status: 'ok', state: tick.state, note: tick.note, solutionMatch: true, ...(Number.isInteger(tick.step)
+      // A value-only tick (the line's value coincides with a value at that step; no statement matched) is marked as such:
+      // it is never said to BE that step, only to come to that step's value. A statement match carries the step's heading.
+      ? { fact: tick.valueOnly ? { kind: 'solution-step', step: tick.step + 1, valueOnly: true, tex: tick.tex } : { kind: 'solution-step', step: tick.step + 1, heading: typeof tick.heading === 'string' ? tick.heading : null } } : {}) };
   }
   if (!matchedCount) return { report, matched: 0, step: cur };
   const stated = out.map(l => ({ ...l, state: l.state || (l.status === 'ok' ? 'verified' : l.status === 'break' ? 'wrong' : l.unreadable ? 'unread' : 'unverified') }));

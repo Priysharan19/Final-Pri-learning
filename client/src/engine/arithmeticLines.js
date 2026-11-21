@@ -1749,9 +1749,19 @@ function stepCheckArithmeticWithinBudget(workingText, prep = null, tickOnly = fa
       ? `The line above comes to ${shown(allValues[0])}, but this line gives ${shown(allValues[k])}.`
       : `${mathSpan(allSides[0])} comes to ${shown(allValues[0])}, but this line gives ${shown(allValues[k])}.`;
     if (tickOnly || substituted) return note(line, NOT_PROVED, { readingFalse: true });
-    diagnosis = { code: 'arithmetic-not-equal', title: 'The two sides of this line are not equal', message, fix: 'Work this line out again, one operation at a time.', confidence: 'high',
-      // Structured facts (never parsed from the message): the value the working reached, and the value this line gives.
-      expectedTex: exactForm(allValues[0]).tex, writtenTex: exactForm(allValues[k]).tex, expectedFrom: continuation && before && k >= 1 ? 'line-above' : 'left-side' };
+    // Structured facts (never parsed from the message), carried for engine/lineCommentary.js and used by no verdict:
+    //   · a line that continues the line above: the value the working reached and the value this line gives;
+    //   · otherwise the first two sides that disagree (side 1 and side k), each with its text, its value and whether it is a bare
+    //     number, because either side may be the slip when both are computed expressions;
+    //   · a log line that is false under both readings carries no value: no single reading is "the" value.
+    const bareNumber = x => /^\s*-?\d+(?:\.\d+)?\s*$/.test(x);
+    const fromAbove = continuation && before && k >= 1;
+    const facts = logFalseInBoth ? {}
+      : fromAbove ? { expectedTex: exactForm(allValues[0]).tex, writtenTex: exactForm(allValues[k]).tex, expectedFrom: 'line-above' }
+      : { expectedFrom: 'sides', sides: { count: allSides.length,
+          left: { text: allSides[0], tex: exactForm(allValues[0]).tex, bare: bareNumber(allSides[0]) },
+          right: { text: allSides[k], tex: exactForm(allValues[k]).tex, bare: bareNumber(allSides[k]) } } };
+    diagnosis = { code: 'arithmetic-not-equal', title: 'The two sides of this line are not equal', message, fix: 'Work this line out again, one operation at a time.', confidence: 'high', ...facts };
     firstBreak = i;
     out.push({ text: line, status: 'break', note: message, diagnosis });
     prev = null;

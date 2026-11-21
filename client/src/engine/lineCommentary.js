@@ -10,7 +10,8 @@
 //
 //   · a tick never gets a negative sentence; a cross never gets a positive one (the template set is chosen by state)
 //   · an arithmetic tick (true as written) gets EQUALITY sentences only: nothing about the line's role
-//   · for a cross, {expected} is always `diagnosis.expected` and {written} always `diagnosis.written`: they cannot swap
+//   · for a cross, {expected} and {written} come only from the diagnosis's own facts and cannot swap; two computed sides are never
+//     given an "expected" (either may be the slip); a value-only solution tick is never said to BE the step
 //   · a rule is named only when the engine named it for that line
 //   · the wording varies by a stable hash of the line's number and text, so the same line always reads the same
 //
@@ -39,6 +40,10 @@ export const CATALOGUE = Object.freeze({
     en: ['Correct. This matches step {step} of the worked solution.', 'Correct. This is step {step} of the worked solution.'],
     hi: ['सही। यह हल के चरण {step} से मेल खाती है।', 'सही। यह हल का चरण {step} है।']
   },
+  stepValue: {
+    en: ['This line comes to {value}, the value at step {step} of the worked solution.', 'The value at step {step} of the worked solution is {value}, and so is the value of this line.', 'This is the value at step {step} of the worked solution: {value}.'],
+    hi: ['इस पंक्ति का मान {value} आता है, जो हल के चरण {step} का मान है।', 'हल के चरण {step} का मान {value} है, और इस पंक्ति का मान भी यही है।', 'यह हल के चरण {step} का मान है: {value}।']
+  },
   ruleResult: {
     en: ['Correct. {rule} gives {result}.', 'Correct. {rule}: {result}.'],
     hi: ['सही। {rule} से {result} मिलता है।', 'सही। {rule}: {result}।']
@@ -63,16 +68,20 @@ export const CATALOGUE = Object.freeze({
     en: ['The working above reaches {expected}, but this line has {written}.', 'This line should come to {expected}, but it has {written}.', 'Check this line: it should come to {expected}, not {written}.'],
     hi: ['ऊपर का हल {expected} तक पहुँचता है, पर इस पंक्ति में {written} है।', 'इस पंक्ति का मान {expected} होना चाहिए, पर इसमें {written} है।', 'इस पंक्ति को जाँचें: मान {expected} होना चाहिए, {written} नहीं।']
   },
-  crossSide: {
-    en: ['Both sides should come to {expected}, but this side comes to {written}.', 'This line should come to {expected}, but it has {written}.'],
-    hi: ['दोनों तरफ़ {expected} आना चाहिए, पर इस तरफ़ {written} आता है।', 'इस पंक्ति का मान {expected} होना चाहिए, पर इसमें {written} है।']
+  crossComputed: {
+    en: ['{expr} comes to {expected}, but this line gives {written}.', 'Check this line: {expr} comes to {expected}, not {written}.', 'This line gives {written}, but {expr} comes to {expected}.'],
+    hi: ['{expr} का मान {expected} आता है, पर इस पंक्ति में {written} है।', 'इस पंक्ति को जाँचें: {expr} का मान {expected} आता है, {written} नहीं।', 'इस पंक्ति में {written} है, पर {expr} का मान {expected} आता है।']
+  },
+  crossSidesDiffer: {
+    en: ['The two sides do not match: {left} comes to {leftValue}, {right} comes to {rightValue}.', 'The two sides are not equal: {left} comes to {leftValue}, but {right} comes to {rightValue}.', 'The two sides differ: {left} comes to {leftValue} and {right} comes to {rightValue}.'],
+    hi: ['दोनों तरफ़ मेल नहीं खाते: {left} का मान {leftValue} आता है, {right} का मान {rightValue} आता है।', 'दोनों तरफ़ बराबर नहीं हैं: {left} का मान {leftValue} आता है, पर {right} का मान {rightValue} आता है।', 'दोनों तरफ़ अलग हैं: {left} का मान {leftValue} और {right} का मान {rightValue} आता है।']
   }
 });
 /** Every template kind, grouped by polarity, for the tests. */
 export const TEMPLATE_KINDS = Object.freeze(Object.keys(CATALOGUE));
-export const POSITIVE_KINDS = Object.freeze(['restates', 'stepHeading', 'step', 'ruleResult', 'rule']);
+export const POSITIVE_KINDS = Object.freeze(['restates', 'stepHeading', 'step', 'stepValue', 'ruleResult', 'rule']);
 export const EQUALITY_KINDS = Object.freeze(['bothSides', 'equalsAbove']);
-export const CROSS_KINDS = Object.freeze(['crossShould', 'crossAbove', 'crossSide']);
+export const CROSS_KINDS = Object.freeze(['crossShould', 'crossAbove', 'crossComputed', 'crossSidesDiffer']);
 
 const fill = (template, slots) => template.replace(/\{(\w+)\}/g, (_, k) => slots[k]);
 const rhsOf = text => { const raw = String(text ?? '').trim(); if (!raw.includes('=')) return null; const rhs = raw.split(/(?<![<>!=≤≥≠])=(?!=)/).pop().trim(); return rhs ? mathSpan(rhs) : null; };
@@ -93,10 +102,33 @@ export function commentFor(card, ctx = {}) {
   // a cross: the engine's structured diagnosis only
   if (card.status === 'first-error') {
     const d = card.diagnosis;
-    const expected = fromTex(d?.expectedTex, d?.expected), written = fromTex(d?.writtenTex, d?.written);
-    if (!d || expected === null || written === null || expected === written) return null;
-    const kind = d.expectedFrom === 'line-above' ? 'crossAbove' : d.expectedFrom === 'left-side' ? 'crossSide' : 'crossShould';
-    return done(kind, { expected, written }, { expected, written });
+    if (!d || typeof d !== 'object') return null;
+    // only a cause the engine named, with the facts that cause needs; anything else (a log line false under both readings, an
+    // unknown cause) keeps the engine's own sentence
+    if (d.expectedFrom === 'line-above' || d.expectedFrom === 'computed-side') {
+      const expected = fromTex(d.expectedTex, d.expected), written = fromTex(d.writtenTex, d.written);
+      if (expected === null || written === null || expected === written) return null;
+      return done(d.expectedFrom === 'line-above' ? 'crossAbove' : 'crossShould', { expected, written }, { expected, written });
+    }
+    if (d.expectedFrom === 'sides') {
+      // the first two sides that disagree. A bare number against a computed expression: the expression is named, with its value.
+      // Two computed expressions: either may be the slip, so neither is "expected". Three or more sides: only a computed
+      // expression against a bare number is said, never "both"; two computed expressions among many is left to the old sentence.
+      const L = d.sides?.left, R = d.sides?.right, count = d.sides?.count;
+      const ok = x => x && typeof x.text === 'string' && x.text.trim() && typeof x.tex === 'string' && x.tex.length > 0 && x.tex.length <= 120 && !x.tex.includes('$') && typeof x.bare === 'boolean';
+      if (!ok(L) || !ok(R) || L.tex === R.tex) return null;
+      if (L.bare !== R.bare) {
+        const [comp, bare] = L.bare ? [R, L] : [L, R];
+        const expr = mathSpan(comp.text), expected = `$${comp.tex}$`, written = `$${bare.tex}$`;
+        return done('crossComputed', { expr, expected, written }, { expr, expected, written });
+      }
+      if (!L.bare && count === 2) {
+        const left = mathSpan(L.text), right = mathSpan(R.text), leftValue = `$${L.tex}$`, rightValue = `$${R.tex}$`;
+        return done('crossSidesDiffer', { left, leftValue, right, rightValue }, { left, leftValue, right, rightValue });
+      }
+      return null;
+    }
+    return null;
   }
   if (card.status !== 'checked') return null;
   // an arithmetic tick: true as written. Equality sentences only.
@@ -111,8 +143,15 @@ export function commentFor(card, ctx = {}) {
   if (card.valueChain === 'verified') {
     const f = card.fact;
     if (!f || f.kind !== 'solution-step' || !Number.isInteger(f.step)) return null;
+    // a line ticked only because its VALUE is a value at that step is never said to be that step
+    if (f.valueOnly === true) {
+      const value = fromTex(f.tex, null);
+      return value === null ? null : done('stepValue', { step: String(f.step), value }, { step: f.step, value });
+    }
+    // a step heading is the worked solution's own English text: a Hindi sentence names the step only, unless the heading has a Hindi form
     const heading = typeof f.heading === 'string' ? f.heading.replace(/\s+/g, ' ').trim().replace(/\.$/, '') : '';
-    return heading ? done('stepHeading', { step: String(f.step), heading }, { step: f.step, heading }) : done('step', { step: String(f.step) }, { step: f.step });
+    const usable = heading && (lang === 'en' || /[ऀ-ॿ]/.test(heading));
+    return usable ? done('stepHeading', { step: String(f.step), heading }, { step: f.step, heading }) : done('step', { step: String(f.step) }, { step: f.step });
   }
   // a line whose rule the engine itself identified
   if (!card.valueChain && Array.isArray(card.rules) && card.rules.length && typeof ctx.ruleLabel === 'function') {

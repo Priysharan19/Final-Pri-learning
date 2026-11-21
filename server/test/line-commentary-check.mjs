@@ -39,7 +39,7 @@ const NEGATIVE = /\b(wrong|incorrect|mistake|error|slip|not|but|false|invalid)\b
 // ── 1. generated pages ───────────────────────────────────────────────────────────────────────────────
 await G.loadAllBanks();
 const families = await loadFamilies();
-let pages = 0, comments = 0; const perKind = {}; const familiesWith = new Set(); const problems = [];
+let pages = 0, comments = 0, valueOnlyTicks = 0, valueOnlyComments = 0, sidesCrosses = 0, sidesComments = 0; const perKind = {}; const familiesWith = new Set(); const problems = [];
 const spansOf = t => [...String(t).matchAll(/\$[^$]+\$/g)].map(m => m[0]);
 for (const id of families) {
   for (const q of questionsFor(id, SEEDS)) {
@@ -59,6 +59,11 @@ for (const id of families) {
         const again = commentFor(card, ctx);
         if (JSON.stringify(c) !== JSON.stringify(again)) problems.push(`not deterministic: ${id} line ${i + 1}`);
         if (!c) return;
+        // F1: a value-only tick (the line's value coincides with a value at a step; no statement matched) is never said to BE the step
+        if (line.fact?.kind === 'solution-step' && line.fact.valueOnly === true) {
+          valueOnlyTicks += 1;
+          if (c.kind !== 'stepValue' || /\b(?:is|matches)\s+step\b/i.test(c.text)) problems.push(`value-only tick said to be a step: id ${id} line ${i + 1}: ${c.text}`); else valueOnlyComments += 1;
+        } else if (c.kind === 'stepValue') problems.push(`stepValue on a statement match: ${id} line ${i + 1}`);
         comments += 1; familiesWith.add(id); perKind[c.kind] = (perKind[c.kind] || 0) + 1;
         const tag = `${id} line ${i + 1} [${c.kind}]: ${c.text}`;
         // polarity by state
@@ -73,15 +78,25 @@ for (const id of families) {
         // maths comes only from the line's structured facts
         const allowed = new Set();
         if (c.kind === 'bothSides' || c.kind === 'equalsAbove') allowed.add(line.fact.tex !== undefined ? '$' + line.fact.tex + '$' : tex(line.fact.value));
+        if (card.status === 'first-error' && line.diagnosis?.expectedFrom === 'sides') sidesCrosses += 1;
+        if (c.kind === 'crossComputed' || c.kind === 'crossSidesDiffer') {
+          sidesComments += 1;
+          const sd = line.diagnosis.sides;
+          allowed.add('$' + sd.left.tex + '$'); allowed.add('$' + sd.right.tex + '$'); allowed.add(mathSpan(sd.left.text)); allowed.add(mathSpan(sd.right.text));
+          if (/\b(?:should|both)\b/i.test(c.text)) problems.push(`a sides cross says should/both: ${tag}`);
+          if (c.kind === 'crossComputed' && sd.left.bare === sd.right.bare) problems.push(`crossComputed on two like sides: ${tag}`);
+          if (c.kind === 'crossSidesDiffer' && !(sd.count === 2 && !sd.left.bare && !sd.right.bare)) problems.push(`crossSidesDiffer not on two computed sides: ${tag}`);
+        }
+        if (c.kind === 'stepValue') allowed.add('$' + line.fact.tex + '$');
         const dE = line.diagnosis?.expectedTex !== undefined ? '$' + line.diagnosis.expectedTex + '$' : line.diagnosis?.expected !== undefined ? tex(line.diagnosis.expected) : null;
         const dW = line.diagnosis?.writtenTex !== undefined ? '$' + line.diagnosis.writtenTex + '$' : line.diagnosis?.written !== undefined ? tex(line.diagnosis.written) : null;
-        if (CROSS_KINDS.includes(c.kind)) { allowed.add(dE); allowed.add(dW); }
+        if (CROSS_KINDS.includes(c.kind) && c.kind !== 'crossComputed' && c.kind !== 'crossSidesDiffer') { allowed.add(dE); allowed.add(dW); }
         if (c.kind === 'ruleResult') { const rhs = mathSpan(String(line.text).split(/(?<![<>!=≤≥≠])=(?!=)/).pop().trim()); allowed.add(rhs); }
         const heading = c.kind === 'stepHeading' ? String(line.fact?.heading ?? '') : '';
         const sp = spansOf(heading ? c.text.replace(heading.replace(/\s+/g, ' ').trim().replace(/\.$/, ''), ' ') : c.text);
         for (const s of sp) if (!allowed.has(s)) problems.push(`maths span not from the line's facts (${s}): ${tag}`);
         // orientation: expected before written, and each is the engine's own
-        if (CROSS_KINDS.includes(c.kind)) {
+        if (CROSS_KINDS.includes(c.kind) && c.kind !== 'crossComputed' && c.kind !== 'crossSidesDiffer') {
           const e = dE, w = dW;
           if (!(c.text.indexOf(e) >= 0 && c.text.indexOf(w) > c.text.indexOf(e))) problems.push(`expected/written swapped or missing: ${tag}`);
         }
@@ -101,12 +116,14 @@ ok(pages >= 3000, `generated pages: ${pages} (need at least 3000)`);
 ok(familiesWith.size >= 20, `families with at least one engine comment: ${familiesWith.size}`);
 ok(families.length >= 60, `generator families: ${families.length} (need at least 60)`);
 ok(comments >= 3000, `comments rendered: ${comments}`);
-for (const k of ['bothSides', 'stepHeading']) ok((perKind[k] || 0) > 0, `template kind ${k} occurs on generated pages (${perKind[k] || 0})`);
+ok(valueOnlyTicks > 0 && valueOnlyComments === valueOnlyTicks, `value-only ticks all say only the step's value: ${valueOnlyComments} of ${valueOnlyTicks} (non-vacuous: need more than 0)`);
+ok(sidesCrosses > 0 && sidesComments > 0, `sides crosses on generated pages: ${sidesCrosses}, with a sides comment: ${sidesComments}`);
+for (const k of ['bothSides', 'stepHeading', 'stepValue']) ok((perKind[k] || 0) > 0, `template kind ${k} occurs on generated pages (${perKind[k] || 0})`);
 for (const p of problems.slice(0, 40)) failures.push(p);
 ok(problems.length === 0, `problems on generated pages: ${problems.length}`);
 
 // ── 2. orientation, by construction: both values known, both ways round ──────────────────────────────
-for (const [expected, written, from] of [[-26, 14, 'line-above'], [14, -26, 'line-above'], [7, 3, 'left-side'], [3, 7, 'left-side'], [0.5, 2, 'computed-side'], [2, 0.5, 'computed-side']]) {
+for (const [expected, written, from] of [[-26, 14, 'line-above'], [14, -26, 'line-above'], [0.5, 2, 'computed-side'], [2, 0.5, 'computed-side']]) {
   const card = { n: 3, status: 'first-error', text: 'x', diagnosis: { expected, written, expectedFrom: from } };
   const c = commentFor(card, ctx);
   ok(c && c.text.indexOf(tex(expected)) >= 0 && c.text.indexOf(tex(written)) > c.text.indexOf(tex(expected)), `orientation ${expected}/${written}: ${c?.text}`);
@@ -114,6 +131,38 @@ for (const [expected, written, from] of [[-26, 14, 'line-above'], [14, -26, 'lin
 ok(commentFor({ n: 3, status: 'first-error', text: 'x', diagnosis: { expected: 3, written: 3, expectedFrom: 'line-above' } }, ctx) === null, 'equal values: no cross sentence');
 ok(commentFor({ n: 3, status: 'first-error', text: 'x', diagnosis: { message: 'The line above comes to $5$, but this line gives $7$.' } }, ctx) === null, 'a message string alone gives nothing: facts are never parsed from prose');
 ok(commentFor({ n: 3, status: 'first-error', text: 'x', diagnosis: { expected: '5', written: '7', expectedFrom: 'line-above' } }, ctx) === null, 'non-numeric facts give nothing');
+// F2: two sides that disagree. Built both ways round, with the shapes the engine carries.
+const sd = (l, r, count = 2) => ({ n: 3, status: 'first-error', text: 'x', diagnosis: { code: 'arithmetic-not-equal', expectedFrom: 'sides', sides: { count, left: l, right: r } } });
+const S = (text, tex, bare) => ({ text, tex, bare });
+const oneBare = commentFor(sd(S('10 - 6', '4', false), S('14', '14', true)), ctx), oneBareR = commentFor(sd(S('14', '14', true), S('10 - 6', '4', false)), ctx);
+ok(oneBare?.kind === 'crossComputed' && oneBare.text.indexOf('$4$') >= 0 && oneBare.text.includes('$14$'), `an expression against a bare number: ${oneBare?.text}`);
+ok(oneBareR?.kind === 'crossComputed' && oneBareR.facts.expected === '$4$' && oneBareR.facts.written === '$14$' && oneBareR.facts.expr === mathSpan('10 - 6'), `a bare number first: the computed side is still named, with its value: ${oneBareR?.text}`);
+const both = commentFor(sd(S('3*4', '12', false), S('5*2', '10', false)), ctx);
+ok(both?.kind === 'crossSidesDiffer' && !/\bshould\b/i.test(both.text) && both.text.indexOf(mathSpan('3*4')) >= 0 && both.text.indexOf(mathSpan('5*2')) > both.text.indexOf(mathSpan('3*4')), `two computed sides: no "should": ${both?.text}`);
+ok(commentFor(sd(S('3*4', '12', false), S('5*2', '10', false), 3), ctx) === null, 'three or more sides, both computed: the old sentence');
+ok(commentFor(sd(S('5', '5', true), S('4', '4', true), 4), ctx) === null, 'two bare numbers: the old sentence');
+ok(!/\bboth\b/i.test(commentFor(sd(S('2 + 3', '5', false), S('4', '4', true), 4), ctx)?.text || ''), 'three or more sides: never "both"');
+ok(commentFor({ n: 3, status: 'first-error', text: 'x', diagnosis: { expected: 5, written: 7, expectedFrom: 'left-side' } }, ctx) === null, 'an unknown cause gives nothing');
+// the engine's own diagnoses for the three shapes, and the old sentences they replace
+{
+  const run = lines => { const r = stepEvidence(G.generateQuestion('y12-integration', 1, 27), '14', lines.join('\n'), { correct: false }).stepReport; return r.lines.find(l => l.status === 'break'); };
+  const cardOf = (l, lines) => { const m = buildAnnotatedWorking({ lines, stepReport: stepEvidence(G.generateQuestion('y12-integration', 1, 27), '14', lines.join('\n'), { correct: false }).stepReport }); return m.cards.find(c => c.status === 'first-error'); };
+  for (const [lines, kind, must] of [
+    [['3 + 4 = 7', '10 - 6 = 14'], 'crossComputed', ['comes to']],
+    [['3 + 4 = 7', '3 * 4 = 5 * 2'], 'crossSidesDiffer', ['do not match']],
+    [['3 + 4 = 7', '2 + 3 = 5 = 5 = 4'], 'crossComputed', ['comes to']]
+  ]) {
+    const l = run(lines); const card = l ? cardOf(l, lines) : null; const c = card ? commentFor(card, ctx) : null;
+    ok(l && c && c.kind === kind && must.every(w => c.text.includes(w)) && !/\b(?:should|both)\b/i.test(c.text), `engine page ${JSON.stringify(lines)}: ${c?.kind} ${c?.text}`);
+  }
+  // F3: a log line false under both readings carries no value, and gets the old sentence
+  const logLines = ['3 + 4 = 7', 'log 3 + log 2 + log 5 = log(3 + 2 + 5)'];
+  const lg = run(logLines);
+  ok(lg && lg.diagnosis && lg.diagnosis.expectedFrom === undefined && lg.diagnosis.expectedTex === undefined && lg.diagnosis.sides === undefined, `a log line false in both readings carries no expected value: ${JSON.stringify(lg?.diagnosis && Object.keys(lg.diagnosis))}`);
+  ok(lg && commentFor(cardOf(lg, logLines), ctx) === null, 'a log line false in both readings: the old sentence');
+  ok(commentFor({ n: 2, status: 'first-error', text: 'x', diagnosis: { code: 'arithmetic-not-equal', message: 'm' } }, ctx) === null, 'a constructed log diagnosis without facts: the old sentence');
+  ok(commentFor({ n: 2, status: 'first-error', text: 'x', diagnosis: { code: 'arithmetic-not-equal', message: 'm', expectedTex: '1', writtenTex: '2' } }, ctx) === null, 'facts without a named cause: the old sentence');
+}
 // ── 3. a rule or a step only when the engine said so ─────────────────────────────────────────────────
 ok(commentFor({ n: 2, status: 'checked', text: "y'=6x^2+18x", rules: [] }, ctx) === null, 'no rule named by the engine: no rule sentence');
 ok(commentFor({ n: 2, status: 'checked', text: "y'=6x^2+18x", rules: [{ rule: 'product' }] }, ctx)?.kind === 'ruleResult', 'a rule the engine named, with the line\'s own right-hand side');
@@ -122,17 +171,30 @@ ok(commentFor({ n: 2, status: 'checked', valueChain: 'verified', text: 'a=2', no
 ok(commentFor({ n: 2, status: 'checked', valueChain: 'verified', text: 'a=2', fact: { kind: 'solution-step', step: 3, heading: 'Differentiate.' } }, ctx).text.includes('step 3') && !commentFor({ n: 2, status: 'checked', valueChain: 'verified', text: 'a=2', fact: { kind: 'solution-step', step: 3, heading: 'Differentiate.' } }, ctx).text.includes('..'), 'a step from the structured fact');
 ok(commentFor({ n: 1, status: 'checked', valueChain: 'arithmetic', text: '3+4=7', note: 'Both sides come to $7$.' }, ctx) === null, 'an arithmetic tick with no structured value keeps the engine sentence');
 for (const st of ['unverified', 'unread', 'not-verified', 'incomplete', 'follows', 'condition']) ok(commentFor({ n: 2, status: st, text: 'x=1', diagnosis: { expected: 1, written: 2 }, fact: { kind: 'both-sides', value: 1 } }, ctx) === null, `status ${st}: no commentary`);
+// F1: a value-only fact is never "is step N"; a statement match still is
+{
+  const vo = commentFor({ n: 2, status: 'checked', valueChain: 'verified', text: '0 + 37 * (-8)', fact: { kind: 'solution-step', step: 3, valueOnly: true, tex: '-296' } }, ctx);
+  ok(vo?.kind === 'stepValue' && vo.text.includes('$-296$') && vo.text.includes('step 3') && !/\b(?:is|matches)\s+step\b/i.test(vo.text) && !/^Correct/.test(vo.text), `a value-only tick: ${vo?.text}`);
+  ok(commentFor({ n: 2, status: 'checked', valueChain: 'verified', text: 'a', fact: { kind: 'solution-step', step: 3, valueOnly: true } }, ctx) === null, 'a value-only tick without its value: the old sentence');
+  // F4: Hindi never embeds the worked solution's English heading
+  const hiH = commentFor({ n: 2, status: 'checked', valueChain: 'verified', text: 'a=2', fact: { kind: 'solution-step', step: 3, heading: 'Differentiate' } }, { language: 'hi' });
+  ok(hiH?.kind === 'step' && !/[A-Za-z]/.test(hiH.text), `Hindi: no English heading: ${hiH?.text}`);
+  const hiD = commentFor({ n: 2, status: 'checked', valueChain: 'verified', text: 'a=2', fact: { kind: 'solution-step', step: 3, heading: 'अवकलन करें' } }, { language: 'hi' });
+  ok(hiD?.kind === 'stepHeading' && hiD.text.includes('अवकलन करें'), `Hindi: a Hindi heading may be used: ${hiD?.text}`);
+}
 // ── 4. Hindi for every template, and variants stay in the catalogue ──────────────────────────────────
 const SAMPLE = {
   restates: { n: 1, status: 'checked', valueChain: 'given', restated: true, text: 'x=1' },
   stepHeading: { n: 2, status: 'checked', valueChain: 'verified', text: 'x=1', fact: { kind: 'solution-step', step: 2, heading: 'Solve' } },
   step: { n: 2, status: 'checked', valueChain: 'verified', text: 'x=1', fact: { kind: 'solution-step', step: 2, heading: null } },
+  stepValue: { n: 2, status: 'checked', valueChain: 'verified', text: 'x=1', fact: { kind: 'solution-step', step: 2, valueOnly: true, tex: '7' } },
   ruleResult: { n: 2, status: 'checked', text: 'y=2x', rules: [{ rule: 'power' }] }, rule: { n: 2, status: 'checked', text: 'y', rules: [{ rule: 'power' }] },
   bothSides: { n: 2, status: 'checked', valueChain: 'arithmetic', text: '3+4=7', fact: { kind: 'both-sides', value: 7 } },
   equalsAbove: { n: 2, status: 'checked', valueChain: 'arithmetic', text: '=7', fact: { kind: 'equals-line-above', value: 7 } },
   crossShould: { n: 3, status: 'first-error', text: 'x', diagnosis: { expected: 5, written: 7, expectedFrom: 'computed-side' } },
   crossAbove: { n: 3, status: 'first-error', text: 'x', diagnosis: { expected: 5, written: 7, expectedFrom: 'line-above' } },
-  crossSide: { n: 3, status: 'first-error', text: 'x', diagnosis: { expected: 5, written: 7, expectedFrom: 'left-side' } }
+  crossComputed: sd(S('10 - 6', '4', false), S('14', '14', true)),
+  crossSidesDiffer: sd(S('3*4', '12', false), S('5*2', '10', false))
 };
 ok(TEMPLATE_KINDS.every(k => SAMPLE[k]) && [...POSITIVE_KINDS, ...EQUALITY_KINDS, ...CROSS_KINDS].length === TEMPLATE_KINDS.length, 'every template kind has a polarity and a sample');
 for (const k of TEMPLATE_KINDS) {
