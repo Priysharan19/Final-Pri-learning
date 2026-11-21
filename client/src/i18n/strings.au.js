@@ -92,7 +92,7 @@ export const AU_STRINGS = Object.freeze({
   'landing.proofConfirm': 'You can see what was read from each line of your handwriting, and correct it.',
   'landing.demo.ask': 'Line {n}: did you write {a} or {b}? In Pri you can see what was read after your work is marked, and correct it.',
   'landing.demo.confirm': 'It’s {a}',
-  'landing.marking.p2': '{brand} reads your handwriting. Once your work is marked, it shows what it read on each line, and you can correct a reading and have the work marked again.',
+  'landing.marking.p2': '{brand} reads your handwriting. Once your work is marked, it shows what it read on each line, and you can correct a reading and have the same attempt marked again.',
   'landing.marking.p3': 'A maths engine on our server checks each line against the line before, where it can. A line it verifies is Checked. The first line that stops being true is the First error, and the lines after it are shown as following from it.',
   'landing.marking.p4': 'A line the engine can’t prove is labelled Not verified. It is never ticked, and AI never decides your mark. The mark is for your final answer; the line checks are feedback.',
   'landing.teachers.p1': 'Every mark {brand} gives comes from the maths engine. Where it can check your working, it shows the line where the working first goes wrong.',
