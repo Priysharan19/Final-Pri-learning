@@ -106,12 +106,12 @@ const atanTex = String.raw`\tan^{-1}`;
 const C = (n, k) => { let r = 1; for (let i = 1; i <= k; i++) r = (r * (n - k + i)) / i; return Math.round(r); };
 const frac = (n, d) => (d === 1 ? `${n}` : String.raw`\dfrac{${n}}{${d}}`);
 /** n/d in lowest terms. */
-const fr = (n, d) => { const g = gcd(n, d); return frac(n / g, d / g); };
-/** (a * sqrt(r)) / d in lowest terms; a coefficient of 1 is not printed. */
+const fr = (n, d) => { const g = gcd(n, d), s = d < 0 ? -1 : 1; return frac((s * n) / g, (s * d) / g); };
 /** x over a, with the denominator left out when it is 1. */
 const xover = a => (a === 1 ? 'x' : String.raw`\dfrac{x}{${a}}`);
 /** (n * pi) / d in lowest terms. */
 const cpi = (n, d) => { const g = gcd(n, d), n1 = n / g, d1 = d / g, top = n1 === 1 ? String.raw`\pi` : String.raw`${n1}\pi`; return d1 === 1 ? top : String.raw`\dfrac{${top}}{${d1}}`; };
+/** (a * sqrt(r)) / d in lowest terms; a coefficient of 1 is not printed. */
 const rad = (a, r, d) => { const g = gcd(a, d), a1 = a / g, d1 = d / g, top = a1 === 1 ? String.raw`\sqrt${r}` : String.raw`${a1}\sqrt${r}`; return d1 === 1 ? top : String.raw`\dfrac{${top}}{${d1}}`; };
 
 // ═══════════════════════════ me12-further-calc ═══════════════════════════════
@@ -404,16 +404,16 @@ const calcForms = [
     rej(!safe3(v));
     return spec(numQ(String.raw`Evaluate $\displaystyle\int_0^{${b}}\dfrac{${k}}{${a * a}+x^2}\,dx$, correct to 3 decimal places (the angle is in radians).`, r3(v), {
       dp: 2, tol: 0.0005,
-      traps: [{ value: r3(k * Math.atan(b / a)), why: String.raw`The antiderivative of $\dfrac{1}{a^2+x^2}$ is $\dfrac{1}{a}${atanTex}\dfrac{x}{a}$: the factor $\dfrac{1}{a}$ is missing.` }, { value: r3((k / a) * Math.atan(b)), why: String.raw`The argument is $\dfrac{x}{a}$, so at the upper limit it is $\dfrac{${b}}{${a}}$.` }],
+      traps: [{ value: r3(k * Math.atan(b / a)), why: String.raw`The antiderivative of $\dfrac{1}{a^2+x^2}$ is $\dfrac{1}{a}${atanTex}\dfrac{x}{a}$: the factor $\dfrac{1}{a}$ is missing.` }, { value: r3((k / a) * Math.atan(b)), why: String.raw`The argument is $\dfrac{x}{a}$, so at the upper limit it is $${fr(b, a)}$.` }],
       hints: [
         String.raw`The integrand has the form $\dfrac{k}{a^2+x^2}$ with $a = ${a}$.`,
         String.raw`The antiderivative is $\dfrac{k}{a}${atanTex}\dfrac{x}{a}$.`,
-        String.raw`The upper limit gives $${atanTex}\dfrac{${b}}{${a}}$, which has no exact value: use a calculator in radian mode.`,
-        `The value is $\\dfrac{${k}}{${a}}\\times ${atanTex}\\dfrac{${b}}{${a}} \\approx ${r3(v)}$.`],
+        String.raw`The upper limit gives $${atanTex}${fr(b, a)}$, which has no exact value: use a calculator in radian mode.`,
+        `The value is $${fr(k, a)}\\times ${atanTex}${fr(b, a)} \\approx ${r3(v)}$.`],
       steps: [
-        { h: 'Antiderivative', d: String.raw`$\dfrac{${k}}{${a}}\left[${atanTex}\dfrac{x}{${a}}\right]_0^{${b}}$` },
-        { h: 'Upper limit', d: String.raw`$${atanTex}\dfrac{${b}}{${a}} \approx ${(Math.atan(b / a)).toFixed(4)}$ and $${atanTex}0 = 0$` },
-        { h: 'Value', d: String.raw`$\dfrac{${k}}{${a}}\times ${(Math.atan(b / a)).toFixed(4)} \approx ${r3(v)}$` }]
+        { h: 'Antiderivative', d: String.raw`$${fr(k, a)}\left[${atanTex}${xover(a)}\right]_0^{${b}}$` },
+        { h: 'Upper limit', d: String.raw`$${atanTex}${fr(b, a)} \approx ${(Math.atan(b / a)).toFixed(4)}$ and $${atanTex}0 = 0$` },
+        { h: 'Value', d: String.raw`$${fr(k, a)}\times ${(Math.atan(b / a)).toFixed(4)} \approx ${r3(v)}$` }]
     }), 'fc-int-decimal', { a, b, k });
   }),
   // find the constant from the value of the integral
@@ -421,7 +421,7 @@ const calcForms = [
     const a = ri(rng, 1, 4), c = ri(rng, 1, 5), k = 6 * c;
     return spec(numQ(String.raw`It is given that $\displaystyle\int_0^{${a % 2 === 0 ? a / 2 : a === 1 ? '\\tfrac12' : String.raw`\tfrac{${a}}{2}`}}\dfrac{k}{\sqrt{${a * a}-x^2}}\,dx = ${c === 1 ? '' : c}\pi$. Find the constant $k$.`, k, {
       dp: 2, prefix: 'k =',
-      traps: [{ value: c, why: String.raw`$${asinTex}\dfrac12 = \dfrac{\pi}{6}$, so the integral equals $\dfrac{k\pi}{6}$, not $k\pi$.` }, { value: c / 6, why: String.raw`Solve $\dfrac{k\pi}{6} = ${c}\pi$ for $k$: multiply by $6$, do not divide.` }],
+      traps: [{ value: c, why: String.raw`$${asinTex}\dfrac12 = \dfrac{\pi}{6}$, so the integral equals $\dfrac{k\pi}{6}$, not $k\pi$.` }, { value: c / 6, why: String.raw`Solve $\dfrac{k\pi}{6} = ${c === 1 ? '' : c}\pi$ for $k$: multiply by $6$, do not divide.` }],
       hints: [
         String.raw`Integrate with $${asinTex}${xover(a)}$ and keep $k$ as a factor.`,
         String.raw`The upper limit gives $${asinTex}\dfrac12$.`,
@@ -524,11 +524,11 @@ const calcForms = [
         'The area under a curve from $x = 0$ is a definite integral: write it down with its limits.',
         String.raw`The integrand has the form $\dfrac{k}{a^2+x^2}$; find $a$.`,
         'Integrate, substitute the limits and use an exact angle.',
-        String.raw`Area $= \dfrac{${k}}{${a}}\cdot\dfrac{\pi}{3} \approx ${r3(v)}$.`],
+        String.raw`Area $= ${fr(k, a)}\cdot\dfrac{\pi}{3} \approx ${r3(v)}$.`],
       steps: [
         { h: 'Set up', d: String.raw`$A = \int_0^{${a === 1 ? '' : a}\sqrt3}\dfrac{${k}}{${a * a}+x^2}\,dx$` },
-        { h: 'Integrate', d: String.raw`$\dfrac{${k}}{${a}}\left[${atanTex}\dfrac{x}{${a}}\right]_0^{${a === 1 ? '' : a}\sqrt3} = \dfrac{${k}}{${a}}\left(${atanTex}\sqrt3 - 0\right)$` },
-        { h: 'Value', d: String.raw`$\dfrac{${k}}{${a}}\cdot\dfrac{\pi}{3} \approx ${r3(v)}$` }]
+        { h: 'Integrate', d: String.raw`$${fr(k, a)}\left[${atanTex}${xover(a)}\right]_0^{${a === 1 ? '' : a}\sqrt3} = ${fr(k, a)}\left(${atanTex}\sqrt3 - 0\right)$` },
+        { h: 'Value', d: String.raw`$${fr(k, a)}\cdot\dfrac{\pi}{3} \approx ${r3(v)}$` }]
     }), 'fc-int-area', { a, k });
   }),
   // which substitution
@@ -839,7 +839,7 @@ const fnForms = [
     const a = rc(rng, [2, 3, 4, 5, -2, -3]), b = nz(rng, -9, 9), t = nz(rng, -6, 6), c = a * t + b;
     return spec(numQ(`The function $f(x) = ${lin(a, b)}$ is one-to-one. Evaluate $f^{-1}(${c})$.`, t, {
       dp: 0,
-      traps: [{ value: a * c + b, why: `$f^{-1}(${c})$ asks which input gives the output $${c}$: that is not $f(${c})$.` }, { value: (c + b) / a, why: `To undo $+ ${b}$ you ${b > 0 ? 'subtract' : 'add'}: check the sign of $${b}$.` }],
+      traps: [{ value: a * c + b, why: `$f^{-1}(${c})$ asks which input gives the output $${c}$: that is not $f(${c})$.` }, { value: (c + b) / a, why: `To undo $${sg(b)}$ you ${b > 0 ? 'subtract' : 'add'}: check the sign of $${b}$.` }],
       hints: ['$f^{-1}(c)$ is the input $x$ for which $f(x) = c$.', `Set up the equation $${lin(a, b)} = ${c}$.`, 'Solve for $x$.', `$x = ${t}$.`],
       steps: [{ h: 'Meaning', d: `$f^{-1}(${c}) = x$ where $f(x) = ${c}$` }, { h: 'Equation', d: `$${lin(a, b)} = ${c}$` }, { h: 'Solve', d: `$x = ${t}$` }]
     }), 'fn-eval-inverse', { a, b, c });
@@ -860,7 +860,7 @@ const fnForms = [
     return spec(mcQ(rng, `Which is the inverse of $f(x) = ${lin(a, b)}$?`, ok.text, [
       { text: `$f^{-1}(x) = \\dfrac{1}{${lin(a, b)}}$`, why: 'The inverse is not the reciprocal: it undoes the operations.' },
       { text: `$f^{-1}(x) = \\dfrac{x}{${a}} ${sg(b)}$`, why: `Undo in reverse order: first remove the $${sg(b)}$, **then** divide by $${a}$, so the whole numerator is divided.` },
-      { text: `$f^{-1}(x) = \\dfrac{x ${sg(b)}}{${a}}$`, why: `$f$ adds $${b}$ last, so the inverse first ${b > 0 ? 'subtracts' : 'adds'} $${Math.abs(b)}$.` }], {
+      { text: `$f^{-1}(x) = \\dfrac{x ${sg(b)}}{${a}}$`, why: `$f$ ${b > 0 ? 'adds' : 'subtracts'} $${Math.abs(b)}$ last, so the inverse first ${b > 0 ? 'subtracts' : 'adds'} $${Math.abs(b)}$.` }], {
       dp: 0,
       hints: ['$f$ multiplies by a number, then adds a number. What does the inverse do?', 'Undo the operations in the **reverse** order.', 'Check by substituting your candidate into $f$: you should get $x$.', `The inverse is $\\dfrac{x ${sg(-b)}}{${a}}$.`],
       steps: [{ h: 'Operations of f', d: `multiply by $${a}$, then ${b > 0 ? 'add' : 'subtract'} $${Math.abs(b)}$` }, { h: 'Undo in reverse', d: `${b > 0 ? 'subtract' : 'add'} $${Math.abs(b)}$, then divide by $${a}$` }, { h: 'Inverse', d: `$f^{-1}(x) = \\dfrac{x ${sg(-b)}}{${a}}$` }]
@@ -891,7 +891,7 @@ const fnForms = [
     const a = nz(rng, -5, 5), b = nz(rng, -4, 4), s = ri(rng, 1, 6), c = s + b;
     return spec(numQ(`For $f(x) = \\sqrt{x ${sg(-a)}} ${sg(b)}$ with domain $x \\ge ${a}$, evaluate $f^{-1}(${c})$.`, s * s + a, {
       dp: 0,
-      traps: [{ value: s + a, why: `Undo the square root by **squaring**: $\\sqrt{x ${sg(-a)}} = ${s}$ means $x ${sg(-a)} = ${s * s}$.` }, { value: (c - a) ** 2 + b, why: `Undo in reverse order: subtract the $${b}$ first, then square, then add $${a}$.` }],
+      traps: [{ value: s + a, why: `Undo the square root by **squaring**: $\\sqrt{x ${sg(-a)}} = ${s}$ means $x ${sg(-a)} = ${s * s}$.` }, { value: (c - a) ** 2 + b, why: `Undo in reverse order: ${b > 0 ? 'subtract' : 'add'} $${Math.abs(b)}$ first, then square, then ${a > 0 ? 'add' : 'subtract'} $${Math.abs(a)}$.` }],
       hints: [`$f^{-1}(${c})$ is the $x$ with $f(x) = ${c}$.`, `Set $\\sqrt{x ${sg(-a)}} ${sg(b)} = ${c}$ and isolate the root.`, 'Undo the root by squaring both sides.', `$x ${sg(-a)} = ${s * s}$, so $x = ${s * s + a}$.`],
       steps: [{ h: 'Equation', d: `$\\sqrt{x ${sg(-a)}} ${sg(b)} = ${c}$` }, { h: 'Isolate the root', d: `$\\sqrt{x ${sg(-a)}} = ${s}$` }, { h: 'Square', d: `$x ${sg(-a)} = ${s * s}$, so $x = ${s * s + a}$` }]
     }), 'fn-sqrt-eval', { a, b, c });
@@ -947,8 +947,8 @@ const fnForms = [
     rej(a === 0 || c === k);
     return spec(numQ(`For $f(x) = \\dfrac{${a}}{x ${sg(-h)}} ${sg(k)}$, evaluate $f^{-1}(${c})$.`, a / d + h, {
       dp: 0,
-      traps: [{ value: a / (c - h) + k, why: `Undo in reverse: subtract the constant $${k}$ from $${c}$ first, then invert the fraction.` }, { value: a / d, why: `The fraction $\\dfrac{${a}}{x ${sg(-h)}}$ equals $${d}$ when $x ${sg(-h)} = \\dfrac{${a}}{${d}}$: add $${h}$ to find $x$.` }].filter(t => t.value !== a / d + h),
-      hints: [`$f^{-1}(${c})$ is the $x$ with $f(x) = ${c}$.`, `Subtract $${k}$ from both sides to isolate the fraction.`, 'Invert the fraction, then undo the shift inside the bracket.', `$\\dfrac{${a}}{x ${sg(-h)}} = ${d}$ gives $x = ${a / d + h}$.`],
+      traps: [{ value: a / (c - h) + k, why: `Undo in reverse: subtract the constant $${k}$ from $${c}$ first, then invert the fraction.` }, { value: a / d, why: `The fraction $\\dfrac{${a}}{x ${sg(-h)}}$ equals $${d}$ when $x ${sg(-h)} = ${fr(a, d)}$: ${h > 0 ? 'add' : 'subtract'} $${Math.abs(h)}$ to find $x$.` }].filter(t => t.value !== a / d + h),
+      hints: [`$f^{-1}(${c})$ is the $x$ with $f(x) = ${c}$.`, `${k > 0 ? 'Subtract' : 'Add'} $${Math.abs(k)}$ ${k > 0 ? 'from' : 'to'} both sides to isolate the fraction.`, 'Invert the fraction, then undo the shift inside the bracket.', `$\\dfrac{${a}}{x ${sg(-h)}} = ${d}$ gives $x = ${a / d + h}$.`],
       steps: [{ h: 'Equation', d: `$\\dfrac{${a}}{x ${sg(-h)}} ${sg(k)} = ${c}$` }, { h: 'Isolate the fraction', d: `$\\dfrac{${a}}{x ${sg(-h)}} = ${d}$` }, { h: 'Solve', d: `$x ${sg(-h)} = ${a / d}$, so $x = ${a / d + h}$` }]
     }), 'fn-reciprocal-eval', { a, h, k, c });
   })
@@ -1020,7 +1020,7 @@ const vecForms = [
     return spec(numQ(`The vector $\\underline{a} = ${col(a[0], a[1])}$ is parallel to $\\underline{b} = ${col(b[0], b[1])}$, with $\\underline{a} = \\lambda\\underline{b}$. Find the scalar $\\lambda$.`, lam, {
       dp: 0,
       traps: [{ value: Math.abs(lam), why: `Compare the signs: $\\underline{a}$ points ${lam < 0 ? 'opposite to' : 'the same way as'} $\\underline{b}$, so $\\lambda$ is ${lam < 0 ? 'negative' : 'positive'}.` }, { value: 1 / lam, why: '$\\underline{a} = \\lambda\\underline{b}$: divide the components of $\\underline{a}$ by those of $\\underline{b}$, not the other way round.' }],
-      hints: ['$\\underline{a} = \\lambda\\underline{b}$ means each component of $\\underline{a}$ is $\\lambda$ times the matching component of $\\underline{b}$.', 'Divide the first components.', 'Check the second components give the same ratio, and look at the sign.', `$\\lambda = \\dfrac{${a[0]}}{${b[0]}} = ${lam}$.`],
+      hints: ['$\\underline{a} = \\lambda\\underline{b}$ means each component of $\\underline{a}$ is $\\lambda$ times the matching component of $\\underline{b}$.', 'Divide the first components.', 'Check the second components give the same ratio, and look at the sign.', `$\\lambda = ${a[0]} \\div ${b[0] < 0 ? `(${b[0]})` : b[0]} = ${lam}$.`],
       steps: [{ h: 'Equate components', d: `$${a[0]} = \\lambda(${b[0]})$ and $${a[1]} = \\lambda(${b[1]})$` }, { h: 'Solve', d: `$\\lambda = ${lam}$` }, { h: 'Check', d: `$${lam}\\times ${b[1]} = ${a[1]}$ ✓` }]
     }), 'vec-lambda', { a, b });
   })
@@ -1083,17 +1083,18 @@ const sumLine = (F, upper) => `\\sum_{i=1}^{${upper}}${F.kind === 'lin' || F.kin
 /** The right-hand side with only the first n replaced by k + 1 (the common slip), or for a power the denominator dropped. */
 const partialTex = F => (F.kind === 'geo' ? `${F.r}^{k+1}-1` : F.baseTex.replace('n', '(k+1)').replace(/n/g, 'k'));
 // Multiple choice, not an expression: an expression check accepts anything algebraically equal, so the unsubstituted
-// work (the right side of P(k) plus the new term) would be accepted as "P(k+1)". As an option it is a named mistake.
+// work (the right side of P(k) plus the new term, which equals the right side of P(k+1) for every k) would be accepted as
+// "P(k+1)". No option may be equal to the key for any k: every distractor below differs from it at every k tested.
 const iRhsNext = dp => V([1], rng => {
   const F = family(rng, ['lin', 'sq', 'pr', 'cube', 'geo']);
   const ok = `$${F.rhsTex('k+1')}$`;
   const ds = [
-    { text: `$${F.rhsTex('k')} + ${F.T('k+1')}$`, why: 'That is the right side of $P(k)$ plus the next term: it is the working of the inductive step. The statement $P(k+1)$ is the formula with $n$ replaced by $k + 1$, which is what the step must reach.' },
+    { text: `$${F.rhsTex('k')}$`, why: 'That is the right-hand side of $P(k)$, unchanged. $P(k+1)$ is the same formula with $n$ replaced by $k + 1$.' },
     { text: `$${F.rhsTex('k')} + 1$`, why: '$P(k+1)$ is the **same formula** with $n$ replaced by $k + 1$ everywhere; it is not the formula for $k$ with $1$ added.' },
     { text: `$${partialTex(F)}$`, why: 'Replace $n$ in **every** place it appears, not only the first.' }];
   return spec(mcQ(rng, `The statement $P(n)$ is $${F.claim}$ for all integers $n \\ge 1$. In the inductive step we must prove $P(k+1)$. Which expression is the **right-hand side of $P(k+1)$**, that is, the right-hand side of $P(n)$ with $n$ replaced by $k + 1$?`, ok, ds, {
     dp,
-    hints: ['$P(k+1)$ is the statement $P(n)$ with $n = k + 1$.', 'Every $n$ in the right-hand side becomes $k + 1$.', 'The statement is the formula itself: adding the next term to the right side of $P(k)$ is the working of the step, not the statement.', `The right-hand side of $P(k+1)$ is $${F.rhsTex('k+1')}$.`],
+    hints: ['$P(k+1)$ is the statement $P(n)$ with $n = k + 1$.', 'Every $n$ in the right-hand side becomes $k + 1$.', 'Put brackets round $k + 1$ so that products and powers are read correctly.', `The right-hand side of $P(k+1)$ is $${F.rhsTex('k+1')}$.`],
     steps: [{ h: 'State P(n)', d: `$${F.claim}$` }, { h: 'Replace n by k + 1', d: `Right-hand side: $${F.rhsTex('k+1')}$` }, { h: 'Use', d: 'This is the target the inductive step must reach.' }]
   }), 'ind-rhs-next', { kind: F.kind, F: F });
 });
@@ -1169,7 +1170,7 @@ const iDivMk = dp => V([3], rng => {
   return spec(exprQ(`In an induction proof that $${a}^{n} - ${b}^{n}$ is divisible by $${d}$ for all integers $n \\ge 1$, the assumption is $${a}^{k} - ${b}^{k} = ${d}p$ for some integer $p$. Then $${a}^{k+1} - ${b}^{k+1} = ${a}(${a}^{k} - ${b}^{k}) + (\\ldots)$. Write $${a}^{k+1} - ${b}^{k+1}$ in terms of $p$ and $k$.`, `${a * d}*p + ${d}*${b}^k`, {
     dp, hint: 'e.g. 15p + 4*3^k',
     traps: [{ expr: `${a * d}*p`, why: `$${a}^{k+1} - ${b}^{k+1} = ${a}\\left(${a}^{k} - ${b}^{k}\\right) + ${b}^{k}(${a} - ${b})$: the second part is not zero.` }, { expr: `${a * d}*p + ${b}^k`, why: `The leftover is $${b}^{k}(${a} - ${b}) = ${d}\\times ${b}^{k}$: keep the factor $${d}$.` }],
-    hints: [`Write $${a}^{k+1} - ${b}^{k+1}$ so that $(${a}^{k} - ${b}^{k})$ appears.`, `Add and subtract $${b}\\times ${a}^{k}$? Simpler: $${a}^{k+1} - ${b}^{k+1} = ${a}(${a}^{k} - ${b}^{k}) + ${b}^{k}(${a} - ${b})$.`, `Replace $${a}^{k} - ${b}^{k}$ by $${d}p$.`, `The result is $${a * d}p + ${d}\\times ${b}^{k} = ${d}(${a}p + ${b}^{k})$.`],
+    hints: [`Write $${a}^{k+1} - ${b}^{k+1}$ so that $(${a}^{k} - ${b}^{k})$ appears.`, `Add and subtract $${a}\\times ${b}^{k}$ so that the bracket appears: $${a}^{k+1} - ${b}^{k+1} = ${a}(${a}^{k} - ${b}^{k}) + ${b}^{k}(${a} - ${b})$.`, `Replace $${a}^{k} - ${b}^{k}$ by $${d}p$.`, `The result is $${a * d}p + ${d}\\times ${b}^{k} = ${d}(${a}p + ${b}^{k})$.`],
     steps: [{ h: 'Split', d: `$${a}^{k+1} - ${b}^{k+1} = ${a}(${a}^{k} - ${b}^{k}) + ${b}^{k}(${a} - ${b})$` }, { h: 'Use the assumption', d: `$= ${a}(${d}p) + ${d}\\times ${b}^{k}$` }, { h: 'Factor', d: `$= ${d}(${a}p + ${b}^{k})$, a multiple of $${d}$` }]
   }), 'ind-div-mk', { a, b });
 });

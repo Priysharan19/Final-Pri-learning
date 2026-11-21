@@ -160,8 +160,19 @@ const ORACLES = {
   'vec-sum-diff': (s) => ({ value: (s.a[0] + s.b[0]) * (s.a[0] - s.b[0]) + (s.a[1] + s.b[1]) * (s.a[1] - s.b[1]) }),
   'vec-lambda': (s) => { const l = s.a[0] / s.b[0]; return { value: s.a[1] === l * s.b[1] ? l : NaN }; },
   // ── induction ──
-  // option 0 is the statement (the formula with n = k + 1); option 1, the unsubstituted work, is equal in value but is not the statement, so it is keyed wrong; option 2 differs in value
-  'ind-rhs-next': (s) => { const F = s.F, S = n => sumTo(F, n), sound = [1, 2, 3, 4].every(k => S(k) + F.term(k + 1) === S(k + 1) && S(k) + 1 !== S(k + 1)); return { truth: i => i === 0 && sound }; },
+  // Every option is read back as a formula and evaluated at k = 1..7 and 11 (by direct summation for the claim): exactly one option equals the right side at n = k + 1,
+  // and every other option differs from it at two or more of those k, so no wrong option is also a correct statement for every k.
+  'ind-rhs-next': (s, q) => {
+    const S = n => sumTo(s.F, n), KS = [1, 2, 3, 4, 5, 6, 7, 11];
+    const toJs = t => { let e = String(t).replace(/\$/g, '').replace(/\^\{([^{}]*)\}/g, '**($1)'); for (let g = 0; g < 4; g++) e = e.replace(/\\dfrac\{([^{}]*)\}\{([^{}]*)\}/g, '(($1)/($2))'); return e.replace(/\s+/g, '').replace(/([\d)k])(?=[(k])/g, '$1*').replace(/\)(?=\d)/g, ')*'); };
+    const val = (t, k) => new Function('k', `return ${toJs(t)};`)(k);
+    const same = (t, k) => Math.abs(val(t, k) - S(k + 1)) < 1e-9;
+    const texts = q.__texts;
+    const equalAll = t => KS.every(k => same(t, k));
+    const diffs = t => KS.filter(k => !same(t, k)).length;
+    texts.forEach((t, i) => { if (i > 0 && diffs(t) < 2) throw new Error(`option ${i} (${t}) differs from the key at only ${diffs(t)} of ${KS.length} k`); });
+    return { truth: i => equalAll(texts[i]) };
+  },
   'ind-lhs-next': (s) => { const F = s.F, m = s.m, S = n => sumTo(F, n), T = i => F.term(i), vals = [S(m) + T(m + 1), S(m) + T(m), S(m) + T(m + 2), S(m + 1) + T(m + 1)]; return { truth: i => vals[i] === S(m + 1) }; },
   'ind-factor-out': (s) => {
     const F = s.F;
@@ -219,11 +230,13 @@ for (const bank of [all]) {
           const bad = JSON.stringify(q).match(/undefined|NaN|\[object|Infinity/);
           ok(!bad, `${where}: text hygiene (${bad})`);
           // wording lint (an external review found these in served text): no bare leading \cdot, no coefficient 1, no "+ -", no unreduced fraction in the named forms, never a base 1
-          for (const [where2, str] of [['prompt', q.prompt], ...(q.mcqOptions || []).map((o, i) => [`option ${i}`, o]), ...q.hints.map((h, i) => [`hint ${i + 1}`, h]), ...q.steps.map((s, i) => [`step ${i + 1}`, `${s.h} ${s.d}`]), ['key', q.answerType === 'expression' ? q.answer.expr : '']]) {
+          for (const [where2, str] of [['prompt', q.prompt], ...(q.mcqOptions || []).map((o, i) => [`option ${i}`, o]), ...q.hints.map((h, i) => [`hint ${i + 1}`, h]), ...q.steps.flatMap((s, i) => [[`step ${i + 1} heading`, s.h], [`step ${i + 1}`, s.d]]), ...(q.traps || []).map((tr, i) => [`trap ${i + 1}`, tr.why || '']), ...Object.values(q.answer?.optionTraps || {}).map((w, i) => [`option trap ${i + 1}`, typeof w === 'string' ? w : (w?.why ?? '')]), ['key', q.answerType === 'expression' ? q.answer.expr : '']]) {
             const L = String(str);
             ok(!/(^|[$=({+\-,]\s*)\\cdot/.test(L), `${where}: ${where2} has a bare leading \\cdot: ${L}`);
-            ok(!/(^|[^\d.\w\\^_])1(?=[a-zA-Z]|\\sqrt|\\pi)/.test(L), `${where}: ${where2} prints a coefficient 1: ${L}`);
+            ok(!/(^|[^\d.\w\\^_])1(?=[a-zA-Z]|\\sqrt|\\pi|\\ln)/.test(L), `${where}: ${where2} prints a coefficient 1: ${L}`);
             if (where2 !== 'key') ok(!/\+\s*[-\u2212]/.test(L), `${where}: ${where2} has "+ -": ${L}`);
+            if (where2 !== 'key') ok(!/\\[dt]frac\{[^{}]*\}\{1\}/.test(L), `${where}: ${where2} has a fraction over 1: ${L}`);
+            if (where2 !== 'key') ok(!/\b(add|adds|adding|subtract|subtracts|subtracting)\s+\$?\s*[-\u2212]\s*\d/i.test(L), `${where}: ${where2} says add/subtract of a negative number: ${L}`);
             if (sp.form === 'ind-div-mk') ok(!/(^|[^\d.\w])1\^/.test(L), `${where}: ${where2} has a base 1: ${L}`);
             if (REDUCED_FORMS.has(sp.form)) {
               for (const m of L.matchAll(/\\[dt]frac\{(\d+)[^{}]*\}\{(\d+)\}|(\d+)\/(\d+)/g)) {
