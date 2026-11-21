@@ -482,7 +482,6 @@ try {
     await answer(L1.t, L1.sealed, wrongOf(wrongOf(L1.k.text)));
     const usedBefore = (await post('/v1/guest/session', {}, L1.t.jar)).data.used;
     const prevForm = formIndexOf(multi, L1.k.t.s);
-    let differing = 0, total = 0, noLike = null;
     const like = await post('/v1/guest/question', ASK({ generator: multi, difficulty: 2, like: L1.sealed }), L1.t.jar, L1.t.headers);
     c.eq(like.status, 201, '"one like it" issues a question');
     c.ok(like.data.like.differentForm === true && formIndexOf(multi, answerKeyOf(like.data.sealed).t.s) !== prevForm, 'in a different form than the one answered');
