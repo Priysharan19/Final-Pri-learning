@@ -330,4 +330,4 @@ html[data-edition=prithagoras] .qpage.ws .verdict{scroll-margin-bottom:148px}
 }
 
 /* The dot-point picker sits in the question's own column (it was 80px wider than the prompt below it on a desktop). */
-.ws-notices { width: min(820px, 100%); }
+html[data-edition=prithagoras] .ws-notices { width: min(820px, 100%); }

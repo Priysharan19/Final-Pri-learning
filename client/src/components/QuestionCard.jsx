@@ -2598,6 +2598,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // showing what Submit would send now.
   const judgedShown = !!judged && judged.viaInk && (resolved || (gradedRetry && judgedLive));
   const boundLines = judgedShown && judged.lines?.length ? judged.lines : null;
+  // The score card prints "Your answer" itself once a typed-answer question is marked from ink (not for working, not after a reveal): the bar then does not repeat it.
+  const cardShowsAnswer = !!judged?.viaInk && !isWorking && !res?.revealed && String(judged?.answer ?? '').trim() !== '';
   const shownAnswerLine = judgedShown
     ? (isWorking ? (boundLines ? boundLines[boundLines.length - 1] : '') : judged.answer)
     // owner decision, 19 Nov 2026: the reading is not shown before marking, whichever path (auto read, Try again) it arrived by
@@ -3603,7 +3605,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         <div className="ws-actions editor-foot no-print">
           <span className="status-line" data-state={statusState} data-work-state={workState} data-work-vocab={vocab.state || undefined} role="status" aria-live="polite">
             {statusState !== 'idle' && <span className="status-mark" aria-hidden="true"><Working pending={statusState === 'working'} />{statusState !== 'working' && <span className="dot" />}</span>}
-            {writeMode && shownAnswerLine && !inkStale && !cloudPending && !resolved && saveState !== 'failed' && saveState !== 'saving'
+            {writeMode && shownAnswerLine && !inkStale && !cloudPending && !(resolved && cardShowsAnswer) && saveState !== 'failed' && saveState !== 'saving'
               ? <span className="ws-answer-preview muted">{t('verdict.yourAnswerIs')} <MathText text={`$${texOf(String(shownAnswerLine).replace(/^\s*[=≈]\s*/, ''))}$`} /></span>
               : resolved && serverAuthoritative && statusText
                 /* The verdict word is already on the page in the score card; the live region still announces it, once, to a screen reader. */

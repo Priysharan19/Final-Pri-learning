@@ -167,6 +167,10 @@ process.env.PRI_EDITION = 'prithagoras';
   check('Exams does not offer the generic "Sit a practice paper" card to an NSW student (the server refuses that kind of paper)', () => {
     assert.match(exams, /user\.course !== 'nsw' && <div className="card">/);
   });
+  check('an NSW student with no paper entry on offer (nswExams off, nothing else) gets a sentence and a way on, never an empty Exams page', () => {
+    assert.match(exams, /data-exams-none/);
+    assert.match(exams, /user\.course === 'nsw' && !generatedPapersFor\(user\) && !\(featureEnabled\('nswExams'\)\) && !ext1PapersFor\(user\) && !practiceSetsFor\(user\)/);
+  });
   const { settleChoice } = await import('../src/guest/guestMenu.js');
   check('the Home question picker opens on the student\'s own course (Extension 1 stays Extension 1)', () => {
     assert.equal(settleChoice('prithagoras', {}, { defaultYear: 12, defaultCourse: 'ext1' }).course, 'ext1');
@@ -175,13 +179,13 @@ process.env.PRI_EDITION = 'prithagoras';
   });
   const css = f => readFileSync(fileURLToPath(new URL(`../src/${f}`, here)), 'utf8');
   check('the history row\'s level column is wide enough for "Intermediate" (it overlapped the question text)', () => {
-    assert.match(css('instrument/ledger.css'), /\.in-led-main \{\s*display: grid; grid-template-columns: 10px (9\d|1\d\d)px /);
+    assert.match(css('instrument/ledger.css'), /html\[data-edition=prithagoras\] \.in-led-main \{ grid-template-columns: 10px (9\d|1\d\d)px /);
   });
   check('the legal pages have a gutter before the shell exists, and a settings label keeps its words whole on a phone', () => {
     const theme = css('theme.css');
-    assert.match(theme, /#root > \.qpage \{ padding: calc\(24px/);
+    assert.match(theme, /html\[data-edition=prithagoras\] #root > \.qpage \{ padding: calc\(24px/);
     assert.match(theme, /\.set-row \.set-k \{ flex: 0 0 auto; max-width: 46%; overflow-wrap: normal/);
-    assert.match(theme, /\.legal-body \{ overflow-wrap: anywhere; \}/);
+    assert.match(theme, /html\[data-edition=prithagoras\] \.legal-body \{ overflow-wrap: anywhere; \}/);
   });
 }
 
@@ -223,7 +227,10 @@ process.env.PRI_EDITION = 'prithagoras';
   check('formatDate and formatDateTime write en-AU for Prithagoras (22 Nov 2026, never 11/22/2026)', () => {
     const ms = Date.UTC(2026, 10, 22, 5, 8, 14);
     assert.equal(formatDate(ms, 'nsw'), '22 Nov');
-    assert.match(formatDateTime(ms, 'nsw'), /^22 Nov 2026,? 4:08 pm$|^22 Nov 2026,? 16:08$/i);
+    assert.equal(formatDateTime(ms, 'nsw'), '22 Nov 2026, 4:08 pm AEDT');
+    assert.equal(formatDateTime(ms, 'in'), '22 Nov 2026, 10:38 am IST');   // India still reads India time, now with its zone
+    assert.match(formatDateTime(ms, { course: 'nsw', timezone: 'America/New_York' }), /12:08 am GMT-5$/);   // a student abroad sees their own zone named
+    assert.match(code('pages/ExamRoom.jsx'), /timeZoneName: 'short'/);
     assert.ok(!/11\/22\/2026/.test(formatDateTime(ms, 'nsw')));
   });
   check('the first-run tour keeps its wide-screen note left of the dot-point picker and falls back under the question', () => {
@@ -239,8 +246,12 @@ process.env.PRI_EDITION = 'prithagoras';
   check('on a wide screen only the last hint rung is offered in the footer, not also "Show solution" (they do the same thing)', () => {
     assert.match(code('components/QuestionCard.jsx'), /!\(INSTRUMENT && ladderOffered && nextRung === 'solution' && !narrow\)/);
   });
-  check('after marking, the bar does not repeat "Your answer" (the score card shows it)', () => {
-    assert.match(code('components/QuestionCard.jsx'), /writeMode && shownAnswerLine && !inkStale && !cloudPending && !resolved && saveState/);
+  check('after marking, the bar does not repeat "Your answer" when the score card prints it, and still shows it when the card does not (working, a reveal)', () => {
+    const c = code('components/QuestionCard.jsx');
+    assert.match(c, /const cardShowsAnswer = !!judged\?\.viaInk && !isWorking && !res\?\.revealed && String\(judged\?\.answer \?\? ''\)\.trim\(\) !== '';/);
+    assert.match(c, /!\(resolved && cardShowsAnswer\) && saveState/);
+    // the card's own line is under exactly the same three conditions
+    assert.match(c, /judged\?\.viaInk && !isWorking && !res\.revealed && String\(judged\.answer\)\.trim\(\) !== ''/);
   });
 }
 

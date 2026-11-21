@@ -113,8 +113,13 @@ export function formatDate(value, profileOrCourse, options = { day: 'numeric', m
   }
 }
 
-/** A date and time written the way the profile reads them ("22 Nov 2026, 4:08 am" for en-AU), never the browser's own locale. */
-export function formatDateTime(value, profileOrCourse, options = { dateStyle: 'medium', timeStyle: 'short' }) {
+/**
+ * A date and time written the way the profile reads them, in the profile's timezone WITH its short zone name
+ * ("22 Nov 2026, 5:30 am AEDT"; "22 Nov 2026, 11:00 am IST"): a student abroad is never shown Sydney or Kolkata time unlabelled.
+ * Display only: nothing stored is read through this.
+ */
+export const DATE_TIME_OPTIONS = Object.freeze({ day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+export function formatDateTime(value, profileOrCourse, options = DATE_TIME_OPTIONS) {
   return formatDate(value, profileOrCourse, options);
 }
 
