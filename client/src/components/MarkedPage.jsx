@@ -35,7 +35,7 @@ const firstSentence = text => { const clean = String(text || '').replace(/\s+/g,
 /** The specific reason a verified line is right, only where the engine has one; otherwise nothing (no filler sentence). */
 function whyOf(card, t) {
   if (card.status === 'condition') return t('mp.why.condition');
-  if (card.valueChain === 'given') return t('mp.why.given');
+  if (card.valueChain === 'given') return card.restated ? t('mp.why.restates') : t('mp.why.given');
   if (card.valueChain === 'verified') return card.note || '';
   if (card.valueChain === 'arithmetic') return card.note || t('mp.why.arithmetic');
   if (card.start) return t('mp.why.start');

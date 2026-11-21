@@ -20,7 +20,7 @@ const ok = (c, m) => { if (c) pass++; else { fail++; console.error('FAIL:', m); 
 await G.loadAllBanks();
 const code = r => r.lines.map(l => (l.status === 'ok' ? 'T' : l.status === 'break' ? 'X' : '.')).join('');
 const marks = e => JSON.stringify({ partial: e.partial, board: e.board ?? null });
-const both = (q, lines) => { const w = lines.join('\n'); return { on: stepEvidence(q, '', w, { correct: false }), off: stepEvidence(q, '', w, { correct: false }, { fold: false }) }; };
+const both = (q, lines) => { const w = lines.join('\n'); return { on: stepEvidence(q, '', w, { correct: false }, { solutionMatch: false }), off: stepEvidence(q, '', w, { correct: false }, { fold: false, solutionMatch: false }) }; };
 
 const SIMPLIFY = { prompt: 'Simplify $3(x + 2)$.', answerType: 'expression', answer: { expr: '3*x+6' }, difficulty: 2, steps: [] };
 ok(stepMetaFor(SIMPLIFY)?.kind === 'expression', 'the test question has a topic Step Check');
@@ -85,7 +85,7 @@ ok(stepMetaFor(SIMPLIFY)?.kind === 'expression', 'the test question has a topic 
     const lines = [...t.lines.map(l => l.text), '7 + 8 = 15', '12 × 3 = 36', '9 - 4 = 6'];
     const w = lines.join('\n');
     let on, off;
-    try { on = stepEvidence(q, '', w, { correct: false }); off = stepEvidence(q, '', w, { correct: false }, { fold: false }); } catch { continue; }
+    try { on = stepEvidence(q, '', w, { correct: false }, { solutionMatch: false }); off = stepEvidence(q, '', w, { correct: false }, { fold: false, solutionMatch: false }); } catch { continue; }
     n++;
     if (marks(on) !== marks(off)) markDiff++;
     if (on.partial?.awarded > 0) withMarks++;

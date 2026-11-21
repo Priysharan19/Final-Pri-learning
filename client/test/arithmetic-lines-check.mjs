@@ -197,8 +197,12 @@ ok(stepEvidence(WITH, '4', '2x = 8\nx = 4', { correct: true }).stepReport?.arith
 { // independent review, round 1: a milestone tick must not be worded as an arithmetic check
   const QM = { answerType: 'numeric', answer: { value: 99 }, prompt: 'Find the value.', steps: [{ h: 'a', d: '$p = 8$' }, { h: 'b', d: '$q = 4$' }] };
   const w = ['2+3 = 5', 'p = 8', 'q = 4'];
-  const rep = stepEvidence(QM, '99', w.join('\n'), { correct: true }).stepReport;
+  const rep = stepEvidence(QM, '99', w.join('\n'), { correct: true }, { solutionMatch: false }).stepReport;
   ok(rep.arithmetic === true && rep.lines.map(l => l.status).join() === 'ok,note,note', `no milestone tick is added to an arithmetic report (${rep.lines.map(l => l.status)})`);
+  // The worked-solution pass (solutionMatch.js) now recognises `p = 8` and `q = 4` as steps of the worked solution: a verified
+  // tick that names the step, never an arithmetic one, and the page is then not an arithmetic-only report (each line has its state).
+  const matched = stepEvidence(QM, '99', w.join('\n'), { correct: true }).stepReport;
+  ok(matched.arithmetic !== true && matched.solutionMatched === true && matched.lines.map(l => `${l.status}:${l.state}`).join() === 'ok:arithmetic,ok:verified,ok:verified' && matched.lines.every(l => !l.milestone) && /step 1 of the worked solution/.test(matched.lines[1].note), `the worked-solution pass ticks p = 8 and q = 4 as verified steps (${matched.lines.map(l => `${l.status}:${l.state}`)})`);
   const evm = workingEvidence({ res: { stepReport: { ...rep, lines: rep.lines.map((l, i) => (i === 2 ? { ...l, status: 'ok', state: undefined } : l)) } }, submitted: { hasWorking: true, lines: w } });
   ok(evm.checked.join() === '1', `only arithmetic ticks are listed as arithmetic (${evm.checked})`);
 }

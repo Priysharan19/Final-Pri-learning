@@ -149,7 +149,7 @@ function buildValueChainModel({ report: reportIn, stepReport, receipt, source, a
     n: i + 1, line: i, status: STATUS[l?.state] || 'not-verified', valueChain: l?.state || 'unverified',
     start: false, startSide: null, rules: [], more: false, same: false, unnamed: false, followsFrom: null,
     diagnosis: l?.state === 'wrong' ? (l.diagnosis || null) : null, note: l?.state === 'wrong' || l?.state === 'given' || l?.state === 'incomplete' || l?.state === 'arithmetic' || l?.state === 'verified' ? (l.note || null) : null,
-    previousText: null, text: String(l?.text ?? '')
+    previousText: null, text: String(l?.text ?? ''), restated: l?.state === 'given' && l?.solutionMatch === true
   }));
   const summaryOf = stepReport.summary || {};
   const unverified = cards.filter(c => c.status === 'not-verified' || c.status === 'unread').map(c => c.n);
@@ -157,8 +157,10 @@ function buildValueChainModel({ report: reportIn, stepReport, receipt, source, a
   const total = cards.length;
   // Every tick only says the line is true as written: the headline must not say "checked" (it is not checked as the right step).
   const onlyArithmetic = checked > 0 && firstBreak < 0 && cards.every(c => c.status === 'checked' && c.valueChain === 'arithmetic');
+  const mixedAll = checked > 0 && firstBreak < 0 && !onlyArithmetic && cards.every(c => c.status === 'checked') && cards.some(c => c.valueChain === 'arithmetic');
   const summary = firstBreak >= 0 ? { key: 'aw.summary.breaksSome', vars: { n: firstBreak + 1, checked, total } }
     : onlyArithmetic ? { key: 'aw.summary.arithmeticAll', vars: { total, checked } }
+    : mixedAll ? { key: 'aw.summary.mixedAll', vars: { total, checked } }
     : checked === 0 ? { key: 'aw.summary.none', vars: { total, checked } }
     : (unverified.length || cards.some(c => c.status === 'incomplete')) ? { key: 'aw.summary.some', vars: { checked, total } }
       : { key: 'aw.summary.valueAll', vars: { checked, total } };
@@ -167,7 +169,7 @@ function buildValueChainModel({ report: reportIn, stepReport, receipt, source, a
     criteria: [], jumps: [], followThrough: [], source, attempt: Number.isInteger(attempt) && attempt > 1 ? attempt : null,
     allChecked: unverified.length === 0 && firstBreak < 0 && !cards.some(c => c.status === 'incomplete'),
     noneChecked: checked === 0 && firstBreak < 0,
-    onlyArithmetic,
+    onlyArithmetic, mixedAll,
     unverified: unverified.length ? { lines: unverified, reason: summaryOf.reason || null } : null
   };
 }
