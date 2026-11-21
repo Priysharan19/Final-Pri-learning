@@ -7,7 +7,7 @@
 // numbers the prompt shows; the AI never sets a key. Original wording. SYNTHETIC: no student or
 // examiner evidence. Difficulty is the writer's own assessment, not reviewed by a teacher.
 // ─────────────────────────────────────────────────────────────────────────────
-import { ri, rc, nz, rs, Frac, gcd, mcq } from '../qhelpers.js';
+import { ri, rc, nz, rs, Frac, gcd, mcq, br } from '../qhelpers.js';
 
 // Builders: every key is computed in code from the numbers the prompt shows. A form's `audit` (kind + raw
 // parameters) is attached as a NON-ENUMERABLE property, so it is never spread into a served question;
@@ -235,7 +235,7 @@ const series = [
     return Fr(`Find the sum of the first ${n} terms of the geometric series $${serTex([a, a * r, a * r * r])} + \\cdots$. Give the answer as a fraction in simplest form if needed.`, sum.n, sum.d, {
       traps: [[a * (r ** n - 1), 'Divide by $r - 1$ as well: $S_n = \\dfrac{a(r^n - 1)}{r - 1}$.'], [nth(a, r, n), 'That is the ' + n + 'th term, not the sum.']],
       hints: ['Identify $a$ and $r$ from the first two terms.', `$a = ${a}$ and $r = ${r}$.`, '$S_n = \\dfrac{a(r^n - 1)}{r - 1}$ works for any $r \\ne 1$.', `Substitute $n = ${n}$.`],
-      steps: [['Identify', `$a = ${a}$, $r = ${r}$, $n = ${n}$`], ['Formula', `$S_{${n}} = \\dfrac{${a}(${r}^{${n}} - 1)}{${r} - 1}$`], ['Evaluate', `$${frT(sum)}$`]],
+      steps: [['Identify', `$a = ${a}$, $r = ${r}$, $n = ${n}$`], ['Formula', `$S_{${n}} = \\dfrac{${a}(${br(r)}^{${n}} - 1)}{${r} - 1}$`], ['Evaluate', `$${frT(sum)}$`]],
       audit: { kind: 'geosum', a, r, n, expect: sum.value }
     });
   }),
@@ -394,7 +394,7 @@ const stats = [
       return N(`A random variable $X$ has $E(X) = ${mu}$ and $\\text{Var}(X) = ${v}$. Let $Y = ${a}X ${sg(b)}$. Find $\\text{Var}(Y)$.`, a * a * v, {
         traps: [[a * v + b, 'Adding a constant does not change the variance, and the factor is SQUARED: $\\text{Var}(aX + b) = a^2\\text{Var}(X)$.'], [a * v, 'The factor $a$ is squared in the variance.']],
         hints: ['Use $\\text{Var}(aX + b) = a^2\\,\\text{Var}(X)$.', 'The constant $b$ does not affect the variance.', `$a^2 = ${a * a}$.`, `Multiply by $${v}$.`],
-        steps: [['Rule', '$\\text{Var}(aX + b) = a^2\\,\\text{Var}(X)$'], ['Substitute', `$${a}^2 \\times ${v} = ${a * a * v}$`]],
+        steps: [['Rule', '$\\text{Var}(aX + b) = a^2\\,\\text{Var}(X)$'], ['Substitute', `$${br(a)}^2 \\times ${v} = ${a * a * v}$`]],
         audit: { kind: 'rvtransform', mu, v, a, b, ask: 'var', expect: a * a * v }
       });
     }
