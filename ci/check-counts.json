@@ -309,7 +309,7 @@
       "job": "platform-contracts",
       "log": "photo-pipeline.log",
       "pins": [
-        {"has":"PHOTO WORKING MARKING: PASS — 45/45 checks","note":"40 → 45 (train marking 9, as printed by the run): the assertion that no line is judged on a question without a Step Check became three: no method marks, no line crossed and any tick a true-as-written tick only, and nothing about working that was not sent. A line restating what the prompt gives is now ticked as given."}
+        {"has":"PHOTO WORKING MARKING: PASS — 51/51 checks","note":"45 → 51 (dot-point fix train: the three cases that send working now assert the one ticked line is the restated f(x) with its given note, and that every other line is a note, two checks each). Earlier 40 → 45 (train marking 9, as printed by the run): the assertion that no line is judged on a question without a Step Check became three: no method marks, no line crossed and any tick a true-as-written tick only, and nothing about working that was not sent. A line restating what the prompt gives is now ticked as given."}
       ]
     },
     "platform/parent-report.log": {
