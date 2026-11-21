@@ -66,7 +66,7 @@ function RuleLine({ rule, t }) {
 
 export function CardBody({ card, model, t, renderBreakDetail }) {
   if (card.status === 'unread') return <p>{t('aw.body.unread')}</p>;
-  if (card.valueChain === 'given') return <p>{t('aw.body.given')}</p>;
+  if (card.valueChain === 'given') return <p>{card.restated ? t('aw.body.restates') : t('aw.body.given')}</p>;
   if (card.valueChain === 'verified') return <p>{t('aw.body.valueVerified')}{card.note ? <> <EngineComment text={card.note} /></> : ''}</p>;
   // The caveat (true as written, not checked to be the right step) is said ONCE for the page, in the result's summary sentence, never on every line.
   if (card.valueChain === 'arithmetic') return <p>{card.note ? <EngineComment text={card.note} /> : t('mp.why.arithmetic')}</p>;

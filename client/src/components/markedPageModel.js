@@ -126,11 +126,12 @@ export function buildMarkedPage({ model, boxes = null, markReady = true } = {}) 
   const first = cards.find(c => c.status === 'first-error') || null;
   const notFinished = cards.filter(c => c.status === 'incomplete').map(c => c.n);
   const quiet = cards.filter(c => isQuiet(c.status)).map(c => c.n);
-  const everyLine = !first && !quiet.length && !notFinished.length && cards.every(c => c.status === 'checked') && model.allChecked !== false && model.onlyArithmetic !== true;
+  const everyLine = !first && !quiet.length && !notFinished.length && cards.every(c => c.status === 'checked') && model.allChecked !== false && model.onlyArithmetic !== true && model.mixedAll !== true;
 
   const parts = [];
   if (everyLine) parts.push({ key: 'mp.head.every', vars: { total } });
   else if (model.onlyArithmetic === true && !first && !quiet.length && !notFinished.length) parts.push({ key: 'mp.head.arithmetic', vars: { total } });
+  else if (model.mixedAll === true && !first && !quiet.length && !notFinished.length) parts.push({ key: 'mp.head.mixedAll', vars: { total } });
   else {
     parts.push({ key: 'mp.head.checked', vars: { checked, total } });
     if (first) parts.push({ key: 'mp.head.firstError', vars: { n: first.n } });

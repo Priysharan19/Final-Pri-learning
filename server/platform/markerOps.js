@@ -29,6 +29,7 @@ import { questionFacts } from '../../client/src/engine/questionFacts.js';
 import { missingSteps } from '../../client/src/engine/missingSteps.js';
 import { infoOf as arithmeticInfo, cleanStatement } from '../../client/src/engine/arithmeticLines.js';
 import { annotateMilestones } from '../../client/src/engine/milestones.js';
+import { solutionMatch } from '../../client/src/engine/solutionMatch.js';
 import { awardBoardScheme, matchBoardPoints } from '../../client/src/engine/boardScheme.js';
 import { answerForm, effectiveSymbols, firstFinalAttempt, planGivens, readClaimForm } from './finalAttempt.js';
 
@@ -201,6 +202,15 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
         if (!report) { if (arithmetic && arithmetic.lines.some(l => l.status === 'ok' || l.status === 'break')) report = arithmetic; }
         else report = foldTrueAsWritten(report, arithmetic);
       }
+    } catch { /* the report stands */ }
+  }
+  // Feedback only, after foldTrueAsWritten (no mark, partial, board or milestone reads it): a line still unjudged that the
+  // question's own worked solution recognises is ticked (engine/solutionMatch.js). Never a cross, never a changed verdict.
+  if (typeof steps === 'string' && steps.trim() && !OBJECTIVE.has(q.answerType) && q.answerType !== 'graph-sketch' && !Array.isArray(q.boardScheme) && !(opts && opts.solutionMatch === false)) {
+    try {
+      const base = report || trueAsWritten(q, steps, opts);
+      const matched = base ? solutionMatch(q, base) : null;
+      if (matched && matched.matched > 0) report = matched.report;
     } catch { /* the report stands */ }
   }
   // A true-as-written tick on a line that ends at the student's own WRONG answer (`so 10^1 = 10` when the answer is 30)
