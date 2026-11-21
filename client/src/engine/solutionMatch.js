@@ -113,6 +113,8 @@ let FUNCS = new Set();
 const readSide = side => {
   try {
     const t = braces(tidy(side));
+    // a comma or semicolon list (a point, a vector, an interval) is never one number: it is compared component by component or not at all
+    if (/[,;]/.test(t)) return null;
     for (const f of FUNCS) if (new RegExp(`(?<![A-Za-z])${f}'*\\s*\\(`).test(t)) return null;
     return infoOf(cleanStatement(t));
   } catch { return null; }
@@ -331,11 +333,24 @@ function functionNames(q) {
   return out;
 }
 
+/** Every `name = value` the question or its worked solution states: the substitutions a line `name = value: …` may follow. */
+function knownSubstitutions(q) {
+  const out = new Set();
+  const texts = [String(q?.prompt ?? ''), ...(Array.isArray(q?.steps) ? q.steps.map(x => String(x?.d ?? '')) : [])];
+  for (const t of texts) for (const st of statementsOfSpans(t)) {
+    if (st.parts.length !== 2 || !/^[A-Za-z]$/.test(st.parts[0].trim())) continue;
+    const v = numericOf(st.parts[1]);
+    if (v !== null) out.add(`${st.parts[0].trim()}|${v}`);
+  }
+  return out;
+}
+
 function run(q, report) {
   FUNCS = functionNames(q);
   const lines = report.lines.slice(0, MAX_LINES);
   const sol = readSolution(q);
   const prompt = readPrompt(q);
+  const known = knownSubstitutions(q);
   let stop = Number.isInteger(report.firstBreak) && report.firstBreak >= 0 ? report.firstBreak : Infinity;
   const brk = lines.findIndex(l => l?.status === 'break');
   if (brk >= 0) stop = Math.min(stop, brk);
@@ -385,7 +400,8 @@ function run(q, report) {
     } else if (!tick && s.parts.length >= 2 && !s.continuation) hit = matchEquation(s.parts, sol, s.ctx);
     if (hit) { tick = tick || { state: 'verified', note: noteStep(hit), step: hit.step }; prevAbove.hit = hit; }
     // c / d · a value the solution reaches, in order
-    if (!tick && !s.multi) {
+    // a substitution `name = a:` counts only where the question or its solution substitutes that name at that value
+    if (!tick && !s.multi && (!s.ctx || known.has(`${s.ctx.name}|${s.ctx.value}`))) {
       const nums = s.parts.map(numericOf);
       const value = nums.every(v => v !== null) && nums.every(v => close(v, nums[0])) ? nums[0] : null;
       // a numeric continuation must agree with the line above (ln1 = 0, then `= 1`, is not one chain)
@@ -434,4 +450,4 @@ function run(q, report) {
 export const _setFunctionsUnused = q => { FUNCS = functionNames(q); };
 export const _internals = { readSolution, readStudent, matchEquation, spanToPlain, conditionOf, readSide, sameSidePublic: sameSide };
 // For engine/lineChains.js (the pass that runs after this one).
-export const _forChains = { statementsOfSpans, numericOf, canon, labelOf, topLevelPieces, sameLabel, setFunctions: q => { FUNCS = functionNames(q); } };
+export const _forChains = { knownSubstitutions, statementsOfSpans, numericOf, canon, labelOf, topLevelPieces, sameLabel, setFunctions: q => { FUNCS = functionNames(q); } };

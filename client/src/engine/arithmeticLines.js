@@ -1392,8 +1392,8 @@ function commaVectorsAsColumns(src, carried) {
 // while the vector reading is (a tick), or the vector reading is the one that can be compared with an earlier vector line (the warning note).
 // Both readings true, or the fraction reading true, leaves the line exactly as it was. Tick only, like every vector reading.
 const SLASH_BRACKET = /\[([^\[\],;|/]+)\/([^\[\],;|/]+)\]/g;
-function slashVectorsAsColumns(src, carried, ref) {
-  if (!src.includes('[') || !src.includes('/') || NOT_A_VECTOR_LINE.test(src)) return src;
+function slashVectorsAsColumns(src, carried, ref, vectorPage) {
+  if (!vectorPage || !src.includes('[') || !src.includes('/') || NOT_A_VECTOR_LINE.test(src)) return src;
   const found = [...src.matchAll(SLASH_BRACKET)].filter(m => /\d/.test(m[1]) && /\d/.test(m[2]) && NUMERIC_COMPONENT.test(m[1]) && NUMERIC_COMPONENT.test(m[2]));
   if (!found.length || found.some(m => /[A-Za-z]\s*$/.test(src.slice(0, m.index)))) return src;
   const otherVector = /\[[^\[\]|]*[,;][^\[\]|]*\]/.test(src);
@@ -1489,6 +1489,8 @@ function stepCheckArithmeticWithinBudget(workingText, prep = null, tickOnly = fa
   // derivative that does not fit is never crossed on it (see pageDefinitions).
   const degreePrimed = new Set(original.flatMap((l, k) => (DEGREE_FOR_PRIME.test(l) ? [k] : [])));
   const columns = findColumns(raw), columnMembers = new Set([...columns.values()].flatMap(c => c.members));
+  // Another vector somewhere on the page (a comma or semicolon column, a named vector, a magnitude of a combination): only then is a slash column read.
+  const vectorPage = raw.some(x => /\[[^\[\]|]*[,;][^\[\]|]*\]/.test(x) || /(?<![A-Za-z])[a-z]\s*=\s*[\[(]\s*-?\d/.test(x) || /\|[^|]*[A-Za-z][^|]*[+\-][^|]*\|/.test(x));
   const lastValue = new Map();   // line index → the value a ticked line came to (for a bare value written under it)
   const out = [];
   let firstBreak = -1;
@@ -1524,7 +1526,7 @@ function stepCheckArithmeticWithinBudget(workingText, prep = null, tickOnly = fa
     const beforeComma = src;
     src = commaVectorsAsColumns(src, carried);
     const commaForm = src !== beforeComma;
-    src = slashVectorsAsColumns(src, carried, vectorRef);
+    src = slashVectorsAsColumns(src, carried, vectorRef, vectorPage);
     // Plain arithmetic only, with one more case (owner, 19 November: `… = log 3 + log 2 + log 5` then `= log(3 + 2 + 5)`):
     // a line of letters whose LAST side is a worked expression of plain numbers. The `=` line below it rewrites that
     // expression, so it is held to it. A bare number left by such a line (`t = 5` then `= 20`) stays tick only.

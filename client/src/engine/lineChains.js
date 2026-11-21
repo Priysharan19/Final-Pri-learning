@@ -231,6 +231,8 @@ function run(q, report, warn) {
   const out = report.lines.slice();
   const env = new Map(world.env);
   let cur = -1, matched = 0, warned = 0, above = null;
+  const hist = [];   // every earlier line that could be read, nearest last
+  const knownSubs = FC.knownSubstitutions(q);
 
   const stepFor = (vec) => { const h = world.vecSteps.find(v => v.vec.length === vec.length && v.vec.every((x, i) => close(x, vec[i]))); return h ? h.step : null; };
   const verified = (note, step) => ({ state: 'verified', note, step });
@@ -245,14 +247,14 @@ function run(q, report, warn) {
     const unjudged = l.status === 'note' && NOTE_STATES.has(l.state) && l.note !== 'Follows from the earlier slip.' && !/misread/i.test(String(l.note ?? '')) && l.unreadable !== true && l.vectorWarning !== true;
     const s = readLine(l.text) || loose(l.text);
     // what this line leaves for the continuation below it
-    const describe = () => {
+    const describe = (st = l.status) => {
       if (!s || s.multi) return null;
       const last = lastOf(s);
       const info = SM.readSide(last);
       const vec = (() => { try { return evalVec(studentPre(last), env); } catch { return null; } })();
-      return { s, last, info, vec, label: s.parts.length >= 2 && !s.continuation ? s.parts[0] : null, sides: s.parts, hasEq: s.parts.length >= 2, text: l.text };
+      return { s, last, info, vec, label: s.parts.length >= 2 && !s.continuation ? s.parts[0] : null, sides: s.parts, hasEq: s.parts.length >= 2, text: l.text, status: st };
     };
-    if (judged) { const st = stepOf(l); if (st !== null && st > cur) cur = st; above = describe(); continue; }
+    if (judged) { const st = stepOf(l); if (st !== null && st > cur) cur = st; above = describe(); if (above) hist.push(above); continue; }
     if (!unjudged) continue;
     let tick = null;
 
@@ -261,13 +263,13 @@ function run(q, report, warn) {
       if (Number.isInteger(tick.step)) cur = Math.max(cur, tick.step);
       matched++;
       out[i] = { text: l.text, status: 'ok', state: tick.state, note: tick.note, solutionMatch: true, ...(tick.arithmetic ? { valueChain: { rule: 'true-as-written' } } : {}) };
-      above = describe();
+      above = describe('ok'); if (above) hist.push(above);
       continue;
     }
     let w = null;
-    if (warn) { try { w = slipWarning(l, s, prevAbove); } catch { w = null; } }
+    if (warn) { try { w = slipWarning(l, s, prevAbove) || substitutionWarning(l, s, hist); } catch { w = null; } }
     if (w) { warned++; out[i] = { text: l.text, status: 'note', state: 'unverified', unverified: true, note: w.note, slipWarning: true }; continue; }   // a warned line ticks nothing below it
-    above = describe();
+    above = describe(); if (above) hist.push(above);
   }
   if (!matched && !warned) return { report, matched: 0, warned: 0 };
 
@@ -350,7 +352,7 @@ function run(q, report, warn) {
     // only a WORD label (`hyp = √(8^2 + 15^2)`) is set aside: a one-letter label says which quantity the value belongs to, and is not read here
     if (parts.length === 2 && /^[A-Za-z]{2,6}$/.test(parts[0]) && !FN_NAME.test(parts[0])) { valueParts = [parts[1]]; label = true; }
     const nums = valueParts.map(FC.numericOf);
-    if (nums.every(x => x !== null) && nums.every(x => close(x, nums[0])) && nontrivial([valueParts[valueParts.length - 1]]) && /[-+*/^(!]/.test(valueParts[valueParts.length - 1].replace(/^-/, '')) && (!s.continuation || (up && up.info && up.info.value !== undefined && Math.abs(up.info.value - nums[0]) <= 1e-3 * Math.max(1, Math.abs(nums[0]))))) {
+    if ((!ctx || knownSubs.has(`${ctx.name}|${ctx.value}`)) && nums.every(x => x !== null) && nums.every(x => close(x, nums[0])) && nontrivial([valueParts[valueParts.length - 1]]) && /[-+*/^(!]/.test(valueParts[valueParts.length - 1].replace(/^-/, '')) && (!s.continuation || (up && up.info && up.info.value !== undefined && Math.abs(up.info.value - nums[0]) <= 1e-3 * Math.max(1, Math.abs(nums[0]))))) {
       const value = nums[0];
       const hi = cur >= 0 ? cur + 1 + (ctx || label ? 1 : 0) : (label || ctx ? 0 : 1);
       const lo = cur >= 0 ? cur : 0;
@@ -414,6 +416,32 @@ function run(q, report, warn) {
   // ── Part B · a slip in symbolic working ──
   function slipWarning(l, s, up) { return slipWarningOf(l, s, up); }
 
+  /** A substitution `t = 4: expr` whose expression is not what ANY earlier line of the page gives at t = 4: a note, never a cross. */
+  function substitutionWarning(l, s, history) {
+    if (!s || s.multi || !s.ctx || s.continuation) return null;
+    const text = tidy(l.text);
+    if (/[≈≃~<>%°|]/.test(text) || /\d\.\d{4,}/.test(text) || /(?:^|[\s)\d])x\s+(?=[\d(a-z])|(?:[\d)])\s+x(?:\s|$)/i.test(text)) return null;
+    const expr = s.parts[s.parts.length - 1];
+    const written = FC.numericOf(expr);
+    if (written === null || !(s.parts.length === 1 || s.parts.length === 2)) return null;
+    const label = s.parts.length === 2 ? tidy(s.parts[0]).replace(/\s/g, '') : null;
+    let first = null, any = false;
+    for (const h of [...history].reverse()) {
+      if (!h.info || !h.info.vars || h.info.vars.length !== 1 || h.info.vars[0] !== s.ctx.name || h.s.ctx || h.s.multi) continue;
+      if (/[≈≃~,:;<>%°|]/.test(tidy(h.text))) continue;
+      if (label && h.label && tidy(h.label).replace(/\s/g, '') !== label) continue;
+      const a = val(h.info, { [s.ctx.name]: s.ctx.value });
+      if (a === null) continue;
+      any = true;
+      if (Math.abs(a - written) <= 1e-6 * Math.max(1, Math.abs(a), Math.abs(written))) return null;
+      if (!first) first = a;
+    }
+    if (!any) return null;
+    const fmt = x => String(Number(x.toPrecision(6)));
+    return { note: `This is not what the line above gives at ${s.ctx.name} = ${s.ctx.raw} (${fmt(first)} against ${fmt(written)}). Check the substitution.` };
+  }
+
+
   const stated = out.map(x => ({ ...x, state: x.state || (x.status === 'ok' ? 'verified' : x.status === 'break' ? 'wrong' : x.unreadable ? 'unread' : 'unverified') }));
   const at = st => stated.flatMap((x, k) => (x.state === st ? [k + 1] : []));
   const unverified = at('unverified'), unread = at('unread');
@@ -448,10 +476,10 @@ function val(info, env) { if (info.value !== undefined) return info.value; try {
 export function slipWarningOf(l, s, up) {
   if (!s || s.multi || s.ctx || !up || !up.s || up.s.multi || up.s.ctx) return null;
   const text = tidy(l.text), above = tidy(up.text);
-  // this line: `= expr`, or `label = expr` with the label of the line above (a chain for the same label)
+  // a CONTINUATION only: the line starts with `=`, and the line above is itself a continuation that was ticked (a chain of at least two equal
+  // expressions). Two full statements `y = 2x + 1` / `y = 3x - 4` are two equations, never a rewrite: no warning.
   let side, label = null;
-  if (s.continuation && s.parts.length === 1) side = s.parts[0];
-  else if (!s.continuation && s.parts.length === 2 && up.s.parts.length >= 2 && !up.s.continuation && s.parts[0].replace(/\s/g, '') === up.s.parts[0].replace(/\s/g, '') && FC.labelOf(s.parts[0])) { side = s.parts[1]; label = s.parts[0]; }
+  if (s.continuation && s.parts.length === 1 && up.s.continuation && up.status === 'ok') side = s.parts[0];
   else return null;
   if (/[≈≃~,:;<>%°|]|\bor\b|\band\b|\\|[°]/.test(text + above)) return null;
   if (AMBIGUOUS.test(text.replace(/\^\s*-?\d*/g, '')) || AMBIGUOUS.test(above)) { /* a bare x that is not part of a name: ambiguous */ if (/(?:^|[\s)\d])x\s+(?=[\d(a-z])|(?:[\d)])\s+x(?:\s|$)/i.test(text) || /(?:^|[\s)\d])x\s+(?=[\d(a-z])|(?:[\d)])\s+x(?:\s|$)/i.test(above)) return null; }
@@ -476,8 +504,10 @@ export function slipWarningOf(l, s, up) {
     if (ref.info.vars.join() !== vars.join()) { if (ref === last) return null; continue; }
     if (SM.sameSidePublic(ref.info, mine, ref.p, rawMine)) return null;
   }
+  // Domain-restricted rewrites (√(x^2) = x, arccos(cos x) = x) hold for positive letters: sample positive values only, and warn only if they differ there too.
   for (let j = 0; j < WSAMPLES.length; j++) {
     const env = sampleEnv(vars, j);
+    for (const v of vars) env[v] = Math.abs(env[v]);
     const a = val(last.info, env), b = val(mine, env);
     if ((a === null) !== (b === null)) return null;   // the domains differ
     if (a === null) continue;

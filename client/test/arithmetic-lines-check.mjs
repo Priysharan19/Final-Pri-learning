@@ -910,6 +910,7 @@ ok(model?.cards?.length === 2 && model.cards.every(c => c.status === 'checked' &
   ok(vr[2].status === 'ok' && /equals the line above/.test(vr[2].note), `the slash column |[-20 - 6/-4 + 12]| equals the line above (${vr[2].note})`);
   ok(vr[6].status === 'note' && vr[6].vectorWarning === true && /agree/.test(vr[6].note) && /does not equal the earlier line/.test(vr[6].note), `|[14/8]| is a warning note: its two sides agree but it is not the earlier length (${vr[6].note})`);
   ok(vr.every(l => l.status !== 'break'), 'the slash page: nothing is crossed');
+  ok(T(['|[3/4]| = 5']) === '.', '|[3/4]| = 5 with no other vector on the page is not read as a column');
   ok(T(['2[3/4] = 3/2']) === 'T' && T(['|[3/4]| = 3/4']) === '.', 'an ordinary fraction in square brackets is untouched');
   ok(T(['|[3/4]| = 3/4', '= 3/4']) !== undefined && stepCheckArithmetic(['|[3/4]| = 3/4'].join('\n')).lines[0].note === stepCheckArithmetic(['|[3/4]| = 3/4'].join('\n')).lines[0].note, '[3/4] inside bars with a true fraction reading is left as it was');
 }
