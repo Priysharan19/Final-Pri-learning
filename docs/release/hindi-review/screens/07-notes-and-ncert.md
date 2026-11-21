@@ -1,16 +1,16 @@
 # Notes, the NCERT chapter library and explanations
 
-Hindi review packet, screen 07. Status: **No native-speaker review on record.** Review tier P2. 332 strings.
+Hindi review packet, screen 07. Status: **No native-speaker review on record.** Review tier P2. 379 strings.
 
 Each row: the English the app shows, the Hindi it shows instead, the last commit that changed the Hindi, and flags. `{name}` is a value the app fills in: keep it exactly as written. `one:` / `other:` are the singular and plural forms. Mark **OK?** with ✓, or write the corrected Hindi.
 
-## `notes.*` (54)
+## `notes.*` (101)
 
 | Key | English | Hindi | Last Hindi edit | Flags | OK? | Suggested Hindi | Note |
 |---|---|---|---|---|---|---|---|
 | `notes.eyebrow` | Revision notebook | दोहराने की कॉपी | 2026-10-02 `2a1c13e52` (agent-marked) | — |  |  |  |
 | `notes.title` | Notes | नोट्स | 2026-10-02 `2a1c13e52` (agent-marked) | — |  |  |  |
-| `notes.lede` | Every chapter in one place: the ideas in plain words, the formulas, the points examiners look for, the usual traps, and worked examples whose answers the maths engine has checked. | हर अध्याय एक जगह: सरल शब्दों में मुख्य विचार, सूत्र, वे बिंदु जिन्हें परीक्षक देखते हैं, आम गलतियाँ, और हल किए गए उदाहरण जिनके उत्तर गणित इंजन ने जाँचे हैं। | 2026-10-02 `2a1c13e52` (agent-marked) | — |  |  |  |
+| `notes.lede` | Your chapters in one place: the ideas in plain words, the formulas, the points examiners look for, the usual traps, and worked examples whose answers the maths engine has checked. | आपके अध्याय एक जगह: सरल शब्दों में मुख्य विचार, सूत्र, वे बिंदु जिन्हें परीक्षक देखते हैं, आम गलतियाँ, और हल किए गए उदाहरण जिनके उत्तर गणित इंजन ने जाँचे हैं। | 2026-11-08 `f6a246c9e` (agent-marked) | — |  |  |  |
 | `notes.classLabel` | Choose a class | कक्षा चुनिए | 2026-10-02 `2a1c13e52` (agent-marked) | — |  |  |  |
 | `notes.searchLabel` | Search all notes | सभी नोट्स में खोजिए | 2026-10-02 `2a1c13e52` (agent-marked) | — |  |  |  |
 | `notes.searchPlaceholder` | Search a formula, term or idea | कोई सूत्र, पद या विचार खोजिए | 2026-10-02 `2a1c13e52` (agent-marked) | — |  |  |  |
@@ -62,6 +62,53 @@ Each row: the English the app shows, the Hindi it shows instead, the last commit
 | `notes.cardsDone` | That is every important point in this chapter. | इस अध्याय के सभी महत्वपूर्ण बिंदु पूरे हुए। | 2026-10-02 `2a1c13e52` (agent-marked) | — |  |  |  |
 | `notes.again` | Go through again | फिर से दोहराइए | 2026-10-02 `2a1c13e52` (agent-marked) | — |  |  |  |
 | `notes.notFound` | There are no notes for this chapter yet. | इस अध्याय के नोट्स अभी उपलब्ध नहीं हैं। | 2026-10-02 `043806b7e` (agent-marked) | — |  |  |  |
+| `notes.sectionObjective` | What you will be able to do | आप क्या कर पाएँगे | 2026-11-17 `de5e0fe65` (agent-marked) | — |  |  |  |
+| `notes.sectionIntuition` | The idea behind it | इसके पीछे का विचार | 2026-11-17 `de5e0fe65` (agent-marked) | — |  |  |  |
+| `notes.sectionDiagrams` | Diagrams | आरेख | 2026-11-17 `de5e0fe65` (agent-marked) | — |  |  |  |
+| `notes.sectionCheck` | Self-check | खुद जाँचें | 2026-11-17 `de5e0fe65` (agent-marked) | — |  |  |  |
+| `notes.showAnswer` | Show the answer | उत्तर दिखाएँ | 2026-11-17 `de5e0fe65` (agent-marked) | — |  |  |  |
+| `notes.hideAnswer` | Hide the answer | उत्तर छिपाएँ | 2026-11-17 `de5e0fe65` (agent-marked) | — |  |  |  |
+| `notes.sectionNext` | Next: practise it | आगे: इसका अभ्यास करें | 2026-11-17 `de5e0fe65` (agent-marked) | — |  |  |  |
+| `notes.nextWhat` | Practice questions on {chapter}, for {scope}. | {chapter} पर अभ्यास प्रश्न, {scope} के लिए। | 2026-11-17 `de5e0fe65` (agent-marked) | — |  |  |  |
+| `notes.olympiadTab` | Olympiad | ओलंपियाड | 2026-11-17 `de5e0fe65` (agent-marked) | — |  |  |  |
+| `notes.olympiadTopics` | Olympiad topics | ओलंपियाड के विषय | 2026-11-17 `de5e0fe65` (agent-marked) | — |  |  |  |
+| `notes.olympiadLede` | For PRMO, RMO and INMO. Olympiad mathematics is not harder school mathematics: each topic here is a subject of its own. | PRMO, RMO और INMO के लिए। ओलंपियाड गणित स्कूल गणित का कठिन रूप नहीं है: यहाँ हर विषय अपने आप में एक अलग विषय है। | 2026-11-17 `de5e0fe65` (agent-marked) | — |  |  |  |
+| `notes.olympiadEyebrow` | Olympiad · Topic {n} | ओलंपियाड · विषय {n} | 2026-11-17 `de5e0fe65` (agent-marked) | — |  |  |  |
+| `notes.olympiadScope` | Olympiad (PRMO, RMO, INMO) | ओलंपियाड (PRMO, RMO, INMO) | 2026-11-17 `de5e0fe65` (agent-marked) | — |  |  |  |
+| `notes.notWrittenYet` | Notes not written yet | नोट्स अभी लिखे नहीं गए | 2026-11-17 `de5e0fe65` (agent-marked) | — |  |  |  |
+| `notes.olympiadNotWritten` | The notes for {topic} are not written yet. Practice questions on it are ready now. | {topic} के नोट्स अभी लिखे नहीं गए हैं। इसके अभ्यास प्रश्न अभी उपलब्ध हैं। | 2026-11-17 `de5e0fe65` (agent-marked) | — |  |  |  |
+| `notes.nsw.nextNone` | There is no practice set for {topic} yet, so Practice will choose questions for your own year and course. | {topic} के लिए अभी कोई अभ्यास सेट नहीं है, इसलिए अभ्यास आपके अपने Year और कोर्स के प्रश्न चुनेगा। | 2026-11-17 `de5e0fe65` (agent-marked) | — |  |  |  |
+| `notes.nsw.openPractice` | Open Practice | अभ्यास खोलें | 2026-11-17 `de5e0fe65` (agent-marked) | — |  |  |  |
+| `notes.nsw.eyebrow` | NSW revision notebook | NSW संशोधन नोटबुक | 2026-11-17 `88763ab07` (agent-marked) | — |  |  |  |
+| `notes.nsw.lede` | Notes for NSW Mathematics, Years 7 to 12: the ideas in plain words, the formulas, what markers look for, the usual traps and worked examples whose answers the maths engine has checked. | NSW गणित, Year 7 से 12 के नोट्स: सरल शब्दों में विचार, सूत्र, परीक्षक किस पर ध्यान देते हैं, आम गलतियाँ और हल किए उदाहरण जिनके उत्तर गणित-इंजन ने जाँचे हैं। | 2026-11-17 `88763ab07` (agent-marked) | — |  |  |  |
+| `notes.nsw.unofficial` | These notes are written for revision. They are not an official NESA publication. | ये नोट्स संशोधन के लिए लिखे गए हैं। ये NESA का आधिकारिक प्रकाशन नहीं हैं। | 2026-11-17 `77b37a125` (author not recorded) | — |  |  |  |
+| `notes.nsw.yearTab` | Year {n} | ईयर {n} | 2026-11-17 `88763ab07` (agent-marked) | — |  |  |  |
+| `notes.nsw.yearLabel` | Choose a year | वर्ष चुनें | 2026-11-17 `88763ab07` (agent-marked) | — |  |  |  |
+| `notes.nsw.courseLabel` | Choose a course | पाठ्यक्रम चुनें | 2026-11-17 `88763ab07` (agent-marked) | — |  |  |  |
+| `notes.nsw.course.standard` | Standard | स्टैंडर्ड | 2026-11-17 `88763ab07` (agent-marked) | — |  |  |  |
+| `notes.nsw.course.advanced` | Advanced | एडवांस्ड | 2026-11-17 `88763ab07` (agent-marked) | — |  |  |  |
+| `notes.nsw.course.ext1` | Extension 1 | एक्सटेंशन 1 | 2026-11-17 `88763ab07` (agent-marked) | — |  |  |  |
+| `notes.nsw.course.ext2` | Extension 2 | एक्सटेंशन 2 | 2026-11-17 `88763ab07` (agent-marked) | — |  |  |  |
+| `notes.nsw.stage` | Stage {n} | स्टेज {n} | 2026-11-17 `88763ab07` (agent-marked) | — |  |  |  |
+| `notes.nsw.topics` | Topics | विषय | 2026-11-17 `88763ab07` (agent-marked) | — |  |  |  |
+| `notes.nsw.searchLabel` | Search the topics | विषय खोजें | 2026-11-17 `88763ab07` (agent-marked) | — |  |  |  |
+| `notes.nsw.searchPlaceholder` | Search a topic or outcome code | विषय या आउटकम कोड खोजें | 2026-11-17 `88763ab07` (agent-marked) | — |  |  |  |
+| `notes.nsw.searchEmpty` | No topic matches “{q}”. | “{q}” से कोई विषय नहीं मिला। | 2026-11-17 `88763ab07` (agent-marked) | — |  |  |  |
+| `notes.nsw.readyCount` | one: {count} topic has notes so far<br>other: {count} topics have notes so far | one: अब तक {count} विषय के नोट्स हैं<br>other: अब तक {count} विषयों के नोट्स हैं | 2026-11-17 `88763ab07` (agent-marked) | — |  |  |  |
+| `notes.nsw.comingSoon` | Coming soon | जल्द आ रहा है | 2026-11-17 `88763ab07` (agent-marked) | — |  |  |  |
+| `notes.nsw.comingSoonYear` | Notes for {topic} in Year {n} are coming soon. Nothing from another curriculum is shown in their place. | Year {n} में {topic} के नोट्स जल्द आ रहे हैं। उनकी जगह किसी और पाठ्यक्रम का कुछ नहीं दिखाया जाता। | 2026-11-17 `88763ab07` (agent-marked) | — |  |  |  |
+| `notes.nsw.comingSoonList` | Notes are being written for the topics marked “Coming soon”. | “जल्द आ रहा है” वाले विषयों के नोट्स लिखे जा रहे हैं। | 2026-11-17 `88763ab07` (agent-marked) | — |  |  |  |
+| `notes.nsw.back` | All topics | सभी विषय | 2026-11-17 `88763ab07` (agent-marked) | — |  |  |  |
+| `notes.nsw.outcomes` | NESA outcome reference: {codes} | NESA आउटकम संदर्भ: {codes} | 2026-11-17 `88763ab07` (agent-marked) | — |  |  |  |
+| `notes.nsw.pathTag` | Pathway | पाथवे | 2026-11-17 `88763ab07` (agent-marked) | — |  |  |  |
+| `notes.nsw.strand.numberAlgebra` | Number and algebra | संख्या और बीजगणित | 2026-11-17 `88763ab07` (agent-marked) | — |  |  |  |
+| `notes.nsw.strand.measurementSpace` | Measurement and space | मापन और आकाश | 2026-11-17 `88763ab07` (agent-marked) | — |  |  |  |
+| `notes.nsw.strand.statisticsProbability` | Statistics and probability | सांख्यिकी और प्रायिकता | 2026-11-17 `88763ab07` (agent-marked) | — |  |  |  |
+| `notes.nsw.notFound` | This topic is not in the NSW notes. | यह विषय NSW नोट्स में नहीं है। | 2026-11-17 `88763ab07` (agent-marked) | — |  |  |  |
+| `notes.nsw.noTopics` | This course has no topics in Year {n}. | इस पाठ्यक्रम में Year {n} के लिए कोई विषय नहीं है। | 2026-11-17 `88763ab07` (agent-marked) | — |  |  |  |
+| `notes.nsw.sectionExaminers` | What examiners look for | परीक्षक क्या देखते हैं | 2026-11-17 `fcf48263a` (agent-marked) | — |  |  |  |
+| `notes.nsw.sectionTraps` | Common traps | आम गलतियाँ | 2026-11-17 `fcf48263a` (agent-marked) | — |  |  |  |
+| `notes.nsw.working` | Working | हल | 2026-11-17 `8b05159af` (agent-marked) | — |  |  |  |
 
 ## `ncert.*` (133)
 
@@ -84,7 +131,7 @@ Each row: the English the app shows, the Hindi it shows instead, the last commit
 | `ncert.priSolutionMethod` | Pri solution method: | Pri की हल-विधि: | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `ncert.writeType` | Write · Type | लिखें · टाइप करें | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `ncert.productionAnswerPath` | production answer path | उत्तर देने का मुख्य तरीका | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
-| `ncert.uploadedPagesAudited` | uploaded pages audited | अपलोड किए गए पृष्ठ जाँचे गए | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
+| `ncert.uploadedPagesAudited` | uploaded pages mapped | अपलोड किए गए पृष्ठ मानचित्रित | 2026-11-08 `f6a246c9e` (agent-marked) | — |  |  |  |
 | `ncert.productionContract` | PRODUCTION CONTRACT | उत्पाद अनुबंध | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `ncert.pdfPages` | PDF pages {pages} | PDF पृष्ठ {pages} | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `ncert.pageShort` | p. {pages} | पृ. {pages} | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
@@ -92,11 +139,11 @@ Each row: the English the app shows, the Hindi it shows instead, the last commit
 | `ncert.topperLearningLayer` | Topper Learning Layer | टॉपर अध्ययन परत | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `ncert.openTopperNotes` | Open topper notes | टॉपर नोट्स खोलें | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `ncert.typeHandwritingPhoto` | Type · AI handwriting · Photo OCR | टाइप · AI हैंडराइटिंग · फ़ोटो OCR | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
-| `ncert.pageByPageAudit` | PAGE-BY-PAGE SOURCE AUDIT | पृष्ठ-दर-पृष्ठ स्रोत जाँच | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
+| `ncert.pageByPageAudit` | PAGE-BY-PAGE SOURCE MAP · SOFTWARE-CHECKED | पृष्ठ-दर-पृष्ठ स्रोत-मानचित्र · सॉफ़्टवेयर से जाँचा | 2026-11-08 `f6a246c9e` (agent-marked) | — |  |  |  |
 | `ncert.statusConfirmed` | confirmed | पुष्ट | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `ncert.c10Eyebrow` | NCERT · Class X · Reprint 2026–27 | NCERT · कक्षा X · पुनर्मुद्रण 2026–27 | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `ncert.c10Title` | NCERT Mastery Library | NCERT दक्षता पुस्तकालय | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
-| `ncert.c10Intro` | All 14 uploaded chapters, source-audited exercises, Topper Notes and worked examples. Practice opens the normal Pri answer experience, so Type, Apple Pencil handwriting, Photo and Pri Reason all stay available. | अपलोड किए गए सभी 14 अध्याय, स्रोत से जाँची गई प्रश्नावलियाँ, टॉपर नोट्स और हल किए गए उदाहरण। अभ्यास Pri का सामान्य उत्तर अनुभव खोलता है, इसलिए टाइप, Apple Pencil से हैंडराइटिंग, फ़ोटो और Pri Reason — सब उपलब्ध रहते हैं। | 2026-10-09 `830c3403a` (agent-marked) | — |  |  |  |
+| `ncert.c10Intro` | All 14 uploaded chapters, with exercises checked against the source by software, Topper Notes and worked examples. No examiner has reviewed this library yet. Practice opens the normal Pri answer experience, so Type, Apple Pencil handwriting, Photo and Pri Reason all stay available. | अपलोड किए गए सभी 14 अध्याय, सॉफ़्टवेयर द्वारा स्रोत से जाँची गई प्रश्नावलियाँ, टॉपर नोट्स और हल किए गए उदाहरण। किसी परीक्षक ने अभी इस लाइब्रेरी की समीक्षा नहीं की है। अभ्यास Pri का सामान्य उत्तर अनुभव खोलता है, इसलिए टाइप, Apple Pencil से हैंडराइटिंग, फ़ोटो और Pri Reason। सब उपलब्ध रहते हैं। | 2026-11-19 `532625a2b` (agent-marked) | — |  |  |  |
 | `ncert.c10ChapterCount` | {n}/14 chapters | {n}/14 अध्याय | 2026-10-09 `3b4f8ccd4` (agent-marked) | — |  |  |  |
 | `ncert.c10ChaptersAria` | NCERT Class 10 chapters | NCERT कक्षा 10 के अध्याय | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `ncert.c10ChapterNum` | Chapter {n} | अध्याय {n} | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
@@ -110,56 +157,56 @@ Each row: the English the app shows, the Hindi it shows instead, the last commit
 | `ncert.c10TopperTag` | TOPPER | टॉपर | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `ncert.c10Core` | Core: | मूल: | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `ncert.c10Trap` | Trap: | सावधान: | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
-| `ncert.c10AppendixNote` | The supplied Answers/Hints appendix is treated as the authority wherever it provides an entry. Proof/construction prompts without an explicit appendix answer are verified from the chapter theorem/method and are labelled rather than invented. | जहाँ दिए गए उत्तर/संकेत परिशिष्ट में कोई प्रविष्टि है, वहाँ उसी को प्रामाणिक माना जाता है। जिन उपपत्ति/रचना वाले प्रश्नों का परिशिष्ट में स्पष्ट उत्तर नहीं है, उन्हें अध्याय के प्रमेय/विधि से सत्यापित किया जाता है और उन पर यह लेबल लगाया जाता है — उत्तर गढ़ा नहीं जाता। | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
+| `ncert.c10AppendixNote` | The supplied Answers/Hints appendix is treated as the authority wherever it provides an entry. Proof/construction prompts without an explicit appendix answer are checked by software against the chapter theorem/method and labelled, not invented. | जहाँ दिए गए उत्तर/संकेत परिशिष्ट में कोई प्रविष्टि है, वहाँ उसी को प्रामाणिक माना जाता है। जिन उपपत्ति/रचना वाले प्रश्नों का परिशिष्ट में स्पष्ट उत्तर नहीं है, उन्हें अध्याय के प्रमेय/विधि से सॉफ़्टवेयर द्वारा जाँचा जाता है और उन पर यह लेबल लगाया जाता है। उत्तर गढ़ा नहीं जाता। | 2026-11-19 `532625a2b` (agent-marked) | — |  |  |  |
 | `ncert.c10SourceQuestions` | one: {n} top-level source question<br>other: {n} top-level source questions | one: स्रोत का {n} मुख्य प्रश्न<br>other: स्रोत के {n} मुख्य प्रश्न | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `ncert.c10AppendixPresent` | Answers/Hints block present | उत्तर/संकेत खंड मौजूद | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `ncert.c10AppendixAbsent` | no dedicated appendix block | कोई अलग परिशिष्ट खंड नहीं | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
-| `ncert.c10Verified` | verified | सत्यापित | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
+| `ncert.c10Verified` | software-checked | सॉफ़्टवेयर से जाँचा | 2026-11-08 `f6a246c9e` (agent-marked) | — |  |  |  |
 | `ncert.c10CurrentExam` | current exam + book | वर्तमान परीक्षा + पुस्तक | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `ncert.c10SourceOnly` | full-book source only | केवल पूरी पुस्तक का स्रोत | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `ncert.c10CoverageNote` | Full-book coverage is intentionally broader than the current CBSE exam contract. Source-only material remains teachable without being falsely promoted as current examinable coverage. | पूरी पुस्तक का कवरेज जानबूझकर वर्तमान CBSE परीक्षा के दायरे से अधिक है। केवल स्रोत वाली सामग्री पढ़ाई जा सकती है, पर उसे वर्तमान परीक्षा का हिस्सा बताकर गलत ढंग से पेश नहीं किया जाता। | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
-| `ncert.c9Eyebrow` | GANITA MANJARI 2026–27 · SOURCE AUDITED | गणित मंजरी 2026–27 · स्रोत से जाँचा गया | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
-| `ncert.c9AuditLine` | {pages} uploaded pages audited · {sections} formal exercise sections · {verified}/{total} formal exercise prompts independently verified. | {pages} अपलोड किए गए पृष्ठ जाँचे गए · {sections} औपचारिक प्रश्नावली खंड · {total} में से {verified} औपचारिक प्रश्न स्वतंत्र रूप से सत्यापित। | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
+| `ncert.c9Eyebrow` | GANITA MANJARI 2026–27 · SOFTWARE-CHECKED, NO EXAMINER REVIEW YET | गणित मंजरी 2026–27 · सॉफ़्टवेयर से जाँचा, परीक्षक की समीक्षा अभी नहीं | 2026-11-08 `f6a246c9e` (agent-marked) | — |  |  |  |
+| `ncert.c9AuditLine` | {pages} uploaded pages mapped · {sections} formal exercise sections · {verified}/{total} formal exercise prompts checked by Pri’s engine, not by a human reviewer. 8 of the 15 chapters in the CBSE 2026–27 list are live. | {pages} अपलोड किए गए पृष्ठ मानचित्रित · {sections} औपचारिक प्रश्नावली खंड · {total} में से {verified} औपचारिक प्रश्न Pri के इंजन से जाँचे गए, किसी मानव समीक्षक से नहीं। CBSE 2026–27 सूची के 15 में से 8 अध्याय उपलब्ध हैं। | 2026-11-08 `f6a246c9e` (agent-marked) | — |  |  |  |
 | `ncert.c9MasteryCells` | {n} Pri mastery cells | {n} Pri दक्षता सेल | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `ncert.c9NoteModules` | topper note modules | टॉपर नोट मॉड्यूल | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `ncert.c9FullyWorked` | fully worked examples | पूरी तरह हल किए गए उदाहरण | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
-| `ncert.c9InkNote` | Numeric practice uses Pri Learning’s existing InkAnswer handwriting recognition, confidence handling, marking, retry and Pri Explain pipeline. No chapter-specific weaker recogniser or marker is introduced. | संख्यात्मक अभ्यास में Pri Learning की मौजूदा InkAnswer हैंडराइटिंग पहचान, विश्वसनीयता-जाँच, मूल्यांकन, दोबारा प्रयास और Pri Explain की प्रक्रिया ही काम आती है। किसी अध्याय के लिए अलग, कमज़ोर पहचानने या जाँचने वाली प्रणाली नहीं जोड़ी गई है। | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
+| `ncert.c9InkNote` | Numeric practice uses {brand}’s existing InkAnswer handwriting recognition, confidence handling, marking, retry and Pri Explain pipeline. No chapter-specific weaker recogniser or marker is introduced. | संख्यात्मक अभ्यास में {brand} की मौजूदा InkAnswer हैंडराइटिंग पहचान, विश्वसनीयता-जाँच, मूल्यांकन, दोबारा प्रयास और Pri Explain की प्रक्रिया ही काम आती है। किसी अध्याय के लिए अलग, कमज़ोर पहचानने या जाँचने वाली प्रणाली नहीं जोड़ी गई है। | 2026-11-12 `a90a58cbd` (agent-marked) | — |  |  |  |
 | `ncert.c9AnswerVerificationLabel` | Answer verification note: | उत्तर सत्यापन टिप्पणी: | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
-| `ncert.c9AnswerVerification` | {label} the current eight-file Grade 9 upload contained the chapter PDFs but no separate Grade 9 answer-key PDF. Pri Learning therefore independently derives and cross-checks every formal exercise prompt instead of falsely labelling it as an attached-key check. | {label} कक्षा 9 के वर्तमान आठ-फ़ाइल अपलोड में अध्यायों की PDF थीं, पर कक्षा 9 की उत्तर-कुंजी की कोई अलग PDF नहीं थी। इसलिए Pri Learning हर औपचारिक प्रश्न का उत्तर स्वयं निकालकर जाँचता है, और उसे संलग्न-कुंजी से जाँचा हुआ बताने का झूठा लेबल नहीं लगाता। | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
-| `ncert.c9ExerciseSummary` | Exercise {n} · {verified}/{total} prompts verified | प्रश्नावली {n} · {total} में से {verified} प्रश्न सत्यापित | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
-| `ncert.c9SourceAnswerAudit` | SOURCE ANSWER AUDIT | स्रोत उत्तर जाँच | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
+| `ncert.c9AnswerVerification` | {label} the current eight-file Grade 9 upload contained the chapter PDFs but no separate Grade 9 answer-key PDF. {brand} therefore derives and cross-checks every formal exercise prompt by software instead of labelling it as an attached-key check. No human examiner has reviewed these answers. | {label} कक्षा 9 के वर्तमान आठ-फ़ाइल अपलोड में अध्यायों की PDF थीं, पर कक्षा 9 की उत्तर-कुंजी की कोई अलग PDF नहीं थी। इसलिए {brand} हर औपचारिक प्रश्न का उत्तर सॉफ़्टवेयर से निकालकर जाँचता है, और उसे संलग्न-कुंजी से जाँचा हुआ बताने का झूठा लेबल नहीं लगाता। किसी मानव परीक्षक ने इन उत्तरों की समीक्षा नहीं की है। | 2026-11-12 `a90a58cbd` (agent-marked) | — |  |  |  |
+| `ncert.c9ExerciseSummary` | Exercise {n} · {verified}/{total} prompts software-checked | प्रश्नावली {n} · {total} में से {verified} प्रश्न सॉफ़्टवेयर से जाँचे | 2026-11-08 `f6a246c9e` (agent-marked) | — |  |  |  |
+| `ncert.c9SourceAnswerAudit` | SOURCE ANSWER CHECK · SOFTWARE | स्रोत उत्तर जाँच · सॉफ़्टवेयर | 2026-11-08 `f6a246c9e` (agent-marked) | — |  |  |  |
 | `ncert.c9QuestionModeTitle` | Question-mode worked solutions | प्रश्न-मोड में पूरे हल | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `ncert.c9QuestionModeBody` | Every dedicated mastery generator at difficulties 1–4 returns at least three progressive hints and a fully staged worked solution. Numeric forms are handwriting-ready; conceptual classification uses MCQ only where handwriting would add no mathematical value. | कठिनाई 1–4 पर हर समर्पित दक्षता जनरेटर कम से कम तीन क्रमिक संकेत और चरण-दर-चरण पूरा हल देता है। संख्यात्मक प्रश्न हैंडराइटिंग के लिए तैयार हैं; अवधारणा-वर्गीकरण में MCQ केवल वहीं है जहाँ हाथ से लिखने से कोई गणितीय लाभ नहीं होता। | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
-| `ncert.c9ContractTitle` | 3 product outcomes · 4 mastery levels · full page map | 3 उत्पाद परिणाम · 4 दक्षता स्तर · पूरा पृष्ठ-मानचित्र | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
+| `ncert.c9ContractTitle` | 3 product outcomes · 4 mastery levels · page map | 3 उत्पाद परिणाम · 4 दक्षता स्तर · पृष्ठ-मानचित्र | 2026-11-08 `f6a246c9e` (agent-marked) | — |  |  |  |
 | `ncert.c9Cells` | {n} cells | {n} सेल | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
-| `ncert.c9ReleaseTitle` | Complete Grade 9 release audit | कक्षा 9 की पूरी रिलीज़ जाँच | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
+| `ncert.c9ReleaseTitle` | Grade 9 chapter summary · 8 of the 15 CBSE 2026–27 chapters | कक्षा 9 अध्याय सारांश · CBSE 2026–27 के 15 में से 8 अध्याय | 2026-11-08 `f6a246c9e` (agent-marked) | — |  |  |  |
 | `ncert.c9ReleaseLine` | {chapters} chapters · {pages} source pages · {sections} formal exercise sections · {prompts} formal exercise prompts · {cells} dedicated mastery cells. | {chapters} अध्याय · {pages} स्रोत पृष्ठ · {sections} औपचारिक प्रश्नावली खंड · {prompts} औपचारिक प्रश्न · {cells} समर्पित दक्षता सेल। | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
-| `ncert.c8Eyebrow` | NCERT SOURCE + ATTACHED ANSWERS · VERIFIED | NCERT स्रोत + संलग्न उत्तर · सत्यापित | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
-| `ncert.c8AuditLine` | All {sections} exercise sections are source-audited; {questions} top-level source questions are represented in the answer audit. | सभी {sections} प्रश्नावली खंड स्रोत से जाँचे गए हैं; स्रोत के {questions} मुख्य प्रश्न उत्तर-जाँच में शामिल हैं। | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
+| `ncert.c8Eyebrow` | NCERT SOURCE + ATTACHED ANSWERS · SOFTWARE-CHECKED | NCERT स्रोत + संलग्न उत्तर · सॉफ़्टवेयर से जाँचा | 2026-11-08 `f6a246c9e` (agent-marked) | — |  |  |  |
+| `ncert.c8AuditLine` | All {sections} exercise sections are mapped to the source by software; {questions} top-level source questions are represented in the answer check. This follows the earlier NCERT book (Reprint 2024–25), and no human examiner has reviewed it. | सभी {sections} प्रश्नावली खंड सॉफ़्टवेयर द्वारा स्रोत से जोड़े गए हैं; स्रोत के {questions} मुख्य प्रश्न उत्तर-जाँच में शामिल हैं। यह पुरानी NCERT पुस्तक (पुनर्मुद्रण 2024–25) पर आधारित है, और किसी मानव परीक्षक ने इसकी समीक्षा नहीं की है। | 2026-11-08 `f6a246c9e` (agent-marked) | — |  |  |  |
 | `ncert.c8KeysConfirmed` | {confirmed}/{total} exercise keys confirmed | {total} में से {confirmed} प्रश्नावली कुंजियाँ पुष्ट | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `ncert.c8MasteryCells` | Pri mastery cells | Pri दक्षता सेल | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
-| `ncert.c8InkNote` | Numeric practice stays on Pri Learning's existing InkAnswer handwriting-recognition, confidence, marking, retry and Pri Explain pipeline. No parallel or weaker marker is used. | संख्यात्मक अभ्यास Pri Learning की मौजूदा InkAnswer हैंडराइटिंग पहचान, विश्वसनीयता-जाँच, मूल्यांकन, दोबारा प्रयास और Pri Explain की प्रक्रिया पर ही चलता है। कोई समानांतर या कमज़ोर जाँच-प्रणाली इस्तेमाल नहीं होती। | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
+| `ncert.c8InkNote` | Numeric practice stays on {brand}'s existing InkAnswer handwriting-recognition, confidence, marking, retry and Pri Explain pipeline. No parallel or weaker marker is used. | संख्यात्मक अभ्यास {brand} की मौजूदा InkAnswer हैंडराइटिंग पहचान, विश्वसनीयता-जाँच, मूल्यांकन, दोबारा प्रयास और Pri Explain की प्रक्रिया पर ही चलता है। कोई समानांतर या कमज़ोर जाँच-प्रणाली इस्तेमाल नहीं होती। | 2026-11-12 `a90a58cbd` (agent-marked) | — |  |  |  |
 | `ncert.c8ExerciseSummary` | Exercise {n} · {questions} top-level source questions · {status} | प्रश्नावली {n} · स्रोत के {questions} मुख्य प्रश्न · {status} | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `ncert.c8AttachedKey` | ATTACHED ANSWER KEY · CHECKED AGAINST SOURCE | संलग्न उत्तर-कुंजी · स्रोत से मिलाई गई | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `ncert.c8QuestionModeTitle` | Question-mode solutions | प्रश्न-मोड के हल | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `ncert.c8QuestionModeBody` | Every four-level NCERT mastery generator returns at least three progressive hints and at least three worked-solution stages. Numeric forms inherit AI handwriting input; conceptual classification forms use MCQ only where handwriting adds no mathematical value. | चार-स्तरीय हर NCERT दक्षता जनरेटर कम से कम तीन क्रमिक संकेत और हल के कम से कम तीन चरण देता है। संख्यात्मक प्रश्नों में AI हैंडराइटिंग इनपुट मिलता है; अवधारणा-वर्गीकरण वाले प्रश्नों में MCQ केवल वहीं है जहाँ हाथ से लिखने से कोई गणितीय लाभ नहीं होता। | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
-| `ncert.c8ContractTitle` | 3 product outcomes · 4 mastery levels · complete source map | 3 उत्पाद परिणाम · 4 दक्षता स्तर · पूरा स्रोत-मानचित्र | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
+| `ncert.c8ContractTitle` | 3 product outcomes · 4 mastery levels · source map | 3 उत्पाद परिणाम · 4 दक्षता स्तर · स्रोत-मानचित्र | 2026-11-08 `f6a246c9e` (agent-marked) | — |  |  |  |
 | `ncert.c8AuthoredCells` | {n} authored cells | {n} तैयार किए गए सेल | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
-| `ncert.c8ReleaseTitle` | Class 8 Chapters 3–13 release audit | कक्षा 8 अध्याय 3–13 की रिलीज़ जाँच | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
+| `ncert.c8ReleaseTitle` | Class 8 Chapters 3–13 summary · earlier NCERT book, Reprint 2024–25 | कक्षा 8 अध्याय 3–13 सारांश · पुरानी NCERT पुस्तक, पुनर्मुद्रण 2024–25 | 2026-11-08 `f6a246c9e` (agent-marked) | — |  |  |  |
 | `ncert.c8ReleaseLine` | {chapters} chapters · {pages} source pages · {sections} exercise sections · {questions} top-level source questions · {cells} dedicated NCERT mastery cells. | {chapters} अध्याय · {pages} स्रोत पृष्ठ · {sections} प्रश्नावली खंड · स्रोत के {questions} मुख्य प्रश्न · {cells} समर्पित NCERT दक्षता सेल। | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
-| `ncert.rnAnswerKeyEyebrow` | Verified against attached answer key | संलग्न उत्तर-कुंजी से सत्यापित | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
+| `ncert.rnAnswerKeyEyebrow` | Checked by software against the attached answer key | संलग्न उत्तर-कुंजी से सॉफ़्टवेयर द्वारा जाँचा गया | 2026-11-08 `f6a246c9e` (agent-marked) | — |  |  |  |
 | `ncert.rnAnswerKeyTitle` | Exercise 1.1 · answer verification | प्रश्नावली 1.1 · उत्तर सत्यापन | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
-| `ncert.rnAnswerKeyIntro` | Pri Learning keeps the uploaded NCERT exercise as the source of truth and records exactly what the attached answer-key crop confirms. | Pri Learning अपलोड की गई NCERT प्रश्नावली को ही प्रामाणिक स्रोत मानता है और ठीक वही दर्ज करता है जिसकी पुष्टि संलग्न उत्तर-कुंजी का अंश करता है। | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
+| `ncert.rnAnswerKeyIntro` | {brand} keeps the uploaded NCERT exercise as the source of truth and records exactly what the attached answer-key crop confirms. | {brand} अपलोड की गई NCERT प्रश्नावली को ही प्रामाणिक स्रोत मानता है और ठीक वही दर्ज करता है जिसकी पुष्टि संलग्न उत्तर-कुंजी का अंश करता है। | 2026-11-12 `a90a58cbd` (agent-marked) | — |  |  |  |
 | `ncert.rnKeyLabels` | key labels this {label} | कुंजी में इसे {label} लिखा है | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
-| `ncert.rnSectionAria` | NCERT Rational Numbers topper learning section | NCERT परिमेय संख्याएँ — टॉपर अध्ययन खंड | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
+| `ncert.rnSectionAria` | NCERT Rational Numbers topper learning section | NCERT परिमेय संख्याएँ: टॉपर अध्ययन खंड | 2026-11-19 `532625a2b` (agent-marked) | — |  |  |  |
 | `ncert.rnAuthoredCells` | {n} authored question cells | {n} तैयार किए गए प्रश्न सेल | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
-| `ncert.rnTitle` | Rational Numbers · Topper Notes + Complete Chapter Bank | परिमेय संख्याएँ · टॉपर नोट्स + अध्याय का पूरा प्रश्न-बैंक | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
-| `ncert.rnIntro` | Built from {title}, {edition}. The source chapter, its property tables, Try These, Examples 1–3, Exercise 1.1 and the final density result are mapped below and connected to Pri Learning practice. | {title}, {edition} पर आधारित। स्रोत अध्याय, उसकी गुणधर्म तालिकाएँ, इन्हें कीजिए, उदाहरण 1–3, प्रश्नावली 1.1 और सघनता का अंतिम परिणाम नीचे क्रम से दिए गए हैं और Pri Learning के अभ्यास से जुड़े हैं। | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
+| `ncert.rnTitle` | Rational Numbers · Topper Notes + Chapter Bank | परिमेय संख्याएँ · टॉपर नोट्स + अध्याय का प्रश्न-बैंक | 2026-11-08 `f6a246c9e` (agent-marked) | — |  |  |  |
+| `ncert.rnIntro` | Built from {title}, {edition}. The source chapter, its property tables, Try These, Examples 1–3, Exercise 1.1 and the final density result are mapped below and connected to {brand} practice. | {title}, {edition} पर आधारित। स्रोत अध्याय, उसकी गुणधर्म तालिकाएँ, इन्हें कीजिए, उदाहरण 1–3, प्रश्नावली 1.1 और सघनता का अंतिम परिणाम नीचे क्रम से दिए गए हैं और {brand} के अभ्यास से जुड़े हैं। | 2026-11-12 `a90a58cbd` (agent-marked) | — |  |  |  |
 | `ncert.rnHideNotes` | Hide notes | नोट्स छिपाएँ | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `ncert.rnHandwritingLive` | AI handwriting is live for the calculation bank. | गणना वाले प्रश्न-बैंक के लिए AI हैंडराइटिंग चालू है। | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `ncert.rnHandwritingBody` | Choose {write} on a generated numeric question. Pri’s handwriting pipeline reads fractions, negative signs and multi-line working, confidence-checks uncertain recognition before marking, and then shows the same fully worked solution used by the answer engine. | किसी बनाए गए संख्यात्मक प्रश्न पर {write} चुनें। Pri की हैंडराइटिंग प्रक्रिया भिन्न, ऋण चिह्न और कई पंक्तियों का हल पढ़ती है, जाँचने से पहले अनिश्चित पहचान की पुष्टि करवाती है, और फिर वही पूरा हल दिखाती है जो उत्तर-इंजन इस्तेमाल करता है। | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `ncert.writeMode` | Write | लिखें | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
-| `ncert.rnViewsAria` | Rational Numbers learning views | परिमेय संख्याएँ — अध्ययन के दृश्य | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
+| `ncert.rnViewsAria` | Rational Numbers learning views | परिमेय संख्याएँ: अध्ययन के दृश्य | 2026-11-19 `532625a2b` (agent-marked) | — |  |  |  |
 | `ncert.rnTopperOnly` | TOPPER-ONLY NOTES | केवल टॉपर के लिए नोट्स | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `ncert.rnTopperOnlyBody` | Definition precision, proof ideas, counterexamples and fast calculation structure. | परिभाषाओं की सटीकता, उपपत्ति के विचार, प्रति-उदाहरण और तेज़ गणना का ढाँचा। | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `ncert.rnExamTraps` | Exam traps included | परीक्षा के जाल शामिल | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
@@ -177,29 +224,29 @@ Each row: the English the app shows, the Hindi it shows instead, the last commit
 | `ncert.rnBankContractBody` | 8 exact skill generators × 4 Pri difficulty levels | 8 सटीक कौशल जनरेटर × Pri के 4 कठिनाई स्तर | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `ncert.rnAnswerExperience` | Answer experience | उत्तर देने का अनुभव | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `ncert.rnPage14` | Page 14 is intentionally listed: it is the blank NCERT notes page, so the audit can distinguish “no mathematical content” from “content missed”. | पृष्ठ 14 जानबूझकर सूची में है: यह NCERT का खाली नोट्स पृष्ठ है, ताकि जाँच “कोई गणितीय सामग्री नहीं” और “सामग्री छूट गई” में अंतर कर सके। | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
-| `ncert.leKeyEyebrow` | ATTACHED ANSWER KEY · INDEPENDENTLY VERIFIED | संलग्न उत्तर-कुंजी · स्वतंत्र रूप से सत्यापित | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
+| `ncert.leKeyEyebrow` | ATTACHED ANSWER KEY · SOFTWARE-CHECKED | संलग्न उत्तर-कुंजी · सॉफ़्टवेयर से जाँची | 2026-11-08 `f6a246c9e` (agent-marked) | — |  |  |  |
 | `ncert.leKeyTitle` | 20 / 20 answers agree with the uploaded NCERT equations | 20 में से 20 उत्तर अपलोड किए गए NCERT समीकरणों से मेल खाते हैं | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
-| `ncert.leKeyBody` | Pri Learning stores the PDF equation as source-of-truth and the supplied image as an independent answer-key check. | Pri Learning PDF के समीकरण को प्रामाणिक स्रोत और दी गई छवि को उत्तर-कुंजी की स्वतंत्र जाँच के रूप में रखता है। | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
+| `ncert.leKeyBody` | {brand} stores the PDF equation as source-of-truth and the supplied image as a second answer-key check, done by software. | {brand} PDF के समीकरण को प्रामाणिक स्रोत और दी गई छवि को सॉफ़्टवेयर द्वारा की गई दूसरी उत्तर-कुंजी जाँच के रूप में रखता है। | 2026-11-12 `a90a58cbd` (agent-marked) | — |  |  |  |
 | `ncert.leMismatches` | 0 mismatches | 0 बेमेल | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `ncert.leQ3Note` | In particular, Exercise 2.2 Q3 is read from the PDF as {equation}, which gives {solution} and matches the supplied answer image. | विशेष रूप से, प्रश्नावली 2.2 का प्रश्न 3 PDF में {equation} पढ़ा जाता है, जिससे {solution} मिलता है और यह दी गई उत्तर-छवि से मेल खाता है। | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `ncert.leFinalCheck` | 60-SECOND FINAL CHECK | 60 सेकंड की अंतिम जाँच | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `ncert.leWorkedEyebrow` | ALL WORKED EXAMPLES PRESENT IN THE UPLOADED PDF | अपलोड की गई PDF के सभी हल किए गए उदाहरण | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `ncert.lePriTopperMethod` | Pri topper method | Pri की टॉपर विधि | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `ncert.leExerciseEyebrow` | NCERT {title} · FULLY WORKED | NCERT {title} · पूरा हल | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
-| `ncert.leExerciseBody` | Each equation is retained as a source check and the generated bank serves additional variants of the same skills. | हर समीकरण स्रोत-जाँच के रूप में रखा गया है और बनाया गया प्रश्न-बैंक इन्हीं कौशलों के और रूप देता है। | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
+| `ncert.leExerciseBody` | Each equation is kept as a worked source check; practice serves original equations of the same skills. | हर समीकरण हल सहित स्रोत-जाँच के रूप में रखा गया है; अभ्यास में इन्हीं कौशलों के मौलिक समीकरण दिए जाते हैं। | 2026-11-08 `f6a246c9e` (agent-marked) | — |  |  |  |
 | `ncert.leSolved` | {solved} / {total} solved | {total} में से {solved} हल | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `ncert.questionShort` | Q{n} | प्रश्न {n} | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
-| `ncert.leVerifiedAnswer` | Verified answer | सत्यापित उत्तर | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
+| `ncert.leVerifiedAnswer` | Checked answer | जाँचा गया उत्तर | 2026-11-08 `f6a246c9e` (agent-marked) | — |  |  |  |
 | `ncert.leBankDepth` | QUESTION-BANK DEPTH | प्रश्न-बैंक की गहराई | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
-| `ncert.leBankDepthBody` | 7 source skills × 4 Pri difficulty levels, plus 20 exact NCERT source questions | 7 स्रोत कौशल × Pri के 4 कठिनाई स्तर, साथ में NCERT के 20 मूल स्रोत प्रश्न | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
+| `ncert.leBankDepthBody` | 7 source skills × 4 Pri difficulty levels; the 20 NCERT exercise items are kept as worked source checks | 7 स्रोत कौशल × Pri के 4 कठिनाई स्तर; NCERT के 20 प्रश्नावली प्रश्न हल सहित स्रोत-जाँच के रूप में रखे गए हैं | 2026-11-08 `f6a246c9e` (agent-marked) | — |  |  |  |
 | `ncert.leAnswerExperience` | ANSWER EXPERIENCE | उत्तर देने का अनुभव | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `ncert.lePage6` | Uploaded page 6 is intentionally audited as a blank learner Notes page. No mathematical content is silently invented to fill it. | अपलोड किया गया पृष्ठ 6 जानबूझकर विद्यार्थी के खाली नोट्स पृष्ठ के रूप में जाँचा गया है। उसे भरने के लिए चुपचाप कोई गणितीय सामग्री नहीं गढ़ी गई है। | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
-| `ncert.leSectionAria` | NCERT Linear Equations topper learning section | NCERT एक चर वाले रैखिक समीकरण — टॉपर अध्ययन खंड | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
-| `ncert.leAuthoredCells` | {n} authored cells + 20 source questions | {n} तैयार किए गए सेल + 20 स्रोत प्रश्न | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
-| `ncert.leTitle` | Linear Equations in One Variable · Topper Notes + Complete Chapter Bank | एक चर वाले रैखिक समीकरण · टॉपर नोट्स + अध्याय का पूरा प्रश्न-बैंक | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
-| `ncert.leIntro` | Source-audited from all six uploaded PDF pages: Introduction, balance/solution checks, Section 2.2, Examples 1–2, Exercise 2.1, Section 2.3, Examples 16–17, Exercise 2.2, chapter summary and the blank Notes page. | अपलोड किए गए सभी छह PDF पृष्ठों से स्रोत-जाँच: परिचय, संतुलन/हल की जाँच, अनुच्छेद 2.2, उदाहरण 1–2, प्रश्नावली 2.1, अनुच्छेद 2.3, उदाहरण 16–17, प्रश्नावली 2.2, अध्याय का सारांश और खाली नोट्स पृष्ठ। | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
+| `ncert.leSectionAria` | NCERT Linear Equations topper learning section | NCERT एक चर वाले रैखिक समीकरण: टॉपर अध्ययन खंड | 2026-11-19 `532625a2b` (agent-marked) | — |  |  |  |
+| `ncert.leAuthoredCells` | {n} authored cells + 20 worked source checks | {n} तैयार किए गए सेल + 20 हल सहित स्रोत-जाँच | 2026-11-08 `f6a246c9e` (agent-marked) | — |  |  |  |
+| `ncert.leTitle` | Linear Equations in One Variable · Topper Notes + Chapter Bank | एक चर वाले रैखिक समीकरण · टॉपर नोट्स + अध्याय का प्रश्न-बैंक | 2026-11-08 `f6a246c9e` (agent-marked) | — |  |  |  |
+| `ncert.leIntro` | Mapped by software from all six uploaded PDF pages: Introduction, balance/solution checks, Section 2.2, Examples 1–2, Exercise 2.1, Section 2.3, Examples 16–17, Exercise 2.2, chapter summary and the blank Notes page. | अपलोड किए गए सभी छह PDF पृष्ठों से सॉफ़्टवेयर द्वारा मानचित्रित: परिचय, संतुलन/हल की जाँच, अनुच्छेद 2.2, उदाहरण 1–2, प्रश्नावली 2.1, अनुच्छेद 2.3, उदाहरण 16–17, प्रश्नावली 2.2, अध्याय का सारांश और खाली नोट्स पृष्ठ। | 2026-11-08 `f6a246c9e` (agent-marked) | — |  |  |  |
 | `ncert.leHideLayer` | Hide chapter layer | अध्याय की परत छिपाएँ | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
-| `ncert.leTabsAria` | Linear equations learning tabs | रैखिक समीकरण — अध्ययन टैब | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
+| `ncert.leTabsAria` | Linear equations learning tabs | रैखिक समीकरण: अध्ययन टैब | 2026-11-19 `532625a2b` (agent-marked) | — |  |  |  |
 
 ## `explain.*` (145)
 
