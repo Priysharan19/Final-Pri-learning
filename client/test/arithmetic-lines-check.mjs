@@ -44,7 +44,11 @@ ok(r.lines.slice(5).map(l => l.status).join() === 'ok,ok,ok,ok,ok,ok,ok', `every
 ok(r.lines[10].state === 'arithmetic' && r.arithmetic === true && r.source === 'value-chain', 'a tick is an arithmetic tick and the report says so');
 // (20 November 2026: numeric column vectors are now read, tick only. The magnitude line and `= sqrt(260)` under it are ticked;
 //  the bare magnitude of a vector, the inline column sum and the words stay notes, and nothing on the page is crossed.)
-ok(r.lines.slice(0, 5).map(l => l.status).join() === 'note,note,ok,ok,note', `vectors are ticked when equal; the rest are not judged (${r.lines.slice(0, 5).map(l => l.status)})`);
+// (21 November 2026: the same page is the owner's own slip, -20 - 6 written as 14 while the line above comes to √740. That line was ticked
+//  before; it is now a warning NOTE, never a tick and never a cross, and the `= sqrt(260)` under it is no longer ticked from it.)
+ok(r.lines.slice(0, 5).map(l => l.status).join() === 'note,note,note,note,note', `the vector slip is a note, not a tick (${r.lines.slice(0, 5).map(l => l.status)})`);
+ok(r.lines[2].vectorWarning === true && /does not equal the earlier line/.test(plain(r.lines[2].note)) && /√260/.test(plain(r.lines[2].note)) && /√740/.test(plain(r.lines[2].note)), `the slip line says what to check (${r.lines[2].note})`);
+ok(r.firstBreak === -1 && r.lines.every(l => l.status !== 'break'), 'the vector slip is never crossed');
 
 r = run(['-20 - 6 = 14']);
 ok(r.lines[0].status === 'break' && /−26/.test(plain(r.diagnosis.message)) && /14/.test(plain(r.diagnosis.message)), `false arithmetic is crossed with both values (${r.diagnosis?.message})`);
@@ -280,10 +284,12 @@ ok(model?.cards?.length === 2 && model.cards.every(c => c.status === 'checked' &
 // simplified). Both are WORDS added to a comment. No line is ticked, crossed or left as a note because of them.
 {
   // 5.0 no verdict moved: every page the sweeps above ran (24497 of them, every one of their lines' status and state,
-  // and where the first cross fell) hashes to the value recorded BEFORE these words were added. Re-recorded on 20 November 2026:
+  // and where the first cross fell) hashes to the value recorded BEFORE these words were added. Re-recorded on 21 November 2026 (the owner's vector slip
+  // is now a warning note, see PAGE above; hashing every page but that one gives the same digest on the old and the new engine, 4d0ecafa1c49).
+  // Re-recorded on 20 November 2026:
   // exactly one of those pages moved, the owner's vector page (PAGE above: its magnitude line and `= sqrt(260)` are now ticked, tick only);
   // the other 24496 verdicts are those of the previous digest, found by running the previous engine over the same pages.
-  ok(reportsSeen === 24497 && verdictHash.copy().digest('hex') === 'c1fe463bf79b1d68c0bde86f348eea790b9bfb2f80eccb4da6d8bfdc8b024a33', `no verdict changed across ${reportsSeen} pages (digest ${verdictHash.copy().digest('hex').slice(0, 12)})`);
+  ok(reportsSeen === 24497 && verdictHash.copy().digest('hex') === 'f2c42cfd16afc3e4e5cd6ab18e7dec53289d0d2e0f832cf84ffa05b7abce8ade', `no verdict changed across ${reportsSeen} pages (digest ${verdictHash.copy().digest('hex').slice(0, 12)})`);
   // (placed after 5.0 so the pages it runs are not part of the recorded digest)
   // independent review of the typesetting: a whole number with float noise is printed as that whole number
   ok(!/144/.test(JSON.stringify(run(['6[4^2 - 2^2] = 6(16 - 4)', '= 72']).lines)) && !/\\frac\{\d+\}\{2\}\$\./.test(run(['0.1 + 0.2 + 71.7 = 72']).lines[0].note || ''), 'no value is printed as an unreduced fraction of a whole number');

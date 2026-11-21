@@ -1,18 +1,14 @@
 # Home, study plan, tasks and reminders
 
-Hindi review packet, screen 03. Status: **No native-speaker review on record.** Review tier P2. 208 strings.
+Hindi review packet, screen 03. Status: **No native-speaker review on record.** Review tier P2. 257 strings.
 
 Each row: the English the app shows, the Hindi it shows instead, the last commit that changed the Hindi, and flags. `{name}` is a value the app fills in: keep it exactly as written. `one:` / `other:` are the singular and plural forms. Mark **OK?** with ✓, or write the corrected Hindi.
 
-## `home.*` (82)
+## `home.*` (94)
 
 | Key | English | Hindi | Last Hindi edit | Flags | OK? | Suggested Hindi | Note |
 |---|---|---|---|---|---|---|---|
 | `home.needsConnection` | Needs a connection | इंटरनेट चाहिए | 2026-10-02 `b126a889f` (agent-marked) | — |  |  |  |
-| `home.goodMorning` | Good morning | सुप्रभात | 2026-09-06 `bba7282b8` (agent-marked) | English changed after this Hindi was last edited |  |  |  |
-| `home.goodAfternoon` | Good afternoon | नमस्कार | 2026-09-06 `bba7282b8` (agent-marked) | English changed after this Hindi was last edited |  |  |  |
-| `home.goodEvening` | Good evening | शुभ संध्या | 2026-09-06 `bba7282b8` (agent-marked) | English changed after this Hindi was last edited |  |  |  |
-| `home.greeting` | {greeting}, {name}. | {greeting}, {name}। | 2026-09-06 `bba7282b8` (agent-marked) | — |  |  |  |
 | `home.reason.examExpired` | Time ran out on this paper. Open it to see it marked from what was saved. | इस पेपर का समय समाप्त हो गया। जो सहेजा गया था उसकी जाँच देखने के लिए इसे खोलें। | 2026-10-02 `3d6bf0f11` (agent-marked) | — |  |  |  |
 | `home.reason.assignmentCached` | Saved from your last sync. Connect to the internet to open it. | पिछली सिंक से सहेजा गया। इसे खोलने के लिए इंटरनेट से जुड़ें। | 2026-10-02 `3d6bf0f11` (agent-marked) | — |  |  |  |
 | `home.next.examResult` | See result | परिणाम देखें | 2026-10-02 `3d6bf0f11` (agent-marked) | — |  |  |  |
@@ -35,8 +31,8 @@ Each row: the English the app shows, the Hindi it shows instead, the last commit
 | `home.pickTrack` | Now select the India maths track | अब भारत का गणित ट्रैक चुनें | 2026-09-06 `bba7282b8` (agent-marked) | — |  |  |  |
 | `home.pickCourse` | Now select the maths course | अब गणित का कोर्स चुनें | 2026-09-06 `bba7282b8` (agent-marked) | — |  |  |  |
 | `home.pickTopic` | Pick a topic for your question | अपने प्रश्न के लिए एक टॉपिक चुनें | 2026-09-06 `bba7282b8` (agent-marked) | — |  |  |  |
-| `home.pickDotpoint` | {topic} — target a single syllabus dot point | {topic} — पाठ्यक्रम का कोई एक बिंदु चुनें | 2026-09-06 `bba7282b8` (agent-marked) | — |  |  |  |
-| `home.pickDifficulty` | Fix the difficulty — or leave it to the adaptive engine | कठिनाई खुद तय करें — या अनुकूली इंजन पर छोड़ दें | 2026-09-06 `bba7282b8` (agent-marked) | — |  |  |  |
+| `home.pickDotpoint` | {topic}: target a single syllabus dot point | {topic}: पाठ्यक्रम का कोई एक बिंदु चुनें | 2026-11-19 `532625a2b` (agent-marked) | — |  |  |  |
+| `home.pickDifficulty` | Fix the difficulty, or leave it to the adaptive engine | कठिनाई खुद तय करें, या अनुकूली इंजन पर छोड़ दें | 2026-11-19 `532625a2b` (agent-marked) | — |  |  |  |
 | `home.optional` | (optional) | (वैकल्पिक) | 2026-09-06 `bba7282b8` (agent-marked) | — |  |  |  |
 | `home.difficultyMissingTopic` | No questions at {levels} for this topic yet, so that level is not offered here. | इस टॉपिक के लिए {levels} स्तर के प्रश्न अभी उपलब्ध नहीं हैं, इसलिए वह स्तर यहाँ नहीं दिया गया है। | 2026-10-19 `c97bd4855` (agent-marked) | — |  |  |  |
 | `home.difficultyMissingDotpoint` | No questions at {levels} for this dot point yet, so that level is not offered here. | इस बिंदु के लिए {levels} स्तर के प्रश्न अभी उपलब्ध नहीं हैं, इसलिए वह स्तर यहाँ नहीं दिया गया है। | 2026-10-09 `23ce43919` (agent-marked) | — |  |  |  |
@@ -48,24 +44,22 @@ Each row: the English the app shows, the Hindi it shows instead, the last commit
 | `home.loadingSyllabus` | Loading syllabus… | पाठ्यक्रम लोड हो रहा है… | 2026-09-06 `bba7282b8` (agent-marked) | — |  |  |  |
 | `home.dotpointChip` | Dot point {n} | बिंदु {n} | 2026-09-06 `bba7282b8` (agent-marked) | — |  |  |  |
 | `home.difficultyChip` | D{n} {label} | D{n} {label} | 2026-09-06 `bba7282b8` (agent-marked) | same text as English |  |  |  |
-| `home.goalComplete` | Daily goal complete — nice work. | आज का लक्ष्य पूरा — बढ़िया काम। | 2026-09-06 `bba7282b8` (agent-marked) | — |  |  |  |
+| `home.goalComplete` | Daily goal complete: nice work. | आज का लक्ष्य पूरा। बढ़िया काम। | 2026-11-19 `532625a2b` (agent-marked) | — |  |  |  |
 | `home.goalRemaining` | one: {n} more to hit today’s goal.<br>other: {n} more to hit today’s goal. | one: आज का लक्ष्य पूरा करने के लिए {n} और।<br>other: आज का लक्ष्य पूरा करने के लिए {n} और। | 2026-09-06 `bba7282b8` (agent-marked) | — |  |  |  |
 | `home.goalTarget` | one: Daily goal: {n} question.<br>other: Daily goal: {n} questions. | one: दैनिक लक्ष्य: {n} प्रश्न।<br>other: दैनिक लक्ष्य: {n} प्रश्न। | 2026-09-06 `bba7282b8` (agent-marked) | — |  |  |  |
-| `home.streakExtended` | one: {n}-day streak — extended today<br>other: {n}-day streak — extended today | one: लगातार {n} दिन — आज भी जारी<br>other: लगातार {n} दिन — आज भी जारी | 2026-09-06 `bba7282b8` (agent-marked) | — |  |  |  |
+| `home.streakExtended` | one: {n}-day streak, extended today<br>other: {n}-day streak, extended today | one: लगातार {n} दिन, आज भी जारी<br>other: लगातार {n} दिन, आज भी जारी | 2026-11-19 `532625a2b` (agent-marked) | — |  |  |  |
 | `home.streakOnTheLine` | one: {n}-day streak<br>other: {n}-day streak | one: लगातार {n} दिन<br>other: लगातार {n} दिन | 2026-10-05 `67f4658ab` (agent-marked) | — |  |  |  |
+| `home.reason.reviews` | Estimated from when you last practised each one. A short review now keeps it from fading. | अनुमान इस पर आधारित है कि आपने हर एक का अभ्यास आखिरी बार कब किया। अभी थोड़ा दोहराने से वह याद रहेगा। | 2026-11-09 `614a200c2` (agent-marked) | — |  |  |  |
 | `home.cloudUnavailable` | Class assignments are unavailable right now. You can still open questions and keep working on this device. | कक्षा के असाइनमेंट अभी उपलब्ध नहीं हैं। आप इस डिवाइस पर प्रश्न खोलकर काम जारी रख सकते हैं। | 2026-10-09 `830c3403a` (agent-marked) | — |  |  |  |
 | `home.chooseElse` | Choose something else | कुछ और चुनें | 2026-10-05 `67f4658ab` (agent-marked) | — |  |  |  |
-| `home.thisWeek` | This week | यह सप्ताह | 2026-10-05 `67f4658ab` (agent-marked) | — |  |  |  |
 | `home.todayCount` | {done} of {goal} today | आज {goal} में से {done} | 2026-10-05 `67f4658ab` (agent-marked) | — |  |  |  |
 | `home.weekSummary` | one: Studied on {n} of the last 7 days<br>other: Studied on {n} of the last 7 days | one: पिछले 7 में से {n} दिन पढ़ाई की<br>other: पिछले 7 में से {n} दिन पढ़ाई की | 2026-10-05 `67f4658ab` (agent-marked) | — |  |  |  |
-| `home.reviewDue` | one: You have {n} topic due for spaced review.<br>other: You have {n} topics due for spaced review. | one: अंतराल पुनरावृत्ति के लिए आपका {n} टॉपिक बाकी है।<br>other: अंतराल पुनरावृत्ति के लिए आपके {n} टॉपिक बाकी हैं। | 2026-10-05 `67f4658ab` (agent-marked) | — |  |  |  |
 | `home.kicker.next` | Next | अगला | 2026-10-05 `67f4658ab` (agent-marked) | — |  |  |  |
 | `home.kicker.continue` | Continue | जारी रखें | 2026-10-05 `67f4658ab` (agent-marked) | — |  |  |  |
 | `home.kicker.exam` | Exam in progress | परीक्षा चल रही है | 2026-10-05 `67f4658ab` (agent-marked) | — |  |  |  |
 | `home.kicker.assigned` | Assigned work | दिया गया काम | 2026-10-05 `67f4658ab` (agent-marked) | — |  |  |  |
 | `home.kicker.review` | Review | पुनरावृत्ति | 2026-10-05 `67f4658ab` (agent-marked) | — |  |  |  |
 | `home.kicker.start` | Start here | यहाँ से शुरू करें | 2026-10-05 `67f4658ab` (agent-marked) | — |  |  |  |
-| `home.next.working` | Finding your next step… | आपका अगला कदम खोजा जा रहा है… | 2026-10-05 `67f4658ab` (agent-marked) | — |  |  |  |
 | `home.next.exam` | Your unfinished paper | आपका अधूरा प्रश्नपत्र | 2026-10-05 `67f4658ab` (agent-marked) | — |  |  |  |
 | `home.next.resumePractice` | Resume where you left off | जहाँ छोड़ा था वहीं से जारी रखें | 2026-10-05 `67f4658ab` (agent-marked) | — |  |  |  |
 | `home.next.reviews` | one: {n} topic is due for review<br>other: {n} topics are due for review | one: {n} टॉपिक पुनरावृत्ति के लिए बाकी है<br>other: {n} टॉपिक पुनरावृत्ति के लिए बाकी हैं | 2026-10-05 `67f4658ab` (agent-marked) | — |  |  |  |
@@ -81,6 +75,14 @@ Each row: the English the app shows, the Hindi it shows instead, the last commit
 | `home.reason.resume` | You have an unfinished question here. Your work on it is kept. | यहाँ एक अधूरा प्रश्न है। उस पर आपका काम सुरक्षित है। | 2026-10-05 `67f4658ab` (agent-marked) | — |  |  |  |
 | `home.reason.dailyGoal` | You have started today. A few more finish your goal. | आज आपने शुरुआत कर दी है। कुछ और प्रश्न लक्ष्य पूरा कर देंगे। | 2026-10-05 `67f4658ab` (agent-marked) | — |  |  |  |
 | `home.reason.adaptive` | Your recent answers point here as the most useful next practice. | आपके हाल के उत्तर बताते हैं कि यहाँ अभ्यास सबसे उपयोगी होगा। | 2026-10-05 `67f4658ab` (agent-marked) | — |  |  |  |
+| `home.reason.adaptiveSlipNamed` | The same slip keeps coming back here: {misconception}. This practice works on it. | यहाँ वही चूक बार-बार हो रही है: {misconception}। यह अभ्यास उसी पर है। | 2026-11-09 `5c6724b06` (agent-marked) | — |  |  |  |
+| `home.reason.adaptiveSlip` | A slip keeps coming back in this chapter. This practice works on it. | इस अध्याय में एक चूक बार-बार हो रही है। यह अभ्यास उसी पर है। | 2026-11-09 `5c6724b06` (agent-marked) | — |  |  |  |
+| `home.reason.adaptiveReviewDp` | Dot point {dotpointN} is due for review, so it stays fresh. | बिंदु {dotpointN} दोहराने का समय आ गया है, ताकि वह याद रहे। | 2026-11-09 `5c6724b06` (agent-marked) | — |  |  |  |
+| `home.reason.adaptiveReview` | This chapter is due for review, so it stays fresh. | इस अध्याय को दोहराने का समय आ गया है, ताकि वह याद रहे। | 2026-11-09 `5c6724b06` (agent-marked) | — |  |  |  |
+| `home.reason.adaptiveWeakDp` | This is your weakest chapter, and dot point {dotpointN} has the most room to grow. | यह आपका सबसे कमज़ोर अध्याय है, और बिंदु {dotpointN} में सुधार की सबसे ज़्यादा गुंजाइश है। | 2026-11-09 `5c6724b06` (agent-marked) | — |  |  |  |
+| `home.reason.adaptiveWeak` | This is your weakest chapter, so it has the most room to grow. | यह आपका सबसे कमज़ोर अध्याय है, इसलिए इसमें सुधार की सबसे ज़्यादा गुंजाइश है। | 2026-11-09 `5c6724b06` (agent-marked) | — |  |  |  |
+| `home.reason.adaptiveNew` | New ground: you have not practised this chapter yet. | नया विषय: आपने इस अध्याय का अभ्यास अभी नहीं किया है। | 2026-11-09 `5c6724b06` (agent-marked) | — |  |  |  |
+| `home.reason.adaptiveInterleave` | Keeping your practice balanced: this chapter is up next. | अभ्यास संतुलित रखने के लिए: अब यह अध्याय। | 2026-11-09 `5c6724b06` (agent-marked) | — |  |  |  |
 | `home.reason.first` | One question at a time. Pri will learn what to give you next from your answers. | एक बार में एक प्रश्न। आपके उत्तरों से Pri सीखेगा कि आगे क्या देना है। | 2026-10-05 `67f4658ab` (agent-marked) | — |  |  |  |
 | `home.reason.practice` | Pri picks the next question from your recent answers. | Pri आपके हाल के उत्तरों से अगला प्रश्न चुनता है। | 2026-10-05 `67f4658ab` (agent-marked) | — |  |  |  |
 | `home.reason.practiceOffline` | You are offline. A question opened now is a draft to work on and cannot be marked; connect to get questions that can. | आप ऑफ़लाइन हैं। अभी खोला गया प्रश्न केवल काम करने का ड्राफ़्ट है और जाँचा नहीं जा सकता; जाँचे जा सकने वाले प्रश्नों के लिए कनेक्ट करें। | 2026-10-09 `3b4f8ccd4` (agent-marked) | — |  |  |  |
@@ -90,8 +92,18 @@ Each row: the English the app shows, the Hindi it shows instead, the last commit
 | `home.cta.practise` | Start practice | अभ्यास शुरू करें | 2026-10-05 `67f4658ab` (agent-marked) | — |  |  |  |
 | `home.cta.exam` | Return to exam | परीक्षा पर लौटें | 2026-10-05 `67f4658ab` (agent-marked) | — |  |  |  |
 | `home.meta.remaining` | one: {n} question left<br>other: {n} questions left | one: {n} प्रश्न बाकी<br>other: {n} प्रश्न बाकी | 2026-10-05 `67f4658ab` (agent-marked) | — |  |  |  |
+| `home.vp.questions` | one: {n} question<br>other: {n} questions | one: {n} प्रश्न<br>other: {n} प्रश्न | 2026-11-17 `a0972dcdc` (agent-marked) | — |  |  |  |
+| `home.vp.minutes` | about {n} min | लगभग {n} मिनट | 2026-11-17 `a0972dcdc` (agent-marked) | — |  |  |  |
+| `home.vp.minutesLeft` | one: {n} minute left<br>other: {n} minutes left | one: {n} मिनट बचा है<br>other: {n} मिनट बचे हैं | 2026-11-17 `a0972dcdc` (agent-marked) | — |  |  |  |
+| `home.vp.aside` | Your recent results | आपके हाल के नतीजे | 2026-11-17 `a0972dcdc` (agent-marked) | — |  |  |  |
+| `home.vp.papers` | Timed papers | समयबद्ध प्रश्नपत्र | 2026-11-17 `a0972dcdc` (agent-marked) | — |  |  |  |
+| `home.vp.papersSay` | one: Your last {n} timed paper scored {series} per cent.<br>other: Your last {n} timed papers scored {series} per cent, oldest first. | one: आपके पिछले {n} समयबद्ध प्रश्नपत्र में {series} प्रतिशत आए।<br>other: आपके पिछले {n} समयबद्ध प्रश्नपत्रों में {series} प्रतिशत आए, सबसे पुराना पहले। | 2026-11-17 `a0972dcdc` (agent-marked) | — |  |  |  |
+| `home.vp.marked` | Latest marked work | हाल में जाँचा गया काम | 2026-11-17 `a0972dcdc` (agent-marked) | — |  |  |  |
+| `home.vp.marks` | {earned} / {possible} marks | {possible} में से {earned} अंक | 2026-11-17 `a0972dcdc` (agent-marked) | — |  |  |  |
+| `home.vp.atStake` | Marks at stake | दाँव पर अंक | 2026-11-17 `a0972dcdc` (agent-marked) | — |  |  |  |
+| `home.vp.atStakeRange` | {lo}–{hi} marks in a typical paper | एक सामान्य प्रश्नपत्र में {lo}–{hi} अंक | 2026-11-17 `a0972dcdc` (agent-marked) | — |  |  |  |
 
-## `plan.*` (44)
+## `plan.*` (46)
 
 | Key | English | Hindi | Last Hindi edit | Flags | OK? | Suggested Hindi | Note |
 |---|---|---|---|---|---|---|---|
@@ -116,20 +128,22 @@ Each row: the English the app shows, the Hindi it shows instead, the last commit
 | `plan.type.mock` | Mock paper | मॉक पेपर | 2026-10-02 `ca855178c` (agent-marked) | — |  |  |  |
 | `plan.reason.due` | one: {n} review falls due today<br>other: {n} reviews fall due today | one: आज {n} पुनरावृत्ति देय है<br>other: आज {n} पुनरावृत्तियाँ देय हैं | 2026-10-02 `ca855178c` (agent-marked) | — |  |  |  |
 | `plan.reason.overdue` | one: {n} review is overdue<br>other: {n} reviews are overdue | one: {n} पुनरावृत्ति की तिथि बीत गई है<br>other: {n} पुनरावृत्तियों की तिथि बीत गई है | 2026-10-02 `ca855178c` (agent-marked) | — |  |  |  |
-| `plan.reason.weak` | Mastery {mastery}% — a weak spot in a heavy chapter | दक्षता {mastery}% — भारी अध्याय में कमज़ोर कड़ी | 2026-10-02 `ca855178c` (agent-marked) | — |  |  |  |
+| `plan.reason.weak` | Mastery {mastery}%: a weak spot in a heavy chapter | दक्षता {mastery}%: भारी अध्याय में कमज़ोर कड़ी | 2026-11-19 `532625a2b` (agent-marked) | — |  |  |  |
 | `plan.reason.heavy` | Carries {share}× the marks of an average chapter | औसत अध्याय के {share} गुना अंक रखता है | 2026-10-02 `ca855178c` (agent-marked) | — |  |  |  |
 | `plan.reason.newGround` | Next in the syllabus, not met yet | पाठ्यक्रम में अगला, अभी तक नहीं पढ़ा | 2026-10-02 `ca855178c` (agent-marked) | — |  |  |  |
 | `plan.reason.rotation` | Kept in rotation so it stays fresh | ताज़ा रखने के लिए चक्र में शामिल | 2026-10-02 `ca855178c` (agent-marked) | — |  |  |  |
 | `plan.reason.mock` | Timed paper before {date} | {date} से पहले समयबद्ध पेपर | 2026-10-02 `ca855178c` (agent-marked) | — |  |  |  |
 | `plan.reason.pinned` | Kept from this morning’s plan | सुबह की योजना से बरकरार | 2026-10-02 `ca855178c` (agent-marked) | — |  |  |  |
+| `plan.reason.slip` | The same slip keeps coming back: {slip} | वही चूक बार-बार हो रही है: {slip} | 2026-11-09 `c20993441` (agent-marked) | — |  |  |  |
+| `plan.reason.notebook` | one: {n} mistake in your notebook to try again<br>other: {n} mistakes in your notebook to try again | one: आपकी नोटबुक में दोबारा हल करने के लिए {n} गलती<br>other: आपकी नोटबुक में दोबारा हल करने के लिए {n} गलतियाँ | 2026-11-09 `c20993441` (agent-marked) | — |  |  |  |
 | `plan.weekLabel` | Week {n} | सप्ताह {n} | 2026-10-02 `ca855178c` (agent-marked) | — |  |  |  |
-| `plan.weekRange` | {start} – {end} | {start} से {end} | 2026-10-02 `ca855178c` (agent-marked) | — |  |  |  |
+| `plan.weekRange` | {start} to {end} | {start} से {end} | 2026-10-02 `ca855178c` (agent-marked) | English changed after this Hindi was last edited |  |  |  |
 | `plan.examIn` | one: Exam in {n} day<br>other: Exam in {n} days | one: परीक्षा {n} दिन में<br>other: परीक्षा {n} दिनों में | 2026-10-02 `ca855178c` (agent-marked) | — |  |  |  |
 | `plan.weekMinutes` | one: {n} min planned<br>other: {n} min planned | one: {n} मिनट नियोजित<br>other: {n} मिनट नियोजित | 2026-10-02 `ca855178c` (agent-marked) | — |  |  |  |
 | `plan.settings` | Plan settings | योजना की सेटिंग | 2026-10-02 `ca855178c` (agent-marked) | — |  |  |  |
 | `plan.weeklyMinutes` | Minutes per week | प्रति सप्ताह मिनट | 2026-10-02 `ca855178c` (agent-marked) | — |  |  |  |
 | `plan.examDate` | Exam date | परीक्षा की तिथि | 2026-10-02 `ca855178c` (agent-marked) | — |  |  |  |
-| `plan.examDateNone` | No exam date — a rolling four-week plan | कोई परीक्षा तिथि नहीं — चार सप्ताह की चलती योजना | 2026-10-02 `ca855178c` (agent-marked) | — |  |  |  |
+| `plan.examDateNone` | No exam date: a rolling four-week plan | कोई परीक्षा तिथि नहीं: चार सप्ताह की चलती योजना | 2026-11-19 `532625a2b` (agent-marked) | — |  |  |  |
 | `plan.clearExam` | Clear date | तिथि हटाएँ | 2026-10-02 `ca855178c` (agent-marked) | — |  |  |  |
 | `plan.restDayLabel` | Rest day | विश्राम का दिन | 2026-10-02 `ca855178c` (agent-marked) | — |  |  |  |
 | `plan.restNone` | No rest day | कोई विश्राम दिन नहीं | 2026-10-02 `ca855178c` (agent-marked) | — |  |  |  |
@@ -137,7 +151,7 @@ Each row: the English the app shows, the Hindi it shows instead, the last commit
 | `plan.hourLabel` | {hour}:00 | {hour}:00 बजे | 2026-10-02 `ca855178c` (agent-marked) | — |  |  |  |
 | `plan.dailyBudget` | one: {n} minute a day<br>other: {n} minutes a day | one: प्रतिदिन {n} मिनट<br>other: प्रतिदिन {n} मिनट | 2026-10-02 `ca855178c` (agent-marked) | — |  |  |  |
 | `plan.carried` | one: {n} review carried to a later day<br>other: {n} reviews carried to later days | one: {n} पुनरावृत्ति बाद के दिन पर टाली गई<br>other: {n} पुनरावृत्तियाँ बाद के दिनों पर टाली गईं | 2026-10-02 `ca855178c` (agent-marked) | — |  |  |  |
-| `plan.how` | Reviews that fall due come first. The rest of each day goes to the heaviest chapters you know least, in syllabus order, rotating so nothing goes stale. The plan is recomputed from your practice every time you open it — nothing is stored but your settings. | जो पुनरावृत्तियाँ देय हैं, वे पहले आती हैं। हर दिन का बाकी समय उन भारी अध्यायों को जाता है जिन्हें आप सबसे कम जानते हैं, पाठ्यक्रम के क्रम में, चक्र में बदलते हुए ताकि कुछ भी पुराना न पड़े। हर बार खोलने पर योजना आपके अभ्यास से दोबारा बनती है — केवल आपकी सेटिंग संग्रहीत होती है। | 2026-10-02 `ca855178c` (agent-marked) | — |  |  |  |
+| `plan.how` | Reviews that fall due come first. The rest of each day goes to the heaviest chapters you know least, in syllabus order, rotating so nothing goes stale. The plan is recomputed from your practice every time you open it. Nothing is stored but your settings. | जो पुनरावृत्तियाँ देय हैं, वे पहले आती हैं। हर दिन का बाकी समय उन भारी अध्यायों को जाता है जिन्हें आप सबसे कम जानते हैं, पाठ्यक्रम के क्रम में, चक्र में बदलते हुए ताकि कुछ भी पुराना न पड़े। हर बार खोलने पर योजना आपके अभ्यास से दोबारा बनती है। केवल आपकी सेटिंग संग्रहीत होती है। | 2026-11-19 `532625a2b` (agent-marked) | — |  |  |  |
 | `plan.saved` | Plan updated | योजना अद्यतन हुई | 2026-10-02 `ca855178c` (agent-marked) | — |  |  |  |
 
 ## `reminders.*` (16)
@@ -150,8 +164,8 @@ Each row: the English the app shows, the Hindi it shows instead, the last commit
 | `reminders.sessionHour` | Remind me at | याद दिलाएँ | 2026-10-02 `ca855178c` (agent-marked) | — |  |  |  |
 | `reminders.streakHour` | Streak check at | स्ट्रीक जाँच | 2026-10-02 `ca855178c` (agent-marked) | — |  |  |  |
 | `reminders.unsupported` | This browser cannot show notifications. | यह ब्राउज़र सूचनाएँ नहीं दिखा सकता। | 2026-10-02 `ca855178c` (agent-marked) | — |  |  |  |
-| `reminders.denied` | Notifications are blocked for Pri Learning in your device settings. | आपके डिवाइस की सेटिंग में Pri Learning की सूचनाएँ अवरुद्ध हैं। | 2026-10-02 `ca855178c` (agent-marked) | — |  |  |  |
-| `reminders.webNote` | In a browser, reminders appear while Pri Learning is open. The iPad app shows them any time. | ब्राउज़र में स्मरण-सूचनाएँ तब दिखती हैं जब Pri Learning खुला हो। iPad ऐप इन्हें कभी भी दिखाता है। | 2026-10-02 `ca855178c` (agent-marked) | — |  |  |  |
+| `reminders.denied` | Notifications are blocked for {brand} in your device settings. | आपके डिवाइस की सेटिंग में {brand} की सूचनाएँ अवरुद्ध हैं। | 2026-11-12 `a90a58cbd` (agent-marked) | — |  |  |  |
+| `reminders.webNote` | In a browser, reminders appear while {brand} is open. On iPhone and iPad, the {brand} app shows them any time. | ब्राउज़र में स्मरण-सूचनाएँ तब दिखती हैं जब {brand} खुला हो। iPhone और iPad पर {brand} ऐप इन्हें कभी भी दिखाता है। | 2026-11-12 `a90a58cbd` (agent-marked) | — |  |  |  |
 | `reminders.turnedOff` | Reminders off | स्मरण-सूचनाएँ बंद | 2026-10-02 `ca855178c` (agent-marked) | — |  |  |  |
 | `reminders.session.title` | Time for today’s session | आज के सत्र का समय | 2026-10-02 `ca855178c` (agent-marked) | — |  |  |  |
 | `reminders.session.body` | Your {minutes}-minute plan is ready. | आपकी {minutes} मिनट की योजना तैयार है। | 2026-10-02 `ca855178c` (agent-marked) | — |  |  |  |
@@ -178,9 +192,9 @@ Each row: the English the app shows, the Hindi it shows instead, the last commit
 | `tasks.topicsSelected` | Topics ({n} selected) | टॉपिक ({n} चुने गए) | 2026-09-06 `bba7282b8` (agent-marked) | — |  |  |  |
 | `tasks.dotpointIn` | Dot point in {chapter} | {chapter} का बिंदु | 2026-09-06 `bba7282b8` (agent-marked) | — |  |  |  |
 | `tasks.wholeChapter` | Whole chapter | पूरा अध्याय | 2026-09-06 `bba7282b8` (agent-marked) | — |  |  |  |
-| `tasks.questionCount` | Questions — {n} | प्रश्न — {n} | 2026-09-06 `bba7282b8` (agent-marked) | — |  |  |  |
+| `tasks.questionCount` | Questions: {n} | प्रश्न: {n} | 2026-11-19 `532625a2b` (agent-marked) | — |  |  |  |
 | `tasks.create` | Create task | कार्य बनाएँ | 2026-09-06 `bba7282b8` (agent-marked) | — |  |  |  |
-| `tasks.empty` | No tasks yet. A teacher profile on this device can assign them from Teacher Studio — or set yourself a goal above. | अभी कोई कार्य नहीं। इस डिवाइस पर बनी शिक्षक प्रोफ़ाइल शिक्षक स्टूडियो से कार्य दे सकती है — या ऊपर से आप खुद अपना लक्ष्य तय कर सकते हैं। | 2026-10-19 `c97bd4855` (agent-marked) | — |  |  |  |
+| `tasks.empty` | No tasks yet. A teacher profile on this device can assign them from Teacher Studio, or set yourself a goal above. | अभी कोई कार्य नहीं। इस डिवाइस पर बनी शिक्षक प्रोफ़ाइल शिक्षक स्टूडियो से कार्य दे सकती है, या ऊपर से आप खुद अपना लक्ष्य तय कर सकते हैं। | 2026-11-19 `532625a2b` (agent-marked) | — |  |  |  |
 | `tasks.finished` | done | पूरा | 2026-10-05 `67f4658ab` (agent-marked) | — |  |  |  |
 | `tasks.fromClass` | From {className} ·  | {className} से ·  | 2026-09-06 `bba7282b8` (agent-marked) | — |  |  |  |
 | `tasks.personal` | Personal ·  | निजी ·  | 2026-09-06 `bba7282b8` (agent-marked) | — |  |  |  |
@@ -198,7 +212,7 @@ Each row: the English the app shows, the Hindi it shows instead, the last commit
 | `inbox.returnedForRevision` | Returned for revision | सुधार के लिए लौटाया गया | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `inbox.loadFailed` | Assignments could not be loaded. | असाइनमेंट लोड नहीं हो सके। | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `inbox.title` | My assignments | मेरे असाइनमेंट | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
-| `inbox.intro` | Teacher assignment metadata is cloud-backed, while questions, handwriting and marking still run through Pri Learning’s normal local-first Practice engine. | शिक्षक के असाइनमेंट का विवरण क्लाउड पर रहता है, जबकि प्रश्न, हैंडराइटिंग और जाँच अब भी Pri Learning के सामान्य अभ्यास इंजन से इसी डिवाइस पर चलते हैं। | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
+| `inbox.intro` | Teacher assignment metadata is cloud-backed, while questions, handwriting and marking still run through {brand}’s normal local-first Practice engine. | शिक्षक के असाइनमेंट का विवरण क्लाउड पर रहता है, जबकि प्रश्न, हैंडराइटिंग और जाँच अब भी {brand} के सामान्य अभ्यास इंजन से इसी डिवाइस पर चलते हैं। | 2026-11-12 `a90a58cbd` (agent-marked) | — |  |  |  |
 | `inbox.empty` | No active assignments. | कोई सक्रिय असाइनमेंट नहीं है। | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `inbox.feedbackReturned` | Your teacher returned feedback. Reopen the assignment to revise and resubmit. | आपके शिक्षक ने टिप्पणी के साथ असाइनमेंट लौटाया है। सुधारकर दोबारा जमा करने के लिए असाइनमेंट फिर से खोलें। | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `inbox.review` | Review assignment | असाइनमेंट देखें | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
@@ -206,7 +220,7 @@ Each row: the English the app shows, the Hindi it shows instead, the last commit
 | `inbox.revise` | Revise assignment | असाइनमेंट सुधारें | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 | `inbox.start` | Start assignment | असाइनमेंट शुरू करें | 2026-10-01 `3820feb8e` (agent-marked) | — |  |  |  |
 
-## `review.*` (6)
+## `review.*` (9)
 
 | Key | English | Hindi | Last Hindi edit | Flags | OK? | Suggested Hindi | Note |
 |---|---|---|---|---|---|---|---|
@@ -214,6 +228,9 @@ Each row: the English the app shows, the Hindi it shows instead, the last commit
 | `review.dueToday` | one: {n} dot point is due for review<br>other: {n} dot points are due for review | one: {n} बिंदु दोहराने का समय है<br>other: {n} बिंदु दोहराने का समय है | 2026-10-19 `7fe7d3e35` (agent-marked) | — |  |  |  |
 | `review.dueTodayWhy` | Estimated from when you last practised each dot point and how it went. An estimate, not a test result. | हर बिंदु को आपने पिछली बार कब और कैसे किया, उससे लगाया गया अनुमान। यह अनुमान है, परीक्षा का परिणाम नहीं। | 2026-10-19 `7fe7d3e35` (agent-marked) | — |  |  |  |
 | `review.recall` | estimated recall {percent}% | अनुमानित याद {percent}% | 2026-10-19 `7fe7d3e35` (agent-marked) | — |  |  |  |
+| `review.history` | {correct} of {attempts} right so far · last practised {when} | अब तक {attempts} में से {correct} सही · आखिरी अभ्यास {when} | 2026-11-09 `5d028939b` (agent-marked) | — |  |  |  |
+| `review.lastToday` | today | आज | 2026-11-09 `614a200c2` (agent-marked) | — |  |  |  |
+| `review.lastDays` | one: {n} day ago<br>other: {n} days ago | one: {n} दिन पहले<br>other: {n} दिन पहले | 2026-11-09 `614a200c2` (agent-marked) | — |  |  |  |
 | `review.overdue` | one: due {n} day ago<br>other: due {n} days ago | one: {n} दिन पहले देय<br>other: {n} दिन पहले देय | 2026-10-19 `7fe7d3e35` (agent-marked) | — |  |  |  |
 | `review.practise` | Review | दोहराएँ | 2026-10-19 `7fe7d3e35` (agent-marked) | — |  |  |  |
 
@@ -244,10 +261,57 @@ Each row: the English the app shows, the Hindi it shows instead, the last commit
 |---|---|---|---|---|---|---|---|
 | `favorites.title` | Favorites | पसंदीदा | 2026-09-06 `bba7282b8` (agent-marked) | — |  |  |  |
 | `favorites.emptyTitle` | No favorites yet | अभी कोई पसंदीदा नहीं | 2026-09-06 `bba7282b8` (agent-marked) | — |  |  |  |
-| `favorites.emptySub` | Star any question — from the question page or your history — and it lands here for quick revision. | किसी भी प्रश्न पर तारा लगाइए — प्रश्न के पन्ने से या इतिहास से — और वह जल्दी दोहराने के लिए यहाँ आ जाएगा। | 2026-09-06 `bba7282b8` (agent-marked) | — |  |  |  |
+| `favorites.emptySub` | Star any question, from the question page or your history, and it lands here for quick revision. | किसी भी प्रश्न पर तारा लगाइए, प्रश्न के पन्ने से या इतिहास से, और वह जल्दी दोहराने के लिए यहाँ आ जाएगा। | 2026-11-19 `532625a2b` (agent-marked) | — |  |  |  |
 | `favorites.openHistory` | Open History | इतिहास खोलें | 2026-09-06 `bba7282b8` (agent-marked) | — |  |  |  |
 | `favorites.saved` | one: {n} saved question<br>other: {n} saved questions | one: {n} सहेजा गया प्रश्न<br>other: {n} सहेजे गए प्रश्न | 2026-09-06 `bba7282b8` (agent-marked) | — |  |  |  |
 | `favorites.remove` | Remove from favorites | पसंदीदा से हटाएँ | 2026-09-06 `bba7282b8` (agent-marked) | — |  |  |  |
 | `favorites.removeOn` | Remove this {topic} question from favorites | {topic} के इस प्रश्न को पसंदीदा से हटाएँ | 2026-09-06 `bba7282b8` (agent-marked) | — |  |  |  |
 | `favorites.retrySame` | Same question | वही प्रश्न | 2026-10-05 `67f4658ab` (agent-marked) | — |  |  |  |
 | `favorites.retryVariant` | Variant | दूसरा रूप | 2026-10-05 `67f4658ab` (agent-marked) | — |  |  |  |
+
+## `today.*` (17)
+
+| Key | English | Hindi | Last Hindi edit | Flags | OK? | Suggested Hindi | Note |
+|---|---|---|---|---|---|---|---|
+| `today.title` | Today | आज | 2026-11-17 `cd7c00eb0` (agent-marked) | — |  |  |  |
+| `today.kicker` | Today | आज | 2026-11-17 `cd7c00eb0` (agent-marked) | — |  |  |  |
+| `today.how` | A short mixed set: new versions of questions you got wrong, and dot points that are due for another look. Chapters are mixed rather than blocked. The schedule is a fixed rule, not a prediction of how you will do. | एक छोटा मिला-जुला सेट: जिन प्रश्नों में गलती हुई उनके नए रूप, और वे बिंदु जिन्हें दोबारा देखने का समय है। अध्याय मिलाकर आते हैं, एक साथ नहीं। यह तय नियम से बना कार्यक्रम है, आपके प्रदर्शन का अनुमान नहीं। | 2026-11-17 `cd7c00eb0` (agent-marked) | — |  |  |  |
+| `today.size` | one: {n} item, about {minutes} minutes<br>other: {n} items, about {minutes} minutes | one: {n} प्रश्न, लगभग {minutes} मिनट<br>other: {n} प्रश्न, लगभग {minutes} मिनट | 2026-11-17 `cd7c00eb0` (agent-marked) | — |  |  |  |
+| `today.held` | one: {n} more is still due<br>other: {n} more are still due | one: {n} और बाकी है<br>other: {n} और बाकी हैं | 2026-11-17 `cd7c00eb0` (agent-marked) | — |  |  |  |
+| `today.cardWhy` | Retests of recent mistakes and reviews that are due, mixed across chapters. | हाल की गलतियों के पुनः-परीक्षण और दोहराने के बिंदु, अध्यायों में मिलाकर। | 2026-11-17 `cd7c00eb0` (agent-marked) | — |  |  |  |
+| `today.open` | Open Today | आज का सेट खोलें | 2026-11-17 `cd7c00eb0` (agent-marked) | — |  |  |  |
+| `today.empty` | Nothing is due today. Anything you get wrong will come back here in a day or two. | आज कुछ बाकी नहीं है। जो प्रश्न गलत होगा, वह एक-दो दिन में यहाँ लौटेगा। | 2026-11-17 `cd7c00eb0` (agent-marked) | — |  |  |  |
+| `today.unavailable` | Today needs a connection and a signed-in account. | आज के सेट के लिए इंटरनेट और साइन-इन खाता चाहिए। | 2026-11-17 `cd7c00eb0` (agent-marked) | — |  |  |  |
+| `today.kindRetest` | Retest | पुनः-परीक्षण | 2026-11-17 `cd7c00eb0` (agent-marked) | — |  |  |  |
+| `today.kindReview` | Review | दोहराना | 2026-11-17 `cd7c00eb0` (agent-marked) | — |  |  |  |
+| `today.whyRetest` | Same skill, new numbers, no hints. You got a question like this wrong. | वही कौशल, नई संख्याएँ, कोई संकेत नहीं। ऐसे प्रश्न में आपसे गलती हुई थी। | 2026-11-17 `cd7c00eb0` (agent-marked) | — |  |  |  |
+| `today.whyReview` | Due for another look, going by when you last practised it. | आपने इसे कब अभ्यास किया, उसके हिसाब से दोबारा देखने का समय है। | 2026-11-17 `cd7c00eb0` (agent-marked) | — |  |  |  |
+| `today.startRetest` | Start retest | पुनः-परीक्षण शुरू करें | 2026-11-17 `cd7c00eb0` (agent-marked) | — |  |  |  |
+| `today.startReview` | Start review | दोहराना शुरू करें | 2026-11-17 `cd7c00eb0` (agent-marked) | — |  |  |  |
+| `today.retestFailed` | A new question could not be drawn just now. | अभी नया प्रश्न नहीं बन सका। | 2026-11-17 `cd7c00eb0` (agent-marked) | — |  |  |  |
+| `today.errorLogLink` | See your error log | अपनी गलतियों की सूची देखें | 2026-11-17 `cd7c00eb0` (agent-marked) | — |  |  |  |
+
+## `recent.*` (7)
+
+| Key | English | Hindi | Last Hindi edit | Flags | OK? | Suggested Hindi | Note |
+|---|---|---|---|---|---|---|---|
+| `recent.title` | Your recent attempts | आपकी हाल की कोशिशें | 2026-11-19 `9eb1dd5fb` (agent-marked) | — |  |  |  |
+| `recent.empty` | You have not answered a question on this topic yet. | आपने इस टॉपिक का अभी कोई प्रश्न हल नहीं किया है। | 2026-11-19 `9eb1dd5fb` (agent-marked) | — |  |  |  |
+| `recent.failed` | Your recent attempts could not be loaded. Try again in a moment. | आपकी हाल की कोशिशें लोड नहीं हो सकीं। थोड़ी देर में फिर कोशिश कीजिए। | 2026-11-19 `9eb1dd5fb` (agent-marked) | — |  |  |  |
+| `recent.open` | Open | खोलें | 2026-11-19 `9eb1dd5fb` (agent-marked) | — |  |  |  |
+| `recent.tryAgain` | Try it again | फिर से हल करें | 2026-11-19 `9eb1dd5fb` (agent-marked) | — |  |  |  |
+| `recent.openLabel` | Open the attempt from {date}: {result} | {date} की कोशिश खोलें: {result} | 2026-11-19 `320ef5418` (agent-marked) | — |  |  |  |
+| `recent.tryAgainLabel` | Try the attempt from {date} again: {result} | {date} की कोशिश फिर से हल करें: {result} | 2026-11-19 `320ef5418` (agent-marked) | — |  |  |  |
+
+## `offer.*` (8)
+
+| Key | English | Hindi | Last Hindi edit | Flags | OK? | Suggested Hindi | Note |
+|---|---|---|---|---|---|---|---|
+| `offer.pick.title` | Choose your course | अपना कोर्स चुनें | 2026-11-18 `3da942721` (agent-marked) | — |  |  |  |
+| `offer.pick.lead` | Pri covers Year 11 and 12 Advanced and Extension 1. Choose yours. Everything you have done stays on your account. | अपना कोर्स चुनें। अब तक का आपका काम आपके खाते में सुरक्षित है। | 2026-11-18 `3da942721` (agent-marked) | English changed after this Hindi was last edited |  |  |  |
+| `offer.pick.year` | Year | वर्ष | 2026-11-18 `3da942721` (agent-marked) | — |  |  |  |
+| `offer.pick.course` | Course | कोर्स | 2026-11-18 `3da942721` (agent-marked) | — |  |  |  |
+| `offer.pick.save` | Save and continue | सहेजें और आगे बढ़ें | 2026-11-18 `3da942721` (agent-marked) | — |  |  |  |
+| `offer.notYet.title` | Not offered yet | अभी उपलब्ध नहीं | 2026-11-18 `3da942721` (agent-marked) | — |  |  |  |
+| `offer.notYet.body` | This part of Pri is not offered yet. Year 11 and 12 Advanced and Extension 1 are. | Pri का यह हिस्सा अभी उपलब्ध नहीं है। | 2026-11-18 `3da942721` (agent-marked) | English changed after this Hindi was last edited |  |  |  |
+| `offer.notYet.home` | Go to Home | होम पर जाएँ | 2026-11-18 `3da942721` (agent-marked) | — |  |  |  |

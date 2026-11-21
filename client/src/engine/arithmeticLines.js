@@ -90,7 +90,7 @@ const shown = v => `$${exactForm(v).tex}$`;
 /** The value of one side when it is plain arithmetic on numbers; null otherwise. */
 function valueOf(side) {
   let ast;
-  try { ast = parse(normalize(side)); } catch { return null; }
+  try { ast = parse(normalize(String(side).replace(/⁄/g, '/'))); } catch { return null; }
   if (!ast || ast.t === 'equation') return null;
   if ([...variablesOf(ast)].some(v => v !== 'e')) return null;   // any letter but the constants e and π: not arithmetic on numbers alone
   let v;
@@ -117,7 +117,7 @@ const closeLoose = (a, b) => Math.abs(a - b) <= 1e-7 * Math.max(1, Math.abs(a), 
 /** A side as a number, or as a function of its letters; null when it cannot be read. */
 export function infoOf(side) {
   let ast;
-  try { ast = parse(normalize(side)); } catch { return null; }
+  try { ast = parse(normalize(String(side).replace(/⁄/g, '/'))); } catch { return null; }
   if (!ast || ast.t === 'equation') return null;
   const vars = [...variablesOf(ast)].filter(v => v !== 'e').sort();
   if (vars.length) return { ast, vars };
@@ -824,21 +824,51 @@ function putGivenInIntegrals(raw, prep) {
   });
 }
 
-function pageDefinitions(raw, out, firstBreak, prep = null) {
+// `8 y = 3/tan x` is ambiguous: a definition y = 3/tan x with a question number in front, or the equation 8y = 3/tan x (y = 3/(8 tan x)).
+// The page is read three ways: without either (exactly as it always was), as the definition ('D') and as the equation ('E'). A line is ticked when
+// the plain reading ticks it, or when BOTH readings tick it; no reading ever crosses.
+function pageDefinitions(raw, out, firstBreak, prep = null, degreePrimed = null, tickOnly = false) {
+  if (!raw.some(l => /^\s*\d{1,2}\s+[A-Za-z]\s*=/.test(l))) return pageDefinitionsOnce(raw, out, firstBreak, prep, degreePrimed, tickOnly, null);
+  const runs = [null, 'D', 'E'].map(mode => { const o = out.slice(); const broke = pageDefinitionsOnce(raw, o, firstBreak, prep, degreePrimed, tickOnly, mode); return { o, broke }; });
+  const [plain, d, e] = runs;
+  const isTick = l => l && l.status === 'ok';
+  for (let i = 0; i < out.length; i++) {
+    if (isTick(plain.o[i])) out[i] = plain.o[i];
+    else if (isTick(d.o[i]) && isTick(e.o[i])) out[i] = d.o[i];
+  }
+  return plain.broke;
+}
+function pageDefinitionsOnce(raw, out, firstBreak, prep, degreePrimed, tickOnly, glueMode) {
   const defs = prep ? { ...prep.seeds } : {};   // 'k' → { expr, line }, 'f' → { expr, variable, line }, "u'" → …   (what the question gives is in from the start)
   let afterPart = false;
   let equation = null;        // the last equation in one unknown: { left, right, variable }
   let broke = null;
   let carry = null;           // { text, variable }: what the last line this pass ticked came to, for the `=` line below
+  let pendingGlue = null;
   let zeroed = null;          // { line, expr, variable }: `y' = 0` was stated straight after a derivative the page set
   const limit = firstBreak === -1 ? raw.length : firstBreak;
   for (let i = 0; i < Math.min(limit, LIMITS.lines); i++) {
     if (raw[i].length > LIMITS.chars) continue;
+    if (pendingGlue) { defs[pendingGlue.letter] = pendingGlue.def; pendingGlue = null; }
     const zeroFor = zeroed && zeroed.line === i - 1 ? zeroed : null;
     zeroed = null;
     // A new part of the question may give a letter a new value on the paper, not on the page: what was defined is dropped.
     if (/^\(?(?:[a-h]|i{1,3}|iv|v|vi{0,3})[.)]\s|^\([a-h]\)|^(?:part|question|q)\s*\(?[a-h0-9]/i.test(raw[i])) { for (const k of Object.keys(defs)) delete defs[k]; equation = null; carry = null; afterPart = true; }
     const src = raw[i].replace(/^\(?[a-h1-9ivx]{1,3}[.)]\s+/i, '').replace(/^[A-Za-z][A-Za-z ]{1,24}:\s*(?=\S)/, '');
+    // A question number glued to a definition (`8 y = 3/tan x`): when the same letter is used primed or evaluated on a later line, the line is
+    // the definition y = … for those lines. The line itself stays a note (the number in front means it is not read as y = … on its own).
+    { const g = /^(\d{1,2})\s+([A-Za-z])\s*=\s*(\S.*)$/.exec(src.replace(/\s*\.\s*$/, ''));
+      if (glueMode && g && out[i].status === 'note' && !/[<>≤≥≠≈%°,;:=]|∫|\]_/.test(g[3]) && raw.slice(i + 1).some(l => new RegExp(`(?<![A-Za-z])${g[2]}(?:'|\\s*\\()`).test(l))) {
+        const last = cleanStatement(g[3].trim());
+        const settled = putIn(last, defs, null);
+        const body = settled && infoOf(settled.text) ? settled.text : infoOf(last) && lettersOf(last).length <= 1 ? last : null;
+        if (body !== null) {
+          const expr = glueMode === 'E' ? `(${body})/${g[1]}` : body;
+          const def = { expr, shown: glueMode === 'E' ? `${g[1]}${g[2]} = ${last}` : last, variable: lettersOf(body).length === 1 ? lettersOf(body)[0] : null, line: i, glued: true };
+          if (glueMode === 'D') { defs[g[2]] = def; carry = null; continue; }
+          pendingGlue = { letter: g[2], def };   // 'E': the line is also judged as the equation it may be, as it always was
+        }
+      } }
     // `y' = 0` (with or without words before it) straight after a derivative the page set: the next line may set that derivative to zero.
     { const zm = src.replace(/\s*\.\s*$/, '').match(/^(?:[A-Za-z][A-Za-z ]*\s+)?([A-Za-z])'\s*=\s*0$/);
       if (zm && defs[`${zm[1]}'`] && defs[`${zm[1]}'`].variable) zeroed = { line: i, expr: defs[`${zm[1]}'`].expr, variable: defs[`${zm[1]}'`].variable }; }
@@ -911,6 +941,24 @@ function pageDefinitions(raw, out, firstBreak, prep = null) {
       }
       const twoWaysHere = parts.some(x => /[\/÷]/.test(x) && (/[\/÷]\s*\d+(?:\.\d+)?\s*[A-Za-z(]|[\/÷]\s*[A-Za-z]\s*[A-Za-z(]|\^\s*-?\d+(?:\.\d+)?[A-Za-z]|\^\s*[A-Za-z][A-Za-z0-9(]/.test(x)));
       if (twoWaysHere) return;
+      // `y'(π/6) = -3sin(π/6) x 1/[cos(π/6)]^3`: the derivative the page set (or, with none, the derivative of the definition) at a number.
+      // True when the value on the right is that derivative's value there; otherwise a note, never a cross (a number may be misread).
+      { const at = /^([A-Za-z])'\((.+)\)$/.exec(head);
+        const point = at && defs[at[1]] && parts.length >= 2 && !lettersOf(at[2]).length ? numberOf(cleanStatement(at[2])) : null;
+        if (point !== null) {
+          const d = defs[at[1]], page = defs[`${at[1]}'`];
+          const variable = (page && page.variable) || d.variable || (lettersOf(d.expr).length === 1 ? lettersOf(d.expr)[0] : null);
+          const flat = x => { const r = putIn(x, defs, variable); return r ? r.text : null; };
+          let slopeAt = null, how = '';
+          if (!variable) return;
+          if (page && page.variable === variable && flat(page.expr)) { const g = fnOf(flat(page.expr), variable); slopeAt = g ? g(point) : null; how = 'page'; }
+          else { const f = flat(d.expr) && fnOf(flat(d.expr), variable); if (f) { const h = 1e-5, a = f(point + h), b = f(point - h); slopeAt = a !== null && b !== null ? (a - b) / (2 * h) : null; how = 'definition'; } }
+          const claimed = parts.slice(1).map(x => { const r = putIn(x, defs, null); return r ? numberOf(r.text) : null; });
+          if (slopeAt !== null && claimed.every(v => v !== null) && claimed.every(v => Math.abs(v - slopeAt) <= (how === 'page' ? 1e-7 : 1e-5) * Math.max(1, Math.abs(slopeAt)))) {
+            ticks.push(how === 'page' ? `This is the value of the derivative above at ${assignSpan(variable, at[2])}.` : `This is the derivative of ${assignSpan(at[1], d.shown)} at ${assignSpan(variable, at[2])}.`);
+          }
+          return;
+        } }
       // B. a derivative of something the page defined: u' = …, f'(x) = …
       let m = head.match(/^([A-Za-z])'(?:\(([a-z])\))?$/);
       if (m && defs[m[1]] && parts.length === 2) {
@@ -931,7 +979,7 @@ function pageDefinitions(raw, out, firstBreak, prep = null) {
           }
           if (tried >= 3 && agree === tried) { carry = { text: claim.text, variable }; ticks.push(`This is the derivative of ${assignSpan(m[1], d.shown)}${lettersOf(d.shown).every(c => c === variable) ? derivativeRuleWords(base.text, variable) : ''}.`); facts.push([`${m[1]}'`, { expr: parts[1], shown: parts[1], variable: m[2] || d.variable || null, line: i }]); return; }
           // A number on the right is the gradient at a point (y' = 3√2/2), not a wrong derivative: never crossed.
-          if (tried >= 3 && differ === tried && !decimal && !d.given && lettersOf(claim.text).includes(variable)) { cross = `The derivative of ${assignSpan(m[1], d.shown)} is not ${mathSpan(parts[1])}.`; return; }
+          if (tried >= 3 && differ === tried && !decimal && !d.given && !d.glued && lettersOf(claim.text).includes(variable) && !(degreePrimed && degreePrimed.has(i)) && !loneTimesSigns(parts[1]).changed) { cross = `The derivative of ${assignSpan(m[1], d.shown)} is not ${mathSpan(parts[1])}.`; return; }
         }
         return;
       }
@@ -1010,7 +1058,7 @@ function pageDefinitions(raw, out, firstBreak, prep = null) {
     }
     const firstTick = verdicts.indexOf('tick');
     const lineHolds = firstTick !== -1 && verdicts[verdicts.length - 1] === 'tick' && verdicts.slice(firstTick).every(v => v === 'tick') && !verdicts.includes('bad');
-    if (cross) { broke = { index: i, message: cross }; break; }
+    if (cross) { if (tickOnly) { cross = null; continue; } broke = { index: i, message: cross }; break; }
     for (const [name, d] of facts) if (!d.open) { defs[name] = d; if (prep && prep.seeds[name] && !/'/.test(name) && sameExpr(d.shown, prep.seeds[name].expr)) d.given = true; }
     // A letter set on this line in a way this pass did not record (`Let x = 4`, `x = 4 now`) no longer has its old value.
     for (const k of Object.keys(defs)) if (!facts.some(([name]) => name === k) && new RegExp(`(?<![A-Za-z])${k.replace(/[^A-Za-z]/g, '\\$&')}\\s*=`).test(src)) delete defs[k];
@@ -1037,7 +1085,8 @@ export function stepCheckArithmetic(workingText, opts = null) {
   return withEvaluationBudget(PAGE_BUDGET, () => {
     let prep = null;
     try { prep = opts && opts.facts ? prepareFacts(opts.facts) : null; } catch { prep = null; }
-    const base = stepCheckArithmeticWithinBudget(workingText, prep);
+    let base = stepCheckArithmeticWithinBudget(workingText, prep);
+    try { base = readTwice(workingText, base, prep); } catch { /* the page as written stands */ }
     if (!opts || !Array.isArray(opts.latex) || !opts.latex.length) return base;
     try { return withTexReading(workingText, base, opts.latex, prep); } catch { return base; }
   });
@@ -1104,7 +1153,8 @@ function withTexReading(workingText, base, pairs, prep = null) {
     return plain && plain.replace(/\s+/g, '') !== line.replace(/\s+/g, '') ? plain : null;
   });
   if (!alt.some(Boolean)) return base;
-  const second = stepCheckArithmeticWithinBudget(raw.map((line, i) => alt[i] ?? line).join('\n'), prep);
+  let second = stepCheckArithmeticWithinBudget(raw.map((line, i) => alt[i] ?? line).join('\n'), prep);
+  try { second = readTwice(raw.map((line, i) => alt[i] ?? line).join('\n'), second, prep); } catch { /* as written */ }
   if (second.lines.length !== base.lines.length) return base;
   const lines = base.lines.map(l => ({ ...l }));
   let changed = false, downgraded = false;
@@ -1143,14 +1193,128 @@ function withTexReading(workingText, base, pairs, prep = null) {
 // ── What the reader writes that the checker reads another way ────────────────────────────────────────────────────────
 // Owner's handwritten pages, 20 November 2026. Normalised before any line is read (the line shown stays as written):
 //   · a prime in any of its forms (′ ’ ʹ ´, and a double prime ″) is the ASCII ' that y' and f'(x) are read from;
+//   · a degree sign the reader wrote for a prime (`y° = 3[tan x]^-1`): a degree sign directly after ONE letter (not a digit, not part of
+//     a longer word) and before `=` or `(` is a prime. `30°` and `sin 30° = 1/2` are untouched;
 //   · `integral_2^4` is ∫_2^4, and a space after the underscore of a limit (`]_ -2^4`) is not part of the limit.
+const DEGREE_FOR_PRIME = /(?<![A-Za-z0-9])[A-Za-z]°(?=\s*[=(])/;
 function normaliseInk(line) {
   return String(line)
     .replace(/(?<=[A-Za-z)])\s*(?:″|′′|’’|ʹʹ|´´)/g, "''")
     .replace(/(?<=[A-Za-z)])[′’ʹ´]/g, "'")
+    .replace(/(?<![A-Za-z0-9])([A-Za-z])°(?=\s*[=(])/g, "$1'")
     .replace(/(?<![A-Za-z])integral\s*(?=[_^])/gi, '∫')
     .replace(/(∫|\])\s*_\s+(?=[-−]?\s*[\d{(πe])/g, '$1_');
 }
+
+// ── The reader's handwriting, read a second way (owner's page, 21 November 2026) ──────────────────────────────────────
+// A lone `x` between two factors is a times sign when the left side is a bracket, a power, a function application or a number (before a number
+// or a bracket) and the right side starts another factor:
+//     -3[tan x]^-2 x sec^2 x      is −3·[tan x]^(−2)·sec²x      (`sec^2 x` at the END keeps its x: that is the argument)
+//     -3sin(π/6) x 1/[cos(π/6)]^3  is −3·sin(π/6)·1/[cos(π/6)]³
+// An x straight after a function name is that function's argument (`sin x`, `cos^2 x`), never a times sign. A square bracket raised to a power
+// (`[tan x]^-2`) is a grouping. In a line with such a times sign, each factor that is a fraction (`1/2`, `1/(√3)^3`) is one unit: `1/2 x 1/3`
+// is (1/2)(1/3) and never 1/(2·1/3). These readings are used ONLY to tick: the page is checked as written, exactly as before; the same page read
+// this way is checked a second time, and a line that came back a note and is true under the second reading is ticked. A line that is false
+// under the second reading is never crossed from it, and a tick the first reading gave to a line that is FALSE under the second is a note
+// (a tick needs the two readings to agree).
+const FN_NAMES = 'sin|cos|tan|sec|cosec|csc|cot|ln|log';
+const FACTOR_START = new RegExp(`^\\s*(?:\\d|\\(|\\[|√|π|(?:${FN_NAMES}|sqrt|exp)(?![A-Za-z]))`);
+const FN_THEN_X = new RegExp(`(?<![A-Za-z])(?:${FN_NAMES})(?:\\^\\s*-?\\d+)?$`);
+function loneTimesSigns(line) {
+  // Every lone x on a line is read the same way: all of them times signs or none (a line where one is the letter and another is times is not read).
+  const cands = [];
+  let argEnd = -1, allTimes = true;
+  const re = /(?<=\S)\s+x(?=\s+\S)/g;
+  for (let m; (m = re.exec(line)); ) {
+    const before = line.slice(0, m.index), end = m.index + m[0].length;
+    if (FN_THEN_X.test(before)) { argEnd = end; continue; }
+    const rest = line.slice(end);
+    if (!FACTOR_START.test(rest) && !/^\s*[A-Za-z]/.test(rest)) continue;
+    // On the left: a bracket, a power, π or a function with its argument. A bare number on the left (`3 x sin x`) may be the coefficient of the
+    // letter (3x sin x), so it is a times sign only before another number or bracket, as it always was (`6 x 12`).
+    const left = /[)\]π]$/.test(before) || /\^\s*-?\d+$/.test(before) || before.length === argEnd || (/\d$/.test(before) && /^\s*(?:\d|\()/.test(rest));
+    if (left && FACTOR_START.test(rest)) cands.push(m); else allTimes = false;
+  }
+  if (!cands.length || !allTimes) return { text: line, changed: false };
+  let out = '', from = 0;
+  for (const m of cands) { out += `${line.slice(from, m.index)} *`; from = m.index + m[0].length; }
+  return { text: out + line.slice(from), changed: true };
+}
+const groupEnd = (s, j) => { let d = 0; for (let k = j; k < s.length; k++) { if (s[k] === '(') d++; else if (s[k] === ')' && --d === 0) return k + 1; } return -1; };
+/** The end of ONE atom at s[i]: a number, a bracket, √ and its number or bracket, or a function call, with an optional power; -1 when it is none of these. */
+function atomEnd(s, i) {
+  let j = i;
+  if (/\d/.test(s[j] || '')) { while (j < s.length && /[\d.]/.test(s[j])) j++; }
+  else if (s[j] === '(') j = groupEnd(s, j);
+  else if (s[j] === '√') { j++; if (/\d/.test(s[j] || '')) { while (j < s.length && /[\d.]/.test(s[j])) j++; } else if (s[j] === '(') j = groupEnd(s, j); else return -1; }
+  else { const m = new RegExp(`^(?:${FN_NAMES}|sqrt|exp)`).exec(s.slice(j)); if (!m || s[j + m[0].length] !== '(') return -1; j = groupEnd(s, j + m[0].length); }
+  if (j < 0) return -1;
+  if (s[j] === '^') { j++; if (s[j] === '-') j++; if (/\d/.test(s[j] || '')) { while (j < s.length && /\d/.test(s[j])) j++; } else if (s[j] === '(') { j = groupEnd(s, j); if (j < 0) return -1; } else return -1; }
+  return j;
+}
+function topLevelSplit(s, ch) {
+  const parts = [];
+  let depth = 0, cur = '';
+  for (const c of s) { if (c === '(' || c === '[') depth++; else if (c === ')' || c === ']') depth--; if (c === ch && depth === 0) { parts.push(cur); cur = ''; } else cur += c; }
+  parts.push(cur);
+  return parts;
+}
+/** In a line with times signs: each factor `a/b` whose denominator is ONE atom is written with the fraction slash ⁄ (one unit). */
+function fractionsAsUnits(text) {
+  return topLevelSplit(text, '=').map(side => {
+    const factors = topLevelSplit(side, '*');
+    if (factors.length < 2) return side;
+    return factors.map(f => {
+      const t = f.trim(), cuts = topLevelSplit(t, '/');
+      if (cuts.length !== 2 || !cuts[0].trim()) return t;
+      const den = cuts[1].trim();
+      return atomEnd(den, 0) === den.length ? `${cuts[0].trim()}⁄${den}` : t;
+    }).join('*');
+  }).join(' = ').replace(/^ = /, '= ');
+}
+function inkReading(line) {
+  let t = line.replace(/\[([^\[\],;_|]*)\](?=\^)(?!\^\s*-?[\w.]+\s*_)/g, '($1)');   // [tan x]^-2: a bracket raised to a power
+  const times = loneTimesSigns(t);
+  t = times.text;
+  // a bracket that holds exactly one simple fraction, sin(π/6) or (3/4), has nothing in it for a later factor to join: it is one unit too
+  if (times.changed) t = fractionsAsUnits(bracketFunctions(t)).replace(/\(\s*(-?[^()*+\-\/⁄=]+?)\s*\/\s*(\d+(?:\.\d+)?|[πe]|√\d+)\s*\)/g, '($1⁄$2)');
+  return { text: t, times: times.changed };
+}
+const readTwice = (workingText, base, prep) => {
+  const raw = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
+  if (base.lines.length !== raw.length) return base;
+  const alt = raw.map(l => inkReading(l));
+  const own = alt.map((a, i) => a.text !== raw[i]);
+  if (!own.some(Boolean)) return base;
+  // A `= …` line straight under a line that is read the second way continues that line, so it is read in the same context.
+  const differs = own.map((d, i) => d || (i > 0 && /^=/.test(raw[i]) && own[i - 1]));
+  const second = stepCheckArithmeticWithinBudget(alt.map(a => a.text).join('\n'), prep, true);
+  if (second.lines.length !== base.lines.length) return base;
+  const lines = base.lines.map(l => ({ ...l }));
+  const brk = base.firstBreak;
+  let changed = false;
+  base.lines.forEach((p, i) => {
+    const t = second.lines[i];
+    if (!differs[i]) return;
+    if (p.status === 'note' && (brk === -1 || i < brk) && !/^Follows from the earlier slip\.|too long or too far/.test(String(p.note)) && t.status === 'ok' && t.state === 'arithmetic') {
+      lines[i] = { ...t, text: p.text, note: String(t.note).replace(/⁄/g, '/') }; changed = true;
+    } else if (p.status === 'ok' && alt[i].times && t.readingFalse) {
+      // true under the first reading and false under the times reading: the two do not agree, so no tick
+      lines[i] = { text: p.text, status: 'note', note: MISREAD_NOTE, unverified: true }; changed = true;
+    }
+  });
+  if (!changed) return base;
+  const state = l => l.state || (l.status === 'break' ? 'wrong' : l.unreadable ? 'unread' : 'unverified');
+  const full = lines.map(l => ({ ...l, state: state(l) }));
+  const at = st => full.flatMap((l, k) => (l.state === st ? [k + 1] : []));
+  const unverified = at('unverified'), unread = at('unread');
+  const firstBreak = full.findIndex(l => l.status === 'break');
+  return {
+    ...base, lines: full, firstBreak, diagnosis: firstBreak === -1 ? null : base.diagnosis,
+    summary: { ...base.summary, checked: full.filter(l => l.status === 'ok').length, arithmetic: at('arithmetic'), wrong: at('wrong'), unverified, unread,
+      reason: unverified.length ? base.summary.reason || 'Pri checks only the arithmetic on this question. These lines have none it can check on its own.' : null }
+  };
+};
 
 // ── A column sum written down the page ───────────────────────────────────────────────────────────────────────────────
 //     196          one block: a bare non-negative number; one or more lines that start with + , or with - and a space (a bare -3
@@ -1196,6 +1360,29 @@ function findColumns(raw) {
 // `[14;8]`, `4[-5;-1] + 3[-2;4] = [-20 - 6;-4 + 12]`, `|[14;8]| = √(14^2 + 8^2)`: numeric column vectors, sums of scalar
 // multiples of them, and their magnitudes. TICK ONLY: a vector line that is not proved equal is a note, never a cross.
 const VECTOR_BRACKET = /\[[^\[\]|]*;[^\[\]|]*\]/;
+// The reader also writes the components with commas: `[-5,-1]`, `|4[-5,-1]+3[-2,4]|`, `|[14,8]|` (owner's page, 21 November 2026).
+// A comma list in square brackets is a column vector ONLY on a line that does something with vectors, and never on a line about an
+// interval, a domain, limits or a function of a bracket (`x ∈ [0,4]`, `for [0,4]`, `∫_[0,4]`, `max[3,4]`):
+//   · a number directly in front (`4[-5,-1]`), or `+` / `-` between two brackets, or bars round a bracket, or an equals sign
+//     between two brackets (or after a vector on the line above);
+//   · and no letter directly in front of the bracket, and none of `∈`, for, in, domain, range, interval, an integral or a limit.
+// Such a bracket is read exactly like the `;` form, so the vector reading stays TICK ONLY.
+const COMMA_BRACKET = /\[[^\[\],;|]+(?:,[^\[\],;|]+){1,2}\]/g;
+const NUMERIC_COMPONENT = /^[\d\s.+\-−–×·*/^()√]+$/;
+const NOT_A_VECTOR_LINE = /∈|\b(?:for|in|domain|range|interval|between|where|when|lim|limit)\b|∫|\]\s*_|_\s*[-\d{(\[]/i;
+function commaVectorsAsColumns(src, carried) {
+  if (!src.includes(',') || !src.includes('[')) return src;
+  const found = [...src.matchAll(COMMA_BRACKET)].filter(m => m[0].slice(1, -1).split(',').every(c => /\d/.test(c) && NUMERIC_COMPONENT.test(c)));
+  if (!found.length || NOT_A_VECTOR_LINE.test(src)) return src;
+  const before = m => src.slice(0, m.index);
+  if (found.some(m => /[A-Za-z]\s*$/.test(before(m)))) return src;   // a function of a bracket, not a vector
+  const scalar = found.some(m => /(?<![\w.)\]])\d+(?:\.\d+)?\s*[*×·x]?\s*$/i.test(before(m)));
+  const between = found.some((m, k) => k > 0 && /^\s*[+\-−–]\s*(?:\d+(?:\.\d+)?\s*[*×·x]?\s*)?$/i.test(src.slice(found[k - 1].index + found[k - 1][0].length, m.index)));
+  const equal = found.some((m, k) => k > 0 && /^\s*=\s*$/.test(src.slice(found[k - 1].index + found[k - 1][0].length, m.index))) || (/^\s*=/.test(src) && !!(carried && carried.vec));
+  const bars = found.some(m => { const b = src.slice(0, m.index).split('|').length - 1, a = src.slice(m.index + m[0].length).split('|').length - 1; return b % 2 === 1 && a >= 1; });
+  if (!(scalar || between || equal || bars)) return src;
+  return src.replace(COMMA_BRACKET, whole => (found.some(m => m[0] === whole) ? whole.replace(/,/g, ';') : whole));
+}
 const arithmeticText = s => s.replace(/[−–—]/g, '-').replace(/[×·]/g, '*').replace(/÷/g, '/').replace(/(\d|\))\s+x\s+(?=\d|\()/gi, '$1*').replace(/\[([^\[\],;_|]*)\](?![_^])/g, '($1)');
 function vectorTerms(s) {
   const terms = [];
@@ -1233,7 +1420,8 @@ function vectorSide(raw) {
     const sum = inner.map(t => ({ sign: t.sign, v: asVector(t.text) }));
     if (!sum.length || sum.some(t => !t.v) || sum.some(t => t.v.length !== sum[0].v.length)) return null;
     const total = sum[0].v.map((_, c) => sum.reduce((a, t) => a + t.sign * t.v[c], 0));
-    return { num: terms[0].sign * Math.sqrt(total.reduce((a, c) => a + c * c, 0)) };
+    const squares = total.reduce((a, c) => a + c * c, 0);
+    return { num: terms[0].sign * Math.sqrt(squares), squares };
   }
   if (/\|/.test(s)) return null;
   const parts = terms.map(t => ({ sign: t.sign, v: asVector(t.text) }));
@@ -1241,11 +1429,24 @@ function vectorSide(raw) {
   return { vec: parts[0].v.map((_, c) => parts.reduce((a, t) => a + t.sign * t.v[c], 0)) };
 }
 const sameVectorSide = (a, b) => (a.vec && b.vec ? a.vec.length === b.vec.length && a.vec.every((x, k) => closeLoose(x, b.vec[k])) : a.num !== undefined && b.num !== undefined && closeLoose(a.num, b.num));
+// A magnitude is shown as the root of its sum of squares when that is a whole number (√740), else in the usual exact form.
+const showSide = x => {
+  if (x.vec) return showVector(x.vec);
+  const sq = Math.round(x.num * x.num);
+  if (Math.abs(x.num * x.num - sq) <= 1e-7 * Math.max(1, sq) && sq >= 0) { const r = Math.round(Math.sqrt(sq)); return r * r === sq ? String(r) : `√${sq}`; }
+  return exactForm(x.num).plain;
+};
+const decimalOf = x => (x.vec ? showVector(x.vec) : String(Number(x.num.toPrecision(6))));
 const showVector = v => `(${v.map(x => String(Number(x.toPrecision(12)))).join(', ')})`;
 
-function stepCheckArithmeticWithinBudget(workingText, prep = null) {
+// `tickOnly` (the second reading of a page, see readTwice): nothing is crossed and nothing halts the lines below it. A line that would have been
+// crossed is a note marked `readingFalse`, so the caller knows the line is false under this reading.
+function stepCheckArithmeticWithinBudget(workingText, prep = null, tickOnly = false) {
   const original = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
   const raw = putGivenInIntegrals(original.map(normaliseInk), prep);
+  // Lines where the reader's degree sign was read as a prime (`y° = …`): such a line may be the definition y = … written with a stray mark, so a
+  // derivative that does not fit is never crossed on it (see pageDefinitions).
+  const degreePrimed = new Set(original.flatMap((l, k) => (DEGREE_FOR_PRIME.test(l) ? [k] : [])));
   const columns = findColumns(raw), columnMembers = new Set([...columns.values()].flatMap(c => c.members));
   const lastValue = new Map();   // line index → the value a ticked line came to (for a bare value written under it)
   const out = [];
@@ -1254,6 +1455,8 @@ function stepCheckArithmeticWithinBudget(workingText, prep = null) {
   let labelled = false;
   const lastSides = new Map();   // line index → the last side of a plain-number tick (for "This simplifies to")
   let prev = null;   // { text, value } or { text, ast, vars }: the last side of the line above, when it could be read
+  // The nearest earlier line that was read as a numeric vector or the magnitude of one, and that no warning was raised on: { text, value }.
+  let vectorRef = null;
 
   const note = (text, why, extra = {}) => { out.push({ text, status: 'note', note: why, unverified: true, ...extra }); };
 
@@ -1274,6 +1477,9 @@ function stepCheckArithmeticWithinBudget(workingText, prep = null) {
       else { const words = src.match(/^(.*=.*?[\d)])\s+(?:so|hence|therefore|thus)\s+[A-Za-z][^=<>\d]*$/i); if (words) src = words[1]; }
       src = src.replace(/^[A-Za-z]'{0,2}\(\s*-?\d+(?:\.\d+)?\s*\)\s*=\s*(?=[^=]+=)/, ''); }
     const afterLabel = labelled; labelled = src !== line;
+    const beforeComma = src;
+    src = commaVectorsAsColumns(src, carried);
+    const commaForm = src !== beforeComma;
     // Plain arithmetic only, with one more case (owner, 19 November: `… = log 3 + log 2 + log 5` then `= log(3 + 2 + 5)`):
     // a line of letters whose LAST side is a worked expression of plain numbers. The `=` line below it rewrites that
     // expression, so it is held to it. A bare number left by such a line (`t = 5` then `= 20`) stays tick only.
@@ -1308,11 +1514,23 @@ function stepCheckArithmeticWithinBudget(workingText, prep = null) {
         const values = written.every(Boolean) ? written.map(vectorSide) : [];
         if (values.length && values.every(Boolean)) {
           const tail = values[values.length - 1];
-          const carry = tail.vec ? { vec: tail.vec, text: written[written.length - 1], calculus: true } : { value: tail.num, text: written[written.length - 1], calculus: true };
+          // A comma-form line whose last side is a number is an ordinary line of numbers from there on: the lines under it are judged as any are.
+          const carry = tail.vec ? { vec: tail.vec, text: written[written.length - 1], calculus: true } : { value: tail.num, text: written[written.length - 1], ...(commaForm ? {} : { calculus: true }) };
           const above = cont && written.length === 1 && carried && (carried.vec ? { vec: carried.vec } : carried.value !== undefined ? { num: carried.value } : null);
           const all = above ? [above, ...values] : values;
           prev = carry;
-          if (all.length >= 2 && all.every(x => sameVectorSide(x, all[0]))) {
+          // The vector slip warning (see vectorRef): a continuation whose value is not the value of the nearest earlier vector line.
+          // Never a tick and never a cross: reader layout of column vectors is unreliable, so the line is a note that says what to check.
+          if (cont && vectorRef && !!vectorRef.value.vec === !!values[0].vec && !sameVectorSide(vectorRef.value, values[0])) {
+            const agree = values.length >= 2 && values.every(x => sameVectorSide(x, values[0]));
+            const earlier = `${mathSpan(vectorRef.text.replace(/^=\s*/, ''))}`;
+            const own = agree ? `The two sides of this line agree (${showSide(values[0])}), but it ` : 'This line ';
+            prev = null;
+            return note(line, `${own}does not equal the earlier line ${earlier}, which comes to ${showSide(vectorRef.value)} (${decimalOf(vectorRef.value)}). Check each component.`, { vectorWarning: true });
+          }
+          const same = all.length >= 2 && all.every(x => sameVectorSide(x, all[0]));
+          if (written.every(Boolean) && values.every(x => sameVectorSide(x, values[0]))) vectorRef = { text: original[i] ?? line, value: tail };
+          if (same) {
             const what = all[0].vec ? `the same vector ${showVector(all[0].vec)}` : shown(all[0].num);
             out.push({ text: line, status: 'ok', state: 'arithmetic', note: above ? `This equals the line above: ${what}.` : `Both sides come to ${what}.`, valueChain: { rule: 'true-as-written' } });
             return;
@@ -1483,6 +1701,7 @@ function stepCheckArithmeticWithinBudget(workingText, prep = null) {
       : continuation && before && k >= 1 && allValues.slice(1, k).every(v => close(v, allValues[0]))
       ? `The line above comes to ${shown(allValues[0])}, but this line gives ${shown(allValues[k])}.`
       : `${mathSpan(allSides[0])} comes to ${shown(allValues[0])}, but this line gives ${shown(allValues[k])}.`;
+    if (tickOnly) return note(line, NOT_PROVED, { readingFalse: true });
     diagnosis = { code: 'arithmetic-not-equal', title: 'The two sides of this line are not equal', message, fix: 'Work this line out again, one operation at a time.', confidence: 'high' };
     firstBreak = i;
     out.push({ text: line, status: 'break', note: message, diagnosis });
@@ -1515,7 +1734,7 @@ function stepCheckArithmeticWithinBudget(workingText, prep = null) {
   // The second pass: what the page itself defines (see pageDefinitions).
   {
     let broke = null;
-    try { broke = pageDefinitions(raw, out, firstBreak, prep); } catch { broke = null; }
+    try { broke = pageDefinitions(raw, out, firstBreak, prep, degreePrimed, tickOnly); } catch { broke = null; }
     if (broke) {
       const message = broke.message;
       diagnosis = { code: 'page-definition-not-held', title: 'This line does not agree with what you wrote above', message, fix: 'Put the value from the earlier line in again and work this line out once more.', confidence: 'high' };

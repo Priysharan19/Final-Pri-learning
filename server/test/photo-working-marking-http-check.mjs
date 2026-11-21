@@ -96,6 +96,14 @@ try {
     c.eq(r.last.partial, null, `6 ${label}: no method marks, the working of this question is not step-checked`);
     c.ok(r.last.stepReport === null || (r.last.stepReport.arithmetic === true && r.last.stepReport.firstBreak === -1 && r.last.stepReport.lines.every(l => l.status === 'ok' || l.status === 'note')),
       `6 ${label}: no line is crossed; any tick is a true-as-written tick only`);
+    if (lines) {
+      // Pinned to what is true today: the ONE ticked line is the one restating the prompt's own f(x), noted as given,
+      // and every other line (the working, and any unrelated notes left in) is a note: none is ticked.
+      const judged = r.last.stepReport.lines;
+      c.deq(judged.filter(l => l.status === 'ok').map(l => [l.text, l.note]), [['f(x) = (x+3)^2 + 6', 'This is given in the question.']],
+        `6 ${label}: the only ticked line is the restatement of f(x) = (x+3)^2 + 6, "This is given in the question."`);
+      c.ok(judged.filter(l => l.text !== 'f(x) = (x+3)^2 + 6').every(l => l.status === 'note'), `6 ${label}: every other line is a note, no unrelated line is ticked`);
+    }
     if (!lines) c.eq(r.last.stepReport, null, `6 ${label}: nothing about working that was not sent`);
     c.ok(String(r.last.solution?.answerText) === '6', `6 ${label}: the worked solution is shown`);
   }
