@@ -38,7 +38,7 @@ const closeLoose = (a, b) => Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), 
 const SPLIT_EQ = /(?<![<>!])=(?!=)/;
 
 // ── a label is a named quantity, not an expression ───────────────────────────
-const LABEL = /^(Δ|[A-Za-z]|[A-Z]{2})('{0,2})(_[A-Za-z0-9]+)?(?:\(([^()]{1,8})\))?$/;
+const LABEL = /^(Δ|θ|α|β|γ|φ|[A-Za-z]|[A-Z]{2})('{0,2})(_[A-Za-z0-9]+)?(?:\(([^()]{1,8})\))?$/;
 const DERIV = /^d\^?2?[a-z]\/d[a-z]\^?2?$/;
 function labelOf(side) {
   const t = tidy(side).replace(/\s+/g, '').replace(/[{}]/g, '');
@@ -56,8 +56,8 @@ const sameLabel = (a, b) => a.name === b.name && ((a.arg === null && b.arg === n
 // ── reading maths from the worked solution ───────────────────────────────────
 function spanToPlain(span) {
   let t = String(span);
-  for (let g = 0; g < 4 && /\^\s*\{[^{}]*\}/.test(t); g++) t = t.replace(/\^\s*\{([^{}]*)\}/g, '^($1)');
-  t = t.replace(/\\[dt]frac/g, '\\frac').replace(/\\(?:displaystyle|,|;|!|quad|qquad)/g, ' ').replace(/\\prime/g, "'").replace(/\\Delta/g, 'Δ');
+  for (let g = 0; g < 4 && !/\\int/.test(t) && /\^\s*\{[^{}]*\}/.test(t); g++) t = t.replace(/\^\s*\{([^{}]*)\}/g, '^($1)');
+  t = t.replace(/_\{\\text\{([A-Za-z0-9]+)\}\}/g, '_$1').replace(/\\[dt]frac/g, '\\frac').replace(/\\(?:displaystyle|,|;|!|quad|qquad| )/g, ' ').replace(/\\prime/g, "'").replace(/\\Delta/g, 'Δ');
   // a rounded value is not a statement of equality: keep what comes before it
   t = t.replace(/\\(?:big|Big|bigg|Bigg)[lr]?/g, '').replace(/\\(arcsin|arccos|arctan|sin|cos|tan|sec|csc|cosec|cot|ln|log|exp)(?![A-Za-z])/g, '$1').replace(/\\theta/g, 'θ');
   t = t.split(/\\approx|\\simeq|\\Rightarrow|\\therefore|\\text|\\mathrm|\\mid/)[0];
@@ -113,6 +113,8 @@ let FUNCS = new Set();
 const readSide = side => {
   try {
     const t = braces(tidy(side));
+    // a comma or semicolon list (a point, a vector, an interval) is never one number: it is compared component by component or not at all
+    if (/[,;]/.test(t)) return null;
     for (const f of FUNCS) if (new RegExp(`(?<![A-Za-z])${f}'*\\s*\\(`).test(t)) return null;
     return infoOf(cleanStatement(t));
   } catch { return null; }
@@ -331,6 +333,18 @@ function functionNames(q) {
   return out;
 }
 
+/** Every `name = value` the question or its worked solution states: the substitutions a line `name = value: …` may follow. */
+function knownSubstitutions(q) {
+  const out = new Set();
+  const texts = [String(q?.prompt ?? ''), ...(Array.isArray(q?.steps) ? q.steps.map(x => String(x?.d ?? '')) : [])];
+  for (const t of texts) for (const st of statementsOfSpans(t)) {
+    if (st.parts.length !== 2 || !/^[A-Za-z]$/.test(st.parts[0].trim())) continue;
+    const v = numericOf(st.parts[1]);
+    if (v !== null) out.add(`${st.parts[0].trim()}|${v}`);
+  }
+  return out;
+}
+
 function run(q, report) {
   FUNCS = functionNames(q);
   const lines = report.lines.slice(0, MAX_LINES);
@@ -382,10 +396,11 @@ function run(q, report) {
         const first = each.find(x => x.hit);
         if (first) hit = first.hit; else tick = { state: 'given', note: NOTE_GIVEN };
       }
-    } else if (!tick && s.parts.length >= 2 && !s.continuation) hit = matchEquation(s.parts, sol, s.ctx);
+    } else if (!tick && s.parts.length >= 2 && !s.continuation && !s.ctx) hit = matchEquation(s.parts, sol, s.ctx);   // a substitution line is judged structurally by engine/lineChains.js
     if (hit) { tick = tick || { state: 'verified', note: noteStep(hit), step: hit.step }; prevAbove.hit = hit; }
     // c / d · a value the solution reaches, in order
-    if (!tick && !s.multi) {
+    // a substitution `name = a:` counts only where the question or its solution substitutes that name at that value
+    if (!tick && !s.multi && !s.ctx) {   // a line `name = a: …` is judged structurally by engine/lineChains.js
       const nums = s.parts.map(numericOf);
       const value = nums.every(v => v !== null) && nums.every(v => close(v, nums[0])) ? nums[0] : null;
       // a numeric continuation must agree with the line above (ln1 = 0, then `= 1`, is not one chain)
@@ -433,3 +448,5 @@ function run(q, report) {
 }
 export const _setFunctionsUnused = q => { FUNCS = functionNames(q); };
 export const _internals = { readSolution, readStudent, matchEquation, spanToPlain, conditionOf, readSide, sameSidePublic: sameSide };
+// For engine/lineChains.js (the pass that runs after this one).
+export const _forChains = { knownSubstitutions, statementsOfSpans, numericOf, canon, labelOf, topLevelPieces, sameLabel, setFunctions: q => { FUNCS = functionNames(q); } };
