@@ -24,6 +24,8 @@ import { checkRefusal, checkRefusalCopy } from '../components/checkAccess.js';
 import { CheckRefusal } from '../components/CheckRefusal.jsx';
 import { MAP_STRANDS, PREREQ_GRAPH_VERSION, mapStrandOf } from '../engine/prerequisites.js';
 import { PREREQ_SKILLS_HI } from '../engine/prerequisiteSkillsHi.js';
+import { formatDate } from '../lib/locale.js';
+import { defaultCourse } from '../platform/edition.js';
 
 const GRADES = [7, 8, 9, 10, 11, 12];
 const PHASE_KEY = {
@@ -222,7 +224,7 @@ function PlacementResult({ view, user, busy, onRetake, error }) {
   const nameOf = id => names[id]?.name || id;
   const [focus, setFocus] = useState(r.rootGaps?.[0]?.chapterId || null);
   const focusChain = useMemo(() => new Set((r.rootGaps || []).find(g => g.chapterId === focus)?.chain.map(c => c.chapterId) || []), [r, focus]);
-  const finished = r.finishedAt ? new Date(r.finishedAt).toLocaleDateString(user?.locale || undefined) : '';
+  const finished = r.finishedAt ? formatDate(r.finishedAt, user || defaultCourse(), { day: 'numeric', month: 'short', year: 'numeric' }) : '';
   // Edge skills are authored in English beside the graph; a Hindi reader gets
   // the reviewed Hindi label, never a blank.
   const skillText = skill => (user?.language === 'hi' && PREREQ_SKILLS_HI[skill]) || skill;

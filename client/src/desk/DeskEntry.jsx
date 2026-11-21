@@ -18,10 +18,12 @@ import { useT } from '../i18n/index.js';
 import { formatClock } from '../engine/deskClock.js';
 import { IMPORT_SITE, deskApi, newKey, unreachable } from './deskApi.js';
 import './desk.css';
+import { formatDate } from '../lib/locale.js';
+import { defaultCourse } from '../platform/edition.js';
 
 /** Whether a library resource can be sat at the desk: a paper with 1–200 questions. */
 export const deskable = r => r?.type === 'paper' && Number.isInteger(r.questionCount) && r.questionCount >= 1 && r.questionCount <= 200;
-const dateOf = ms => new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
+const dateOf = ms => formatDate(ms, defaultCourse(), { day: 'numeric', month: 'long', year: 'numeric' });
 
 /** The entry as drawn, given this paper's attempts. Exported for client/test/desk-ui-check.mjs. */
 export function DeskEntryView({ t, attempts, error, busy, onStart }) {

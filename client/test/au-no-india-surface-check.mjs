@@ -151,7 +151,7 @@ process.env.PRI_EDITION = 'prithagoras';
     assert.ok(!/हर पंक्ति जाँची जाती है/.test(HI['verdict.showWorkingToggle']));
   });
   check('the Prithagoras welcome copy promises line-by-line checking only where the question allows it', () => {
-    for (const k of ['login.welcomeSub', 'login.heroSub']) assert.match(au[k], /where the question allows it/, k);
+    for (const k of ['login.welcomeSub', 'login.heroSub']) assert.match(au[k], /where the question allows it|checks the lines of your working it can/, k);
     assert.ok(!/Your working is checked line by line\./.test(au['login.welcomeSub']));
   });
   check('Australian spelling: Favourite, never Favorite, on every Prithagoras favourite string', () => {
@@ -182,6 +182,65 @@ process.env.PRI_EDITION = 'prithagoras';
     assert.match(theme, /#root > \.qpage \{ padding: calc\(24px/);
     assert.match(theme, /\.set-row \.set-k \{ flex: 0 0 auto; max-width: 46%; overflow-wrap: normal/);
     assert.match(theme, /\.legal-body \{ overflow-wrap: anywhere; \}/);
+  });
+}
+
+// ── QA sweep, round 2 (22 Nov 2026) ──────────────────────────────────────────────────────────────────────────────────────
+{
+  const { AU_STRINGS } = await import('../src/i18n/strings.au.js');
+  const EN = (await import('../src/i18n/strings.en.js')).default;
+  const HI = (await import('../src/i18n/strings.hi.js')).default;
+  const au = { ...EN, ...AU_STRINGS };
+  check('Prithagoras says the mark is for the final answer wherever a shared string said every line is marked', () => {
+    for (const k of ['verdict.workingAria', 'verdict.workingPlaceholder', 'examRoom.workingNote', 'login.point2', 'ai.checked.body']) assert.ok(!/every line is marked|Each line is marked|awarded line by line|marked line by line|your answer line by line/.test(au[k]), `${k}: ${au[k]}`);
+    assert.ok(!/first-party/.test(au['cloudSecurity.deleteHelp']));
+  });
+  check('a placeholder dash is the words "None yet" on Home and Report, in English and Hindi', () => {
+    assert.equal(EN['inst.noneYet'], 'None yet');
+    assert.ok(HI['inst.noneYet'] && HI['inst.noneYet'] !== '—');
+    for (const f of ['instrument/ReportHead.jsx', 'instrument/IndexPage.jsx']) {
+      const c = code(f);
+      assert.ok(/inst\.noneYet/.test(c), f);
+      assert.ok(!/\? '—' :|: '—'\}/.test(c.replace(/const fmtPct[^\n]*\n/, '')), `${f} still has a lone dash placeholder`);
+    }
+  });
+  check('every accessible name of a paper or set "Sit" button starts with its visible text', () => {
+    for (const [vis, label] of [['papers.sets.sit', 'papers.sets.sitLabel'], ['papers.ext1.sit', 'papers.ext1.sitPaperLabel']]) {
+      for (const cat of [au, HI]) assert.ok(cat[label].replace(/[:：]?\s*\{title\}.*/, '').startsWith(cat[vis]) || cat[label].startsWith(cat[vis]), `${label}: ${cat[label]}`);
+    }
+  });
+  check('no student-facing date or time is written in the browser\'s own locale (lib/locale.js formatDate / formatDateTime instead)', () => {
+    const FILES = ['desk/DeskPage.jsx', 'desk/DeskImport.jsx', 'desk/DeskEntry.jsx', 'progress/SyllabusBoard.jsx', 'classroom/ReviewQueue.jsx', 'classroom/StudentClassroom.jsx', 'classroom/TeacherWorkspace.jsx',
+      'components/CloudAccountPanel.jsx', 'components/CloudAccountSecurity.jsx', 'components/StaffOperationsPanel.jsx', 'components/AssignmentInboxPanel.jsx', 'components/ClassroomPanel.jsx', 'components/TrialNotice.jsx',
+      'pages/ExamRoom.jsx', 'pages/Classes.jsx', 'pages/Home.jsx', 'pages/Placement.jsx'];
+    for (const f of FILES) {
+      const c = code(f);
+      assert.ok(!/toLocale(Date|Time)?String\(\s*(\)|undefined|\[\])/.test(c), `${f}: a date written with the browser's default locale`);
+      assert.ok(!/Intl\.DateTimeFormat\(\s*[^,)]*\? 'hi-IN' : undefined/.test(c), `${f}: an Intl date with the browser's default locale`);
+    }
+  });
+  const { formatDate, formatDateTime } = await import('../src/lib/locale.js');
+  check('formatDate and formatDateTime write en-AU for Prithagoras (22 Nov 2026, never 11/22/2026)', () => {
+    const ms = Date.UTC(2026, 10, 22, 5, 8, 14);
+    assert.equal(formatDate(ms, 'nsw'), '22 Nov');
+    assert.match(formatDateTime(ms, 'nsw'), /^22 Nov 2026,? 4:08 pm$|^22 Nov 2026,? 16:08$/i);
+    assert.ok(!/11\/22\/2026/.test(formatDateTime(ms, 'nsw')));
+  });
+  check('the first-run tour keeps its wide-screen note left of the dot-point picker and falls back under the question', () => {
+    const c = code('components/PracticeTour.jsx');
+    assert.match(c, /data-dotpoint-picker/);
+    assert.match(c, /room >= 180/);
+    assert.match(c, /const avoid = step\.avoid && !inGutter/);
+  });
+  check('the free-cap actions are two bordered buttons, not indented text', () => {
+    const c = code('components/FreeCapNotice.jsx');
+    assert.ok(!/btn btn-quiet/.test(c));
+  });
+  check('on a wide screen only the last hint rung is offered in the footer, not also "Show solution" (they do the same thing)', () => {
+    assert.match(code('components/QuestionCard.jsx'), /!\(INSTRUMENT && ladderOffered && nextRung === 'solution' && !narrow\)/);
+  });
+  check('after marking, the bar does not repeat "Your answer" (the score card shows it)', () => {
+    assert.match(code('components/QuestionCard.jsx'), /writeMode && shownAnswerLine && !inkStale && !cloudPending && !resolved && saveState/);
   });
 }
 

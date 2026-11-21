@@ -40,12 +40,17 @@ export default function PracticeTour({ onClose }) {
     const note = noteRef.current;
     if (!el || !note) return;
     const r = el.getBoundingClientRect();
-    const w = step.gutter && window.innerWidth >= 900 ? 236 : Math.min(320, window.innerWidth - 2 * EDGE);
+    // The wide-screen gutter note stays wholly left of the dot-point picker and the question (it used to overlap their left
+    // edge at 1280); when the margin is too narrow for it, it sits under the question text like a narrow screen's.
+    const column = step.gutter && window.innerWidth >= 900 ? document.querySelector('[data-dotpoint-picker], .q-prompt') : null;
+    const room = column ? column.getBoundingClientRect().left - EDGE - 12 : 0;
+    const inGutter = !!column && room >= 180;
+    const w = inGutter ? Math.min(236, room) : Math.min(320, window.innerWidth - 2 * EDGE);
     const h = note.offsetHeight;
-    const left = Math.max(EDGE, Math.min(r.left, window.innerWidth - w - EDGE));
+    const left = inGutter ? EDGE : Math.max(EDGE, Math.min(r.left, window.innerWidth - w - EDGE));
     // Narrow screens: under the question text, never over it (and clear of the action bar). On a short window the note
     // covers the hint ladder before it covers the prompt, and it is always wholly on screen and below the header.
-    const avoid = step.avoid && window.innerWidth < 900 && document.querySelector(step.avoid);
+    const avoid = step.avoid && !inGutter && document.querySelector(step.avoid);
     const header = document.querySelector('[data-instrument-bar]');
     const top = tourNoteTop({
       anchor: r, side: step.side, h, vh: window.innerHeight,

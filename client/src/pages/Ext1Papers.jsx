@@ -88,7 +88,7 @@ export default function Ext1Papers() {
             <div className="sc-label">{p.title}{p.sample ? ` · ${t('papers.ext1.sample')}` : ''}</div>
             <div className="muted">{t('papers.ext1.meta', { marks: p.marks, time: p.workingTime, pages: p.pages })}</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
-              {p.inApp && !p.sitLocked && <button type="button" className="btn btn-primary btn-sm" disabled={busy !== ''} aria-label={t('papers.ext1.sitLabel', { title: p.title })}
+              {p.inApp && !p.sitLocked && <button type="button" className="btn btn-primary btn-sm" disabled={busy !== ''} aria-label={t('papers.ext1.sitPaperLabel', { title: p.title })}
                 onClick={() => sit(p)} data-ext1-sit={p.id}>
                 {busy === `${p.id}:sit` ? t('papers.ext1.sitting') : t('papers.ext1.sit')}
               </button>}

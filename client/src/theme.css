@@ -1089,6 +1089,10 @@ body { overscroll-behavior-y: none; }
   /* ...but a settings label keeps its words whole: the value beside it is what wraps. */
   .set-row .set-k { flex: 0 0 auto; max-width: 46%; overflow-wrap: normal; word-break: normal; }
   .set-row .set-v { min-width: 0; }
+  /* A sentence of explanation, not a value: it sits under its label, left-aligned, instead of a tall right-aligned column. */
+  .set-row-note { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .set-row-note .set-k { max-width: none; }
+  .set-row-note .set-v { margin-left: 0; text-align: left; }
 
   
   

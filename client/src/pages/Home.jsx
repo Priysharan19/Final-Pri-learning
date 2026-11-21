@@ -7,6 +7,8 @@ import { dayKey, formatWeekday } from '../lib/locale.js';
 import { useT } from '../i18n/index.js';
 import { practiceHref } from '../lib/practiceLinks.js';
 import { featureEnabled } from '../platform/features.js';
+import { formatDate } from '../lib/locale.js';
+import { defaultCourse } from '../platform/edition.js';
 
 
 // ── The home decision ─────────────────────────────────────────────────────────
@@ -159,7 +161,7 @@ export function actionCopy(action, user, t, topicName, resume) {
     ? t('home.meta.remaining', { count: d.remaining, n: d.remaining }) : '';
   return {
     title, kicker: t(kicker), cta: t(cta), meta,
-    reason: t(reason, { ...d, topic: adaptiveTopic || d.topic || '', date: action.dueAt ? new Date(action.dueAt).toLocaleDateString() : '' })
+    reason: t(reason, { ...d, topic: adaptiveTopic || d.topic || '', date: action.dueAt ? formatDate(action.dueAt, defaultCourse()) : '' })
   };
 }
 

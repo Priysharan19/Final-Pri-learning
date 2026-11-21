@@ -56,6 +56,8 @@ import { useExamShortcuts } from '../examShell/useExamShortcuts.js';
 import '../workspace.css';
 import Working from '../instrument/Working.jsx';
 import { walkthroughFixes } from '../platform/edition.js';
+import { formatDate } from '../lib/locale.js';
+import { defaultCourse } from '../platform/edition.js';
 
 const SAVE_DEBOUNCE_MS = 600;
 // A submitted paper waiting for the server is asked about again this often.
@@ -632,7 +634,7 @@ export default function ExamRoom() {
             aria-busy={retrying === item.pendingKey || undefined} onClick={() => retryChecking(item.pendingKey)}>{t('examRoom.retryChecking')}</button>
           <p className="muted" style={{ marginTop: 4, fontSize: 13 }} data-exam-tries-left={item.pendingTriesLeft}>
             {t('examRoom.retryExplain')} {t('examRoom.retryTriesLeft', { count: item.pendingTriesLeft, n: item.pendingTriesLeft })}
-            {item.pendingRetryAt ? <> {t('examRoom.retryAllowedAt', { time: new Date(item.pendingRetryAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) })}</> : null}
+            {item.pendingRetryAt ? <> {t('examRoom.retryAllowedAt', { time: formatDate(item.pendingRetryAt, defaultCourse(), { hour: '2-digit', minute: '2-digit' }) })}</> : null}
           </p>
         </div>
       )}

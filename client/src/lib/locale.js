@@ -113,6 +113,11 @@ export function formatDate(value, profileOrCourse, options = { day: 'numeric', m
   }
 }
 
+/** A date and time written the way the profile reads them ("22 Nov 2026, 4:08 am" for en-AU), never the browser's own locale. */
+export function formatDateTime(value, profileOrCourse, options = { dateStyle: 'medium', timeStyle: 'short' }) {
+  return formatDate(value, profileOrCourse, options);
+}
+
 /** A weekday initial for the week strip, in the profile's timezone and locale. */
 export function formatWeekday(value, profileOrCourse, width = 'narrow') {
   return formatDate(value, profileOrCourse, { weekday: width });

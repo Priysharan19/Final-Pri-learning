@@ -3603,7 +3603,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         <div className="ws-actions editor-foot no-print">
           <span className="status-line" data-state={statusState} data-work-state={workState} data-work-vocab={vocab.state || undefined} role="status" aria-live="polite">
             {statusState !== 'idle' && <span className="status-mark" aria-hidden="true"><Working pending={statusState === 'working'} />{statusState !== 'working' && <span className="dot" />}</span>}
-            {writeMode && shownAnswerLine && !inkStale && !cloudPending && !(resolved && !judgedShown) && saveState !== 'failed' && saveState !== 'saving'
+            {writeMode && shownAnswerLine && !inkStale && !cloudPending && !resolved && saveState !== 'failed' && saveState !== 'saving'
               ? <span className="ws-answer-preview muted">{t('verdict.yourAnswerIs')} <MathText text={`$${texOf(String(shownAnswerLine).replace(/^\s*[=≈]\s*/, ''))}$`} /></span>
               : resolved && serverAuthoritative && statusText
                 /* The verdict word is already on the page in the score card; the live region still announces it, once, to a screen reader. */
@@ -3687,7 +3687,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             {!resolved && diagnostic && (
               <button className="btn btn-quiet" onClick={dontKnow} disabled={busy}>{t('placement.dontKnow')}</button>
             )}
-            {!resolved && !diagnostic && !unmarkable && (() => {
+            {/* On a wide screen the footer Hint on the last rung and "Show solution" do the same thing (the server reveals the solution and spends the attempt, after a second press), so only the rung is offered then; it names the reveal. On a phone "Show solution" lives under More and stays. */}
+            {!resolved && !diagnostic && !unmarkable && !(INSTRUMENT && ladderOffered && nextRung === 'solution' && !narrow) && (() => {
               const showBtn = (
                 <button className={`btn ${revealArmed ? 'btn-ghost' : 'btn-quiet'}`} onClick={reveal} disabled={busy} aria-live="polite">
                   {revealArmed ? t('verdict.showSolutionConfirm') : t('verdict.showSolution')}
