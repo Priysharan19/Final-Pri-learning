@@ -76,12 +76,12 @@ try {
   c.eq(g1.status, 201, 'a guest is given a question');
   c.eq(JSON.parse(decryptDeliveryToken(g1.data.sealed, 'guest-question-v1')).c, CONTENT_VERSION, 'the ticket carries the content version in force');
   const ok1 = await answer(g1.data.sealed);
-  c.deq([ok1.status, ok1.data.resolved], [200, true], 'minted under this version, it is marked');
+  c.deq([ok1.status, typeof ok1.data.correct], [200, 'boolean'], 'minted under this version, it is marked');
   for (const [label, version] of [['another version', OTHER], ['the previous version', UNVERSIONED_TOKEN_CONTENT_VERSION], ['no version field', null]]) {
     const g = await ask();
     const stale = await answer(reseal(g.data.sealed, 'guest-question-v1', version));
     c.deq([stale.status, stale.data?.error?.code], [410, 'GUEST_QUESTION_EXPIRED'], `guest ticket, ${label}: refused with the expired-ticket response`);
-    c.eq((await answer(g.data.sealed)).data?.resolved, true, `guest ticket, ${label}: and the question is not spent (the real ticket is still markable)`);
+    c.eq(typeof (await answer(g.data.sealed)).data?.correct, 'boolean', `guest ticket, ${label}: and the question is not spent (the real ticket is still markable)`);
   }
 } finally {
   await h.close();
