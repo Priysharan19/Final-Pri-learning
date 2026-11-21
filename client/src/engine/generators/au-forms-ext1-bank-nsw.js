@@ -104,9 +104,13 @@ function mcQ(rng, prompt, correct, ds, { dp, hints, steps } = {}) {
 const asinTex = String.raw`\sin^{-1}`;
 const atanTex = String.raw`\tan^{-1}`;
 const C = (n, k) => { let r = 1; for (let i = 1; i <= k; i++) r = (r * (n - k + i)) / i; return Math.round(r); };
+/** (x - b) / a for a non-zero a, the sign in front when a is negative. */
+const invLin = (a, b) => (a < 0 ? String.raw`-\dfrac{x ${sg(-b)}}{${-a}}` : String.raw`\dfrac{x ${sg(-b)}}{${a}}`);
 const frac = (n, d) => (d === 1 ? `${n}` : String.raw`\dfrac{${n}}{${d}}`);
 /** n/d in lowest terms. */
 const fr = (n, d) => { const g = gcd(n, d), s = d < 0 ? -1 : 1; return frac((s * n) / g, (s * d) / g); };
+/** n/d in lowest terms as a multiplier: nothing is printed for 1, otherwise the fraction then op. */
+const mul = (n, d, op) => { const m = fr(n, d); return m === '1' ? '' : `${m}${op}`; };
 /** x over a, with the denominator left out when it is 1. */
 const xover = a => (a === 1 ? 'x' : String.raw`\dfrac{x}{${a}}`);
 /** (n * pi) / d in lowest terms. */
@@ -409,11 +413,11 @@ const calcForms = [
         String.raw`The integrand has the form $\dfrac{k}{a^2+x^2}$ with $a = ${a}$.`,
         String.raw`The antiderivative is $\dfrac{k}{a}${atanTex}\dfrac{x}{a}$.`,
         String.raw`The upper limit gives $${atanTex}${fr(b, a)}$, which has no exact value: use a calculator in radian mode.`,
-        `The value is $${fr(k, a)}\\times ${atanTex}${fr(b, a)} \\approx ${r3(v)}$.`],
+        `The value is $${mul(k, a, '\\times ')}${atanTex}${fr(b, a)} \\approx ${r3(v)}$.`],
       steps: [
-        { h: 'Antiderivative', d: String.raw`$${fr(k, a)}\left[${atanTex}${xover(a)}\right]_0^{${b}}$` },
+        { h: 'Antiderivative', d: String.raw`$${mul(k, a, '')}\left[${atanTex}${xover(a)}\right]_0^{${b}}$` },
         { h: 'Upper limit', d: String.raw`$${atanTex}${fr(b, a)} \approx ${(Math.atan(b / a)).toFixed(4)}$ and $${atanTex}0 = 0$` },
-        { h: 'Value', d: String.raw`$${fr(k, a)}\times ${(Math.atan(b / a)).toFixed(4)} \approx ${r3(v)}$` }]
+        { h: 'Value', d: String.raw`$${mul(k, a, '\\times ')}${(Math.atan(b / a)).toFixed(4)} \approx ${r3(v)}$` }]
     }), 'fc-int-decimal', { a, b, k });
   }),
   // find the constant from the value of the integral
@@ -524,11 +528,11 @@ const calcForms = [
         'The area under a curve from $x = 0$ is a definite integral: write it down with its limits.',
         String.raw`The integrand has the form $\dfrac{k}{a^2+x^2}$; find $a$.`,
         'Integrate, substitute the limits and use an exact angle.',
-        String.raw`Area $= ${fr(k, a)}\cdot\dfrac{\pi}{3} \approx ${r3(v)}$.`],
+        String.raw`Area $= ${mul(k, a, '\\cdot ')}\dfrac{\pi}{3} \approx ${r3(v)}$.`],
       steps: [
         { h: 'Set up', d: String.raw`$A = \int_0^{${a === 1 ? '' : a}\sqrt3}\dfrac{${k}}{${a * a}+x^2}\,dx$` },
-        { h: 'Integrate', d: String.raw`$${fr(k, a)}\left[${atanTex}${xover(a)}\right]_0^{${a === 1 ? '' : a}\sqrt3} = ${fr(k, a)}\left(${atanTex}\sqrt3 - 0\right)$` },
-        { h: 'Value', d: String.raw`$${fr(k, a)}\cdot\dfrac{\pi}{3} \approx ${r3(v)}$` }]
+        { h: 'Integrate', d: String.raw`$${mul(k, a, '')}\left[${atanTex}${xover(a)}\right]_0^{${a === 1 ? '' : a}\sqrt3} = ${mul(k, a, '')}\left(${atanTex}\sqrt3 - 0\right)$` },
+        { h: 'Value', d: String.raw`$${mul(k, a, '\\cdot ')}\dfrac{\pi}{3} \approx ${r3(v)}$` }]
     }), 'fc-int-area', { a, k });
   }),
   // which substitution
@@ -928,8 +932,8 @@ const fnForms = [
       traps: inner ? [{ value: (c - b) * (c - b) / (a * a), why: '$(f^{-1}\\circ g)(x) = f^{-1}(g(x))$: square **first**, then apply the inverse.' }] : [{ value: (c * c - b) / a, why: '$(g\\circ f^{-1})(x) = g(f^{-1}(x))$: apply the inverse **first**, then square.' }],
       hints: ['Read the composite from the inside out: the function on the right acts first.', inner ? 'Find $g(' + c + ')$ first.' : `Find $f^{-1}(${c})$ first.`, inner ? 'Now apply $f^{-1}$ to that result.' : 'Now apply $g$ to that result.', `The value is $${val}$.`],
       steps: inner
-        ? [{ h: 'Inner function', d: `$g(${c}) = ${c * c}$` }, { h: 'Inverse of f', d: `$f^{-1}(x) = \\dfrac{x ${sg(-b)}}{${a}}$` }, { h: 'Outer function', d: `$f^{-1}(${c * c}) = ${val}$` }]
-        : [{ h: 'Inverse of f', d: `$f^{-1}(x) = \\dfrac{x ${sg(-b)}}{${a}}$, so $f^{-1}(${c}) = ${tVal}$` }, { h: 'Outer function', d: `$g(${tVal}) = ${tVal < 0 ? `(${tVal})` : tVal}^{2}$` }, { h: 'Value', d: `$${val}$` }]
+        ? [{ h: 'Inner function', d: `$g(${c}) = ${c * c}$` }, { h: 'Inverse of f', d: `$f^{-1}(x) = ${invLin(a, b)}$` }, { h: 'Outer function', d: `$f^{-1}(${c * c}) = ${val}$` }]
+        : [{ h: 'Inverse of f', d: `$f^{-1}(x) = ${invLin(a, b)}$, so $f^{-1}(${c}) = ${tVal}$` }, { h: 'Outer function', d: `$g(${tVal}) = ${tVal < 0 ? `(${tVal})` : tVal}^{2}$` }, { h: 'Value', d: `$${val}$` }]
     }), 'fn-composite-inverse', { a, b, c, inner });
   }),
   V([3], rng => {
