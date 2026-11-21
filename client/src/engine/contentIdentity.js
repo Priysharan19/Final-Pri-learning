@@ -87,7 +87,12 @@
 // of rational solutions prints as fractions; a previous-year question keeps the exam's published band; the key-format
 // repairs (a constant key, a plain percentage box, a plain value box) and the wider parameter ranges change what
 // those generators serve.
-export const CONTENT_VERSION = '2026.11.45';
+// 2026.11.46 — Extension 1 bank variety: me12-further-calc, me11-binomial, me11-functions (D1, D3), me12-vectors-forms (D1) and the two induction
+//              generators gain decision-different forms (80 forms; inverse sine versus tangent, substitutions, split numerators, constants found from
+//              an integral, binomial terms and sums, inverses of restricted functions, and the single steps of an induction proof as expression and
+//              multiple-choice answers). Adding forms to those cells changes which question a given seed draws, so every seed in them is a different
+//              question from 2026.11.45's; every other generator is unchanged.
+export const CONTENT_VERSION = '2026.11.46';
 /**
  * A sealed token that re-generates a question from (generator, difficulty, seed) (a prepared practice question, a guest
  * ticket) carries the content version it was minted under (`c`). A token with no `c` was minted before that field existed,

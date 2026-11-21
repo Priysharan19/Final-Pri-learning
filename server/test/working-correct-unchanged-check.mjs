@@ -50,6 +50,10 @@ ok(flips === 0, `no page flips to correct, and no partial credit changes with th
 // the correctness of every page, pinned: this is the verdict stepCheck gave before the rule existed
 const sum = digest.digest('hex');
 console.log(`  working pages: ${pages}, correctness digest ${sum.slice(0, 16)}`);
-ok(sum === 'f3a871da25402131d3f3515f6cb6bcfc2fcf5159c4e182f8bb662a02d2851419', `the correctness of all ${pages} pages is the one pinned (${sum})`);
+// Re-pinned 2026-11-22 (Extension 1 bank variety, CONTENT_VERSION 2026.11.46): 1245 -> 1140 pages. me12-induction gained expression and
+// multiple-choice forms, so 105 pages of seven seeds that used to draw a working-answer form (me12-induction D4, 15 pages a seed) now draw one of the
+// new forms and are no longer pages here. Verified against the parent commit by dumping every page: the 1140 pages that remain are the same
+// pages with the same verdict, none is new, and none changed verdict. The marker is untouched.
+ok(sum === 'efb46183474a39a4539e231f6bb317bb4862f99c544def0ce939b631fb8d80eb', `the correctness of all ${pages} pages is the one pinned (${sum})`);
 console.log(`WORKING CORRECT UNCHANGED: ${fail ? 'FAIL' : 'PASS'} — ${pass}/${pass + fail} checks — a stray definition, label or bare number never changes whether a working answer is correct`);
 if (fail) process.exit(1);

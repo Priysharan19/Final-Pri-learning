@@ -172,8 +172,14 @@ const INSTALL_GZIP_CEILING = 1_000_000;
 // FIRST_VISIT_RAW 5,250,000 -> 5,400,000 bytes; gzip unchanged. Measured on the merged tree: 5,158 kB raw install plus warm, over 5,127 kB.
 // A re-baseline for the combined branch, not a weaker gate: the install ceilings, the banned-from-install list, render-from-install and
 // offline coverage are unchanged. Headroom is about 115 kB.
-const FIRST_VISIT_RAW_CEILING = 5_400_000;
-const FIRST_VISIT_GZIP_CEILING = 1_850_000;
+// Raised 2026-11-22 (train ext1bank-1, the Extension 1 bank-variety forms, under the same owner decision, size not a constraint):
+// FIRST_VISIT_RAW 5,400,000 -> 5,600,000 and FIRST_VISIT_GZIP 1,850,000 -> 1,950,000 bytes. A RE-BASELINE, not a weaker gate. Measured with a real
+// build of this branch: 5,349 kB raw / 1,813 kB gzipped install plus warm, over the old 5,273 / 1,807 kB. What it added: one lazy overlay module of
+// 80 decision-different forms (worked steps, four-rung hint ladders, named traps) for 6 Extension 1 generators. The ceiling also leaves room for the
+// parallel Advanced bank-variety branch, which adds a similar module; the install ceilings, the banned-from-install list, render-from-install and
+// offline coverage are unchanged. Headroom is about 120 kB raw and 48 kB gzipped.
+const FIRST_VISIT_RAW_CEILING = 5_600_000;
+const FIRST_VISIT_GZIP_CEILING = 1_950_000;
 
 // Things that must never be in the install again, and what each one costs.
 const BANNED_FROM_INSTALL = [

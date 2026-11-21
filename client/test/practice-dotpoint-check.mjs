@@ -82,8 +82,12 @@ const draw = (sub, d, arg) => Array.from({ length: DRAWS }, (_, i) => generateQu
 const credited = q => (Array.isArray(q.dotpoints) && q.dotpoints.length ? q.dotpoints : q.dotpoint ? [q.dotpoint] : []);
 const KNOWN_LEAKS = {
   'y12-financial.1@D1': 28, 'y12-financial.2@D1': 12, 'me11-poly.3@D4': 21, 'me11-functions.2@D2': 35,
-  'me11-comb.3@D4': 5, 'me12-induction.1@D4': 11, 'me12-induction.3@D4': 25
+  'me11-comb.3@D4': 5, 'me12-induction.1@D4': 23, 'me12-induction.3@D4': 26
 };
+// me12-induction D4: 11 -> 23 and 25 -> 26 of 40 draws belong to the asked dot point (the leak SHRINKS: 29 -> 17 and 15 -> 14 draws
+// on a sibling's dot point). Cause: the Extension 1 bank-variety forms (CONTENT_VERSION 2026.11.46) joined that cell declaring no
+// dot point, so they are credited to the cell's own dot points (series and structure) and the divisibility-only forms of
+// au-forms-gaps-g-nsw.js are a smaller share of the draw. No new leak cell was added.
 let topics = 0, cells = 0, exact = 0, shared = 0, belongs = 0, total = 0;
 // Baseline: a topic asked at its first issued level with no dot point, against each of its dot points asked at that level.
 let pairs = 0, pairsReachedWithout = 0, pairsOnTargetWithout = 0, pairsOnTargetWith = 0;
