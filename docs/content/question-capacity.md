@@ -14,7 +14,7 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `y11-explog-more` | 4 | 104 | 1 | — | instances + forms |
 | `me12-trigeq` | 4 | 408 | 34 | — | instances |
 | `ms11-time-location` | 4 | 511 | 3 | — | instances + forms |
-| `me12-further-calc` | 4 | 887 | 16 | — | instances |
+| `me12-further-calc` | 4 | 871 | 20 | — | instances |
 | `me11-binomial` | 4 | 919 | 11 | — | instances |
 | `y11-functions-more` | 4 | 1.7k | 8 | — | instances |
 | `ms12-annuity` | 4 | 1.8k | 2 | — | instances + forms |
