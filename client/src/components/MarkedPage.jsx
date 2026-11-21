@@ -23,8 +23,6 @@ import { dollarsBalanced, lineTex } from '../engine/commentTex.js';
 import { strokePath } from './originalWorkModel.js';
 import { STATE, alignCards, boxesFromInk, boxesFromPhoto, buildMarkedPage, commentItems, listOf, markerOf } from './markedPageModel.js';
 import { criteriaView } from './criteriaTableModel.js';
-import { LineComment, AiNote } from './LineComment.jsx';
-import { commentsByCard } from './lineCommentsModel.js';
 import './MarkedPage.css';
 
 const pointsOf = s => (Array.isArray(s) ? s : Array.isArray(s?.points) ? s.points : []);
@@ -113,7 +111,7 @@ function Sheet({ source, geometry, page, active, setActive, t, cleaned }) {
  * source: { kind: 'ink', strokes } or { kind: 'photo', src, lines } where `lines` are the judged
  * lines in order (each may carry the reader's normalised `box`). The geometry is worked out here.
  */
-export default function MarkedPage({ input, source, texOf = s => s, markReady = true, scoreShown = false, criteria = null, approved, reading = null, onCorrect = null, comments = null }) {
+export default function MarkedPage({ input, source, texOf = s => s, markReady = true, scoreShown = false, criteria = null, approved, reading = null, onCorrect = null }) {
   const t = useT();
   const uid = useId();
   // A read line is shown as maths: stacked fractions and proper powers where it parses, else the reader's own text via texOf.
@@ -129,7 +127,6 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
   }, [source, input]);
   const page = useMemo(() => buildMarkedPage({ model, boxes: geometry?.boxes || null, markReady }), [model, geometry, markReady]);
   const items = useMemo(() => commentItems(page), [page]);
-  const byN = useMemo(() => commentsByCard(model?.cards, comments), [model, comments]);
   // Only for a question type the author has approved, for its current scheme; otherwise nothing is drawn.
   const table = useMemo(() => (page && model ? criteriaView({ criteria, mark: page.header.mark, cards: model.cards, ...(approved ? { approved } : {}) }) : null), [criteria, page, model, approved]);
   const [active, setActive] = useState(null);
@@ -250,12 +247,11 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
             if (status === 'checked' || status === 'condition') {
               const why = whyOf(card, t);
               return (
-                <li key={it.id} className={`mp-card mp-row is-${status}${reading ? ' has-read' : ''}${byN.has(n) ? ' has-comment' : ''}${active === n ? ' is-active' : ''}`} data-mp-card={n} data-mp-status={status} tabIndex={0} style={pos} {...on(n)}>
+                <li key={it.id} className={`mp-card mp-row is-${status}${reading ? ' has-read' : ''}${active === n ? ' is-active' : ''}`} data-mp-card={n} data-mp-status={status} tabIndex={0} style={pos} {...on(n)}>
                   <Icon name={st.icon} size={14} />
                   <span className="mp-row-n">{t('mp.line', { n })}</span>
                   {why && <span className="mp-row-why" data-mp-why>{whyIsEngine(card) ? <EngineComment text={why} /> : why}</span>}
                   <span className="sr-only">{t(st.word)}</span>
-                  <LineComment c={byN.get(n)} n={n} />
                   {reading && readingOfLine(n)}
                 </li>
               );
@@ -274,7 +270,6 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
                 {status === 'first-error'
                   ? <p className="mp-text mp-sentence-1" data-mp-why-error>{sentence ? (sentence.includes('$') && dollarsBalanced(sentence) ? <EngineComment text={sentence} /> : <Typeset text={sentence} texOf={texOf} />) : (n > 1 ? t('aw.body.firstError', { n: n - 1 }) : t('aw.body.firstErrorStart'))}</p>
                   : <div className="mp-text"><CardBody card={card} model={model} t={t} /></div>}
-                <LineComment c={byN.get(n)} n={n} />
                 {reading && status !== 'unread' && readingOfLine(n)}
               </li>
             );
@@ -303,7 +298,6 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
           <p className="mp-label" data-mp-approval-label>{t('mp.criteria.label')}</p>
         </div>
       )}
-      <AiNote comments={byN} />
     </section>
   );
 }

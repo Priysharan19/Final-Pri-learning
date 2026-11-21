@@ -11,8 +11,6 @@
 // their offline grades as server grades. The client transport integration is
 // a separate mandatory release gate.
 import { interpretAfterStepCheck, reportWithInterpretation } from './lineInterpreter/overlay.js';
-import { createLineCommentsHandler, notEnabledBody as lineCommentsNotEnabled } from './lineComments/route.js';
-import { lineCommentsEnabled } from './lineComments/provider.js';
 import { createHash, randomInt, randomUUID } from 'node:crypto';
 import { asyncRouter, asyncHandler } from './asyncRouter.js';
 import { asStore } from './store.js';
@@ -588,6 +586,13 @@ async function chooseQuestionFor(db, accountId, request, now, { draw = () => ran
  * may start working on before signing in, and the sealed token that lets one
  * account turn it into an issued question later.
  */
+/** What the client sees of a stored grade reply: `markingReport` stays in the record; the reply says only THAT it differs. */
+function clientVisibleGrade(response) {
+  if (!response || typeof response !== 'object' || !response.markingReport) return response;
+  const { markingReport, ...visible } = response;
+  return { ...visible, markingReportDiffers: true };
+}
+
 export function createPracticePrepareRoute(db, { banks = bankPolicy(), env = process.env } = {}) {
   db = asStore(db);
   return [rateLimit(db, 'practice-prepare', { limit: 90, windowMs: 60 * 60 * 1000 }), asyncHandler(async (req, res) => {
@@ -1404,7 +1409,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       const [forecast, cooling, consentBlockedBefore] = await Promise.all([
         gate(), markerCooldownUntil(db, accountId), consentBlockedNow(db, accountId)]);
       if (forecast.status) return refuse(forecast);
-      if (forecast.response) return res.status(200).json(forecast.response);
+      if (forecast.response) return res.status(200).json(clientVisibleGrade(forecast.response));
       // An account that has just had several entries stopped at the deadline
       // waits (markerPool.js MARKER_COOLDOWN). A committed receipt is replayed
       // above regardless: recovering a reply costs no marking.
@@ -1581,7 +1586,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // method-mark switch says: its lines are still reported, as feedback.
       const finalAnswerOnly = q._marking === FINAL_ANSWER_MARKING;
       const counted = resolved && finalAnswerOnly ? { stepReport: evidence.stepReport || null, partial: null } : evidence;
-      const { stepReport, partial } = resolved ? counted : { stepReport: null, partial: null };
+      const { stepReport, partial, markingReport } = resolved ? counted : { stepReport: null, partial: null };
       const notRead = resolved && workingNotRead && working.trim() !== '';
       // After the engine's step check, never before it, and rules only (the model arm is unreachable here).
       const lineInterpretation = resolved && !invalid && !notRead
@@ -1663,6 +1668,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         // What the marked page draws: the engine's report with the interpreter's line verdicts folded in (feedback only;
         // `partial` and every mark above were computed from the engine's report alone).
         stepReport: invalid ? null : reportWithInterpretation({ stepReport, lineInterpretation, working }), partial: invalid ? null : partial,
+        // The report that decided `partial`, only when the displayed one differs (markerOps.stepEvidence): stored with the reply.
+        ...(resolved && !invalid && markingReport ? { markingReport } : {}),
         ...(resolved && !invalid && lineInterpretation ? { lineInterpretation } : {}), ...(resolved ? {
           solution: solutionFor(q, result.sketch),
           // Supplemental aggregate marking: no per-step allocations are invented.
@@ -1798,7 +1805,9 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       }, { accountScope: accountId, lock: syncLockKey(accountId) }));
       if (outcome.again) { evidenceForced = evidenceForced || outcome.needEvidence === true; continue; }
       if (outcome.status) return refuse(outcome);
-      return res.status(200).json(outcome.response);
+      // The stored record (and the replay read from it) keeps `markingReport`; the client is told only THAT the displayed
+      // report differs from the one that decided the marks, never what the report said.
+      return res.status(200).json(clientVisibleGrade(outcome.response));
     }
     // The question kept changing under three attempts to commit one mark.
     // Nothing was written; the same submission key retries safely.
@@ -1852,12 +1861,6 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     res.set('Cache-Control', 'no-store');
     return res.status(200).json({ ...catalog, premium: serverEntitlementCapabilities(snapshot, Date.now()).includes(JEE_BAND_CAPABILITY), capability: JEE_BAND_CAPABILITY });
   });
-
-  // The comments written on a marked answer (lineComments/route.js): after the engine, from the server's own stored reply.
-  // Dark: answers `enabled: false` unless the server sets PRI_FEATURE_LINE_COMMENTS=1.
-  // The switch is checked FIRST: off, nothing runs after it (no rate-limit row, no read, nothing stored).
-  router.post('/:id/line-comments', (req, res, next) => (lineCommentsEnabled(env) ? next() : res.status(200).json(lineCommentsNotEnabled())), rateLimit(db, 'practice-line-comments', { limit: 240, windowMs: 60 * 60 * 1000 }),
-    createLineCommentsHandler({ db, env, deps: { UUID, reject, MAX_AGE, solutionFor, marksPossibleFor, serverEdition } }));
 
   // ── The tutor policy's smallest next step (helpPlan.js) ─────────────────
   // One decision of client/src/engine/tutorPolicy.js for THIS account's open

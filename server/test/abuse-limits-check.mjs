@@ -21,7 +21,6 @@ delete process.env.PRI_HANDWRITING_API_KEY;
 process.env.PRI_FEATURE_TUTOR = '1';
 process.env.PRI_FEATURE_LINE_CHECK = '1';
 process.env.PRI_FEATURE_STEP_COACH = '1';
-process.env.PRI_FEATURE_LINE_COMMENTS = '1';   // AI-written marking comments ship dark; the declared limit is measured with it on
 
 const { startApp, registerAccount, verifyEmail, checks, enrolMfa } = await import('./support/app-harness.mjs');
 const { requestedEngine } = await import('./support/engine.mjs');

@@ -50,7 +50,7 @@ import { CheckRefusal, CheckSignIn, SignInChoices } from './CheckRefusal.jsx';
 import { awardStepMarks, marksSentenceKey } from '../engine/cbseMarking.js';
 import { checkWorkingWithCloud, CLOUD_WORKING_ENGINE, mergeVerdicts, misconceptionProposal, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
 import { createStrokeSignature } from '../ink/strokeSignature.js';
-import { annotationsLive, inkLineVerdicts, photoFingerprint, revisionKey, sameLines, workingEvidence, workingEvidenceCopy } from './attemptEvidence.js';
+import { annotationsLive, inkLineVerdicts, photoFingerprint, revisionKey, sameLines, workingEvidence, workingEvidenceCopy, lostMarksForPage } from './attemptEvidence.js';
 import { misconceptionById } from '../engine/misconceptions.js';
 import { practiceWorkState } from '../platform/workState.js';
 import { HINT_RUNGS, RUNG_COST, markWeightAfter } from '../engine/hintLadder.js';
@@ -165,7 +165,6 @@ const MistakeGraph = React.lazy(() => import('./MistakeGraph.jsx').catch(() => (
 // Annotated working: each checked line's named rule, numbered against the ink,
 // and the evaluation built from the receipt. Engine-only, feedback only, and
 // its own chunk; a chunk that cannot load shows the plain step report instead.
-import { useLineComments } from './useLineComments.js';
 const MarkedPage = React.lazy(() => import('./MarkedPage.jsx').catch(() => ({ default: () => null })));
 const AnnotatedWorkingPart = React.lazy(() => import('./AnnotatedWorking.jsx').catch(() => ({ default: () => null })));
 
@@ -2245,8 +2244,6 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const markedId = (resolved ? res?.submissionId : state.res?.submissionId);
   if (typeof markedId === 'string' && markedId && (resolved || gradedRetry)) markedSubmissions.current.seen.add(markedId);
   const markedCount = markedSubmissions.current.seen.size;
-  // The comments a model wrote on this marked answer, only where the server has the feature on (dark: nothing is asked of a model and nothing changes).
-  const lineComments = useLineComments(resolved ? res : null, { language });
   const awInput = useMemo(() => {
     if (!resolved || previousAttempt || !res || res.revealed || res.invalid || !Array.isArray(res.stepReport?.lines) || res.stepReport.lines.length < 2) return null;
     const lines = writeMode ? (judged?.lines || inkResult?.lines || []) : String(working || '').split('\n').filter(Boolean);
@@ -2994,7 +2991,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               )}
               {photoPageOn && (
                 <React.Suspense fallback={null}>
-                  <MarkedPage input={awInput} source={{ kind: 'photo', src: photo, lines: photoPageLines }} texOf={texOf} scoreShown={instrumentScore} criteria={res?.methodCriteria} reading={pageReading} onCorrect={onRedo ? correctReadLine : null} comments={lineComments} />
+                  <MarkedPage input={awInput} source={{ kind: 'photo', src: photo, lines: photoPageLines }} texOf={texOf} scoreShown={instrumentScore} criteria={res?.methodCriteria} reading={pageReading} onCorrect={onRedo ? correctReadLine : null} />
                 </React.Suspense>
               )}
               {photoSignInOpen && photoOCR.blockedKey === 'verdict.photoReadingSignIn' && (
@@ -3045,7 +3042,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           <>
           {inkPageOn && (
             <React.Suspense fallback={null}>
-              <MarkedPage input={awInput} source={{ kind: 'ink', strokes: latestInk.current || restoredInk || [] }} texOf={texOf} scoreShown={instrumentScore} criteria={res?.methodCriteria} reading={pageReading} onCorrect={onRedo ? correctReadLine : null} comments={lineComments} />
+              <MarkedPage input={awInput} source={{ kind: 'ink', strokes: latestInk.current || restoredInk || [] }} texOf={texOf} scoreShown={instrumentScore} criteria={res?.methodCriteria} reading={pageReading} onCorrect={onRedo ? correctReadLine : null} />
             </React.Suspense>
           )}
           <div className={`ink-row${awModel && !inkPageOn ? ' aw-row' : ''}`} hidden={inkPageOn || undefined}>
@@ -3344,7 +3341,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               {attemptViaInk && !checkRefused && !previousAttempt && <div className="eval-provenance" data-provenance="handwriting" style={{ padding: '6px 0 0', border: 0 }}>{t('verdict.readByAiMarkedByEngine')}</div>}
               {!previousAttempt && state.res?.authoritative !== true && state.res?.partial &&
                 <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>{state.res.partial.note}</div>}
-              {!previousAttempt && state.res?.authoritative !== true && state.res?.partial && <LostMarks lost={state.res.partial.lost} t={t} />}
+              {!previousAttempt && state.res?.authoritative !== true && state.res?.partial && <LostMarks lost={state.res.partial.lost} res={state.res} t={t} />}
               {!previousAttempt && state.res.stepReport && <StepReport report={state.res.stepReport} />}
               {!previousAttempt && !checkRefused && !state.res?.readerBlock && <div className="verdict-next">{state.res?.conflict ? t('verdict.nextAfterConflict') : t(technicalRetry ? 'verdict.nextTechnical' : invalidRetry ? 'verdict.nextUnreadable'
                 : markedLineFix ? 'verdict.nextFix' : 'verdict.nextTryAgain')}</div>}
@@ -3454,7 +3451,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>{res.partial.note}</div>}
                 {res.partial && !verdictGood &&
                   (!serverAuthoritative || showCommittedMethodAwardNote(res, committedGrade)) &&
-                  <LostMarks lost={res.partial.lost} t={t} />}
+                  <LostMarks lost={res.partial.lost} res={res} t={t} />}
                 {/* The answer that was marked is the one the student confirmed. */}
                 {judged?.viaInk && !isWorking && !res.revealed && String(judged.answer).trim() !== '' && (
                   <div data-submitted-answer={judged.answer}>
@@ -3744,11 +3741,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
  */
 const LOST_KEY = /^marks\.lost\.[a-zA-Z]+$/;
 const RULE_KEY = /^(?:marks\.rule\.[a-zA-Z]+|misconception\.[a-zA-Z]+\.name)$/;
-function LostMarks({ lost, t }) {
-  const rows = Array.isArray(lost) ? lost.filter(l => l && LOST_KEY.test(String(l.key))) : [];
-  if (!rows.length) return null;
+function LostMarks({ lost, res = null, t }) {
+  const page = lostMarksForPage({ lost, stepReport: res?.stepReport, markingReportDiffers: res?.markingReportDiffers === true });
+  const rows = page.rows.filter(l => l && LOST_KEY.test(String(l.key)));
+  if (!rows.length && !page.fromCheckable) return null;
   return (
     <ul className="lost-marks muted" style={{ marginTop: 6, paddingLeft: 18, fontSize: 13 }} aria-label={t('marks.lost.heading')}>
+      {page.fromCheckable && <li data-lost-key="marks.lost.fromCheckable">{t('marks.lost.fromCheckable')}</li>}
       {rows.map((l, i) => (
         <li key={i} data-lost-line={l.line} data-lost-key={l.key}>{t(l.key, { ...(l.vars || {}), rule: RULE_KEY.test(String(l.ruleKey)) ? t(l.ruleKey) : '' })}</li>
       ))}

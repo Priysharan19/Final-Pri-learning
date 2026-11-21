@@ -30,6 +30,7 @@ import { missingSteps } from '../../client/src/engine/missingSteps.js';
 import { infoOf as arithmeticInfo, cleanStatement } from '../../client/src/engine/arithmeticLines.js';
 import { annotateMilestones } from '../../client/src/engine/milestones.js';
 import { solutionMatch } from '../../client/src/engine/solutionMatch.js';
+import { lineChains } from '../../client/src/engine/lineChains.js';
 import { awardBoardScheme, matchBoardPoints } from '../../client/src/engine/boardScheme.js';
 import { answerForm, effectiveSymbols, firstFinalAttempt, planGivens, readClaimForm } from './finalAttempt.js';
 
@@ -132,6 +133,19 @@ export function foldTrueAsWritten(report, arithmetic) {
   };
 }
 
+// The report that DECIDED the marks, reduced to what reproduces the decision (checker.methodMarks reads a line's text, status,
+// stage, ecf, given, coversAll and otherUnknown; the card reads state, note and diagnosis). Absent when the displayed report
+// carries the same: ordinary pages store nothing extra.
+const MARKING_LINE_KEYS = ['text', 'status', 'state', 'note', 'diagnosis', 'stage', 'ecf', 'given', 'coversAll', 'otherUnknown'];
+function markingReportOf(report) {
+  if (!report || !Array.isArray(report.lines)) return null;
+  const out = { lines: report.lines.map(l => { const o = {}; for (const k of MARKING_LINE_KEYS) if (l && l[k] !== undefined) o[k] = l[k]; return o; }) };
+  if (report.firstBreak !== undefined) out.firstBreak = report.firstBreak;
+  if (report.diagnosis !== undefined) out.diagnosis = report.diagnosis;
+  if (report.summary !== undefined) out.summary = report.summary;
+  return out;
+}
+
 export function stepEvidence(q, answer, steps, result, opts = null) {
   const meta = stepMetaFor(q);
   let report = result.stepReport || null;
@@ -150,29 +164,34 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
     // Nothing judged (no line was arithmetic): the reply says nothing about the lines, as before.
     if (report && !report.lines.some(l => l.status === 'ok' || l.status === 'break')) report = null;
   }
-  let partial = null;
-  // A blank final-answer box may still carry verified mathematical method
-  // evidence. Invalid nonblank expressions do not become creditable merely
-  // because working was attached; only an actually empty final-answer field
-  // can be graded by method alone.
   const blankFinal = typeof answer === 'string' && answer.trim() === '';
-  if (meta && steps && !result.correct && (!result.invalid || blankFinal) && Array.isArray(q.boardScheme)) {
-    // The Board's own scheme: each value point earned by its own line, one line
-    // per point, in order, verified by the deterministic step check
-    // (matchBoardPoints). methodMarks' generic rubric is not used — the record
-    // says how the Board marked this question.
-    const okLines = (report?.lines || []).filter(l => l?.status === 'ok').length;
-    const ticked = matchBoardPoints({ scheme: q.boardScheme, lines: report?.lines || [], meta });
-    const award = awardBoardScheme({ scheme: q.boardScheme, ticked, correct: false });
-    if (okLines > 0) partial = { okLines, awarded: award.method, note: award.method > 0 ? `${award.method} of ${award.total} marks for the method the Board's marking scheme credits.` : 'Your working does not yet reach a whole mark of the Board\'s marking scheme.', lines: (report?.lines || []).map(l => ({ status: l?.status, text: l?.text })), lost: award.total - award.method, boardScheme: true };
-  } else if (meta && steps && !result.correct && (!result.invalid || blankFinal)) {
-    try {
-      const method = methodMarks({
-        meta, working: steps, marks: marksPossibleFor(q), prompt: q.prompt, report
-      });
-      if (method) partial = { okLines: method.okLines, awarded: method.awarded, note: method.note, lines: method.lines, lost: method.lost };
-    } catch { partial = null; }
-  }
+  // The method marks of a topic report (also run again on the displayed report to see whether it reproduces them).
+  const partialOf = rep => {
+    let out = null;
+    // A blank final-answer box may still carry verified mathematical method
+    // evidence. Invalid nonblank expressions do not become creditable merely
+    // because working was attached; only an actually empty final-answer field
+    // can be graded by method alone.
+    if (meta && steps && !result.correct && (!result.invalid || blankFinal) && Array.isArray(q.boardScheme)) {
+      // The Board's own scheme: each value point earned by its own line, one line
+      // per point, in order, verified by the deterministic step check
+      // (matchBoardPoints). methodMarks' generic rubric is not used — the record
+      // says how the Board marked this question.
+      const okLines = (rep?.lines || []).filter(l => l?.status === 'ok').length;
+      const ticked = matchBoardPoints({ scheme: q.boardScheme, lines: rep?.lines || [], meta });
+      const award = awardBoardScheme({ scheme: q.boardScheme, ticked, correct: false });
+      if (okLines > 0) out = { okLines, awarded: award.method, note: award.method > 0 ? `${award.method} of ${award.total} marks for the method the Board's marking scheme credits.` : 'Your working does not yet reach a whole mark of the Board\'s marking scheme.', lines: (rep?.lines || []).map(l => ({ status: l?.status, text: l?.text })), lost: award.total - award.method, boardScheme: true };
+    } else if (meta && steps && !result.correct && (!result.invalid || blankFinal)) {
+      try {
+        const method = methodMarks({
+          meta, working: steps, marks: marksPossibleFor(q), prompt: q.prompt, report: rep
+        });
+        if (method) out = { okLines: method.okLines, awarded: method.awarded, note: method.note, lines: method.lines, lost: method.lost };
+      } catch { out = null; }
+    }
+    return out;
+  };
+  const partial = partialOf(report);
   // Feedback only, after the mark is computed: a correct intermediate line
   // that matches a step of the worked solution is ticked (milestones.js).
   // A question whose working is not checked (no Step Check: supportsSteps
@@ -182,6 +201,8 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
   // (matchBoardPoints). A right answer with junk, repeated or no working is
   // worth the answer point alone, never the printed marks (D25 delta review).
   const board = Array.isArray(q.boardScheme) ? boardAward(q, meta, report, result.correct === true) : null;
+  // What decided the marks above; the display passes below may change `report`.
+  const decided = meta && steps ? report : null;
   // Feedback only, after every mark: the topic check's CROSS on a definition, a label or a bare margin number is shown as a note,
   // and the lines after it are judged as if it were absent (checker.claimFreeReport). Every mark, `correct`, method mark and
   // board tick above was computed from the report the topic check made, unchanged. `opts.claims === false` is the test switch.
@@ -212,6 +233,12 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
       const matched = base ? solutionMatch(q, base) : null;
       if (matched && matched.matched > 0) report = matched.report;
     } catch { /* the report stands */ }
+    // Feedback only, after solutionMatch: chains, integrals, vectors and a slip warning (engine/lineChains.js). Never a mark, never a cross.
+    try {
+      const base2 = report || trueAsWritten(q, steps, opts);
+      const more = base2 && !(opts && opts.fold === false) ? lineChains(q, base2, { warn: !!(opts && opts.slipWarnings === true) }) : null;
+      if (more && (more.matched > 0 || more.warned > 0)) report = more.report;
+    } catch { /* the report stands */ }
   }
   // A true-as-written tick on a line that ends at the student's own WRONG answer (`so 10^1 = 10` when the answer is 30)
   // reads as "this is right". The arithmetic is; the value was not accepted (it may be wrong, or right in a form or unit
@@ -238,7 +265,15 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
   // Feedback only, for an answer that is not right: the steps of the worked solution whose values are nowhere on the
   // page (engine/missingSteps.js). Computed after every mark above; nothing reads it but the result card.
   try { if (report && result.correct !== true && typeof steps === 'string') { const gap = missingSteps(q, steps); if (gap) report = { ...report, missing: gap.missing, stepsFound: gap.found, stepsReadable: gap.total }; } } catch { /* the report stands */ }
-  return board ? { stepReport: report, partial, board } : { stepReport: report, partial };
+  // The displayed report is kept as it was. Where running the marks again on it would NOT give the stored `partial` (or the
+  // Board's ticks), the report that decided them is kept beside it, reduced to what reproduces the decision.
+  let markingReport = null;
+  if (decided && decided !== report) {
+    let reproduces = false;
+    try { reproduces = JSON.stringify(partialOf(report)) === JSON.stringify(partial) && (!Array.isArray(q.boardScheme) || JSON.stringify(boardAward(q, meta, report, result.correct === true)) === JSON.stringify(board)); } catch { reproduces = false; }
+    if (!reproduces) markingReport = markingReportOf(decided);
+  }
+  return { stepReport: report, partial, ...(board ? { board } : {}), ...(markingReport ? { markingReport } : {}) };
 }
 
 /** The Board-scheme award for a question carrying one, from the deterministic report. */
@@ -491,7 +526,7 @@ export const MARKER_OPS = Object.freeze({
     emit({ result });
     const wanted = result.correct || evidenceIfWrong || !String(working || '').trim();
     if (!wanted) return { result, evidence: null };
-    const evidence = stepEvidence(q, answer, working, result, Array.isArray(workingLatex) ? { latex: workingLatex } : null);
+    const evidence = stepEvidence(q, answer, working, result, { slipWarnings: true, ...(Array.isArray(workingLatex) ? { latex: workingLatex } : {}) });
     // Final answer only: the step report stays, the method mark does not.
     return { result, evidence: policyOf({ policy }).methodMarks ? evidence : { stepReport: evidence.stepReport, partial: null, ...(evidence.board ? { board: evidence.board } : {}) } };
   },

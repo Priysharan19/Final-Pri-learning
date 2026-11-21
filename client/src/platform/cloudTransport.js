@@ -729,8 +729,6 @@ export const cloud = Object.freeze({
   hintPractice: (questionId, rung) => cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/hint', { method: 'POST', body: { rung } }),
   // The tutor policy's smallest next step (server/platform/helpPlan.js). Dark: 404 unless the server sets PRI_FEATURE_TUTOR_POLICY=1.
   helpPlanPractice: (questionId, body) => cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/help-plan', { method: 'POST', body }),
-  // The comments written on a marked answer (server/platform/lineComments/route.js): after the mark, from the server's own records.
-  lineCommentsPractice: (questionId, body) => cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/line-comments', { method: 'POST', body }),
   practiceNotebook: () => cloudRequest('/v1/practice/notebook'),
   notebookTwin: attemptId => cloudRequest('/v1/practice/notebook/' + pathId(attemptId, 'attempt id') + '/twin', { method: 'POST', body: {} }),
   reviewQueue: () => cloudRequest('/v1/practice/review-queue'),

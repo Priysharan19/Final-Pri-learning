@@ -49,8 +49,8 @@ ok(Object.keys(AI_ALLOWANCE_DEFAULTS).every(kind => AI_ALLOWANCE_DEFAULTS[kind].
 ok(aiAllowanceConfigProblems({ PRI_AI_DAILY_FREE: '-3' }).length === 1 && aiAllowanceConfigProblems({ PRI_AI_DAILY_PREMIUM: '0' }).length === 1 &&
   aiAllowanceConfigProblems({ PRI_AI_DAILY_FREE_HANDWRITING: 'five' }).length === 1 && aiAllowanceConfigProblems({ PRI_AI_DAILY_PREMIUM_PHOTO: '1.5' }).length === 1,
   'a non-positive or nonsense value, global or per kind, is a configuration problem (production refuses to boot)');
-ok(aiAllowanceConfigProblems({ PRI_AI_DAILY_FREE: '50', PRI_AI_DAILY_PREMIUM: '10' }).length === 4 && // one per kind: handwriting, question-photo, working and comments (AI-written marking comments, dark)
-  ['handwriting', 'question-photo', 'working', 'comments'].every(kind => aiAllowance({ PRI_AI_DAILY_FREE: '50', PRI_AI_DAILY_PREMIUM: '10' }, kind).premium === 50) &&
+ok(aiAllowanceConfigProblems({ PRI_AI_DAILY_FREE: '50', PRI_AI_DAILY_PREMIUM: '10' }).length === 3 &&
+  ['handwriting', 'question-photo', 'working'].every(kind => aiAllowance({ PRI_AI_DAILY_FREE: '50', PRI_AI_DAILY_PREMIUM: '10' }, kind).premium === 50) &&
   aiAllowanceConfigProblems({ PRI_AI_DAILY_FREE_PHOTO: '60' }).length === 1, // above Premium's 50 default (owner decision 2026-11-18; was 30 over 25)
   'Premium below free is flagged for each kind it affects, and never applied below free');
 ok(aiAllowance({ PRI_AI_DAILY_FREE: '9', PRI_AI_DAILY_FREE_PHOTO: '3' }, 'question-photo').free === 3 &&
