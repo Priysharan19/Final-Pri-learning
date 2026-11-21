@@ -29,7 +29,16 @@ const V = (diffs, fn) => ({
 
 const fin = v => typeof v === 'number' && Number.isFinite(v);
 
+// One tidy pass over everything a student reads: a doubled sign from a negative term, and stray spaces.
+const tidy = s => (typeof s === 'string'
+  ? s.replace(/ [+-] 0[a-z](?:\^\{?\d+\}?)?(?![\w])/g, '').replace(/\+ -/g, '- ').replace(/- -/g, '+ ')
+    .replace(/(?<![\d.^_{(,\w\\])1(?=[a-zA-Z]|\\(?:sin|cos|tan|theta|log|sqrt))/g, '').replace(/(?<=\S) {2,}(?=\S)/g, ' ')
+  : s);
 function attach(q, audit) {
+  q.prompt = tidy(q.prompt);
+  if (Array.isArray(q.hints)) q.hints = q.hints.map(tidy);
+  if (Array.isArray(q.steps)) q.steps = q.steps.map(s => ({ h: tidy(s.h), d: tidy(s.d) }));
+  if (Array.isArray(q.mcqOptions)) q.mcqOptions = q.mcqOptions.map(tidy);
   if (audit) Object.defineProperty(q, '__audit', { value: audit, enumerable: false });
   return q;
 }
@@ -517,7 +526,7 @@ const stats = [
     const mu = ri(rng, 40, 120), sd = rc(rng, [2, 3, 4, 5, 6, 10]), k = rc(rng, [1, 2, 3]);
     const pct = k === 1 ? 68 : k === 2 ? 95 : 99.7;
     const lo = mu - k * sd, hi = mu + k * sd;
-    return N(`The masses of apples in a crate are approximately normally distributed with a mean of ${mu} g and a standard deviation of ${sd} g. Approximately what percentage of apples have a mass between ${lo} g and ${hi} g?`, pct, {
+    return N(`The masses of apples in a crate are approximately normally distributed with a mean of ${mu} g and a standard deviation of ${sd} g. Using the empirical rule (68%, 95%, 99.7%), approximately what percentage of apples have a mass between ${lo} g and ${hi} g?`, pct, {
       suffix: '%',
       traps: [[k === 1 ? 95 : 68, 'Work out how many standard deviations the limits are from the mean: ' + k + '.'], [50, 'The limits are not at the mean.']],
       hints: ['Find how far each limit is from the mean.', `$${hi} - ${mu} = ${hi - mu}$, which is how many standard deviations?`, 'The limits are the same number of standard deviations either side of the mean.', 'Use the empirical rule: 68% within 1, 95% within 2, 99.7% within 3.'],
@@ -536,7 +545,7 @@ const stats = [
     rej(!Number.isInteger(cnt));
     const above = rng() < 0.5;
     const limit = above ? mu + k * sd : mu - k * sd;
-    return N(`The lengths of ${n} fish are approximately normally distributed with a mean of ${mu} cm and a standard deviation of ${sd} cm. Approximately how many fish are ${above ? 'longer' : 'shorter'} than ${limit} cm?`, cnt, {
+    return N(`The lengths of ${n} fish are approximately normally distributed with a mean of ${mu} cm and a standard deviation of ${sd} cm. Using the empirical rule (68%, 95%, 99.7%), approximately how many fish are ${above ? 'longer' : 'shorter'} than ${limit} cm? Give the number the rule predicts.`, cnt, {
       traps: [[(n * (k === 1 ? 32 : k === 2 ? 5 : 0.3)) / 100, 'Both tails are outside the limits; the question asks about one tail only, so halve the outside percentage.'], [(n * (k === 1 ? 68 : k === 2 ? 95 : 99.7)) / 100, 'That is the number INSIDE the limits.']],
       hints: [`${limit} is ${k} standard deviation${k === 1 ? '' : 's'} ${above ? 'above' : 'below'} the mean.`, `The empirical rule says ${k === 1 ? '68' : k === 2 ? '95' : '99.7'}% lie within ${k} standard deviation${k === 1 ? '' : 's'} of the mean.`, `So ${k === 1 ? '32' : k === 2 ? '5' : '0.3'}% lie outside, split equally between the two tails.`, 'Find the percentage in one tail, then of the total.'],
       steps: [['Position', `$${limit}$ is $${k}\\sigma$ ${above ? 'above' : 'below'} the mean`], ['One tail', `${tailPct}%`], ['Number of fish', `$${tailPct}\\% \\times ${n} = ${cnt}$`]],
@@ -548,7 +557,7 @@ const stats = [
   V([4], rng => {
     const mu = ri(rng, 40, 110), sd = ri(rng, 2, 12), k = rc(rng, [1, 2, 3]);
     const pct = k === 1 ? 68 : k === 2 ? 95 : 99.7;
-    return N(`Approximately ${pct}% of the values in a bell-shaped data set lie between ${mu - k * sd} and ${mu + k * sd}. Find the standard deviation.`, sd, {
+    return N(`By the empirical rule (68%, 95%, 99.7%), approximately ${pct}% of the values in a bell-shaped data set lie between ${mu - k * sd} and ${mu + k * sd}. Find the standard deviation.`, sd, {
       traps: [[2 * k * sd, 'That is the width of the interval. It spans ' + 2 * k + ' standard deviations.'], [k * sd, 'That is the distance from the mean to one end. It spans ' + k + ' standard deviations.']],
       hints: [`${pct}% corresponds to ${k} standard deviation${k === 1 ? '' : 's'} either side of the mean.`, 'The interval is symmetric about the mean.', `Its width is ${2 * k * sd}, which spans ${2 * k} standard deviations.`, 'Divide the width by the number of standard deviations it spans.'],
       steps: [['Number of standard deviations', `${pct}% $\\Rightarrow$ $\\mu \\pm ${k}\\sigma$`], ['Width', `$${mu + k * sd} - ${mu - k * sd} = ${2 * k * sd} = ${2 * k}\\sigma$`], ['Standard deviation', `$\\sigma = ${sd}$`]],

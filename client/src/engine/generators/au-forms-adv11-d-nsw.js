@@ -30,7 +30,16 @@ const V = (diffs, fn) => ({
 
 const fin = v => typeof v === 'number' && Number.isFinite(v);
 
+// One tidy pass over everything a student reads: a doubled sign from a negative term, and stray spaces.
+const tidy = s => (typeof s === 'string'
+  ? s.replace(/ [+-] 0[a-z](?:\^\{?\d+\}?)?(?![\w])/g, '').replace(/\+ -/g, '- ').replace(/- -/g, '+ ')
+    .replace(/(?<![\d.^_{(,\w\\])1(?=[a-zA-Z]|\\(?:sin|cos|tan|theta|log|sqrt))/g, '').replace(/(?<=\S) {2,}(?=\S)/g, ' ')
+  : s);
 function attach(q, audit) {
+  q.prompt = tidy(q.prompt);
+  if (Array.isArray(q.hints)) q.hints = q.hints.map(tidy);
+  if (Array.isArray(q.steps)) q.steps = q.steps.map(s => ({ h: tidy(s.h), d: tidy(s.d) }));
+  if (Array.isArray(q.mcqOptions)) q.mcqOptions = q.mcqOptions.map(tidy);
   if (audit) Object.defineProperty(q, '__audit', { value: audit, enumerable: false });
   return q;
 }
@@ -770,18 +779,21 @@ const data = [
     });
   }),
 
-  // Dm6 · D2 · read a stem-and-leaf display
+  // Dm6 · D2 · an unknown value inside an ordered list with a given median
   V([2], rng => {
-    const n = rc(rng, [9, 11, 12, 14]);
-    const xs = sortNum(Array.from({ length: n }, () => ri(rng, 12, 59)));
-    const stems = [...new Set(xs.map(x => Math.floor(x / 10)))];
-    const rows = stems.map(s => `${s} & \\mid & ${xs.filter(x => Math.floor(x / 10) === s).map(x => x % 10).join('\\;')}`);
-    const m = med(xs);
-    return N(`The stem-and-leaf plot shows ${n} values (stem $\\mid$ leaf, for example $3\\mid 4$ means 34).\n\n$\\begin{array}{rcl} ${rows.join(' \\\\ ')} \\end{array}$\n\nFind the median.`, m, {
-      traps: [[Math.round(mean(xs) * 100) / 100, 'The median is the middle value, not the mean.'], ...(n % 2 ? [] : [[xs[Math.floor(n / 2)], 'With an even number of values, average the two middle ones.']])],
-      hints: ['Read each value as stem followed by leaf.', 'The leaves are already in order, so the values are in order.', n % 2 ? `The median is the ${(n + 1) / 2}th value.` : `The median is the mean of the ${n / 2}th and ${n / 2 + 1}th values.`, 'Count along the rows to that position.'],
-      steps: [['Values in order', `$${xs.join(', ')}$`], ['Median', `$${m}$`]],
-      audit: { kind: 'median', xs, expect: m }
+    const n = rc(rng, [6, 8]);
+    const xs = [];
+    let v = ri(rng, 3, 20);
+    for (let k = 0; k < n; k++) { xs.push(v); v += ri(rng, 2, 7); }
+    const lo = n / 2 - 1;            // index of the lower middle value; the upper middle value is the unknown
+    const x = xs[lo + 1];
+    const m = (xs[lo] + x) / 2;
+    const shown = xs.map((val, k) => (k === lo + 1 ? 'x' : val));
+    return N(`The ${n} values ${shown.join(', ')} are in order from smallest to largest. Their median is ${m}. Find $x$.`, x, {
+      traps: [[m, 'The median is the mean of the two middle values, so it is not equal to the unknown value.'], [m - xs[lo], 'Solve $\\dfrac{' + xs[lo] + ' + x}{2} = ' + m + '$ for $x$.']],
+      hints: [`With ${n} values the median is the mean of the ${n / 2}th and ${n / 2 + 1}th values.`, `The ${n / 2}th value is $${xs[lo]}$ and the ${n / 2 + 1}th is $x$.`, `Write $\\dfrac{${xs[lo]} + x}{2} = ${m}$.`, 'Solve the equation for $x$.'],
+      steps: [['Middle pair', `$${xs[lo]}$ and $x$`], ['Equation', `$\\dfrac{${xs[lo]} + x}{2} = ${m}$`], ['Solve', `$x = ${2 * m} - ${xs[lo]} = ${x}$`]],
+      audit: { kind: 'medianunknown' }
     });
   }),
 
@@ -812,7 +824,7 @@ const data = [
   V([3, 4], (rng, d) => {
     const n = ri(rng, 5, 25), mu = ri(rng, 4, 30), sd = ri(rng, 2, 9);
     const sx = n * mu, sxx = n * (sd * sd + mu * mu);
-    return N(`For a data set of ${n} values, $\\sum x = ${sx}$ and $\\sum x^2 = ${sxx}$. Find the ${d === 3 ? 'standard deviation' : 'population standard deviation, $\\sigma$'}.`, sd, {
+    return N(`For a data set of ${n} values, $\\sum x = ${sx}$ and $\\sum x^2 = ${sxx}$. Find the population standard deviation, $\\sigma$.`, sd, {
       traps: [[sd * sd, 'That is the variance. Take the square root.'], [Math.sqrt(sxx / n), 'Subtract the square of the mean before taking the square root: $\\sigma^2 = \\dfrac{\\sum x^2}{n} - \\mu^2$.']],
       hints: [`The mean is $\\dfrac{\\sum x}{n} = \\dfrac{${sx}}{${n}}$.`, `$\\mu = ${mu}$.`, 'Use $\\sigma^2 = \\dfrac{\\sum x^2}{n} - \\mu^2$.', 'Take the square root of the variance.'],
       steps: [['Mean', `$\\mu = ${mu}$`], ['Variance', `$\\sigma^2 = \\dfrac{${sxx}}{${n}} - ${mu}^2 = ${sd * sd}$`], ['Standard deviation', `$\\sigma = ${sd}$`]],
@@ -855,18 +867,21 @@ const data = [
     });
   }),
 
-  // Sd5 · D3 · which measure of spread resists an outlier?
+  // Sd5 · D3 · which data set has no spread at all? (a standard deviation of zero)
   V([3], rng => {
-    const xs = Array.from({ length: 6 }, () => ri(rng, 20, 40));
-    const out = ri(rng, 90, 140);
-    return M(rng, `A swimmer's training times (in seconds) are ${fmtList(xs)} and one extreme time of ${out} after a fall. Which measure of spread is least affected by the extreme time?`, 'the interquartile range', [
-      { text: 'the range', why: 'The range uses the largest and smallest values, so the extreme value changes it a lot.' },
-      { text: 'the standard deviation', why: 'The standard deviation squares every deviation, so one extreme value has a big effect.' },
-      { text: 'the variance', why: 'The variance squares every deviation, so one extreme value has a big effect.' }
+    const k = ri(rng, 4, 40), ctx = rc(rng, ['five test marks', 'five heights in centimetres', 'five ticket prices in dollars', 'five times in seconds']);
+    const same = Array(5).fill(k);
+    const near = [k, k, k, k, k + ri(rng, 1, 3)];
+    const ap = [k, k + 1, k + 2, k + 3, k + 4];
+    const sym = [k - 2, k - 1, k, k + 1, k + 2];
+    return M(rng, `A data set of ${ctx} has a standard deviation of exactly $0$. Which could the data set be?`, `$${same.join(', ')}$`, [
+      { text: `$${near.join(', ')}$`, why: 'One value is different, so the values are not all the same distance from the mean: the spread is not zero.' },
+      { text: `$${ap.join(', ')}$`, why: 'Evenly spaced values still spread out from their mean.' },
+      { text: `$${sym.join(', ')}$`, why: 'The mean is the middle value, but the other values are not at the mean, so the spread is not zero.' }
     ], {
-      hints: ['Which measures use the extreme value directly?', 'The range uses the maximum.', 'The standard deviation and variance square the distances from the mean.', 'The interquartile range uses only the middle half of the data.'],
-      steps: [['Compare', 'Range, standard deviation and variance all use the extreme value strongly.'], ['Resistant measure', 'The interquartile range uses only the middle 50% of the data.']],
-      audit: { kind: 'measuremc', key: 'the interquartile range' }
+      hints: ['The standard deviation measures how far the values are from the mean.', 'It is zero only if every value is at the mean.', 'That means every value is equal.', 'Choose the set whose values are all the same.'],
+      steps: [['Meaning of zero spread', 'Every deviation from the mean is $0$, so all the values are equal.'], ['Answer', `$${same.join(', ')}$`]],
+      audit: { kind: 'sdzero', key: same }
     });
   }),
 

@@ -21,10 +21,10 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `ms11-earning-exact` | 4 | 3.0k | 1 | — | instances + forms |
 | `me12-calc` | 4 | 4.8k | 18 | — | instances |
 | `ms11-energy` | 4 | 5.1k | 1 | — | instances + forms |
-| `y11-trig-ident` | 4 | 5.2k | 73 | — | instances |
+| `y11-trig-ident` | 4 | 5.2k | 70 | — | instances |
 | `ms12-loans` | 4 | 6.0k | 2 | — | instances + forms |
 | `y11-explog-more` | 4 | 6.3k | 126 | — | instances |
-| `y12-financial` | 4 | 6.8k | 15 | — | instances |
+| `y12-financial` | 4 | 6.7k | 15 | — | instances |
 | `ms11-linear` | 4 | 7.2k | 2 | — | instances + forms |
 | `ms11-measure-more` | 4 | 8.5k | 1 | — | instances + forms |
 | `ms11-earning` | 4 | 9.4k | 26 | — | instances |
@@ -110,7 +110,7 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `ms12-networks` | 4 | 54.3k | 1318 | — | — |
 | `ms12-simple-interest` | 4 | 54.8k | 16 | — | — |
 | `y10-polynomials` | 4 | 57.1k | 290 | — | — |
-| `y12-stats` | 4 | 57.7k | 25 | — | — |
+| `y12-stats` | 4 | 57.4k | 25 | — | — |
 | `y11-diff` | 4 | 60.2k | 255 | — | — |
 | `y7-equations` | 4 | 63.4k | 72 | — | — |
 | `me11-rates` | 4 | 64.7k | 108 | — | — |
@@ -134,8 +134,8 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `mex-vectors` | 4 | 227.2k | 50 | — | — |
 | `me12-vectors-forms` | 4 | 250.8k | 6 | 5: context, direct, missing-parameter, multi-step, representation | — |
 | `y9-data-inquiry` | 4 | 256.8k | 273 | — | — |
+| `y11-data-sets` | 4 | 256.8k | 34 | — | — |
 | `y11-sine-cosine-rule` | 4 | 268.5k | 12 | — | — |
-| `y11-data-sets` | 4 | 270.1k | 263 | — | — |
 | `ms12-nonright` | 4 | 399.9k | 9 | — | — |
 | `ms12-bivariate` | 4 | 722.8k | 11 | — | — |
 | `ms12-critical-path` | 4 | 1.0M | 13 | — | — |

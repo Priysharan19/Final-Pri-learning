@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `9087b09557ae6c8fd78b64da05323c3f4e8124f245abb8adb069686264e076ef` (`docs/marking/hsc-examiner-certification-dossier.md`).
+Dossier digest: `1d0fb6c896bc752675d755326caa22201445ea1a8e55d51ac1630cf70275bba9` (`docs/marking/hsc-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -3053,14 +3053,14 @@ Final answer: -6, 7
 
 ## `nsw-final:y12-financial/D2` — seed 1009
 
-> A prize pays \\$2,000 at the end of each year for 6 years. Money can earn 6% p.a., compounded annually. What single amount, paid today, has the same value as the prize? Give your answer to the nearest cent.
+> \\$2,000 is deposited at the end of each year for 6 years into an account paying 6% p.a., compounded annually. How much of the balance immediately after the last deposit is interest? Give your answer to the nearest cent.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `196693/20` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `196693/20` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `196713/20` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `196713/20` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `48766/25` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `48766/25` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `48791/25` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `48791/25` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-financial/D3` — seed 1009
 

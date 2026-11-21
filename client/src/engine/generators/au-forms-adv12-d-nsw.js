@@ -30,7 +30,16 @@ const V = (diffs, fn) => ({
 
 const fin = v => typeof v === 'number' && Number.isFinite(v);
 
+// One tidy pass over everything a student reads: a doubled sign from a negative term, and stray spaces.
+const tidy = s => (typeof s === 'string'
+  ? s.replace(/ [+-] 0[a-z](?:\^\{?\d+\}?)?(?![\w])/g, '').replace(/\+ -/g, '- ').replace(/- -/g, '+ ')
+    .replace(/(?<![\d.^_{(,\w\\])1(?=[a-zA-Z]|\\(?:sin|cos|tan|theta|log|sqrt))/g, '').replace(/(?<=\S) {2,}(?=\S)/g, ' ')
+  : s);
 function attach(q, audit) {
+  q.prompt = tidy(q.prompt);
+  if (Array.isArray(q.hints)) q.hints = q.hints.map(tidy);
+  if (Array.isArray(q.steps)) q.steps = q.steps.map(s => ({ h: tidy(s.h), d: tidy(s.d) }));
+  if (Array.isArray(q.mcqOptions)) q.mcqOptions = q.mcqOptions.map(tidy);
   if (audit) Object.defineProperty(q, '__audit', { value: audit, enumerable: false });
   return q;
 }
@@ -136,20 +145,20 @@ const financial = [
     });
   }),
 
-  // F4 · D2, D3 · present value of an annuity (what lump sum is it worth today?)
+  // F4 · D2, D3 · how much of the final balance is interest?
   V([2, 3], (rng, d) => {
     const yearly = d === 2;
     const rate = yearly ? rc(rng, [3, 4, 5, 6, 8]) : rc(rng, [3, 6, 9]);
     const r = yearly ? rate / 100 : rate / 1200;
     const n = yearly ? ri(rng, 4, 10) : 12 * ri(rng, 2, 4);
     const a = yearly ? rc(rng, [1000, 2000, 3000, 5000]) : rc(rng, [100, 200, 300, 500]);
-    const PV = (a * (1 - (1 + r) ** -n)) / r;
-    rej(nearBoundary(PV, 2, 0.05));
-    return money(`A prize pays ${$(a)} at the end of each ${yearly ? 'year' : 'month'} for ${yearly ? `${n} years` : `${n / 12} years`}. Money can earn ${PA(rate)}, compounded ${yearly ? 'annually' : 'monthly'}. What single amount, paid today, has the same value as the prize? Give your answer to the nearest cent.`, PV, {
-      traps: [[a * n, 'This adds the payments with no interest. Money received later is worth less today, so each payment is discounted.'], [a * fvFactor(r, n), 'That is the VALUE AT THE END (the future value). The question asks for the value today.']],
-      hints: ['The present value is the sum of each payment discounted back to today: $\\dfrac{a}{(1 + r)} + \\dfrac{a}{(1 + r)^2} + \\cdots$.', 'This is a geometric series with ratio $\\dfrac{1}{1 + r}$.', 'Its sum is $PV = a\\times\\dfrac{1 - (1 + r)^{-n}}{r}$.', `Use $r = ${rnd(r, 6)}$ and $n = ${n}$.`],
-      steps: [['Geometric series', `$PV = a\\left[v + v^2 + \\cdots + v^{n}\\right]$ with $v = \\dfrac{1}{1 + r}$`], ['Formula', `$PV = ${a}\\times\\dfrac{1 - (1 + ${rnd(r, 6)})^{-${n}}}{${rnd(r, 6)}}$`], ['Evaluate', `$PV \\approx ${rnd(PV, 2)}$`]],
-      audit: { kind: 'presentvalue', a, r, n, expect: PV }
+    const F = a * fvFactor(r, n);
+    rej(nearBoundary(F - a * n, 2, 0.05));
+    return money(`${$(a)} is deposited at the end of each ${yearly ? 'year' : 'month'} for ${yearly ? `${n} years` : `${n / 12} years`} into an account paying ${PA(rate)}, compounded ${yearly ? 'annually' : 'monthly'}. How much of the balance immediately after the last deposit is interest? Give your answer to the nearest cent.`, F - a * n, {
+      traps: [[F, 'That is the whole balance. Subtract the total of the deposits to find the interest.'], [a * n, 'That is only the money paid in. The interest is the balance minus that.']],
+      hints: ['Interest earned is the final balance minus the money paid in.', 'First find the final balance: the future value of the annuity.', `$FV = ${a}\\times\\dfrac{(1 + r)^n - 1}{r}$ with $r = ${rnd(r, 6)}$ and $n = ${n}$.`, `The total paid in is $${n}\\times ${a}$.`],
+      steps: [['Future value', `$FV = ${a}\\times\\dfrac{(1 + ${rnd(r, 6)})^{${n}} - 1}{${rnd(r, 6)}} \\approx ${rnd(F, 2)}$`], ['Paid in', `$${n}\\times ${a} = ${a * n}$`], ['Interest', `$${rnd(F, 2)} - ${a * n} = ${rnd(F - a * n, 2)}$`]],
+      audit: { kind: 'interestpart', a, r, n, expect: F - a * n }
     });
   }),
 
@@ -186,14 +195,15 @@ const financial = [
   V([2, 3], (rng, d) => {
     const rate = rc(rng, [3, 4, 5, 6, 8]), r = d === 2 ? rate / 100 : rate / 1200;
     const a = rc(rng, [100, 150, 200, 300, 500]), A0 = rc(rng, [0, 0, 500, 1000]), n = ri(rng, 4, d === 2 ? 6 : 9);
+    const mult = rnd(1 + r, 6);   // the rule is printed with this multiplier, so the key follows the printed rule exactly
     let A = A0;
-    for (let i = 0; i < n; i++) A = A * (1 + r) + a;
+    for (let i = 0; i < n; i++) A = A * mult + a;
     rej(nearBoundary(A, 2, 0.05));
-    return money(`A savings account follows the rule $A_{k+1} = ${rnd(1 + r, 6)}A_k + ${a}$, where $A_k$ is the balance in dollars after $k$ ${d === 2 ? 'years' : 'months'}, and $A_0 = ${A0}$. Find $A_${n}$, to the nearest cent.`, A, {
+    return money(`A savings account follows the rule $A_{k+1} = ${mult}A_k + ${a}$, where $A_k$ is the balance in dollars after $k$ ${d === 2 ? 'years' : 'months'}, and $A_0 = ${A0}$. Find $A_${n}$, to the nearest cent.`, A, {
       traps: [[A0 * (1 + r) ** n + a * n, 'Each step multiplies the previous balance by ' + rnd(1 + r, 6) + ' AND adds ' + a + '. The earlier deposits earn interest too.'], [A0 + a * n, 'This ignores the multiplier. The rule also adds interest each step.']],
       hints: ['Apply the rule one step at a time, starting from $A_0$.', `$A_1 = ${rnd(1 + r, 6)}(${A0}) + ${a}$.`, 'Use each answer as the input to the next step.', `Continue until $A_{${n}}$. Keep the full calculator value until the end.`],
       steps: [['First steps', `$A_1 = ${rnd(A0 * (1 + r) + a, 4)}$`], [`Continue to A${n}`, `$A_{${n}} \\approx ${rnd(A, 2)}$`]],
-      audit: { kind: 'recurrence', mult: 1 + r, add: a, A0, n, expect: A }
+      audit: { kind: 'recurrence', mult, add: a, A0, n, expect: A }
     });
   }),
 
@@ -284,20 +294,17 @@ const financial = [
     });
   }),
 
-  // L6 · D4 · a table of repayments per $1000: choose the right term, then scale
+  // L6 · D4 · the amount borrowed from the repayment (work the loan recurrence backwards)
   V([4], rng => {
-    const rate = rc(rng, [6, 7.2, 9]), r = rate / 1200;
-    const terms = [5, 10, 15, 20, 25];
-    const F = t => Math.round((1000 * r * (1 + r) ** (12 * t)) / (((1 + r) ** (12 * t)) - 1) * 100) / 100;
-    const t = rc(rng, terms.slice(1)), P = rc(rng, [150000, 200000, 250000, 300000, 400000, 450000]);
-    const row = `\\begin{array}{c|${'c'.repeat(terms.length)}} \\text{Term (years)} & ${terms.join(' & ')} \\\\ \\hline \\text{Repayment per \\$1000} & ${terms.map(x => F(x).toFixed(2)).join(' & ')} \\end{array}`;
-    const M = (P / 1000) * F(t);
-    const total = M * 12 * t;
-    return money(`The table shows the monthly repayment for each \\$1000 borrowed at ${rate}% p.a. (reducing balance), for different loan terms.\n\n$${row}$\n\nFind the total amount repaid over the life of a ${$(P)} loan taken over ${t} years. Give your answer to the nearest cent.`, total, {
-      traps: [[M, 'That is the MONTHLY repayment. The question asks for the total over the whole term.'], [(P / 1000) * F(terms.find(x => x !== t)) * 12 * t, 'Read the column for the term in the question.']],
-      hints: ['Find the column for the right term.', `The repayment per \\$1000 for ${t} years is the number in that column.`, `Scale up: $\\dfrac{${P}}{1000}$ lots of that repayment is the monthly repayment.`, `Multiply by the number of months, $${12 * t}$.`],
-      steps: [['Repayment per $1000', `$${F(t).toFixed(2)}$`], ['Monthly repayment', `$${P / 1000}\\times ${F(t).toFixed(2)} = ${rnd(M, 2)}$`], ['Total repaid', `$${rnd(M, 2)}\\times ${12 * t} = ${rnd(total, 2)}$`]],
-      audit: { kind: 'loantable', P, rate, t, factor: F(t), expect: total }
+    const rate = rc(rng, [6, 7.2, 9, 12]), r = rate / 1200, yrs = ri(rng, 2, 5), n = 12 * yrs;
+    const M = rc(rng, [200, 250, 300, 400, 500, 600, 800]);
+    const P = (M * (1 - (1 + r) ** -n)) / r;
+    rej(nearBoundary(P, 0, 0.08));
+    return whole(`A loan is charged ${rate}% p.a. interest, calculated monthly on the reducing balance. It is cleared by ${n} monthly repayments of ${$(M)}, the first one month after the loan is taken out. How much was borrowed? Give your answer to the nearest dollar.`, P, {
+      traps: [[M * n, 'That adds the repayments with no allowance for interest. Each repayment pays interest as well as principal, so less than this was borrowed.'], [P * (1 + r) ** n / (1 + r) ** n * (1 + rate / 100 * yrs), 'Interest is charged monthly on the reducing balance, not as simple interest on the whole amount.']],
+      hints: ['After the last repayment the balance is zero: $A_n = P(1 + r)^n - M\\,\\dfrac{(1 + r)^n - 1}{r} = 0$.', `The monthly rate is $r = ${rnd(r, 6)}$ and $n = ${n}$.`, 'Rearrange for $P$.', '$P = M\\,\\dfrac{1 - (1 + r)^{-n}}{r}$.'],
+      steps: [['Final balance is zero', `$P(1 + r)^n = M\\,\\dfrac{(1 + r)^n - 1}{r}$`], ['Rearrange', `$P = ${M}\\times\\dfrac{1 - (1 + ${rnd(r, 6)})^{-${n}}}{${rnd(r, 6)}}$`], ['Evaluate', `$P \\approx ${Math.round(P)}$`]],
+      audit: { kind: 'loanprincipal', M, r, n, expect: P }
     });
   })
 ];

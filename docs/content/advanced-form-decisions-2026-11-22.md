@@ -98,12 +98,12 @@ Dot points are the cell-level ones in `DOTPOINT_FORMS`; nothing here claims more
 | Which measure of centre? (MCQ) | D2 | Mean, median or mode, depending on outliers and data type. |
 | Median after adding a value | D2 | The count becomes even. |
 | Median after an outlier | D2 | The median is unchanged by an extreme value. |
-| Stem-and-leaf median | D2 | Read stems and leaves, then locate the middle. |
+| Unknown value from a median | D2 | An even-sized ordered list with one unknown in the middle pair: the median is the mean of that pair, so solve for the unknown. |
 | Variance of a list | D3 | Variance, not standard deviation, and divide by `n`. |
 | Standard deviation from `sum x` and `sum x^2` | D3, D4 | Subtract the square of the mean before the root. |
 | Add a value equal to the mean | D3, D4 | The sum of squares is unchanged but the divisor grows. |
 | Which set is more spread? (MCQ) | D3 | Compare distances from the middle, not the means. |
-| Spread resistant to an outlier (MCQ) | D3 | Interquartile range, not range, variance or standard deviation. |
+| Which data set has zero spread? (MCQ) | D3 | A standard deviation of zero means every value equals the mean, so all values are equal. |
 | Spread after `y = ax + b` | D3, D4 | The shift does nothing; the factor is squared for variance; a negative factor still gives a positive spread. |
 | Combined variance, same mean | D4 | Weight by group size, add the squared deviations. |
 | Find `b` for a target mean and spread | D4 | `a` from the spread, then `b` from the mean. |
@@ -116,7 +116,7 @@ Dot points are the cell-level ones in `DOTPOINT_FORMS`; nothing here claims more
 | Unknown regular deposit | D2, D3 | Rearrange the future-value formula; D3 uses monthly deposits and an annual rate. |
 | Number of deposits to reach a goal | D2, D3 | Solve for `n` and round up to a whole deposit. |
 | Unknown rate from a table | D2, D3 | Divide the goal by the deposit, read the first rate that reaches the factor. |
-| Present value of an annuity | D2, D3 | Discount each payment back to today (geometric series with ratio `1/(1+r)`). |
+| Interest part of the final balance | D2, D3 | Future value of the annuity minus the total paid in. |
 | Regular deposits or a lump sum | D2, D3 | Value both plans, then subtract. |
 | Deposits at the start of each year | D3 | Every deposit earns one more period of interest. |
 | A recurrence written out | D2, D3 | Follow `A(k+1) = m A(k) + a` step by step. |
@@ -125,7 +125,7 @@ Dot points are the cell-level ones in `DOTPOINT_FORMS`; nothing here claims more
 | Compare two loans | D4 | Total paid minus the amount borrowed for each plan, then the difference. |
 | Balance after `k` repayments | D4 | Apply the recurrence, keeping full precision. |
 | Interest and principal of a repayment | D4 | The interest uses the current balance (balance after repayment 1 for the second repayment). |
-| Table of repayments per \$1000 | D4 | Choose the column for the term, scale, then multiply by the number of months. |
+| Amount borrowed from the repayment | D4 | Set the loan's final balance to zero and solve for the amount borrowed. |
 
 ## y12-stats (`au-forms-adv12-c-nsw.js`)
 
@@ -173,4 +173,4 @@ Dot points are the cell-level ones in `DOTPOINT_FORMS`; nothing here claims more
 ## Not decided here
 
 - Whether sec, cosec and cot belong in the Year 11 Advanced trigonometry cell: none of these forms uses them.
-- A teacher has not reviewed the level labels above or confirmed that each form is inside the NSW Mathematics Advanced (2024) syllabus. Items to check first: stem-and-leaf displays, the interquartile-range distractor, present value of an annuity (`y12-financial`), the repayments-per-\$1000 table, and the reverse-chain-rule area of `(ax + b)^n`.
+- A teacher has not reviewed the level labels above or confirmed that each form is inside the NSW Mathematics Advanced (2024) syllabus. Items to check first: the amount borrowed from a reducing-balance repayment (`y12-financial` D4) and the reverse-chain-rule area of `(ax + b)^n`. Stem-and-leaf plots, interquartile range as a keyed answer, present value of an annuity and the repayments-per-\$1000 table were removed after review.

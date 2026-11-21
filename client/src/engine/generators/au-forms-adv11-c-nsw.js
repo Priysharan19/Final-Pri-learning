@@ -30,7 +30,16 @@ const V = (diffs, fn) => ({
 
 const fin = v => typeof v === 'number' && Number.isFinite(v);
 
+// One tidy pass over everything a student reads: a doubled sign from a negative term, and stray spaces.
+const tidy = s => (typeof s === 'string'
+  ? s.replace(/ [+-] 0[a-z](?:\^\{?\d+\}?)?(?![\w])/g, '').replace(/\+ -/g, '- ').replace(/- -/g, '+ ')
+    .replace(/(?<![\d.^_{(,\w\\])1(?=[a-zA-Z]|\\(?:sin|cos|tan|theta|log|sqrt))/g, '').replace(/(?<=\S) {2,}(?=\S)/g, ' ')
+  : s);
 function attach(q, audit) {
+  q.prompt = tidy(q.prompt);
+  if (Array.isArray(q.hints)) q.hints = q.hints.map(tidy);
+  if (Array.isArray(q.steps)) q.steps = q.steps.map(s => ({ h: tidy(s.h), d: tidy(s.d) }));
+  if (Array.isArray(q.mcqOptions)) q.mcqOptions = q.mcqOptions.map(tidy);
   if (audit) Object.defineProperty(q, '__audit', { value: audit, enumerable: false });
   return q;
 }
@@ -428,10 +437,15 @@ const explog = [
     const term = (c, v) => (c === 0 ? '' : `+(${c})*${v}`);
     const key = `${term(i, 'p')}${term(j, 'q')}${l === 0 ? '' : `+(${l})`}`.replace(/^\+/, '');
     const noL = `${term(i, 'p')}${term(j, 'q')}`.replace(/^\+/, '');
+    const parts = [[i, 2, 'p'], [j, 3, 'q'], [l, B, '']].filter(t => t[0] !== 0);
+    const facTex = parts.map(([e, b]) => (e === 1 ? `${b}` : `${b}^{${e}}`)).join('\\times ');
+    const joinSigned = xs => xs.map((t, k) => (k === 0 ? t : t.startsWith('-') ? ` - ${t.slice(1)}` : ` + ${t}`)).join('');
+    const lawTex = joinSigned(parts.map(([e, b]) => `${e === 1 ? '' : e === -1 ? '-' : e}\\log_{${B}} ${b}`));
+    const keyTex = joinSigned(parts.map(([e, , v]) => (v ? `${e === 1 ? '' : e === -1 ? '-' : e}${v}` : `${e}`)));
     return E(`Given that $\\log_{${B}} 2 = p$ and $\\log_{${B}} 3 = q$, write $\\log_{${B}} ${bot === 1 ? arg : `\\left(${arg}\\right)`}$ in terms of $p$ and $q$.`, key, {
       traps: l !== 0 ? [[noL, `$\\log_{${B}} ${B} = 1$, so the factors of ${B} contribute their own constant.`]] : [[`(${-i})*p+(${-j})*q`, 'A factor in the denominator subtracts its logarithm.']],
       hints: [`Break the number into prime factors: only $2$, $3$ and $${B}$ appear.`, 'Use the product law to split the logarithm, and the power law for repeated factors.', `A factor in the denominator subtracts. Remember $\\log_{${B}} ${B} = 1$.`, `Replace $\\log_{${B}} 2$ by $p$ and $\\log_{${B}} 3$ by $q$.`],
-      steps: [['Prime factors', `$${top}${bot === 1 ? '' : `\\div ${bot}`}$ is built from $2^{${i}}\\times 3^{${j}}\\times ${B}^{${l}}$`], ['Laws', `$\\log_{${B}}(2^{${i}}3^{${j}}${B}^{${l}}) = ${i}\\log_{${B}} 2 + ${j}\\log_{${B}} 3 + ${l}\\log_{${B}} ${B}$`], ['Substitute', `$${i}p + ${j}q + ${l}$`]],
+      steps: [['Prime factors', `$${bot === 1 ? top : `\\dfrac{${top}}{${bot}}`} = ${facTex}$`], ['Laws', `$\\log_{${B}} ${bot === 1 ? top : 'N'} = ${lawTex}$`], ['Substitute', `$${keyTex}$`]],
       audit: { kind: 'logexprsym', B, i, j, l }
     });
   }),
@@ -663,7 +677,8 @@ const trig = [
     const row = SPEC.tan[o.i], k = ri(rng, 1, 5);
     const sol = solveIn(Math.tan, row, 0, 360).filter(x => x > 0 && x < 360);
     const kk = k === 1 ? '' : String(k);
-    return S(`Solve $${kk}${o.L} = ${kk}${o.R}$ for $0^\\circ \\le \\theta \\le 360^\\circ$. Give every solution in degrees.`, sol, {
+    const rhs = o.R.startsWith('-') ? `-${kk}${o.R.slice(1)}` : `${kk}${o.R}`;
+    return S(`Solve $${kk}${o.L} = ${rhs}$ for $0^\\circ \\le \\theta \\le 360^\\circ$. Give every solution in degrees.`, sol, {
       suffix: '°',
       traps: [[sol[0], 'There are two solutions in the interval: tangent has period $180^\\circ$.']],
       hints: ['Divide both sides by $\\cos\\theta$ (it is not zero at any solution).', 'Use $\\dfrac{\\sin\\theta}{\\cos\\theta} = \\tan\\theta$.', 'Find the exact value of $\\tan\\theta$ and its reference angle.', 'Tangent repeats every $180^\\circ$, so add $180^\\circ$ for the second solution.'],

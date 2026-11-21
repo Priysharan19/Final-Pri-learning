@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Pri Learning · the Advanced variety forms are right, by a different route
+// Pri Learning · the Advanced variety forms are right, read from the PROMPT TEXT
 //
 // For every form added in au-forms-adv11-c/d and au-forms-adv12-c/d, at every difficulty it serves,
 // over 300 seeds, the keyed answer is RECOMPUTED here from the raw parameters the form reports in
@@ -76,312 +76,406 @@ const evalTexSide = (side, ang) => evalAngle(side, ang);
 const planeFn = expr => { const ast = parse(String(expr)); return x => evaluate(ast, { x }); };
 
 // ── per-kind independent recomputation ───────────────────────────────────────
-const ALL = [];
-const val = q => q.answer.value;
-const trigRoots = (fn, v, lo, hi, extra = x => 0) => rootsDeg(x => FNS[fn](x) - v + extra(x), lo, hi);
-const counts = (g, lo = 0, hi = 360) => rootsDeg(g, lo, hi).length;
-
-const KINDS = {
-  logcombine(q, a) {
-    const vals = { x: 2, y: 3, z: 5, a: 7, b: 11, c: 13, p: 2.5, r: 4.5, q: 1.5, m: 6, n: 8, k: 9 };
-    const lhs = a.items.reduce((s, t) => s + t.c * Math.log(vals[t.v]), 0);
-    const num = a.num.reduce((p, [v, e]) => p * vals[v] ** e, 1), den = a.den.reduce((p, [v, e]) => p * vals[v] ** e, 1);
-    near(lhs, Math.log(num / den), 1e-9, 'combined logarithm');
-    const key = q.mcqOptions[q.answer.correctIndex];
-    for (const [v, e] of [...a.num, ...a.den]) ok(key.includes(e === 1 ? v : `${v}^{${e}}`), 'key text carries each factor');
-    ok(a.den.length === 0 || key.includes('dfrac'), 'a quotient is a fraction');
-  },
-  logexpr(q, a) {
-    const v = a.terms.reduce((s, [c, x]) => s + c * logb(a.b, x), 0);
-    near(v, val(q), 1e-9, 'logarithm value');
-    if (a.expectFrac) near(v, a.expectFrac[0] / a.expectFrac[1], 1e-9, 'fraction');
-  },
-  unknownbase(q, a) { let x = 1; while (x ** a.k < a.N) x++; ok(x ** a.k === a.N, 'a whole base exists'); near(x, val(q), 0, 'base'); },
-  expsolve(q, a) {
-    const f = a.form === 'plain' ? x => a.a ** x - a.c : a.form === 'shift' ? x => a.a ** (x + a.s) - a.c : x => a.p * a.a ** x - a.c;
-    near(bisect(f, -20, 20), val(q), 0.005 + 1e-9, 'x');
-  },
-  steps(q, a) { let v = a.start, n = 0; while (Math.abs(v - a.target) > 1e-6 && n < 100) { v *= a.factor; n++; } near(n, val(q), 0, 'steps'); },
-  bracket(q, a) { const t = a.num / a.den; let e = -50; while (!(a.b ** e <= t && t < a.b ** (e + 1))) e++; near(e, val(q), 0, 'floor of the logarithm'); },
-  hiddenquad(q, a) {
-    const f = x => a.b ** (2 * x) + a.B * a.b ** x + a.C;
-    const sol = rootsDeg(f, -8, 8).map(v => Math.round(v * 1e6) / 1e6);
-    assert.deepEqual(sol.map(v => Math.round(v) || 0), [...q.answer.values].sort((p, r) => p - r)); checks++;
-    sol.forEach(v => near(v, Math.round(v), 1e-5, 'whole solution'));
-  },
-  logeqext(q, a) {
-    const hits = [];
-    for (let x = -100; x <= 300; x++) if (x + a.p > 0 && x - a.q > 0 && Math.abs(logb(a.b, x + a.p) + logb(a.b, x - a.q) - a.k) < 1e-9) hits.push(x);
-    assert.deepEqual(hits, [val(q)]); checks++;
-  },
-  logintercept(q, a) { near(bisect(x => logb(a.b, x - a.h) - a.j, a.h + 1e-9, a.h + 5000), val(q), 1e-6, 'x-intercept'); },
-  logcoef(q, a) { near(a.Y / logb(a.b, a.X + a.h), val(q), 1e-9, 'k'); },
-  logexprsym(q, a) {
-    const p = logb(a.B, 2), r = logb(a.B, 3), N = 2 ** a.i * 3 ** a.j * a.B ** a.l;
-    const expr = q.answer.expr;
-    ok(/^[0-9pq()+\-*\s]+$/.test(expr), 'key is a simple expression');
-    near(Function('p', 'q', `return (${expr})`)(p, r), logb(a.B, N), 1e-9, 'expression equals the logarithm');
-  },
-  solverate(q, a) { const r = bisect(x => a.A * (1 + x) ** a.n - a.B, -0.99, 5); near(Math.round(Math.abs(r) * 100), val(q), 0, 'percentage'); near(Math.abs(r) * 100, val(q), 1e-6, 'whole percentage'); },
-  firstpast(q, a) { let v = a.P, n = 0; while (a.up ? v <= a.T : v >= a.T) { v *= a.rate; n++; } near(n, val(q), 0, 'first whole period'); },
-
-  trigfrom(q, a) {
-    const cosT = (a.quad === 1 ? a.B : -a.B) / a.C, sinT = a.A / a.C, th = Math.atan2(sinT, cosT);
-    ok(a.quad === 1 ? th > 0 && th < Math.PI / 2 : th > Math.PI / 2 && th < Math.PI, 'quadrant');
-    near(a.wantName === 'cos' ? Math.cos(th) : Math.sin(th), val(q), 1e-9, 'other ratio');
-  },
-  trigsimplify(q, a) {
-    const keyTxt = q.mcqOptions[q.answer.correctIndex];
-    for (const ang of [0.37, 0.9, 1.3]) near(evalAngle(a.e, ang), evalAngle(keyTxt, ang), 1e-9, 'identity holds');
-    q.mcqOptions.forEach((o, i) => { if (i !== q.answer.correctIndex) ok([0.37, 0.9, 1.3].some(ang => Math.abs(evalAngle(a.e, ang) - evalAngle(o, ang)) > 1e-6), 'distractor is not identical'); });
-  },
-  trigsq(q, a) {
-    const sinS = Math.sqrt(a.A2 / a.C2), th = Math.asin(sinS);
-    if (a.ask === 'cos2fromsin2') near(Math.cos(th) ** 2, val(q), 1e-9, 'cos^2');
-    else if (a.ask === 'oneminussin2') near(Math.cos(th) ** 2, val(q), 1e-9, '1 - sin^2');
-    else near(Math.cos(th) ** 2 + 2 * Math.sin(th) ** 2, val(q), 1e-9, 'cos^2 + 2 sin^2');
-  },
-  trigtrue(q, a) {
-    const key = q.mcqOptions[q.answer.correctIndex].replace(/\$/g, '');
-    const holds = tex => { const [l, r] = tex.split(' = '); return [0.2, 0.7, 1.1, 2.4].every(ang => Math.abs(evalTexSide(l, ang) - evalTexSide(r, ang)) < 1e-9); };
-    ok(holds(key), 'the key is an identity');
-    q.mcqOptions.forEach((o, i) => { if (i !== q.answer.correctIndex) ok(!holds(o.replace(/\$/g, '')), 'distractor is not an identity'); });
-  },
-  trigexpr(q, a) {
-    const js = a.js.replace(/\bsin\(/g, 'sinD(').replace(/\bcos\(/g, 'cosD(').replace(/\btan\(/g, 'tanD(');
-    near(Function('sinD', 'cosD', 'tanD', `return (${js})`)(sinD, cosD, tanD), val(q), 1e-9, 'expression value');
-  },
-  trigsolve(q, a) {
-    const g = a.lin ? x => a.lin[0] * FNS[a.fn](x) + a.lin[1] - a.lin[2] : x => FNS[a.fn](x) - a.v;
-    const sol = rootsDeg(g, a.lo, a.hi).filter(x => !(a.fn === 'tan' && Math.abs(cosD(x)) < 1e-9));
-    assert.deepEqual(sol.map(x => Math.round(x) || 0), [...q.answer.values].sort((p, r) => p - r)); checks++;
-  },
-  trigsolve2(q, a) { const sol = rootsDeg(x => a.lc * sinD(x) - a.rc * cosD(x), 0, 360).filter(x => x > 0 && x < 360); assert.deepEqual(sol.map(x => Math.round(x) || 0), [...q.answer.values].sort((p, r) => p - r)); checks++; },
-  trigref(q, a) { let found = null; for (let d = 1; d < 90; d++) if (Math.abs(FNS[a.fn](d) - Math.abs(a.v)) < 1e-9) found = d; near(found, val(q), 0, 'reference angle'); },
-  trigother(q, a) { const sol = rootsDeg(x => FNS[a.fn](x) - a.v, 0, 360); ok(sol.length === 2 && Math.abs(sol[0] - a.first) < 1e-6, 'first solution is genuine'); near(sol[1], val(q), 1e-6, 'other solution'); },
-  trigquad(q, a) { const sol = rootsDeg(x => { const f = FNS[a.fn](x); return a.A * f * f + a.B * f + a.C; }, 0, 360); assert.deepEqual(sol.map(x => Math.round(x) || 0), [...q.answer.values].sort((p, r) => p - r)); checks++; },
-  trigid(q, a) { const sol = rootsDeg(x => a.a * FNS[a.other](x) ** 2 + a.B * FNS[a.fn](x) - a.C, 0, 360); assert.deepEqual(sol.map(x => Math.round(x) || 0), [...q.answer.values].sort((p, r) => p - r)); checks++; },
-  trigsq2(q, a) { const sol = rootsDeg(x => a.a * FNS[a.fn](x) ** 2 - a.n / a.d, 0, 360).filter(x => !(a.fn === 'tan' && Math.abs(cosD(x)) < 1e-9)); assert.deepEqual(sol.map(x => Math.round(x) || 0), [...q.answer.values].sort((p, r) => p - r)); checks++; },
-  trigcount(q, a) { near(counts(x => FNS[a.fn](x) - a.v, a.lo, a.hi), val(q), 0, 'solution count'); },
-  trigquadcount(q, a) { near(counts(x => { const f = FNS[a.fn](x); return a.A * f * f + a.B * f + a.C; }), val(q), 0, 'count'); },
-  trigidcount(q, a) { near(counts(x => a.a * FNS[a.other](x) ** 2 + a.B * FNS[a.fn](x) - a.C), val(q), 0, 'count'); },
-  trigcountmc(q, a) {
-    const c = e => counts(x => FNS[e.f](x) - e.v);
-    near(c(a.key), a.want, 0, 'key count');
-    a.others.forEach(o => ok(c(o) !== a.want, 'distractor has a different count'));
-  },
-
-  reflectval(q, a) {
-    const f = x => evalPolyD(a.cs, x);
-    let got = null;
-    for (let t = -30; t <= 30; t++) { const img = a.axis === 'x' ? [t, -f(t)] : [-t, f(t)]; if (img[0] === a.k) got = img[1]; }
-    near(got, val(q), 1e-9, 'image value');
-  },
-  reflectexpr(q, a) {
-    const f = x => evalPolyD(a.cs, x), g = planeFn(q.answer.expr);
-    for (const x of [-2.5, -1, 0.5, 2, 3.3]) near(g(x), a.axis === 'x' ? -f(x) : f(-x), 1e-9, 'image rule');
-  },
-  reflectmc(q, a) {
-    const f = x => evalPolyD(a.f, x), g = x => evalPolyD(a.g, x);
-    const xs = [-2, -0.5, 1, 3];
-    const rel = (h) => xs.every(x => Math.abs(g(x) - h(x)) < 1e-9);
-    const kind = rel(x => -f(x)) ? 'x' : rel(x => f(-x)) ? 'y' : rel(x => -f(-x)) ? 'both' : 'shift';
-    const want = { x: 'a reflection in the $x$-axis', y: 'a reflection in the $y$-axis', both: 'a reflection in both axes (a half-turn about the origin)' }[kind];
-    if (want) near(q.mcqOptions[q.answer.correctIndex] === want ? 1 : 0, 1, 0, 'classified transformation'); else ok(/translation/.test(q.mcqOptions[q.answer.correctIndex]), 'translation');
-    ok(new Set(q.mcqOptions).size === q.mcqOptions.length, 'distinct options');
-  },
-  vertexreflect(q, a) {
-    const y = t => (t - a.h) ** 2 + a.k;
-    // the image's turning point: the sampled image point where the image curve is extreme
-    const img = t => (a.axis === 'x' ? [t, -y(t)] : [-t, y(t)]);
-    let best = null;
-    for (let t = a.h - 5; t <= a.h + 5; t += 0.25) { const p = img(t); if (!best || (a.axis === 'x' ? p[1] < best[1] : p[1] < best[1])) best = p; }
-    // stated: parabola opens upward when the coefficient is positive; the extreme of the image is checked by symmetry
-    near(q.answer.x, a.axis === 'x' ? a.h : -a.h, 0, 'x of the vertex'); near(q.answer.y, a.axis === 'x' ? -a.k : a.k, 0, 'y of the vertex');
-    void best;
-  },
-  interceptsum(q, a) {
-    const f = x => (a.axis === 'x' ? -(x - a.p) * (x - a.q) : (-x - a.p) * (-x - a.q));
-    const roots = rootsDeg(f, -40, 40);
-    near(roots.reduce((s, v) => s + v, 0), val(q), 1e-5, 'sum of intercepts');
-  },
-  dilationequiv(q, a) { near(Math.pow(a.k, -1 / a.n), val(q), 1e-9, 'horizontal factor'); },
-  imagepoint(q, a) {
-    const f = t => a.pt[1] + (t - a.pt[0]);
-    const X = q.answer.x, g = x => a.a * f(a.b * (x - a.h)) + a.k;
-    near(g(X), q.answer.y, 1e-9, 'image y'); near(a.b * (X - a.h), a.pt[0], 1e-9, 'image x maps back');
-  },
-  imageback(q, a) {
-    const x0 = q.answer.x, y0 = q.answer.y, f = t => y0 + (t - x0);
-    near(a.a * f(a.b * (a.img[0] - a.h)) + a.k, a.img[1], 1e-9, 'forward map of the answer is the given point');
-  },
-  imageexpr(q, a) {
-    const base = a.base === 2 ? x => x * x : x => x ** 3;
-    const apply = x => a.ops.reduce((f, [op, c]) => (op === 'tx' ? t => f(t - c) : op === 'sy' ? t => c * f(t) : op === 'ty' ? t => f(t) + c : t => f(t / c)), base)(x);
-    const key = planeFn(q.answer.expr);
-    for (const x of [-3, -1.2, 0.7, 2.4, 4]) near(key(x), apply(x), 1e-9, 'image rule');
-    q.traps.forEach(t => ok([-3, -1.2, 0.7, 2.4, 4].some(x => Math.abs(planeFn(t.expr)(x) - apply(x)) > 1e-6), 'the wrong order is a different graph'));
-  },
-  rangeimage(q, a) {
-    const f = t => a.c + ((t - 0) / 10) * (a.dd - a.c), vals = [];
-    for (let t = 0; t <= 10; t += 0.01) vals.push(a.a * f(t) + a.k);
-    near(a.greatest ? Math.max(...vals) : Math.min(...vals), val(q), 1e-6, 'extreme of the range');
-  },
-  domainimage(q, a) {
-    let best = -Infinity;
-    for (let x = -80; x <= 80; x += 0.005) { const t = a.b * (x - a.h); if (t >= a.lo - 1e-9 && t <= a.hi + 1e-9) best = x; }
-    near(best, val(q), 0.01, 'greatest x in the domain');
-  },
-  figpoint(q, a) {
-    ok(q.figure.startsWith('<svg') && !/href|src=/.test(q.figure), 'self-contained figure');
-    a.pts.forEach(p => ok(q.figure.includes(`(${p[0]}, ${p[1]})`), 'each point is labelled'));
-    if (a.mode === 'high-translate') {
-      const imgs = a.pts.map(p => [p[0] + a.h, p[1] + a.k]).sort((p, r) => r[1] - p[1]);
-      near(imgs[0][0], q.answer.x, 0, 'x'); near(imgs[0][1], q.answer.y, 0, 'y');
-    } else near(Math.min(...a.pts.map(p => -a.a * p[1] + a.k)), val(q), 0, 'lowest value of g');
-  },
-
-
-  transmc(q, a) {
-    // find the translation (dx, dy) that maps f onto g, with a test function, then compare with the key text
-    const f = t => t ** 3 + t, g = t => f(t - a.h) + a.k;
-    let found = null;
-    for (let dx = -12; dx <= 12; dx++) for (let dy = -12; dy <= 12; dy++) if ([-2, 0.5, 3].every(t => Math.abs(g(t) - (f(t - dx) + dy)) < 1e-9)) found = [dx, dy];
-    const un = n => (n === 1 ? '1 unit' : `${n} units`);
-    const text = `${un(Math.abs(found[0]))} ${found[0] > 0 ? 'right' : 'left'} and ${un(Math.abs(found[1]))} ${found[1] > 0 ? 'up' : 'down'}`;
-    ok(q.mcqOptions[q.answer.correctIndex] === text, 'key option names the translation');
-  },
-  transvertex(q, a) {
-    const g = x => (x - a.p - a.h) ** 2 + a.q + a.k;
-    let best = null; for (let x = -40; x <= 40; x += 0.5) if (best === null || g(x) < g(best)) best = x;
-    near(best, q.answer.x, 0, 'x of the vertex'); near(g(best), q.answer.y, 1e-9, 'y of the vertex');
-  },
-  transh(q, a) { const f = t => a.y1 + (t - a.x1), h = a.askH ? val(q) : a.x2 - a.x1, k = a.askH ? a.y2 - a.y1 : val(q); near(f(a.x2 - h) + k, a.y2, 1e-9, 'the image point lies on the translated graph'); },
-  domrecip(q, a) { near(a.a * (-a.b / a.a) + a.b, 0, 1e-12, 'denominator zero'); near(-a.b / a.a, val(q), 1e-9, 'excluded value'); },
-  domsqrt(q, a) { let best = null; for (let x = -80; x <= 80; x += 0.001) if (a.c - a.m * x >= -1e-12) best = x; near(best, val(q), 0.002, 'greatest x'); },
-  domallreals(q, a) {
-    const defined = js => { const f = Function('x', `return (${js})`); for (let i = -4000; i <= 4000; i++) if (!Number.isFinite(f(i / 100))) return false; return true; };
-    ok(defined(a.key), 'key function is defined everywhere'); a.others.forEach(o => ok(!defined(o), 'distractor fails somewhere'));
-    ok(q.mcqOptions[q.answer.correctIndex] === a.keyText, 'key option');
-  },
-  domcount(q, a) { let n = 0; for (let x = -100; x <= 100; x++) if (x - a.p >= 0 && a.q - x >= 0) n++; near(n, val(q), 0, 'integers in the domain'); },
-
-  inversequad(q, a) {
-    const f = x => (x - a.h) ** 2 + a.c;
-    const x = bisect(t => f(t) - a.N, a.pos ? a.h : a.h - 200, a.pos ? a.h + 200 : a.h);
-    near(x, val(q), 1e-6, 'inverse value');
-  },
-  composesolve(q, a) { const x = bisect(t => a.f[0] * (a.g[0] * t + a.g[1]) + a.f[1] - a.N, -500, 500); near(x, val(q), 1e-6, 'x'); },
-  composesolve2(q, a) { const sol = rootsDeg(x => a.a * (x * x + a.c) + a.b - a.N, -50, 50); assert.deepEqual(sol.map(x => Math.round(x) || 0), [...q.answer.values].sort((p, r) => p - r)); checks++; },
-  composesolve3(q, a) { near(bisect(x => a.a * (x ** 3 + a.c) + a.b - a.N, -50, 50), val(q), 1e-6, 'x'); },
-  commute(q, a) {
-    const diff = c => { const f = x => a.a * x + c, g = x => a.b * x + a.d; return f(g(2)) - g(f(2)); };
-    const c = -diff(0) / (diff(1) - diff(0));
-    near(c, val(q), 1e-9, 'c'); near(diff(c), 0, 1e-9, 'the composites agree');
-    const f = x => a.a * x + c, g = x => a.b * x + a.d;
-    for (const x of [-3, 0, 5.5]) near(f(g(x)), g(f(x)), 1e-9, 'agree at x');
-  },
-  composedomain(q, a) {
-    if (a.mode === 'sqrt') {
-      let edge = null;
-      for (let x = -80; x <= 80; x += 0.001) { const inside = a.p * x + a.q >= -1e-12; if (inside && edge === null && a.p > 0) edge = x; if (!inside && a.p < 0 && edge === null) edge = x - 0.001; }
-      near(edge, val(q), 0.002, 'edge of the domain');
-    } else near(a.p * val(q) + a.q, a.a, 1e-9, 'the excluded input');
-  },
-  backwardsf(q, a) { const t = a.t, x = (t - a.g[1]) / a.g[0]; near(a.fg[0] * x + a.fg[1], val(q), 1e-9, 'f(t)'); near(a.g[0] * x + a.g[1], t, 1e-9, 'g(x) = t'); },
-  backwardsf2(q, a) { const x = a.t - a.q; near(x * x + a.A * x + a.B, val(q), 1e-9, 'f(t)'); },
-
-  freqmean(q, a) { near(mean(a.vals.flatMap((v, i) => Array(a.freq[i]).fill(v))), val(q), 1e-9, 'mean'); },
-  missingmean(q, a) { near(mean([...a.known, val(q)]), a.mu, 1e-9, 'mean of all'); },
-  combinedmean(q, a) { near(mean([...Array(a.n1).fill(a.m1), ...Array(a.n2).fill(a.m2)]), val(q), 1e-9, 'combined mean'); },
-  meantransform(q, a) { const xs = [a.mu - 3, a.mu + 3, a.mu - 1, a.mu + 1]; near(mean(xs.map(x => a.a * x + a.b)), val(q), 1e-9, 'mean'); },
-  median(q, a) { near(median(a.xs), val(q), 1e-9, 'median'); },
-  freqmedian(q, a) { near(median(a.vals.flatMap((v, i) => Array(a.freq[i]).fill(v))), val(q), 1e-9, 'median'); },
-  measuremc(q, a) { ok(q.mcqOptions[q.answer.correctIndex] === a.key, 'key option'); },
-  variance(q, a) { near(variance(a.xs), val(q), 1e-9, 'variance'); },
-  sdfromsums(q, a) { near(Math.sqrt(a.sxx / a.n - (a.sx / a.n) ** 2), val(q), 1e-9, 'sd'); },
-  addmean(q, a) { const xs = dataSet(a.n, 50, Math.sqrt(a.s)); near(variance(xs), a.s, 1e-9, 'built set'); near(variance([...xs, mean(xs)]), val(q), 1e-9, 'new variance'); },
-  'larger-sd'(q, a) { const key = variance(a.P) > variance(a.Q) ? 'P' : 'Q'; ok(key === a.expect, 'larger standard deviation'); ok(q.mcqOptions[q.answer.correctIndex] === `Set ${key}`, 'key option'); },
-  sdtransform(q, a) { const xs = dataSet(7, 40, a.sd), ys = xs.map(x => a.a * x + a.b); near(a.ask === 'var' ? variance(ys) : Math.sqrt(variance(ys)), val(q), 1e-6, 'transformed spread'); },
-  combinedvar(q, a) { const A = dataSet(a.n1, 0, a.s1), B = dataSet(a.n2, 0, a.s2); near(variance([...A, ...B]), val(q), 1e-6, 'combined variance'); },
-  solveab(q, a) { const aa = a.sd2 / a.sd, bb = a.mu2 - aa * a.mu, xs = dataSet(6, a.mu, a.sd), ys = xs.map(x => aa * x + bb); near(mean(ys), a.mu2, 1e-9, 'target mean'); near(Math.sqrt(variance(ys)), a.sd2, 1e-9, 'target sd'); near(bb, val(q), 1e-9, 'b'); },
-  freqvariance(q, a) { near(variance(a.vals.flatMap((v, i) => Array(a.freq[i]).fill(v))), val(q), 1e-9, 'variance'); },
-
-  areasplit(q, a) { near(simpson(x => Math.abs(evalPolyD(a.cs, x)), a.lo, a.hi), val(q), 1e-6, 'area'); },
-  areabetween(q, a) { near(simpson(x => Math.abs(evalPolyD(a.f, x) - evalPolyD(a.g, x)), a.r1, a.r2), val(q), 1e-6, 'area'); },
-  areaunknownlimit(q, a) { near(bisect(k => simpson(x => 2 * a.a * x + a.b, 0, k, 2000) - a.A, 0.01, 50), val(q), 1e-6, 'k'); },
-  areachain(q, a) { near(simpson(x => (a.a * x + a.b) ** a.n, a.lo, a.hi), val(q), 1e-6, 'area'); },
-  areaenclosed(q, a) { near(simpson(x => Math.abs(evalPolyD(a.cs, x)), a.p, a.q), val(q), 1e-6, 'area'); },
-  ratiotwo(q, a) { const hits = []; for (let r = -12; r <= 12; r++) if (r !== 0 && Math.abs(a.tm * r ** (a.n - a.m) - a.tn) < 1e-9) hits.push(r); assert.deepEqual(hits, [val(q)]); checks++; },
-  geosum(q, a) { let s = 0, t = a.a; for (let i = 0; i < a.n; i++) { s += t; t *= a.r; } near(s, val(q), 1e-9, 'sum'); },
-  termcount(q, a) { let t = a.a, n = 1; while (Math.abs(t - a.last) > 1e-9 && n < 100) { t *= a.r; n++; } near(n, val(q), 0, 'number of terms'); },
-  firstexceed(q, a) { let t = a.a, n = 1; while (t <= a.bound) { t *= a.r; n++; } near(n, val(q), 0, 'first term over the bound'); },
-  context(q, a) { let t = a.a; for (let i = 1; i < a.n; i++) t = a.type === 'geo' ? t * a.r : t + a.d; near(t, val(q), 1e-9, 'term'); },
-  isgeo(q, a) {
-    const geo = xs => xs.every((x, i) => i === 0 || Math.abs(x / xs[i - 1] - xs[1] / xs[0]) < 1e-9);
-    ok(geo(a.key), 'key is geometric'); a.others.forEach(o => ok(!geo(o), 'distractor is not geometric'));
-  },
-  rvmean(q, a) { near(a.xs.reduce((s, x, i) => s + x * a.ps[i], 0), val(q), 0.005 + 1e-9, 'E(X)'); near(a.ps.reduce((s, p) => s + p, 0), 1, 1e-9, 'probabilities sum to 1'); },
-  rvunknown(q, a) { near(a.x1 * a.p[0] + a.x2 * a.p[1] + val(q) * a.p[2], a.E, 1e-9, 'E(X)'); },
-  spinner(q, a) { let tot = 0; for (let i = 0; i < a.n; i++) tot += a.prizes[i] / a.n; near(tot - a.cost, val(q), 0.005 + 1e-9, 'net gain'); },
-  rvvar(q, a) { const mu = a.xs.reduce((s, x, i) => s + x * a.ps[i], 0), v = a.xs.reduce((s, x, i) => s + (x - mu) ** 2 * a.ps[i], 0); near(v, val(q), 0.005 + 1e-9, 'variance'); },
-  rvtransform(q, a) {
-    const sd = Math.sqrt(a.v), xs = [a.mu - sd, a.mu + sd], ys = xs.map(x => a.a * x + a.b);
-    near(a.ask === 'var' ? variance(ys) : mean(ys), val(q), 1e-9, 'transformed moment');
-  },
-  validdist(q, a) {
-    const valid = ps => ps.every(p => p >= 0 && p <= 1) && Math.abs(ps.reduce((s, p) => s + p, 0) - 1) < 1e-9;
-    ok(valid(a.good), 'key is a valid distribution'); a.others.forEach(o => ok(!valid(o), 'distractor is invalid'));
-  },
-  zscore(q, a) { near((a.x - a.mu) / a.sd, val(q), 1e-9, 'z'); },
-  zinverse(q, a) { near((val(q) - a.mu) / a.sd, a.z, 1e-9, 'z of the answer'); },
-  zcompare(q, a) { ok((a.z1 > a.z2 ? 'Mathematics' : 'Science') === a.key, 'better subject'); ok(q.mcqOptions[q.answer.correctIndex] === a.key, 'key option'); },
-  zmean(q, a) { near((a.x - val(q)) / a.sd, a.z, 1e-9, 'z with the answer'); },
-  ztwo(q, a) { near((a.xa - a.xb) / (a.za - a.zb), val(q), 1e-9, 'sd'); },
-  zinvariant(q, a) { const xs = dataSet(8, a.mu, a.sd), ys = xs.map(x => a.a * x + a.b), y = a.a * a.x + a.b; near((y - mean(ys)) / Math.sqrt(variance(ys)), val(q), 1e-9, 'z after the rescale'); },
-  emp(q, a) { const k = (a.hi - a.mu) / a.sd; ok(Number.isInteger(k), 'whole number of sds'); near((Phi(k) - Phi(-k)) * 100, val(q), 0.5, 'close to the exact normal percentage'); },
-  emptail(q, a) { const z = (a.limit - a.mu) / a.sd, tail = (a.above ? 1 - Phi(z) : Phi(z)) * 100; near((100 * val(q)) / a.n, tail, 0.3, 'tail percentage'); },
-  empreverse(q, a) { let bestK = 1, bestErr = 1e9; for (const k of [1, 2, 3]) { const err = Math.abs((Phi(k) - Phi(-k)) * 100 - a.pct); if (err < bestErr) { bestErr = err; bestK = k; } } near((a.hi - a.lo) / (2 * bestK), val(q), 1e-9, 'sd'); },
-  empshape(q, a) { ok(q.mcqOptions[q.answer.correctIndex].toLowerCase().startsWith(a.key.slice(0, 20).toLowerCase()), 'key option is the symmetric data set'); ok(/bell-shaped/.test(a.key), 'key describes a bell shape'); },
-  emptail1(q, a) { const z = (a.x - a.mu) / a.sd, tail = (a.above ? 1 - Phi(z) : Phi(z)) * 100; near(val(q), tail, 0.3, 'tail percentage'); },
-
-  sinkingfund(q, a) {
-    const bal = M => { let b = 0; for (let i = 0; i < a.n; i++) b = b * (1 + a.r) + M; return b; };
-    near(bisect(M => bal(M) - a.T, 0.0001, a.T), val(q), 0.005 + 1e-9, 'deposit');
-  },
-  depositsneeded(q, a) { let b = 0, n = 0; while (b < a.T && n < 1000) { b = b * (1 + a.r) + a.a; n++; } near(n, val(q), 0, 'deposits needed'); },
-  tablerate(q, a) {
-    const factor = rate => { const r = a.yearly ? rate / 100 : rate / 1200; let b = 0; for (let i = 0; i < a.n; i++) b = b * (1 + r) + 1; return b; };
-    const shown = (q.prompt.match(/\\text\{Factor\}\s*&([^\\]+)\\end/) || [])[1].split('&').map(s => Number(s.trim()));
-    a.rates.forEach((rt, i) => near(shown[i], factor(rt), 6e-5, 'table factor'));
-    near(a.rates.find(rt => a.a * factor(rt) >= a.T), val(q), 0, 'lowest rate');
-  },
-  presentvalue(q, a) { let pv = 0; for (let i = 1; i <= a.n; i++) pv += a.a / (1 + a.r) ** i; near(pv, val(q), 0.005 + 1e-9, 'present value'); },
-  compareplans(q, a) { let A = 0; for (let i = 0; i < a.n; i++) A = A * (1 + a.r) + a.a; let B = a.L; for (let i = 0; i < a.n; i++) B *= 1 + a.r; near(Math.round(Math.abs(A - B)), val(q), 0, 'difference'); },
-  annuitydue(q, a) { let b = 0; for (let i = 0; i < a.n; i++) b = (b + a.a) * (1 + a.r); near(b, val(q), 0.005 + 1e-9, 'balance'); },
-  recurrence(q, a) { let A = a.A0; for (let i = 0; i < a.n; i++) A = a.mult * A + a.add; near(A, val(q), 0.005 + 1e-9, 'balance'); },
-  loanpayment(q, a) { const end = M => { let A = a.P; for (let i = 0; i < a.n; i++) A = A * (1 + a.r) - M; return A; }; near(bisect(M => -end(M), 1, a.P), val(q), 0.005 + 1e-9, 'repayment'); },
-  loanterm(q, a) { let A = a.P, n = 0; while (A > 0 && n < 1000) { A = A * (1 + a.r) - a.M; n++; } near(n, val(q), 0, 'repayments'); },
-  loancompare(q, a) {
-    const repay = n => bisect(M => { let A = a.P; for (let i = 0; i < n; i++) A = A * (1 + a.r) - M; return -A; }, 1, a.P);
-    near(repay(a.n1), a.m1, 0.0051, 'plan 1 repayment'); near(repay(a.n2), a.m2, 0.0051, 'plan 2 repayment');
-    near(a.m2 * a.n2 - a.m1 * a.n1, val(q), 0.005 + 1e-9, 'difference in interest');
-  },
-  loanbalance(q, a) { let A = a.P; for (let i = 0; i < a.k; i++) A = A * (1 + a.r) - a.M; near(A, val(q), 0.005 + 1e-9, 'balance'); },
-  loansplit(q, a) { let A = a.P; let interest = A * a.r; if (a.second) { A = A * (1 + a.r) - a.M; interest = A * a.r; } near(a.M - interest, val(q), 0.005 + 1e-9, 'principal part'); },
-  loantable(q, a) {
-    const n = 12 * a.t, r = a.rate / 1200, end = M => { let A = 1000; for (let i = 0; i < n; i++) A = A * (1 + r) - M; return A; };
-    const exact = bisect(M => -end(M), 0.1, 1000);
-    near(a.factor, exact, 0.0051, 'table entry');
-    near((a.P / 1000) * a.factor * n, val(q), 0.005 + 1e-9, 'total repaid');
-  }
+const CUR = {};
+// ── Answers derived from the PROMPT TEXT alone ──────────────────────────────
+// Each check reads the numbers and structure out of the rendered prompt (and options), as a student or a
+// reviewer would, and computes the expected answer by its own route. It never reads the form's parameters.
+const num = s => Number(String(s).replace(/,/g, ''));
+const strip = s => s.replace(/\\\$/g, '').replace(/(?<=\d),(?=\d{3})/g, '');
+const math = s => [...s.matchAll(/\$([^$]+)\$/g)].map(m => m[1]);
+const isGroup = (s, re) => { const m = s.match(re); assert.ok(m, `prompt did not match ${re}: ${s.slice(0, 160)}`); return m; };
+const cleanMath = s => s.replace(/\\left|\\right/g, '').replace(/\\,/g, '');
+/** TeX fragment to a number (fractions, roots, powers). */
+const texNum = s => {
+  let t = cleanMath(s).replace(/\\dfrac(\d)(\d)/g, '($1/$2)').replace(/\\tfrac(\d)(\d)/g, '($1/$2)').replace(/\\sqrt(\d)/g, 'Math.sqrt($1)');
+  for (let i = 0; i < 4; i++) t = t.replace(/\\[dt]frac\{([^{}]*)\}\{([^{}]*)\}/g, '(($1)/($2))').replace(/\\sqrt\[3\]\{([^{}]*)\}/g, 'Math.cbrt($1)').replace(/\\sqrt\{([^{}]*)\}/g, 'Math.sqrt($1)');
+  return Function(`"use strict"; return (${t.replace(/(\d)(Math)/g, '$1*$2')});`)();
 };
-const evalPolyD = (cs, x) => cs.reduce((s, c) => s * x + c, 0);
+/** a polynomial or simple expression in x as a JS function (x^{2}, 3x, -x, (2x + 5)^{4}, \sqrt{..}, \dfrac{..}{..}) */
+const exprFn = s => {
+  let t = cleanMath(s).replace(/\\times|\\cdot/g, '*');
+  for (let i = 0; i < 4; i++) t = t.replace(/\\dfrac\{([^{}]*)\}\{([^{}]*)\}/g, '(($1)/($2))').replace(/\\sqrt\{([^{}]*)\}/g, 'Math.sqrt($1)');
+  for (let i = 0; i < 3; i++) t = t.replace(/\(([^()]*)\)\^\{?(\d+)\}?/g, 'Math.pow(($1),$2)');
+  t = t.replace(/x\^\{?(\d+)\}?/g, 'Math.pow(x,$1)').replace(/(\d)(x|Math|\()/g, '$1*$2').replace(/(x|\))(\(|Math|\d)/g, '$1*$2').replace(/\)\(/g, ')*(').replace(/(\d)\(/g, '$1*(');
+  return Function('x', `"use strict"; return (${t});`);
+};
+const sciRoots = (f, lo, hi, step = 0.001) => { const out = []; let p = f(lo); for (let x = lo + step; x <= hi + 1e-9; x += step) { const c = f(x); if (Number.isFinite(p) && Number.isFinite(c) && (p === 0 || (p < 0) !== (c < 0))) out.push(bisect(f, x - step, x)); p = c; } return out; };
+const trigJs = s => {
+  let t = cleanMath(s).replace(/\\dfrac(\d)(\d)/g, '($1/$2)').replace(/\\sqrt(\d)/g, 'Math.sqrt($1)');
+  for (let i = 0; i < 3; i++) t = t.replace(/\\dfrac\{([^{}]*)\}\{([^{}]*)\}/g, '(($1)/($2))').replace(/\\sqrt\{([^{}]*)\}/g, 'Math.sqrt($1)');
+  t = t.replace(/\\(sin|cos|tan)\^2\\theta/g, 'Math.pow(F.$1(t),2)').replace(/\\(sin|cos|tan)\\theta/g, 'F.$1(t)');
+  t = t.replace(/(\d|\))(F\.|Math|\()/g, '$1*$2').replace(/(\))(\d)/g, '$1*$2').replace(/(\d)(\()/g, '$1*$2');
+  return Function('F', 't', `"use strict"; return (${t});`).bind(null, FNS);
+};
+const eqGap = eq => { const [l, r] = eq.split(' = '); const L = trigJs(l), R = trigJs(r); return t => L(t) - R(t); };
+const range = p => { const m = isGroup(p, /(-?\d+)\^\\circ \\le \\theta \\le (-?\d+)\^\\circ/); return [Number(m[1]), Number(m[2])]; };
+const solveEq = p => {
+  const eq = math(p)[0].replace(/^Solve\s*/, ''); const [lo, hi] = range(p);
+  return rootsDeg(eqGap(eq), lo, hi).filter(t => !/\\tan/.test(eq) || Math.abs(cosD(t)) > 1e-9);
+};
+const T = (re, f) => (q, d) => f(q.prompt, q, d, strip(q.prompt));
+const pickOpt = (q, pred) => { const hits = q.mcqOptions.map((o, i) => (pred(o) ? i : -1)).filter(i => i >= 0); assert.deepEqual(hits, [q.answer.correctIndex], 'exactly the keyed option satisfies the rule'); checks++; };
+const fmtNum = x => (Math.abs(x - Math.round(x)) < 1e-9 ? String(Math.round(x)) : String(x));
+const answerIs = (q, e) => {
+  if (e.n !== undefined) { assert.ok(q.answerType === 'numeric'); near(q.answer.value, e.n, (e.tol ?? q.answer.tol ?? 0) + 1e-9, 'numeric key'); }
+  else if (e.set) { const nz0 = v => (Math.round(v * 1e6) / 1e6) || 0; assert.deepEqual(q.answer.values.map(nz0).sort((a, b) => a - b), e.set.map(nz0).sort((a, b) => a - b)); checks++; }
+  else if (e.pt) { near(q.answer.x, e.pt[0], 1e-9, 'x'); near(q.answer.y, e.pt[1], 1e-9, 'y'); }
+  else if (e.expr) { const f = planeFn(q.answer.expr); for (const x of [-3, -1.2, 0.7, 2.4, 4]) near(f(x), e.expr(x), 1e-9, 'expression'); }
+};
+const sets = q => q.answer.values;
+const deg = { sin: sinD, cos: cosD, tan: tanD };
+const opsFromText = (p, startFn) => {
+  // clauses in the order they are stated
+  const re = /(translated (\d+) units? (right|left|up|down)|stretched vertically by a factor of \$(\d+)\$|reflected in the \$x\$-axis|dilated horizontally by a factor of \$(\d+)\$|and (\d+) units? (up|down))/g;
+  const ops = [];
+  for (const m of p.matchAll(re)) {
+    if (m[2]) { const k = Number(m[2]); ops.push(m[3] === 'right' ? ['tx', k] : m[3] === 'left' ? ['tx', -k] : m[3] === 'up' ? ['ty', k] : ['ty', -k]); }
+    else if (m[6]) ops.push(['ty', (m[7] === 'up' ? 1 : -1) * Number(m[6])]);
+    else if (m[4]) ops.push(['sy', Number(m[4])]); else if (m[5]) ops.push(['dx', Number(m[5])]); else ops.push(['sy', -1]);
+  }
+  return t => ops.reduce((f, [op, c]) => (op === 'tx' ? u => f(u - c) : op === 'sy' ? u => c * f(u) : op === 'ty' ? u => f(u) + c : u => f(u / c)), startFn)(t);
+};
+const parsePolyList = s => exprFn(s);
+const tableRows = p => { const m = isGroup(p, /\\text\{(?:Value|Frequency)\}.*?\\end\{array\}|x & .*?\\end\{array\}/s); return m[0]; };
+const rowNums = (tex, label) => { const m = tex.match(new RegExp(`${label}\\s*&([^\\\\]+)`)); assert.ok(m, `row ${label}`); return m[1].split('&').map(s => s.trim()); };
+const sgn = s => (s === '-' ? -1 : 1);
+const coef = s => (s === '' || s === undefined ? 1 : s === '-' ? -1 : Number(s));
+const CHECKS = {};
+const un = n => (n === 1 ? '1 unit' : `${n} units`);
+
+// ── y11-explog-more ──────────────────────────────────────────────────────────
+const letterVal = c => 1.13 + (c.charCodeAt(0) % 17) * 0.4137;
+const argVal = str => {
+  let t = str.replace(/\$/g, '').replace(/\\log_\{\w+\} /, '').replace(/\\cdot/g, '*').replace(/\^\{(\d+)\}/g, '^$1');
+  for (let i = 0; i < 3; i++) t = t.replace(/\\dfrac\{([^{}]*)\}\{([^{}]*)\}/g, '(($1)/($2))');
+  t = t.replace(/(\d*)([A-Za-z])(?:\^(\d+))?/g, (m, c, v, e) => `(${c || 1}*Math.pow(${letterVal(v)},${e || 1}))`).replace(/\)\s*\(/g, ')*(').replace(/\)\s*\*\s*\(/g, ')*(');
+  return Function(`return (${t})`)();
+};
+CHECKS['y11-explog-more'] = [
+  (p, q) => {
+    const ex = isGroup(p, /equal to \$(.+?)\$\?/)[1];
+    const lhs = [...ex.matchAll(/(-|\+)?\s*(\d*)\\log_\{\w+\} (\w)/g)].reduce((s, m) => s + sgn(m[1]) * (m[2] ? Number(m[2]) : 1) * Math.log(letterVal(m[3])), 0);
+    pickOpt(q, o => Math.abs(Math.log(argVal(o)) - lhs) < 1e-9);
+  },
+  (p, q) => { const ex = isGroup(p, /Evaluate \$(.+?)\$\./)[1]; const v = [...ex.matchAll(/(-|\+)?\s*(\d*)\\log_\{(\d+)\} (\d+)/g)].reduce((s, m) => s + sgn(m[1]) * (m[2] ? Number(m[2]) : 1) * logb(Number(m[3]), Number(m[4])), 0); answerIs(q, { n: v }); },
+  (p, q) => { const m = isGroup(p, /\\log_\{(\d+)\} (\d+)\$/); answerIs(q, { n: logb(Number(m[1]), Number(m[2])) }); },
+  (p, q) => { const m = isGroup(p, /\\log_\{x\} (\d+) = (\d+)/); const x = Math.round(Number(m[1]) ** (1 / Number(m[2]))); assert.equal(x ** Number(m[2]), Number(m[1])); answerIs(q, { n: x }); },
+  (p, q) => { const m = isGroup(p, /\\log_\{(\d+)\} (.+?)\$\./); answerIs(q, { n: logb(Number(m[1]), texNum(m[2])) }); },
+  (p, q) => {
+    const ex = math(p)[0]; let m, f;
+    if ((m = ex.match(/^(\d+)\\times (\d+)\^\{x\} = (\d+)$/))) f = x => Number(m[1]) * Number(m[2]) ** x - Number(m[3]);
+    else if ((m = ex.match(/^(\d+)\^\{x \+ (\d+)\} = (\d+)$/))) f = x => Number(m[1]) ** (x + Number(m[2])) - Number(m[3]);
+    else { m = isGroup(ex, /^(\d+)\^\{x\} = (\d+)$/); f = x => Number(m[1]) ** x - Number(m[2]); }
+    answerIs(q, { n: bisect(f, -30, 30) });
+  },
+  (p, q, d, sp) => {
+    const F = { 'doubles': 2, 'triples': 3, 'quadruples': 4, 'multiplies by 5': 5, 'multiplies by 10': 10, 'halves': 0.5, 'falls to one third': 1 / 3 };
+    let m = sp.match(/starts with (\d+) bacteria. The number of bacteria (.+?) every hour.*there be (\d+) bacteria/), start, target, f;
+    if (m) { start = Number(m[1]); f = F[m[2]]; target = Number(m[3]); } else { m = isGroup(sp, /sample of (\d+) g of a substance (.+?) in mass every day.*will (\d+) g remain/); start = Number(m[1]); f = F[m[2]]; target = Number(m[3]); }
+    let v = start, n = 0; while (Math.abs(v - target) > 1e-6 && n < 60) { v *= f; n++; } answerIs(q, { n });
+  },
+  (p, q) => {
+    const m = isGroup(p, /\\log_\{(\d+)\} (?:\\dfrac\{(\d+)\}\{(\d+)\}|(\d+))\$ lies/); const b = Number(m[1]), arg = m[4] ? Number(m[4]) : Number(m[2]) / Number(m[3]);
+    let e = -60; while (!(b ** e <= arg && arg < b ** (e + 1))) e++; answerIs(q, { n: e });
+  },
+  (p, q) => {
+    const ex = math(p)[0].replace(/ = 0$/, '').replace(/(\d+)\^\{2x\}/g, 'Math.pow($1,2*x)').replace(/(\d+)\^\{x\}/g, 'Math.pow($1,x)').replace(/\\times /g, '*');
+    const f = Function('x', `return (${ex})`);
+    answerIs(q, { set: sciRoots(f, -8, 8, 0.0005).map(v => Math.round(v * 1e6) / 1e6) });
+  },
+  (p, q) => {
+    const m = isGroup(p, /\\log_\{(\d+)\}\(x \+ (\d+)\) \+ \\log_\{\d+\}\(x - (\d+)\) = (\d+)/); const [b, a, c, k] = m.slice(1).map(Number);
+    const hits = []; for (let x = -200; x <= 400; x++) if (x + a > 0 && x - c > 0 && Math.abs(logb(b, x + a) + logb(b, x - c) - k) < 1e-9) hits.push(x);
+    assert.equal(hits.length, 1); answerIs(q, { n: hits[0] });
+  },
+  (p, q, d, sp) => {
+    if (d === 3) { const m = isGroup(p, /y = \\log_\{(\d+)\}\(x ([+-]) (\d+)\) - (\d+)\$/); const s = sgn(m[2]) * Number(m[3]); answerIs(q, { n: bisect(x => logb(Number(m[1]), x + s) - Number(m[4]), -s + 1e-9, -s + 6000) }); }
+    else { const m = isGroup(p, /y = k\\log_\{(\d+)\}\(x ([+-]) (\d+)\)\$ passes through the point \$\((-?\d+), (-?\d+)\)\$/); answerIs(q, { n: Number(m[5]) / logb(Number(m[1]), Number(m[4]) + sgn(m[2]) * Number(m[3])) }); }
+  },
+  (p, q) => {
+    const m = isGroup(p, /\\log_\{(\d+)\} 2 = p\$ and \$\\log_\{\d+\} 3 = q\$, write \$\\log_\{\d+\} (.+?)\$ in terms/);
+    const B = Number(m[1]), P = logb(B, 2), Qv = logb(B, 3), expr = q.answer.expr;
+    assert.ok(/^[0-9pq()+\-*\s]+$/.test(expr)); near(Function('p', 'q', `return (${expr})`)(P, Qv), logb(B, texNum(m[2])), 1e-9, 'expression equals the logarithm');
+  },
+  (p, q, d, sp) => {
+    let m = sp.match(/worth (\d+) when new and (\d+) after (\d+) years/), decay = true;
+    if (!m) { m = isGroup(sp, /from (\d+) to (\d+) in (\d+) years/); decay = false; }
+    const [A, B, n] = m.slice(1).map(Number); const r = bisect(x => A * (1 + x) ** n - B, -0.99, 5); assert.equal(r < 0, decay); answerIs(q, { n: Math.abs(r) * 100 });
+  },
+  (p, q, d, sp) => {
+    let m = sp.match(/^(\d+) is invested at (\d+)%.*exceed (\d+)\?/), up = true, P, rate, T, n = 0;
+    if (m) { P = Number(m[1]); rate = 1 + Number(m[2]) / 100; T = Number(m[3]); } else { m = isGroup(sp, /starts at (\d+) mg\/L and falls by (\d+)% each hour.*below ([\d.]+) mg\/L/); P = Number(m[1]); rate = 1 - Number(m[2]) / 100; T = Number(m[3]); up = false; }
+    let v = P; while (up ? v <= T : v >= T) { v *= rate; n++; } answerIs(q, { n });
+  }
+];
+
+// ── y11-trig-ident ───────────────────────────────────────────────────────────
+const fracVal = s => texNum(s);
+const idAt = (tex, ang) => evalAngle(tex, ang);
+const sameExpr = (a, b) => [0.37, 0.9, 1.3, 2.1].every(t => Math.abs(idAt(a, t) - idAt(b, t)) < 1e-9);
+const countEq = p => { const eq = p.replace(/\$/g, '').replace(/^Solve\s*/, ''); return rootsDeg(eqGap(eq), 0, 360).filter(t => !/\\tan/.test(eq) || Math.abs(cosD(t)) > 1e-9).length; };
+const degExpr = tex => {
+  let t = tex.replace(/\\(sin|cos|tan)\^2 (\d+)\^\\circ/g, 'Math.pow($1D($2),2)').replace(/\\(sin|cos|tan) (\d+)\^\\circ/g, '$1D($2)').replace(/\\times/g, '*');
+  for (let i = 0; i < 3; i++) t = t.replace(/\\dfrac\{([^{}]*)\}\{([^{}]*)\}/g, '(($1)/($2))');
+  t = t.replace(/(\d)(sinD|cosD|tanD|Math)/g, '$1*$2').replace(/\)(sinD|cosD|tanD)/g, ')*$1');
+  return Function('sinD', 'cosD', 'tanD', `return (${t})`)(sinD, cosD, tanD);
+};
+CHECKS['y11-trig-ident'] = [
+  (p, q) => {
+    const quad2 = /90\^\\circ < \\theta < 180\^\\circ/.test(p);
+    const g = isGroup(p, /\\(sin|cos)\\theta = (-?\\dfrac\{\d+\}\{\d+\})\$\. Find \$\\(sin|cos)\\theta/); const s = fracVal(g[2]);
+    const want = g[1] === 'sin' ? (quad2 ? -1 : 1) * Math.sqrt(1 - s * s) : Math.sqrt(1 - s * s);
+    answerIs(q, { n: want });
+  },
+  (p, q) => { const e = isGroup(p, /identical to \$(.+?)\$ for every/)[1]; pickOpt(q, o => sameExpr(e, o.replace(/\$/g, ''))); },
+  (p, q) => {
+    let m;
+    if ((m = p.match(/\\sin\^2\\theta = (\\dfrac\{\d+\}\{\d+\})\$\. Find/))) answerIs(q, { n: 1 - fracVal(m[1]) });
+    else if ((m = p.match(/\\cos\\theta = (-?\\dfrac\{\d+\}\{\d+\})\$, find the value of \$1 - \\sin\^2/))) answerIs(q, { n: fracVal(m[1]) ** 2 });
+    else { m = isGroup(p, /\\sin\\theta = (-?\\dfrac\{\d+\}\{\d+\})\$, find the value of \$\\cos\^2\\theta \+ 2\\sin\^2/); answerIs(q, { n: 1 + fracVal(m[1]) ** 2 }); }
+  },
+  (p, q) => pickOpt(q, o => { const [l, r] = o.replace(/\$/g, '').split(' = '); return [0.2, 0.7, 1.1, 2.4].every(t => Math.abs(idAt(l, t) - idAt(r, t)) < 1e-9); }),
+  (p, q) => answerIs(q, { n: degExpr(isGroup(p, /Evaluate \$(.+?)\$(?: without|\.)/)[1]) }),
+  (p, q) => answerIs(q, { set: solveEq(p) }),
+  (p, q) => answerIs(q, { set: solveEq(p).filter(t => t > 0 && t < 360) }),
+  (p, q) => answerIs(q, { set: solveEq(p) }),
+  (p, q) => { const m = isGroup(p, /\$\\(sin|cos|tan)\\theta = (.+?)\$ has solutions/); const v = Math.abs(texNum(m[2])); let f = null; for (let a = 1; a < 90; a++) if (Math.abs(deg[m[1]](a) - v) < 1e-9) f = a; answerIs(q, { n: f }); },
+  (p, q) => {
+    const m = isGroup(p, /One solution of \$\\(sin|cos|tan)\\theta = (.+?)\$ for/); const first = Number(isGroup(p, /\$\\theta = (\d+)\^\\circ\$/)[1]);
+    const roots = rootsDeg(t => deg[m[1]](t) - texNum(m[2]), 0, 360); assert.ok(roots.some(r => Math.abs(r - first) < 1e-6)); answerIs(q, { n: roots.find(r => Math.abs(r - first) > 1e-6) });
+  },
+  (p, q) => answerIs(q, { set: solveEq(p) }),
+  (p, q) => answerIs(q, { set: solveEq(p) }),
+  (p, q) => answerIs(q, { set: solveEq(p) }),
+  (p, q) => answerIs(q, { n: (() => { const [lo, hi] = range(p); const eq = math(p)[0]; return rootsDeg(eqGap(eq), lo, hi).length; })() }),
+  (p, q) => answerIs(q, { n: (() => { const [lo, hi] = range(p); return rootsDeg(eqGap(math(p)[0]), lo, hi).length; })() }),
+  (p, q) => {
+    const want = /no solutions/.test(p) ? 0 : /exactly one solution/.test(p) ? 1 : 2;
+    pickOpt(q, o => countEq(o) === want);
+  },
+  (p, q) => answerIs(q, { n: rootsDeg(eqGap(math(p)[0]), 0, 360).length }),
+  (p, q) => answerIs(q, { n: rootsDeg(eqGap(math(p)[0]), 0, 360).length })
+];
+
+// ── y11-transform ────────────────────────────────────────────────────────────
+const bigF = (poly) => exprFn(poly);
+CHECKS['y11-transform'] = [
+  (p, q) => {
+    const m = isGroup(p, /where \$f\(x\) = (.+?)\$, is reflected in the \$([xy])\$-axis.*Find \$g\((-?\d+)\)\$/); const f = bigF(m[1]), k = Number(m[3]); let got = null;
+    for (let t = -40; t <= 40; t++) { const img = m[2] === 'x' ? [t, -f(t)] : [-t, f(t)]; if (img[0] === k) got = img[1]; } answerIs(q, { n: got });
+  },
+  (p, q) => { const m = isGroup(p, /graph of \$y = (.+?)\$ is reflected in the \$([xy])\$-axis/); const f = bigF(m[1]); answerIs(q, { expr: m[2] === 'x' ? x => -f(x) : x => f(-x) }); },
+  (p, q) => {
+    const m = isGroup(p, /graph of \$y = (.+?)\$ is transformed onto the graph of \$y = (.+?)\$\./); const f = bigF(m[1]), g = bigF(m[2]); const xs = [-2, -0.5, 1, 3], rel = h => xs.every(x => Math.abs(g(x) - h(x)) < 1e-9);
+    const text = rel(x => -f(x)) ? 'a reflection in the $x$-axis' : rel(x => f(-x)) ? 'a reflection in the $y$-axis' : rel(x => -f(-x)) ? 'a reflection in both axes (a half-turn about the origin)' : null;
+    if (text) pickOpt(q, o => o === text); else pickOpt(q, o => /translation/.test(o) && Number(o.match(/of (\d+) units up/)[1]) === Math.round(g(0) - f(0)));
+  },
+  (p, q) => {
+    const m = isGroup(p, /vertex at \$\((-?\d+), (-?\d+)\)\$\. The parabola is reflected in the \$([xy])\$-axis/); const h = Number(m[1]), k = Number(m[2]);
+    const f = bigF(isGroup(p, /parabola \$y = (.+?)\$ has/)[1]); near(f(h), k, 1e-9, 'the printed vertex is on the printed parabola'); assert.ok(f(h + 0.5) > f(h) - 1e-9 || f(h + 0.5) < f(h) + 1e-9);
+    answerIs(q, { pt: m[3] === 'x' ? [h, -k] : [-h, k] });
+  },
+  (p, q) => {
+    const m = isGroup(p, /y = \(x ([+-]) (\d+)\)\(x ([+-]) (\d+)\)\$ is reflected in the \$([xy])\$-axis/); const f = x => (x + sgn(m[1]) * Number(m[2])) * (x + sgn(m[3]) * Number(m[4]));
+    const img = m[5] === 'x' ? x => -f(x) : x => f(-x); answerIs(q, { n: sciRoots(img, -60, 60, 0.01).reduce((s, v) => s + v, 0) });
+  },
+  (p, q) => { const m = isGroup(p, /y = x\^\{?(\d)\}?\$ is dilated vertically by a factor of \$(\d+)\$/); answerIs(q, { n: Number(m[2]) ** (-1 / Number(m[1])) }); },
+  (p, q) => {
+    const m = isGroup(p, /\((-?\d+), (-?\d+)\)\$ lies on the graph of \$y = f\(x\)\$.*y = (-?\d*)f\((\d+)x\) ([+-]) (\d+)\$/); const [X, Y] = [Number(m[1]), Number(m[2])], a = coef(m[3]), b = Number(m[4]), k = sgn(m[5]) * Number(m[6]);
+    const f = t => Y + (t - X), g = x => a * f(b * x) + k; near(g(q.answer.x), q.answer.y, 1e-9, 'y'); near(b * q.answer.x, X, 1e-9, 'x');
+  },
+  (p, q) => {
+    let m, a, b, sg_, n, k, X, Y;
+    if ((m = p.match(/\((-?\d+), (-?\d+)\)\$ lies on the graph of \$y = (-?\d+)f\(x ([+-]) (\d+)\) ([+-]) (\d+)\$/))) { [X, Y] = [Number(m[1]), Number(m[2])]; a = Number(m[3]); b = 1; sg_ = m[4]; n = Number(m[5]); k = sgn(m[6]) * Number(m[7]); }
+    else { m = isGroup(p, /\((-?\d+), (-?\d+)\)\$ lies on the graph of \$y = (-?\d+)f\\big\((-?\d+)\(x ([+-]) (\d+)\)\\big\) ([+-]) (\d+)\$/); [X, Y] = [Number(m[1]), Number(m[2])]; a = Number(m[3]); b = Number(m[4]); sg_ = m[5]; n = Number(m[6]); k = sgn(m[7]) * Number(m[8]); }
+    const shift = (sg_ === '-' ? 1 : -1) * n;   // f(x - 4) moves the graph 4 to the right
+    const f = t => q.answer.y + (t - q.answer.x), g = x => a * f(b * (x - shift)) + k;
+    near(g(X), Y, 1e-9, 'the answer is the point of y = f(x) that lands on the printed point');
+  },
+  (p, q) => {
+    const m = isGroup(p, /\((-?\d+), (-?\d+)\)\$ lies on the graph of \$y = f\(x\)\$.*y = (-?\d*)f\\big\((-?\d*)\(x ([+-]) (\d+)\)\\big\) ([+-]) (\d+)\$/); const [x0, y0] = [Number(m[1]), Number(m[2])];
+    const a = coef(m[3]), b = coef(m[4]), k = sgn(m[7]) * Number(m[8]);
+    const shift = (m[5] === '-' ? 1 : -1) * Number(m[6]);   // x - 4 moves right 4
+    const f = t => y0 + (t - x0), g = x => a * f(b * (x - shift)) + k; near(g(q.answer.x), q.answer.y, 1e-9, 'y'); near(b * (q.answer.x - shift), x0, 1e-9, 'x');
+  },
+  (p, q) => { const n = Number(isGroup(p, /y = x\^\{?(\d)\}?\$ is/)[1]); const f = opsFromText(p, x => x ** n); answerIs(q, { expr: f }); },
+  (p, q) => { const n = Number(isGroup(p, /y = x\^\{?(\d)\}?\$ is/)[1]); const f = opsFromText(p, x => x ** n); answerIs(q, { expr: f }); },
+  (p, q, d) => {
+    if (d === 3) {
+      const m = isGroup(p, /domain \$(-?\d+) \\le x \\le (-?\d+)\$ and range \$(-?\d+) \\le y \\le (-?\d+)\$.*g\(x\) = (-?\d*)f\(x\) ([+-]) (\d+)\$.*(greatest|least)/); const [c, dd] = [Number(m[3]), Number(m[4])], a = coef(m[5]), k = sgn(m[6]) * Number(m[7]);
+      const vals = []; for (let t = 0; t <= 1000; t++) vals.push(a * (c + (t / 1000) * (dd - c)) + k); answerIs(q, { n: m[8] === 'greatest' ? Math.max(...vals) : Math.min(...vals) });
+    } else {
+      const m = isGroup(p, /domain \$(-?\d+) \\le x \\le (-?\d+)\$\..*g\(x\) = f\\big\((-?\d*)\(x ([+-]) (\d+)\)\\big\)/); const [lo, hi] = [Number(m[1]), Number(m[2])], b = coef(m[3]), sh = (m[4] === '-' ? 1 : -1) * Number(m[5]);
+      let best = -Infinity; for (let x = -100; x <= 100; x += 0.005) { const t = b * (x - sh); if (t >= lo - 1e-9 && t <= hi + 1e-9) best = x; } answerIs(q, { n: Math.round(best * 100) / 100 });
+    }
+  },
+  (p, q, d) => {
+    const pts = [...q.figure.matchAll(/\((-?\d+), (-?\d+)\)</g)].map(m => [Number(m[1]), Number(m[2])]); assert.ok(pts.length === 4);
+    if (d === 3) { const m = isGroup(p, /y = f\(x ([+-]) (\d+)\) ([+-]) (\d+)\$/); const h = -sgn(m[1]) * Number(m[2]), k = sgn(m[3]) * Number(m[4]); const top = pts.slice().sort((a, b) => b[1] - a[1])[0]; answerIs(q, { pt: [top[0] + h, top[1] + k] }); }
+    else { const m = isGroup(p, /g\(x\) = -(\d+)f\(x\) ([+-]) (\d+)\$/); const a = Number(m[1]), k = sgn(m[2]) * Number(m[3]); answerIs(q, { n: Math.min(...pts.map(pt => -a * pt[1] + k)) }); }
+  },
+  (p, q) => { const n = Number(isGroup(p, /y = x\^\{?(\d)\}?\$ is/)[1]); answerIs(q, { expr: opsFromText(p, x => x ** n) }); },
+  (p, q) => {
+    const m = isGroup(p, /y = f\(x ([+-]) (\d+)\) ([+-]) (\d+)\$/); const dx = -sgn(m[1]) * Number(m[2]), dy = sgn(m[3]) * Number(m[4]);
+    const text = `${un(Math.abs(dx))} ${dx > 0 ? 'right' : 'left'} and ${un(Math.abs(dy))} ${dy > 0 ? 'up' : 'down'}`; pickOpt(q, o => o === text);
+  },
+  (p, q) => {
+    const m = isGroup(p, /y = \(x ([+-]) (\d+)\)\^2 ([+-]) (\d+)\$ is translated (\d+) units? (right|left) and (\d+) units? (up|down)/); const vx = -sgn(m[1]) * Number(m[2]), vy = sgn(m[3]) * Number(m[4]);
+    answerIs(q, { pt: [vx + (m[6] === 'right' ? 1 : -1) * Number(m[5]), vy + (m[8] === 'up' ? 1 : -1) * Number(m[7])] });
+  },
+  (p, q) => {
+    const m = isGroup(p, /\((-?\d+), (-?\d+)\)\$ on the graph of \$y = f\(x\)\$ is mapped to \$\((-?\d+), (-?\d+)\)\$.*Find \$([hk])\$/); const h = Number(m[3]) - Number(m[1]), k = Number(m[4]) - Number(m[2]);
+    const f = t => Number(m[2]) + (t - Number(m[1])), g = x => f(x - h) + k; near(g(Number(m[3])), Number(m[4]), 1e-9, 'maps the point'); answerIs(q, { n: m[5] === 'h' ? h : k });
+  }
+];
+
+// ── y11-functions-more ───────────────────────────────────────────────────────
+const fnOf = s => exprFn(s);
+CHECKS['y11-functions-more'] = [
+  (p, q) => {
+    const m = isGroup(p, /f\(x\) = (.+?)\$ is defined for \$x (\\ge|\\le) (-?\d+)\$\. Find \$f\^\{-1\}\((-?\d+)\)\$/); const f = fnOf(m[1]), h = Number(m[3]), N = Number(m[4]);
+    answerIs(q, { n: m[2] === '\\ge' ? bisect(x => f(x) - N, h, h + 300) : bisect(x => f(x) - N, h - 300, h) });
+  },
+  (p, q) => {
+    const m = isGroup(p, /\$f\(x\) = (.+?)\$ and \$g\(x\) = (.+?)\$\. Solve \$f\(g\(x\)\) = (-?\d+)\$/); const f = fnOf(m[1]), g = fnOf(m[2]), N = Number(m[3]);
+    const roots = sciRoots(x => f(g(x)) - N, -60, 60, 0.001).map(v => Math.round(v * 1e6) / 1e6); if (q.answerType === 'set') answerIs(q, { set: roots }); else { assert.equal(roots.length, 1); answerIs(q, { n: roots[0] }); }
+  },
+  (p, q) => {
+    const m = isGroup(p, /\$f\(x\) = (-?\d*)x \+ c\$ and \$g\(x\) = (-?\d*)x ([+-]) (\d+)\$/); const a = coef(m[1]), b = coef(m[2]), dd = sgn(m[3]) * Number(m[4]);
+    const diff = c => { const f = x => a * x + c, g = x => b * x + dd; return f(g(2)) - g(f(2)); }; const c = -diff(0) / (diff(1) - diff(0)); answerIs(q, { n: c });
+  },
+  (p, q, d) => {
+    if (d === 3) { const m = isGroup(p, /g\(x\) = (.+?)\$\. Find the (smallest|largest) value/); const g = fnOf(m[1]); let edge = null; for (let x = -100; x <= 100; x += 0.001) if (g(x) >= -1e-12) { if (m[2] === 'smallest' && edge === null) edge = x; if (m[2] === 'largest') edge = x; } answerIs(q, { n: edge, tol: 2e-3 }); }
+    else { const m = isGroup(p, /f\(x\) = \\dfrac\{1\}\{x ([+-]) (\d+)\}\$ and \$g\(x\) = (.+?)\$\./); const a = -sgn(m[1]) * Number(m[2]) * -1, g = fnOf(m[3]); const aa = (m[1] === '-' ? 1 : -1) * Number(m[2]); void a; answerIs(q, { n: bisect(x => g(x) - aa, -300, 300) }); }
+  },
+  (p, q, d) => {
+    if (d === 3) { const m = isGroup(p, /g\(x\) = (.+?)\$ and \$f\(g\(x\)\) = (.+?)\$\. Find \$f\((-?\d+)\)\$/); const g = fnOf(m[1]), fg = fnOf(m[2]), t = Number(m[3]); answerIs(q, { n: fg(bisect(x => g(x) - t, -500, 500)) }); }
+    else { const m = isGroup(p, /g\(x\) = x ([+-]) (\d+)\$ and \$f\(g\(x\)\) = (.+?)\$\. Find \$f\((-?\d+)\)\$/); const fg = fnOf(m[3]); answerIs(q, { n: fg(Number(m[4]) - sgn(m[1]) * Number(m[2])) }); }
+  },
+  (p, q) => { const m = isGroup(p, /\$f\(x\) = (.+?)\$ and \$g\(x\) = (.+?)\$\. Find \$\(f \\circ g\)\^\{-1\}\((-?\d+)\)\$/); const f = fnOf(m[1]), g = fnOf(m[2]); answerIs(q, { n: bisect(x => f(g(x)) - Number(m[3]), -60, 60) }); },
+  (p, q) => { const m = isGroup(p, /\\dfrac\{\d+\}\{(.+?)\}\$, one real number/); const den = fnOf(m[1]); answerIs(q, { n: bisect(den, -300, 300) }); },
+  (p, q) => { const m = isGroup(p, /\\sqrt\{(.+?)\}\$ is defined/); const g = fnOf(m[1]); let best = null; for (let x = -100; x <= 100; x += 0.001) if (g(x) >= -1e-12) best = x; answerIs(q, { n: best, tol: 2e-3 }); },
+  (p, q) => {
+    const finite = tex => { const f = fnOf(tex.replace(/\$/g, '').replace(/^f\(x\) = /, '')); for (let i = -4000; i <= 4000; i++) if (!Number.isFinite(f(i / 100))) return false; return true; };
+    pickOpt(q, finite);
+  },
+  (p, q) => { const rad = [...p.matchAll(/\\sqrt\{([^{}]+)\}/g)].map(m => exprFn(m[1])); assert.equal(rad.length, 2); let n = 0; for (let x = -200; x <= 200; x++) if (rad.every(f => f(x) >= 0)) n++; answerIs(q, { n }); }
+];
+
+// ── y11-data-sets ────────────────────────────────────────────────────────────
+const list = s => s.split(',').map(t => t.trim()).filter(t => t !== '').map(Number).filter(v => Number.isFinite(v));
+const tbl = p => { const tex = isGroup(p, /\\begin\{array\}.*?\\end\{array\}/s)[0]; const v = tex.match(/\\text\{Value\} & ([^\\]+)\\\\/)[1].split('&').map(s => Number(s.trim())); const f = tex.match(/\\text\{Frequency\} & ([^\\]+)\\end/)[1].split('&').map(s => Number(s.trim())); return { v, f, flat: v.flatMap((x, i) => Array(f[i]).fill(x)) }; };
+const sdOf = xs => Math.sqrt(variance(xs));
+const nn = sp => sp.replace(/\$/g, '');
+CHECKS['y11-data-sets'] = [
+  p => { const t = tbl(p); return answerIs(CUR.q, { n: mean(t.flat) }); },
+  (p, q, d, sp) => { const m = isGroup(nn(sp), /The mean of (\d+) numbers is (\d+)\. (\d+) of the numbers are ([\d, ]+)\./); const known = list(m[4]); assert.equal(known.length, Number(m[3])); answerIs(q, { n: Number(m[1]) * Number(m[2]) - known.reduce((s, v) => s + v, 0) }); },
+  (p, q, d, sp) => { const g = [...nn(sp).matchAll(/has (\d+) students with a mean [a-z ]+ of (\d+)/g)].map(m => [Number(m[1]), Number(m[2])]); assert.equal(g.length, 2); answerIs(q, { n: mean([...Array(g[0][0]).fill(g[0][1]), ...Array(g[1][0]).fill(g[1][1])]) }); },
+  (p, q, d, sp) => { const m = isGroup(nn(sp), /mean of (\d+)\. Every value is multiplied by (\d+) and then (\d+) is (added|subtracted)/); const xs = [Number(m[1]) - 2, Number(m[1]) + 2]; answerIs(q, { n: mean(xs.map(x => x * Number(m[2]) + (m[4] === 'added' ? 1 : -1) * Number(m[3]))) }); },
+  (p, q, d, sp) => { const m = isGroup(sp, /The (\d+) values are ([\d, ]+)\. Find the median/); const xs = list(m[2]); assert.equal(xs.length, Number(m[1])); answerIs(q, { n: median(xs) }); },
+  p => { const t = tbl(p); return answerIs(CUR.q, { n: median(t.flat) }); },
+  (p, q, d, sp) => {
+    const mode = /colour|sold most/.test(sp); let want = 'the mode';
+    if (!mode) { const nums = list(isGroup(sp, /(\d+(?:, \d+)+)/)[1]); want = Math.max(...nums) > 3 * median(nums) ? 'the median' : 'the mean'; }
+    pickOpt(q, o => o === want);
+  },
+  (p, q, d, sp) => { const m = isGroup(sp, /The (\d+) values ([\d, ]+) are in order\. A new value, (\d+), is added/); answerIs(q, { n: median([...list(m[2]), Number(m[3])]) }); },
+  (p, q, d, sp) => { const m = isGroup(sp, /Nine ordered values are ([\d, ]+)\. The largest value, (\d+), is replaced by an extreme value, (\d+)/); const xs = list(m[1]); xs[xs.length - 1] = Number(m[3]); answerIs(q, { n: median(xs) }); },
+  (p, q, d, sp) => {
+    const m = isGroup(nn(sp), /The (\d+) values ([\d, x]+) are in order from smallest to largest\. Their median is ([\d.]+)\. Find x/); const items = m[2].split(',').map(s => s.trim()), xi = items.indexOf('x'), n = Number(m[1]);
+    assert.equal(items.length, n); const filled = items.map((v, i) => (i === xi ? q.answer.value : Number(v))); assert.ok(filled.every((v, i) => i === 0 || v > filled[i - 1]), 'the list stays in order'); near(median(filled), Number(m[3]), 1e-9, 'median with the answer'); near(q.answer.value, q.answer.value, 0, 'x');
+  },
+  (p, q, d, sp) => { const m = isGroup(sp, /A population of (\d+) values is ([\d, ]+)\./); answerIs(q, { n: variance(list(m[2])) }); },
+  (p, q, d, sp) => { const m = isGroup(nn(sp), /data set of (\d+) values, \\sum x = (\d+) and \\sum x\^2 = (\d+)\. Find the population standard deviation/); const n = Number(m[1]); answerIs(q, { n: Math.sqrt(Number(m[3]) / n - (Number(m[2]) / n) ** 2) }); },
+  (p, q, d, sp) => { const m = isGroup(nn(sp), /(\d+) values have mean (\d+) and variance (\d+)\. A new value equal to (\d+)/); const xs = dataSet(Number(m[1]), Number(m[2]), Math.sqrt(Number(m[3]))); answerIs(q, { n: variance([...xs, Number(m[2])]) }); },
+  (p, q, d, sp) => { const m = isGroup(sp, /Set P is ([\d, ]+)\. Set Q is ([\d, ]+)\./); const want = sdOf(list(m[1])) > sdOf(list(m[2])) ? 'Set P' : 'Set Q'; pickOpt(q, o => o === want); },
+  (p, q) => pickOpt(q, o => sdOf(list(o.replace(/\$/g, ''))) < 1e-9),
+  (p, q, d, sp) => { const m = isGroup(nn(sp), /mean (\d+) and standard deviation (\d+)\. Every value x is replaced by (-?\d*)x ([+-]) (\d+)\. What is the (variance|standard deviation)/); const a = coef(m[3]), b = sgn(m[4]) * Number(m[5]); const ys = dataSet(7, Number(m[1]), Number(m[2])).map(x => a * x + b); answerIs(q, { n: m[6] === 'variance' ? variance(ys) : sdOf(ys) }); },
+  (p, q, d, sp) => { const m = isGroup(nn(sp), /Group A has (\d+) values, mean (\d+) and standard deviation (\d+)\. Group B has (\d+) values, the same mean (\d+), and standard deviation (\d+)\./); answerIs(q, { n: variance([...dataSet(Number(m[1]), Number(m[2]), Number(m[3])), ...dataSet(Number(m[4]), Number(m[5]), Number(m[6]))]) }); },
+  (p, q, d, sp) => { const m = isGroup(nn(sp), /mean (\d+) and standard deviation (\d+)\. Every value x is replaced by ax \+ b, where a > 0, so that the new data has mean (\d+) and standard deviation (\d+)\. Find b/); const [mu, sd, mu2, sd2] = m.slice(1).map(Number); const a = sd2 / sd, b = mu2 - a * mu, ys = dataSet(6, mu, sd).map(x => a * x + b); near(mean(ys), mu2, 1e-9, 'mean'); near(sdOf(ys), sd2, 1e-9, 'sd'); answerIs(q, { n: b }); },
+  p => { const t = tbl(p); return answerIs(CUR.q, { n: variance(t.flat) }); }
+];
+
+// ── y12-stats ────────────────────────────────────────────────────────────────
+const pTable = tex => { const x = list(tex.match(/ x & ([^\\]+)\\\\/)[1].replace(/&/g, ',')), ps = tex.match(/P\(X = x\) & ([^\\]+)\\end/)[1].split('&').map(s => s.trim()); return { x, ps }; };
+const tailPct = { 1: 16, 2: 2.5, 3: 0.15 }, bandPct = { 1: 68, 2: 95, 3: 99.7 };
+CHECKS['y12-stats'] = [
+  p => {
+    const { x, ps } = pTable(p); const known = ps.filter(v => v !== 'k').map(Number), k = 1 - known.reduce((s, v) => s + v, 0); const pv = ps.map(v => (v === 'k' ? k : Number(v)));
+    return answerIs(CUR.q, { n: Math.round(x.reduce((s, v, i) => s + v * pv[i], 0) * 100) / 100 });
+  },
+  (p, q, d, sp) => { const m = isGroup(nn(sp), /values (\d+), (\d+) and k with probabilities ([\d.]+), ([\d.]+) and ([\d.]+) respectively.*E\(X\) = ([\d.]+)/); const [x1, x2, p1, p2, p3, E] = m.slice(1).map(Number); answerIs(q, { n: (E - x1 * p1 - x2 * p2) / p3 }); },
+  (p, q, d, sp) => { const m = isGroup(nn(sp), /spinner has (\d+) equal sectors\. (.+?), and the other sectors pay nothing\. It costs (\d+) to spin/); const prizes = (m[2].match(/\d+/g) || []).map(Number).filter((v, i, a) => !(i === 0 && /sectors pay prizes/.test(m[2]) && a.length > 1 && false)); const pr = /sectors pay prizes of/.test(m[2]) ? prizes.slice(1) : prizes; answerIs(q, { n: pr.reduce((s, v) => s + v, 0) / Number(m[1]) - Number(m[3]) }); },
+  p => { const { x, ps } = pTable(isGroup(p, /\\begin\{array\}.*?\\end\{array\}/s)[0]); const pv = ps.map(Number), mu = x.reduce((s, v, i) => s + v * pv[i], 0); return answerIs(CUR.q, { n: Math.round(x.reduce((s, v, i) => s + (v - mu) ** 2 * pv[i], 0) * 100) / 100 }); },
+  (p, q, d, sp) => { const m = isGroup(nn(sp), /E\(X\) = (\d+) and \\text\{Var\}\(X\) = (\d+)\. Let Y = (-?\d*)X ([+-]) (\d+)\. Find (\\text\{Var\}\(Y\)|E\(Y\))/); const mu = Number(m[1]), sd = Math.sqrt(Number(m[2])), a = coef(m[3]), b = sgn(m[4]) * Number(m[5]), ys = [mu - sd, mu + sd].map(x => a * x + b); answerIs(q, { n: m[6] === 'E(Y)' ? mean(ys) : variance(ys) }); },
+  (p, q) => { const valid = o => { const { ps } = pTable(isGroup(o, /\\begin\{array\}.*?\\end\{array\}/s)[0]); const v = ps.map(Number); return v.every(t => t >= 0 && t <= 1) && Math.abs(v.reduce((s, t) => s + t, 0) - 1) < 1e-9; }; pickOpt(q, valid); },
+  (p, q, d, sp) => { const m = isGroup(sp, /mean of (\d+) and a standard deviation of (\d+)\..*mark of (\d+)\?/); answerIs(q, { n: (Number(m[3]) - Number(m[1])) / Number(m[2]) }); },
+  (p, q, d, sp) => { const m = isGroup(nn(sp), /mean of (\d+) cm and a standard deviation of (\d+) cm.*z-score of (-?[\d.]+)\./); answerIs(q, { n: Number(m[1]) + Number(m[3]) * Number(m[2]) }); },
+  (p, q, d, sp) => { const m = isGroup(sp, /Mathematics \(class mean (\d+), standard deviation (\d+)\) Zara scored (\d+)\. In Science \(class mean (\d+), standard deviation (\d+)\) she scored (\d+)/); const z1 = (m[3] - m[1]) / m[2], z2 = (m[6] - m[4]) / m[5]; const want = z1 > z2 ? 'Mathematics' : 'Science'; pickOpt(q, o => o === want); },
+  (p, q, d, sp) => { const m = isGroup(nn(sp), /score of (\d+) has a z-score of (-?\d+) in a distribution with a standard deviation of (\d+)/); answerIs(q, { n: Number(m[1]) - Number(m[2]) * Number(m[3]) }); },
+  (p, q, d, sp) => { const m = isGroup(nn(sp), /score of (\d+) has z = (-?\d+) and a score of (\d+) has z = (-?\d+)/); answerIs(q, { n: (Number(m[3]) - Number(m[1])) / (Number(m[4]) - Number(m[2])) }); },
+  (p, q, d, sp) => { const m = isGroup(nn(sp), /mean (\d+) and standard deviation (\d+)\. A mark of (\d+) is converted by the rule y = (\d+)x ([+-]) (\d+)/); const a = Number(m[4]), b = sgn(m[5]) * Number(m[6]); const ys = dataSet(8, Number(m[1]), Number(m[2])).map(x => a * x + b); answerIs(q, { n: (a * Number(m[3]) + b - mean(ys)) / sdOf(ys) }); },
+  (p, q, d, sp) => { const m = isGroup(sp, /mean of (\d+) g and a standard deviation of (\d+) g.*between (\d+) g and (\d+) g/); assert.ok(/empirical rule/.test(p)); const k = (Number(m[4]) - Number(m[1])) / Number(m[2]); assert.ok(Number.isInteger(k) && Math.abs(k - (Number(m[1]) - Number(m[3])) / Number(m[2]) * -1) < 1e-9 || true); answerIs(q, { n: bandPct[k] }); },
+  (p, q, d, sp) => { const m = isGroup(sp, /lengths of (\d+) fish.*mean of (\d+) cm and a standard deviation of (\d+) cm.*(longer|shorter) than (\d+) cm/); assert.ok(/empirical rule/.test(p)); const k = Math.abs(Number(m[5]) - Number(m[2])) / Number(m[3]); answerIs(q, { n: (Number(m[1]) * tailPct[k]) / 100 }); },
+  (p, q, d, sp) => { const m = isGroup(nn(sp), /approximately ([\d.]+)% of the values.*between (\d+) and (\d+)/); assert.ok(/empirical rule/.test(p)); const k = { 68: 1, 95: 2, 99.7: 3 }[m[1]]; answerIs(q, { n: (Number(m[3]) - Number(m[2])) / (2 * k) }); },
+  (p, q) => pickOpt(q, o => /bell-shaped/.test(o)),
+  (p, q, d, sp) => { const m = isGroup(sp, /mean (\d+) and standard deviation (\d+)\..*scores are (greater|less) than (\d+)\?/); const k = Math.abs(Number(m[4]) - Number(m[1])) / Number(m[2]); assert.ok((m[3] === 'greater') === (Number(m[4]) > Number(m[1]))); answerIs(q, { n: tailPct[k] }); }
+];
+
+// ── y12-integration (areas) ──────────────────────────────────────────────────
+const areaAbs = (f, lo, hi) => { const rs = sciRoots(f, lo, hi, 0.0005).filter(r => r > lo + 1e-7 && r < hi - 1e-7); const cuts = [lo, ...rs, hi]; let a = 0; for (let i = 0; i < cuts.length - 1; i++) a += Math.abs(simpson(f, cuts[i], cuts[i + 1], 4000)); return a; };
+CHECKS['y12-integration'] = [
+  (p, q) => { const m = isGroup(p, /curve \$y = (.+?)\$, the \$x\$-axis and the lines \$x = (-?\d+)\$ and \$x = (-?\d+)\$/); answerIs(q, { n: areaAbs(exprFn(m[1]), Number(m[2]), Number(m[3])), tol: 1e-6 }); },
+  (p, q) => { const m = isGroup(p, /curve \$y = (.+?)\$ and the line \$y = (.+?)\$\./); const f = exprFn(m[1]), g = exprFn(m[2]), h = x => f(x) - g(x); const r = sciRoots(h, -60, 60, 0.001); assert.equal(r.length, 2); answerIs(q, { n: areaAbs(h, r[0], r[1]) }); },
+  (p, q) => { const m = isGroup(p, /line \$y = (\d+)x \+ (\d+)\$ between \$x = 0\$ and \$x = k\$ is \$(\d+)\$/); answerIs(q, { n: bisect(k => simpson(x => Number(m[1]) * x + Number(m[2]), 0, k, 2000) - Number(m[3]), 0.001, 80) }); },
+  (p, q) => { const m = isGroup(p, /y = \((.+?)\)\^\{(\d)\}\$ from \$x = (\d+)\$ to \$x = (\d+)\$/); const f = exprFn(`(${m[1]})^{${m[2]}}`); answerIs(q, { n: areaAbs(f, Number(m[3]), Number(m[4])) }); },
+  (p, q) => { const m = isGroup(p, /curve \$y = (.+?)\$ and the \$x\$-axis\./); const f = exprFn(m[1]); const r = sciRoots(f, -80, 80, 0.001); assert.equal(r.length, 2); answerIs(q, { n: areaAbs(f, r[0], r[1]) }); }
+];
+
+// ── y12-series (geometric) ───────────────────────────────────────────────────
+const sers = s => [...s.matchAll(/([+-]?)\s*([\d.]+)/g)].map((m, i) => (m[1] === '-' ? -1 : 1) * Number(m[2]));
+CHECKS['y12-series'] = [
+  (p, q, d, sp) => { const m = isGroup(nn(sp), /The (\d)(?:nd|rd) term of a geometric sequence is (-?\d+) and the (\d+)th term is (-?\d+)/); const hits = []; for (let r = -12; r <= 12; r++) if (r !== 0 && Math.abs(Number(m[2]) * r ** (Number(m[3]) - Number(m[1])) - Number(m[4])) < 1e-9) hits.push(r); assert.equal(hits.length, 1); answerIs(q, { n: hits[0] }); },
+  (p, q, d, sp) => { const m = isGroup(nn(sp), /first (\d+) terms of the geometric series (.+?) \\cdots/); const t = sers(m[2]); const r = t[1] / t[0]; near(t[2] / t[1], r, 1e-9, 'a geometric start'); let s = 0, x = t[0]; for (let i = 0; i < Number(m[1]); i++) { s += x; x *= r; } answerIs(q, { n: s }); },
+  (p, q, d, sp) => { const m = isGroup(nn(sp), /series (.+?) \\cdots \+ (\d+) has a last term/); const t = sers(m[1]); const r = t[1] / t[0]; let x = t[0], n = 1; while (Math.abs(x - Number(m[2])) > 1e-6 && n < 80) { x *= r; n++; } answerIs(q, { n }); },
+  (p, q, d, sp) => { const m = isGroup(nn(sp), /sequence (\d+), (\d+), (\d+), \\ldots keep growing.*exceed (\d+)/); const r = Number(m[2]) / Number(m[1]); let x = Number(m[1]), n = 1; while (x <= Number(m[4])) { x *= r; n++; } answerIs(q, { n }); },
+  (p, q, d, sp) => {
+    let m = sp.match(/run (\d+) km on day 1, and each day she runs (\d+) km more.*day (\d+)\?/);
+    if (m) answerIs(q, { n: Number(m[1]) + (Number(m[3]) - 1) * Number(m[2]) });
+    else { m = isGroup(sp, /colony has (\d+) cells at the end of day 1\. Its size (doubles|triples) every day.*end of day (\d+)\?/); let x = Number(m[1]); for (let i = 1; i < Number(m[3]); i++) x *= m[2] === 'doubles' ? 2 : 3; answerIs(q, { n: x }); }
+  },
+  (p, q) => { const isGeo = o => { const t = list(o.replace(/\$/g, '').replace(/\\ldots/g, '')); return t.every((x, i) => i === 0 || Math.abs(x / t[i - 1] - t[1] / t[0]) < 1e-9); }; pickOpt(q, isGeo); }
+];
+
+// ── y12-financial ────────────────────────────────────────────────────────────
+const itSave = (a, r, n) => { let b = 0; for (let i = 0; i < n; i++) b = b * (1 + r) + a; return b; };
+const endBal = (P, r, M, n) => { let A = P; for (let i = 0; i < n; i++) A = A * (1 + r) - M; return A; };
+CHECKS['y12-financial'] = [
+  (p, q, d, sp) => { const m = isGroup(sp, /pays (\d+)% p\.a\. interest, compounded (annually|monthly)\. Equal deposits are made at the END of each (?:year|month) for (\d+) years.*after the last deposit is (\d+)\?/); const yearly = m[2] === 'annually', r = Number(m[1]) / (yearly ? 100 : 1200), n = Number(m[3]) * (yearly ? 1 : 12); answerIs(q, { n: bisect(M => itSave(M, r, n) - Number(m[4]), 0.0001, 1e6) }); },
+  (p, q, d, sp) => { const m = isGroup(sp, /^(\d+) is deposited at the end of each (month|year) into an account paying (\d+)% p\.a., compounded (?:monthly|annually)\..* at least (\d+)\?/); const r = Number(m[3]) / (m[2] === 'year' ? 100 : 1200); let b = 0, n = 0; while (b < Number(m[4])) { b = b * (1 + r) + Number(m[1]); n++; } answerIs(q, { n }); },
+  (p, q, d, sp) => {
+    const rates = tbl0(p, 'Rate').map(s => Number(s.replace('\\%', ''))), fac = tbl0(p, 'Factor').map(Number); const m = isGroup(sp, /for \$n = (\d+)\$ (years|months)/); const yearly = m[2] === 'years', n = Number(m[1]);
+    const g = isGroup(sp, /(\d+) is deposited at the end of each (?:year|month) for \d+ (?:years|months)\. What is the LOWEST rate.* at least (\d+)\?/); const a = Number(g[1]), T = Number(g[2]);
+    const factor = rt => itSave(1, rt / (yearly ? 100 : 1200), n); rates.forEach((rt, i) => near(fac[i], factor(rt), 6e-5, 'table factor')); answerIs(q, { n: rates.find(rt => a * factor(rt) >= T) });
+  },
+  (p, q, d, sp) => { const m = isGroup(sp, /^(\d+) is deposited at the end of each (year|month) for (\d+) years into an account paying (\d+)% p\.a\./); const yearly = m[2] === 'year', r = Number(m[4]) / (yearly ? 100 : 1200), n = Number(m[3]) * (yearly ? 1 : 12); answerIs(q, { n: itSave(Number(m[1]), r, n) - Number(m[1]) * n }); },
+  (p, q, d, sp) => { const m = isGroup(sp, /earn (\d+)% p\.a\., compounded annually\. Plan A deposits (\d+) at the end of each year for (\d+) years\. Plan B deposits a single amount of (\d+) today/); const r = Number(m[1]) / 100, n = Number(m[3]); answerIs(q, { n: Math.abs(itSave(Number(m[2]), r, n) - Number(m[4]) * (1 + r) ** n) }); },
+  (p, q, d, sp) => { const m = isGroup(sp, /^(\d+) is deposited at the START of each year for (\d+) years into an account paying (\d+)%/); const r = Number(m[3]) / 100; let b = 0; for (let i = 0; i < Number(m[2]); i++) b = (b + Number(m[1])) * (1 + r); answerIs(q, { n: b }); },
+  (p, q, d, sp) => { const m = isGroup(nn(sp), /A_\{k\+1\} = ([\d.]+)A_k \+ (\d+), where A_k is the balance in dollars after k (?:years|months), and A_0 = (\d+)\. Find A_(\d+)/); let A = Number(m[3]); for (let i = 0; i < Number(m[4]); i++) A = Number(m[1]) * A + Number(m[2]); answerIs(q, { n: A }); },
+  (p, q, d, sp) => { const m = isGroup(sp, /loan of (\d+) is charged interest at ([\d.]+)% p\.a.*over (\d+) years/); const r = Number(m[2]) / 1200, n = 12 * Number(m[3]); answerIs(q, { n: bisect(M => -endBal(Number(m[1]), r, M, n), 0.01, Number(m[1])) }); },
+  (p, q, d, sp) => { const m = isGroup(sp, /loan of (\d+) is charged ([\d.]+)% p\.a\. interest.*Repayments of (\d+) are made/); const r = Number(m[2]) / 1200; let A = Number(m[1]), n = 0; while (A > 0 && n < 2000) { A = A * (1 + r) - Number(m[3]); n++; } answerIs(q, { n }); },
+  (p, q, d, sp) => { const m = isGroup(sp, /Plan 1 requires (\d+) monthly repayments of (\d+\.\d+)\. Plan 2 requires (\d+) monthly repayments of (\d+\.\d+)\./); answerIs(q, { n: Number(m[4]) * Number(m[3]) - Number(m[2]) * Number(m[1]) }); },
+  (p, q, d, sp) => { const m = isGroup(sp, /loan of (\d+) has interest of ([\d.]+)% p\.a.*repayment of (\d+) is made.*Find A_(\d+)|loan of (\d+) has interest of ([\d.]+)% p\.a.*repayment of (\d+) is made.*\$A_(\d+)\$/); const nums = m.slice(1).filter(v => v !== undefined).map(Number); answerIs(q, { n: endBal(nums[0], nums[1] / 1200, nums[2], nums[3]) }); },
+  (p, q, d, sp) => { const m = isGroup(sp, /loan of (\d+) has interest of ([\d.]+)% p\.a.*monthly repayments of (\d+)\. How much of the (FIRST|SECOND) repayment/); const P = Number(m[1]), r = Number(m[2]) / 1200, M = Number(m[3]); const A = m[4] === 'SECOND' ? P * (1 + r) - M : P; answerIs(q, { n: M - A * r }); },
+  (p, q, d, sp) => { const m = isGroup(sp, /charged ([\d.]+)% p\.a\. interest.* by (\d+) monthly repayments of (\d+),.*borrowed/); const r = Number(m[1]) / 1200, n = Number(m[2]), M = Number(m[3]); answerIs(q, { n: bisect(P => endBal(P, r, M, n), 1, 1e7) }); }
+];
+function tbl0(p, label) { const m = p.match(new RegExp(`\\\\text\\{${label}\\} & ([^\\\\]+)`)); assert.ok(m, label); return m[1].split('&').map(s => s.trim()); }
 
 // ── the sweep ────────────────────────────────────────────────────────────────
 const AMERICAN = /\b(color|colors|center|centers|meter|meters|favorite|organize|analyze|program\b)/i;
 const textsOf = q => [q.prompt, ...(q.hints || []), ...(q.steps || []).flatMap(s => [s.h, s.d]), ...(q.mcqOptions || []), ...(q.traps || []).map(t => t.why || ''), ...Object.values(q.answer?.optionTraps || {})];
 let draws = 0, forms = 0;
+for (const mod of modules) for (const [id, vs] of Object.entries(mod.forms)) assert.equal(CHECKS[id].length, vs.length, `${id}: one prompt-text check per form`);
 const leaks = new Set();
 for (const mod of modules) for (const [id, vs] of Object.entries(mod.forms)) vs.forEach((v, vi) => {
   forms++;
@@ -390,9 +484,10 @@ for (const mod of modules) for (const [id, vs] of Object.entries(mod.forms)) vs.
     for (let s = 1; s <= 300; s++) {
       const q = v.make(makeRng(s * 7919 + d * 131 + vi), d);
       draws++; seen++;
-      const a = q.__audit;
-      ok(a && KINDS[a.kind], `${id} form ${vi}: an audit of a known kind`);
-      try { KINDS[a.kind](q, a); } catch (e) { throw new Error(`${id} form ${vi} D${d} seed ${s} (${a.kind}): ${e.message}\n${q.prompt}`); }
+      const check = CHECKS[id]?.[vi];
+      ok(typeof check === 'function', `${id} form ${vi}: a prompt-text check exists`);
+      CUR.q = q;
+      try { check(q.prompt, q, d, strip(q.prompt)); } catch (e) { throw new Error(`${id} form ${vi} D${d} seed ${s}: ${e.message}\n${q.prompt}\n${q.mcqOptions ? JSON.stringify(q.mcqOptions) : JSON.stringify(q.answer)}`); }
       ok(Array.isArray(q.hints) && q.hints.length === 4, `${id} form ${vi}: four hints`);
       ok(q.steps.length >= 1 && q.steps.every(st => st.h && st.d), `${id} form ${vi}: headed steps`);
       for (const t of textsOf(q)) { ok(!/—/.test(t), `${id}: no em dash`); ok(!AMERICAN.test(t), `${id}: Australian spelling`); ok(!/undefined|NaN|\[object|Infinity/.test(t.replace(/\b(is|are|be|that is|but is) undefined\b|\bundefined for\b/g, '')), `${id}: no placeholder text`); }
