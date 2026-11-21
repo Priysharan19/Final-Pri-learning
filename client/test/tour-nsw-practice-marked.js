@@ -175,6 +175,15 @@ try {
       .filter(el => el.getClientRects().length > 0).map(el => `${el.className}: ${el.innerText}`).join(' | ').replace(/\s+/g, ' '));
     check('the card shows the server\'s verdict: correct', /correct/i.test(verdict) && !/incorrect|not quite/i.test(verdict), verdict.slice(0, 160));
   }
+  // The Exams page for this NSW Year 11 student, nswExams off (this build has no PRI_FEATURE_NSW_EXAMS): it offers the generator and the
+  // practice sets, and not the generic "Sit a practice paper" card, whose Start the Prithagoras server refuses (QA sweep, 22 Nov 2026).
+  stage = 'the Exams page';
+  await page.goto(`${platform.origin}/exams`, { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('[data-practice-set-sit], .card-title', { timeout: 30000 });
+  const examsText = await page.locator('main').innerText();
+  check('Exams offers "Make your own paper" and the paper generator', /Make your own paper/i.test(examsText) && await page.getByRole('button', { name: /Open the paper generator/i }).count() === 1);
+  check('Exams lists the exam-style practice sets with a Sit button each', await page.locator('[data-practice-set-sit]').count() >= 1, String(await page.locator('[data-practice-set-sit]').count()));
+  check('Exams has no generic "Sit a practice paper" card and no Start practice paper button', !/Sit a practice paper/i.test(examsText) && await page.getByRole('button', { name: /Start practice paper/i }).count() === 0);
 } catch (err) {
   failures.push(`the tour stopped: ${String(err.stack || err.message).split('\n').slice(0, 4).join(' | ')}`);
 } finally {
