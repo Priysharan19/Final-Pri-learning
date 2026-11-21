@@ -11,8 +11,8 @@ A comment in `photoSubmissionGuard.js` says these notices should move into the p
 | Source | Call | English | Hindi | OK? | Suggested Hindi | Note |
 |---|---|---|---|---|---|---|
 | `photoSubmissionGuard.js` | `pdfReceiptWarning(language, 3)` | This PDF has 3 pages. You can review the transcription, but online Photo grading currently verifies only one image. Attach a single-page photo or switch to Type after checking your answer. | इस PDF में 3 पेज हैं। आप पढ़े गए हल को देख सकते हैं, लेकिन अभी ऑनलाइन फ़ोटो-जाँच केवल एक तस्वीर की पुष्टि कर सकती है। जाँच के लिए एक पेज की फ़ोटो लगाएँ, या उत्तर जाँचकर टाइप करें। |  |  |  |
-| `photoSubmissionGuard.js` | `earlierSubmissionNotice(language, "x = 4", true)` | This is the result for the answer you submitted earlier (“x = 4”) — its reply did not reach this device at the time. Your changed answer was not sent. | यह परिणाम आपके पहले जमा किए गए उत्तर (“x = 4”) का है — उसका जवाब पहले नहीं पहुँच पाया था। आपका बदला हुआ उत्तर नहीं भेजा गया। |  |  |  |
-| `photoSubmissionGuard.js` | `earlierSubmissionNotice(language, "x = 4", false)` | This is the result for the answer you submitted earlier (“x = 4”) — its reply did not reach this device at the time. Your changed answer has not been sent yet: check it and press Submit to send it. | यह परिणाम आपके पहले जमा किए गए उत्तर (“x = 4”) का है — उसका जवाब पहले नहीं पहुँच पाया था। आपका बदला हुआ उत्तर अभी नहीं भेजा गया है: उसे जाँचकर फिर से जमा करें। |  |  |  |
+| `photoSubmissionGuard.js` | `earlierSubmissionNotice(language, "x = 4", true)` | This is the result for the answer you submitted earlier (“x = 4”). Its reply did not reach this device at the time. Your changed answer was not sent. | यह परिणाम आपके पहले जमा किए गए उत्तर (“x = 4”) का है। उसका जवाब पहले नहीं पहुँच पाया था। आपका बदला हुआ उत्तर नहीं भेजा गया। |  |  |  |
+| `photoSubmissionGuard.js` | `earlierSubmissionNotice(language, "x = 4", false)` | This is the result for the answer you submitted earlier (“x = 4”). Its reply did not reach this device at the time. Your changed answer has not been sent yet: check it and press Submit to send it. | यह परिणाम आपके पहले जमा किए गए उत्तर (“x = 4”) का है। उसका जवाब पहले नहीं पहुँच पाया था। आपका बदला हुआ उत्तर अभी नहीं भेजा गया है: उसे जाँचकर फिर से जमा करें। |  |  |  |
 | `photoSubmissionGuard.js` | `draftPersistenceWarning(language)` | This device could not safely save the attempt. Check available storage and site data, then try again. Nothing has been submitted. | यह डिवाइस आपके उत्तर और जमा करने की पहचान को सुरक्षित नहीं रख पाया। जगह खाली करें या साइट डेटा चालू करें, फिर कोशिश करें। उत्तर अभी जमा नहीं हुआ है। |  |  |  |
 | `photoSubmissionGuard.js` | `photoSupportedFormats(language)` | For online grading, use one photo or a single-page PDF. A multi-page PDF can be transcribed but cannot yet receive a verified Photo grade. | ऑनलाइन जाँच के लिए एक फ़ोटो या एक पेज की PDF चुनें। कई पेज की PDF पढ़ी जा सकती है, लेकिन अभी पूरी PDF के अंक नहीं दिए जा सकते। |  |  |  |
 | `photoSubmissionGuard.js` | `photoAwaitingOnlineReader(language)` | The attachment remains on this screen. Reading and grading it require an online eligible account and any required guardian consent. | तस्वीर सुरक्षित रूप से इसी स्क्रीन पर है। इसकी लिखावट पढ़ने और जाँचने के लिए इंटरनेट, सही खाता और आवश्यक अभिभावक अनुमति चाहिए। |  |  |  |
@@ -48,13 +48,11 @@ A comment in `photoSubmissionGuard.js` says these notices should move into the p
 | `x > 3` | x greater than 3 | x, 3 से अधिक है |  |  |  |
 | `x \le 5` | x less than or equal to 5 | x, 5 से कम या बराबर है |  |  |  |
 | `x \ge 5` | x greater than or equal to 5 | x, 5 से अधिक या बराबर है |  |  |  |
-| `x \ne 2` | x 2 | x 2 |  |  |  |
+| `x \ne 2` | x not equal to 2 | x, 2 के बराबर नहीं है |  |  |  |
 | `-2 < x \le 5` | minus 2 less than x less than or equal to 5 | ऋण 2, x से कम है और x, 5 से कम या बराबर है |  |  |  |
 | `\pi` | pi | पाई |  |  |  |
 | `\theta` | theta | थीटा |  |  |  |
 | `30^\circ` | 30 degrees | 30 डिग्री |  |  |  |
-
-Known defect, found while building this packet and reported to the owner of `speech.js`: `x \ne 2` is spoken as "x 2" / "x 2", so the relation is lost, while `x \neq 2` and `x ≠ 2` are spoken correctly. This packet does not fix it.
 
 ## Prerequisite skill labels (placement page)
 
@@ -210,10 +208,10 @@ The four notices are documents, not strings, and lane L7 owns their text (`docs/
 
 | Notice | English | Hindi | English sha256 (first 16) | Hindi sha256 (first 16) | Headings EN / HI | OK? | Note |
 |---|---|---|---|---|---|---|---|
-| privacy | `docs/legal/privacy.md` | `docs/legal/privacy.hi.md` | `34d3ce767ac5feae` | `68aededa7310366a` | 11 / 11 |  |  |
-| terms | `docs/legal/terms.md` | `docs/legal/terms.hi.md` | `18ca07f0e9d2da2b` | `59c6094eff63e662` | 10 / 10 |  |  |
-| refund-policy | `docs/legal/refund-policy.md` | `docs/legal/refund-policy.hi.md` | `06a11d334c4095c5` | `592d052b625be803` | 5 / 5 |  |  |
-| grievance | `docs/legal/grievance.md` | `docs/legal/grievance.hi.md` | `d93a04c1a4f05e3a` | `c4650e4d3b230aa4` | 6 / 6 |  |  |
+| privacy | `docs/legal/privacy.md` | `docs/legal/privacy.hi.md` | `83a68d9db13ff732` | `97a5f9e51080dab0` | 16 / 16 |  |  |
+| terms | `docs/legal/terms.md` | `docs/legal/terms.hi.md` | `1e4234f0caf1c501` | `4dbf069aba14cc28` | 11 / 11 |  |  |
+| refund-policy | `docs/legal/refund-policy.md` | `docs/legal/refund-policy.hi.md` | `96af2563a0a1d060` | `59bf2845c4dc8f48` | 5 / 5 |  |  |
+| grievance | `docs/legal/grievance.md` | `docs/legal/grievance.hi.md` | `84c57039dc0c1168` | `7f3df80a8b2204ba` | 6 / 6 |  |  |
 
 ## Files with Devanagari that are not in this packet
 
@@ -228,5 +226,28 @@ The four notices are documents, not strings, and lane L7 owns their text (`docs/
 | `client/src/components/TermGloss.jsx` | Devanagari only in comments |
 | `client/src/pages/Home.jsx` | Devanagari only in a comment |
 | `client/src/pages/SettingsLegacy.jsx` | Devanagari only in a comment |
+| `client/src/brand/edition.js` | Devanagari only in a comment (the brand name in Hindi running text is read from edition.config) |
+| `client/src/components/missingStepsCopy.js` | Devanagari only in a comment |
+| `client/src/home/TopicGenerator.jsx` | Devanagari only in a comment |
+| `client/src/i18n/core.js` | Devanagari only in a comment |
+| `server/platform/finalAttempt.js` | words the final-answer reader recognises in a student's own writing (है, हैं, बराबर); never displayed |
+| `server/platform/tutorSafety.js` | tutor safety replies and word list; the tutor is off at launch (D4) |
+| `client/src/diagrams/coreText.js` | student-visible Hindi written beside its component. NOT YET EXTRACTED into this packet: a native-speaker review gap, listed so it is not mistaken for reviewed (diagram labels) |
+| `client/src/diagrams/packs/algebra.kinds.js` | student-visible Hindi written beside its component. NOT YET EXTRACTED into this packet: a native-speaker review gap, listed so it is not mistaken for reviewed (diagram labels) |
+| `client/src/diagrams/packs/plane.kinds.js` | student-visible Hindi written beside its component. NOT YET EXTRACTED into this packet: a native-speaker review gap, listed so it is not mistaken for reviewed (diagram labels) |
+| `client/src/diagrams/packs/space.jsx` | student-visible Hindi written beside its component. NOT YET EXTRACTED into this packet: a native-speaker review gap, listed so it is not mistaken for reviewed (diagram labels) |
+| `client/src/diagrams/packs/stats.kinds.js` | student-visible Hindi written beside its component. NOT YET EXTRACTED into this packet: a native-speaker review gap, listed so it is not mistaken for reviewed (diagram labels) |
+| `client/src/engine/misconceptions/topics/algebra.js` | student-visible Hindi written beside its component. NOT YET EXTRACTED into this packet: a native-speaker review gap, listed so it is not mistaken for reviewed (misconception messages) |
+| `client/src/engine/misconceptions/topics/finance.slips.js` | student-visible Hindi written beside its component. NOT YET EXTRACTED into this packet: a native-speaker review gap, listed so it is not mistaken for reviewed (misconception messages) |
+| `client/src/engine/misconceptions/topics/functions.js` | student-visible Hindi written beside its component. NOT YET EXTRACTED into this packet: a native-speaker review gap, listed so it is not mistaken for reviewed (misconception messages) |
+| `client/src/engine/misconceptions/topics/indices.js` | student-visible Hindi written beside its component. NOT YET EXTRACTED into this packet: a native-speaker review gap, listed so it is not mistaken for reviewed (misconception messages) |
+| `client/src/engine/misconceptions/topics/number.slips.js` | student-visible Hindi written beside its component. NOT YET EXTRACTED into this packet: a native-speaker review gap, listed so it is not mistaken for reviewed (misconception messages) |
+| `client/src/engine/misconceptions/topics/polynomial-lines.js` | student-visible Hindi written beside its component. NOT YET EXTRACTED into this packet: a native-speaker review gap, listed so it is not mistaken for reviewed (misconception messages) |
+| `client/src/engine/misconceptions/topics/sequences.slips.js` | student-visible Hindi written beside its component. NOT YET EXTRACTED into this packet: a native-speaker review gap, listed so it is not mistaken for reviewed (misconception messages) |
+| `client/src/engine/misconceptions/topics/trigonometry.js` | student-visible Hindi written beside its component. NOT YET EXTRACTED into this packet: a native-speaker review gap, listed so it is not mistaken for reviewed (misconception messages) |
+| `client/src/engine/slipHint.js` | student-visible Hindi written beside its component. NOT YET EXTRACTED into this packet: a native-speaker review gap, listed so it is not mistaken for reviewed (slip hints) |
+| `client/src/ink/readerFailure.js` | student-visible Hindi written beside its component. NOT YET EXTRACTED into this packet: a native-speaker review gap, listed so it is not mistaken for reviewed (reader-failure times) |
+| `client/src/lib/mathSpeech.js` | student-visible Hindi written beside its component. NOT YET EXTRACTED into this packet: a native-speaker review gap, listed so it is not mistaken for reviewed (spoken maths words) |
+| `server/platform/practice.js` | student-visible Hindi written beside its component. NOT YET EXTRACTED into this packet: a native-speaker review gap, listed so it is not mistaken for reviewed (the server's "look at line" marking notice) |
 | `server/platform/tutor.js` | tutor prompts; the tutor is off at launch (D4) |
 | `server/platform/tutorGuard.js` | tutor guard word lists; the tutor is off at launch (D4) |

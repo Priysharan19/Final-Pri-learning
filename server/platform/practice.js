@@ -127,6 +127,10 @@ const PREPARED_CONTEXT = 'practice-prepared-v1';
 const SEEK_TRIES = 12;                   // the floor: a trap or a written form is sought at least this far
 const SEEK_TRIES_PER_FRESH_CHANCE = 14;  // ≈ ln(10^6)
 const SEEK_TRIES_CAP = 300;
+// A requested dot point is sought at least this far. Some cells draw a form of a sibling dot point on most seeds
+// (the least on-target cell, me11-comb.3 at D4, lands on its dot point on about one draw in nine), which 12 draws
+// would miss one time in four; 120 misses it about once in 10^6.
+const DOTPOINT_SEEK_TRIES = 120;
 export const seekBudget = avoided => Math.min(SEEK_TRIES_CAP, Math.max(SEEK_TRIES, SEEK_TRIES_PER_FRESH_CHANCE * (Math.max(0, avoided | 0) + 1)));
 const CONTENT_HASH = /^[a-zA-Z0-9:_-]{6,96}$/;
 const DOTPOINT = /^[a-zA-Z0-9._:-]{1,80}$/;
@@ -487,7 +491,8 @@ function* seekQuestion(request, { draw, tries, batches, admits = null }) {
   // item can be guessed, which a diagnostic must avoid where it can.
   const springs = q => (!trap || carriesTrap(trap.owner, q, trap.key)) && (!written || (q.answerType !== 'mcq' && !q.multipart));
   const resolvedElsewhere = new Set();
-  const budget = () => tries ?? seekBudget(avoid.size + resolvedElsewhere.size);
+  const budget = () => tries ?? (dotpoint == null ? seekBudget(avoid.size + resolvedElsewhere.size)
+    : Math.max(DOTPOINT_SEEK_TRIES, seekBudget(avoid.size + resolvedElsewhere.size)));
   let fallback = null, drawn = 0;
   for (let round = 0; drawn < budget(); round++) {
     const size = Math.min(batches[Math.min(round, batches.length - 1)], budget() - drawn);
@@ -498,6 +503,10 @@ function* seekQuestion(request, { draw, tries, batches, admits = null }) {
       // A form this edition does not issue (editionBanks.js `admits`) is never
       // served, fresh or as a fallback: the seek passes over it.
       if (admits && !admits(q, generator)) continue;
+      // A dot point that was asked for is never answered with another one, fresh or as a fallback: a cell's other
+      // forms (a sibling dot point's) are passed over, as a form the edition does not issue is. When the whole
+      // seek finds none, the request is refused below (PRACTICE_CONTENT_UNSUPPORTED), never substituted.
+      if (dotpoint != null && !(q.dotpoints || []).includes(q.dotpointRequested)) continue;
       // Rush and Match answer in one line of their own: a sketch is a form of features, so neither is ever dealt one.
       if (q.answerType === 'graph-sketch' && (request.mode === 'rush' || request.mode === 'match')) continue;
       const hash = opaqueContentHash(q.contentHash);

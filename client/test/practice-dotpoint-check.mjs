@@ -74,8 +74,9 @@ eq(readDotpointParam(row, 'x'), { missing: true, ordinal: null }, 'a non-numeric
 //   exact   the bank pins the question to the dot point (dotpointExact): the label may be worn
 //   shared  the cell exercises the dot point with siblings: it belongs, but is not pinned to it
 //   leak    the question belongs to a different dot point: NOT narrowed
-// The seven leaks below are a recorded finding (server/platform/practice.js seekQuestion does not
-// prefer dotpointExact); the list can only shrink.
+// The seven leaks below are the GENERATOR's: asked for a dot point, a cell can still draw a sibling's form.
+// The server no longer issues them (server/platform/practice.js seekQuestion passes over a question that does not
+// carry the requested dot point; the ISSUED section below pins that map as empty); the generator list can only shrink.
 const DRAWS = 40;
 const draw = (sub, d, arg) => Array.from({ length: DRAWS }, (_, i) => generateQuestion(sub, d, 104729 * (i + 1) + 7, arg));
 const credited = q => (Array.isArray(q.dotpoints) && q.dotpoints.length ? q.dotpoints : q.dotpoint ? [q.dotpoint] : []);
@@ -119,6 +120,38 @@ eq(belongs, total - Object.values(KNOWN_LEAKS).reduce((a, k) => a + (DRAWS - k),
 ok(pairsOnTargetWith > pairsOnTargetWithout * 1.5, `asked at one level, ${pairsOnTargetWith} of ${pairs * DRAWS} draws land on the chosen dot point with the parameter and ${pairsOnTargetWithout} without it`);
 ok(pairsReachedWithout < pairs, `without the parameter ${pairs - pairsReachedWithout} of ${pairs} dot points never appear in 40 questions at the topic's first level`);
 ok(exact > total / 2, `${exact}/${total} are pinned to the dot point by the bank; ${shared} of ${cells} cells share it with a sibling dot point`);
+// ── ISSUED: the same cells, drawn through the server's own picker ───────────
+// What a student is actually dealt is chooseQuestion's seek, not a bare generateQuestion: it draws seeds until one
+// carries the requested dot point. Every cell above (the seven generator leaks included) must come back entirely on
+// the dot point. A new leak in the picker fails here.
+const { chooseQuestion, ensureBanks } = await import('../../server/platform/practice.js');
+const { bankPolicy } = await import('../../server/platform/editionBanks.js');
+await ensureBanks();
+const banks = bankPolicy('prithagoras'); // the edition that issues these cells
+const lcg = a => () => { a = (Math.imul(a, 1664525) + 1013904223) >>> 0; return a; };
+const issuedLeaks = {};
+let issuedCells = 0, issuedTotal = 0, issuedOn = 0;
+for (const s of SUBTOPICS) {
+  if (s.year < 11 || !nswIssuedLevels(s.id).length) continue;
+  for (const d of dotpointsFor(s.id).filter(x => nswIssuedForms(s.id, x.forms).length > 0)) {
+    for (const level of nswIssuedForms(s.id, d.forms)) {
+      const next = lcg(level * 7919 + 13);
+      let on = 0;
+      for (let i = 0; i < DRAWS; i++) {
+        const { q } = chooseQuestion({ generator: s.id, difficulty: level, mode: 'practice', avoid: new Set(), dotpoint: d.id, trap: null, written: false, band: null },
+          null, { draw: () => next() % 0x80000000, banks });
+        if (credited(q).includes(d.id)) on++;
+      }
+      issuedCells++; issuedTotal += DRAWS; issuedOn += on;
+      if (on < DRAWS) issuedLeaks[`${d.id}@D${level}`] = on;
+    }
+  }
+}
+eq(issuedCells, cells, 'the issued section covers the same cells');
+eq(issuedLeaks, {}, 'issued through the server, a requested dot point never returns another one in any cell');
+eq(issuedOn, issuedTotal, `${issuedOn}/${issuedTotal} issued questions belong to the dot point asked for`);
+console.log(`  issued through the server: ${issuedOn}/${issuedTotal} on the dot point across ${issuedCells} cells; leaks ${JSON.stringify(issuedLeaks)}`);
+
 const diff = dotpointsFor('y12-diff').filter(d => nswIssuedForms('y12-diff', d.forms).length);
 ok(diff.length >= 2, 'y12-diff offers more than one dot point');
 const seen = new Set(diff.map(d => draw('y12-diff', nswIssuedForms('y12-diff', d.forms)[0], d.id).map(q => q.dotpoint).join('|')));

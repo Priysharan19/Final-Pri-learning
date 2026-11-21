@@ -56,21 +56,23 @@ const STATUS = 'No native-speaker review on record';
 // last. Check the "not in V1" notes against the release build.
 const SCREENS = [
   { id: '01-account-and-consent', title: 'Sign-in, sign-up, guardian consent and account', tier: 'P1',
-    ns: ['login', 'signup', 'pw', 'mfa', 'activation', 'accountAction', 'cloudSecurity', 'cloudError', 'deleteRequest', 'guardianPage', 'check'] },
+    ns: ['login', 'signup', 'pw', 'mfa', 'activation', 'accountAction', 'cloudSecurity', 'cloudError', 'deleteRequest', 'guardianPage', 'check', 'edition', 'readerPermission'] },
   { id: '02-shell-and-navigation', title: 'App shell, navigation, legal pages and error screens', tier: 'P2',
-    ns: ['lang', 'app', 'inst', 'nav', 'common', 'boot', 'errorScreen', 'time', 'difficulty', 'legal', 'gloss', 'charts'] },
+    ns: ['lang', 'app', 'inst', 'nav', 'common', 'boot', 'errorScreen', 'time', 'difficulty', 'legal', 'gloss', 'charts', 'update', 'about', 'workstate', 'landing', 'guest', 'picker', 'scn'] },
   { id: '03-home-and-plan', title: 'Home, study plan, tasks and reminders', tier: 'P2',
-    ns: ['home', 'plan', 'reminders', 'tasks', 'inbox', 'review', 'study', 'favorites'] },
+    ns: ['home', 'plan', 'reminders', 'tasks', 'inbox', 'review', 'study', 'favorites', 'today', 'recent', 'offer'] },
   { id: '04-practice-and-answering', title: 'Practice, writing and photo answers, marking and feedback', tier: 'P2',
-    ns: ['practice', 'verdict', 'verifiedMarks', 'marks', 'misconception', 'board', 'sym', 'ink', 'photo', 'snap', 'notebook', 'history'] },
+    ns: ['practice', 'verdict', 'verifiedMarks', 'marks', 'misconception', 'board', 'sym', 'ink', 'photo', 'snap', 'notebook', 'history', 'report', 'mistake', 'ow', 'tutorPolicy', 'smart', 'ai', 'mark', 'msg', 'aw', 'mp', 'sketch', 'tour', 'math', 'living'] },
   { id: '05-exams', title: 'Timed papers and exam analysis', tier: 'P2',
-    ns: ['exams', 'examRoom', 'exam', 'examAnalysis', 'freeCap'] },
-  { id: '06-progress-and-placement', title: 'Progress and placement', tier: 'P2', ns: ['progress', 'placement'] },
+    ns: ['exams', 'examRoom', 'exam', 'examAnalysis', 'freeCap', 'mock', 'lossBreakdown', 'sectionTime'] },
+  { id: '06-progress-and-placement', title: 'Progress and placement', tier: 'P2', ns: ['progress', 'progressEv', 'placement', 'insights', 'badge', 'parent', 'parentEmail'] },
   { id: '07-notes-and-ncert', title: 'Notes, the NCERT chapter library and explanations', tier: 'P2', ns: ['notes', 'ncert', 'explain'] },
-  { id: '08-settings-and-sync', title: 'Settings, account sync and reading consent', tier: 'P2', ns: ['settings', 'cloud'] },
+  { id: '08-settings-and-sync', title: 'Settings, account sync and reading consent', tier: 'P2', ns: ['settings', 'cloud', 'sounds', 'autoRead', 'hand', 'errorLog', 'export'] },
   { id: '09-games', title: 'Rush and match games', tier: 'P3', ns: ['rush', 'match'] },
+  { id: '09b-plans-and-premium', title: 'Plans, pricing, the free trial and invitations', tier: 'P2',
+    ns: ['paywall', 'pricing', 'upgrade', 'trial', 'invite'] },
   { id: '10-not-in-v1', title: 'Surfaces the V1 decisions keep away from students', tier: 'P4',
-    ns: ['classes', 'classroom', 'assignment', 'teach', 'tutor', 'calibrate', 'progressAu'] }
+    ns: ['classes', 'classroom', 'assignment', 'teach', 'tutor', 'calibrate', 'progressAu', 'desk', 'shell', 'papers', 'paper', 'gen', 'hsc', 'library', 'tw', 'staffLib'] }
 ];
 const NOT_IN_V1 = {
   classes: 'Classes tab hidden from students in the V1 build (D10).',
@@ -79,7 +81,16 @@ const NOT_IN_V1 = {
   teach: 'Teacher-facing tools; hidden with Classes (D10).',
   tutor: 'AI tutor stays off at launch (D4).',
   calibrate: 'Handwriting calibration retired with the on-device readers (D16).',
-  progressAu: 'Australian-curriculum progress bands; V1 is India-only (D2, CBSE/NCERT and JEE).'
+  progressAu: 'Australian-curriculum progress bands; V1 is India-only (D2, CBSE/NCERT and JEE).',
+  desk: 'Exam desk of the Prithagoras (Australian) edition; not in the India build.',
+  shell: 'Exam-desk shell (clock, shortcuts) of the Prithagoras edition; not in the India build.',
+  papers: 'Extension and standard practice papers of the Prithagoras edition; not in the India build.',
+  paper: 'Paper sitting of the Prithagoras edition; not in the India build.',
+  gen: 'Paper generator of the Prithagoras edition; not in the India build.',
+  hsc: 'HSC priorities of the Prithagoras edition; not in the India build.',
+  library: 'Library of the Prithagoras exam desk; not in the India build.',
+  tw: 'Teacher workspace; hidden with Classes (D10).',
+  staffLib: 'Staff library publishing; never shown to students.'
 };
 // Copy that decides what leaves the device or what a guardian agrees to. It
 // is a legal artefact as well as a translation: counsel reviews it too.
@@ -254,6 +265,29 @@ const SOURCES_OUT = {
   'client/src/components/TermGloss.jsx': 'Devanagari only in comments',
   'client/src/pages/Home.jsx': 'Devanagari only in a comment',
   'client/src/pages/SettingsLegacy.jsx': 'Devanagari only in a comment',
+  'client/src/brand/edition.js': 'Devanagari only in a comment (the brand name in Hindi running text is read from edition.config)',
+  'client/src/components/missingStepsCopy.js': 'Devanagari only in a comment',
+  'client/src/home/TopicGenerator.jsx': 'Devanagari only in a comment',
+  'client/src/i18n/core.js': 'Devanagari only in a comment',
+  'server/platform/finalAttempt.js': 'words the final-answer reader recognises in a student\'s own writing (है, हैं, बराबर); never displayed',
+  'server/platform/tutorSafety.js': 'tutor safety replies and word list; the tutor is off at launch (D4)',
+  'client/src/diagrams/coreText.js': 'student-visible Hindi written beside its component. NOT YET EXTRACTED into this packet: a native-speaker review gap, listed so it is not mistaken for reviewed (diagram labels)',
+  'client/src/diagrams/packs/algebra.kinds.js': 'student-visible Hindi written beside its component. NOT YET EXTRACTED into this packet: a native-speaker review gap, listed so it is not mistaken for reviewed (diagram labels)',
+  'client/src/diagrams/packs/plane.kinds.js': 'student-visible Hindi written beside its component. NOT YET EXTRACTED into this packet: a native-speaker review gap, listed so it is not mistaken for reviewed (diagram labels)',
+  'client/src/diagrams/packs/space.jsx': 'student-visible Hindi written beside its component. NOT YET EXTRACTED into this packet: a native-speaker review gap, listed so it is not mistaken for reviewed (diagram labels)',
+  'client/src/diagrams/packs/stats.kinds.js': 'student-visible Hindi written beside its component. NOT YET EXTRACTED into this packet: a native-speaker review gap, listed so it is not mistaken for reviewed (diagram labels)',
+  'client/src/engine/misconceptions/topics/algebra.js': 'student-visible Hindi written beside its component. NOT YET EXTRACTED into this packet: a native-speaker review gap, listed so it is not mistaken for reviewed (misconception messages)',
+  'client/src/engine/misconceptions/topics/finance.slips.js': 'student-visible Hindi written beside its component. NOT YET EXTRACTED into this packet: a native-speaker review gap, listed so it is not mistaken for reviewed (misconception messages)',
+  'client/src/engine/misconceptions/topics/functions.js': 'student-visible Hindi written beside its component. NOT YET EXTRACTED into this packet: a native-speaker review gap, listed so it is not mistaken for reviewed (misconception messages)',
+  'client/src/engine/misconceptions/topics/indices.js': 'student-visible Hindi written beside its component. NOT YET EXTRACTED into this packet: a native-speaker review gap, listed so it is not mistaken for reviewed (misconception messages)',
+  'client/src/engine/misconceptions/topics/number.slips.js': 'student-visible Hindi written beside its component. NOT YET EXTRACTED into this packet: a native-speaker review gap, listed so it is not mistaken for reviewed (misconception messages)',
+  'client/src/engine/misconceptions/topics/polynomial-lines.js': 'student-visible Hindi written beside its component. NOT YET EXTRACTED into this packet: a native-speaker review gap, listed so it is not mistaken for reviewed (misconception messages)',
+  'client/src/engine/misconceptions/topics/sequences.slips.js': 'student-visible Hindi written beside its component. NOT YET EXTRACTED into this packet: a native-speaker review gap, listed so it is not mistaken for reviewed (misconception messages)',
+  'client/src/engine/misconceptions/topics/trigonometry.js': 'student-visible Hindi written beside its component. NOT YET EXTRACTED into this packet: a native-speaker review gap, listed so it is not mistaken for reviewed (misconception messages)',
+  'client/src/engine/slipHint.js': 'student-visible Hindi written beside its component. NOT YET EXTRACTED into this packet: a native-speaker review gap, listed so it is not mistaken for reviewed (slip hints)',
+  'client/src/ink/readerFailure.js': 'student-visible Hindi written beside its component. NOT YET EXTRACTED into this packet: a native-speaker review gap, listed so it is not mistaken for reviewed (reader-failure times)',
+  'client/src/lib/mathSpeech.js': 'student-visible Hindi written beside its component. NOT YET EXTRACTED into this packet: a native-speaker review gap, listed so it is not mistaken for reviewed (spoken maths words)',
+  'server/platform/practice.js': 'student-visible Hindi written beside its component. NOT YET EXTRACTED into this packet: a native-speaker review gap, listed so it is not mistaken for reviewed (the server\'s "look at line" marking notice)',
   'server/platform/tutor.js': 'tutor prompts; the tutor is off at launch (D4)',
   'server/platform/tutorGuard.js': 'tutor guard word lists; the tutor is off at launch (D4)'
 };
