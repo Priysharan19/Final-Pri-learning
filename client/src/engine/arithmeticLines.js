@@ -824,16 +824,32 @@ function putGivenInIntegrals(raw, prep) {
   });
 }
 
+// `8 y = 3/tan x` is ambiguous: a definition y = 3/tan x with a question number in front, or the equation 8y = 3/tan x (y = 3/(8 tan x)).
+// The page is read three ways: without either (exactly as it always was), as the definition ('D') and as the equation ('E'). A line is ticked when
+// the plain reading ticks it, or when BOTH readings tick it; no reading ever crosses.
 function pageDefinitions(raw, out, firstBreak, prep = null, degreePrimed = null, tickOnly = false) {
+  if (!raw.some(l => /^\s*\d{1,2}\s+[A-Za-z]\s*=/.test(l))) return pageDefinitionsOnce(raw, out, firstBreak, prep, degreePrimed, tickOnly, null);
+  const runs = [null, 'D', 'E'].map(mode => { const o = out.slice(); const broke = pageDefinitionsOnce(raw, o, firstBreak, prep, degreePrimed, tickOnly, mode); return { o, broke }; });
+  const [plain, d, e] = runs;
+  const isTick = l => l && l.status === 'ok';
+  for (let i = 0; i < out.length; i++) {
+    if (isTick(plain.o[i])) out[i] = plain.o[i];
+    else if (isTick(d.o[i]) && isTick(e.o[i])) out[i] = d.o[i];
+  }
+  return plain.broke;
+}
+function pageDefinitionsOnce(raw, out, firstBreak, prep, degreePrimed, tickOnly, glueMode) {
   const defs = prep ? { ...prep.seeds } : {};   // 'k' → { expr, line }, 'f' → { expr, variable, line }, "u'" → …   (what the question gives is in from the start)
   let afterPart = false;
   let equation = null;        // the last equation in one unknown: { left, right, variable }
   let broke = null;
   let carry = null;           // { text, variable }: what the last line this pass ticked came to, for the `=` line below
+  let pendingGlue = null;
   let zeroed = null;          // { line, expr, variable }: `y' = 0` was stated straight after a derivative the page set
   const limit = firstBreak === -1 ? raw.length : firstBreak;
   for (let i = 0; i < Math.min(limit, LIMITS.lines); i++) {
     if (raw[i].length > LIMITS.chars) continue;
+    if (pendingGlue) { defs[pendingGlue.letter] = pendingGlue.def; pendingGlue = null; }
     const zeroFor = zeroed && zeroed.line === i - 1 ? zeroed : null;
     zeroed = null;
     // A new part of the question may give a letter a new value on the paper, not on the page: what was defined is dropped.
@@ -842,13 +858,16 @@ function pageDefinitions(raw, out, firstBreak, prep = null, degreePrimed = null,
     // A question number glued to a definition (`8 y = 3/tan x`): when the same letter is used primed or evaluated on a later line, the line is
     // the definition y = … for those lines. The line itself stays a note (the number in front means it is not read as y = … on its own).
     { const g = /^(\d{1,2})\s+([A-Za-z])\s*=\s*(\S.*)$/.exec(src.replace(/\s*\.\s*$/, ''));
-      if (g && out[i].status === 'note' && !/[<>≤≥≠≈%°,;:=]|∫|\]_/.test(g[3]) && raw.slice(i + 1).some(l => new RegExp(`(?<![A-Za-z])${g[2]}(?:'|\\s*\\()`).test(l))) {
+      if (glueMode && g && out[i].status === 'note' && !/[<>≤≥≠≈%°,;:=]|∫|\]_/.test(g[3]) && raw.slice(i + 1).some(l => new RegExp(`(?<![A-Za-z])${g[2]}(?:'|\\s*\\()`).test(l))) {
         const last = cleanStatement(g[3].trim());
         const settled = putIn(last, defs, null);
-        if (settled && infoOf(settled.text)) defs[g[2]] = { expr: settled.text, shown: last, variable: null, line: i, glued: true };
-        else if (infoOf(last) && lettersOf(last).length <= 1) defs[g[2]] = { expr: last, shown: last, variable: lettersOf(last).length === 1 ? lettersOf(last)[0] : null, line: i, glued: true };
-        carry = null;
-        continue;
+        const body = settled && infoOf(settled.text) ? settled.text : infoOf(last) && lettersOf(last).length <= 1 ? last : null;
+        if (body !== null) {
+          const expr = glueMode === 'E' ? `(${body})/${g[1]}` : body;
+          const def = { expr, shown: glueMode === 'E' ? `${g[1]}${g[2]} = ${last}` : last, variable: lettersOf(body).length === 1 ? lettersOf(body)[0] : null, line: i, glued: true };
+          if (glueMode === 'D') { defs[g[2]] = def; carry = null; continue; }
+          pendingGlue = { letter: g[2], def };   // 'E': the line is also judged as the equation it may be, as it always was
+        }
       } }
     // `y' = 0` (with or without words before it) straight after a derivative the page set: the next line may set that derivative to zero.
     { const zm = src.replace(/\s*\.\s*$/, '').match(/^(?:[A-Za-z][A-Za-z ]*\s+)?([A-Za-z])'\s*=\s*0$/);
@@ -1202,19 +1221,24 @@ const FN_NAMES = 'sin|cos|tan|sec|cosec|csc|cot|ln|log';
 const FACTOR_START = new RegExp(`^\\s*(?:\\d|\\(|\\[|√|π|(?:${FN_NAMES}|sqrt|exp)(?![A-Za-z]))`);
 const FN_THEN_X = new RegExp(`(?<![A-Za-z])(?:${FN_NAMES})(?:\\^\\s*-?\\d+)?$`);
 function loneTimesSigns(line) {
-  let out = '', from = 0, changed = false, argEnd = -1;
+  // Every lone x on a line is read the same way: all of them times signs or none (a line where one is the letter and another is times is not read).
+  const cands = [];
+  let argEnd = -1, allTimes = true;
   const re = /(?<=\S)\s+x(?=\s+\S)/g;
   for (let m; (m = re.exec(line)); ) {
     const before = line.slice(0, m.index), end = m.index + m[0].length;
     if (FN_THEN_X.test(before)) { argEnd = end; continue; }
+    const rest = line.slice(end);
+    if (!FACTOR_START.test(rest) && !/^\s*[A-Za-z]/.test(rest)) continue;
     // On the left: a bracket, a power, π or a function with its argument. A bare number on the left (`3 x sin x`) may be the coefficient of the
     // letter (3x sin x), so it is a times sign only before another number or bracket, as it always was (`6 x 12`).
-    const rest = line.slice(end);
     const left = /[)\]π]$/.test(before) || /\^\s*-?\d+$/.test(before) || before.length === argEnd || (/\d$/.test(before) && /^\s*(?:\d|\()/.test(rest));
-    if (!left || !FACTOR_START.test(rest)) continue;
-    out += `${line.slice(from, m.index)} *`; from = end; changed = true;
+    if (left && FACTOR_START.test(rest)) cands.push(m); else allTimes = false;
   }
-  return { text: out + line.slice(from), changed };
+  if (!cands.length || !allTimes) return { text: line, changed: false };
+  let out = '', from = 0;
+  for (const m of cands) { out += `${line.slice(from, m.index)} *`; from = m.index + m[0].length; }
+  return { text: out + line.slice(from), changed: true };
 }
 const groupEnd = (s, j) => { let d = 0; for (let k = j; k < s.length; k++) { if (s[k] === '(') d++; else if (s[k] === ')' && --d === 0) return k + 1; } return -1; };
 /** The end of ONE atom at s[i]: a number, a bracket, √ and its number or bracket, or a function call, with an optional power; -1 when it is none of these. */
@@ -1453,7 +1477,9 @@ function stepCheckArithmeticWithinBudget(workingText, prep = null, tickOnly = fa
       else { const words = src.match(/^(.*=.*?[\d)])\s+(?:so|hence|therefore|thus)\s+[A-Za-z][^=<>\d]*$/i); if (words) src = words[1]; }
       src = src.replace(/^[A-Za-z]'{0,2}\(\s*-?\d+(?:\.\d+)?\s*\)\s*=\s*(?=[^=]+=)/, ''); }
     const afterLabel = labelled; labelled = src !== line;
+    const beforeComma = src;
     src = commaVectorsAsColumns(src, carried);
+    const commaForm = src !== beforeComma;
     // Plain arithmetic only, with one more case (owner, 19 November: `… = log 3 + log 2 + log 5` then `= log(3 + 2 + 5)`):
     // a line of letters whose LAST side is a worked expression of plain numbers. The `=` line below it rewrites that
     // expression, so it is held to it. A bare number left by such a line (`t = 5` then `= 20`) stays tick only.
@@ -1488,7 +1514,8 @@ function stepCheckArithmeticWithinBudget(workingText, prep = null, tickOnly = fa
         const values = written.every(Boolean) ? written.map(vectorSide) : [];
         if (values.length && values.every(Boolean)) {
           const tail = values[values.length - 1];
-          const carry = tail.vec ? { vec: tail.vec, text: written[written.length - 1], calculus: true } : { value: tail.num, text: written[written.length - 1], calculus: true };
+          // A comma-form line whose last side is a number is an ordinary line of numbers from there on: the lines under it are judged as any are.
+          const carry = tail.vec ? { vec: tail.vec, text: written[written.length - 1], calculus: true } : { value: tail.num, text: written[written.length - 1], ...(commaForm ? {} : { calculus: true }) };
           const above = cont && written.length === 1 && carried && (carried.vec ? { vec: carried.vec } : carried.value !== undefined ? { num: carried.value } : null);
           const all = above ? [above, ...values] : values;
           prev = carry;

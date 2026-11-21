@@ -152,13 +152,13 @@ ok(!acode(STAT).includes('X'), `the page itself, as written, is never crossed by
   ok(!near(l6, D(p)) && near(l6, l5(p)) && near(D(p), -12), `line 6 is FALSE against the derivative of the page (${l6.toFixed(4)} against ${D(p).toFixed(4)}); it is only the value of line 5`);
   ok(near(l7, l6), `line 7 (${l7.toFixed(4)}) is the right-hand side of line 6: true as arithmetic`);
   ok(!near(l8a, l8b) && near(l8b, -4 * Math.sqrt(3) / 3), `line 8 is FALSE as written: −8·4/(3√3) = ${l8a.toFixed(4)}, while −4/√3 = −4√3/3 = ${l8b.toFixed(4)}`);
-  ok(L.map(l => l.status).join() === 'note,note,ok,note,note,note,ok,note', `statuses: 1 note, 2 note, 3 ok, 4 note, 5 note, 6 note, 7 ok, 8 note (${L.map(l => l.status)})`);
-  ok(said(L[2]).startsWith('This is the derivative of') && /3/.test(said(L[2])), `line 3 is ticked as the derivative of y = 3/tan x (${said(L[2])})`);
+  ok(L.map(l => l.status).join() === 'note,note,note,note,note,note,ok,note', `statuses: only line 7 ticks; line 3 is a note because "8 y = 3/tan x" may be the equation 8y = 3/tan x (${L.map(l => l.status)})`);
+  ok(L[2].status === 'note', 'line 3 is true under the definition reading only (the equation reading 8y = 3/tan x makes it false): a note');
   ok(/equals the line above/.test(said(L[6])) && /4√3\/3|4\\sqrt\{3\}/.test(String(L[6].note) + said(L[6])), `line 7 is ticked as equal to the line above (${said(L[6])})`);
   ok(!L[7].note.includes('equals'), 'line 8 is a note: its first side −8·4/(3√3) is not the value above');
   // the real reader's text for the same page (cos x for cos^2 x): line 5 is then the same as line 4, written another way
   const real = arithmetic(TAN17.slice(9)), R = real.lines;
-  ok(R.map(l => l.status).join() === 'note,note,ok,note,ok,note,ok,ok', `the reader's own tan page: 3, 5, 7 and 8 tick (${R.map(l => l.status)})`);
+  ok(R.map(l => l.status).join() === 'note,note,note,note,ok,note,ok,ok', `the reader's own tan page: 5, 7 and 8 tick (${R.map(l => l.status)})`);
   ok(real.firstBreak === -1, 'the reader\'s own tan page: nothing crossed');
   // each reading rule on its own
   ok(acode(['y = 3tan x', 'y′ = 3 sec^2 x']) === '.T', 'sec^2 x at the end of the expression keeps its x: the derivative of 3 tan x is ticked');
@@ -169,7 +169,12 @@ ok(!acode(STAT).includes('X'), `the page itself, as written, is never crossed by
   ok(acode(['1/2 x 1/3 = 1/5', '1/2 x 1/3 = 1/6']) === '.T', 'a false line under the times reading does not stop the lines below it');
   ok(acode(['sin x x 2 = 2 sin x']) === 'T' && acode(['sin x x 2 = 3 sin x']) === '.', 'sin x x 2: the first x is the argument, the second a times sign');
   // the glued question number
-  ok(acode(['8 y = 3/tan x', "y' = -3[tan x]^-2 x sec^2 x"]) === '.T', 'a question number glued to a definition: the later derivative is ticked, the glued line stays a note');
+  ok(acode(['1 y = 2x', "y' = 2"]) === '.T', 'a glued number that changes nothing (1 y = 2x): both readings agree, the derivative ticks');
+  ok(acode(['8 y = 3/tan x', "y' = -3[tan x]^-2 x sec^2 x"]) === '..', 'a glued number that changes the derivative: a note');
+  // the reviewer's cases: each is false under one reading, so none ticks; and never a cross
+  for (const page of [['3 y = 2x + 1', "y' = 2"], ['3 y = 6x', 'y(3) = 18'], ['8 y = 16', 'y(1) = 16'], ['2 y = x^2', "y' = 2x"], ['12 y = 3x^2 + 6', "y' = 6x"], ['3 y = 6x', "y'(2) = 6"]])
+    ok(acode(page) === '..', `glued number, ambiguous: ${page.join(' ; ')} (${acode(page)})`);
+  ok(acode(['8 y = 16', 'y = 2']) === '.T' && acode(['8 y = 16', 'y = 2', "y' = 0"]) === '.T.', '8 y = 16 then y = 2 still ticks as a root, as before');
   ok(acode(['8 y = 3/tan x', 'z = 4']) === '..' && acode(['8 y = 3/tan x']) === '.', 'with no later use of y the glued line is just a note');
   ok(acode(['8 y = 3/tan x', "y' = -3 sec^2 x"]) === '..', 'a wrong derivative of a glued definition is a note, never a cross (the glued line is only used to tick)');
   // y'(π/6), evaluated against the page's derivative
@@ -179,9 +184,17 @@ ok(!acode(STAT).includes('X'), `the page itself, as written, is never crossed by
   ok(acode(['y = 2x^3', "y' = 6x^2", "y'(π/6) = 6 x (π/6)^2"]) === '.TT', 'y′(π/6) = 6 x (π/6)²: the point may be π/6');
   // on the questions the run used
   const withFold = q => lines(q, TAN8, '-4sqrt(3)/3').map(l => l.status === 'ok' ? 'T' : l.status === 'break' ? 'X' : '.').join('');
-  ok(withFold(Q.areaExact) === '..T...T.', `y12-integration (no Step Check) on the tan page: 3 and 7 ticked (${withFold(Q.areaExact)})`);
+  ok(withFold(Q.areaExact) === '......T.', `y12-integration (no Step Check) on the tan page: only 7 ticked (${withFold(Q.areaExact)})`);
   ok(!withFold(Q.trig48).includes('X') && !withFold(Q.trig99).includes('X'), 'y12-trigcalc, with and without a Step Check: nothing crossed');
   ok(withFold(Q.trig48)[6] === 'T', 'the question that fixes x = π/3 still ticks line 7, which has no x in it');
+}
+
+// ── comma vectors that end in plain numbers, and mixed readings of x ────────────────────────────────────────────────────
+{
+  ok(acode(['|[3,4]| = √(3^2+4^2)', '= √25', '= 6']) === 'TTX', 'a comma vector line ending in numbers: the continuation that is wrong is crossed as on main');
+  ok(acode(['|[3,4]| = √(3^2+4^2)', '= √24', '= 5']) === 'TX.', 'a wrong √24 under it is crossed');
+  ok(acode(['|[3,4]| = √(676+64)', '= √741']).endsWith('X'), 'a wrong √741 after √(676+64) is crossed');
+  ok(acode(['x = 2', '-3 x cos(π/3) x sec^2(π/4) = -6']) === '..', 'with x = 2 on the page, one x as the letter and the next as times is not read: a note');
 }
 
 // ── the whole run: every page on every question it was marked against, no true line crossed on the page's own question ──
