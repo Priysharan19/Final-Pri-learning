@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `78d0df5e9339606052ac218aeb43d1d3b576a657f590fbb69aa876074cae66e6` (`docs/marking/hsc-examiner-certification-dossier.md`).
+Dossier digest: `be3bbb7c3233a0431e45aacd6c2b84377cd90332671e7e22466824ee826a5be0` (`docs/marking/hsc-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -4679,14 +4679,14 @@ Final answer: -3, -2, 2, 4
 
 ## `nsw-final:me12-induction/D1` — seed 1009
 
-> The statement $P(n)$ is $\\sum_{i=1}^{n}i^{3} = \\dfrac{n^{2}(n+1)^{2}}{4}$ for all integers $n \\ge 1$. In the inductive step we must prove $P(k+1)$. Write the **right-hand side of $P(k+1)$** as an expression in $k$ (replace $n$ by $k + 1$; you need not expand).
+> The statement $P(n)$ is $\\sum_{i=1}^{n}i^{3} = \\dfrac{n^{2}(n+1)^{2}}{4}$ for all integers $n \\ge 1$. In the inductive step we must prove $P(k+1)$. Which expression is the **right-hand side of $P(k+1)$**, that is, the right-hand side of $P(n)$ with $n$ replaced by $k + 1$?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `(k+1)^2*((k+1)+1)^2/4` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `((k+1)^2*((k+1)+1)^2/4)` | yes | 1/1 | 1/1 | The same expression written with brackets. |
-| common wrong | `((k+1)^2*((k+1)+1)^2/4) + 1` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `((k+1)^2*((k+1)+1)^2/4) + 1` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `0` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. Option 0 is “$\\dfrac{(k+1)^{2}((k+1)+1)^{2}}{4}$”. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `1` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. Option 1 is “$\\dfrac{k^{2}(k+1)^{2}}{4} + 1$”. |
+| partial | `1` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me12-induction/D2` — seed 1009
 
@@ -5900,14 +5900,14 @@ Final answer: -3, -2, 2, 4
 
 ## `nsw-final:me12-further-calc/D4` — seed 1009
 
-> Evaluate $\\displaystyle\\int_{-1}^{1}\\dfrac{dx}{x^2 + 2x + 5}$. The answer is $c\\pi$: type $c$ as a fraction in lowest terms (not $\\pi$).
+> The region $R$ is bounded by the curve $y = \\dfrac{10}{4+x^2}$, the $x$-axis, the $y$-axis and the line $x = 2\\sqrt3$. Find the area of $R$ in square units, correct to 3 decimal places.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `1/8` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `9/8` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `9/8` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `1309/250` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `1309/250` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `1559/250` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `1559/250` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:mex-vectors-lines/D1` — seed 1009
 
