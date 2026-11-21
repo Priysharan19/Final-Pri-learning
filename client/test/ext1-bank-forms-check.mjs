@@ -235,6 +235,9 @@ for (const bank of [all]) {
             ok(!/(^|[$=({+\-,]\s*)\\cdot/.test(L), `${where}: ${where2} has a bare leading \\cdot: ${L}`);
             ok(!/(^|[^\d.\w\\^_])1(?=[a-zA-Z]|\\sqrt|\\pi|\\ln)/.test(L), `${where}: ${where2} prints a coefficient 1: ${L}`);
             if (where2 !== 'key') ok(!/\+\s*[-\u2212]/.test(L), `${where}: ${where2} has "+ -": ${L}`);
+            // scoped: the flawed-proof forms show a student's genuine base-case substitution, for example (1 x 2)/2 at n = 1, which keeps its factor 1
+            if (where2 !== 'key' && !(['ind-flaw-logic', 'ind-flaw-series'].includes(sp.form) && where2 === 'prompt')) ok(!/(^|[^\d.\w\\])1\\(left|times|cdot)/.test(L), `${where}: ${where2} prints a multiplier 1: ${L}`);
+            if (where2 !== 'key') ok(!/\\[dt]frac\{[^{}]*\}\{\s*[-\u2212]/.test(L), `${where}: ${where2} has a negative denominator: ${L}`);
             if (where2 !== 'key') ok(!/\\[dt]frac\{[^{}]*\}\{1\}/.test(L), `${where}: ${where2} has a fraction over 1: ${L}`);
             if (where2 !== 'key') ok(!/\b(add|adds|adding|subtract|subtracts|subtracting)\s+\$?\s*[-\u2212]\s*\d/i.test(L), `${where}: ${where2} says add/subtract of a negative number: ${L}`);
             if (sp.form === 'ind-div-mk') ok(!/(^|[^\d.\w])1\^/.test(L), `${where}: ${where2} has a base 1: ${L}`);
