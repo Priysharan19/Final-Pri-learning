@@ -75,6 +75,10 @@
 .gp-squares i.is-used { background: var(--ink-3); }
 .gp-squares i.is-right { background: var(--good); }
 .gp-squares i.is-wrong { background: var(--correction); }
+/* Right after a hint or a worked step: outlined, so it differs from right first time by shape, not colour. */
+.gp-squares i.is-assisted { background: transparent; box-shadow: inset 0 0 0 1px var(--good); }
+.gp-left { margin: 0; }
+.gp-tally-sum { flex: 1 1 100%; list-style: none; margin: var(--space-1) 0 0; padding: 0; display: grid; gap: 2px; color: var(--ink-2); }
 .gp-squares i.is-now { background: var(--ink); }
 .gp-context { margin: var(--space-8) 0 0; display: grid; gap: var(--space-4); }
 .gp-context dt, .gp-row > legend, .gp-row > label, .gp-typed > label, .gp-options > legend, .gp-reads-k { font: 500 11px/1.4 var(--font-mono); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--ink-3); }
@@ -101,6 +105,20 @@
 .gp-option { font-size: var(--text-md); min-height: 52px; }
 .gp-option .gp-key { flex: none; width: 1.4em; font: 500 var(--text-sm) var(--font-mono); color: var(--ink-3); }
 .gp-option .gp-mark { margin-left: auto; width: 20px; height: 20px; }
+.gt-worked { max-width: 640px; margin-top: var(--space-6); }
+.gt-worked-k { margin: 0 0 var(--space-3); font: 500 11px/1.4 var(--font-mono); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--ink-3); }
+.gt-worked .gt-steps { list-style: none; margin: 0; padding: 0; gap: var(--space-4); }
+.gt-worked .step { padding: 0; }
+.gt-worked .step:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; border-radius: var(--radius-sm); }
+.gt-worked .step-h, .gt-worked .step-d { overflow-wrap: anywhere; }
+.gt-worked .step-d { font-size: var(--text-md); }
+.gp-worked-line { margin: var(--space-6) 0 0; }
+.gp-worked-lede { margin: var(--space-2) 0 0; }
+.gp-worked-controls, .gt-worked-controls { max-width: 640px; margin-top: var(--space-2); }
+.gp-first { display: flex; align-items: center; gap: var(--space-3); max-width: 640px; margin: var(--space-3) 0 0; color: var(--ink-2); }
+.gp-line-sm { font-size: var(--text-lg); }
+.gp-after { margin-top: var(--space-6); }
+.gp-nolike { flex: 1 1 100%; margin: 0; }
 .gp-hint { max-width: 620px; margin: var(--space-5) 0 0; padding: var(--space-3) 0 0; border-top: 1px solid var(--hairline); color: var(--ink-2); }
 .gp-problem { max-width: 620px; margin: var(--space-4) 0; padding: var(--space-3) var(--space-4); border: 1px solid var(--hairline-strong); border-radius: var(--radius); color: var(--ink); }
 .gp-quiet { margin: var(--space-3) 0 0; color: var(--ink-3); font-size: var(--text-sm); }

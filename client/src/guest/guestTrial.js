@@ -34,6 +34,7 @@ const reason = error => {
   if (code === 'GUEST_TOO_FAST') return 'fast';
   if (code === 'MARKING_BUSY') return 'marking-busy';
   if (code === 'GUEST_ALREADY_ANSWERED') return 'answered';
+  if (code === 'GUEST_NOT_ANSWERED' || code === 'GUEST_STEP_ORDER' || code === 'GUEST_NO_STEPS') return 'steps';
   return 'offline';
 };
 
@@ -55,15 +56,15 @@ async function withSession(call) {
 }
 
 /** One question: { question, sealed, remaining, limit } or throws { reason }. */
-export async function askGuest({ generator, difficulty, curriculum, form }) {
+export async function askGuest({ generator, difficulty, curriculum, form, like }) {
   try {
-    const out = await withSession(csrf => cloud.guestQuestion({ generator, difficulty, curriculum, form }, csrf));
+    const out = await withSession(csrf => cloud.guestQuestion({ generator, difficulty, curriculum, form, ...(typeof like === 'string' ? { like } : {}) }, csrf));
     session.remaining = out.remaining;
     return out;
   } catch (error) { throw Object.assign(new Error('guest question refused'), { reason: reason(error), resetAt: error?.resetAt }); }
 }
 
-/** One verdict: { resolved, correct, answer, remaining } | { invalid } or throws { reason }. */
+/** One verdict: { resolved, correct, answer, remaining } | { resolved: false, retry, step, shown, total } | { invalid } or throws { reason }. */
 export async function answerGuest({ sealed, answer }) {
   try {
     const out = await withSession(csrf => cloud.guestAnswer({ sealed, answer }, csrf));
@@ -73,3 +74,12 @@ export async function answerGuest({ sealed, answer }) {
 }
 
 export const guestRemaining = () => session?.remaining ?? null;
+
+/** The worked step after the ones shown (the server releases them in order): { step, shown, total } or, past the last, { answer, resolved }. Throws { reason }. */
+export async function stepsGuest({ sealed, step }) {
+  try {
+    const out = await withSession(csrf => cloud.guestSteps({ sealed, step }, csrf));
+    if (typeof out?.remaining === 'number') session.remaining = out.remaining;
+    return out;
+  } catch (error) { throw Object.assign(new Error('guest step refused'), { reason: reason(error) }); }
+}

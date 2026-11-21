@@ -386,7 +386,7 @@
       "job": "platform-contracts",
       "log": "region-isolation.log",
       "pins": [
-        {"has":"REGION ISOLATION (H2): PASS — 580 checks (sqlite)","note":"423 → 429 (plan F6a): the check walks the route inventory, which now lists the two public catalogue routes. 429 → 467 (plan F3, re-derived by running): the 17 publishing routes and the two new tables; +3 Step15 authenticated sync ownership route assertions."}
+        {"has":"REGION ISOLATION (H2): PASS — 582 checks (sqlite)","note":"580 → 582 (train guest teach 1, as printed by the run): the new guest route POST /v1/guest/steps is walked by the two per-route checks. 423 → 429 (plan F6a): the check walks the route inventory, which now lists the two public catalogue routes. 429 → 467 (plan F3, re-derived by running): the 17 publishing routes and the two new tables; +3 Step15 authenticated sync ownership route assertions."}
       ]
     },
     "platform/practice-http.log": {
@@ -491,7 +491,8 @@
       "job": "platform-contracts",
       "log": "guest-trial.log",
       "pins": [
-        {"has":"✓ guest-trial-check.mjs (103 checks)","note":"ADR-0003, the guest trial over real HTTP (re-derived by running)."},
+        {"has":"✓ guest-trial-check.mjs (177 checks)","note":"ADR-0003, the guest trial over real HTTP; 103 -> 177: worked steps after a wrong answer, one retry, one like it, parallel-guess races (re-derived by running)."},
+        {"has":"✓ guest-steps-leak-check.mjs (3 checks)","note":"No worked step that states the answer is released while the retry is open, over every guest-issuable chapter and level of both editions, 20 seeds each (3 checks; added by the worked-steps flow)."},
         {"has":"✓ guest-menu-issuable-check.mjs (3981 checks)","note":"Everything the guest picker lists, in both editions, is a request the edition's server issues (3981, re-derived by running; it follows the number of listed chapter-and-level cells)."}
       ]
     },
@@ -739,7 +740,7 @@
         {"has":"PRACTICE INPUT TIMING: PASS — 4/4 cases (390×844 and 820×1180, light and dark), 12/12 answer-mode presses (the selected tab included) inside 100 ms"},
         {"has":"E2E SUITE PASSED — 129/129 checks across 1 flows"},
         {"has":"NSW PRACTICE MARKED TOUR: PASS — 9/9 checks","note":"A Prithagoras NSW Year 10 student is issued a question by the server and the server marks it (the device names the profile own course)."},
-        {"has":"GUEST TRIAL TOUR: PASS - 129 checks (priyabhata, prithagoras)","note":"ADR-0003: both editions, a visitor with no account, five server-marked questions, the sign-up prompt, Hindi where offered, and the same picker as the signed-in Home quick start (129, re-derived by running the tour on the merged tree)."}
+        {"has":"GUEST TRIAL TOUR: PASS - 180 checks (priyabhata, prithagoras)","note":"ADR-0003: both editions, a visitor with no account, five server-marked questions, the sign-up prompt, Hindi where offered, and the same picker as the signed-in Home quick start. 129 -> 180: a wrong answer shows the first worked step and keeps the answer closed, one retry (recorded as after a worked step), the next steps one at a time, \"Try one like it\" and the three-state tally (re-derived by running the tour)."}
       ]
     },
     "build/brand-build.log": {

@@ -690,6 +690,7 @@ export const cloud = Object.freeze({
   // issues and marks, the device holds no key. Never reaches a paid reader.
   guestStart: () => cloudRequest('/v1/guest/session', { method: 'POST', body: {} }),
   guestQuestion: (body, guestCsrf) => cloudRequest('/v1/guest/question', { method: 'POST', body, guestCsrf }),
+  guestSteps: (body, guestCsrf) => cloudRequest('/v1/guest/steps', { method: 'POST', body, guestCsrf }),
   guestAnswer: (body, guestCsrf) => cloudRequest('/v1/guest/answer', { method: 'POST', body, guestCsrf }),
   gradePractice: (questionId, body) => cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/submit', {
     method: 'POST', body, idempotencyKey: body.submissionId,

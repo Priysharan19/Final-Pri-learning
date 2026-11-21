@@ -542,6 +542,7 @@ jobs:
           # something the server issues, in both editions.
           node server/test/guest-trial-check.mjs 2>&1 | tee guest-trial.log
           node server/test/guest-menu-issuable-check.mjs 2>&1 | tee -a guest-trial.log
+          node server/test/guest-steps-leak-check.mjs 2>&1 | tee -a guest-trial.log
           node tools/ci-check-counts.mjs verify platform/guest-trial.log
           # CodeQL #461: prove the recognize route's account-keyed, atomic limit
           # under simultaneous requests rather than only the serial boundary.
