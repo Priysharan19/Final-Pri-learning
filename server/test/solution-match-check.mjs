@@ -11,6 +11,7 @@
 import fs from 'node:fs';
 import { stepEvidence } from '../platform/markerOps.js';
 import * as G from '../../client/src/engine/generators/index.js';
+import { evaluate } from '../../client/src/engine/expr.js';
 import { solutionMatch, _internals as I } from '../../client/src/engine/solutionMatch.js';
 
 const OBJ = new Set(['mcq', 'multi-mcq', 'matrix-match']);
@@ -148,6 +149,101 @@ const MUTATIONS = {
   ok(ticked === 0, `no false tick: ${ticked} of ${exercised} wrong lines ticked (${tickedExamples.join(' || ')})`);
   ok(exercised >= 1500 && Object.keys(kinds).length >= 7, `no false tick: ${exercised} wrong lines reached the pass (${built} built), kinds ${JSON.stringify(kinds)}`);
   console.log(`no false tick: ${built} wrong lines built, ${exercised} left unjudged by the arithmetic check and handed to the pass, ${ticked} ticked; ${JSON.stringify(kinds)}`);
+}
+
+// ── b2 · adversarial: wrong lines NOT made by mutating a step into something near it, but built to look like a step ──────────
+{
+  let built = 0, exercised = 0, ticked = 0, gens = new Set(); const ex = []; const kinds = {};
+  const canon = x => String(x).replace(/[\s{}*]/g, '');
+  const SPLIT = /(?<![<>!])=(?!=)/;
+  // an independent check (random points, a fitted constant) that a built line is not secretly the same condition as the original
+  const sameCondition = (a, b) => {
+    const pa = a.split(SPLIT).map(x => x.trim()), pb = b.split(SPLIT).map(x => x.trim());
+    if (pa.length !== 2 || pb.length !== 2) return false;
+    const A = pa.map(x => I.readSide(x)), B = pb.map(x => I.readSide(x));
+    if (A.some(x => !x) || B.some(x => !x)) return false;
+    const vars = [...new Set([...A, ...B].flatMap(x => x.vars || []))];
+    const rnd = mulberry(99);
+    const val = (info, env) => (info.value !== undefined ? info.value : (() => { try { return evaluate(info.ast, env); } catch { return NaN; } })());
+    let ratio = null;
+    for (let j = 0; j < 14; j++) {
+      const env = Object.fromEntries(vars.map(v => [v, (rnd() - 0.5) * 9]));
+      const fa = val(A[0], env) - val(A[1], env), fb = val(B[0], env) - val(B[1], env);
+      if (!Number.isFinite(fa) || !Number.isFinite(fb)) continue;
+      if (Math.abs(fa) < 1e-9) { if (Math.abs(fb) > 1e-6) return false; continue; }
+      const r = fb / fa;
+      if (ratio === null) ratio = r; else if (Math.abs(r - ratio) > 1e-9 * Math.max(1, Math.abs(r))) return false;
+    }
+    return ratio !== null && Math.abs(ratio) > 1e-9;
+  };
+  const readTail = l => l.split(SPLIT).pop().trim();
+  const solValues = q => I.readSolution(q).values.map(x => x.v);
+  for (let round = 0; round < 6; round++) for (const id of ids) {
+    const d = 1 + (round % 4), seed = 11 + round * 13 + (id.length % 9);
+    const q = generate(id, d, seed);
+    if (!q || OBJ.has(q.answerType) || Array.isArray(q.boardScheme) || q.answerType === 'graph-sketch') continue;
+    const worked = workedLines(q);
+    const variants = [];
+    for (const line of worked) {
+      const parts = line.split(SPLIT).map(x => x.trim());
+      if (parts.length !== 2 || !parts[0] || !parts[1] || /[,<>]/.test(line)) continue;
+      const [L, R] = parts;
+      if (/^[A-Za-z]'*(?:\([^()]*\))?$/.test(L)) continue;   // a label: shifting it gives another true statement of the solution (r + 1 = 5 for r = 4)
+      const bigs = line.match(/\d{3,}/g) || [];
+      variants.push(['constAddedLeft', `${L} + 1 = ${R}`], ['constAddedRight', `${L} = ${R} + 1`], ['oneSideScaled', `2(${L}) = ${R}`],
+        ['extraTerm', `${L} + 1 = ${R} + 2`], ...(/[A-Za-z]/.test(R) ? [['sharedRoots', `(${L})^2 = (${R})^2`]] : []), ['sharedRoots', `(${L} - (${R}))^2 = 0`]);
+      if (bigs.length) variants.push(['largeNearMiss', line.replace(/\d{3,}/, n => String(Number(n) + 1))]);
+      const letters = [...new Set(line.match(/(?<![A-Za-z])[A-Za-z](?![A-Za-z(])/g) || [])].filter(c => c !== 'e');
+      if (letters.length) variants.push(['lettersShifted', letters.reduce((t, v) => t.replace(new RegExp(`(?<![A-Za-z])${v}(?![A-Za-z])`, 'g'), `(${v}+1)`), line)]);
+      if (letters.length >= 2) variants.push(['twoLettersShifted', `${L.replace(new RegExp(`(?<![A-Za-z])${letters[0]}(?![A-Za-z])`, 'g'), `(${letters[0]}+1)`)} = ${R}`]);
+    }
+    // a true restatement of the question followed by a false statement on the same line
+    for (const m of String(q.prompt).matchAll(/\$([^$]+)\$/g)) { const p = I.spanToPlain(m[1]); if (p && p.includes('=') && !/,/.test(p)) variants.push(['restateThenFalse', `${p}, 1 = 2`], ...(/\d/.test(p) && !canon(String(q.prompt)).includes(canon(p.replace(/\d+(?!.*\d)/, n => String(Number(n) + 1)))) ? [['restateThenShifted', `${p}, ${p.replace(/\d+(?!.*\d)/, n => String(Number(n) + 1))}`]] : [])); }
+    for (const [kind, line] of variants.slice(0, 40)) {
+      if (worked.some(w => canon(w) === canon(line))) continue;
+      // a variant that is itself a true statement of the solution (k = 1 + 1 when the solution has k = 2) is not wrong
+      { const tail = readTail(line); const v = tail !== null ? I.readSide(tail) : null; if (v && v.value !== undefined && solValues(q).some(x => Math.abs(x - v.value) < 1e-9) && !/[A-Za-z]/.test(tail)) continue; }
+      if (kind !== 'restateThenFalse' && kind !== 'restateThenShifted' && worked.some(w => sameCondition(w, line))) continue;
+      built++;
+      const pages = [[line], worked.length ? [worked[0], line] : [line]];
+      for (const lines of pages) {
+        const { on, off } = evidence(q, lines);
+        const i = lines.length - 1;
+        if (!off.stepReport || off.stepReport.lines[i]?.status !== 'note') { if (off.stepReport) continue; }
+        exercised++; gens.add(id); kinds[kind] = (kinds[kind] || 0) + 1;
+        if (on.stepReport?.lines[i]?.status === 'ok') { ticked++; if (ex.length < 8) ex.push(`${kind}: ${line} / ${(on.stepReport.lines[i].note || '').slice(0, 40)} [${q.prompt.slice(0, 30)}]`); }
+      }
+    }
+  }
+  ok(ticked === 0, `adversarial: ${ticked} of ${exercised} look-alike wrong lines ticked (${ex.join(' || ')})`);
+  ok(exercised >= 1500 && gens.size >= 150, `adversarial: ${exercised} lines from ${gens.size} generators`);
+  console.log(`adversarial: ${built} look-alike wrong lines built, ${exercised} pages reached the pass from ${gens.size} generators, ${ticked} ticked; ${JSON.stringify(kinds)}`);
+}
+
+// ── a report exists only when a line was matched ────────────────────────────────────────────────────────────────────────
+{
+  const q = generate('y12-appdiff', 3, 7);
+  const none = stepEvidence(q, '', ['hello world', '7 = 8'].join('\n'), { correct: false });
+  const noMatch = stepEvidence(q, '', ['z = 4', 'p + q'].join('\n'), { correct: false });
+  const withMatch = stepEvidence(q, '', ['y - 2 = -3(x - 1)'].join('\n'), { correct: false });
+  const without = stepEvidence(q, '', ['y - 2 = -3(x - 1)'].join('\n'), { correct: false }, { solutionMatch: false });
+  const offNo = stepEvidence(q, '', ['z = 4', 'p + q'].join('\n'), { correct: false }, { solutionMatch: false });
+  ok(JSON.stringify(noMatch) === JSON.stringify(offNo), 'a page nothing on which is recognised gets exactly the reply it got before');
+  ok(withMatch.stepReport && withMatch.stepReport.firstBreak === -1 && !withMatch.stepReport.diagnosis && withMatch.stepReport.lines.every(l => l.status !== 'break'), 'a page with a recognised line gets a report with no break and no diagnosis');
+  ok(JSON.stringify(withMatch.partial) === JSON.stringify(without.partial) && JSON.stringify(withMatch.board ?? null) === JSON.stringify(without.board ?? null), 'the partial and the board are those of the same page without the pass');
+  ok(JSON.stringify(none) === JSON.stringify(stepEvidence(q, '', ['hello world', '7 = 8'].join('\n'), { correct: false }, { solutionMatch: false })), 'a page with nothing recognised is exactly as it was without the pass');
+}
+
+// ── the reviewer's own look-alikes ──────────────────────────────────────────────────────────────────────────────────────
+{
+  const R = [['c11-straight-lines', 2, 11, ['y-(7) + 1 = 1(x-(2))']], ['c10-trig-standard-reasoning', 1, 3, ['2(sin(A-B)) = (1/2)', 'sin(A-B) + 1 = (1/2)']], ['c11-3d-section-jee-reasoning', 1, 3, ['2(-y+z) = 7']],
+    ['c10-quadratic-context', 2, 29, ['x(x+1) + 1 = 29412']], ['c10-linear-pair-methods', 3, 3, ['8x-13y=787, 1 = 2', '8x-13y=787, 8x-13y=788']], ['c10-ap-daily-life-reasoning', 1, 29, ['(S(n))^2 = 5850^2']]];
+  let n = 0, bad = [];
+  for (const [id, d, seed, pageLines] of R) {
+    const q = generate(id, d, seed); if (!q) continue;
+    for (const line of pageLines) { n++; const r = evidence(q, [line]).on.stepReport; if (r && r.lines[0].status === 'ok' && r.lines[0].solutionMatch) bad.push(`${id}: ${line}`); }
+  }
+  ok(n >= 8 && bad.length === 0, `the reviewer's look-alikes are not ticked (${n} lines; ${bad.join(' | ')})`);
 }
 
 // ── c · the battery ──────────────────────────────────────────────────────────

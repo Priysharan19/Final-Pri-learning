@@ -14,7 +14,7 @@
 // A line is ticked only by one of four rules, in this order:
 //   a  restates the question: the same expression, or exactly the prompt's own equation (state "given")
 //   b  an equation whose label and result agree with a step of the worked solution, or an equation that is the same
-//      condition as a step equation (a constant multiple of it, or one with the same solutions)
+//      condition as a step equation (an exact rational multiple of it, proved at independent points and by the engine)
 //   c  a continuation or bare number whose value is a value the solution reaches, in order (the same step as the last
 //      matched line, or the next), and never a bare small number unless it continues a matched line or ends the page
 //   d  a substitution (`x = 4: 6(16) + 8(4)`) whose value is the one the solution reaches
@@ -34,7 +34,7 @@ const CLAIM = /\b(?:show|prove|verify|test|check|whether|disprove|explain|claim|
 
 const tidy = s => String(s ?? '').replace(/[−–—]/g, '-').replace(/[′’`]/g, "'").replace(/[×·]/g, '*').replace(/÷/g, '/').trim();
 const close = (a, b) => Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b));
-const closeLoose = (a, b) => Math.abs(a - b) <= 1e-7 * Math.max(1, Math.abs(a), Math.abs(b));
+const closeLoose = (a, b) => Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b));
 const SPLIT_EQ = /(?<![<>!])=(?!=)/;
 
 // ── a label is a named quantity, not an expression ───────────────────────────
@@ -107,17 +107,29 @@ function statementsOfSpans(text) {
 }
 
 const braces = s => s.replace(/\^\{([^{}]*)\}/g, '^($1)').replace(/_\{([^{}]*)\}/g, '_$1');
-const readSide = side => { try { return infoOf(cleanStatement(braces(tidy(side)))); } catch { return null; } };
+// A letter the question or its solution uses as a function name (f(x), S(n)): `f(x + 1)` there is an application, which the
+// engine would read as the product f·(x + 1). A side that applies one is not read at all.
+let FUNCS = new Set();
+const readSide = side => {
+  try {
+    const t = braces(tidy(side));
+    for (const f of FUNCS) if (new RegExp(`(?<![A-Za-z])${f}'*\\s*\\(`).test(t)) return null;
+    return infoOf(cleanStatement(t));
+  } catch { return null; }
+};
 const numericOf = side => { const i = readSide(side); return i && i.value !== undefined ? i.value : null; };
 
 // ── sampling: the same function of the same letters, at points of both signs ─
-const POINTS = [-2.7, -1.3, -0.4, 0.6, 1.9, 3.1, 4.3];
 const varsKey = i => (i.vars || []).join();
 function valAt(info, env) {
   if (info.value !== undefined) return info.value;
   try { const y = evaluate(info.ast, env); return typeof y === 'number' && Number.isFinite(y) ? y : null; } catch { return null; }
 }
-const envAt = (vars, x) => Object.fromEntries(vars.map((v, k) => [v, x + 0.37 * k]));
+// Independent sample points for every letter (a different offset, stride and curvature each, both signs), so two letters never
+// move along one line and a difference that is constant along it cannot pass as no difference at all.
+const OFFSETS = [[0.61, 0.83, 0.071], [-1.07, 0.59, 0.113], [0.37, 1.13, -0.059]];
+const SAMPLES = 9;
+const envAt = (vars, j) => Object.fromEntries(vars.map((v, k) => { const [a, b, c] = OFFSETS[k % 3]; return [v, (j % 2 ? -1 : 1) * (a + b * j * (1 + 0.31 * k) + c * j * j * (k + 1))]; }));
 
 /** The module's identity test: the same letters, the same value at points of both signs, exprEquivalent, no differing domains. */
 function sameSide(a, b, rawA, rawB) {
@@ -126,15 +138,15 @@ function sameSide(a, b, rawA, rawB) {
   if (a.value !== undefined && b.value !== undefined) return closeLoose(a.value, b.value);
   if (a.value !== undefined || b.value !== undefined) return false;   // a number and a function (sin²x + cos²x = 1) are not the same side
   let agreed = 0;
-  for (const x of POINTS) {
-    const env = envAt(a.vars, x);
+  for (let j = 0; j < SAMPLES; j++) {
+    const env = envAt(a.vars, j);
     const p = valAt(a, env), q = valAt(b, env);
     if ((p === null) !== (q === null)) return false;
     if (p === null) continue;
     if (!closeLoose(p, q)) return false;
     agreed++;
   }
-  if (agreed < 3) return false;
+  if (agreed < 5) return false;
   try { return exprEquivalent(cleanStatement(tidy(rawA)), cleanStatement(tidy(rawB)), { isolatedDomain: true }) === true; } catch { return false; }
 }
 
@@ -145,48 +157,38 @@ function conditionOf(parts) {
   if (!l || !r) return null;
   const vars = [...new Set([...(l.vars || []), ...(r.vars || [])])].sort();
   if (!vars.length || vars.length > 3) return null;
-  return { l, r, vars, f: env => { const a = valAt(l, env), b = valAt(r, env); return a === null || b === null ? null : a - b; } };
+  const clean = x => cleanStatement(braces(tidy(x)));
+  return { l, r, vars, rawL: clean(parts[0]), rawR: clean(parts[1]), f: env => { const a = valAt(l, env), b = valAt(r, env); return a === null || b === null ? null : a - b; } };
 }
-/** True when f is a constant non-zero multiple of g at every sampled point and they are defined at the same points. */
+/**
+ * True when the two equations are the same condition: f = left - right is an exact rational multiple c of g everywhere. c is
+ * fitted at one point and must be a small rational; f - c·g must then vanish at nine independent points to an absolute residual
+ * scaled to the size of the individual terms (never of the totals), and the engine's own equivalence must agree. Not proved: no tick.
+ */
 function proportional(f, g) {
   if (f.vars.join() !== g.vars.join()) return false;
-  let ratio = null, used = 0;
-  for (const x of POINTS) {
-    const env = envAt(f.vars, x);
+  let c = null, used = 0;
+  for (let j = 0; j < SAMPLES; j++) {
+    const env = envAt(f.vars, j);
     const a = f.f(env), b = g.f(env);
     if ((a === null) !== (b === null)) return false;
     if (a === null) continue;
-    if (Math.abs(b) < 1e-9) { if (Math.abs(a) >= 1e-7) return false; continue; }
-    const r = a / b;
-    if (ratio === null) ratio = r; else if (!closeLoose(r, ratio)) return false;
+    if (c === null) {
+      if (Math.abs(b) < 1e-9) continue;
+      const r = a / b;
+      let fit = null;
+      for (let d = 1; d <= 12 && fit === null; d++) { const n = Math.round(r * d); if (n !== 0 && Math.abs(r * d - n) < 1e-9 * Math.max(1, Math.abs(n))) fit = [n, d]; }
+      if (!fit) return false;
+      c = fit;
+    }
+    const k = c[0] / c[1];
+    const scale = Math.abs(valAt(f.l, env) ?? 0) + Math.abs(valAt(f.r, env) ?? 0) + Math.abs(k) * (Math.abs(valAt(g.l, env) ?? 0) + Math.abs(valAt(g.r, env) ?? 0));
+    if (Math.abs(a - k * b) > 1e-10 * scale + 1e-12) return false;
     used++;
   }
-  return used >= 4 && ratio !== null && Math.abs(ratio) > 1e-9;
+  if (used < 5 || c === null) return false;
+  try { return exprEquivalent(`(${f.rawL})-(${f.rawR})`, `(${c[0]}/${c[1]})*((${g.rawL})-(${g.rawR}))`, { isolatedDomain: true }) === true; } catch { return false; }
 }
-/** The roots of a one-letter condition on [-30, 30] by sign change (bisected). */
-function rootsOf(c) {
-  if (c.vars.length !== 1) return null;
-  const v = c.vars[0], at = x => c.f({ [v]: x });
-  const roots = [];
-  let px = -30, py = at(px);
-  for (let k = 1; k <= 1200; k++) {
-    const x = -30 + k * 0.05, y = at(x);
-    if (py !== null && y !== null) {
-      if (py === 0) roots.push(px);
-      else if (py * y < 0) {
-        let lo = px, hi = x, flo = py;
-        for (let it = 0; it < 60; it++) { const mid = (lo + hi) / 2, fm = at(mid); if (fm === null) break; if (fm * flo <= 0) hi = mid; else { lo = mid; flo = fm; } }
-        const root = (lo + hi) / 2, fr = at(root);
-        // a pole is not a root
-        if (fr !== null && Math.abs(fr) < 1e-5 * Math.max(1, Math.abs(py), Math.abs(y))) roots.push(root);
-      }
-    }
-    px = x; py = y;
-    if (roots.length > 8) return null;
-  }
-  return roots;
-}
-const sameRoots = (a, b) => !!a && !!b && a.length > 0 && a.length === b.length && a.every((r, i) => Math.abs(r - b[i]) < 1e-5);
 
 // ── the worked solution, read once ───────────────────────────────────────────
 function readSolution(q) {
@@ -312,17 +314,6 @@ function matchEquation(parts, sol, ctx) {
       for (const st of sol.conditions) {
         if (proportional(cond, st.cond)) return st;
       }
-      // not a rearrangement of it: the very same solutions, and not an identity
-      if (cond.vars.length === 1) {
-        for (const st of sol.conditions) {
-          if (st.cond.vars.join() !== cond.vars.join()) continue;
-          st.roots = st.roots === undefined ? rootsOf(st.cond) : st.roots;
-          if (!st.roots || !st.roots.length) continue;
-          const v = cond.vars[0];
-          if (!st.roots.every(r => { const y = cond.f({ [v]: r }); return y !== null && Math.abs(y) < 1e-6 * Math.max(1, Math.abs(r)); })) continue;
-          if (sameRoots(rootsOf(cond), st.roots)) return { ...st, same: true };
-        }
-      }
     }
   }
   return null;
@@ -330,7 +321,7 @@ function matchEquation(parts, sol, ctx) {
 
 // ── notes ────────────────────────────────────────────────────────────────────
 export const NOTE_GIVEN = 'This restates the question.';
-export const noteStep = (st) => `${st.same ? 'Has the same solutions as' : 'Matches'} step ${st.step + 1} of the worked solution${st.heading ? ` (${st.heading.replace(/\.$/, '')})` : ''}.`;
+export const noteStep = (st) => `Matches step ${st.step + 1} of the worked solution${st.heading ? ` (${st.heading.replace(/\.$/, '')})` : ''}.`;
 export const noteValue = (m, v) => `This is the value at step ${m.step + 1} of the worked solution: $${exactForm(v).tex}$.`;
 
 /**
@@ -343,7 +334,15 @@ export function solutionMatch(q, report) {
   try { return withEvaluationBudget(PAGE_BUDGET, () => run(q, report)); } catch { return { report, matched: 0 }; }
 }
 
+function functionNames(q) {
+  const out = new Set();
+  const texts = [String(q?.prompt ?? ''), ...(Array.isArray(q?.steps) ? q.steps.map(x => String(x?.d ?? '')) : [])];
+  for (const t of texts) for (const m of t.matchAll(/(?<![A-Za-z\\])([A-Za-z])\s*(?:'|\\prime)*\s*\(\s*[A-Za-z0-9\\.,+\- ]{1,12}\)\s*=/g)) out.add(m[1]);
+  return out;
+}
+
 function run(q, report) {
+  FUNCS = functionNames(q);
   const lines = report.lines.slice(0, MAX_LINES);
   const sol = readSolution(q);
   const prompt = readPrompt(q);
@@ -371,7 +370,7 @@ function run(q, report) {
     let hit = null;
 
     // a · the question restated
-    if (unjudged && !s.ctx && !s.continuation && s.parts.length <= 2) {
+    if (unjudged && !s.ctx && !s.continuation && !s.multi && s.parts.length <= 2) {
       const flat = s.parts.join('');
       if (flat.length >= 3 && !/^[-+]?\d+(?:\.\d+)?$/.test(flat) && /[A-Za-z]|[+\-*/^]/.test(flat) && sameAsPromptStatement(s.parts, prompt)) tick = { state: 'given', note: NOTE_GIVEN };
     }
@@ -383,12 +382,16 @@ function run(q, report) {
       if (h && above && above.hit && above.hit.step === h.step) { tick = { state: 'verified', note: noteStep(h), step: h.step }; hit = h; }
     }
     if (!tick && s.multi) {
-      const hits = s.multi.map(ps => matchEquation(ps, sol, null));
-      if (hits.every(Boolean)) hit = hits[0];
+      // several statements on one line: the line is ticked only when EVERY one qualifies (restates the question, or matches a step)
+      const each = s.multi.map(ps => ({ hit: matchEquation(ps, sol, null), given: unjudged && sameAsPromptStatement(ps, prompt) }));
+      if (each.every(x => x.hit || x.given)) {
+        const first = each.find(x => x.hit);
+        if (first) hit = first.hit; else tick = { state: 'given', note: NOTE_GIVEN };
+      }
     } else if (!tick && s.parts.length >= 2 && !s.continuation) hit = matchEquation(s.parts, sol, s.ctx);
     if (hit) { tick = tick || { state: 'verified', note: noteStep(hit), step: hit.step }; prevAbove.hit = hit; }
     // c / d · a value the solution reaches, in order
-    if (!tick) {
+    if (!tick && !s.multi) {
       const nums = s.parts.map(numericOf);
       const value = nums.every(v => v !== null) && nums.every(v => close(v, nums[0])) ? nums[0] : null;
       // a numeric continuation must agree with the line above (ln1 = 0, then `= 1`, is not one chain)
@@ -434,4 +437,5 @@ function run(q, report) {
     }
   };
 }
-export const _internals = { readSolution, readStudent, matchEquation, spanToPlain, conditionOf, rootsOf, readSide, sameSidePublic: sameSide };
+export const _setFunctionsUnused = q => { FUNCS = functionNames(q); };
+export const _internals = { readSolution, readStudent, matchEquation, spanToPlain, conditionOf, readSide, sameSidePublic: sameSide };
