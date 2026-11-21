@@ -165,6 +165,7 @@ const MistakeGraph = React.lazy(() => import('./MistakeGraph.jsx').catch(() => (
 // Annotated working: each checked line's named rule, numbered against the ink,
 // and the evaluation built from the receipt. Engine-only, feedback only, and
 // its own chunk; a chunk that cannot load shows the plain step report instead.
+import { useLineComments } from './useLineComments.js';
 const MarkedPage = React.lazy(() => import('./MarkedPage.jsx').catch(() => ({ default: () => null })));
 const AnnotatedWorkingPart = React.lazy(() => import('./AnnotatedWorking.jsx').catch(() => ({ default: () => null })));
 
@@ -2244,6 +2245,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const markedId = (resolved ? res?.submissionId : state.res?.submissionId);
   if (typeof markedId === 'string' && markedId && (resolved || gradedRetry)) markedSubmissions.current.seen.add(markedId);
   const markedCount = markedSubmissions.current.seen.size;
+  // The comments a model wrote on this marked answer, only where the server has the feature on (dark: nothing is asked of a model and nothing changes).
+  const lineComments = useLineComments(resolved ? res : null, { language });
   const awInput = useMemo(() => {
     if (!resolved || previousAttempt || !res || res.revealed || res.invalid || !Array.isArray(res.stepReport?.lines) || res.stepReport.lines.length < 2) return null;
     const lines = writeMode ? (judged?.lines || inkResult?.lines || []) : String(working || '').split('\n').filter(Boolean);
@@ -2991,7 +2994,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               )}
               {photoPageOn && (
                 <React.Suspense fallback={null}>
-                  <MarkedPage input={awInput} source={{ kind: 'photo', src: photo, lines: photoPageLines }} texOf={texOf} scoreShown={instrumentScore} criteria={res?.methodCriteria} reading={pageReading} onCorrect={onRedo ? correctReadLine : null} />
+                  <MarkedPage input={awInput} source={{ kind: 'photo', src: photo, lines: photoPageLines }} texOf={texOf} scoreShown={instrumentScore} criteria={res?.methodCriteria} reading={pageReading} onCorrect={onRedo ? correctReadLine : null} comments={lineComments} />
                 </React.Suspense>
               )}
               {photoSignInOpen && photoOCR.blockedKey === 'verdict.photoReadingSignIn' && (
@@ -3042,7 +3045,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           <>
           {inkPageOn && (
             <React.Suspense fallback={null}>
-              <MarkedPage input={awInput} source={{ kind: 'ink', strokes: latestInk.current || restoredInk || [] }} texOf={texOf} scoreShown={instrumentScore} criteria={res?.methodCriteria} reading={pageReading} onCorrect={onRedo ? correctReadLine : null} />
+              <MarkedPage input={awInput} source={{ kind: 'ink', strokes: latestInk.current || restoredInk || [] }} texOf={texOf} scoreShown={instrumentScore} criteria={res?.methodCriteria} reading={pageReading} onCorrect={onRedo ? correctReadLine : null} comments={lineComments} />
             </React.Suspense>
           )}
           <div className={`ink-row${awModel && !inkPageOn ? ' aw-row' : ''}`} hidden={inkPageOn || undefined}>

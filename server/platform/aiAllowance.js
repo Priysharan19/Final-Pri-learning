@@ -21,7 +21,7 @@ import { READ_ALLOWANCE } from '../../client/src/engine/practiceAllowance.js';
 // rate_limits rows older than 24 hours (housekeeping.js
 // RATE_BUCKET_MAX_WINDOW_MS); a longer window here would need that raised too.
 export const AI_WINDOW_MS = 24 * 60 * 60 * 1000;
-export const AI_KINDS = Object.freeze(['handwriting', 'working', 'question-photo']);
+export const AI_KINDS = Object.freeze(['handwriting', 'working', 'question-photo', 'comments']);
 // Handwriting (the `handwriting` kind): the unit is one ANSWER, not one read
 // (owner decision, 18 November 2026). The first paid read of an issued
 // question's answer in the day spends the unit; re-reads of the same answer
@@ -46,12 +46,15 @@ export const AI_KINDS = Object.freeze(['handwriting', 'working', 'question-photo
 export const AI_ALLOWANCE_DEFAULTS = Object.freeze({
   handwriting: Object.freeze({ free: READ_ALLOWANCE.free, premium: READ_ALLOWANCE.premium }),
   'question-photo': Object.freeze({ free: READ_ALLOWANCE.free, premium: READ_ALLOWANCE.premium }),
-  working: Object.freeze({ free: 120, premium: 1200 })
+  working: Object.freeze({ free: 120, premium: 1200 }),
+  // Marking comments (lineComments/): one unit per MARKED ANSWER, however many lines it has. A modelled
+  // default, to be revisited after real cost data. Dark: nothing spends it unless PRI_FEATURE_LINE_COMMENTS=1.
+  comments: Object.freeze({ free: 40, premium: 400 })
 });
 // Per-kind configuration. The older PRI_AI_DAILY_FREE / PRI_AI_DAILY_PREMIUM
 // still apply to every kind a per-kind variable does not set, so a deployment
 // (or a test suite) that raised them keeps what it set.
-const KIND_ENV = Object.freeze({ handwriting: 'HANDWRITING', 'question-photo': 'PHOTO', working: 'WORKING' });
+const KIND_ENV = Object.freeze({ handwriting: 'HANDWRITING', 'question-photo': 'PHOTO', working: 'WORKING', comments: 'COMMENTS' });
 export const AI_ALLOWANCE_ENV = Object.freeze(Object.fromEntries(AI_KINDS.map(kind => [kind, Object.freeze({
   free: `PRI_AI_DAILY_FREE_${KIND_ENV[kind]}`, premium: `PRI_AI_DAILY_PREMIUM_${KIND_ENV[kind]}`
 })])));
@@ -121,7 +124,7 @@ export async function refundAiAllowance(db, verdict) {
   await asStore(db).run('UPDATE rate_limits SET count = count - 1 WHERE bucket = ? AND window_start = ? AND count > 0', [verdict.bucket, verdict.windowStart]);
 }
 
-const WHAT = Object.freeze({ handwriting: 'handwritten answers', 'question-photo': 'question photos', working: 'working checks' });
+const WHAT = Object.freeze({ handwriting: 'handwritten answers', 'question-photo': 'question photos', working: 'working checks', comments: 'marking comments' });
 
 /** "in about 23 hours" / "in about 40 minutes": how long until a window renews. */
 export function renewsIn(resetAt, now = Date.now()) {

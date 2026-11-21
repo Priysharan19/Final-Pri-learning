@@ -307,6 +307,8 @@ const EXPORT_BODY_SCOPES = new Set([
   'practice-reveal', 'practice-hints', 'practice-tries', 'practice-issue', 'practice-prepared', 'practice-daily', 'practice-content',
   // The tutor policy's offers on an item (helpPlan.js): what the student was shown.
   'practice-help-plan',
+  // The comments written on a marked answer, with who wrote them (lineComments/route.js).
+  'practice-line-comments',
   // Sitting an exam paper in the app (paperAttempts.js): what the sitting was, what the student wrote and the result.
   // None holds a key or a sample answer: those are read from the content files, never stored with the sitting.
   'paper-sitting', 'paper-answers', 'paper-result'

@@ -3225,6 +3225,29 @@
     },
     {
       "method": "POST",
+      "path": "/v1/practice/:id/line-comments",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "Answers 200 {enabled:false, comments:[]} before reading anything unless the server sets PRI_FEATURE_LINE_COMMENTS=1 (dark by default: no provider call, no allowance unit, nothing stored). On, the student owns the RESOLVED attempt (escrow, completion and grade rows keyed by this account; another account's, an unknown, an unresolved or an invalid attempt is the same 404 or an empty reply). The body names only the attempt and the language; the engine's step report, the reading's line states, the question and its released solution are read from the server's own stored records, never from the request. A model writes one comment for each line the engine gave a final verdict (a tick or a cross with a state, never a note that Pri could not check the line), and every comment is held to the engine's rules after generation (a comment that breaks one is dropped, so the page keeps the engine's own sentence); no mark, tick, cross or note is ever changed. One allowance unit (kind comments) per marked answer in front of the deployment's paid-call ceiling; the result is stored with the attempt (scope practice-line-comments, in the account export) and reused, so a re-request spends nothing.",
+      "rateLimits": [
+        {
+          "key": "practice-line-comments",
+          "limit": 240,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
       "path": "/v1/practice/:id/repeat",
       "auth": "session",
       "roles": [
