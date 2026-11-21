@@ -92,7 +92,9 @@ export const GUEST_DEFAULTS = Object.freeze({
   prefixDayLimit: 60,
   prefixMintDayLimit: 24,
   // Per address and hour, across all guest routes (the route limiter below).
-  routeHourLimit: 240,
+  routeHourLimit: 120,
+  // The worked steps: up to a dozen requests a question, so their own counter, apart from the route limit above.
+  stepsHourLimit: 240,
   // A question cannot be answered faster than a person can read it. Scripts
   // that issue-and-answer in a loop pay this wait on every question.
   minAnswerMs: 2000,
@@ -127,18 +129,40 @@ export function formIndexOf(generator, seed) {
 }
 export const formCountOf = generator => formDrawShares(generator)?.length || 1;
 
-const bareText = text => String(text ?? '').replace(/\\(?:Rightarrow|rightarrow|implies|therefore)/g, '⇒').replace(/\\(?:dfrac|frac|left|right)/g, '').replace(/[\s$]/g, '').replace(/[−–]/g, '-').replace(/\.$/, '').toLowerCase();
+const bareText = (text, keepSpaces = false) => String(text ?? '')
+  .replace(/\\(?:Rightarrow|rightarrow|implies|therefore)/g, '⇒')
+  .replace(/([\^_])\s*\{([^{}]*)\}/g, '$1$2')
+  .replace(/\\d?frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, '$1/$2')
+  .replace(/\\sqrt\s*\{([^{}]*)\}/g, '√$1')
+  .replace(/\^\s*\\circ/g, '°').replace(/\\circ/g, '°')
+  .replace(/\\(?:times|cdot)/g, '×').replace(/\\pi\b/g, 'π')
+  .replace(/\\[a-zA-Z]+|\\[,;! ]/g, ' ').replace(/[{}$]/g, ' ')
+  .replace(/\s+/g, keepSpaces ? ' ' : '').trim().replace(/[−–]/g, '-').replace(/\s*\+\s*-/g, '-').replace(/\.$/, '').toLowerCase();
 const escapeRe = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/** Everything a step must not state before the answer is released: the displayed answer, its value, its canonical input, and each solution of a set. */
+function answerTokens(q, keep) {
+  const text = bareText(answerTextFor(q), keep);
+  const value = text.replace(/^[a-z]'?(\([a-z0-9]\))?\s*=\s*/, '');
+  const out = new Set([text, value, bareText(q?.answer?.canonicalInput, keep)]);
+  out.add(value.replace(/^[×*·]\s*/, ''));
+  const num = value.match(/^-?\d+(?:\.\d+)?(?![\d.a-z])/)?.[0];
+  if (num) out.add(num);
+  for (const part of value.replace(/[()[\]]/g, '').split(/[,;]|\bor\b|\band\b/)) out.add(part.trim().replace(/^[a-z]'?\s*=\s*/, ''));
+  return [...out].filter(Boolean);
+}
 /**
- * Whether a step's working ends on the answer: its last equation is the answer ("k = 1", "-2 + k = -1 ⇒ k = 1", or the answer alone).
- * Such a step is the answer, whatever it is headed, so showing it ends the question as the answer does.
+ * Whether a step states the answer anywhere in its working or heading, as a whole token (not inside a longer number): showing it releases the answer, so it ends the question as the answer does. Deliberately conservative: a middle
+ * step that merely contains a number equal to the answer closes the question there, and a step this cannot decide is treated as stating it.
  */
-function statesAnswer(step, answerText) {
-  const d = bareText(step?.d), key = bareText(answerText);
-  if (!d || !key) return false;
-  const value = key.replace(/^[a-z]'?(\([a-z0-9]\))?=/, '');
-  if (d === key || d === value) return true;
-  return new RegExp(`(^|[⇒;,])[a-z][^=+\\-*/^]{0,7}=${escapeRe(value)}$`).test(d);
+function statesAnswer(step, q) {
+  if (!answerTokens(q, false).length) return true;
+  return [false, true].some(keep => {
+    const tokens = answerTokens(q, keep);
+    return [step?.d, step?.h].some(raw => {
+      const text = bareText(raw, keep);
+      return text !== '' && tokens.some(t => new RegExp(`(?<![0-9.])${escapeRe(t)}(?![0-9.])`).test(text));
+    });
+  });
 }
 
 /** The worked steps a guest may be shown: heading and working only (a figure is not part of the trial), or [] when there is no safe first step. */
@@ -151,13 +175,13 @@ export function guestSteps(q) {
   out = out.slice(0, MAX_STEPS);
   if (out.length < 2) return [];   // a one-step solution is the answer itself: no retry is offered
   // A first step whose working ends on the answer is not a step toward it: the question resolves as it always did.
-  if (statesAnswer(out[0], answerTextFor(q))) return [];
+  if (statesAnswer(out[0], q)) return [];
   return out;
 }
 
 /** The 1-based step at which the answer is released: the first step that states it, else the answer after the last step. */
 export function closingStepOf(q, steps = guestSteps(q)) {
-  const at = steps.findIndex(step => statesAnswer(step, answerTextFor(q)));
+  const at = steps.findIndex(step => statesAnswer(step, q));
   return at === -1 ? steps.length + 1 : at + 1;
 }
 
@@ -238,8 +262,8 @@ export function createGuestTrialRouter(db, { env = process.env, banks = bankPoli
   // of an address (the shared limiter's names are a plain sha256, which an IPv4
   // address can be recovered from).
   const routeWindow = 60 * 60 * 1000;
-  const perAddress = tagPolicy(asyncHandler(async (req, res, next) => {
-    const verdict = await consumeRateLimit(db, `guest-route:${scramble(`route:${clientIdentity(req)}`)}`, { limit: L.routeHourLimit, windowMs: routeWindow }, clock());
+  const routeLimiter = (name, limit) => tagPolicy(asyncHandler(async (req, res, next) => {
+    const verdict = await consumeRateLimit(db, `${name}:${scramble(`${name === 'guest-route' ? 'route' : name}:${clientIdentity(req)}`)}`, { limit, windowMs: routeWindow }, clock());
     res.set('RateLimit-Remaining', String(verdict.remaining));
     res.set('RateLimit-Reset', String(Math.ceil(verdict.resetAt / 1000)));
     if (!verdict.allowed) {
@@ -247,7 +271,9 @@ export function createGuestTrialRouter(db, { env = process.env, banks = bankPoli
       return res.status(429).json({ error: { code: 'RATE_LIMITED', message: 'Too many requests. Try again later.' } });
     }
     next();
-  }), { rateLimit: { key: 'guest-route', limit: L.routeHourLimit, windowMs: routeWindow } });
+  }), { rateLimit: { key: name, limit, windowMs: routeWindow } });
+  const perAddress = routeLimiter('guest-route', L.routeHourLimit);
+  const stepsPerAddress = routeLimiter('guest-steps', L.stepsHourLimit);
 
   /**
    * Spend one unit from each counter in turn; if any refuses, give back what was
@@ -326,7 +352,7 @@ export function createGuestTrialRouter(db, { env = process.env, banks = bankPoli
       if (!opened) return undefined;
       if (opened.ticket.g !== generator || opened.ticket.d !== difficulty) return reject(res, 400, 'GUEST_QUESTION_INVALID', 'This question is not valid.');
       const k = names(opened.ticket);
-      if (!(await live(k.done, opened.now)) && !(await live(k.wrong, opened.now))) return reject(res, 409, 'GUEST_NOT_ANSWERED', 'Answer the question first.');
+      if (!(await live(k.done, opened.now))) return reject(res, 409, 'GUEST_NOT_ANSWERED', 'Finish the question first.');
       like = { form: formIndexOf(generator, opened.ticket.s), seed: opened.ticket.s };
     }
     // An edition's own banks only; and nothing premium or archival for a guest.
@@ -421,6 +447,8 @@ export function createGuestTrialRouter(db, { env = process.env, banks = bankPoli
   // The keyed counters of one question: closed, first verdict wrong (the one retry is open), steps released.
   const names = ticket => ({
     done: `guest-done:${scramble(`q:${ticket.n}`)}`,
+    first: `guest-first:${scramble(`q:${ticket.n}`)}`,
+    retry: `guest-retry:${scramble(`q:${ticket.n}`)}`,
     wrong: `guest-wrong:${scramble(`q:${ticket.n}`)}`,
     steps: `guest-steps:${scramble(`q:${ticket.n}`)}`
   });
@@ -471,14 +499,26 @@ export function createGuestTrialRouter(db, { env = process.env, banks = bankPoli
     const q = await rebuild(ticket);
     if (!q) return reject(res, 422, 'GUEST_QUESTION_INVALID', 'This question is not valid.');
 
-    const marked = await markerPool().run('practice', { q, answer: body.answer, working: '', evidenceIfWrong: false }, { key: `guest:${req.guest.id}` });
+    // ONE claim per verdict, taken BEFORE marking: exactly one request wins the first verdict of a ticket, and (after a wrong
+    // first verdict) exactly one wins the retry. Any request that arrives while the claim is held, or after it is spent, is
+    // refused, so parallel guesses cannot each be marked, and "right first time" belongs only to the holder of the first claim.
+    const turn = retrying ? key.retry : key.first;
+    const held = await consumeRateLimit(db, turn, { limit: 1, windowMs: DAY }, now);
+    if (!held.allowed) return reject(res, 409, 'GUEST_ALREADY_ANSWERED', 'This question has already been answered.');
+    // An entry that gives no verdict gives the claim back (the visitor may correct it).
+    const giveBack = () => db.run('UPDATE rate_limits SET count = count - 1 WHERE bucket = ? AND count > 0', [turn]);
+    let marked;
+    try { marked = await markerPool().run('practice', { q, answer: body.answer, working: '', evidenceIfWrong: false }, { key: `guest:${req.guest.id}` }); }
+    catch (error) { await giveBack(); throw error; }
     res.set('Cache-Control', 'no-store');
     if (!marked.ok) {
+      await giveBack();
       if (marked.code === MARKING_BUSY) return reject(res, 503, 'MARKING_BUSY', 'Marking is busy. Try again in a moment.');
       return res.status(200).json({ invalid: true, tooComplex: true, resolved: false });
     }
     const result = marked.value.result;
     if (result.invalid === true) {
+      await giveBack();
       // Not a verdict and nothing about the answer key: the entry could not be read.
       return res.status(200).json({ invalid: true, resolved: false, feedback: typeof result.feedback === 'string' ? result.feedback.slice(0, 300) : null });
     }
@@ -507,7 +547,7 @@ export function createGuestTrialRouter(db, { env = process.env, banks = bankPoli
   // open, or closed). Step k is released only after step k-1; the step after the
   // last is the answer, and releasing it, or any step that states it, closes the question (no retry after).
   // Asking again for a step already released re-reads it and costs nothing.
-  router.post('/steps', perAddress, guestCsrf, asyncHandler(async (req, res) => {
+  router.post('/steps', stepsPerAddress, guestCsrf, asyncHandler(async (req, res) => {
     const body = req.body;
     if (!plain(body) || Object.keys(body).some(k => !['sealed', 'step'].includes(k)) || typeof body.sealed !== 'string' || body.sealed.length > 2000
       || !Number.isInteger(body.step) || body.step < 1 || body.step > MAX_STEPS + 1) {

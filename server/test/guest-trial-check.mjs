@@ -36,7 +36,7 @@ const { GUEST_LIMIT, GUEST_DEFAULTS, GUEST_CSRF_HEADER, guestSteps, closingStepO
 const { encryptDeliveryToken } = await import('../platform/deliveryCrypto.js');
 await loadAllBanks();
 
-const h = await startApp({ engine: requestedEngine(), guest: { limits: { minAnswerMs: 0, mintDayLimit: 100, ipDayLimit: 1000 } } });
+const h = await startApp({ engine: requestedEngine(), guest: { limits: { minAnswerMs: 0, mintDayLimit: 5000, ipDayLimit: 100000, prefixMintDayLimit: 5000, prefixDayLimit: 100000, routeHourLimit: 1000000, stepsHourLimit: 1000000 } } });
 // A second server with the shipped address limits, for the rotation checks.
 const hl = await startApp({ engine: requestedEngine(), guest: { limits: { minAnswerMs: 0 } } });
 const c = checks();
@@ -401,11 +401,50 @@ try {
     // a one-step solution, or a first step that states the answer, is not given a retry
     const fake = (stepsList, answerValue) => ({ answerType: 'numeric', answer: { value: answerValue, canonicalInput: String(answerValue) }, steps: stepsList });
     c.deq(guestSteps(fake([{ h: 'Solve', d: '$x = 4$' }], 4)), [], 'one step: no retry');
-    const ends = list => closingStepOf(fake(list, 1), list);
-    c.deq([ends([{ h: 'a', d: '$3 + 2x = 1$' }, { h: 'b', d: '$x = 1$' }, { h: 'c', d: '$y = 2$' }]), ends([{ h: 'a', d: '$2x = 1$' }, { h: 'b', d: '$x + 1 = 2$' }]), ends([{ h: 'a', d: '$2x = 1$' }, { h: 'b', d: '$x - 1 = -1 \\Rightarrow x = 1$' }])], [2, 3, 2], 'the step whose working ends on the answer is the one that releases it; an intermediate equation that happens to end on the same number is not');
+    const ends = list => closingStepOf(fake(list, 7), list);
+    c.deq([ends([{ h: 'a', d: '$3 + 2x = 11$' }, { h: 'b', d: '$x = 7$' }, { h: 'c', d: '$y = 2$' }]), ends([{ h: 'a', d: '$2x = 14$' }, { h: 'b', d: '$x + 1 = 8$' }]), ends([{ h: 'a', d: '$2x = 14$' }, { h: 'b', d: '$x - 1 = 6 \\Rightarrow x = 7$' }]), ends([{ h: 'a', d: '$2x = 14$' }, { h: 'b', d: '$7 \\times 2 = 14$' }, { h: 'c', d: '$x = 7$' }])], [2, 3, 2, 2], 'the first step that states the answer anywhere in its working releases it, so it closes the question; a step that does not state it does not');
     c.deq(guestSteps(fake([{ h: 'Solve', d: '$x = 4$' }, { h: 'Check', d: '$4 + 1 = 5$' }], 4)), [], 'a first step that ends on the answer: no retry');
     c.eq(guestSteps(fake([{ h: 'Subtract', d: '$2x = 8$' }, { h: 'Divide', d: '$x = 4$' }], 4)).length, 2, 'a first step that stops short of the answer is released');
     c.deq(guestSteps(fake([{ h: 'a', d: 'b', figure: '<svg/>' }, { h: 'c', d: 'd' }], 99)).map(x => Object.keys(x).sort()), [['d', 'h'], ['d', 'h']], 'a figure is never part of a guest step');
+
+    // parallel guesses at one ticket: ONE first verdict, at most one retry, "right first time" only for the single first-verdict winner
+    const race = async (size, mix, reps = 20) => {
+      const outcomes = [];
+      for (let rep = 0; rep < reps; rep++) {
+        const R = await issue();
+        const bodies = Array.from({ length: size }, (_, i) => (mix === 'wrong' ? wrongOf(String(i)) : mix === 'right' ? R.k.text : i === size - 1 ? R.k.text : wrongOf(String(i))));
+        const replies = await Promise.all(bodies.map(text => answer(R.t, R.sealed, text)));
+        const oks = replies.filter(r => r.status === 200 && !r.data.invalid && !r.data.replayed).map(r => r.data);
+        const retries = oks.filter(d => d.retry === true);
+        const firstTime = oks.filter(d => d.correct === true && d.assisted === false);
+        const stepOnes = oks.filter(d => d.step && d.shown === 1);
+        const rows = Object.fromEntries((await store.all("SELECT bucket, count FROM rate_limits WHERE bucket LIKE 'guest-first:%' OR bucket LIKE 'guest-retry:%'")).map(r => [r.bucket.split(':')[0], Number(r.count)]));
+        outcomes.push(oks.length >= 1 && oks.length <= 2 && retries.length <= 1 && stepOnes.length <= 1
+          && (firstTime.length === 0 || (oks.length === 1 && retries.length === 0))
+          && replies.every(r => [200, 409].includes(r.status)) && (rows['guest-first'] ?? 0) <= 1 && (rows['guest-retry'] ?? 0) <= 1);
+        await store.run("DELETE FROM rate_limits WHERE bucket LIKE 'guest-first:%' OR bucket LIKE 'guest-retry:%'");
+      }
+      return outcomes.every(Boolean);
+    };
+    for (const size of [3, 4, 20]) for (const mix of ['wrong', 'mixed', 'right']) {
+      c.eq(await race(size, mix), true, `${size} parallel answers (${mix}), 20 times: one first verdict, at most one retry, step 1 once, first-time credit only to the single first-verdict winner`);
+    }
+    // multiple choice: all four options fired at once cannot buy first-time credit by guessing
+    {
+      const outcomes = [];
+      for (let rep = 0; rep < 20; rep++) {
+        let M = null;
+        for (const generator of [...GENERATORS, 'c7-number-play-current', 'c7-fractions-current', 'c7-letter-numbers-current', 'c7-decimal-operations-current']) { const t = await start(); const r = await question(t, { generator, form: 'choice', difficulty: 2 }); if (r.status === 201) { M = { t, r }; break; } }
+        if (!M) break;
+        const k = answerKeyOf(M.r.data.sealed);
+        const replies = await Promise.all([0, 1, 2, 3].map(i => answer(M.t, M.r.data.sealed, String(i))));
+        const oks = replies.filter(x => x.status === 200 && !x.data.invalid).map(x => x.data);
+        const firstTime = oks.filter(d => d.correct === true && d.assisted === false);
+        outcomes.push(oks.length <= 2 && firstTime.length <= 1 && (firstTime.length === 0 || oks.length === 1) && oks.filter(d => d.retry).length <= 1);
+        void k;
+      }
+      c.eq(outcomes.length > 0 && outcomes.every(Boolean), true, 'all four options of a multiple-choice question fired at once, 20 times: at most one first verdict, and a lucky option is first-time only if it alone was marked');
+    }
 
     // a stale content version is refused as before, for a step and for "one like it"
     const stale = tk => encryptDeliveryToken(JSON.stringify({ ...JSON.parse(decryptDeliveryToken(tk, 'guest-question-v1')), c: '2020.01.01' }), 'guest-question-v1');
@@ -418,7 +457,7 @@ try {
     c.eq((await post('/v1/guest/question', ASK({ like: stale(G.sealed) }), G.t.jar, G.t.headers)).status, 410, 'and for "one like it"');
 
     // think time and the per-address route limit still bind the new route
-    const hs = await startApp({ engine: requestedEngine(), guest: { limits: { mintDayLimit: 100, ipDayLimit: 100, routeHourLimit: 6 } } });
+    const hs = await startApp({ engine: requestedEngine(), guest: { limits: { mintDayLimit: 100, ipDayLimit: 100, stepsHourLimit: 6 } } });
     try {
       const sp = (path, body, jar, headers = {}) => hs.request(path, { method: 'POST', jar, body, headers });
       const jar = {}; const sess = await sp('/v1/guest/session', {}, jar); const hd = { [GUEST_CSRF_HEADER]: sess.data.csrf };
@@ -438,6 +477,9 @@ try {
     c.ok(formsSeen.size > 1, 'the form index varies with the seed');
     const L1 = await issue(multi, 2);
     await answer(L1.t, L1.sealed, wrongOf(L1.k.text));
+    const early2 = await post('/v1/guest/question', ASK({ generator: multi, difficulty: 2, like: L1.sealed }), L1.t.jar, L1.t.headers);
+    c.deq([early2.status, early2.data.error.code], [409, 'GUEST_NOT_ANSWERED'], '"one like it" is refused while the retry is still open: the question must be closed first');
+    await answer(L1.t, L1.sealed, wrongOf(wrongOf(L1.k.text)));
     const usedBefore = (await post('/v1/guest/session', {}, L1.t.jar)).data.used;
     const prevForm = formIndexOf(multi, L1.k.t.s);
     let differing = 0, total = 0, noLike = null;
@@ -448,6 +490,7 @@ try {
     c.eq((await post('/v1/guest/question', ASK({ generator: GENERATORS[0], difficulty: 2, like: L1.sealed }), L1.t.jar, L1.t.headers)).status, 400, '"one like it" must be the same skill and level as the question answered');
     const single = await issue(GENERATORS[0], 2);
     await answer(single.t, single.sealed, wrongOf(single.k.text));
+    await answer(single.t, single.sealed, wrongOf(wrongOf(single.k.text)));
     const likeSingle = await post('/v1/guest/question', ASK({ like: single.sealed }), single.t.jar, single.t.headers);
     c.deq([likeSingle.status, likeSingle.data.like.differentForm], [201, false], 'a skill with one form still offers another question and says it is not a different form');
     c.ok(answerKeyOf(likeSingle.data.sealed).t.s !== single.k.t.s, 'a different question');
@@ -455,6 +498,7 @@ try {
     let lastSealed = null;
     for (let i = 0; i < 5; i++) { const r = await question(full, { generator: multi, difficulty: 2 }); lastSealed = r.data.sealed; }
     await answer(full, lastSealed, '987654321');
+    await answer(full, lastSealed, '987654322');
     const none = await post('/v1/guest/question', ASK({ generator: multi, difficulty: 2, like: lastSealed }), full.jar, full.headers);
     c.deq([none.status, none.data.error.code], [429, 'GUEST_LIMIT_REACHED'], '"one like it" is refused when no question is left today');
   }

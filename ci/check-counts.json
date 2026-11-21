@@ -491,7 +491,8 @@
       "job": "platform-contracts",
       "log": "guest-trial.log",
       "pins": [
-        {"has":"✓ guest-trial-check.mjs (166 checks)","note":"ADR-0003, the guest trial over real HTTP; 103 -> 166: worked steps after a wrong answer, one retry, one like it (re-derived by running)."},
+        {"has":"✓ guest-trial-check.mjs (177 checks)","note":"ADR-0003, the guest trial over real HTTP; 103 -> 177: worked steps after a wrong answer, one retry, one like it, parallel-guess races (re-derived by running)."},
+        {"has":"✓ guest-steps-leak-check.mjs (3 checks)","note":"No worked step that states the answer is released while the retry is open, over every guest-issuable chapter and level of both editions, 20 seeds each (3 checks; added by the worked-steps flow)."},
         {"has":"✓ guest-menu-issuable-check.mjs (3981 checks)","note":"Everything the guest picker lists, in both editions, is a request the edition's server issues (3981, re-derived by running; it follows the number of listed chapter-and-level cells)."}
       ]
     },
