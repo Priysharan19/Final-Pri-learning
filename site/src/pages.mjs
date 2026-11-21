@@ -329,7 +329,7 @@ export function homePage({ docs }) {
     <div>
       <p class="eyebrow">Maths practice · India · Coming soon</p>
       <h1 id="hero-title">Write the maths by hand. Pri checks the answer.</h1>
-      <p class="lede">Maths practice for <b>CBSE / NCERT Classes 7 to 12, JEE Main and JEE Advanced</b>. Write your working with an Apple Pencil or a finger, or type it. The mark is decided by a fixed set of mathematical rules, not by an AI model — and it can be wrong.</p>
+      <p class="lede">Maths practice for <b>CBSE / NCERT Classes 7 to 12, JEE Main and JEE Advanced</b>. Write your working with an Apple Pencil or a finger, or type it. The mark is decided by a fixed set of mathematical rules, not by an AI model, and it can be wrong.</p>
       <p class="status"><i aria-hidden="true"></i><span>Coming soon on the App Store for iPhone and iPad, in India.</span><small>Android later.</small></p>
       <p class="hero-links"><a href="#marking">How a question is marked</a><a href="#coverage">What it covers</a><a href="${r.privacy}">Privacy notice</a></p>
     </div>
@@ -428,7 +428,7 @@ export function homePage({ docs }) {
   return page({
     lang: 'en',
     path: '/',
-    title: 'Pri Learning — maths practice for CBSE / NCERT and JEE, marked by rule',
+    title: 'Pri Learning: maths practice for CBSE / NCERT and JEE, marked by rule',
     description: 'Maths practice for CBSE / NCERT Classes 7 to 12, JEE Main and JEE Advanced. Write by hand or type; the mark is decided by a fixed set of mathematical rules, not an AI model, and it can be wrong. Coming soon for iPhone and iPad in India.',
     alternate: null,
     body,
