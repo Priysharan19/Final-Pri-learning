@@ -263,23 +263,13 @@ function readStudent(text) {
   return { parts, ctx, continuation, raw: t };
 }
 
-const canon = s => tidy(s).replace(/\s+/g, '').replace(/[{}]/g, '').replace(/\*/g, '');
+// Restating the question is STRUCTURAL: the same tokens, differing only in spaces, bracket style, `*` and a unicode minus. Two
+// things that merely evaluate alike (f^(-2)(0) and f^(-1)(0) when f is read as a product) are never the same statement.
+const canon = s => tidy(s).replace(/\s+/g, '').replace(/[{}]/g, '').replace(/\[/g, '(').replace(/\]/g, ')').replace(/\^\(([^()]*)\)/g, '^$1').replace(/\*/g, '');
 function sameAsPromptStatement(parts, prompt) {
   for (const s of prompt) {
     if (s.parts.length !== parts.length) continue;
-    if (parts.length === 1) {
-      if (canon(parts[0]) === canon(s.parts[0])) return true;
-      const a = readSide(parts[0]), b = readSide(s.parts[0]);
-      if (a && b && !/^-?[\d.]+$/.test(parts[0]) && sameSide(a, b, parts[0], s.parts[0])) return true;
-    } else {
-      let all = true;
-      for (let k = 0; k < 2 && all; k++) {
-        if (canon(parts[k]) === canon(s.parts[k])) continue;
-        const a = readSide(parts[k]), b = readSide(s.parts[k]);
-        all = !!(a && b && sameSide(a, b, parts[k], s.parts[k]));
-      }
-      if (all) return true;
-    }
+    if (parts.every((p, k) => canon(p) === canon(s.parts[k]))) return true;
   }
   return false;
 }
@@ -383,7 +373,11 @@ function run(q, report) {
     }
     if (!tick && s.multi) {
       // several statements on one line: the line is ticked only when EVERY one qualifies (restates the question, or matches a step)
-      const each = s.multi.map(ps => ({ hit: matchEquation(ps, sol, null), given: unjudged && sameAsPromptStatement(ps, prompt) }));
+      // statements that give one name two different values contradict each other: the line is not ticked
+      const seen = new Map();
+      let clash = false;
+      for (const ps of s.multi) { const key = canon(ps[0]), v = ps.slice(1).map(x => numericOf(x) ?? canon(x)).join('|'); const was = seen.get(key); if (was !== undefined && was !== v) clash = true; seen.set(key, v); }
+      const each = clash ? [{ hit: null, given: false }] : s.multi.map(ps => ({ hit: matchEquation(ps, sol, null), given: unjudged && sameAsPromptStatement(ps, prompt) }));
       if (each.every(x => x.hit || x.given)) {
         const first = each.find(x => x.hit);
         if (first) hit = first.hit; else tick = { state: 'given', note: NOTE_GIVEN };

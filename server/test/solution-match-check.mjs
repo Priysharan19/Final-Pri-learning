@@ -25,6 +25,7 @@ const evidence = (q, lines, opts = {}) => {
   return { on: stepEvidence(q, '', w, result, opts), off: stepEvidence(q, '', w, { correct: false }, { ...opts, solutionMatch: false }), result };
 };
 const mulberry = a => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+const canon0 = x => String(x).replace(/[\s{}*]/g, '').replace(/\^\(([^()]*)\)/g, '^$1');
 const ids = Object.keys(G.GENERATORS).sort();
 
 /** The lines of a worked solution as a student would write them: each `$…$` statement of each step, in order. */
@@ -244,6 +245,34 @@ const MUTATIONS = {
     for (const line of pageLines) { n++; const r = evidence(q, [line]).on.stepReport; if (r && r.lines[0].status === 'ok' && r.lines[0].solutionMatch) bad.push(`${id}: ${line}`); }
   }
   ok(n >= 8 && bad.length === 0, `the reviewer's look-alikes are not ticked (${n} lines; ${bad.join(' | ')})`);
+}
+
+// ── restating is structural; contradictory statements on one line ─────────────────────────────────────────────────────────
+{
+  const q = generate('me11-functions', 2, 17);
+  const rep = lines => solutionMatch(q, { lines: lines.map(text => ({ text, status: 'note', state: 'unverified', note: 'n' })), firstBreak: -1 }).report.lines;
+  ok(q && rep(['f^(-2)(0)'])[0].status === 'note', 'f^(-2)(0) is not a restatement of f^(-1)(0)');
+  ok(rep(['f^(-1)(0)'])[0].status === 'ok' && rep(['f^(-1)(0)'])[0].state === 'given' && rep(['f^{-1}(0)'])[0].state === 'given', 'f^(-1)(0) restates the question, in either bracket style');
+  const q2 = generate('c11-inequality-region-jee-reasoning', 1, 29);
+  const two = q2 ? solutionMatch(q2, { lines: [{ text: 'x=4, x = 4 + 3', status: 'note', state: 'unverified', note: 'n' }], firstBreak: -1 }) : { matched: 0 };
+  ok(two.matched === 0, 'two statements giving x two values are not ticked');
+  // 200 generated prompts, one digit, one exponent or one sign changed
+  let n = 0, bad = [], gens = new Set();
+  for (let round = 0; round < 8 && n < 400; round++) for (const id of ids) {
+    const qq = generate(id, 1 + round % 4, 3 + round * 17); if (!qq) continue;
+    const spans = [...String(qq.prompt).matchAll(/\$([^$]+)\$/g)].map(m => I.spanToPlain(m[1])).filter(p => p && !/,/.test(p));
+    for (const p of spans) {
+      const muts = [p.replace(/\d(?!.*\d)/, c => String((Number(c) + 1) % 10)), p.replace(/\^\(?(\d)\)?/, (m, c) => `^${(Number(c) + 1) % 10}`), p.replace(/([+\-])(?=\s*[\dA-Za-z(])/, m => (m === '+' ? '-' : '+'))];
+      for (const m of muts) {
+        if (m === p || spans.some(x => canon0(x) === canon0(m))) continue;
+        n++; gens.add(id);
+        const r = solutionMatch(qq, { lines: [{ text: m, status: 'note', state: 'unverified', note: 'n' }], firstBreak: -1 }).report.lines[0];
+        if (r.state === 'given') bad.push(`${id}: ${m}`);
+      }
+    }
+  }
+  ok(n >= 200 && gens.size >= 40 && bad.length === 0, `changed prompt expressions never restate the question (${n} cases, ${gens.size} generators, ${bad.length} ticked: ${bad.slice(0, 3).join(' | ')})`);
+  console.log(`restatement: ${n} changed-prompt cases from ${gens.size} generators, ${bad.length} ticked`);
 }
 
 // ── c · the battery ──────────────────────────────────────────────────────────
