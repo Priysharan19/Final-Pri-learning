@@ -67,6 +67,7 @@ if (typeof globalThis.document === 'undefined') {
 
 const en = (await import('../src/i18n/strings.en.js')).default;
 const hi = (await import('../src/i18n/strings.hi.js')).default;
+const { FREE_LAUNCH } = await import('../src/platform/launchPolicy.js');
 const access = await import('../src/components/checkAccess.js');
 const { CHECK_REFUSAL, checkRefusal, checkRefusalCopy, needsAccountToCheck, refusedCheckState, retryActionFor, serverRevealReceipt, legacyDeviceReplay } = access;
 const { matchingGradeResponse, attestedGrade } = await import('../src/components/authoritativeGrade.js');
@@ -154,6 +155,7 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
   eq(checkRefusalCopy('sign-in', 'game').contextKey, 'check.gameNotStarted', 'a game that could not start says so, and that nothing was marked');
   eq(checkRefusalCopy('reconnect', 'placement').contextKey, 'check.placementNotStarted', 'a placement check that could not start says so');
   eq(checkRefusalCopy('nonsense'), null, 'an unknown reason has no words');
+  if (FREE_LAUNCH) used.add('check.freeLaunchCapHint');
   const catalogueKeys = Object.keys(en).filter(k => k.startsWith('check.'));
   eq(catalogueKeys.filter(k => !used.has(k)), [], 'no check.* string is unused');
   for (const key of catalogueKeys) {
@@ -397,10 +399,10 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
     ok(new RegExp(`<button[^>]*data-check-next[^>]*>${en['practice.nextQuestion']}</button>`).test(unavailable) && /data-check-retry/.test(unavailable), 'question: Next question, or try again');
     ok(!/data-check-next/.test(reconnect), 'only that reason offers to leave the question');
     const freeCap = refusal('free-cap');
-    ok(freeCap.includes(en['check.freeCapTitle']) && freeCap.includes(en['check.notChecked']) && freeCap.includes(en['check.freeCapHint']),
+    ok(freeCap.includes(en['check.freeCapTitle']) && freeCap.includes(en['check.notChecked']) && freeCap.includes(en[FREE_LAUNCH ? 'check.freeLaunchCapHint' : 'check.freeCapHint']),
       'free cap: today\'s free questions are used up, the answer was not checked, and when they come back');
-    ok(/<a[^>]*href="\/settings#cloud-account-title"[^>]*>See Premium<\/a>/.test(freeCap) && !/data-check-retry|data-check-sign-in|data-check-next/.test(freeCap),
-      'free cap: See Premium is the one next step — no retry (the day does not change), no sign-in, no next question (capped the same way)');
+    ok((FREE_LAUNCH ? !/See Premium|href="\/settings#cloud-account-title"/.test(freeCap) : /<a[^>]*href="\/settings#cloud-account-title"[^>]*>See Premium<\/a>/.test(freeCap)) && !/data-check-retry|data-check-sign-in|data-check-next/.test(freeCap),
+      'free cap: free launch has no Premium route; paid mode retains it; neither offers invalid retry, sign-in or next question');
     for (const kind of Object.values(CHECK_REFUSAL)) {
       const html = refusal(kind);
       ok(new RegExp(`data-check-refusal="${kind}"`).test(html) && !/marks|XP|Correct|solution/i.test(html.replace(/<[^>]+>/g, ' ')), `${kind}: the refusal shows no verdict, marks, XP or solution`);
