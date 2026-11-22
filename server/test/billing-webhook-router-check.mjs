@@ -223,7 +223,7 @@ try {
   });
   check(browserNoOrigin.status === 403 && (await browserNoOrigin.json()).error.code === 'ORIGIN_REJECTED', 'a browser-shaped request without the app Origin never reaches the purchase verifier');
   const bootstrap = await fetch(`${origin}/v1/billing/google/bootstrap`);
-  check(bootstrap.status === 401, `bootstrap needs a session (${bootstrap.status})`);
+  check(bootstrap.status === 404, `free launch must not expose Google store bootstrap (${bootstrap.status})`);
 
   console.log(`BILLING WEBHOOK ROUTER: PASS — ${checks}/${checks} checks — provider webhooks bypass browser Origin checks only on the signed server endpoint; unrelated verified events are acknowledged; browser billing mutations remain origin-protected.`);
 } finally {
