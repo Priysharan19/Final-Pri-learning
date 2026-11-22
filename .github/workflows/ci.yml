@@ -53,7 +53,11 @@ jobs:
       # from GitHub's checked-out exact PR head, without touching academic rules.
       - name: Regenerate examiner dossier for independent comparison (B3)
         if: always() && matrix.shard == 4
-        run: node tools/examiner-dossier.mjs
+        run: |
+          node tools/examiner-dossier.mjs
+          echo 'B3_DOSSIER_BASE64_BEGIN'
+          base64 -w 180 docs/marking/order14-examiner-certification-dossier.md
+          echo 'B3_DOSSIER_BASE64_END'
       - name: Upload canonical examiner dossier (B3)
         if: always() && matrix.shard == 4
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
