@@ -31,7 +31,7 @@ import { createHmac } from 'node:crypto';
 // ─────────────────────────────────────────────────────────────────────────────
 
 const envNames = [
-  'NODE_ENV', 'PRI_PUBLIC_ORIGIN', 'PRI_AUTH_DELIVERY_KEY',
+  'NODE_ENV', 'PRI_TEST_PAID_MODE', 'PRI_PUBLIC_ORIGIN', 'PRI_AUTH_DELIVERY_KEY',
   'PRI_RAZORPAY_KEY_ID', 'PRI_RAZORPAY_KEY_SECRET', 'PRI_RAZORPAY_WEBHOOK_SECRET',
   'PRI_RAZORPAY_MONTHLY_PLAN_ID', 'PRI_RAZORPAY_ANNUAL_PLAN_ID',
   'PRI_RAZORPAY_MONTHLY_TOTAL_COUNT', 'PRI_RAZORPAY_ANNUAL_TOTAL_COUNT',
@@ -39,6 +39,7 @@ const envNames = [
 ];
 const previous = Object.fromEntries(envNames.map(name => [name, process.env[name]]));
 process.env.NODE_ENV = 'test';
+process.env.PRI_TEST_PAID_MODE = '1'; // Retain paid-mode account lifecycle denial coverage separately from India free launch.
 delete process.env.PRI_PUBLIC_ORIGIN;
 process.env.PRI_AUTH_DELIVERY_KEY = '5a'.repeat(32);
 process.env.PRI_RAZORPAY_KEY_ID = 'rzp_test_lifecycle';
