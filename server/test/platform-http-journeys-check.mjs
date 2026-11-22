@@ -12,7 +12,7 @@ import { join } from 'node:path';
 // reports, telemetry, rate limiting, and the Razorpay cancel / deletion path
 // (cloud-03, commercial-14) through the real adapter with a faked provider.
 const envNames = [
-  'NODE_ENV', 'PRI_PUBLIC_ORIGIN', 'PRI_PLATFORM_DB', 'PRI_AUTH_DELIVERY_KEY',
+  'NODE_ENV', 'PRI_TEST_PAID_MODE', 'PRI_PUBLIC_ORIGIN', 'PRI_PLATFORM_DB', 'PRI_AUTH_DELIVERY_KEY',
   'PRI_RAZORPAY_KEY_ID', 'PRI_RAZORPAY_KEY_SECRET', 'PRI_RAZORPAY_WEBHOOK_SECRET',
   'PRI_RAZORPAY_MONTHLY_PLAN_ID', 'PRI_RAZORPAY_ANNUAL_PLAN_ID',
   'PRI_RAZORPAY_MONTHLY_TOTAL_COUNT', 'PRI_RAZORPAY_ANNUAL_TOTAL_COUNT',
@@ -21,6 +21,7 @@ const envNames = [
 const previous = Object.fromEntries(envNames.map(name => [name, process.env[name]]));
 const scratch = mkdtempSync(join(tmpdir(), 'pri-http-journeys-'));
 process.env.NODE_ENV = 'test';
+process.env.PRI_TEST_PAID_MODE = '1'; // Legacy provider lifecycle contract; free-launch refusal has a separate suite.
 delete process.env.PRI_PUBLIC_ORIGIN;
 process.env.PRI_PLATFORM_DB = join(scratch, 'platform.db');
 process.env.PRI_AUTH_DELIVERY_KEY = '44'.repeat(32);
