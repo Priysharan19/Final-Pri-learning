@@ -26,7 +26,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const scratch = mkdtempSync(join(tmpdir(), 'pri-daily-cap-'));
-delete process.env.NODE_ENV;              // the product's own mode: the server chooses every question
+process.env.NODE_ENV = 'test';
+process.env.PRI_TEST_PAID_MODE = '1'; // Explicit legacy capped-plan fixture; current free launch is uncapped and tested separately.
 // Owner decision 2026-11-18 (docs/product/packaging-2026-11.md): the active
 // packaging leaves free practice uncapped, so the daily-cap MECHANISM this suite
 // proves is exercised through the deployment's own cap, at the value the free
