@@ -18,7 +18,9 @@ const { commercialConfig } = await import('../platform/billing.js');
 const { freeLaunchActive } = await import('../platform/launchPolicy.js');
 const { premiumContentRefusal } = await import('../platform/practiceAllowance.js');
 const { entitlementRefusal } = await import('../platform/exams.js');
-const h = await startApp({ engine: requestedEngine() });
+const engine = requestedEngine();
+const h = await startApp({ engine });
+if (engine === 'postgres') console.log('engine: postgres'); // Must satisfy the real-Postgres gate after successfully opening the selected engine.
 try {
   assert.equal(freeLaunchActive(), true);
   const free = await registerAccount(h, { email: 'free.launch@example.test', deviceId: 'free-launch-1012' });
