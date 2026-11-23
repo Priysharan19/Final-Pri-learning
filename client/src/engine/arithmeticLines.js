@@ -1237,12 +1237,17 @@ const DEGREE_FOR_PRIME = /(?<![A-Za-z0-9])[A-Za-z]°(?=\s*[=(])/;
 // (`P = 8000 (principal)`). The line shown stays as written; only the reading drops the currency sign, the thousands commas (a comma
 // with exactly three digits after it, not in front of a bracket, so a point (2,100) is not read as 2100) and a trailing bracketed
 // gloss of two or more plain words (not a function name, never a lone letter such as (x)).
-const GLOSS = /\s+\((?!(?:sin|cos|tan|sec|cosec|csc|cot|ln|log|sqrt|exp|abs)\))[A-Za-z]{3,}(?:\s+[A-Za-z]+)*\)\s*$/;
+const GLOSS_WORDS = new Set(('principal interest rate annual number of years year months month total amount value cost price deposit balance new old initial final given approx approximately units unit per the an in at to for and or compound simple payment payments loan investment profit loss time period term length width height area volume mass weight speed distance population sales discount tax fee rent').split(' '));
+// Closed rule: a trailing bracket is a gloss only when EVERY token inside is a word of GLOSS_WORDS (no letters on their own, digits, operators or
+// function names); anything else, such as (abc), (xy), (sin x) or (new x), stays in the line as maths and the line is not checkable.
+function dropGloss(s) {
+  const m = /\s+\(([A-Za-z]+(?:\s+[A-Za-z]+)*)\)\s*$/.exec(s);
+  return m && m[1].toLowerCase().split(/\s+/).every(w => GLOSS_WORDS.has(w)) ? s.slice(0, m.index) : s;
+}
 function moneyReading(s) {
-  return s
+  return dropGloss(s)
     .replace(/(?<![A-Za-z])(?:A|AU|AUD)?\\?\$\s*(?=\d)/g, '')
-    .replace(/(?<![\d.,(\[;])\d{1,3}(?:,\d{3})+(?:\.\d+)?(?![\d,])/g, m => m.replace(/,/g, ''))
-    .replace(GLOSS, '');
+    .replace(/(?<![\d.,(\[;])\d{1,3}(?:,\d{3})+(?:\.\d+)?(?![\d,])/g, m => m.replace(/,/g, ''));
 }
 function normaliseInk(line) {
   return moneyReading(String(line))

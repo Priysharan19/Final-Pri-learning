@@ -93,6 +93,18 @@ ok(one('1,000 + 2,500 = 3,400')[0] === 'break', 'a false sum with thousands is c
 ok(one('x = 5 (given)\nx = 5')[1] === 'ok', 'a gloss in brackets is ignored: x = 5 again is the same value');
 ok(one('(2,100)')[0] !== 'ok', 'a point (2,100) is not read as 2100');
 
+// the gloss is a CLOSED list of plain words: any other bracket stays maths, so the line is not checkable (a note, never carried on)
+for (const [a, b] of [['y = 2 (abc)', 'y = 2'], ['y = 3 (sin x)', 'y = 3'], ['y = 2 (cos x)', 'y = 2'], ['P = 100 (xyz)', 'P = 100'], ['x = 2 (pqr)', 'x = 2'],
+  ['x = 2 (xy)', 'x = 2'], ['x = 2 (ab)', 'x = 2'], ['x = 2 (new x)', 'x = 2'], ['x = 2 (sin)', 'x = 2'], ['x = 2 (2 years)', 'x = 2']]) {
+  ok(one(`${a}\n${b}`)[1] === 'note', `a bracket that is not a gloss is not dropped: ${a} then ${b}`);
+}
+ok(one('P = 8000 (principal)\nP = 8000')[1] === 'ok', 'a gloss of listed words is dropped');
+ok(one('r = 5 (annual interest rate)\nr = 5')[1] === 'ok', 'a gloss of several listed words is dropped');
+// money read as numbers never turns a false line into a tick; false ones are crossed by the existing rule
+ok(one('1,000 + 1 = 1,002')[0] === 'break', '1,000 + 1 = 1,002 is crossed');
+ok(one('$5 + $5 = $11')[0] === 'break', '$5 + $5 = $11 is crossed');
+ok(one('1,000 / 4 = 205')[0] === 'break', '1,000 / 4 = 205 is crossed');
+
 // named quantity carried down the page: tick only, never a cross
 ok(JSON.stringify(one('x = 3 + 4\nx = 7')) === '["note","ok"]', 'x = 3 + 4 then x = 7: the second is ticked');
 ok(JSON.stringify(one('x = 3 + 4\nx = 8')) === '["note","note"]', 'x = 3 + 4 then x = 8: a note, never a cross, never a tick');
