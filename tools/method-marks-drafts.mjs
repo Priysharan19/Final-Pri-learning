@@ -23,8 +23,8 @@ import { SCHEMES, UNAVAILABLE, schemeDigest, awardScheme } from '../server/platf
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const OUT_DIR = path.join(ROOT, 'owner-review', 'method-marks');
-// The packets the owner reads (owner-actions/READ-ME-method-marks-signoff.md links here): the same files, without the machine-readable types.json.
-export const OWNER_DIR = path.join(ROOT, 'owner-actions', 'method-marks');
+// The packets the owner reads (docs/marking/method-marks-signoff/READ-ME-method-marks-signoff.md links here; the owner copies the folder into his private owner-actions): the same files, without the machine-readable types.json.
+export const OWNER_DIR = path.join(ROOT, 'docs', 'marking', 'method-marks-signoff', 'method-marks');
 export const ownerFiles = files => new Map([...files].filter(([name]) => name.endsWith('.md')));
 export const BANNER = "DRAFT for the author's review: not approved. Nothing in this file is switched on.";
 const SAMPLES_PER_TYPE = 3;
@@ -466,8 +466,8 @@ export function diffFiles(files, dir = OUT_DIR) {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const { files, summary } = await build();
   if (process.argv.includes('--check')) {
-    const bad = [...diffFiles(files), ...diffFiles(ownerFiles(files), OWNER_DIR).map(f => `owner-actions/${f}`)];
-    if (bad.length) { console.error(`owner-review/method-marks or owner-actions/method-marks is out of date: ${bad.join(', ')}. Run: node tools/method-marks-drafts.mjs`); process.exit(1); }
+    const bad = [...diffFiles(files), ...diffFiles(ownerFiles(files), OWNER_DIR).map(f => `docs/marking/method-marks-signoff/method-marks/${f}`)];
+    if (bad.length) { console.error(`owner-review/method-marks or docs/marking/method-marks-signoff/method-marks is out of date: ${bad.join(', ')}. Run: node tools/method-marks-drafts.mjs`); process.exit(1); }
     console.log(`method-marks drafts match (${summary.schemes} types).`);
   } else {
     writeFiles(files);

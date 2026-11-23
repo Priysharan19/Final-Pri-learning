@@ -1,7 +1,7 @@
 // Pri Learning · method marks paid by a signed scheme, per question type, from the SAME line report the page shows
 //
 // R4 (marking authority). The generic method-mark rubric (checker.methodMarks) counts lines that "moved the solution on". A scheme
-// is different: the author signs a short list of criteria for ONE question type (owner-actions/method-marks), and this module pays
+// is different: the author signs a short list of criteria for ONE question type (docs/marking/method-marks-signoff), and this module pays
 // exactly those, so that what he signs is what is paid. It is the only source of the criteria: tools/method-marks-drafts.mjs
 // generates the owner packets from it, so a packet and the server cannot disagree.
 //
@@ -18,7 +18,8 @@
 // GATES (all must hold; none is set by this module):
 //   1. APPROVED_SCHEME_TYPES, the explicit per-type allow-list for the NSW bank. EMPTY in the repository: nothing is paid by a
 //      scheme until the author's approval is committed here, type by type, with the digest he read.
-//   2. markingPolicy(env): PRI_METHOD_MARKS=on, and in production PRI_METHOD_MARKS_EXAMINER_RESULT (markingPolicy.js, unchanged).
+//   2. editionMarkingPolicy(env): PRI_METHOD_MARKS=on, in production PRI_METHOD_MARKS_EXAMINER_RESULT (markingPolicy.js), and the edition
+//      not in UNCERTIFIED_EDITIONS (editionMarking.js: Prithagoras is, until its own signed evidence lifts it). All unchanged.
 //   3. A question is stamped `_methodScheme` at issue only for an allow-listed type (editionBanks.sealForEdition); every other
 //      question stays sealed final-answer-only.
 //
@@ -26,7 +27,7 @@
 import crypto from 'node:crypto';
 import { publicDescription } from './lineInterpreter/givens.js';
 import { makeFn, polynomial, extremes } from './lineInterpreter/truth.js';
-import { markingPolicy } from './markingPolicy.js';
+import { editionMarkingPolicy, editionMethodMarksRefusal } from './editionMarking.js';
 
 /** The question types whose scheme the author has approved for payment. EMPTY by default. Entries: { typeId, digest }. */
 export const APPROVED_SCHEME_TYPES = Object.freeze([]);
@@ -202,7 +203,9 @@ export function schemePay({ q, report, topic = null, correct, marksPossible, env
   const scheme = typeId ? byId.get(typeId) : null;
   if (!scheme) return { paid: false, reason: 'not-a-scheme-question' };
   if (!isApproved(typeId, list)) return { paid: false, typeId, reason: 'type-not-approved' };
-  if (markingPolicy(env).methodMarks !== true) return { paid: false, typeId, reason: 'method-marks-off' };
+  // Every existing gate, unchanged: the switch, the production examiner result, and the edition's certification. While Prithagoras is in
+  // UNCERTIFIED_EDITIONS (editionMarking.js) the policy is final answer only and nothing is paid, whatever the list and the switch say.
+  if (editionMarkingPolicy(env).methodMarks !== true) return { paid: false, typeId, reason: editionMethodMarksRefusal(env)?.code ?? 'method-marks-off' };
   const possible = schemeMarks(scheme);
   if (possible !== marksPossible) return { paid: false, typeId, reason: `criteria-count: the scheme has ${possible} marks and this question is worth ${marksPossible}, so it stays on the final answer` };
   const award = awardScheme(scheme, report, correct, topic, q);

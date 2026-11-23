@@ -6,7 +6,17 @@
 
 **Worked example (your product-rule question).** Differentiate y = x^2(x - 1), a 2-mark question, with the working on your page but the last line wrong (3x^2 - x instead of 3x^2 - 2x). The page ticks the working down to line 8 and crosses line 9. Step 1, "writes a correct derivative (any equivalent form)", is earned by the first ticked line that is the derivative, line 6. Step 2, "gives the final answer correctly", is not earned, because 3x^2 - x is wrong. Result: **1 of 2**. Line 9, the crossed line, earns nothing, and neither would any line after it.
 
-**To approve.** Reply with exactly: `I approve the seven step-mark schemes in INDEX.md as drafted. Priysharan Tripathi`. Approving does not switch anything on: the server list stays empty and the marking switch stays off until you decide, in a separate step. As before, the approval record for each type is written by you, in your own name (steps below).
+**What must exist before a type pays a real student (production).** All five, for that type, and nothing pays until every one is in place:
+
+1. Your approval record for the type in `docs/marking/author-approvals/<type>.json`, for the digest printed in the packet (this also makes the marked page show the table).
+2. The type's entry `{ typeId, digest }` in `APPROVED_SCHEME_TYPES` in `server/platform/schemeAward.js`. It is empty today. A question is stamped with its scheme only at issue, so only questions issued after this change are paid by it.
+3. `PRI_METHOD_MARKS=on` in the server's environment.
+4. In production, `PRI_METHOD_MARKS_EXAMINER_RESULT` naming the signed examiner result (`markingPolicy.js`).
+5. The edition's certification: `'prithagoras'` is in `UNCERTIFIED_EDITIONS` (`server/platform/editionMarking.js:27`), which forces final-answer marking for the whole edition whatever else is set. It is lifted only by a change to that list made with the edition's own signed evidence. Until then the scheme pays nothing, even with 1 to 4 in place.
+
+Approving in your own name (the reply line below) does steps 1 only; steps 2 to 5 are separate decisions.
+
+**To approve.** Reply with exactly: `I approve the seven step-mark schemes in INDEX.md as drafted. Priysharan Tripathi`. Approving does not switch anything on: the approved list stays empty and the marking switch stays off until you decide, in separate steps. As before, the approval record for each type is written by you, in your own name (steps below).
 
 ---
 

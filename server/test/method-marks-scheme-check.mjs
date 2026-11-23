@@ -24,6 +24,7 @@ import { TYPES } from '../../tools/method-marks-drafts.mjs';
 import { SCHEMES, UNAVAILABLE, APPROVED_SCHEME_TYPES, schemeDigest, schemeMarks, schemePay, schemeTypeOf, isApproved, awardScheme } from '../platform/schemeAward.js';
 import { stepEvidence, marksPossibleFor, practiceMarksEarned, MARKER_OPS } from '../platform/markerOps.js';
 import { FINAL_ANSWER_ONLY } from '../platform/markingPolicy.js';
+import { UNCERTIFIED_EDITIONS } from '../platform/editionMarking.js';
 import { sealForEdition, bankPolicy, FINAL_ANSWER_MARKING } from '../platform/editionBanks.js';
 import { checkAnswer } from '../../client/src/engine/checker.js';
 import { criteriaView } from '../../client/src/components/criteriaTableModel.js';
@@ -77,8 +78,14 @@ ok(typed.every(([s, q]) => schemePay({ q, report: { lines: [] }, correct: false,
 {
   const [s, q] = typed[0]; const q2 = asMarks(q, schemeMarks(s), s.id);
   const run = env => schemePay({ q: q2, report: { lines: [] }, correct: false, marksPossible: schemeMarks(s), env, list: LIST });
-  ok(run({}).reason === 'method-marks-off' && run({ PRI_METHOD_MARKS: 'off' }).reason === 'method-marks-off' && run({ PRI_METHOD_MARKS: 'yes' }).reason === 'method-marks-off', 'the switch off, empty or misspelt pays nothing');
-  ok(run({ NODE_ENV: 'production', PRI_METHOD_MARKS: 'on' }).reason === 'method-marks-off', 'in production the switch alone pays nothing');
+  ok(run({}).reason === 'method-marks-off' && run({ PRI_METHOD_MARKS: 'off' }).reason === 'method-marks-off' && run({ PRI_METHOD_MARKS: 'yes' }).paid === false && run({ PRI_METHOD_MARKS: 'yes' }).reason === 'MARKER_POLICY_INVALID', 'the switch off, empty or misspelt pays nothing');
+  ok(run({ NODE_ENV: 'production', PRI_METHOD_MARKS: 'on' }).reason === 'MARKER_POLICY_UNSIGNED', 'in production the switch alone pays nothing');
+  // The edition certification (editionMarking.js UNCERTIFIED_EDITIONS): Prithagoras pays nothing while it is uncertified, whatever the
+  // allow-list and the switch say, in every environment.
+  ok(UNCERTIFIED_EDITIONS.includes('prithagoras'), 'Prithagoras is uncertified in this repository');
+  ok(run({ ...ON, PRI_EDITION: 'prithagoras' }).reason === 'MARKER_POLICY_EDITION_UNCERTIFIED' && !run({ ...ON, PRI_EDITION: 'prithagoras' }).paid, 'uncertified Prithagoras: on the list and switched on, the scheme pays nothing');
+  ok(run({ NODE_ENV: 'production', PRI_METHOD_MARKS: 'on', PRI_METHOD_MARKS_EXAMINER_RESULT: 'signed-1', PRI_EDITION: 'prithagoras' }).paid === false, 'uncertified Prithagoras: even with the production examiner result the scheme pays nothing');
+  ok(run({ ...ON, PRI_EDITION: 'priyabhata' }).paid === true, 'another edition is not affected by the Prithagoras refusal');
   ok(run({ NODE_ENV: 'production', PRI_METHOD_MARKS: 'on', PRI_METHOD_MARKS_EXAMINER_RESULT: 'signed-1' }).paid === true, 'in production it needs the signed result too');
   ok(run(ON).paid === true, 'outside production the switch pays an approved type');
 }
@@ -196,13 +203,13 @@ for (const s of SCHEMES) ok(R.questionsOfType(s, { limit: 3 }).length === 3, `${
   const types = JSON.parse(fs.readFileSync(new URL('../../owner-review/method-marks/types.json', import.meta.url), 'utf8'));
   ok(types.types.length === SCHEMES.length && types.types.every(t => schemeDigest(SCHEMES.find(s => s.id === t.id)) === t.digest), 'every packet digest is the digest of the criteria the server pays');
   ok(types.types.every(t => { const s = SCHEMES.find(x => x.id === t.id); return t.totalMarks === schemeMarks(s) && t.criteria.length === s.criteria.length && t.criteria.every((c, i) => c.key === s.criteria[i].key && c.marks === s.criteria[i].marks && c.text === s.criteria[i].text); }), 'every packet criterion, mark and text is the server\'s');
-  const owner = id => fs.readFileSync(new URL(`../../owner-actions/method-marks/${id}.md`, import.meta.url), 'utf8');
+  const owner = id => fs.readFileSync(new URL(`../../docs/marking/method-marks-signoff/method-marks/${id}.md`, import.meta.url), 'utf8');
   ok(SCHEMES.every(s => owner(s.id).includes(schemeDigest(s)) && s.criteria.every(c => owner(s.id).includes(c.text))), 'the owner packets carry the digest and every criterion');
-  ok(UNAVAILABLE.length === 3 && UNAVAILABLE.every(u => !SCHEMES.some(s => s.id === u.id) && !fs.existsSync(new URL(`../../owner-actions/method-marks/${u.id}.md`, import.meta.url))), 'the three unavailable types have no scheme and no packet');
-  const index = fs.readFileSync(new URL('../../owner-actions/method-marks/INDEX.md', import.meta.url), 'utf8');
+  ok(UNAVAILABLE.length === 3 && UNAVAILABLE.every(u => !SCHEMES.some(s => s.id === u.id) && !fs.existsSync(new URL(`../../docs/marking/method-marks-signoff/method-marks/${u.id}.md`, import.meta.url))), 'the three unavailable types have no scheme and no packet');
+  const index = fs.readFileSync(new URL('../../docs/marking/method-marks-signoff/method-marks/INDEX.md', import.meta.url), 'utf8');
   ok(/## Not available yet/.test(index) && UNAVAILABLE.every(u => index.includes(u.reason.slice(0, 40))), 'INDEX.md says "not available yet", with the reason for each');
-  const readme = fs.readFileSync(new URL('../../owner-actions/READ-ME-method-marks-signoff.md', import.meta.url), 'utf8');
-  ok(/1 of 2/.test(readme.slice(0, 2500)) && /I approve the seven step-mark schemes/.test(readme.slice(0, 2500)) && !/[—–]/.test(readme.slice(0, 2500)), 'the owner note opens with the plain summary, the worked example (1 of 2) and one line to approve, no dashes');
+  const readme = fs.readFileSync(new URL('../../docs/marking/method-marks-signoff/READ-ME-method-marks-signoff.md', import.meta.url), 'utf8');
+  ok(/1 of 2/.test(readme.slice(0, 5200)) && /I approve the seven step-mark schemes/.test(readme.slice(0, 5200)) && !/[—–]/.test(readme.slice(0, 5200)), 'the owner note opens with the plain summary, the worked example (1 of 2) and one line to approve, no dashes');
   // unavailable types are never typed as a scheme question
   let leaked = 0;
   for (const u of UNAVAILABLE) for (const fam of u.families) for (let d = 1; d <= 4; d++) for (let seed = 1; seed <= 20; seed++) { let q; try { q = G.generateQuestion(fam, d, seed); } catch { continue; } const id = schemeTypeOf(q, fam); if (id && /stationary|tangent|gradient$/.test(id) && !SCHEMES.some(s => s.id === id)) leaked++; }
