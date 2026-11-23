@@ -697,7 +697,6 @@ export default function App() {
             {LEGAL_ROUTES_EXTRA}
             <Route path="/third-party-notices" element={<Legal />} />
             <Route path="*" element={<AccountActivationGate key={user.id} user={user} onReady={setActivated} onSwitch={switchLocal} />} />
-              : <AccountActivationGate key={user.id} user={user} onReady={setActivated} onSwitch={switchLocal} />} />
           </Routes>
         </React.Suspense>
         <ToastLayer toasts={toasts} />
