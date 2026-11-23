@@ -20,7 +20,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:f
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { EDITIONS, EDITION_IDS } from '../edition.config.mjs';
+import { EDITIONS, EDITION_IDS, editionOf } from '../edition.config.mjs';
 import { WEB_FILES, brandFile, webManifest } from '../brand/edition-brand.mjs';
 import { PRIYABHATA_WORDMARK, PRITHAGORAS_WORDMARK } from '../src/brand/paths.js';
 
@@ -115,8 +115,13 @@ if (BOTH) {
     // chunks are compared as a set of normalised contents.
     const plain = rel => !/-[A-Za-z0-9_-]{8}\.\w+$/.test(rel);
     const BRAND = new Set([...WEB_FILES, 'index.html', 'manifest.webmanifest', 'features.json', 'sw.js']);
-    const plainDiffer = [...A.keys()].filter(plain).filter(rel => A.get(rel) !== B.get(rel));
-    ok(plainDiffer.every(rel => BRAND.has(rel)), `unhashed files differ only where the brand is: ${plainDiffer.filter(r => !BRAND.has(r)).join(', ')}`);
+    // Unhashed files are compared over BOTH builds' names, so a file only one build has is a difference too. The only such file
+    // allowed is an edition's own share image (identity.share.image), and only in the build of the edition that declares it.
+    const plainNames = [...new Set([...A.keys(), ...B.keys()])].filter(plain);
+    const plainDiffer = plainNames.filter(rel => A.get(rel) !== B.get(rel));
+    const ownShareImage = rel => (A.has(rel) && !B.has(rel) && editionOf(first).identity.share?.image === rel)
+      || (B.has(rel) && !A.has(rel) && editionOf(other).identity.share?.image === rel);
+    ok(plainDiffer.every(rel => BRAND.has(rel) || ownShareImage(rel)), `unhashed files differ only where the brand is: ${plainDiffer.filter(r => !BRAND.has(r) && !ownShareImage(r)).join(', ')}`);
     ok(WEB_FILES.every(rel => plainDiffer.includes(rel)) && ['index.html', 'manifest.webmanifest'].every(rel => plainDiffer.includes(rel)), 'and every brand file does differ');
     const swLines = (m, f) => m.get('sw.js').split('\n').filter(l => !/^const (VERSION|PRECACHE|WARM|OPTIONAL) = /.test(l)).join('\n');
     ok(swLines(A) === swLines(B), 'sw.js differs only in its generated version and file lists');

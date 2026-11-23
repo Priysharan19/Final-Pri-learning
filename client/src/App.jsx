@@ -100,7 +100,7 @@ const APP_PATHS = NOT_FOUND_PAGE ? [
   '/desk/:attemptId', '/rush', '/match', '/review', '/history', '/favorites', '/mistakes', '/classes', '/privacy', '/terms',
   '/refund-policy', '/third-party-notices', '/welcome', '/welcome/marking', '/welcome/syllabus', '/welcome/teachers',
   '/contact', '/grievance', '/refunds', '/settings', '/account-action', '/guardian/consent', '/account/delete-request',
-  '/parent/report-email'
+  '/parent/report-email', '/index.html'
 ] : [];
 // react-router's own matching for these patterns (static segments, case-insensitive, ":param" for one segment,
 // a trailing slash allowed), written here so Priyabhata's and Prithagoras's builds import the same router exports.
@@ -108,6 +108,16 @@ const isRoute = (pattern, pathname) => {
   const a = pattern.split('/').filter(Boolean), b = pathname.split('/').filter(Boolean);
   return a.length === b.length && a.every((seg, i) => seg.startsWith(':') ? b[i] !== '' : seg.toLowerCase() === b[i].toLowerCase());
 };
+/**
+ * The signed-in `*` route. A path in APP_PATHS that reaches it is one the signed-in router does not declare for this
+ * student: the public landing pages, /index.html, and a feature that is switched off (parent report, placement, library,
+ * desk). Those go home as they always did, so turning a flag off never shows a student an error page; any other address
+ * is not found.
+ */
+function SignedInUnknown({ home }) {
+  const { pathname } = useLocation();
+  return APP_PATHS.some(path => isRoute(path, pathname)) ? <Navigate to={home} replace /> : <NotFound to={home} signedIn />;
+}
 /** The `*` route before the shell: Login at a real app address, "not found" anywhere else (Prithagoras). */
 function UnknownAddress({ otherwise, to }) {
   const { pathname } = useLocation();
@@ -819,7 +829,7 @@ export default function App() {
                     {LEGAL_ROUTES_EXTRA}
                     <Route path="/third-party-notices" element={<Legal />} />
                     <Route path="/settings" element={<Settings />} />
-                    <Route path="*" element={NOT_FOUND_PAGE ? <NotFound to={roleLanding} signedIn /> : <Navigate to={roleLanding} replace />} />
+                    <Route path="*" element={NOT_FOUND_PAGE ? <SignedInUnknown home={roleLanding} /> : <Navigate to={roleLanding} replace />} />
                   </Routes>
                 </React.Suspense>
               </ErrorBoundary>
