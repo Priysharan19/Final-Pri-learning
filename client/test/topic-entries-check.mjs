@@ -5,7 +5,7 @@
 //   NAMES      no catalogue name carries "Original Forms"; a companion reads as its base;
 //   ONE ENTRY  every chooser list a Prithagoras student reaches (Years 11 and 12, Advanced and Extension 1) names a topic
 //              once; no two entries share a display name;
-//   MIX        practising an entry draws BOTH generators, evenly, and nothing outside
+//   MIX        practising an entry draws BOTH generators, in proportion to their authored forms, and nothing outside
 //              the pair, from a seed (2,400+ draws per entry and level);
 //   DOT POINTS the entry lists the base's dot points then the companion's, each under its own id; a named dot point
 //              is issued by its own generator; an old link naming the companion lands on the same dot point;
@@ -103,8 +103,10 @@ try {
       ok(`${base} D${d ?? '*'}: 2,400 seeded draws, only the pair`, other.length === 0, other.slice(0, 3).join(','));
       ok(`${base} D${d ?? '*'}: both sides drawn (${counts[base]} / ${counts[companion]})`, counts[base] > 0 && counts[companion] > 0);
       if (counts[base] > 0 && counts[companion] > 0) fromBoth++;
-      const got = counts[companion] / 2400, sigma = Math.sqrt(0.25 / 2400);
-      ok(`${base} D${d ?? '*'}: the draw splits the pair evenly (${(got * 100).toFixed(1)}% on the companion)`, Math.abs(got - 0.5) <= 5 * sigma);
+      const lv = d === null ? nswIssuedLevels(base) : [d];
+      const w = id => Math.max(1, lv.reduce((n, l) => n + T.formDotpointOrdinals(id, l).length, 0));
+      const share = w(companion) / (w(base) + w(companion)), got = counts[companion] / 2400, sigma = Math.sqrt(share * (1 - share) / 2400);
+      ok(`${base} D${d ?? '*'}: the mix follows the authored forms (${(got * 100).toFixed(1)}% vs ${(share * 100).toFixed(1)}%)`, Math.abs(got - share) <= 5 * sigma + 0.01);
       const again = Array.from({ length: 50 }, (_, i) => T.resolveSide(base, { difficulty: d, seed: (i + 0.5) / 2400 }).subtopic);
       ok(`${base} D${d ?? '*'}: the same seed draws the same side`, again.every((g, i) => g === T.resolveSide(base, { difficulty: d, seed: (i + 0.5) / 2400 }).subtopic));
     }

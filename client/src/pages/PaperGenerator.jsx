@@ -139,7 +139,7 @@ export default function PaperGenerator() {
             <legend className="label">{t('gen.topics')}</legend>
             <p className="muted pg-help" id="gen-topics-help">{t('gen.topicsHelp', { n: MAX_TOPICS })}</p>
             <div className="pg-row">
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setTopics(options.topics.slice(0, MAX_TOPICS).map(x => x.id))}>{t('gen.selectAll', { n: Math.min(MAX_TOPICS, options.topics.length) })}</button>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setTopics(entries.reduce((acc, e) => (acc.length + e.ids.length <= MAX_TOPICS ? [...acc, ...e.ids] : acc), []))}>{t('gen.selectAll', { n: Math.min(MAX_TOPICS, options.topics.length) })}</button>
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => setTopics([])} disabled={!topics.length}>{t('gen.clear')}</button>
             </div>
             <ul className="pg-topics" aria-describedby="gen-topics-help">

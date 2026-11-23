@@ -61,6 +61,14 @@ function ProfilePractice() {
   // A link or saved state that names a `-forms` generator lands on the topic's one entry (engine/curriculum.js).
   const { subtopic, dotpoint: entryDotpoint } = requestOnEntry(params.get('subtopic'), params.get('dotpoint'));
   const dotpoint = entryDotpoint === undefined ? params.get('dotpoint') : String(entryDotpoint);
+  // The address names the topic's one entry: an old `-forms` link is rewritten in place (no history entry).
+  useEffect(() => {
+    if (!params.get('subtopic') || (subtopic === params.get('subtopic') && dotpoint === params.get('dotpoint'))) return;
+    const next = new URLSearchParams(params);
+    next.set('subtopic', subtopic);
+    if (dotpoint != null && dotpoint !== '') next.set('dotpoint', dotpoint);
+    setParams(next, { replace: true });
+  }, [params, subtopic, dotpoint, setParams]);
   const difficulty = params.get('difficulty');
   const track = params.get('track');
   const taskId = params.get('task');

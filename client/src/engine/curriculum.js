@@ -1121,8 +1121,8 @@ export function difficultiesForDotpoint(id) {
 //     is read as its base, at read time, with no migration;
 //   - the entry's dot points are the base's followed by the companion's, each
 //     keeping its own id, so the picker's ordinal is a position in that list;
-//   - practising an entry draws one side per question from a seed, among the sides the
-//     server issues at the level asked;
+//   - practising an entry draws one side per question from a seed, in proportion to how many
+//     authored forms each side has at the level asked;
 //   - lists a student reads group the pair into one row at render time (counts added); nothing a computation reads
 //     moves: the adaptive engine, the planner, the predictor and the exports keep reading each generator's own rows.
 //
@@ -1179,8 +1179,8 @@ export function dotpointOfEntry(subtopicId, ref) {
 
 /**
  * The generator that answers a request on an entry: `{ subtopic: generator id, dotpoint: that generator's own ordinal }`.
- * A named dot point fixes its generator. Otherwise one side is drawn from `seed`, among the sides the server issues at the level asked
- * (every issued level when none is named).
+ * A named dot point fixes its generator. Otherwise one side is drawn from `seed`, weighted by each side's form count
+ * across the levels asked (all issued levels when none is named), among the sides the server issues at that level.
  * `seed` is a number in [0, 1): the same seed draws the same side.
  * When no side issues the level the entry itself is returned and the caller's refusal explains it.
  */
@@ -1190,7 +1190,11 @@ export function resolveSide(entryId, { dotpoint = null, difficulty = null, seed 
   const d = blank(difficulty) ? null : Number(difficulty);
   const sides = sidesOf(entryId).map(id => ({ id, levels: nswIssuedLevels(id).filter(l => d === null || l === d) })).filter(s => s.levels.length);
   if (sides.length < 2) return { subtopic: sides[0]?.id || entryId, dotpoint: undefined };
-  return { subtopic: sides[(seed * sides.length | 0) % sides.length].id, dotpoint: undefined };
+  // Weighted by each side's authored forms (the registry's cells) across the levels in play.
+  const weights = sides.map(s => Math.max(1, s.levels.reduce((n, l) => n + formDotpointOrdinals(s.id, l).length, 0)));
+  let pick = seed * weights.reduce((a, b) => a + b, 0);
+  const at = weights.findIndex(w => (pick -= w) < 0);
+  return { subtopic: sides[at < 0 ? sides.length - 1 : at].id, dotpoint: undefined };
 }
 
 // ── Scope (what a chooser or picker lists) ───────────────────────────────────
