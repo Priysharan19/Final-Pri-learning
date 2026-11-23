@@ -3,6 +3,8 @@ import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
 import StaffMfaGate, { useMfaStepUp } from './StaffMfaGate.jsx';
 import ResourcePublishingPanel from './ResourcePublishingPanel.jsx';
+import { formatDateTime } from '../lib/locale.js';
+import { defaultCourse } from '../platform/edition.js';
 
 function parseJson(text, label) {
   let value;
@@ -14,7 +16,7 @@ function parseJson(text, label) {
 
 function when(value) {
   if (!value) return '—';
-  try { return new Date(value).toLocaleString(); } catch { return '—'; }
+  try { return formatDateTime(value, defaultCourse()); } catch { return '—'; }
 }
 
 // Every call the console makes sits behind the staff second factor

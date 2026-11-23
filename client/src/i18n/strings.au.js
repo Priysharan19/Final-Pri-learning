@@ -11,6 +11,28 @@
 // without an override here or a reasoned entry in its allowlist.
 // ─────────────────────────────────────────────────────────────────────────────
 export const AU_STRINGS = Object.freeze({
+  // Australian spelling: the shared catalogue says Favorites (en-US).
+  'favorites.title': 'Favourites',
+  'favorites.emptyTitle': 'No favourites yet',
+  'favorites.remove': 'Remove from favourites',
+  'favorites.removeOn': 'Remove this {topic} question from favourites',
+  'verdict.favorite': 'Favourite',
+  'verdict.favoriteThis': 'Favourite this question',
+  'verdict.savedToFavorites': 'Saved to Favourites',
+  'verdict.removedFromFavorites': 'Removed from Favourites',
+  'verdict.favoriteNeedsAnswer': 'Answer the question first, then favourite it from History.',
+  // Plain wording for the students' own account screens (the shared text spoke to developers).
+  'settings.helpBody': 'Every subtopic tracks a skill rating that moves with each answer. Harder questions move it more. Smart Practice targets ~70% success, weaves in spaced reviews before topics fade, and the mark estimate covers only the parts of the paper you have actually practised. Handwritten answers are read by Pri’s server reader when you are online, then the final answer is marked by the same engine as typed answers. Hints and retries still earn credit, just a little less.',
+  'cloud.intro': 'Your profile stays on this device. Connecting a {brand} account is what lets Pri’s server check your answers, and adds sync between your devices and your HSC Pass plan; it does not replace the profile on this device or its encryption keys.',
+  'cloudSecurity.providersUnavailable': 'Linked sign-in methods could not be loaded just now.',
+  'cloudSecurity.socialNote': 'Linking Google or Apple needs a fresh sign-in with that provider. {brand} never accepts a typed provider ID or an unverified email in its place.',
+  // Overclaims the launch audit found in shared strings: the mark is for the final answer, and Pri checks the lines it can.
+  'verdict.workingAria': 'Your working: one line per row. Pri checks the lines it can.',
+  'verdict.workingPlaceholder': 'Show every line of your working, one per row. Pri checks the lines it can and labels the rest.\nFinish with the result you were asked to reach.',
+  'examRoom.workingNote': 'Full-working question: the mark is for the final answer, and Pri checks the lines of your working it can as feedback.',
+  'login.point2': 'Handwritten working, checked where Pri can',
+  'ai.checked.body': 'The maths engine checks your working and your answer where it can, and it alone decides what is right and what is marked. It did not check this explanation. Automatic guards only stop it from giving away the answer, from using numbers that are not in the verified solution, and from talking about marks. It can still be wrong, so compare it with the verified steps.',
+  'cloudSecurity.deleteHelp': 'This permanently deletes your Prithagoras account data held on Pri’s server and signs out every device. It does not erase the separate profile stored on this device.',
   'common.classNumber': 'Year {n}',
   'msg.classTitle': 'Year {n} · {title}',
   'msg.classOnly': 'Year {n}',

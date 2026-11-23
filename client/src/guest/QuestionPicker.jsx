@@ -28,9 +28,9 @@ export function rememberChoice(edition, choice) {
  * `forms` lists the types offered (the guest offers all three; Home offers none,
  * because the practice page itself lets a student type or write).
  */
-export default function QuestionPicker({ edition, defaultYear = 9, forms = PICKER_FORMS, onStart, busy = false, idPrefix = 'qp', startLabel = null }) {
+export default function QuestionPicker({ edition, defaultYear = 9, defaultCourse = null, forms = PICKER_FORMS, onStart, busy = false, idPrefix = 'qp', startLabel = null }) {
   const t = useT();
-  const [choice, setChoice] = useState(() => settleChoice(edition, rememberedChoice(edition), { defaultYear }));
+  const [choice, setChoice] = useState(() => settleChoice(edition, rememberedChoice(edition), { defaultYear, defaultCourse }));
 
   const courses = useMemo(() => coursesFor(edition, choice.year, { mathsLabel: t('picker.maths') }), [edition, choice.year, t]);
   const chapters = useMemo(() => (choice.course ? chaptersFor(edition, choice.year, choice.course) : []), [edition, choice.year, choice.course]);
@@ -44,7 +44,7 @@ export default function QuestionPicker({ edition, defaultYear = 9, forms = PICKE
   useEffect(() => { rememberChoice(edition, choice); }, [edition, choice]);
 
   // Any change settles to a choice that is still on offer (a new year may have no such course or chapter).
-  const change = patch => setChoice(prev => settleChoice(edition, { ...prev, ...patch }, { defaultYear }));
+  const change = patch => setChoice(prev => settleChoice(edition, { ...prev, ...patch }, { defaultYear, defaultCourse }));
   const ready = choice.course && choice.chapter && choice.difficulty != null && !busy;
   const submit = e => { e.preventDefault(); if (ready) onStart(choice); };
   const id = name => `${idPrefix}-${name}`;

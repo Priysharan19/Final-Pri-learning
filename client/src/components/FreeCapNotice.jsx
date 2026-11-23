@@ -87,9 +87,9 @@ export default function FreeCapNotice({ gate, onRetry, profile = null }) {
             {gate.refreshRequired ? t('freeCap.reconnect') : t('freeCap.seePremium')}
           </PageLink>}
           {onRetry && (
-            <button className="btn btn-quiet" onClick={onRetry}>{t('common.tryAgain')}</button>
+            <button className="btn btn-ghost" onClick={onRetry}>{t('common.tryAgain')}</button>
           )}
-          <PageLink className="btn btn-quiet" to="/review">{t('freeCap.reviewDone')}</PageLink>
+          <PageLink className="btn btn-ghost" to="/review">{t('freeCap.reviewDone')}</PageLink>
         </div>
       </section>
     </div>

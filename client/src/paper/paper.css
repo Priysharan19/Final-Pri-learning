@@ -117,3 +117,10 @@
   .pp-opt { padding: var(--space-3); }
 }
 @media (prefers-reduced-motion: no-preference) { .pp-opt, .pp-mode { transition: border-color 120ms ease, background-color 120ms ease; } }
+
+/* Touch screens: the answer-mode switch and the way back are pressed with a finger. */
+@media (pointer: coarse), (hover: none) {
+  .pp-mode { min-height: var(--tap-min); }
+  .pp-back { min-height: var(--tap-min); display: flex; align-items: center; }
+  .pp-back > a { display: inline-flex; align-items: center; min-height: var(--tap-min); }
+}

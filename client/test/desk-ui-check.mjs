@@ -28,6 +28,8 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { markWording, saysUnmarked, textOfMarkup } from './support/no-mark-wording.mjs';
+import { formatDate } from '../src/lib/locale.js';
+import { defaultCourse } from '../src/platform/edition.js';
 
 let pass = 0;
 const failures = [];
@@ -302,7 +304,7 @@ try {
     ok(closed.includes('03:04:00') && closed.includes('03:00:00') && closed.includes('+00:04:00') && closed.includes('00:14:00'), `${lang}: the closed paper states time used, the allotment, overtime and the pause, as figures`);
     ok(closed.includes(tr('desk.tallies', { done: 1, flagged: 1, notes: 1 })) && screens['the closed paper'].includes('data-desk-next-flagged'), `${lang}: and the student's own done, flagged and note counts, with a way through the flags`);
     const imported = textOfMarkup(screens['an imported attempt']);
-    ok(imported.includes(tr('desk.importedOn', { site: 'Prithagoras', date: new Date(Date.parse(FIXTURE.createdAt)).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) })) && !imported.includes('03:00:00'), `${lang}: an imported attempt says the timer was not brought across, and shows no sitting time`);
+    ok(imported.includes(tr('desk.importedOn', { site: 'Prithagoras', date: formatDate(Date.parse(FIXTURE.createdAt), defaultCourse(), { day: 'numeric', month: 'long', year: 'numeric' }) })) && !imported.includes('03:00:00'), `${lang}: an imported attempt says the timer was not brought across, and shows no sitting time`);
     ok(/data-desk-continue/.test(draw(h(entry.DeskEntryView, { t: tr, attempts: [{ id: 'open-one', state: 'working', tallies: {} }], onStart() {} }))) && /data-desk-start/.test(screens['the way in from a library paper']),
       `${lang}: an open attempt offers Continue; otherwise Practise at the desk`);
   }

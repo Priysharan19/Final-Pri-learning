@@ -126,7 +126,9 @@ export default function Exams() {
           <button className="btn btn-ghost" onClick={() => nav('/progress?tab=hsc')}>{t('hsc.examsCardOpen')}</button>
         </div>
       )}
-      <div className="card">
+      {/* The Prithagoras server refuses this kind of paper (server/platform/exams.js: the NSW-era practice paper stays refused), so its Start
+          button could only fail with an India refusal. Prithagoras students sit generated papers from the card above. */}
+      {user.course !== 'nsw' && <div className="card">
         <div className="card-title">{t('exams.sitPaperTitle')}</div>
         <p className="sub" style={{ marginBottom: 18 }}>
           {t('exams.sitPaperBody')}
@@ -156,7 +158,7 @@ export default function Exams() {
         <button className="btn btn-primary btn-lg" style={{ width: '100%', marginTop: 8 }} onClick={start} disabled={busy}>
           {busy ? t('exams.building') : t('exams.startPractice')}
         </button>
-      </div>
+      </div>}
 
       <PaperHistory exams={exams} openPaper={openPaper} nav={nav} />
       {startRefused}

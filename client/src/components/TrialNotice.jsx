@@ -11,6 +11,8 @@ import React, { useEffect, useState } from 'react';
 import { useLanguage, useT } from '../i18n/index.js';
 import { referralState } from '../platform/referral.js';
 import { priNative } from '../platform/native/index.js';
+import { localeOf } from '../lib/locale.js';
+import { defaultCourse } from '../platform/edition.js';
 
 const DAY = 86_400_000;
 
@@ -34,6 +36,6 @@ export default function TrialNotice() {
   const key = priNative.isNativeShell() ? null : trialNoticeKey(trial);
   if (!key) return null;
   let when = '';
-  try { when = new Intl.DateTimeFormat(language === 'hi' ? 'hi-IN' : undefined, { weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(Number(trial.endsAt))); } catch { when = ''; }
+  try { when = new Intl.DateTimeFormat(language === 'hi' ? 'hi-IN' : localeOf(defaultCourse()), { weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(Number(trial.endsAt))); } catch { when = ''; }
   return <p className="muted" role="status" data-trial-notice={key} style={{ margin: '0 0 14px' }}>{t(key, { when })}</p>;
 }

@@ -131,7 +131,7 @@ try {
     && await page.locator('[data-ext1-paper][data-sit-locked="no"]').count() === 1 && await page.locator('[data-ext1-paper][data-sit-locked="yes"]').count() === 12
     && await page.getByRole('button', { name: 'Download Practice Paper 01, paper (PDF)' }).count() === 1
     && await page.getByRole('button', { name: 'Download Practice Paper 01, marking guidelines (PDF)' }).count() === 1
-    && await page.getByRole('button', { name: /^Sit Practice Paper \d+ in the app$/ }).count() === 1
+    && await page.getByRole('button', { name: /^Sit this paper in the app: Practice Paper \d+$/ }).count() === 1
     && await page.locator('[data-ext1-papers] button').count() === 27);
   check('a sitting-locked row (Paper 02) still has both PDF buttons, plus the Premium prompt and a link to Premium',
     await page.locator(`[data-ext1-paper="${lockedP.id}"] button`).count() === 2

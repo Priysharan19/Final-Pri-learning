@@ -52,7 +52,7 @@ export default function PracticeSets() {
             <div className="sc-label">{s.title}</div>
             <div className="muted">{t('papers.sets.meta', { questions: s.questions, marks: s.marks, time: s.workingTime })}</div>
             <div style={{ marginTop: 10 }}>
-              <button type="button" className="btn btn-primary btn-sm" disabled={busy !== ''} aria-label={t('papers.ext1.sitLabel', { title: s.title })}
+              <button type="button" className="btn btn-primary btn-sm" disabled={busy !== ''} aria-label={t('papers.sets.sitLabel', { title: s.title })}
                 onClick={() => sit(s)} data-practice-set-sit={s.id}>{busy === s.id ? t('papers.ext1.sitting') : t('papers.sets.sit')}</button>
             </div>
           </li>

@@ -79,8 +79,9 @@ export default function Practice() {
       {CLASS9_IDS.includes(chapter) && (
         <OptionalSection key={chapter}><NcertClass9ChapterSection chapterId={chapter} /></OptionalSection>
       )}
-      {(/^me1[12]-/.test(chapter || '') || PRACTICE_SET_CHAPTERS.includes(chapter)) && <OptionalSection key={`es-${chapter}`}><ExamStyleQuestions chapter={chapter} /></OptionalSection>}
       <PracticeBase />
+      {/* After the question, not before it: above the workspace this card put four buttons ahead of the question on a phone (QA sweep, 22 Nov 2026). */}
+      {(/^me1[12]-/.test(chapter || '') || PRACTICE_SET_CHAPTERS.includes(chapter)) && <OptionalSection key={`es-${chapter}`}><ExamStyleQuestions chapter={chapter} /></OptionalSection>}
     </React.Suspense>
   );
 }
