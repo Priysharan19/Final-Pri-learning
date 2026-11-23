@@ -1081,6 +1081,9 @@ jobs:
             node client/test/tour-activation-gate.js --no-build 2>&1 | tee -a browser.log
             # The library and the Exam Desk (makes its own flagged builds).
             node client/test/tour-exam-desk.js 2>&1 | tee -a browser.log
+            # Unknown paths show "not found" and real ones do not, signed out and in, on a Prithagoras build (it builds
+            # and serves its own). test:map runs only its --static half: the suite shards have no browser.
+            node client/test/not-found-routes-check.mjs 2>&1 | tee -a browser.log
             # The paywall (E5) and NSW exam (G4) tours stay in a11y-boot: they
             # build Prithagoras themselves whatever this group's edition is.
               ;;
