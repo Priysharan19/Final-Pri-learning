@@ -23,7 +23,7 @@ import { segmentInkLines, plausibleLineMatch } from '../ink/inkLines.js';
 /** A card status the page speaks about, with the icon that carries it besides colour. */
 export const STATE = Object.freeze({
   checked: { word: 'aw.status.checked', icon: 'check', tone: 'good' },
-  condition: { word: 'aw.status.condition', icon: 'check', tone: 'good' },
+  condition: { word: 'aw.status.condition', icon: 'dash', tone: 'quiet' },
   'first-error': { word: 'aw.status.firstError', icon: 'alert', tone: 'error' },
   follows: { word: 'aw.status.follows', icon: 'arrowRight', tone: 'partial' },
   incomplete: { word: 'aw.status.incomplete', icon: 'uncertain', tone: 'partial' },

@@ -28,7 +28,7 @@
   border: 1px solid var(--hairline-strong); border-radius: var(--radius-sm); cursor: pointer; }
 .mp-marker:focus-visible, .mp-pick:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .mp-marker.is-first-error { border-color: var(--correction); color: var(--correction); }
-.mp-marker.is-checked svg, .mp-marker.is-condition svg { color: var(--good); }
+.mp-marker.is-checked svg { color: var(--good); }
 .mp-marker.is-quiet, .mp-marker.is-not-verified, .mp-marker.is-unread { border-style: dotted; color: var(--ink-3); }
 .mp-marker.is-active { background: var(--ink); color: var(--surface-raised); border-color: var(--ink); }
 .mp-marker.is-active svg { color: inherit; }
@@ -42,7 +42,7 @@
   padding: var(--space-3); font-size: 14px; line-height: 1.5; color: var(--ink-2); display: grid; gap: var(--space-2); min-width: 0; }
 .mp-state { display: flex; align-items: center; gap: var(--space-2); margin: 0; color: var(--ink); }
 .mp-state b { font-weight: 600; margin-left: auto; }
-.mp-detail[data-mp-status="checked"] .mp-state b, .mp-detail[data-mp-status="condition"] .mp-state b { color: var(--good); }
+.mp-detail[data-mp-status="checked"] .mp-state b { color: var(--good); }
 .mp-detail[data-mp-status="first-error"] .mp-state b { color: var(--correction); }
 .mp-detail[data-mp-status="first-error"] { border-color: var(--correction-line); }
 .mp-text, .mp-text p { margin: 0; }
@@ -62,7 +62,7 @@
 .mp-card.is-active .mp-pick { background: var(--accent-soft); color: var(--ink); }
 .mp-card.is-active .mp-pick .mp-row-n { font-weight: 600; }
 .mp-pick svg { flex: none; }
-.mp-card.is-checked svg, .mp-card.is-condition svg { color: var(--good); }
+.mp-card.is-checked svg { color: var(--good); }
 .mp-card.is-first-error svg { color: var(--correction); }
 .mp-row-n { color: var(--ink); }
 .mp-row-w { margin-left: auto; color: var(--ink-3); }

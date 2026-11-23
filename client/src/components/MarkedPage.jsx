@@ -187,17 +187,19 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
   const lineOpen = n => showAll || shown.has(n);
   const toggleLine = n => setShown(prev => { const next = new Set(prev); if (next.has(n)) next.delete(n); else next.add(n); return next; });
   // One line's reading, on demand, with Edit. A correction marks the page again (the caller's business).
-  const readingOfLine = n => {
-    const open = lineOpen(n);
+  // `inline`: the reading is the panel's own "How Pri read this line" (a wrong line), so there is no second link to open it, only Edit.
+  const readingOfLine = (n, inline = false) => {
+    const open = inline || lineOpen(n);
     const text = textOf(n);
     const isEditing = editing?.line === n;
     return (
       <div className="mp-read" data-mp-read-line={n}>
-        <button type="button" className="mp-link" data-mp-see-line={n} aria-expanded={open} aria-controls={`${uid}-read-${n}`}
-          onClick={() => toggleLine(n)}>{t('mp.seeLine')}</button>
+        {!inline && <button type="button" className="mp-link" data-mp-see-line={n} aria-expanded={open} aria-controls={`${uid}-read-${n}`}
+          onClick={() => toggleLine(n)}>{t('mp.seeLine')}</button>}
         <div id={`${uid}-read-${n}`} hidden={!open}>
           {open && (
             <>
+              {inline && <p className="mp-fact-l">{t('mp.readAs')}</p>}
               {text.trim()
                 ? <p className="mp-expr" data-mp-reading={n} data-text={text} aria-label={t('mp.readingOf', { n })}><Typeset text={text} texOf={lineOf} tex={latexOf(n)} /></p>
                 : <p className="mp-text" data-mp-reading={n}>{t('mp.readingBlank')}</p>}
@@ -244,7 +246,8 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
       const body = <CardBody card={card} model={model} t={t} />;
       comment = <div className="mp-text">{body}</div>;
     }
-    const showRead = status === 'first-error' || status === 'follows';
+    const inlineRead = status === 'first-error' && !!reading;
+    const showRead = (status === 'first-error' && !reading) || status === 'follows';
     return (
       <div className="mp-detail" data-mp-detail={n} data-mp-status={status} ref={detailRef}>
         <p className="mp-state" data-mp-state={state}>
@@ -259,13 +262,14 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
             <p className="mp-expr" data-mp-expr><Typeset text={card.text} texOf={lineOf} tex={textOf(n).replace(/\s+/g, '') === String(card.text).replace(/\s+/g, '') ? latexOf(n) : null} /></p>
           </div>
         )}
+        {inlineRead && readingOfLine(n, true)}
         {status === 'first-error' && card.corrected && (
           <div className="mp-fact" data-mp-fact="corrected">
             <p className="mp-fact-l">{t('mp.corrected')}</p>
             <p className="mp-expr" data-mp-corrected><Typeset text={card.corrected} texOf={lineOf} /></p>
           </div>
         )}
-        {reading && status !== 'unread' && readingOfLine(n)}
+        {reading && status !== 'unread' && !inlineRead && readingOfLine(n)}
       </div>
     );
   };

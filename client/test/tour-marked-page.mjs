@@ -65,7 +65,8 @@ const browser0 = await chromium.launch();
   const nums = await pg.locator('[data-mp-card]').evaluateAll(es => es.map(e => Number(e.getAttribute('data-mp-card'))));
   ok(nums.length === 9 && nums.every((n, i) => n === i + 1), `the line list holds every line, in line order (${nums})`);
   ok(await pg.locator('[data-mp-card="collapsed"]').count() === 0, 'there is no separate "Not verified" box: the unchecked lines are rows like the rest');
-  ok(await pg.locator('[data-mp-see-line]').count() === 1, 'one "See how Pri read this line" for the selected line, not one on every line');
+  ok(await pg.locator('[data-mp-see-line]').count() === 0 && await pg.locator('[data-mp-detail] [data-mp-reading="9"]').count() === 1 && /How Pri read this line/.test(await pg.locator('[data-mp-detail]').innerText()), 'on a wrong line "How Pri read this line" is shown and there is no second "See how Pri read this line" link');
+  ok(await pg.locator('[data-mp-box="3"] svg').count() === 1 && await pg.locator('[data-mp-pick="3"] svg').count() === 1 && await pg.locator('[data-mp-box="3"] path[d="M7 12h10"]').count() === 1 && await pg.locator('[data-mp-pick="3"] path[d="M7 12h10"]').count() === 1 && await pg.locator('[data-mp-box="1"] path[d="m5 12.5 4.5 4.5L19 7.5"]').count() === 1, 'a Context line has a plain dash, not a tick, in the list and on its marker');
   ok(await pg.locator('[data-marked-page]').getAttribute('data-mp-selected') === '9' && /Line 9/.test(await pg.locator('[data-mp-detail]').innerText()) && /Wrong/.test(await pg.locator('[data-mp-detail]').innerText()), 'the panel opens on the first crossed line, in words');
   ok(await pg.locator('[data-mp-box="9"]').getAttribute('aria-label') === 'Line 9, wrong' && await pg.locator('[data-mp-box="1"]').getAttribute('aria-label') === 'Line 1, correct' && await pg.locator('[data-mp-box="6"]').getAttribute('aria-label') === 'Line 6, not checked' && await pg.locator('[data-mp-box="3"]').getAttribute('aria-label') === 'Line 3, context', 'markers are named buttons: Line 9, wrong');
   ok(await pg.locator('button[data-mp-box]').count() === 9, 'every marker is a real button');
@@ -95,6 +96,7 @@ const browser0 = await chromium.launch();
   const ring = await pg.evaluate(() => { const b = document.querySelector('[data-mp-box="3"]'); b.focus(); const s = getComputedStyle(b); return { style: s.outlineStyle, w: s.outlineWidth }; });
   ok(ring.style !== 'none' && parseFloat(ring.w) >= 2, 'a focused marker shows a visible focus ring');
   // "See how Pri read this line" stays a real, on-demand button
+  await pg.locator('[data-mp-box="1"]').click();
   const see = pg.locator('[data-mp-see-line]').first();
   await see.focus();
   ok(await see.evaluate(b => b.tagName === 'BUTTON') && await see.getAttribute('aria-expanded') === 'false' && await pg.locator('[data-mp-reading]').count() === 0, 'See how Pri read this line is a real button, collapsed, nothing read out before it is pressed');

@@ -227,8 +227,7 @@ export const flow = {
       await page.locator('[data-mp-card="2"][data-mp-status="first-error"]').count() === 1, JSON.stringify((g4?.json?.stepReport?.lines || []).map(l => [l.text, l.status])));
     const providerBeforeFix = reader.requests.length;
     const row4 = (await front().getAttribute('data-question-id'));
-    await page.locator('[data-mp-see-line="2"]').click();
-    await check('"See how Pri read this line" shows the misread, so the student can see where it went wrong',
+    await check('"How Pri read this line" is already shown on the wrong line, with no second link, and shows the misread, so the student can see where it went wrong',
       (await page.locator('[data-mp-reading="2"]').getAttribute('data-text')) === MISREAD);
     await page.locator('[data-mp-edit-line="2"]').click();
     await page.locator('[data-mp-edit-input="2"]').fill(picked2[1]);
