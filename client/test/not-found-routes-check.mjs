@@ -129,3 +129,5 @@ if (!process.argv.includes('--static')) {
 }
 
 console.log(`NOT FOUND ROUTES: PASS — ${n}/${n} checks`);
+// The platform server and its database keep the event loop alive after the walk; the verdict is printed, so stop here.
+process.exit(0);
