@@ -1,6 +1,8 @@
 // The marked page's pure model: where each judged line sits on the student's own page, where its
 // comment goes, the one collapsed "not checked" card, and the header sentence. No DOM.
-import { boxesFromInk, boxesFromPhoto, alignCards, buildMarkedPage, commentItems } from '../src/components/markedPageModel.js';
+import { buildAnnotatedWorking } from '../src/components/annotatedWorkingModel.js';
+import { typesetProse } from '../src/components/typesetProse.js';
+import { boxesFromInk, boxesFromPhoto, alignCards, buildMarkedPage, commentItems, defaultLine, stateOf } from '../src/components/markedPageModel.js';
 
 let pass = 0; const fail = [];
 const ok = (c, l) => { if (c) pass++; else fail.push(l); };
@@ -49,13 +51,24 @@ const model8 = {
   cards: [card(1, 'checked'), card(2, 'checked'), card(3, 'not-verified'), card(4, 'checked'), card(5, 'not-verified'), card(6, 'checked'), card(7, 'checked'), card(8, 'first-error')],
   marks: { awarded: 1, possible: 3 }, allChecked: false
 };
+function clean0() { return { cards: [card(1, 'checked'), card(2, 'checked')], allChecked: true }; }
 const p8 = buildMarkedPage({ model: model8 });
-eq(p8.header.parts.map(x => [x.key, x.vars]), [['mp.head.checked', { checked: 5, total: 8 }], ['mp.head.firstError', { n: 8 }]], 'header: 5 of 8 lines checked, first error on line 8');
+eq(p8.header.parts.map(x => [x.key, x.vars]), [['mp.sum.firstError', { n: 8 }], ['mp.sum.right', { count: 5 }], ['mp.sum.wrong', { count: 1 }], ['mp.sum.unchecked', { count: 2 }]], 'header: where first (not "correct up to" over unchecked lines), then three separate counts that never call an unchecked line right or wrong');
+eq(p8.header.counts, { right: 5, wrong: 1, unchecked: 2 }, 'the counts: 5 correct, 1 wrong, 2 not checked');
+eq(buildMarkedPage({ model: { cards: [card(1, 'checked'), card(2, 'condition'), card(3, 'checked'), card(4, 'first-error'), card(5, 'follows')], allChecked: false } }).header.parts.slice(0, 1).map(x => [x.key, x.vars]), [['mp.sum.upTo', { n: 3, m: 4 }]], 'a clean run of ticks above the cross: correct up to line 3, first error on line 4');
+eq(buildMarkedPage({ model: { cards: [card(1, 'first-error'), card(2, 'not-verified')], allChecked: false } }).header.parts[0].key, 'mp.sum.firstError', 'a cross on line 1 says only where it is');
+eq(buildMarkedPage({ model: { cards: [card(1, 'checked'), card(2, 'checked'), card(3, 'not-verified')], marks: { awarded: 0, possible: 3 }, allChecked: false } }).header.parts.map(x => x.key), ['mp.sum.finalWrongChecked', 'mp.sum.right', 'mp.sum.unchecked'], 'no cross and a wrong final answer: the lines Pri could check are right, the answer is not, no location invented');
+eq(buildMarkedPage({ model: { cards: [card(1, 'checked'), card(2, 'checked')], marks: { awarded: 0, possible: 3 }, allChecked: true } }).header.parts.map(x => x.key), ['mp.sum.finalWrongChecked', 'mp.sum.right'], 'every line ticked but a wrong final answer never says every line was checked');
+eq(buildMarkedPage({ model: { cards: [card(1, 'not-verified'), card(2, 'unread')], marks: { awarded: 0, possible: 3 }, allChecked: false } }).header.parts.map(x => x.key), ['mp.sum.finalWrongNone', 'mp.sum.unchecked'], 'nothing checkable and a wrong final answer');
+eq(defaultLine(p8), 8, 'the first crossed line is selected to begin with');
+eq(defaultLine(buildMarkedPage({ model: clean0() })), 1, 'with no cross the first line is selected');
+eq(defaultLine(buildMarkedPage({ model: { ...clean0(), firstBreakIndex: 1 } })), 2, 'the first-break index the engine reports, when no line is crossed, picks the line');
+eq(defaultLine(buildMarkedPage({ model: { ...clean0(), firstBreakIndex: 9 } })), 1, 'an out-of-range first-break index is ignored');
+eq([stateOf('checked'), stateOf('first-error'), stateOf('condition'), stateOf('not-verified'), stateOf('follows'), stateOf('unread'), stateOf('incomplete')], ['right', 'wrong', 'context', 'unchecked', 'unchecked', 'unchecked', 'unchecked'], 'four plain states; follow-through, unread and unfinished lines are never called right or wrong');
 eq(p8.header.mark, { awarded: 1, possible: 3 }, 'the mark shown is the server mark, copied');
 eq(p8.collapsed.lines, [3, 5], 'lines 3 and 5 are the "not checked" lines');
 const items = commentItems(p8);
-eq(items.filter(i => i.kind === 'collapsed').length, 1, 'ONE collapsed card, not one per line');
-eq(items.map(i => i.id), ['l1', 'l2', 'collapsed', 'l4', 'l6', 'l7', 'l8'], 'the collapsed card stands where the first unchecked line is; no card repeats the reason');
+eq(items.filter(i => i.kind === 'collapsed').length, 1, 'the model still groups the unchecked lines into one item');
 eq(p8.firstError, 8, 'the first error is line 8');
 ok(buildMarkedPage({ model: model8, markReady: false }).header.mark === null, 'a page that is not a marked result shows no mark');
 ok(buildMarkedPage({ model: { ...model8, marks: null } }).header.mark === null, 'unmarked work is never shown as zero: no receipt, no mark');
@@ -63,9 +76,9 @@ ok(buildMarkedPage({ model: { ...model8, marks: { awarded: 0, possible: 3 } } })
 
 const clean = { cards: [card(1, 'checked'), card(2, 'checked'), card(3, 'checked')], marks: { awarded: 3, possible: 3 }, allChecked: true };
 eq(buildMarkedPage({ model: clean }).header.parts.map(x => x.key), ['mp.head.every'], 'every line checked says so');
-ok(buildMarkedPage({ model: { ...clean, allChecked: false } }).header.parts[0].key === 'mp.head.checked', 'never "every line was checked" unless it is true');
-ok(buildMarkedPage({ model: { cards: [card(1, 'checked'), card(2, 'incomplete')], allChecked: true } }).header.parts.some(x => x.key === 'mp.head.notFinished'), 'a true but unfinished line is said to be unfinished');
-ok(buildMarkedPage({ model: { cards: [card(1, 'checked'), card(2, 'not-verified')], allChecked: true } }).header.parts[0].key === 'mp.head.checked', 'a line that was not checked stops "every line"');
+ok(buildMarkedPage({ model: { ...clean, allChecked: false } }).header.parts[0].key === 'mp.sum.right', 'never "every line was checked" unless it is true');
+ok(buildMarkedPage({ model: { cards: [card(1, 'checked'), card(2, 'incomplete')], allChecked: true } }).header.parts.some(x => x.key === 'mp.sum.unchecked'), 'a true but unfinished line is counted as not checked, never as right or wrong');
+ok(buildMarkedPage({ model: { cards: [card(1, 'checked'), card(2, 'not-verified')], allChecked: true } }).header.parts[0].key === 'mp.sum.right', 'a line that was not checked stops "every line"');
 eq(buildMarkedPage({ model: { cards: [] } }), null, 'no lines, no page');
 
 // ── outlines are drawn only when every line has a box ─────────────────────────
@@ -78,5 +91,20 @@ ok(ci.every(i => typeof i.y === 'number'), 'every comment has a level when the p
 ok(Math.abs(ci.find(i => i.kind === 'collapsed').y - (boxes[2].y + boxes[2].h / 2)) < 1e-9, 'the collapsed card is level with the first line it speaks about');
 ok(commentItems(p8).every(i => i.y === null || i.kind === 'collapsed' && i.y === null), 'without geometry no comment claims a level');
 
+eq([typesetProse('The term -2x became -x.'), typesetProse('At x = 1 the line above gives 1 but this line gives 2.'), typesetProse('Already $x$ done'), typesetProse('Every line before line 9 is correct.')],
+  ['The term $-2x$ became $-x$.', 'At $x = 1$ the line above gives 1 but this line gives 2.', 'Already $x$ done', 'Every line before line 9 is correct.'], 'engine sentences get their maths typeset; plain numbers, marked maths and prose are left alone');
+// ── the engine's optional per-line fields reach the cards, and only when present ─────────────────────────────
+{
+  const rep = { source: 'value-chain', firstBreakLine: 3, lines: [
+    { text: 'y=2x', status: 'ok', state: 'given', how: 'Restates the question.' },
+    { text: 'y=3x', status: 'ok', state: 'verified' },
+    { text: 'y=4x', status: 'break', state: 'wrong', note: 'Wrong.', diagnosis: { comment: 'Not equal to line 2.', whatChanged: 'a', whyWrong: 'b', errorType: 'slip', corrected: 'y=5x', fromLine: 2, check: 'c', kept: 'd' } }] };
+  const m = buildAnnotatedWorking({ lines: rep.lines.map(l => l.text), stepReport: rep });
+  eq(m.cards.map(c => c.comment), ['Restates the question.', null, 'Not equal to line 2.'], 'a line comment from the engine reaches its card; none is invented');
+  eq(m.cards[2].facts, { whatChanged: 'a', whyWrong: 'b', fromLine: 2, check: 'c', kept: 'd' }, 'the wrong line carries the engine\'s what changed, why, from line, quick check and kept');
+  eq([m.cards[2].corrected, m.cards[0].facts, m.cards[1].corrected, m.firstBreakIndex], ['y=5x', null, null, 2], 'a corrected line only on the wrong line; the first-break index is carried');
+  const bare = buildAnnotatedWorking({ lines: ['a', 'b'], stepReport: { source: 'value-chain', lines: [{ text: 'a', status: 'ok', state: 'verified' }, { text: 'b', status: 'break', state: 'wrong' }] } });
+  eq([bare.cards[1].facts, bare.cards[1].corrected, bare.firstBreakIndex], [{ whatChanged: null, whyWrong: null, fromLine: null, check: null, kept: null }, null, null], 'without the optional fields every one is null');
+}
 if (fail.length) { console.error(fail.map(f => `  · ${f}`).join('\n')); console.error(`MARKED PAGE MODEL: FAIL (${fail.length} of ${pass + fail.length})`); process.exit(1); }
 console.log(`MARKED PAGE MODEL: PASS — ${pass}/${pass} checks — line geometry for ink and photo, level comments, the one collapsed card, an honest header, no mark unless the server gave one`);

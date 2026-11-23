@@ -46,6 +46,7 @@ const PATHS = {
   type: <><rect x="2.5" y="6" width="19" height="12" rx="1.5" /><path d="M6 10h.01M9.5 10h.01M13 10h.01M16.5 10h.01M7.5 14h9" /></>,
   photo: <><path d="M4 7.5h3l1.5-2h7l1.5 2h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></>,
   check: ['m5 12.5 4.5 4.5L19 7.5'],
+  dash: ['M7 12h10'],
   correction: ['M4.5 19.5c3-1 5-3 6.5-6', 'M13.5 4.5l6 6-7.5 7.5H6v-6z'],
   uncertain: <><circle cx="12" cy="12" r="8.5" strokeDasharray="3 2.6" /><path d="M9.8 9.6a2.3 2.3 0 1 1 3.3 2.1c-.7.4-1.1.9-1.1 1.7v.4" /><path d="M12 16.6v.1" /></>,
   alert: ['M12 4 21 19.5H3z', 'M12 10v4.5', 'M12 17v.1'],

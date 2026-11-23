@@ -29,16 +29,39 @@ if (edition === 'priyabhata') setLanguage('hi');
 const BUOY = { kind: 'value-chain', fn: { name: 'h', variable: 't', expr: '22+5*sin(pi*t/6)' }, quantities: { max: 27, min: 17, amplitude: 5, midline: 22, period: 12 }, fullDomain: true };
 const STAT = { kind: 'value-chain', fn: { name: 'y', variable: 'x', expr: '(2)*x^3+(9)*x^2' }, curve: { derivative: '(6)*x^2+(18)*x', stationary: [-3, 0], choose: 'smaller' } };
 const OWNER = ['y=2x³+9x²', "y'=6x²+18x", "for stat points y'=0", '0=6x²+18x', '0=6x[x+3]', 'x=0 or x=-3'];
+// SYNTHETIC report for the product-rule page (y = x^2(x - 1)): the shape the engine's value-chain report takes, carrying the optional
+// per-line `comment` and, on the wrong line, whatChanged, whyWrong, corrected, fromLine, check and kept. Not an engine verdict.
+const PRODUCT_LINES = ['y = x^2(x - 1)', 'u = x^2', 'v = x - 1', "u' = 2x", "v' = 1", "y' = u'v + uv'", "y' = 2x(x - 1) + x^2(1)", "y' = 2x^2 - 2x + x^2", '= 3x^2 - x'];
+const PRODUCT_HOW = ['Restates the function from the question.', 'Correct choice: u = x^2 is the first factor.', 'Correct choice: v = x - 1 is the second factor.', "Correct: the derivative of x^2 is 2x, so u' = 2x.", "Correct: the derivative of x - 1 is 1.", "Correct statement of the product rule: y' = u'v + uv'.", "Correct substitution: y' = 2x(x - 1) + x^2(1).", 'Correct expansion: 2x(x - 1) = 2x^2 - 2x.'];
+// The engine's field names (task/first-wrong-step): `how` on a ticked line; `diagnosis` { whatChanged, whyWrong, errorType, corrected, fromLine, check, kept, comment } on the wrong one.
+const PRODUCT_REPORT = {
+  source: 'value-chain', firstBreak: 8, firstBreakLine: 9, summary: { total: 9, checked: 8, given: [1], verified: [2, 3, 4, 5, 6, 7, 8], conditions: [], wrong: [9], unverified: [], unread: [], reason: null },
+  lines: PRODUCT_LINES.map((text, i) => (i < 8
+    ? { text, status: 'ok', state: i === 0 ? 'given' : 'verified', how: PRODUCT_HOW[i], ...(i === 0 ? { restates: true, note: PRODUCT_HOW[0] } : {}) }
+    : { text, status: 'break', state: 'wrong', note: 'This line does not follow from line 8.', diagnosis: { code: 'combine-like-terms', errorType: 'algebra-slip', title: 'Like terms combined wrongly', confidence: 'high',
+        comment: 'This line does not follow from line 8.', whatChanged: 'The term -2x became -x.', whyWrong: 'Collecting 2x^2 + x^2 gives 3x^2 and leaves the -2x term alone, so -2x stays -2x.',
+        corrected: '= 3x^2 - 2x', fromLine: 8, check: 'At x = 1 the line above gives 1 but this line gives 2.', kept: 'Every line checked before line 9 is correct. The product rule was applied correctly; this is an algebra slip.' } }))
+};
 const CASES = {
+  product: { meta: null, lines: PRODUCT_LINES, report: PRODUCT_REPORT, receipt: { awarded: 0, possible: 3 } },
   buoy: { meta: BUOY, lines: ['22 + 5sin(πt/6)', 'max = 22 + 5', '= 27'], receipt: { awarded: 2, possible: 2 } },
   stationary: { meta: STAT, lines: [...OWNER, 'y(0)=0', 'smallest: (0,0)'], receipt: { awarded: 0, possible: 3 } },
-  mixed: { meta: STAT, lines: ['y=2x³+9x²', '@@@', "y'=6x²+18x", 'foo', '0=6x[x+3]', 'x=0 or x=-3'], receipt: { awarded: 0, possible: 3 } }
+  mixed: { meta: STAT, lines: ['y=2x³+9x²', '@@@', "y'=6x²+18x", 'foo', '0=6x[x+3]', 'x=0 or x=-3'], receipt: { awarded: 0, possible: 3 } },
+  // ticks, lines the engine could not check (one unread), a tick, then the cross on the last line
+  crossed: { meta: STAT, lines: [...OWNER.slice(0, 4), '0=6x[x+4]', '@@@', 'foo', 'x=0 or x=-3', 'smallest: (0,0)'], receipt: { awarded: 0, possible: 3 } },
+  // every line the engine could check is a tick; the final answer is the server's 0 of 3
+  wrongfinal: { meta: STAT, lines: [...OWNER, 'y(0)=0'], receipt: { awarded: 0, possible: 3 } }
 };
 // A test may hand the page its own picture and reader boxes (window.__markedPageFixture = { src, lines: [{ text, box }] }),
 // to check where the outlines fall on that picture. Nothing in the real build reads this.
 const FIXTURE_PAGE = typeof window !== 'undefined' && window.__markedPageFixture && source === 'photo' ? window.__markedPageFixture : null;
 const c = FIXTURE_PAGE ? { ...CASES.buoy, lines: FIXTURE_PAGE.lines.map(l => l.text) } : (CASES[which] || CASES.buoy);
-const stepReport = stepCheck(c.meta, c.lines.join('\n'));
+const stepReport = c.report || stepCheck(c.meta, c.lines.join('\n'));
+// ?facts=1: the optional fields the engine may add (a first-break index, a corrected line on the crossed line). Absent otherwise.
+if (q.get('facts') === '1' && !c.report) {
+  const at = stepReport.lines.findIndex(l => l.state === 'wrong' || l.status === 'break');
+  if (at >= 0) { stepReport.firstBreak = at; stepReport.lines[at] = { ...stepReport.lines[at], corrected: '0=6x[x+3]' }; }
+}
 const input = { lines: c.lines, stepReport, solution: null, source: source === 'ink' ? 'handwriting' : 'typed', receipt: { ...c.receipt, id: 'synthetic-0000' }, attempt: 1 };
 
 // ── a synthetic page ─────────────────────────────────────────────────────────

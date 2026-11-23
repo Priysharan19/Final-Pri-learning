@@ -169,8 +169,10 @@ export const flow = {
       `${await page.locator('[data-mp-card]').count()} comments`);
     const after = await readingIsNotShown(page, longLines);
     await check('and still no typed reading is visible: the reading is on demand only', after.structure.length === 0 && after.leaked.length === 0, JSON.stringify(after));
+    // One panel for the selected line (the first line, with no cross): choose line 2 from the list, then its reading is on offer.
+    await page.locator('[data-mp-pick="2"]').evaluate(el => el.click());
     const seeLine = page.locator('[data-mp-see-line="2"]');
-    await check('each comment offers a quiet text action, "See how Pri read this line", reachable from the keyboard',
+    await check('the selected line offers a quiet text action, "See how Pri read this line", reachable from the keyboard',
       await seeLine.count() === 1 && /^See how Pri read this line$/.test((await seeLine.innerText()).trim()) && await seeLine.evaluate(el => el.tabIndex >= 0 && el.tagName === 'BUTTON'));
     await seeLine.focus();
     await page.keyboard.press('Enter');
@@ -196,9 +198,10 @@ export const flow = {
     await check('a line read below the reader\'s floor is excluded by the server and named by its index',
       g2?.json?.reading?.studentConfirmed === false && JSON.stringify(g2.json.reading.excludedLines) === '[1]' && JSON.stringify(g2.json.reading.lineStates) === '["judged","not-read","judged","judged"]',
       JSON.stringify(g2?.json?.reading));
-    const unreadCard = page.locator('[data-mp-card="collapsed"]');
-    await check('the page shows it as not checked, in the one quiet card, with "Rewrite it, or type it."',
-      await unreadCard.count() === 1 && /wasn’t checked: Pri couldn’t read it\./.test(await unreadCard.innerText()) && /Rewrite it, or type it\./.test(await unreadCard.innerText()) && (await unreadCard.getAttribute('data-mp-lines')).split(',').includes('2'),
+    await page.locator('[data-mp-pick="2"]').evaluate(el => el.click());
+    const unreadCard = page.locator('[data-mp-detail="2"]');
+    await check('the page shows it as Not checked, in the panel for that line, with "Rewrite it, or type it."',
+      await unreadCard.count() === 1 && /Not checked/.test(await unreadCard.innerText()) && /wasn’t checked: Pri couldn’t read it\./.test(await unreadCard.innerText()) && /Rewrite it, or type it\./.test(await unreadCard.innerText()) && await unreadCard.getAttribute('data-mp-status') === 'unread',
       await unreadCard.innerText().catch(() => 'none'));
     await check('and it is neither ticked nor crossed: no first error, and its text is in no verdict',
       await page.locator('[data-mp-status="first-error"]').count() === 0 && await page.locator('[data-mp-card="2"][data-mp-status="checked"]').count() === 0 && !JSON.stringify(g2?.json?.stepReport || {}).includes('+ 7') && !JSON.stringify(g2?.json?.stepReport || {}).includes('+7'),
@@ -224,8 +227,7 @@ export const flow = {
       await page.locator('[data-mp-card="2"][data-mp-status="first-error"]').count() === 1, JSON.stringify((g4?.json?.stepReport?.lines || []).map(l => [l.text, l.status])));
     const providerBeforeFix = reader.requests.length;
     const row4 = (await front().getAttribute('data-question-id'));
-    await page.locator('[data-mp-see-line="2"]').click();
-    await check('"See how Pri read this line" shows the misread, so the student can see where it went wrong',
+    await check('"How Pri read this line" is already shown on the wrong line, with no second link, and shows the misread, so the student can see where it went wrong',
       (await page.locator('[data-mp-reading="2"]').getAttribute('data-text')) === MISREAD);
     await page.locator('[data-mp-edit-line="2"]').click();
     await page.locator('[data-mp-edit-input="2"]').fill(picked2[1]);

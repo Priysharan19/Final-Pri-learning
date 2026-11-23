@@ -15,6 +15,16 @@
 import { annotateWorking } from '../engine/stepJustify.js';
 
 const MAX_LINES = 40;
+// Optional per-line fields the engine may add: a specific comment (any line) and, on a wrong line, what changed, why it is wrong,
+// the line it comes from (1-based), a quick check and a closing sentence about what was kept. Absent: null, nothing invented.
+const clip = (v, n = 400) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, n) : null);
+// Engine field names (task/first-wrong-step): a wrong line's detail is `diagnosis` { whatChanged, whyWrong, errorType, corrected, fromLine, check, kept, comment };
+// a ticked line's "what you did right" sentence is `how`. The older top-level `comment`, `corrected` and `note` are the fallbacks.
+const factsOf = l => { const d = l?.diagnosis || {}; const from = Number.isInteger(d.fromLine) ? d.fromLine : l?.fromLine; return { whatChanged: clip(d.whatChanged ?? l?.whatChanged), whyWrong: clip(d.whyWrong ?? l?.whyWrong), fromLine: Number.isInteger(from) && from >= 1 ? from : null, check: clip(d.check ?? l?.check), kept: clip(d.kept ?? l?.kept) }; };
+// `firstBreak` is the zero-based index; `firstBreakLine` is the same line, one-based.
+const breakIndexOf = r => (Number.isInteger(r?.firstBreak) && r.firstBreak >= 0 ? r.firstBreak : Number.isInteger(r?.firstBreakLine) && r.firstBreakLine >= 1 ? r.firstBreakLine - 1 : null);
+const commentOf = l => clip(l?.diagnosis?.comment ?? l?.how ?? l?.comment, 300);
+const correctedOf = l => clip(l?.diagnosis?.corrected ?? l?.corrected, 200);
 
 /** 6, 7, 8 → "6–8"; 2, 4 → "2, 4". */
 export function lineRange(ns) {
@@ -94,7 +104,9 @@ export function buildAnnotatedWorking({ lines, stepReport, receipt = null, solut
       diagnosis: status === 'first-error' ? (l.diagnosis || null) : null,
       note: status === 'first-error' ? (l.note || null) : null,
       previousText: status === 'first-error' && i > 0 && report[i - 1]?.status === 'ok' ? texts[i - 1] : null,
-      text: texts[i]
+      text: texts[i],
+      corrected: status === 'first-error' ? correctedOf(l) : null,
+      comment: commentOf(l), facts: status === 'first-error' ? factsOf(l) : null
     };
   });
 
@@ -130,7 +142,8 @@ export function buildAnnotatedWorking({ lines, stepReport, receipt = null, solut
 
   const marks = receipt && Number.isFinite(Number(receipt.awarded)) && Number(receipt.possible) > 0
     ? { awarded: Number(receipt.awarded), possible: Number(receipt.possible), receiptId: typeof receipt.id === 'string' && receipt.id ? receipt.id.slice(-8) : null } : null;
-  return { cards, proof, summary, marks, criteria, jumps, followThrough, source, allChecked, noneChecked, attempt: Number.isInteger(attempt) && attempt > 1 ? attempt : null };
+  const firstBreakIndex = breakIndexOf(stepReport);
+  return { cards, proof, summary, marks, criteria, jumps, followThrough, source, firstBreakIndex, allChecked, noneChecked, attempt: Number.isInteger(attempt) && attempt > 1 ? attempt : null };
 }
 
 /**
@@ -146,10 +159,12 @@ function buildValueChainModel({ report: reportIn, stepReport, receipt, source, a
   report = report.map(l => ({ ...l, state: l?.state === 'unverified' && l.status === 'ok' ? 'verified' : l?.state || (l?.status === 'ok' ? 'verified' : l?.status === 'break' ? 'wrong' : 'unverified') }));
   const firstBreak = report.findIndex(l => l?.state === 'wrong');
   const cards = report.map((l, i) => ({
-    n: i + 1, line: i, status: STATUS[l?.state] || 'not-verified', valueChain: l?.state || 'unverified',
+    n: i + 1, line: i, status: l?.context === true && !['wrong', 'verified', 'given', 'arithmetic', 'unread'].includes(l?.state) ? 'condition' : STATUS[l?.state] || 'not-verified', valueChain: l?.state || 'unverified',
     start: false, startSide: null, rules: [], more: false, same: false, unnamed: false, followsFrom: null,
     diagnosis: l?.state === 'wrong' ? (l.diagnosis || null) : null, note: l?.state === 'wrong' || l?.state === 'given' || l?.state === 'incomplete' || l?.state === 'arithmetic' || l?.state === 'verified' ? (l.note || null) : null,
-    previousText: null, text: String(l?.text ?? ''), restated: l?.state === 'given' && l?.solutionMatch === true, fact: l?.fact || null, how: l?.how || null, how: l?.how || null
+    previousText: null, text: String(l?.text ?? ''), restated: l?.state === 'given' && l?.solutionMatch === true, fact: l?.fact || null, how: l?.how || null,
+    corrected: l?.state === 'wrong' ? correctedOf(l) : null,
+    comment: commentOf(l), facts: l?.state === 'wrong' ? factsOf(l) : null
   }));
   const summaryOf = stepReport.summary || {};
   const unverified = cards.filter(c => c.status === 'not-verified' || c.status === 'unread').map(c => c.n);
@@ -165,6 +180,7 @@ function buildValueChainModel({ report: reportIn, stepReport, receipt, source, a
     : (unverified.length || cards.some(c => c.status === 'incomplete')) ? { key: 'aw.summary.some', vars: { checked, total } }
       : { key: 'aw.summary.valueAll', vars: { checked, total } };
   return {
+    firstBreakIndex: breakIndexOf(stepReport),
     cards, proof: null, summary, marks: receipt && Number.isFinite(Number(receipt.awarded)) && Number(receipt.possible) > 0 ? { awarded: Number(receipt.awarded), possible: Number(receipt.possible), receiptId: typeof receipt.id === 'string' && receipt.id ? receipt.id.slice(-8) : null } : null,
     criteria: [], jumps: [], followThrough: [], source, attempt: Number.isInteger(attempt) && attempt > 1 ? attempt : null,
     allChecked: unverified.length === 0 && firstBreak < 0 && !cards.some(c => c.status === 'incomplete'),
