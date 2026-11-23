@@ -247,7 +247,10 @@ export function MapCanvas({ areas, links, selected, onSelect, raised, label, axi
   }, [areas, links, selected, raised, size, phone, reduce, axis]);
 
   const pick = e => {
-    const r = e.currentTarget.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+    const el = e.currentTarget, r = el.getBoundingClientRect();
+    // Hit points are in the canvas's own CSS pixels; under Text size the page is zoomed (src/lib/textSize.js), so divide the scale out (1 at Standard).
+    const k = el.offsetWidth > 0 && r.width > 0 ? r.width / el.offsetWidth : 1;
+    const x = (e.clientX - r.left) / k, y = (e.clientY - r.top) / k;
     let best = null, bd = 30 * 30;
     for (const [hx, hy, id] of hits.current) { const d = (hx - x) ** 2 + (hy - y) ** 2; if (d < bd) { bd = d; best = id; } }
     if (best) onSelect(best);

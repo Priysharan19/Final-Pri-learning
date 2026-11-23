@@ -366,7 +366,13 @@ const InkCanvas = forwardRef(function InkCanvas({
 
     const local = (e) => {
       const rect = canvas.getBoundingClientRect();
-      return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      // The page content can be zoomed (Text size, src/lib/textSize.js): the
+      // bounding box is then in screen pixels while the sheet is laid out in
+      // its own CSS pixels. Their ratio maps the pen back; it is exactly 1
+      // when nothing is scaled, so Standard is bit-for-bit the old mapping.
+      const k = canvas.offsetWidth > 0 && rect.width > 0 ? rect.width / canvas.offsetWidth : 1;
+      return k === 1 ? { x: e.clientX - rect.left, y: e.clientY - rect.top }
+        : { x: (e.clientX - rect.left) / k, y: (e.clientY - rect.top) / k };
     };
 
     const widthFor = (e, cur) => {
