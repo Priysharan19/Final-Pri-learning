@@ -265,7 +265,7 @@ ok(QUESTION_MODULE.test('./content.js') && /\bimport\s*\(/.test(badAdapter), 'an
   eq(sanitizeSymbolHint('t'), [], 'hint: not a list is no hint');
   ok(sanitizeSymbolHint('abcdefghijklmnopqrstuvwxyz'.split('')).length === MAX_SYMBOL_HINT, `hint: at most ${MAX_SYMBOL_HINT} symbols`);
   ok(sanitizeSymbolHint(['y'.repeat(50)]).length === 0 && sanitizeSymbolHint(['\u0000', '\n', '"', '$', '\\pi']).length === 0, 'hint: no control characters, quotes, dollars or commands');
-  eq(userTextFor([]), 'Transcribe every line of handwriting in this image. Do not solve it.', 'with no symbols the user turn is the constant sentence');
+  eq(userTextFor([]), 'Transcribe every line of working in this image, whether handwritten, typed or printed. Do not solve it.', 'with no symbols the user turn is the constant sentence');
   const withHint = userTextFor(['t', 'h', 'π', 'sin']);
   ok(/appear on the page: h, sin, t, π\./.test(withHint), 'with symbols the hint is a bare, sorted list');
   ok(/may write any other symbol/.test(withHint) && /exactly what is written, even if it looks wrong/.test(withHint), 'and says the student may write anything else and the page is read as written');
