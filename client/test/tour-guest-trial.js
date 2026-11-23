@@ -14,6 +14,10 @@
 //     answer is read at the test's desk from the sealed ticket the server sent,
 //     never from the page); a wrong one is marked wrong and the answer shown
 //     only afterwards;
+//   · a wrong answer on a question with worked steps shows the first step and keeps
+//     the answer closed; the visitor may try once more (recorded as "after a worked
+//     step"), read the next steps one at a time, and is offered "one like it" in
+//     a different form; the tally tells right first time, right after help and not yet;
 //   · after five questions the sign-up prompt, with no countdown and with the
 //     sentence that tried questions are not carried over;
 //   · no account, session or handwriting request exists at any point, and no
@@ -60,11 +64,98 @@ const { decryptDeliveryToken } = await import('../../server/platform/deliveryCry
 const { generateQuestion, loadAllBanks } = await import('../../server/../client/src/engine/generators/index.js');
 const { answerTextFor } = await import('../../server/platform/practice.js');
 await loadAllBanks();
+const { guestSteps, closingStepOf } = await import('../../server/platform/guestTrial.js');
 const keyOf = sealed => {
   const t = JSON.parse(decryptDeliveryToken(sealed, 'guest-question-v1'));
   const q = generateQuestion(t.g, t.d, t.s, undefined, null);
-  return { text: answerTextFor(q), mcq: q.answerType === 'mcq', index: q.answer?.correctIndex };
+  q._generator = t.g;
+  return { text: answerTextFor(q), mcq: q.answerType === 'mcq', index: q.answer?.correctIndex, steps: guestSteps(q), closeAt: closingStepOf(q), hint: Array.isArray(q.hints) && q.hints.length > 0 };
 };
+
+// One question, played as the scenario says. Everything the page claims is read back from the page; the oracle only supplies the right answer.
+//   right   - right first time
+//   retry   - wrong, the first step, one retry that is right (assisted), then "one like it"
+//   reveal  - wrong, every step, the answer; no retry after it
+//   hint    - a hint, then right (assisted)
+async function play(page, { edition, i, key, scenario, requests, shot }) {
+  const label = `${edition} q${i + 1} (${scenario})`;
+  const ok = (name, cond, detail) => check(`${label}: ${name}`, cond, detail);
+  const fill = async (right, wrongIndex = 0) => {
+    if (key.mcq) await page.locator('.gt-option').nth(right ? key.index : (key.index + 1 + wrongIndex) % 4).click();
+    else await page.locator('#gt-answer').fill(right ? key.text : String(987650 + wrongIndex));
+  };
+  const submit = async () => { await page.waitForTimeout(2100); await page.locator('[data-guest-check]').click(); };
+  const last = i === 4;
+  const advance = async () => {
+    if (last) return false;
+    await page.locator('[data-guest-like]').click();
+    return true;
+  };
+  if (scenario === 'hint') {
+    await page.getByRole('button', { name: 'Show a hint' }).click();
+    ok('the hint is shown', await page.locator('.gp-hint, .gt-hint').count() === 1);
+    await fill(true); await submit();
+    await page.locator('[data-guest-verdict]').waitFor({ timeout: 30000 });
+    ok('right after a hint is said so, and is not counted as right first time', await page.locator('[data-guest-verdict]').getAttribute('data-guest-assisted') === 'hint' && /Correct, after a hint\./.test(await page.locator('[data-guest-verdict]').innerText()));
+    ok('"one like it" is offered', last || await page.locator('[data-guest-like]').isVisible());
+    return { verdict: 'assisted', advanced: await advance() };
+  }
+  if (scenario === 'right') {
+    await fill(true); await submit();
+    await page.locator('[data-guest-verdict]').waitFor({ timeout: 30000 });
+    const v = await page.locator('[data-guest-verdict]').getAttribute('data-guest-verdict');
+    ok('the server marks it right, unassisted', v === 'correct' && await page.locator('[data-guest-verdict]').getAttribute('data-guest-assisted') === null, v);
+    ok('the answer is shown only now', /the answer is(?! shown)/i.test(await page.locator('[data-guest-verdict]').innerText()));
+    ok('the verdict is said in words, not by colour alone', /Correct\./.test(await page.locator('[data-guest-verdict]').innerText()));
+    return { verdict: 'right', advanced: false };
+  }
+  // retry and reveal begin with a wrong answer on a question that has worked steps
+  await fill(false); await submit();
+  await page.locator('[data-guest-stage="worked"]').waitFor({ timeout: 30000 });
+  const body = async () => page.locator('body').innerText();
+  ok('the first wrong answer leaves the question open: the first step, not the answer', await page.locator('[data-guest-step="1"]').isVisible() && await page.locator('[data-guest-step="2"]').count() === 0 && !/the answer is(?! shown)/i.test(await body()), (await body()).match(/.{0,60}The answer is.{0,60}/i)?.[0]);
+  ok('it is said in words: "Not this time."', /Not this time\./.test(await page.locator('[data-guest-stage="worked"]').innerText()));
+  ok('focus moved to the revealed step', await page.evaluate(() => document.activeElement?.matches('[data-guest-step="1"]')));
+  const stepText = (await page.locator('[data-guest-step="1"]').innerText()).replace(/\s+/g, ' ');
+  ok('the step is typeset with its heading and working', /Step 1\./.test(stepText) && await page.locator('[data-guest-step="1"] .katex').count() >= 1, stepText.slice(0, 80));
+  ok('the answer the visitor gave is kept on the screen', key.mcq ? await page.locator('.gt-option.on, .gp-option.on').count() === 1 : await page.locator('#gt-answer').inputValue() === '987650');
+  ok('and cannot be edited until "Try again"', key.mcq ? await page.locator('.gt-options, .gp-options').first().evaluate(e => e.disabled === true) : await page.locator('#gt-answer').evaluate(e => e.readOnly === true));
+  ok('"Try again" and "Show the next step" are both offered', await page.locator('[data-guest-retry]').isVisible() && (await page.locator('[data-guest-more]').first().innerText()).trim() === (key.steps.length > 1 ? 'Show the next step' : 'Show the answer'));
+  await page.keyboard.press('Tab');
+  const ring = await page.evaluate(() => { const e = document.activeElement; const c = getComputedStyle(e); return { on: e.matches('[data-guest-retry], [data-guest-more]'), ring: `${c.outlineStyle} ${c.outlineWidth}` }; });
+  ok('Tab goes from the step to the controls, with a visible focus ring', ring.on && /^solid [2-9]/.test(ring.ring), JSON.stringify(ring));
+  await page.locator('[data-guest-step="1"]').focus();
+  await shot('worked-first-step');
+  if (scenario === 'retry') {
+    await page.locator('[data-guest-retry]').click();
+    ok('"Try again" opens the answer for one more go, with the first answer kept above it', await page.locator('[data-guest-first-answer]').isVisible() && (key.mcq || (await page.locator('#gt-answer').inputValue() === '' && await page.evaluate(() => document.activeElement?.id === 'gt-answer'))));
+    ok('the first step is still on the page', await page.locator('[data-guest-step="1"]').isVisible());
+    await fill(true); await submit();
+    await page.locator('[data-guest-verdict]').filter({ hasText: /Correct/ }).waitFor({ timeout: 30000 });
+    ok('the retry is right, recorded as after a worked step', await page.locator('[data-guest-verdict="correct"]').getAttribute('data-guest-assisted') === 'step' && /Correct, after a worked step\./.test(await page.locator('[data-guest-verdict="correct"]').innerText()));
+    ok('and there is no second retry', await page.locator('[data-guest-retry]').count() === 0 && await page.locator('[data-guest-check]').count() === 0);
+    await shot('retry-assisted');
+    const label = last ? 'Create an account' : (key.moreForms ? 'Try one like it' : 'Try another question on this topic');
+    ok('"Try one like it" is offered (the same idea; another question on the topic when the skill has one form)', last ? /Create an account/.test(await page.locator('[data-guest-next]').innerText()) : /^Try (one like it|another question on this topic)$/.test((await page.locator('[data-guest-like]').innerText()).trim()), label);
+    return { verdict: 'assisted', advanced: await advance() };
+  }
+  // reveal: read the steps in order; the one that gives the answer (the step after the last, or a step that ends on it) closes the question
+  const closing = key.closeAt;
+  const stepsOk = [];
+  for (let n = 2; n < closing; n++) {
+    await page.locator('[data-guest-more]').click();
+    await page.locator(`[data-guest-step="${n}"]`).waitFor({ timeout: 15000 });
+    stepsOk.push(await page.evaluate(k => document.activeElement?.matches(`[data-guest-step="${k}"]`), n) && !/the answer is(?! shown)/i.test(await body()) && await page.locator('[data-guest-retry]').isVisible());
+  }
+  ok('each step appears in order and takes focus, the answer stays closed and the retry stays open', stepsOk.every(Boolean), JSON.stringify(stepsOk));
+  ok('before the step that gives the answer, the page says it ends the question', /ends this question/.test(await page.locator('[data-guest-retry-note]').innerText()));
+  await shot('worked-all-steps');
+  await page.locator('[data-guest-more]').click();
+  await page.locator('[data-guest-verdict="wrong"]').filter({ hasText: /the answer is/i }).waitFor({ timeout: 15000 });
+  ok('showing the answer ends the question: no retry, no editing', await page.locator('[data-guest-retry]').count() === 0 && await page.locator('[data-guest-check]').count() === 0);
+  ok('and it is not counted as right', /Not this time\./.test(await page.locator('[data-guest-verdict="wrong"]').innerText()));
+  return { verdict: 'wrong', advanced: await advance() };
+}
 
 for (const edition of editions) {
   console.log(`\n== ${edition}`);
@@ -191,9 +282,10 @@ for (const edition of editions) {
       // ── a second visitor (a fresh token): five questions, marked by the server, starting from the one drawn on arrival ──
       ({ ctx, page, requests, issued } = await visit());
       await page.goto(platform.origin, { waitUntil: 'domcontentloaded' });
-      let verdicts = [];
+      let verdicts = [], retries = 0, advanced = false;
+      const needs = ['retry', 'reveal', 'hint'];
       for (let i = 0; i < 5; i++) {
-        if (i > 0) await page.locator('[data-guest-next]').click();
+        if (i > 0 && !advanced) await page.locator('[data-guest-next]').click();
         await page.waitForFunction(n => document.querySelector(`[data-guest-question] [data-guest-check]`) && document.querySelector('[data-guest-number]')?.dataset.guestNumber === String(n) || document.querySelector('[data-guest-problem]'), i + 1, { timeout: 30000 });
         if (await page.locator('[data-guest-problem]').count() && !await page.locator('[data-guest-question]').count()) {
           // This chapter has no typed question at this level: the page says so plainly; take a multiple-choice one.
@@ -217,29 +309,31 @@ for (const edition of editions) {
           await page.screenshot({ path: join(SHOTS, `${edition}-04-question-390.png`) });
           await page.setViewportSize({ width: 1180, height: 820 });
         }
-        const wrongOnPurpose = i === 1;
-        if (key.mcq) {
-          const pick = wrongOnPurpose ? (key.index + 1) % 4 : key.index;
-          await page.locator('.gt-option').nth(pick).click();
-        } else {
-          await page.locator('#gt-answer').fill(wrongOnPurpose ? '987654' : key.text);
+        const can = { retry: key.steps.length >= 2, reveal: key.steps.length >= 2, hint: key.hint };
+        let scenario = 'right';
+        if (i > 0) { const n = needs.find(x => can[x]); if (n) { scenario = n; needs.splice(needs.indexOf(n), 1); } }
+        if (scenario === 'retry') retries++;
+        const played = await play(page, { edition, i, key, scenario, requests, shot: name => page.screenshot({ path: join(SHOTS, `${edition}-q${i + 1}-${name}.png`) }) });
+        verdicts.push(played.verdict); advanced = played.advanced;
+        if (scenario !== 'right') {
+          if (page.viewportSize().width > 800) await page.screenshot({ path: join(SHOTS, `${edition}-05-${scenario}.png`) });
+          await page.setViewportSize({ width: 390, height: 844 });
+          const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+          check(`${edition} q${i + 1} (${scenario}): 390px: no sideways scroll`, overflow <= 0, String(overflow));
+          await page.setViewportSize({ width: 1180, height: 820 });
         }
-        // The server's real think time (2 s): a person has read the question by then.
-        await page.waitForTimeout(2100);
-        await page.locator('[data-guest-check]').click();
-        await page.locator('[data-guest-verdict]').waitFor({ timeout: 30000 });
-        const v = await page.locator('[data-guest-verdict]').getAttribute('data-guest-verdict');
-        verdicts.push(v);
-        check(`${edition} q${i + 1}: the server marks it ${wrongOnPurpose ? 'wrong' : 'right'}`, v === (wrongOnPurpose ? 'wrong' : 'correct'), v);
-        check(`${edition} q${i + 1}: the answer is shown only now`, /The answer is/i.test(await page.locator('[data-guest-verdict]').innerText()));
-        check(`${edition} q${i + 1}: the verdict is said in words, not by colour alone`, /Correct\.|Not this time\./.test(await page.locator('[data-guest-verdict]').innerText()));
-        if (i === 1) {
-          check(`${edition}: the count shows one right and one wrong, as the server marked them`, await page.locator('.gp-squares .is-right').count() === 1 && await page.locator('.gp-squares .is-wrong').count() === 1 && await page.locator('.gp-squares .is-left').count() === 3);
+        if (i === 0) {
+          check(`${edition}: the count shows one right first time, as the server marked it`, await page.locator('.gp-squares .is-right').count() === 1 && await page.locator('.gp-squares .is-left').count() === 4);
           check(`${edition}: a marked answer cannot be edited or sent again`, await page.locator('#gt-answer, .gp-options').first().evaluate(e => e.readOnly === true || e.disabled === true) && await page.locator('[data-guest-check]').count() === 0);
-          await page.screenshot({ path: join(SHOTS, `${edition}-05-verdict.png`) });
         }
       }
-      check(`${edition}: five verdicts, each from the server`, verdicts.length === 5 && requests.filter(r => r === 'POST /v1/guest/answer').length === 5 && requests.filter(r => r === 'POST /v1/guest/question').length === 5, JSON.stringify(verdicts));
+      const want = { right: verdicts.filter(v => v === 'right').length, assisted: verdicts.filter(v => v === 'assisted').length, wrong: verdicts.filter(v => v === 'wrong').length };
+      check(`${edition}: all three helped scenarios were played (retry, reveal, hint)`, needs.length === 0, `left: ${needs.join(',')}`);
+      const tally = (await page.locator('[data-guest-tally]').innerText()).replace(/\s+/g, ' ');
+      check(`${edition}: the tally states right first time, right after a hint or a worked step, and not yet, in words`, tally.includes(`${want.right} right first time`) && tally.includes(`${want.assisted} right after a hint or a worked step`) && (want.wrong === 0 || tally.includes(`${want.wrong} not yet`)), `${tally} vs ${JSON.stringify(want)}`);
+      check(`${edition}: and the squares agree: outlined for after help`, await page.locator('.gp-squares .is-right').count() === want.right && await page.locator('.gp-squares .is-assisted').count() === want.assisted && await page.locator('.gp-squares .is-wrong').count() === want.wrong);
+      await page.screenshot({ path: join(SHOTS, `${edition}-05-tally.png`) });
+      check(`${edition}: five verdicts, each from the server`, verdicts.length === 5 && requests.filter(r => r === 'POST /v1/guest/answer').length === 5 + retries && requests.filter(r => r === 'POST /v1/guest/question').length === 5, JSON.stringify(verdicts));
     } else {
       await page.goto(platform.origin, { waitUntil: 'domcontentloaded' });
       await page.locator('[data-guest-try]').waitFor({ timeout: 30000 });
@@ -314,9 +408,10 @@ for (const edition of editions) {
       await page.locator('[data-picker-form="typed"]').check();
 
       // ── five questions, marked by the server ──
-      let verdicts = [];
+      let verdicts = [], retries = 0, advanced = false;
+      const needs = ['retry', 'reveal', 'hint'];
       for (let i = 0; i < 5; i++) {
-        await page.locator(i === 0 ? '[data-picker-start]' : '[data-guest-next]').click();
+        if (i === 0 || !advanced) await page.locator(i === 0 ? '[data-picker-start]' : '[data-guest-next]').click();
         await page.locator('[data-guest-question], [data-guest-problem]').first().waitFor({ timeout: 30000 });
         if (await page.locator('[data-guest-problem]').count() && !await page.locator('[data-guest-question]').count()) {
           // This chapter has no typed question at this level: the picker says so plainly; take a multiple-choice one.
@@ -337,23 +432,16 @@ for (const edition of editions) {
           await page.screenshot({ path: join(SHOTS, `${edition}-04-question-390.png`) });
           await page.setViewportSize({ width: 1180, height: 820 });
         }
-        const wrongOnPurpose = i === 1;
-        if (key.mcq) {
-          const pick = wrongOnPurpose ? (key.index + 1) % 4 : key.index;
-          await page.locator('.gt-option').nth(pick).click();
-        } else {
-          await page.locator('#gt-answer').fill(wrongOnPurpose ? '987654' : key.text);
-        }
-        // The server's real think time (2 s): a person has read the question by then.
-        await page.waitForTimeout(2100);
-        await page.locator('[data-guest-check]').click();
-        await page.locator('[data-guest-verdict]').waitFor({ timeout: 30000 });
-        const v = await page.locator('[data-guest-verdict]').getAttribute('data-guest-verdict');
-        verdicts.push(v);
-        check(`${edition} q${i + 1}: the server marks it ${wrongOnPurpose ? 'wrong' : 'right'}`, v === (wrongOnPurpose ? 'wrong' : 'correct'), v);
-        check(`${edition} q${i + 1}: the answer is shown only now`, /The answer is/.test(await page.locator('[data-guest-verdict]').innerText()));
-        if (i === 1) await page.screenshot({ path: join(SHOTS, `${edition}-05-verdict.png`) });
+        const can = { retry: key.steps.length >= 2, reveal: key.steps.length >= 2, hint: key.hint };
+        let scenario = 'right';
+        if (i > 0) { const n = needs.find(x => can[x]); if (n) { scenario = n; needs.splice(needs.indexOf(n), 1); } }
+        if (scenario === 'retry') retries++;
+        const played = await play(page, { edition, i, key, scenario, requests, shot: name => page.screenshot({ path: join(SHOTS, `${edition}-q${i + 1}-${name}.png`) }) });
+        verdicts.push(played.verdict); advanced = played.advanced;
+        if (scenario !== 'right') await page.screenshot({ path: join(SHOTS, `${edition}-05-${scenario}.png`) });
       }
+      check(`${edition}: all three helped scenarios were played (retry, reveal, hint)`, needs.length === 0, `left: ${needs.join(',')}`);
+      check(`${edition}: five verdicts' worth of answers, each from the server`, verdicts.length === 5 && requests.filter(r => r === 'POST /v1/guest/answer').length === 5 + retries, JSON.stringify(verdicts));
     }
     check(`${edition}: after the fifth, the button leads to sign-up`, /Create an account/.test(await page.locator('[data-guest-next]').innerText()));
     await page.locator('[data-guest-next]').click();

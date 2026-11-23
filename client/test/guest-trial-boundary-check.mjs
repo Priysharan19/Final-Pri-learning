@@ -39,8 +39,8 @@ for (const f of files) {
   ok(stores.every(s => /STORE|`pri\.picker/.test(s)), `${f}: localStorage holds only the last picker choice (${stores.join(' ; ') || 'none'})`);
 }
 const transport = read('client/src/platform/cloudTransport.js');
-const guestCalls = [...transport.matchAll(/guest(?:Start|Question|Answer):[^\n]*'(\/v1\/[a-z/]+)'/g)].map(m => m[1]);
-ok(JSON.stringify(guestCalls) === JSON.stringify(['/v1/guest/session', '/v1/guest/question', '/v1/guest/answer']), `the transport adds exactly the three guest calls (${guestCalls})`);
+const guestCalls = [...transport.matchAll(/guest(?:Start|Question|Steps|Answer):[^\n]*'(\/v1\/[a-z/]+)'/g)].map(m => m[1]);
+ok(JSON.stringify(guestCalls) === JSON.stringify(['/v1/guest/session', '/v1/guest/question', '/v1/guest/steps', '/v1/guest/answer']), `the transport adds exactly the four guest calls (${guestCalls})`);
 ok(/typeof guestCsrf === 'string'/.test(transport) && /X-Pri-Guest-CSRF/.test(transport), 'and sends the guest CSRF value only when given one');
 const session = read('client/src/guest/guestTrial.js');
 ok(/isNativeShell\(\)/.test(session) && /nativeCloudAvailable\(\)/.test(session), 'the guest screen is not offered inside a native shell');

@@ -29,15 +29,14 @@ How it is held:
    (random 128-bit id, issue time, expiry one day later; nothing else) in an HttpOnly,
    SameSite=Strict cookie scoped to `/v1/guest`. No account, session, child-data or learning row is
    created. The route takes no fields, so no personal data can be sent.
-2. **CSRF.** The question and answer routes also require `X-Pri-Guest-CSRF`, an HMAC of the cookie's
+2. **CSRF.** The question, answer and steps routes also require `X-Pri-Guest-CSRF`, an HMAC of the cookie's
    own token, on top of the origin guard every browser mutation already passes.
 3. **Limits, enforced on the server** (`server/platform/guestTrial.js`): 5 questions per token per
    day; 15 per client address bucket per day across any number of tokens (IPv6 collapsed to its /64);
    6 tokens minted per address per day; for IPv6 also 60 questions and 24 tokens per /48 per day (a host with a /56 or /48 can rotate /64 buckets, so the /48 is the bound that holds); a process-wide daily ceiling of 5,000 questions as a
-   backstop against many addresses; a per-address route limit (120 an hour, its counter named with the same per-purpose key as the others, so no row holds an unkeyed hash of an address); every counter is taken together or not at all: a request refused by the address, /48 or process limit gives back the token's unit, so a refusal that was not the visitor's costs them nothing; one verdict per issued
-   question; a 2 second minimum think time; at most 3 retries of an unreadable entry; and a verdict lost in transit may be re-fetched, with the same answer by the same token, for 2 minutes after it was given, from one keyed right-or-wrong counter written with the claim (the question is not marked a second time). These bound
-   the feature as a marking oracle: the most one connection can learn is 15 verdicts a day, each on
-   a different question, with the answer only after the verdict. No CAPTCHA is used.
+   backstop against many addresses; a per-address route limit (120 an hour, with a separate 240 an hour for the worked steps, its counter named with the same per-purpose key as the others, so no row holds an unkeyed hash of an address); every counter is taken together or not at all: a request refused by the address, /48 or process limit gives back the token's unit, so a refusal that was not the visitor's costs them nothing; one verdict per issued
+   question, and one more only after a wrong first verdict on a question that has worked steps and before its answer has been released (the first wrong verdict releases the first worked step and not the answer; each verdict is claimed once, before marking, so parallel guesses at one question cannot each be marked, and "right first time" belongs only to the single first-verdict winner); a 2 second minimum think time; at most 3 retries of an unreadable entry; and a verdict lost in transit may be re-fetched, with the same answer by the same token, for 2 minutes after it was given, from one keyed right-or-wrong counter written with the claim (the question is not marked a second time). These bound
+   the feature as a marking oracle: the most one connection can learn is 15 questions a day with at most two verdicts each, with the answer only once the question is closed. Worked steps (`/v1/guest/steps`) are released one request at a time, in order, only for a question that has had a verdict, and never from the ticket; the step that states the answer closes the question as the answer does, so a retry never follows it; steps and retries spend none of the day's allowance, and "one like it" is an ordinary question that spends one, offered only once the source question is closed. No CAPTCHA is used.
 4. **Typed and multiple-choice only.** A guest cannot reach handwriting or photo reading (a paid
    provider that needs the consent prompt and an account), the tutor, working checks, premium or
    archive content, or any hint beyond the first authored one. There is no history, sync or
