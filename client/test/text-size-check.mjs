@@ -59,7 +59,7 @@ ok(/MathText text=/.test(settings) && /settings\.appearance'\)\}<\/h2>[\s\S]*set
 // 6 · strings in both languages, no em dashes
 const en = read('../src/i18n/strings.en.js'); const hi = read('../src/i18n/strings.hi.js');
 for (const k of ['settings.textSize', 'settings.textSize.standard', 'settings.textSize.large', 'settings.textSize.larger', 'settings.textSize.largest', 'settings.textSizeNote', 'settings.textSizePreview', 'settings.textSizeSet']) {
-  const rx = new RegExp(`'${k.replace(/\./g, '\\.')}':\\s*'([^']+)'`);
+  const rx = new RegExp(`'${k.replace(/[.\\]/g, '\\$&')}':\\s*'([^']+)'`);
   const a = en.match(rx)?.[1]; const b = hi.match(rx)?.[1];
   ok(a && b, `${k} exists in English and Hindi`);
   ok(!/—/.test(a + b), `${k} has no em dash`);

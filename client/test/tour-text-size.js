@@ -180,7 +180,7 @@ try {
         if (bar) check(`${tag} ${size}: ${label}: every action-bar button is on one line`, rows[size].wrapped.length === 0, JSON.stringify(rows[size].wrapped));
         if (bar) check(`${tag} ${size}: ${label}: the action bar is inside the viewport`, barInside(rows[size].foot), JSON.stringify(rows[size].foot));
         if (shot) {   // the question in view, the first-run note, if it is up, left showing
-          await page.evaluate(() => { const st = document.getElementById('ts-shot') || Object.assign(document.head.appendChild(document.createElement('style')), { id: 'ts-shot' }); document.querySelector('.qpage .q-prompt, .qpage')?.scrollIntoView({ block: 'start' }); });
+          await page.evaluate(() => { document.querySelector('.qpage .q-prompt, .qpage')?.scrollIntoView({ block: 'start' }); });
           await page.waitForTimeout(200);
           await page.screenshot({ path: join(SHOTS, `${shot}-${size}-${vid}.png`) });
         }
@@ -337,7 +337,7 @@ try {
         });
         const cy = got ? (got.t + got.b) / 2 - got.top : NaN;   // relative to the sheet, so a page that moved meanwhile does not matter
         check(`${tag} ${size}: the pen draws under the pen (centre within 2px)`, !!got && Math.abs(cy - (y - box.y)) <= 2 && Math.abs(got.l - x0) <= 8 && Math.abs(got.r - x1) <= 12,
-          got ? `drawn y ${cy.toFixed(1)} vs ${(y - box.y).toFixed(1)} (sheet-relative), x ${(got.l).toFixed(1)}..${(got.r).toFixed(1)} vs ${x0.toFixed(1)}..${x1.toFixed(1)}; scrollY ${sy0}->${sy1}; box.h ${box.height}` : 'no ink on any canvas', `scrollY ${sy0}->${sy1}`);
+          got ? `drawn y ${cy.toFixed(1)} vs ${(y - box.y).toFixed(1)} (sheet-relative), x ${(got.l).toFixed(1)}..${(got.r).toFixed(1)} vs ${x0.toFixed(1)}..${x1.toFixed(1)}; scrollY ${sy0}->${sy1}; box.h ${box.height}` : `no ink on any canvas; scrollY ${sy0}->${sy1}`);
         await page.evaluate(SET_STEP, ['standard', 1]);
         const undo = page.getByRole('button', { name: 'Undo last stroke' }).first();
         if (await undo.count()) await undo.click().catch(() => {});   // leave a clean sheet for the next step

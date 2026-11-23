@@ -43,7 +43,7 @@ const check = (name, condition, detail = '') => {
 
 const SRC = pathToFileURL(join(CLIENT, 'src')).href + '/';
 const T = await import(`${SRC}engine/curriculum.js`);
-const { SUBTOPIC_BY_ID, dotpointsFor } = await import(`${SRC}engine/curriculum.js`);
+const { SUBTOPIC_BY_ID } = await import(`${SRC}engine/curriculum.js`);
 const { nswIssuedForms } = await import(`${SRC}engine/nswOffer.js`);
 // A different paired topic at each width: an unfinished question is resumed for any dot point it credits, not issued again.
 const PICK = Object.fromEntries([['desktop', 'me12-induction'], ['phone', 'me12-binomial']].map(([label, base]) => {
