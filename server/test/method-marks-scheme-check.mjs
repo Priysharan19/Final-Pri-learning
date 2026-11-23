@@ -202,6 +202,23 @@ for (const s of SCHEMES) ok(R.questionsOfType(s, { limit: 3 }).length === 3, `${
   }
 }
 
+// ── 2c. a lying interpreter cannot pay a mark ────────────────────────────────────────────────────────────────────
+{
+  const { reportWithInterpretation } = await import('../platform/lineInterpreter/overlay.js');
+  const q = asMarks(R.OWNER_QUESTION, 2, 'y12-diff-rules');
+  const working = ['Differentiate y = x^2(x-1).', 'dy/dx = 3x^2 - 2x'];
+  // A report in which the engine left both lines unchecked (a value-chain report, the only kind the interpreter extends).
+  const engine = { source: 'value-chain', firstBreak: -1, lines: working.map(text => ({ text, status: 'note', state: 'unverified', unverified: true, note: 'Not checked' })) };
+  const lying = { lines: working.map((_, index) => ({ index, engine: false, verdict: 'valid', ticked: true })) };
+  const shown = reportWithInterpretation({ stepReport: engine, lineInterpretation: lying, working: working.join('\n') });
+  ok(shown.lines.every(l => l.status === 'ok'), 'the lying interpreter ticks both lines on the page');
+  const wrong = { correct: false };
+  const fromDeterministic = schemePay({ q, report: engine, topic: null, correct: wrong.correct, marksPossible: 2, env: ON, list: LIST });
+  const fromShown = schemePay({ q, report: shown, topic: null, correct: wrong.correct, marksPossible: 2, env: ON, list: LIST });
+  ok(fromDeterministic.paid && fromDeterministic.awarded === 0 && fromDeterministic.items[0].verified === false, 'paid from the engine\'s report: no mark, the derivative criterion is "not verified"');
+  ok(fromShown.awarded === 1, 'control: paid from the folded report it WOULD pay, which is why practice.js never reads it');
+}
+
 // ── 3. criteria not the question's marks ───────────────────────────────────────────────────────────────────────────
 {
   const [s, q] = typed.find(([x]) => x.id === 'y12-diff-rules');
@@ -235,7 +252,7 @@ for (const s of SCHEMES) ok(R.questionsOfType(s, { limit: 3 }).length === 3, `${
     const plain = MARKER_OPS.practice({ q: { ...R.OWNER_QUESTION, difficulty: 2 }, answer: '3x^2-x', working: lines.join('\n'), evidenceIfWrong: true, policy: FINAL_ANSWER_ONLY }, () => {});
     ok(!('topicTicks' in plain.evidence), 'a question with no scheme gets exactly the evidence it always got');
     const src = fs.readFileSync(new URL('../platform/practice.js', import.meta.url), 'utf8');
-    ok(/schemePay\(\{ q, report: shownReport, topic: counted\?\.topicTicks \?\? null,/.test(src) && /stepReport: shownReport, partial: invalid \? null : markedPartial,/.test(src) && /!finalAnswerOnly && q\._methodScheme/.test(src), 'practice.js pays a scheme question from the report it shows, and only an unsealed scheme question');
+    ok(/schemePay\(\{ q, report: evidence\.stepReport \|\| null, topic: evidence\.topicTicks \?\? null,/.test(src) && !/schemePay\([^\n]*(?:shownReport|reportWithInterpretation|lineInterpretation)/.test(src) && /stepReport: invalid \? null : reportWithInterpretation\(\{ stepReport, lineInterpretation, working \}\), partial: invalid \? null : partial,/.test(src) && /!finalAnswerOnly && schemeQuestion/.test(src), 'practice.js pays a scheme question from the deterministic step report, never from the report the interpreter has been folded into');
   }
   // a crossed line and the lines after it never earn: line 8 falsified, line 9 true again
   const slip = [...R.OWNER_HEAD.slice(0, 7), '= 2x^2 - 2x + 2x^2', '= 3x^2 - 2x'];
