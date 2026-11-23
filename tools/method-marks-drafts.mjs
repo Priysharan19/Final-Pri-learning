@@ -134,7 +134,7 @@ const PHRASE = {
   final: 'the last line, read as the final answer, is checked by the answer checker (the same check that marks a one-line answer)'
 };
 
-const TYPES = [
+export const TYPES = [
   // ───────────── Year 12 Advanced ─────────────
   {
     id: 'y12-diff-rules', title: 'Differentiate using the chain, product or quotient rule', course: 'Year 12 Mathematics Advanced', year: 12, level: 1,
@@ -450,7 +450,7 @@ const ENGINE_WORDS = { ok: 'true line', break: 'wrong here', note: 'no verdict' 
 const INTERP_WORDS = { valid: 'checked', given: 'from the question', 'first-break': 'wrong here', 'follows-from-error': 'follows from the earlier mistake', unverifiable: 'could not verify' };
 const cell = s => plain(String(s)).replace(/\bPri\b/g, 'the checker').replace(/\|/g, '\\|').replace(/\n/g, ' ');
 
-async function runCase(type, q, lines) {
+export async function runCase(type, q, lines) {
   const { rows, finalOk } = await judge(q, lines);
   const award = awardOf(type, rows, finalOk);
   const rowsOut = rows.map(r => ({ ...r, counts: award.earned.filter(e => e.earned && e.line === r.index).map(e => e.key) }));

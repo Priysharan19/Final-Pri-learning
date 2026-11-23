@@ -32,6 +32,7 @@ import { annotateMilestones } from '../../client/src/engine/milestones.js';
 import { solutionMatch } from '../../client/src/engine/solutionMatch.js';
 import { lineChains } from '../../client/src/engine/lineChains.js';
 import { awardBoardScheme, matchBoardPoints } from '../../client/src/engine/boardScheme.js';
+import { constrainToShown, unsupportedCredit } from '../../client/src/engine/markExplanation.js';
 import { answerForm, effectiveSymbols, firstFinalAttempt, planGivens, readClaimForm } from './finalAttempt.js';
 
 // Mirrors the shared deterministic checker input used by local practice;
@@ -199,7 +200,7 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
     }
     return out;
   };
-  const partial = partialOf(report);
+  let partial = partialOf(report);
   // Feedback only, after the mark is computed: a correct intermediate line
   // that matches a step of the worked solution is ticked (milestones.js).
   // A question whose working is not checked (no Step Check: supportsSteps
@@ -210,7 +211,7 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
   // worth the answer point alone, never the printed marks (D25 delta review).
   const board = Array.isArray(q.boardScheme) ? boardAward(q, meta, report, result.correct === true) : null;
   // What decided the marks above; the display passes below may change `report`.
-  const decided = meta && steps ? report : null;
+  let decided = meta && steps ? report : null;
   // Feedback only, after every mark: the topic check's CROSS on a definition, a label or a bare margin number is shown as a note,
   // and the lines after it are judged as if it were absent (checker.claimFreeReport). Every mark, `correct`, method mark and
   // board tick above was computed from the report the topic check made, unchanged. `opts.claims === false` is the test switch.
@@ -275,6 +276,16 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
   try { if (report && result.correct !== true && typeof steps === 'string') { const gap = missingSteps(q, steps); if (gap) report = { ...report, missing: gap.missing, stepsFound: gap.found, stepsReadable: gap.total }; } } catch { /* the report stands */ }
   // The displayed report is kept as it was. Where running the marks again on it would NOT give the stored `partial` (or the
   // Board's ticks), the report that decided them is kept beside it, reduced to what reproduces the decision.
+  // One page, one story (engine/markExplanation.js). The marks rest only on lines the page shows as ticks, and not after a cross
+  // that only the page makes (the first wrong step). Measured over the ten question types with a draft scheme no page breaks
+  // that today, so there it clips nothing and changes no mark; it makes the rule structural, so a later display pass cannot pay a
+  // mark on a line it does not tick or after a line it alone crosses. A cross the deciding report also made stays the rubric's own.
+  // `opts.reconcile === false` is the measurement's "before" switch (tools/method-marks-ready.mjs).
+  if (decided && partial && !Array.isArray(q.boardScheme) && !(opts && opts.reconcile === false)) {
+    const unsupported = unsupportedCredit(partial.lines, report?.lines, decided.lines);
+    const { report: bounded, clipped } = unsupported.length ? constrainToShown(decided, report?.lines, unsupported) : { report: decided, clipped: 0 };
+    if (clipped) { try { partial = partialOf(bounded); decided = bounded; } catch { /* the marks stand */ } }
+  }
   let markingReport = null;
   if (decided && decided !== report) {
     let reproduces = false;

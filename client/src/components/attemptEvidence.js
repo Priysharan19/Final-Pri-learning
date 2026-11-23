@@ -28,6 +28,8 @@
 //      annotations of that submission are no longer about what is on screen.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { reconcileLostRows } from '../engine/markExplanation.js';
+
 const clean = v => String(v ?? '').trim();
 
 /** The same written lines, in the same order. */
@@ -223,13 +225,12 @@ export function transcriptIsAnswer(transcript, answerGiven) {
  * mistake on a line the page does not show as a mistake would send the student to a slip they cannot see. Those rows are
  * replaced by one sentence that is true of both; every other row stays. Without `markingReportDiffers` nothing changes.
  */
-const POINTS_AT_A_SLIP = { 'marks.lost.break': 'line', 'marks.lost.anotherBreak': 'line', 'marks.lost.afterBreak': 'breakLine', 'marks.lost.carried': 'breakLine', 'marks.lost.answerCarried': 'breakLine' };
 export function lostMarksForPage({ lost, stepReport = null, markingReportDiffers = false } = {}) {
   const rows = Array.isArray(lost) ? lost : [];
   if (!markingReportDiffers) return { rows, fromCheckable: false };
-  const shown = Array.isArray(stepReport?.lines) ? stepReport.lines : [];
-  const shownBreak = n => shown[Number(n) - 1]?.status === 'break';
-  // A row without a line number cannot be placed on the page, so it is dropped by design.
-  const kept = rows.filter(l => !(l && POINTS_AT_A_SLIP[l.key] && !shownBreak(l.vars?.[POINTS_AT_A_SLIP[l.key]])));
-  return { rows: kept, fromCheckable: kept.length !== rows.length };
+  // engine/markExplanation.js: a row pointing at a mistake the page does not show is dropped (a row without a line number cannot
+  // be placed on the page, so it is dropped by design); a "could not be read" row on a line the page ticks, crosses or puts after
+  // its first cross is replaced by a sentence that is true of the page. Every other row stays.
+  const r = reconcileLostRows(rows, Array.isArray(stepReport?.lines) ? stepReport.lines : []);
+  return { rows: r.rows, fromCheckable: r.dropped > 0 };
 }

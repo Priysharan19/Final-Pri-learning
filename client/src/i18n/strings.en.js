@@ -2852,6 +2852,8 @@ export default {
   'marks.lost.answer': 'Final answer: the answer mark was lost. The final value is not the solution.',
   'marks.lost.answerCarried': 'Final answer: the answer mark was lost. The final value carries the mistake from line {breakLine}.',
   'marks.lost.fromCheckable': "Method marks are counted from the lines Pri could check against this question's method.",
+  'marks.lost.tickedNotCounted': "Line {line}: ticked as true, but not counted for a method mark. Pri could not tie it to a step of this question's method. That does not mean it is wrong.",
+  'marks.lost.crossedNoMark': 'Line {line}: crossed on the page, so it earns no method mark.',
   'marks.rule.equationBroken': 'the true solution no longer satisfies this equation',
   'marks.rule.expressionBroken': 'this line is not equivalent to the expression before it',
   'marks.rule.valueWrong': 'this value does not satisfy the original equation',
