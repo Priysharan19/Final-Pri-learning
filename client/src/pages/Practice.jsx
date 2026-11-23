@@ -14,10 +14,10 @@ import { PRACTICE_SET_CHAPTERS } from '../engine/multipart/practiceSets.js';
 const PracticeBase = React.lazy(() => import('./PracticeBase.jsx'));
 // The four NCERT Class 8/9 sections are India's: their chapter ids exist only in
 // Priyabhata's curriculum, so a Prithagoras build (a literal, vite.config.js
-// __PRI_EDITION__) never emits, installs or warms them or the Class 8 and 9
+// __PRI_AU_BUILD__) never emits, installs or warms them or the Class 8 and 9
 // banks only they reach. A Node suite or the dev server, with no literal, has them.
-/* global __PRI_EDITION__ */
-const NCERT_SECTIONS = !(typeof __PRI_EDITION__ === 'string' && __PRI_EDITION__ === 'prithagoras');
+/* global __PRI_AU_BUILD__ */
+const NCERT_SECTIONS = !(typeof __PRI_AU_BUILD__ === 'boolean' && __PRI_AU_BUILD__);
 const RationalNumbersTopperSectionProduction = NCERT_SECTIONS ? React.lazy(() => import('../components/RationalNumbersTopperSectionProduction.jsx')) : null;
 const LinearEquationsTopperSectionProduction = NCERT_SECTIONS ? React.lazy(() => import('../components/LinearEquationsTopperSectionProduction.jsx')) : null;
 const NcertClass8ChapterSection = NCERT_SECTIONS ? React.lazy(() => import('../components/NcertClass8ChapterSection.jsx')) : null;

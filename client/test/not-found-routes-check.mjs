@@ -25,7 +25,7 @@ ok(declared.length > 30, `the router declares routes (${declared.length})`);
 for (const p of declared) ok(known.has(p), `${p} is declared by a route and listed in APP_PATHS`);
 for (const p of known) ok(declared.includes(p) || main.includes(`'${p}'`), `${p} is listed in APP_PATHS and is a route or a main.jsx page`);
 
-ok(/const NOT_FOUND_PAGE = typeof __PRI_EDITION__ === 'string' && __PRI_EDITION__ === 'prithagoras';/.test(app), 'the page is a Prithagoras build literal, so Priyabhata\'s build never includes it');
+ok(/const NOT_FOUND_PAGE = typeof __PRI_AU_BUILD__ === 'boolean' && __PRI_AU_BUILD__;/.test(app), 'the page is a Prithagoras build literal, so Priyabhata\'s build never includes it');
 ok(/NOT_FOUND_PAGE \? React\.lazy\(\(\) => import\('\.\/landing\/NotFound\.jsx'\)\) : null/.test(app), 'the page is a lazy chunk only a Prithagoras build has');
 ok(/path="\*" element=\{NOT_FOUND_PAGE \? <UnknownAddress otherwise=\{<Login \/>\} to="\/welcome" \/> : <Login \/>\}/.test(app), 'signed out: Login at real addresses, not-found elsewhere, button to /welcome; Priyabhata: Login');
 ok(/<Route path="\*" element=\{NOT_FOUND_PAGE \? <NotFound to=\{roleLanding\} signedIn \/> : <Navigate to=\{roleLanding\} replace \/>\}/.test(app), 'signed in: not-found with the button to the role\'s home; Priyabhata: the redirect it had');

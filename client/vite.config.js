@@ -777,6 +777,9 @@ export function featureDefines(command, env = process.env) {
     __PRI_NOTES_PAGE__: JSON.stringify(states.edition === 'prithagoras' ? 'nsw' : 'india'),
     // Rapid Fire and Match (owner decision, 19 Nov 2026: hidden in Prithagoras): a literal, so a build without them
     // holds neither page, nor their chunks, in the install (App.jsx).
+    // True only in a Prithagoras build: a literal, so Priyabhata's build holds neither the not-found page nor
+    // anything it alone needs, and Prithagoras's holds none of India's NCERT Class 8 and 9 sections (App.jsx, pages/Practice.jsx).
+    __PRI_AU_BUILD__: JSON.stringify(states.edition === 'prithagoras'),
     __PRI_GAMES__: JSON.stringify(editionOf(states.edition).games !== false),
     // Plan E5: false in a build of an edition with no payment provider, so its
     // bundle holds no purchase flow at all (client/src/platform/nativeBilling.js).

@@ -83,15 +83,15 @@ const LEGAL_ROUTES_EXTRA = EDITION === 'prithagoras' ? (
   </>
 ) : <Route path="/grievance" element={<Legal />} />;
 // A real "page not found" for an address that is no route at all. Prithagoras
-// only (a literal in a build, vite.config.js __PRI_EDITION__): Priyabhata keeps
+// only (a literal in a build, vite.config.js __PRI_AU_BUILD__): Priyabhata keeps
 // sending an unknown address to its landing page, byte for byte, and its build
 // emits no NotFound chunk. A signed-out visitor still reaches Login at every
 // address that IS an app route (a bookmark to /practice signs in, then opens),
 // so the signed-out and activation-gate tables below need the list of real
 // paths. client/test/not-found-routes-check.mjs holds it equal to the signed-in
 // route table.
-/* global __PRI_EDITION__ */
-const NOT_FOUND_PAGE = typeof __PRI_EDITION__ === 'string' && __PRI_EDITION__ === 'prithagoras';
+/* global __PRI_AU_BUILD__ */
+const NOT_FOUND_PAGE = typeof __PRI_AU_BUILD__ === 'boolean' && __PRI_AU_BUILD__;
 const NotFound = NOT_FOUND_PAGE ? React.lazy(() => import('./landing/NotFound.jsx')) : null;
 const APP_PATHS = NOT_FOUND_PAGE ? [
   '/', '/practice', '/practise-photo', '/progress', '/plan', '/today', '/error-log', '/premium', '/insights',

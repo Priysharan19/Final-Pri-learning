@@ -4,10 +4,9 @@
 // Shown for an address that is no route of the app, signed in or out. One
 // heading, one sentence, one button: signed-in students go to their home,
 // everyone else to the public start page. It is a lazy chunk that only the
-// Prithagoras build emits, and that edition offers English only (edition.config
-// languages), so the words are written here, in en-AU, like the other plain
-// signed-out pages under src/landing, and not in the shared catalogue that
-// every language must mirror.
+// Prithagoras build emits. That edition offers English only, so the words are
+// written here in en-AU rather than in the shared catalogue, which every
+// registered language must mirror.
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useEffect, useRef } from 'react';
 import PageLink from '../components/PageLink.jsx';
