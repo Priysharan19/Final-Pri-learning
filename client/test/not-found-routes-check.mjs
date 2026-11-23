@@ -79,7 +79,7 @@ if (!process.argv.includes('--static')) {
     const REAL = ['/', '/practice', '/progress', '/plan', '/today', '/exams', '/review', '/notes', '/settings', '/map', '/insights', '/privacy', '/terms', '/refund-policy', '/contact', '/signin', '/stats', '/rush'];
     const UNKNOWN = ['/this-does-not-exist', '/practice/x/y', '/welcome/nope', '/Privacy2', '/library/a/b'];
     const settle = async page => {
-      await page.waitForSelector(`${NOT_FOUND}, .shell, [data-guest-try], [data-signin-card]`, { timeout: 30000 });
+      await page.waitForSelector('h1', { timeout: 30000 });
       await page.waitForTimeout(900);
     };
     for (const [label, width, height] of [['375x812', 375, 812], ['1280x800', 1280, 800]]) {
