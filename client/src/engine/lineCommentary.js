@@ -69,15 +69,35 @@ export const CATALOGUE = Object.freeze({
   crossComputed: {
     en: ['{expr} comes to {expected}, but this line gives {written}.', 'Check this line: {expr} comes to {expected}, not {written}.', 'This line gives {written}, but {expr} comes to {expected}.']
   },
+  // a false continuation of a polynomial line: the engine's exact terms, and the line above in its simplest form
+  crossTerms: {
+    en: ['The line above comes to {above}, but this line comes to {written}. {change} The corrected line is {corrected}.', 'Check this line: the line above comes to {above}, not {written}. {change} The corrected line is {corrected}.']
+  },
+  crossExact: {
+    en: ['This line is not equal to the line above, which comes to {above}. The corrected line is {corrected}.', 'Check this line: it is not equal to the line above, which comes to {above}. The corrected line is {corrected}.']
+  },
+  crossExample: {
+    en: ['This line is not equal to the line above: at {at} the line above comes to {above}, but this line gives {written}.', 'Check this line: it is not equal to the line above. At {at} the line above comes to {above} and this line gives {written}.']
+  },
+  // what a ticked line DID, each claim recomputed by the engine (engine/falseStep.js); English only
+  howFactors: { en: ['Good choice of {u} and {v}: their product is the function in the question.'] },
+  howRule: { en: ['Correct statement of the product rule.'] },
+  howDerivatives: { en: ['{lead}: {list}.'] },
+  howSubstituted: { en: ['Correct substitution of {names} into the product rule.'] },
+  howOne: { en: ['Multiplying by $1$ changes nothing, so this equals the line above.'] },
+  howExpanded: { en: ['Correct expansion: {items}.'] },
+  howCollected: { en: ['Like terms collected correctly: {items}.'] },
+  howEqualAbove: { en: ['Equal to the line above.'] },
   crossSidesDiffer: {
     en: ['The two sides do not match: {left} comes to {leftValue}, and {right} comes to {rightValue}.', 'The two sides are not equal: {left} comes to {leftValue}, but {right} comes to {rightValue}.', 'The two sides differ: {left} comes to {leftValue} and {right} comes to {rightValue}.']
   }
 });
 /** Every template kind, grouped by polarity, for the tests. */
 export const TEMPLATE_KINDS = Object.freeze(Object.keys(CATALOGUE));
-export const POSITIVE_KINDS = Object.freeze(['restates', 'stepHeading', 'step', 'stepValue', 'ruleResult', 'rule']);
+export const HOW_KINDS = Object.freeze(['howFactors', 'howRule', 'howDerivatives', 'howSubstituted', 'howOne', 'howExpanded', 'howCollected', 'howEqualAbove']);
+export const POSITIVE_KINDS = Object.freeze(['restates', 'stepHeading', 'step', 'stepValue', 'ruleResult', 'rule', ...HOW_KINDS]);
 export const EQUALITY_KINDS = Object.freeze(['bothSides', 'equalsAbove']);
-export const CROSS_KINDS = Object.freeze(['crossAbove', 'crossComputed', 'crossSidesDiffer']);
+export const CROSS_KINDS = Object.freeze(['crossAbove', 'crossComputed', 'crossSidesDiffer', 'crossTerms', 'crossExact', 'crossExample']);
 
 const fill = (template, slots) => template.replace(/\{(\w+)\}/g, (_, k) => slots[k]);
 const rhsOf = text => { const raw = String(text ?? '').trim(); if (!raw.includes('=')) return null; const rhs = raw.split(/(?<![<>!=≤≥≠])=(?!=)/).pop().trim(); return rhs ? mathSpan(rhs) : null; };
@@ -87,7 +107,7 @@ const rhsOf = text => { const raw = String(text ?? '').trim(); if (!raw.includes
  * @param {{ language?: 'en'|'hi', ruleLabel?: (rule: object) => string }} ctx
  * @returns {{ text: string, kind: string, facts: object } | null}  null: keep the engine's own sentence
  */
-export function commentFor(card, ctx = {}) {
+function baseComment(card, ctx = {}) {
   if (!card || typeof card !== 'object') return null;
   const lang = ctx.language === 'hi' ? 'hi' : 'en';
   const key = `${card.n}|${card.text}`;
@@ -109,6 +129,30 @@ export function commentFor(card, ctx = {}) {
       const expected = fromTex(d.expectedTex, d.expected), written = fromTex(d.writtenTex, d.written);
       if (expected === null || written === null || expected === written) return null;
       return done('crossAbove', { expected, written }, { expected, written });
+    }
+    if (d.expectedFrom === 'symbolic') {
+      const tex = x => (typeof x === 'string' && x.length > 0 && x.length <= 120 && !x.includes('$') ? `$${x}$` : null);
+      const numTex = x => (typeof x === 'number' && Number.isFinite(x) ? `$${exactForm(x).tex}$` : null);
+      if (d.exact === true) {
+        const above = tex(d.aboveTex), written = tex(d.writtenTex), corrected = tex(`= ${d.correctedTex}`);
+        if (!above || !corrected) return null;
+        const changed = Array.isArray(d.changed) ? d.changed : [];
+        if (changed.length >= 1 && changed.length <= 3 && written) {
+          // the terms that differ, named from the exact coefficients: "the -2x term became -x; the other terms are the same."
+          const parts = changed.map(c => { const f = tex(c.fromTex), t = tex(c.toTex); return f && t ? `the ${f} term became ${t}` : f ? `the ${f} term is missing` : t ? `an extra ${t} term appears` : null; });
+          if (parts.some(x => x === null)) return null;
+          const first = parts.join('; ');
+          const change = `${first.charAt(0).toUpperCase()}${first.slice(1)}${Array.isArray(d.same) && d.same.length ? '; the other terms are the same' : ''}.`;
+          return done('crossTerms', { above, written, change, corrected }, { above, written, change, corrected });
+        }
+        return done('crossExact', { above, corrected }, { above, corrected });
+      }
+      const ex = d.example;
+      if (ex && Array.isArray(ex.at) && ex.at.length && ex.at.every(a => typeof a.v === 'string' && /^[A-Za-zθ]$/.test(a.v))) {
+        const at = `$${ex.at.map(a => `${a.v} = ${a.value}`).join(', ')}$`, above = numTex(ex.above), written = numTex(ex.written);
+        return done('crossExample', { at, above, written }, { at, above, written });
+      }
+      return null;
     }
     if (d.expectedFrom === 'sides') {
       // the first two sides that disagree. A bare number against a computed expression: the expression is named, with its value.
@@ -167,6 +211,45 @@ export function commentFor(card, ctx = {}) {
     const rules = card.rules.map(r => r.rule);
     return result ? done('ruleResult', { rule, result }, { rules, result: card.text }) : done('rule', { rule }, { rules });
   }
+  return null;
+}
+
+const inner = span => (typeof span === 'string' && span.startsWith('$') && span.endsWith('$') && span.indexOf('$', 1) === span.length - 1 ? span.slice(1, -1) : null);
+const okTex = x => (typeof x === 'string' && x.length > 0 && x.length <= 120 && !x.includes('$') ? x : null);
+/** A tick says what the engine recomputed the line did (never a bare "Correct"): facts `card.how` and `card.fact`. English only. */
+function howComment(card, ctx = {}) {
+  if (!card || card.status !== 'checked' || ctx.language === 'hi') return null;
+  const key = `${card.n}|${card.text}`;
+  const done = (kind, slots, facts) => { for (const v of Object.values(slots)) if (v === null || v === undefined || v === '') return null; return { text: fill(pick(CATALOGUE[kind].en, key), slots), kind, facts }; };
+  const f = card.fact, h = card.how;
+  if (f && f.kind === 'factors-of-question' && Array.isArray(f.names) && f.names.length === 2 && f.names.every(n => /^[a-z]$/.test(n))) return done('howFactors', { u: `$${f.names[0]}$`, v: `$${f.names[1]}$` }, { names: f.names });
+  if (f && f.kind === 'rule-statement' && f.rule === 'product-rule') return done('howRule', { x: 'x' }, {});
+  if (!h || typeof h !== 'object') return null;
+  if (h.kind === 'derivatives' && Array.isArray(h.items) && h.items.length >= 1 && h.items.length <= 3) {
+    const parts = h.items.map(i => (okTex(i.nameTex) && okTex(i.exprTex) ? `$${i.nameTex} = ${i.exprTex}$` : null));
+    if (parts.some(x => x === null)) return null;
+    const list = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+    return done('howDerivatives', { lead: parts.length === 1 ? 'The derivative is right' : parts.length === 2 ? 'Both derivatives are right' : 'All the derivatives are right', list }, { items: h.items });
+  }
+  if (h.kind === 'substituted' && Array.isArray(h.names) && h.names.length === 2) { const [a, b] = h.names; return done('howSubstituted', { names: `$${a}$, $${b}$, $${a}'$ and $${b}'$` }, { names: h.names }); }
+  if (h.kind === 'one') return done('howOne', { x: 'x' }, {});
+  if (h.kind === 'expanded' && Array.isArray(h.items) && h.items.length >= 1) {
+    const parts = h.items.map(i => { const from = typeof i.fromText === 'string' ? inner(mathSpan(i.fromText)) : null, to = okTex(i.toTex); return from && to ? `$${from} = ${to}$` : null; });
+    return parts.some(x => x === null) ? null : done('howExpanded', { items: parts.join(' and ') }, { items: h.items });
+  }
+  if (h.kind === 'collected' && Array.isArray(h.groups) && h.groups.length >= 1) {
+    const parts = h.groups.map(g => (okTex(g.fromTex) && okTex(g.toTex) ? `$${g.fromTex} = ${g.toTex}$` : null));
+    return parts.some(x => x === null) ? null : done('howCollected', { items: parts.join(' and ') }, { groups: h.groups });
+  }
+  return null;
+}
+/** The comment on a card: what the engine computed the line did, else the engine's equality or rule sentence, else only "Equal to the line above." where that was computed. */
+export function commentFor(card, ctx = {}) {
+  const how = howComment(card, ctx);
+  if (how) return how;
+  const base = baseComment(card, ctx);
+  if (base) return base;
+  if (card && card.status === 'checked' && card.how && card.how.kind === 'equal-above' && !card.note && ctx.language !== 'hi') return { text: CATALOGUE.howEqualAbove.en[0], kind: 'howEqualAbove', facts: {} };
   return null;
 }
 

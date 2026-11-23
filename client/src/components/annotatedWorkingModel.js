@@ -149,7 +149,7 @@ function buildValueChainModel({ report: reportIn, stepReport, receipt, source, a
     n: i + 1, line: i, status: STATUS[l?.state] || 'not-verified', valueChain: l?.state || 'unverified',
     start: false, startSide: null, rules: [], more: false, same: false, unnamed: false, followsFrom: null,
     diagnosis: l?.state === 'wrong' ? (l.diagnosis || null) : null, note: l?.state === 'wrong' || l?.state === 'given' || l?.state === 'incomplete' || l?.state === 'arithmetic' || l?.state === 'verified' ? (l.note || null) : null,
-    previousText: null, text: String(l?.text ?? ''), restated: l?.state === 'given' && l?.solutionMatch === true, fact: l?.fact || null
+    previousText: null, text: String(l?.text ?? ''), restated: l?.state === 'given' && l?.solutionMatch === true, fact: l?.fact || null, how: l?.how || null, how: l?.how || null
   }));
   const summaryOf = stepReport.summary || {};
   const unverified = cards.filter(c => c.status === 'not-verified' || c.status === 'unread').map(c => c.n);
