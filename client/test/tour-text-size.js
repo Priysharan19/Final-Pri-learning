@@ -197,8 +197,10 @@ try {
     const EXPECTED = ['topic', 'answer', 'marked', 'history'];
     // A student who has never seen the tour, at this size. The question is drawn by the server, and a draw without a control
     // (a multiple-choice question has no answer modes) has fewer steps, so a load is repeated until the note says it has all four.
+    let loads = 0;   // question loads spent finding a draw with all four steps, printed so a slow suite can be told from a stuck one
     const fresh = async (size, { wantAll = true } = {}) => {
       for (let attempt = 0; attempt < 10; attempt++) {
+        loads++;
         await page.evaluate(sz => { for (const k of Object.keys(localStorage)) if (k.startsWith('pri.tour.practice.')) localStorage.removeItem(k); localStorage.setItem('pri.textSize', sz); }, size);
         await page.goto(`${platform.origin}/practice?subtopic=${CHAPTER}`, { waitUntil: 'domcontentloaded' });
         await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
@@ -231,6 +233,7 @@ try {
           const n = await page.evaluate(NOTE_AUDIT);
           if (n.missing) { closed = true; break; }
           audited.push(n.step);
+          if (i === 0) check(`${label}: focus is on the note at step 1`, await page.evaluate(() => document.activeElement === document.querySelector('.pr-tour')));
           check(`${label}: note step ${i + 1} (${n.step}): wholly on screen, clear of the prompt and the picker, within 24px of its control (or, for the topic note, directly under the question), on <body>, Skip and Next not covered`,
             n.inside && !n.coversPrompt && !n.coversPicker && (n.gap <= 24 || n.underPrompt) && n.inBody && n.skipFree && n.nextFree, JSON.stringify(n));
           await page.locator('[data-tour-next]').click({ timeout: 8000 });
@@ -238,6 +241,7 @@ try {
         }
         if (!closed) closed = (await page.locator('.pr-tour').count()) === 0;
       }
+      console.log(`  question loads so far ${label}: ${loads}`);
       console.log(`  steps audited ${label}: ${audited.join(', ') || 'none'}`);
       check(`${label}: every tour step was audited, in order (${EXPECTED.join(', ')}), and Next closed the note`, JSON.stringify(audited) === JSON.stringify(EXPECTED) && closed, `audited [${audited.join(', ')}], closed ${closed}`);
       const up2 = await fresh(size);

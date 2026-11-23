@@ -97,8 +97,14 @@ export default function PracticeTour({ onClose }) {
     return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', again); window.removeEventListener('scroll', again, true); };
   }, [step, place]);
 
-  // Focus moves to the note at each step.
-  useEffect(() => { noteRef.current?.focus({ preventScroll: true }); }, [at]);
+  // Focus moves to the note at each step, once the note is visible (a hidden element cannot take focus, and step 1 is
+  // hidden until it has been placed), and not again when an overlay closes over it and away.
+  const focusedAt = useRef(-1);
+  useEffect(() => {
+    if (!box || covered || focusedAt.current === at) return;
+    focusedAt.current = at;
+    noteRef.current?.focus({ preventScroll: true });
+  }, [at, box, covered]);
 
   // Finishing, Skip and Escape all mean the student has seen it.
   const close = useCallback(() => {
