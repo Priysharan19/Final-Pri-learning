@@ -11,13 +11,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useEffect, useRef } from 'react';
 import PageLink from '../components/PageLink.jsx';
-import { BRAND } from '../brand/edition.js';
 
 export default function NotFound({ to, signedIn }) {
   const heading = useRef(null);
   useEffect(() => {
     const before = document.title;
-    document.title = `Page not found · ${BRAND}`;
+    document.title = 'Page not found · Prithagoras';
     heading.current?.focus({ preventScroll: true });
     return () => { document.title = before; };
   }, []);
