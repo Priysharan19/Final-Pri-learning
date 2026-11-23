@@ -15,6 +15,9 @@
 //   · a rule is named only when the engine named it for that line
 //   · the wording varies by a stable hash of the line's number and text, so the same line always reads the same
 //
+// New templates (a value-only tick, a cross between sides) are written in English only: in any other language they give null and the
+// engine's own sentence stays.
+//
 // Pure, deterministic, no I/O. Feedback only: it never touches a mark, a tick or a cross.
 // ─────────────────────────────────────────────────────────────────────────────
 import { exactForm } from './arithmeticLines.js';
@@ -41,8 +44,7 @@ export const CATALOGUE = Object.freeze({
     hi: ['सही। यह हल के चरण {step} से मेल खाती है।', 'सही। यह हल का चरण {step} है।']
   },
   stepValue: {
-    en: ['This line comes to {value}, the value at step {step} of the worked solution.', 'The value at step {step} of the worked solution is {value}, and so is the value of this line.', 'This is the value at step {step} of the worked solution: {value}.'],
-    hi: ['इस पंक्ति का मान {value} आता है, जो हल के चरण {step} का मान है।', 'हल के चरण {step} का मान {value} है, और इस पंक्ति का मान भी यही है।', 'यह हल के चरण {step} का मान है: {value}।']
+    en: ['This line comes to {value}, the value at step {step} of the worked solution.', 'The value at step {step} of the worked solution is {value}, and so is the value of this line.', 'This is the value at step {step} of the worked solution: {value}.']
   },
   ruleResult: {
     en: ['Correct. {rule} gives {result}.', 'Correct. {rule}: {result}.'],
@@ -69,12 +71,10 @@ export const CATALOGUE = Object.freeze({
     hi: ['ऊपर का हल {expected} तक पहुँचता है, पर इस पंक्ति में {written} है।', 'इस पंक्ति का मान {expected} होना चाहिए, पर इसमें {written} है।', 'इस पंक्ति को जाँचें: मान {expected} होना चाहिए, {written} नहीं।']
   },
   crossComputed: {
-    en: ['{expr} comes to {expected}, but this line gives {written}.', 'Check this line: {expr} comes to {expected}, not {written}.', 'This line gives {written}, but {expr} comes to {expected}.'],
-    hi: ['{expr} का मान {expected} आता है, पर इस पंक्ति में {written} है।', 'इस पंक्ति को जाँचें: {expr} का मान {expected} आता है, {written} नहीं।', 'इस पंक्ति में {written} है, पर {expr} का मान {expected} आता है।']
+    en: ['{expr} comes to {expected}, but this line gives {written}.', 'Check this line: {expr} comes to {expected}, not {written}.', 'This line gives {written}, but {expr} comes to {expected}.']
   },
   crossSidesDiffer: {
-    en: ['The two sides do not match: {left} comes to {leftValue}, {right} comes to {rightValue}.', 'The two sides are not equal: {left} comes to {leftValue}, but {right} comes to {rightValue}.', 'The two sides differ: {left} comes to {leftValue} and {right} comes to {rightValue}.'],
-    hi: ['दोनों तरफ़ मेल नहीं खाते: {left} का मान {leftValue} आता है, {right} का मान {rightValue} आता है।', 'दोनों तरफ़ बराबर नहीं हैं: {left} का मान {leftValue} आता है, पर {right} का मान {rightValue} आता है।', 'दोनों तरफ़ अलग हैं: {left} का मान {leftValue} और {right} का मान {rightValue} आता है।']
+    en: ['The two sides do not match: {left} comes to {leftValue}, {right} comes to {rightValue}.', 'The two sides are not equal: {left} comes to {leftValue}, but {right} comes to {rightValue}.', 'The two sides differ: {left} comes to {leftValue} and {right} comes to {rightValue}.']
   }
 });
 /** Every template kind, grouped by polarity, for the tests. */
@@ -97,6 +97,8 @@ export function commentFor(card, ctx = {}) {
   const key = `${card.n}|${card.text}`;
   const done = (kind, slots, facts) => {
     for (const v of Object.values(slots)) if (v === null || v === undefined || v === '') return null;
+    // a template with no wording in this language gives nothing: the engine's own sentence stays (new templates are English only)
+    if (!CATALOGUE[kind][lang]?.length) return null;
     return { text: fill(pick(CATALOGUE[kind][lang], key), slots), kind, facts };
   };
   // a cross: the engine's structured diagnosis only
@@ -148,10 +150,10 @@ export function commentFor(card, ctx = {}) {
       const value = fromTex(f.tex, null);
       return value === null ? null : done('stepValue', { step: String(f.step), value }, { step: f.step, value });
     }
-    // a step heading is the worked solution's own English text: a Hindi sentence names the step only, unless the heading has a Hindi form
+    // a step heading is the worked solution's own English text: a Hindi sentence never embeds it (the engine's sentence stays)
     const heading = typeof f.heading === 'string' ? f.heading.replace(/\s+/g, ' ').trim().replace(/\.$/, '') : '';
-    const usable = heading && (lang === 'en' || /[ऀ-ॿ]/.test(heading));
-    return usable ? done('stepHeading', { step: String(f.step), heading }, { step: f.step, heading }) : done('step', { step: String(f.step) }, { step: f.step });
+    if (heading && lang !== 'en') return null;
+    return heading ? done('stepHeading', { step: String(f.step), heading }, { step: f.step, heading }) : done('step', { step: String(f.step) }, { step: f.step });
   }
   // a line whose rule the engine itself identified
   if (!card.valueChain && Array.isArray(card.rules) && card.rules.length && typeof ctx.ruleLabel === 'function') {

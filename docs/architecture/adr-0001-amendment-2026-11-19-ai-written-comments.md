@@ -34,10 +34,11 @@ sentence is shown exactly as before. The wording varies by a stable hash of the 
   for a value-only match) and on an arithmetic tick (`kind`, `tex`); on the diagnosis created in `reason-chain.js`
   (`chainDiagnosis`) and `vectorChain.js` (`vector-chain-not-equal`) `expected` / `written` / `expectedFrom`; in `arithmeticLines.js`
   (`arithmetic-not-equal`) `expectedTex` / `writtenTex` / `expectedFrom: 'line-above'`, or `expectedFrom: 'sides'` with `sides`.
+* Owner decision, 23 November 2026: new templates (value-only tick, cross between sides) are English only (Prithagoras). In Hindi they give nothing
+  and the engine's own sentence shows; a Hindi sentence never embeds the worked solution's English step heading.
 * Held by `server/test/line-commentary-check.mjs` (generated pages over every generator family: maths only from the line's
   facts, verdict matches state, an arithmetic tick only equality sentences, expected/written never swapped, a value-only tick never said to be a step, no "should" or "both" on a cross
-  between sides, a rule named only when the engine named it, no word outside the catalogue, Hindi for every template with no English
-  step heading, deterministic).
+  between sides, a rule named only when the engine named it, no word outside the catalogue, Hindi only for templates that have Hindi wording, deterministic).
 * The owner's pages, old sentence beside new: `owner-review/ENGINE-COMMENTS-SAMPLES.md`.
 
 ## Unchanged

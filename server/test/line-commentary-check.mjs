@@ -10,7 +10,7 @@
 //   · {expected} and {written} are never swapped (built crosses where both are known, both ways round)
 //   · a rule is named only when the engine named it for that line
 //   · no sentence holds a word outside the catalogue (and the heading / rule label slots)
-//   · Hindi renders for every template; a line's comment is deterministic
+//   · Hindi renders for every template that has Hindi wording (the value-only, expression-names and two-sides templates are English only: Hindi gives null and keeps the engine's sentence; no sentence embeds an English heading in Hindi); a line's comment is deterministic
 //   · the engine edits only ADD facts: no status, mark or note changed (the marking identity tests prove the rest)
 //
 //   node server/test/line-commentary-check.mjs [--write]   (--write regenerates owner-review/ENGINE-COMMENTS-SAMPLES.md)
@@ -176,13 +176,12 @@ for (const st of ['unverified', 'unread', 'not-verified', 'incomplete', 'follows
   const vo = commentFor({ n: 2, status: 'checked', valueChain: 'verified', text: '0 + 37 * (-8)', fact: { kind: 'solution-step', step: 3, valueOnly: true, tex: '-296' } }, ctx);
   ok(vo?.kind === 'stepValue' && vo.text.includes('$-296$') && vo.text.includes('step 3') && !/\b(?:is|matches)\s+step\b/i.test(vo.text) && !/^Correct/.test(vo.text), `a value-only tick: ${vo?.text}`);
   ok(commentFor({ n: 2, status: 'checked', valueChain: 'verified', text: 'a', fact: { kind: 'solution-step', step: 3, valueOnly: true } }, ctx) === null, 'a value-only tick without its value: the old sentence');
-  // F4: Hindi never embeds the worked solution's English heading
-  const hiH = commentFor({ n: 2, status: 'checked', valueChain: 'verified', text: 'a=2', fact: { kind: 'solution-step', step: 3, heading: 'Differentiate' } }, { language: 'hi' });
-  ok(hiH?.kind === 'step' && !/[A-Za-z]/.test(hiH.text), `Hindi: no English heading: ${hiH?.text}`);
-  const hiD = commentFor({ n: 2, status: 'checked', valueChain: 'verified', text: 'a=2', fact: { kind: 'solution-step', step: 3, heading: 'अवकलन करें' } }, { language: 'hi' });
-  ok(hiD?.kind === 'stepHeading' && hiD.text.includes('अवकलन करें'), `Hindi: a Hindi heading may be used: ${hiD?.text}`);
+  // Hindi: no new wording. A Hindi sentence never embeds the English heading, and the new templates give nothing in Hindi
+  ok(commentFor({ n: 2, status: 'checked', valueChain: 'verified', text: 'a=2', fact: { kind: 'solution-step', step: 3, heading: 'Differentiate' } }, { language: 'hi' }) === null, 'Hindi: a headed step gives nothing (no English heading in a Hindi sentence)');
+  ok(commentFor({ n: 2, status: 'checked', valueChain: 'verified', text: 'a=2', fact: { kind: 'solution-step', step: 3, valueOnly: true, tex: '7' } }, { language: 'hi' }) === null, 'Hindi: a value-only tick gives nothing');
+  ok(commentFor(sd(S('10 - 6', '4', false), S('14', '14', true)), { language: 'hi' }) === null && commentFor(sd(S('3*4', '12', false), S('5*2', '10', false)), { language: 'hi' }) === null, 'Hindi: a cross between sides gives nothing');
 }
-// ── 4. Hindi for every template, and variants stay in the catalogue ──────────────────────────────────
+// ── 4. Hindi only for the templates that still have it (new templates are English only by owner decision), variants stay in the catalogue ──────────────────────────────────
 const SAMPLE = {
   restates: { n: 1, status: 'checked', valueChain: 'given', restated: true, text: 'x=1' },
   stepHeading: { n: 2, status: 'checked', valueChain: 'verified', text: 'x=1', fact: { kind: 'solution-step', step: 2, heading: 'Solve' } },
@@ -197,14 +196,15 @@ const SAMPLE = {
   crossSidesDiffer: sd(S('3*4', '12', false), S('5*2', '10', false))
 };
 ok(TEMPLATE_KINDS.every(k => SAMPLE[k]) && [...POSITIVE_KINDS, ...EQUALITY_KINDS, ...CROSS_KINDS].length === TEMPLATE_KINDS.length, 'every template kind has a polarity and a sample');
+const ENGLISH_ONLY = new Set(['stepValue', 'crossComputed', 'crossSidesDiffer']);
 for (const k of TEMPLATE_KINDS) {
-  for (const lang of ['en', 'hi']) for (let n = 1; n < 40; n += 1) {
+  for (const lang of ['en', 'hi']) { if (lang === 'hi' && (ENGLISH_ONLY.has(k) || k === 'stepHeading')) { ok((k === 'stepHeading' || !variantsOf(k, 'hi').length) && commentFor({ ...SAMPLE[k], n: 1 }, { language: 'hi', ruleLabel: r => r.rule }) === null, `template ${k}: nothing in Hindi (English only, or never embeds the English heading)`); continue; } for (let n = 1; n < 40; n += 1) {
     const c = commentFor({ ...SAMPLE[k], n }, { language: lang, ruleLabel: r => (lang === 'hi' ? 'नियम' : 'Rule') + ' ' + r.rule });
     if (!c || c.text.includes('{') || (lang === 'hi' && !/[ऀ-ॿ]/.test(c.text)) || !variantsOf(k, lang).length) { failures.push(`template ${k} ${lang} line ${n}: ${c?.text}`); break; }
-  }
-  ok(variantsOf(k, 'en').length >= 1 && variantsOf(k, 'en').length === variantsOf(k, 'hi').length, `template ${k}: the same number of English and Hindi variants`);
+  } }
+  ok(variantsOf(k, 'en').length >= 1 && (ENGLISH_ONLY.has(k) || variantsOf(k, 'en').length === variantsOf(k, 'hi').length), `template ${k}: the same number of English and Hindi variants (English-only templates have no Hindi)`);
 }
-ok(Object.values(CATALOGUE).every(c => [...c.en, ...c.hi].every(s => !/[\u2014\u2013]/.test(s))), 'no em dash in any template');
+ok(Object.values(CATALOGUE).every(c => [...c.en, ...(c.hi || [])].every(s => !/[\u2014\u2013]/.test(s))), 'no em dash in any template');
 ok(new Set(Array.from({ length: 30 }, (_, n) => commentFor({ ...SAMPLE.bothSides, n }, ctx).text)).size > 1, 'the wording varies across lines');
 eq(commentFor({ ...SAMPLE.bothSides, n: 5 }, ctx), commentFor({ ...SAMPLE.bothSides, n: 5 }, ctx), 'the same line always reads the same');
 
