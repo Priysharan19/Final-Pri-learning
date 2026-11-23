@@ -12,10 +12,16 @@ import { PRACTICE_SET_CHAPTERS } from '../engine/multipart/practiceSets.js';
 // Progress/etc. Keep those dependencies behind the Practice route boundary so
 // opening Pri Learning does not download/parse the entire solving workspace.
 const PracticeBase = React.lazy(() => import('./PracticeBase.jsx'));
-const RationalNumbersTopperSectionProduction = React.lazy(() => import('../components/RationalNumbersTopperSectionProduction.jsx'));
-const LinearEquationsTopperSectionProduction = React.lazy(() => import('../components/LinearEquationsTopperSectionProduction.jsx'));
-const NcertClass8ChapterSection = React.lazy(() => import('../components/NcertClass8ChapterSection.jsx'));
-const NcertClass9ChapterSection = React.lazy(() => import('../components/NcertClass9ChapterSection.jsx'));
+// The four NCERT Class 8/9 sections are India's: their chapter ids exist only in
+// Priyabhata's curriculum, so a Prithagoras build (a literal, vite.config.js
+// __PRI_AU_BUILD__) never emits, installs or warms them or the Class 8 and 9
+// banks only they reach. A Node suite or the dev server, with no literal, has them.
+/* global __PRI_AU_BUILD__ */
+const NCERT_SECTIONS = !(typeof __PRI_AU_BUILD__ === 'boolean' && __PRI_AU_BUILD__);
+const RationalNumbersTopperSectionProduction = NCERT_SECTIONS ? React.lazy(() => import('../components/RationalNumbersTopperSectionProduction.jsx')) : null;
+const LinearEquationsTopperSectionProduction = NCERT_SECTIONS ? React.lazy(() => import('../components/LinearEquationsTopperSectionProduction.jsx')) : null;
+const NcertClass8ChapterSection = NCERT_SECTIONS ? React.lazy(() => import('../components/NcertClass8ChapterSection.jsx')) : null;
+const NcertClass9ChapterSection = NCERT_SECTIONS ? React.lazy(() => import('../components/NcertClass9ChapterSection.jsx')) : null;
 const ExamStyleQuestions = React.lazy(() => import('../paper/ExamStyleQuestions.jsx'));
 const InkPhysicalEvidenceSession = React.lazy(() => import('../components/InkPhysicalEvidenceSession.jsx'));
 
@@ -71,12 +77,12 @@ export default function Practice() {
 
   return (
     <React.Suspense fallback={<LoadingPractice />}>
-      {chapter === 'c8-rational-numbers' && <OptionalSection key={chapter}><RationalNumbersTopperSectionProduction /></OptionalSection>}
-      {chapter === 'c8-linear-equations' && <OptionalSection key={chapter}><LinearEquationsTopperSectionProduction /></OptionalSection>}
-      {NCERT_CLASS8_3_13_IDS.includes(chapter) && (
+      {NCERT_SECTIONS && chapter === 'c8-rational-numbers' && <OptionalSection key={chapter}><RationalNumbersTopperSectionProduction /></OptionalSection>}
+      {NCERT_SECTIONS && chapter === 'c8-linear-equations' && <OptionalSection key={chapter}><LinearEquationsTopperSectionProduction /></OptionalSection>}
+      {NCERT_SECTIONS && NCERT_CLASS8_3_13_IDS.includes(chapter) && (
         <OptionalSection key={chapter}><NcertClass8ChapterSection chapterId={chapter} /></OptionalSection>
       )}
-      {CLASS9_IDS.includes(chapter) && (
+      {NCERT_SECTIONS && CLASS9_IDS.includes(chapter) && (
         <OptionalSection key={chapter}><NcertClass9ChapterSection chapterId={chapter} /></OptionalSection>
       )}
       <PracticeBase />
