@@ -90,7 +90,7 @@ const neverCrossed = (q, lines, what, opts) => { const r = mark(q, lines, '', op
   const two = mark(PRODUCT, [...base, '= 3x^2 - x', '= 3x^2 - x + 5'], '3x^2-x+5');
   ok(crossed(two).join() === '9', `two slips: only the first is crossed (${two.st})`);
   const miss = mark(PRODUCT, [...base, '= 3x^2'], '3x^2');
-  ok(crossed(miss).join() === '9' && miss.report.lines[8].diagnosis.changed[0].toTex === null, 'a dropped term is named as missing');
+  ok(crossed(miss).length === 0, 'a line equal to a sub-sum of the line above (the x^2 terms collected, the rest not yet written) is partial work, not a cross');
   // a line that is not the same line above: equivalent forms are never crossed
   neverCrossed(SIMPLIFY, ['y = x^2 - 1', '= (x - 1)(x + 1)', '= x^2 - 1'], 'factored then expanded');
   neverCrossed(QUESTION('Simplify $y = \\dfrac{1}{\\sqrt{2}}$.', 'sqrt(2)/2'), ['y = 1/sqrt(2)', '= sqrt(2)/2', '= 0.5sqrt(2)'], 'a surd rationalised');

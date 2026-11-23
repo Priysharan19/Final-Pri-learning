@@ -29,13 +29,32 @@ const CONTEXT = [
   /\b(?:when|at|if|where|given|for|whenever|substitut\w*|evaluat\w*|approximat\w*|estimat\w*|nearest|decimal|significant|sig\.?\s*fig\w*)\b/i,
   /\b(?:solv\w*|solution|roots?|zeros?|intercepts?|equations?|inequalit\w*|simultaneous|satisf\w*|prove|show that|verif\w*|identity|identities|tangent|normal|stationary|turning|maxim\w*|minim\w*|optimi\w*)\b/i,
   /\b(?:integra\w*|antiderivative|primitive|limits?|lim|series|sum|sequence|domain|range|exact value|numerically)\b/i,
+  /\b(?:complex|imagin\w*|modulus|argument|vectors?|matri(?:x|ces)|sets?|union|intersect\w*|subscript\w*|polar|conjugate|surds?|radicals?|logarithm\w*|exponential|trigonometr\w*)\b|[±∪∩∈]|\\pm|\\mathbb|\\cup|\\cap|\\in\b|\\vec|\\begin/i,
   /[<>≤≥≈∫]|\\int|\\approx|\\le(?![a-z])|\\ge(?![a-z])|\\leq|\\geq|\\lim|\\sum/
 ];
+/** One question, one target: a part label, a second part, a second expression to work on, or a second paragraph is a different question. */
+export function isMultiPart(prompt) {
+  const raw = String(prompt ?? '');
+  if (/\n\s*\S/.test(raw.trim())) return true;
+  if (/(?:^|[\s(])\(?[a-hi]{1,3}\)|\(\s*(?:i{1,3}|iv|v)\s*\)|\bpart\b|\bparts\b|\bhence\b|\bthen\b[^.]*\b(?:find|simplify|expand|differentiate)\b|\b(?:first|second|also|and then|next)\b/i.test(raw.replace(/\$[^$]*\$/g, ' $ '))) return true;
+  // more than one expression to work on: two or more TeX spans that are not a bare letter or number
+  const spans = [...raw.matchAll(/\$+([^$]+)\$+/g)].map(m => m[1].trim()).filter(t => !/^[A-Za-z]$/.test(t) && !/^-?\d+(?:\.\d+)?$/.test(t));
+  if (spans.length > 1) return true;
+  // more than one sentence that asks for work
+  const asks = raw.replace(/\$[^$]*\$/g, ' $ ').split(/[.?!]/).filter(x => TASK.test(x) || /\b(?:find|show|write|solve|calculate|state)\b/i.test(x));
+  return asks.length > 1;
+}
+/** The letter is a real variable of THIS question: the prompt itself uses it, and it is never i, j or e. */
+export function isRealVariable(prompt, v) {
+  if (typeof v !== 'string' || !/^[a-df-hk-z]$/.test(v)) return false;   // not i, j, e
+  const p = String(prompt ?? '').replace(/\\[A-Za-z]+/g, ' ');
+  return new RegExp(`(?<![A-Za-z])${v}(?![A-Za-z])`).test(p);
+}
 /** The question asks for a rewrite and defines no context that could make two different-looking lines both right. */
 export function contextAllowsCross(prompt) {
   const p = String(prompt ?? '').replace(/\$+/g, ' ');
   if (!p.trim() || p.length > 1500) return false;
-  return TASK.test(p) && !CONTEXT.some(re => re.test(p));
+  return TASK.test(p) && !CONTEXT.some(re => re.test(p)) && !isMultiPart(prompt);
 }
 
 // ── the page ───────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -44,7 +63,8 @@ export function pageBlocksCross(lines, vars) {
   const set = new Set(vars || []);
   for (const raw of lines || []) {
     const t = tidy(raw);
-    if (/[≈≃~<>≤≥∫⇒→]|=>|\\int|\\approx/.test(t)) return true;
+    if (/[≈≃~<>≤≥∫⇒→±∪∩|_\[\]{}]|=>|\\int|\\approx/.test(t)) return true;
+    if (/^\(?[a-hi]{1,3}\)|^part\b|^q(?:uestion)?\s*\d|^\d+\s*[.)]\s|^\(\s*(?:i{1,3}|iv|v)\s*\)/i.test(t)) return true;   // a part label: another question follows
     if (/\+\s*c\b/i.test(t) || /\]\s*_/.test(t) || /\b(?:when|at|if|sub\w*|approx\w*|solve|since|where|given that|for)\b/i.test(t.replace(/^(?:let|then)\b/i, ''))) return true;
     if (/:/.test(t)) return true;                                   // `t = 4: ...` a substitution label, `Check:` and the like
     // a value put in for a letter of the chain (`x = 2`), or the letter redefined (`let x = t + 1`): the lines below are not rewrites of the lines above
@@ -483,7 +503,15 @@ export function explainFalseStep(aboveSide, writtenSide) {
     const x = frac(k), ya = evalAt({ c: a.c }, x), yb = evalAt({ c: b.c }, x);
     if (!fEq(ya, yb)) { out.check = `At ${v} = ${k} the line above gives ${fText(ya)} but this line gives ${fText(yb)}.`; out.checkAt = { v, x: Number(k), above: fText(ya), written: fText(yb) }; break; }
   }
-  if (rows.length <= 3) out.whatChanged = rows.map(r => (r.a && r.b ? `The term ${T(r.d, r.a)} became ${T(r.d, r.b)}.` : r.a ? `The term ${T(r.d, r.a)} is missing.` : `An extra term ${T(r.d, r.b)} appears.`)).join(' ');
+  // a term is NAMED only when it literally appears on the line it is said to be on; otherwise the collected form is said so
+  const writtenAbove = monos(aboveSide), writtenThis = monos(writtenSide);
+  const lit = (list, d, c) => !!list && list.some(m => m.d === d && fEq(m.c, c));
+  const pow = d => (d === 0 ? 'constant' : d === 1 ? v : `${v}^${d}`);
+  if (rows.length <= 3) out.whatChanged = rows.map(r => {
+    const aOk = !r.a || lit(writtenAbove, r.d, r.a), bOk = !r.b || lit(writtenThis, r.d, r.b);
+    if (aOk && bOk) return r.a && r.b ? `The term ${T(r.d, r.a)} became ${T(r.d, r.b)}.` : r.a ? `The term ${T(r.d, r.a)} is missing.` : `An extra term ${T(r.d, r.b)} appears.`;
+    return `Collected, the ${pow(r.d)} ${r.d === 0 ? 'term' : 'terms'} come to ${r.a ? T(r.d, r.a) : 'nothing'} in the line above and ${r.b ? T(r.d, r.b) : 'nothing'} in this line.`;
+  }).join(' ');
   // the type: exact, from the terms of the line above as written (a bracketed line above is expanded by the distributive law first)
   const written = monos(aboveSide);
   const brackets = topTerms(aboveSide);
@@ -501,22 +529,69 @@ export function explainFalseStep(aboveSide, writtenSide) {
     }
     const hasBrackets = !!(brackets && brackets.some(x => /[()]/.test(x)));   // a bracketed line above: only the bracket rule is told, the others cannot be (signs change when a bracket is multiplied out)
     if (!type && hasBrackets) { /* unclassified */ }
-    else if (!type && r.a && !r.b) { type = 'dropped-term'; slots = { term: T(r.d, r.a) }; }
-    else if (!type && !r.a && r.b) { type = 'extra-term'; slots = { term: T(r.d, r.b) }; }
-    else if (!type && r.a && r.b && fEq(r.b, frac(-r.a.n, r.a.d))) { type = 'sign-error'; slots = { term: T(r.d, r.a) }; }
+    else if (!type && r.a && !r.b && lit(written, r.d, r.a)) { type = 'dropped-term'; slots = { term: T(r.d, r.a) }; }
+    else if (!type && !r.a && r.b && lit(writtenThis, r.d, r.b)) { type = 'extra-term'; slots = { term: T(r.d, r.b) }; }
+    else if (!type && r.a && r.b && fEq(r.b, frac(-r.a.n, r.a.d)) && lit(written, r.d, r.a) && lit(writtenThis, r.d, r.b)) { type = 'sign-error'; slots = { term: T(r.d, r.a) }; }
     else if (!type && r.a && r.b && written) {
       const at = written.filter(m => m.d === r.d);
       const groups = [...new Set(written.map(m => m.d))].filter(d => d !== r.d && written.filter(m => m.d === d).length >= 2);
-      if (at.length >= 2) { type = 'like-terms-wrong'; slots = { terms: signedText(at.map(m => ({ ...m, v })), false), sum: T(r.d, r.a), written: T(r.d, r.b) }; }
-      else if (at.length === 1 && groups.length) { const d = groups[0]; const g = written.filter(m => m.d === d); type = 'coefficient-beside-collected'; slots = { group: signedText(g.map(m => ({ ...m, v })), false), sum: T(d, a.c.get(d)), term: T(r.d, r.a) }; }
-      else if (at.length === 1) { type = 'coefficient-alone'; slots = { term: T(r.d, r.a), coef: fText(r.a) }; }
+      if (at.length >= 2 && lit(writtenThis, r.d, r.b)) { type = 'like-terms-wrong'; slots = { terms: signedText(at.map(m => ({ ...m, v })), false), sum: T(r.d, r.a), written: T(r.d, r.b) }; }
+      else if (at.length === 1 && groups.length && lit(writtenThis, r.d, r.b)) { const d = groups[0]; const g = written.filter(m => m.d === d); type = 'coefficient-beside-collected'; slots = { group: signedText(g.map(m => ({ ...m, v })), false), sum: T(d, a.c.get(d)), term: T(r.d, r.a) }; }
+      else if (at.length === 1 && lit(writtenThis, r.d, r.b)) { type = 'coefficient-alone'; slots = { term: T(r.d, r.a), coef: fText(r.a) }; }
     }
   } else if (rows.length === 2) {
     const [p, q] = rows;
     const from = p.a && !p.b ? p : q.a && !q.b ? q : null, to = from === p ? q : p;
-    if (from && !to.a && to.b && fEq(from.a, to.b) && from.d !== to.d && from.d >= 1 && to.d >= 1) { type = 'exponent-changed'; slots = { from: T(from.d, from.a), to: T(to.d, to.b) }; }
+    if (from && !to.a && to.b && fEq(from.a, to.b) && from.d !== to.d && from.d >= 1 && to.d >= 1 && lit(written, from.d, from.a) && lit(writtenThis, to.d, to.b)) { type = 'exponent-changed'; slots = { from: T(from.d, from.a), to: T(to.d, to.b) }; }
   }
   if (type) { out.type = type; out.whyWrong = sentence(fill(ERROR_CATALOGUE[type], slots)); }
   void QUOTE;
   return out;
+}
+
+// ── work that is true but is not "the line above, rewritten" ─────────────────────────────────────────────────────────────────────
+/**
+ * The written line is the value of a PROPER part of the line above (one piece expanded, one bracket, a sub-sum), or of any earlier side on the
+ * page (a restart): the student is working on a piece, not rewriting the whole line, so nothing is crossed.
+ */
+export function isPartialWork(aboveSide, writtenSide, earlierSides = []) {
+  const w = readPoly(writtenSide);
+  if (!w) return false;
+  const same = t => { const p = readPoly(t); return !!p && polyEqual(p, w) && !(p.v && w.v && p.v !== w.v && p.c.size && w.c.size); };
+  const terms = topTerms(aboveSide);
+  if (terms && terms.length >= 2 && terms.length <= 10) {
+    const n = terms.length;
+    for (let mask = 1; mask < (1 << n) - 1; mask++) {   // every proper non-empty sub-sum
+      const pick = terms.filter((_, k) => mask & (1 << k)).map((t, k) => (k === 0 ? t.replace(/^\+\s*/, '') : (/^[+-]/.test(t) ? t : `+ ${t}`))).join(' ');
+      if (same(pick)) return true;
+    }
+  }
+  // one factor, or a product of some of the factors, of a product
+  const ast = astOf(aboveSide);
+  const factors = [];
+  const walk = n => { if (n && n.t === 'bin' && n.op === '*') { walk(n.l); walk(n.r); } else factors.push(n); };
+  walk(ast);
+  if (factors.length >= 2 && factors.length <= 6) {
+    for (let mask = 1; mask < (1 << factors.length) - 1; mask++) {
+      let prod = null; let ok = true;
+      for (let k = 0; k < factors.length; k++) if (mask & (1 << k)) { const st = { v: null }; const p = polyOf(factors[k], st); if (!p) { ok = false; break; } prod = prod ? (() => { const o = new Map(); for (const [i, x] of prod) for (const [j, y] of p) o.set(i + j, fAdd(o.get(i + j) || frac(0n), fMul(x, y))); return o; })() : p; }
+      if (ok && prod && polyEqual({ v: w.v, c: prod }, w)) return true;
+    }
+  }
+  for (const e of earlierSides) { if (same(e)) return true; }
+  return false;
+}
+
+/**
+ * A line that claims derivatives of names the page defined (`u' = 3x and v' = 1` after `Let u = x^2 and v = x - 1`): { claimed, verified }.
+ * `verified` is true only when EVERY piece is the exact derivative of its definition. A line with no such claim gives null.
+ */
+export function derivativeClaims(text, defs) {
+  if (!defs) return null;
+  const t = tidy(text).replace(/^then\b\s*/i, '').replace(/[.;]\s*$/, '');
+  const pieces = t.split(/\s*(?:,|;|\band\b|&)\s*/i).map(x => x.trim()).filter(Boolean);
+  const claims = pieces.map(p => /^([a-z])'\s*=\s*([^=]+)$/.exec(p)).filter(m => m && defs.some(d => d.name === m[1]));
+  if (!claims.length) return null;
+  const items = readDerivativeStatements(text, defs);
+  return { claimed: claims.length, verified: !!items && items.length === pieces.length };
 }

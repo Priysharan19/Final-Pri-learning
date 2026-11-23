@@ -146,6 +146,14 @@ function markingReportOf(report) {
   return out;
 }
 
+/** Positions (in the non-blank lines) that follow a blank line: the student left a gap, so the line after it is not a continuation of the one before it. */
+function blankGaps(steps) {
+  if (typeof steps !== 'string') return [];
+  const out = []; let kept = 0, blank = false;
+  for (const raw of steps.split('\n')) { if (!raw.trim()) { blank = kept > 0; continue; } if (blank) out.push(kept); blank = false; kept++; }
+  return out;
+}
+
 export function stepEvidence(q, answer, steps, result, opts = null) {
   const meta = stepMetaFor(q);
   let report = result.stepReport || null;
@@ -236,7 +244,7 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
     // Feedback only, after solutionMatch: chains, integrals, vectors and a slip warning (engine/lineChains.js). Never a mark, never a cross.
     try {
       const base2 = report || trueAsWritten(q, steps, opts);
-      const more = base2 && !(opts && opts.fold === false) ? lineChains(q, base2, { warn: !!(opts && opts.slipWarnings === true), gaps: opts && Array.isArray(opts.gaps) ? opts.gaps : [] }) : null;
+      const more = base2 && !(opts && opts.fold === false) ? lineChains(q, base2, { warn: !!(opts && opts.slipWarnings === true), gaps: [...(opts && Array.isArray(opts.gaps) ? opts.gaps : []), ...blankGaps(steps)] }) : null;
       if (more && (more.matched > 0 || more.warned > 0)) report = more.report;
     } catch { /* the report stands */ }
   }

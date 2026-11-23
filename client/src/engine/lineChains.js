@@ -19,7 +19,7 @@
 import { _forChains as FC, _internals as SM, noteStep, noteValue, NOTE_GIVEN } from './solutionMatch.js';
 import { infoOf, cleanStatement, exactForm } from './arithmeticLines.js';
 import { evaluate, parse, normalize, withEvaluationBudget } from './expr.js';
-import { contextAllowsCross, pageBlocksCross, readingIsAmbiguous, falseStepFacts, readPoly, crossDiagnosis, readDefinitions, factorsOfQuestion, isProductRuleStatement, isContextLine, stepHow, readDerivativeStatements, isRuleSubstitution } from './falseStep.js';
+import { contextAllowsCross, pageBlocksCross, readingIsAmbiguous, falseStepFacts, readPoly, crossDiagnosis, readDefinitions, factorsOfQuestion, isProductRuleStatement, isContextLine, isRealVariable, isPartialWork, derivativeClaims, stepHow, readDerivativeStatements, isRuleSubstitution } from './falseStep.js';
 
 const BUDGET = 120000;
 const MAX_LINES = 20;
@@ -356,12 +356,18 @@ function run(q, report, warn, opts = null) {
       warned++; bad = true;
       let diag = null;
       if (crossOpen && crossedAt < 0 && w.facts && w.facts.strict && !gaps.has(i) && !readingIsAmbiguous(l.text) && !readingIsAmbiguous(prevAbove ? prevAbove.text : '') && !pageBlocksCross(pageTexts, w.facts.vars)) {
-        // where both sides are polynomials in one letter the difference is EXACT, and an exactly equal pair is never crossed
-        const both = readPoly(w.facts.aboveSide) && readPoly(w.facts.writtenSide);
-        const f = falseStepFacts(w.facts.aboveSide, w.facts.writtenSide);
-        if (!both || f) {
-          const priorOk = out.slice(0, i).filter(x => x && x.status === 'ok').length;
-          diag = crossDiagnosis(f, w.facts.example, { aboveSide: w.facts.aboveSide, writtenSide: w.facts.writtenSide, lineNo: i + 1, checkedBefore: priorOk, ruleApplied: out.slice(0, i).some(x => x && x.how && x.how.kind === 'substituted') });
+        // A CROSS is told only for two polynomials in ONE real variable of the question (exact, BigInt fractions). Anything else is the slip warning note.
+        const pa = readPoly(w.facts.aboveSide), pb = readPoly(w.facts.writtenSide);
+        const letter = (pa && pa.v) || (pb && pb.v) || null;
+        const f = pa && pb ? falseStepFacts(w.facts.aboveSide, w.facts.writtenSide) : null;
+        // earlier sides of the page (a restart from an earlier line is not a false rewrite of the line above)
+        const earlier = [];
+        for (let k = 0; k < i - 1; k++) for (const part of String(pageTexts[k] || '').split('=')) { const t = part.trim(); if (t) earlier.push(t); }
+        if (f && letter && (!pa.v || !pb.v || pa.v === pb.v) && isRealVariable(world.prompt, letter) && !isPartialWork(w.facts.aboveSide, w.facts.writtenSide, earlier)) {
+          // every line before the cross must be a verified tick (or a line that only sets the page up) for "everything before is correct" to be said
+          const before = out.slice(0, i);
+          const allTicked = before.length > 0 && before.every(x => x && (x.status === 'ok' || x.context === true));
+          diag = crossDiagnosis(f, w.facts.example, { aboveSide: w.facts.aboveSide, writtenSide: w.facts.writtenSide, lineNo: i + 1, checkedBefore: 0 });
         }
       }
       if (diag) { crossedAt = i; crossedDiagnosis = diag; out[i] = { text: l.text, status: 'break', state: 'wrong', note: diag.message, diagnosis: diag }; continue; }
@@ -376,6 +382,11 @@ function run(q, report, warn, opts = null) {
     const after = t => String(t).replace(/^\s*=\s*/, '');
     for (let i = 0; i < out.length; i++) {
       const l = out[i];
+      // a line that states derivatives of the page's own names is ticked only when EVERY statement on it is the exact derivative (`u' = 3x and v' = 1`: not)
+      if (l && l.status === 'ok' && typeof l.text === 'string' && defs) {
+        const dc = derivativeClaims(l.text, defs);
+        if (dc && !dc.verified) { out[i] = { text: l.text, status: 'note', state: 'unverified', unverified: true, note: 'Not checked: a derivative on this line is not the derivative of the function the page defined, so the line is not ticked.' }; continue; }
+      }
       if (!l || l.status !== 'ok' || typeof l.text !== 'string') continue;
       if (defs && !derivs) {
         const items = readDerivativeStatements(l.text, defs);
@@ -391,12 +402,17 @@ function run(q, report, warn, opts = null) {
       if (how) { out[i] = { ...l, how }; howed++; }
     }
   }
-  // the method was applied correctly on a line above the cross: the annotation says the slip is in the algebra, not the rule
-  if (crossedAt >= 0 && crossedDiagnosis && crossedDiagnosis.kept && !/product rule/.test(crossedDiagnosis.kept) && out.slice(0, crossedAt).some(x => x && x.how && x.how.kind === 'substituted')) {
-    const kept = `${crossedDiagnosis.kept} The product rule was applied correctly; this is an algebra slip.`;
-    const comment = String(crossedDiagnosis.comment).replace(crossedDiagnosis.kept, kept);
-    crossedDiagnosis = { ...crossedDiagnosis, kept, comment, message: comment };
-    out[crossedAt] = { ...out[crossedAt], note: comment, diagnosis: crossedDiagnosis };
+  // What is still right, said only over verified ticks: every line before the cross is a tick (or only sets the page up). Method praise only when
+  // the question names the method and its substitution into the rule was verified.
+  if (crossedAt >= 1 && crossedDiagnosis) {
+    const before = out.slice(0, crossedAt);
+    if (before.some(x => x && x.status === 'ok') && before.every(x => x && (x.status === 'ok' || x.context === true))) {
+      const praise = /product rule/i.test(world.prompt) && before.some(x => x && x.how && x.how.kind === 'substituted') ? ' The product rule was applied correctly; this is an algebra slip.' : '';
+      const kept = `Every line checked before line ${crossedAt + 1} is correct.${praise}`;
+      const comment = `${crossedDiagnosis.comment} ${kept}`;
+      crossedDiagnosis = { ...crossedDiagnosis, kept, comment, message: comment };
+      out[crossedAt] = { ...out[crossedAt], note: comment, diagnosis: crossedDiagnosis };
+    }
   }
   if (!matched && !warned && !followed && !setups && !howed) return { report, matched: 0, warned: 0 };
 
