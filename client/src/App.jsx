@@ -10,6 +10,7 @@ import { DEFAULT_THEME_PREF, applyTheme, cleanThemePref, followSystemTheme, stor
 import { requestPersistentStorage } from './local/idb.js';
 import { onCloudSessionChange } from './platform/cloudSession.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
+import ChunkBoundary from './components/ChunkBoundary.jsx';
 import { setDraftProfile } from './components/drafts.js';
 import { setLanguage, signInLanguage, useT } from './i18n/index.js';
 import { claimPendingInvite } from './platform/referral.js';
@@ -651,6 +652,7 @@ export default function App() {
   if (!user) {
     return (
       <AppCtx.Provider value={ctx}>
+        <ChunkBoundary>
         <React.Suspense fallback={<RouteLoading />}>
           <Routes>
             {/* A store reviewer and a payment provider open these without an
@@ -672,6 +674,7 @@ export default function App() {
             <Route path="*" element={NOT_FOUND_PAGE ? <UnknownAddress otherwise={<Login />} to="/welcome" /> : <Login />} />
           </Routes>
         </React.Suspense>
+        </ChunkBoundary>
         <ToastLayer toasts={toasts} />
       </AppCtx.Provider>
     );

@@ -788,7 +788,8 @@
         {"has":"E2E SUITE PASSED — 72/72 checks across 1 flows","note":"The activation gate on a Prithagoras build."},
         {"has":"E2E SUITE PASSED — 5/5 checks across 1 flows","note":"The Exam Desk dark without its flag, Prithagoras."},
         {"has":"E2E SUITE PASSED — 120/120 checks across 4 flows","note":"The Exam Desk sitting, import and desk journeys on Prithagoras."},
-        {"has":"NOT FOUND ROUTES: PASS — 232/232 checks","note":"New pin (train 2, as printed by running it with PRI_EDITION=prithagoras): the browser walk of client/test/not-found-routes-check.mjs, moved here from test:map because the suite shards have no browser; test:map keeps its --static half (131 checks)."}
+        {"has":"NOT FOUND ROUTES: PASS — 232/232 checks","note":"New pin (train 2, as printed by running it with PRI_EDITION=prithagoras): the browser walk of client/test/not-found-routes-check.mjs, moved here from test:map because the suite shards have no browser; test:map keeps its --static half (131 checks)."},
+        {"has":"OFFLINE WELCOME: PASS — 19/19 checks","note":"Signed out and offline with the real service worker (Chromium), /welcome and /welcome/marking say the page could not load and offer Try again; never the crash screen. 19 is the printed count of the new tour."}
       ]
     },
     "platform/classroom.log": {
