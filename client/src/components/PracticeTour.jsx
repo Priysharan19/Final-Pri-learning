@@ -7,17 +7,26 @@
 // Escape or Skip closes it; focus moves to the note and returns to the control
 // afterwards. A step whose control is not on the page is left out.
 // ─────────────────────────────────────────────────────────────────────────────
+import { createPortal } from 'react-dom';
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useT } from '../i18n/index.js';
-import { TOUR_STEPS, TOUR_EDGE as EDGE, tourNoteTop } from '../lib/firstRunTour.js';
+import { TOUR_STEPS, TOUR_EDGE as EDGE, tourNoteTop, tourNotePlace } from '../lib/firstRunTour.js';
 
 // The tour never scrolls the page: a control that is not on screen when it starts is left out.
+// With a Text size chosen the controls sit lower on the page (the content is zoomed), so a note is not left out for being
+// below the fold: its control is scrolled into view when its turn comes (place, below). At Standard nothing scrolls.
+const zoomed = () => document.documentElement.hasAttribute('data-text-size');
 const inView = s => {
   const el = document.querySelector(s.anchor);
   if (!el) return false;
+  if (zoomed()) return el.getClientRects().length > 0;
   const r = el.getBoundingClientRect();
   return r.bottom > 0 && r.top < window.innerHeight && r.right > 0 && r.left < window.innerWidth;
 };
+
+// The note is never above a sheet, scrim, menu or dialog: while one is open it is hidden (and its step is kept).
+const OVERLAYS = '[role="dialog"]:not(.pr-tour), [aria-modal="true"], .in-hintsheet, .in-hintsheet-scrim, .mnav-sheet, .mnav-sheet-scrim, .in-more-menu, [role="menu"], .pri-explain-backdrop, .drawer, .paper-overlay, [data-question-report]';
+const overlayOpen = () => [...document.querySelectorAll(OVERLAYS)].some(e => e.getClientRects().length > 0 && !e.closest('.pr-tour'));
 
 export default function PracticeTour({ onClose }) {
   const t = useT();
@@ -25,6 +34,15 @@ export default function PracticeTour({ onClose }) {
   const [steps, setSteps] = useState(() => TOUR_STEPS.filter(inView));
   const [box, setBox] = useState(null);
   const noteRef = useRef(null);
+  const [covered, setCovered] = useState(false);
+  useEffect(() => {
+    let raf = 0;
+    const look = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => setCovered(overlayOpen())); };
+    look();
+    const mo = new MutationObserver(look);
+    mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'aria-expanded', 'hidden', 'open', 'style'] });
+    return () => { cancelAnimationFrame(raf); mo.disconnect(); };
+  }, []);
   const step = steps[at];
 
   // The controls may arrive a moment after the first paint (the question loads).
@@ -39,7 +57,8 @@ export default function PracticeTour({ onClose }) {
     const el = step && document.querySelector(step.anchor);
     const note = noteRef.current;
     if (!el || !note) return;
-    const r = el.getBoundingClientRect();
+    let r = el.getBoundingClientRect();
+    if (zoomed() && (r.bottom <= 0 || r.top >= window.innerHeight - EDGE)) { el.scrollIntoView({ block: 'center' }); r = el.getBoundingClientRect(); }
     // The wide-screen gutter note stays wholly left of the dot-point picker and the question (it used to overlap their left
     // edge at 1280); when the margin is too narrow for it, it sits under the question text like a narrow screen's.
     const column = step.gutter && window.innerWidth >= 900 ? document.querySelector('[data-dotpoint-picker], .q-prompt') : null;
@@ -57,7 +76,15 @@ export default function PracticeTour({ onClose }) {
       minTop: header ? Math.max(0, header.getBoundingClientRect().bottom) : 0,
       avoid: avoid ? avoid.getBoundingClientRect() : null
     });
-    setBox({ left, top, width: w });
+    // Never over the question or the dot-point picker: the usual place first, then every side of the control (see tourNotePlace).
+    // Obstacles: the question, the picker and the bars that sit over the page (a sticky bar is not one when it holds the control).
+    const avoids = ['.q-prompt', '[data-dotpoint-picker]', '.ws-actions', '.ws-bar', '.mobilenav'].map(sel => document.querySelector(sel))
+      .filter(e => e && e.getClientRects().length && !e.contains(el)).map(e => e.getBoundingClientRect());
+    const at = tourNotePlace({
+      anchor: r, w, h, vw: window.innerWidth, vh: window.innerHeight, avoids, usual: { left, top },
+      minTop: header ? Math.max(0, header.getBoundingClientRect().bottom) : 0
+    });
+    setBox({ left: at.left, top: at.top, width: w });
   }, [step]);
 
   useLayoutEffect(() => {
@@ -70,8 +97,14 @@ export default function PracticeTour({ onClose }) {
     return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', again); window.removeEventListener('scroll', again, true); };
   }, [step, place]);
 
-  // Focus moves to the note at each step.
-  useEffect(() => { noteRef.current?.focus({ preventScroll: true }); }, [at]);
+  // Focus moves to the note at each step, once the note is visible (a hidden element cannot take focus, and step 1 is
+  // hidden until it has been placed), and not again when an overlay closes over it and away.
+  const focusedAt = useRef(-1);
+  useEffect(() => {
+    if (!box || covered || focusedAt.current === at) return;
+    focusedAt.current = at;
+    noteRef.current?.focus({ preventScroll: true });
+  }, [at, box, covered]);
 
   // Finishing, Skip and Escape all mean the student has seen it.
   const close = useCallback(() => {
@@ -96,9 +129,11 @@ export default function PracticeTour({ onClose }) {
 
   if (!step) return null;
   const last = at === steps.length - 1;
-  return (
+  // Rendered on <body>, outside the page content: Text size zooms the content, and a fixed note inside it would be
+  // offset and clamped in the wrong units. Its anchor is found by selector, and focus moves to it at each step.
+  return createPortal(
     <div ref={noteRef} className="pr-tour" role="group" tabIndex={-1} data-practice-tour={step.id}
-      aria-label={t('tour.label')} style={box ? { left: box.left, top: box.top, width: box.width } : { visibility: 'hidden' }}>
+      aria-label={t('tour.label')} style={box && !covered ? { left: box.left, top: box.top, width: box.width } : { ...(box || {}), visibility: 'hidden', pointerEvents: 'none' }}>
       <p className="pr-tour-step muted">{t('tour.stepOf', { n: at + 1, total: steps.length })}</p>
       <p className="pr-tour-text">{t(step.key)}</p>
       <div className="pr-tour-actions">
@@ -106,6 +141,7 @@ export default function PracticeTour({ onClose }) {
         <button type="button" className="btn btn-primary btn-sm" data-tour-next
           onClick={() => (last ? close() : setAt(at + 1))}>{t(last ? 'tour.done' : 'tour.next')}</button>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

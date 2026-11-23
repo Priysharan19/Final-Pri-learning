@@ -21,6 +21,7 @@
 import { HSC_PRACTICE_LINKS } from './hscOutcomes.js';
 import { hscPriorities } from './hscPriorities.js';
 import { hscCoursesFor } from '../hscCourses.js';
+import { entryIdOf } from '../curriculum.js';
 
 /** Answers on an outcome's practice before its success rate is used. */
 export const HSC_EVIDENCE_FLOOR = 5;
@@ -49,10 +50,11 @@ const offered = row => !!row && Array.isArray(row.requestable) && row.requestabl
  */
 export function hscPractiseNext(priorities, rows) {
   const out = priorities.map(p => {
-    const links = (HSC_PRACTICE_LINKS[p.code] || []).filter(id => offered(rows[id])).map(id => ({ id, name: rows[id].name }));
+    // A topic and its `-forms` generator are one row (engine/curriculum.js): its counts are read once, and it is named once.
+    const topics = [...new Set((HSC_PRACTICE_LINKS[p.code] || []).map(id => rows[entryIdOf(id)]).filter(offered))];
+    const links = topics.map(r => ({ id: r.id, name: r.name }));
     let answers = 0, right = 0, independent = 0, known = true;
-    for (const { id } of links) {
-      const r = rows[id];
+    for (const r of topics) {
       const ev = r.evidence;
       if (ev) { answers += ev.attempts || 0; right += ev.correct || 0; independent += ev.independentCorrect || 0; }
       else { answers += r.attempts || 0; right += r.correct || 0; known = false; }

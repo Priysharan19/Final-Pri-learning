@@ -32,6 +32,9 @@ import { attemptTotals, evidenceByKey, isCreditedCorrect, isRepeat as isRepeatAt
 import { indiaExamBlueprint } from '../engine/indiaExams.js';
 import { predictExamMark } from '../engine/markPredictor.js';
 import { nswIssuedLevels, nswIssuedForms, nswOfferedCell } from '../engine/nswOffer.js';
+import {
+  entryIdOf, entryIssuedLevels, dotpointOfEntry, requestOnEntry, resolveSide, groupBy, mergeRows
+} from '../engine/curriculum.js';
 import { IN_CHAPTERS, OLYMPIAD_TOPICS } from '../engine/curriculum-in.js';
 import { evidenceProgress } from '../engine/progressEvidence.js';
 import { generateQuestion } from '../engine/generators/index.js';
@@ -1974,7 +1977,7 @@ function sanitize(q, row) {
   const inChapter = row.india ? indiaChapter(row.india.chapterId) : null;
   const inDp = inChapter && Number.isInteger(row.india?.dotpointIndex) ? row.india.dotpointIndex : null;
   return {
-    id: row.id, subtopic: inChapter?.id || q.subtopic,
+    id: row.id, subtopic: inChapter?.id || entryIdOf(q.subtopic),
     subtopicName: inChapter?.name || (q.custom ? q.customName || translate('msg.custom') : (s?.name || q.subtopic)),
     year: inChapter ? indiaChapterGrade(inChapter) : s?.year, strand: inChapter?.strand || s?.strand,
     indiaTrack: row.india?.track || null,
@@ -3501,7 +3504,7 @@ const routes = {
     const years = CURRICULUM.filter(y => yearOffered(y.year)).map(y => ({
       year: y.year, title: y.title, caption: y.caption,
       courseLabel: courseLabel(p.course || 'nsw', y.year),
-      subtopics: y.subtopics.map(s => {
+      subtopics: mergeRows(y.subtopics.map(s => {
         const st = ratings[s.id];
         const m = st ? masteryOf(st.rating, st.attempts, st.last_at, now) : 0;
         return {
@@ -3511,7 +3514,7 @@ const routes = {
           attempts: st?.attempts || 0, correct: st?.correct || 0, evidence: evidenceOf(s.id),
           due: due.has(s.id), rating: st?.rating || null
         };
-      })
+      }), masteryBand)
     }));
     // Senior pathway streams: appended as extra sections for Years 11–12
     const pw = pathwayOf(p);
@@ -3526,7 +3529,7 @@ const routes = {
       return {
         year: yr, key, stream: true, title: grp.title, caption: grp.caption,
         courseLabel: PATHWAYS[pw]?.name || '',
-        subtopics: streamSubtopics(key).map(s2 => {
+        subtopics: mergeRows(streamSubtopics(key).map(s2 => {
           const st = ratings[s2.id];
           const m = st ? masteryOf(st.rating, st.attempts, st.last_at, now) : 0;
           return {
@@ -3536,7 +3539,7 @@ const routes = {
             attempts: st?.attempts || 0, correct: st?.correct || 0, evidence: evidenceOf(s2.id),
             due: due.has(s2.id), rating: st?.rating || null
           };
-        })
+        }), masteryBand)
       };
     });
     return { years, streams, userYear: p.year, pathway: p.year >= 11 ? pw : null, course: p.course || 'nsw' };
@@ -3589,7 +3592,8 @@ const routes = {
         return { ...resumedQuestionResponse(unfinished), ...(unfinished.answered ? {} : difficultyServedAs(body?.difficulty, level)) };
       }
     }
-    const { mode = 'smart', subtopic, difficulty, dotpoint, taskId, track, pyqOnly = false } = body || {};
+    const { mode = 'smart', difficulty, taskId, track, pyqOnly = false } = body || {};
+    let { subtopic, dotpoint } = body || {};
     // Task-driven question
     if (taskId) {
       const task = await get('tasks', taskId);
@@ -3678,15 +3682,22 @@ const routes = {
     }
     let choice;
     if (mode === 'topic' && subtopic && SUBTOPIC_BY_ID[subtopic]) {
-      const sub = SUBTOPIC_BY_ID[subtopic];
+      // A topic is one entry however many generators stand behind it (engine/curriculum.js): a request that names a
+      // `-forms` id (an old link, a saved task) is read on its base entry, and one of the entry's generators answers
+      // it: the one a named dot point belongs to, else one drawn from a seed. The server
+      // still issues, and still refuses, by generator.
+      const entry = requestOnEntry(subtopic, dotpoint);
+      const issuedLevels = entryIssuedLevels(entry.subtopic);
       // A topic the server issues nothing from is not practised at all, and a
       // level the student NAMED that it does not issue is answered with the
       // levels it does — never moved silently, never a draft (engine/nswOffer.js).
-      const issuedLevels = nswIssuedLevels(subtopic);
       if (!issuedLevels.length) throw practiceNotOffered();
       if (difficulty && !issuedLevels.includes(Math.min(4, Math.max(1, Number(difficulty))))) {
-        throw difficultyUnavailable(Math.min(4, Math.max(1, Number(difficulty))), issuedLevels, { subtopic });
+        throw difficultyUnavailable(Math.min(4, Math.max(1, Number(difficulty))), issuedLevels, { subtopic: entry.subtopic });
       }
+      const side = resolveSide(entry.subtopic, { dotpoint: entry.dotpoint, difficulty, seed: Math.random() });
+      ({ subtopic, dotpoint } = side);
+      const sub = SUBTOPIC_BY_ID[subtopic];
       const st = await getRating(p.id, subtopic);
       const asked = dotpointOf(subtopic, dotpoint);
       const real = dotpointIsGeneratable(asked);
@@ -4838,7 +4849,8 @@ const routes = {
     const inkCount = attempts.filter(a => a.viaInk).length;
     const recent = attempts.slice(-15).reverse().map(a => ({ subtopic: a.subtopic, difficulty: a.difficulty, correct: a.correct, created_at: a.createdAt, mode: a.mode, name: SUBTOPIC_BY_ID[a.subtopic]?.name || translate('msg.custom') }));
     return {
-      predicted: pred, trajectory, priorities: prio, strands, misconceptions,
+      // Lists a student reads show a topic once (engine/curriculum.js); the engine's own rows above are untouched.
+      predicted: pred, trajectory, priorities: groupBy(prio, r => entryIdOf(r.subtopic)), strands, misconceptions,
       activity: days.slice(-120), totals, byDiff, bestRush,
       matchWins: matchRuns.filter(r => r.won).length, matchPlayed: matchRuns.length,
       examCount: exams.filter(e => e.finishedAt).length, inkCount, recent,
@@ -4849,7 +4861,8 @@ const routes = {
   // no mastery figure, percentage, predicted mark or band, for either edition.
   'GET /progress/evidence': async () => {
     const p = await requireProfile();
-    return evidenceProgress(await attemptsInOrder(p.id), { now: Date.now() });
+    // Attempts recorded under a `-forms` generator count under the topic's entry (engine/curriculum.js).
+    return evidenceProgress((await attemptsInOrder(p.id)).map(a => ({ ...a, subtopic: entryIdOf(a.subtopic) })), { now: Date.now() });
   },
   // The syllabus board's inputs (progress/SyllabusBoard.jsx, engine/
   // syllabusBoard.js): each attempt with the dot points its question named —
@@ -4950,17 +4963,17 @@ const routes = {
     }
     const pred = predictMark(ratings, p.year, now, pathwayOf(p));
     const { own } = offeredScope(scopeForYear(p.year, pathwayOf(p)));
-    const rows = own.map(s => {
+    const rows = mergeRows(own.map(s => {
       const st = ratings[s.id];
       const m = st ? Math.round(100 * masteryOf(st.rating, st.attempts, st.last_at, now)) : 0;
-      return { name: s.name, strand: s.strand, mastery: m, attempts: st?.attempts || 0, correct: st?.correct || 0, band: st ? masteryBand(m / 100) : 'unseen' };
-    });
+      return { id: s.id, name: s.name, strand: s.strand, mastery: m, attempts: st?.attempts || 0, correct: st?.correct || 0, band: st ? masteryBand(m / 100) : 'unseen' };
+    }), masteryBand);
     const attempts = await byIndex('attempts', 'pid', p.id);
     const acts = await activityFor(p.id);
     return {
       student: { name: p.name, year: p.year, course: courseLabel(p.course || 'nsw', p.year, pathwayOf(p)) },
       generatedAt: now, predicted: pred, subtopics: rows,
-      misconceptions: namedWeaknesses(ratings, now, 6, { india: p.course === 'in', grade: p.year }),
+      misconceptions: groupBy(namedWeaknesses(ratings, now, 6, { india: p.course === 'in', grade: p.year }), m => `${m.label}|${entryIdOf(m.subtopic)}`),
       strengths: [...rows].filter(r => r.attempts >= 3).sort((a, b) => b.mastery - a.mastery).slice(0, 3),
       focus: [...rows].sort((a, b) => a.mastery - b.mastery).slice(0, 3),
       weekly: acts.slice(-28),
@@ -5177,7 +5190,7 @@ const routes = {
       // the row must carry the chapter id the practice route understands.
       const inChapter = r.india ? indiaChapter(r.india.chapterId) : null;
       return {
-        id: r.id, subtopic: inChapter ? inChapter.id : r.subtopic,
+        id: r.id, subtopic: inChapter ? inChapter.id : entryIdOf(r.subtopic),
         subtopicName: q.multipart ? q.title : (inChapter?.name || (q.custom ? q.customName || translate('msg.custom') : (SUBTOPIC_BY_ID[r.subtopic]?.name || r.subtopic))),
         year: inChapter ? indiaChapterGrade(inChapter) : undefined,
         dotpointText: inChapter && Number.isInteger(r.india?.dotpointIndex) ? inChapter.dotpoints[r.india.dotpointIndex] : undefined,
@@ -5216,7 +5229,7 @@ const routes = {
       const inChapter = indiaChapter(a.subtopic);
       const certified = Number.isInteger(a.marksEarned) && Number.isInteger(a.marksPossible);
       list.push({
-        id: a.questionId, subtopic: inChapter ? inChapter.id : a.subtopic,
+        id: a.questionId, subtopic: inChapter ? inChapter.id : entryIdOf(a.subtopic),
         subtopicName: inChapter?.name || SUBTOPIC_BY_ID[a.subtopic]?.name || a.subtopic,
         year: inChapter ? indiaChapterGrade(inChapter) : undefined,
         multipart: false, prompt: '',
@@ -5233,7 +5246,7 @@ const routes = {
       });
     }
     // Counts per filter, inside the chapter asked for (before paging).
-    if (subtopic) list = list.filter(x => x.subtopic === subtopic);
+    if (subtopic) list = list.filter(x => x.subtopic === entryIdOf(subtopic));
     const counts = Object.fromEntries(Object.entries(HISTORY_FILTERS).map(([k, f]) => [k, list.filter(f).length]));
     list = list.filter(HISTORY_FILTERS[filter]).sort(HISTORY_SORTS[sort]);
 
@@ -6243,7 +6256,7 @@ async function resumableQuestion(profile, body = {}) {
     ? Math.min(4, Math.max(1, Number(body.difficulty))) : null;
 
   const scope = { track: body.track, pyqOnly: body.pyqOnly === true, explicit: !!subtopic };
-  const askedDotpoint = subtopic && body.dotpoint != null && body.dotpoint !== '' ? dotpointOf(subtopic, body.dotpoint) : null;
+  const askedDotpoint = subtopic && body.dotpoint != null && body.dotpoint !== '' ? dotpointOfEntry(subtopic, body.dotpoint) : null;
   const candidates = rows.filter(r => {
     if (!r || r.answered || r.discardedAt || r.examId || r.mode === 'rush' || r.mode === 'match') return false;
     if (!atNamedLevel(r)) return false;
@@ -6252,7 +6265,8 @@ async function resumableQuestion(profile, body = {}) {
     if (!resumeInScope(profile, r, scope)) return false;
     if (!subtopic) return r.mode === 'practice' || r.mode === 'review';
     const actual = r.india?.chapterId || r.payload?.subtopic || r.subtopic;
-    if (String(actual || '') !== subtopic) return false;
+    // A topic is its entry: a question from either generator behind it resumes under it (engine/curriculum.js).
+    if (entryIdOf(String(actual || '')) !== entryIdOf(subtopic)) return false;
     if (difficulty !== null && Number(r.difficulty) !== difficulty) return false;
     // A request that names a dot point resumes only a question that belongs to it, so choosing
     // a dot point on the practice page is answered with one from that dot point.

@@ -7,10 +7,13 @@
 // stands behind are offered (`generated`), because the others are answered with
 // a topic question and a label that says otherwise would be false.
 import { dotpointAvailable } from '../engine/curriculumAvailability.js';
+import { entryIdOf } from '../engine/curriculum.js';
 
 /** The chapter row for a subtopic id, from a GET /curriculum reply (years and streams). */
 export function chapterRowOf(curriculum, subtopicId) {
   if (!curriculum || !subtopicId) return null;
+  // A link or a saved state naming a `-forms` generator lands on the topic's one entry.
+  subtopicId = entryIdOf(subtopicId);
   for (const section of [...(curriculum.years || []), ...(curriculum.streams || [])]) {
     const row = (section.subtopics || section.chapters || []).find(s => s.id === subtopicId);
     if (row) return row;
@@ -41,6 +44,8 @@ export function readDotpointParam(row, value) {
 /** The query string after choosing a dot point (null or '' for all), every other filter kept. */
 export function withDotpoint(params, ordinal) {
   const next = new URLSearchParams(params);
+  // The ordinal is a place in the topic's one list, so the link names the topic and not a `-forms` generator.
+  if (next.get('subtopic')) next.set('subtopic', entryIdOf(next.get('subtopic')));
   if (ordinal == null || ordinal === '') next.delete('dotpoint'); else next.set('dotpoint', String(ordinal));
   return next;
 }

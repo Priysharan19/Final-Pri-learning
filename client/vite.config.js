@@ -150,7 +150,7 @@ if (process.env.PRI_FEATURE_INSTRUMENT !== undefined && process.env.PRI_FEATURE_
   console.warn(`[pri] PRI_FEATURE_INSTRUMENT=${process.env.PRI_FEATURE_INSTRUMENT} is ignored: the student interface is set in client/interface.config.mjs (${STUDENT_INTERFACE}).`);
 }
 
-export const PRECACHE_SKIP = /(^|\/)sw\.js$|(^|\/)release\.json$|(^|\/)features\.json$|(^|\/)\.DS_Store$|\.map$|\.woff$|\.ttf$/;
+export const PRECACHE_SKIP = /(^|\/)sw\.js$|(^|\/)release\.json$|(^|\/)share\.png$|(^|\/)features\.json$|(^|\/)\.DS_Store$|\.map$|\.woff$|\.ttf$/;
 
 export const ON_DEMAND = [
   // ~2.7 MB of renderer and worker, for the student who attaches a scanned PDF.
@@ -536,6 +536,9 @@ export function editionBrand(edition) {
     generateBundle() {
       this.emitFile({ type: 'asset', fileName: 'manifest.webmanifest', source: manifest });
       for (const rel of WEB_FILES) this.emitFile({ type: 'asset', fileName: rel, source: readFileSync(brandFile(edition, rel)) });
+      // The share image an edition's og:image names (index.html, edition-brand.mjs); only an edition with a `share` record has one.
+      const share = editionOf(edition).identity.share;
+      if (share) this.emitFile({ type: 'asset', fileName: share.image, source: readFileSync(brandFile(edition, share.image)) });
     },
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
@@ -544,7 +547,7 @@ export function editionBrand(edition) {
           res.setHeader('Content-Type', 'application/manifest+json');
           return res.end(manifest);
         }
-        if (!WEB_FILES.includes(path)) return next();
+        if (!WEB_FILES.includes(path) && path !== editionOf(edition).identity.share?.image) return next();
         res.setHeader('Content-Type', BRAND_TYPES[path.slice(path.lastIndexOf('.'))]);
         return res.end(readFileSync(brandFile(edition, path)));
       });
@@ -774,6 +777,9 @@ export function featureDefines(command, env = process.env) {
     __PRI_NOTES_PAGE__: JSON.stringify(states.edition === 'prithagoras' ? 'nsw' : 'india'),
     // Rapid Fire and Match (owner decision, 19 Nov 2026: hidden in Prithagoras): a literal, so a build without them
     // holds neither page, nor their chunks, in the install (App.jsx).
+    // True only in a Prithagoras build: a literal, so Priyabhata's build holds neither the not-found page nor
+    // anything it alone needs, and Prithagoras's holds none of India's NCERT Class 8 and 9 sections (App.jsx, pages/Practice.jsx).
+    __PRI_AU_BUILD__: JSON.stringify(states.edition === 'prithagoras'),
     __PRI_GAMES__: JSON.stringify(editionOf(states.edition).games !== false),
     // Plan E5: false in a build of an edition with no payment provider, so its
     // bundle holds no purchase flow at all (client/src/platform/nativeBilling.js).

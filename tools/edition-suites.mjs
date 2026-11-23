@@ -46,6 +46,7 @@ export const EDITION_SUITES = [
   'client/test/syllabus-board-check.mjs',
   'client/test/nsw-bank-quality-check.mjs',
   'client/test/nsw-offer-check.mjs',
+  'client/test/topic-entries-check.mjs',
   'client/test/nsw-exams-check.mjs',
   'client/test/library-ui-check.mjs',
   'client/test/desk-clock-check.mjs',
@@ -80,7 +81,8 @@ export const EXEMPT = {
   'client/test/a11y-gate.mjs': 'a browser walk: the CI browser shard "edition-prithagoras" runs it on a Prithagoras build and server',
   'client/test/a11y-check.mjs': 'the walk a11y-gate.mjs runs (exempt above for the same reason)',
   'client/test/legal-owner-review-check.mjs': 'reads the Indian and the Australian notices side by side from the repository and compares them with both editions\' table entries; it does not depend on PRI_EDITION (it runs once in test:legal)',
-  'client/test/brand-build-check.mjs': 'builds both editions itself (--both) in the "Client build and offline-first boundary" job'
+  'client/test/brand-build-check.mjs': 'builds both editions itself (--both) in the "Client build and offline-first boundary" job',
+  'client/test/share-image-check.mjs': 'names both editions explicitly (the Prithagoras card, and Priyabhata\'s page unchanged), so PRI_EDITION does not change what it reads; it runs once in test:map'
 };
 
 // Any reference counts (static import, dynamic import, a path read at runtime).

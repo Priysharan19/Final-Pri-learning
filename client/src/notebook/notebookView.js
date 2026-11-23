@@ -38,6 +38,8 @@ function normalizeMisconception(m) {
 }
 
 /** What the local backend returned, made safe to render. */
+import { entryIdOf } from '../engine/curriculum.js';
+
 export function normalizeNotebook(raw) {
   const src = raw && typeof raw === 'object' ? raw : {};
   const base = { available: src.available !== false, reason: str(src.reason) };
@@ -76,7 +78,7 @@ export function notebookSections(book) {
   for (const g of book?.groups || []) {
     const items = [...g.items].sort(byDueThenNewest);
     const group = { ...g, items, due: items.filter(i => i.review.due).length, open: items.filter(i => !i.fixed).length, lastAt: Math.max(0, ...items.map(i => i.answeredAt)) };
-    const key = g.subtopic || g.key;
+    const key = entryIdOf(g.subtopic) || g.key;   // a `-forms` generator's slips are read under its topic
     const t = topics.get(key) || topics.set(key, { subtopic: key, chapterName: g.chapterName || null, due: 0, open: 0, lastAt: 0, groups: [] }).get(key);
     t.groups.push(group);
     t.due += group.due;

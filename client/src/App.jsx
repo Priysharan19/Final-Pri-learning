@@ -82,6 +82,49 @@ const LEGAL_ROUTES_EXTRA = EDITION === 'prithagoras' ? (
     <Route path="/refunds" element={<Navigate to="/refund-policy" replace />} />
   </>
 ) : <Route path="/grievance" element={<Legal />} />;
+// A real "page not found" for an address that is no route at all. Prithagoras
+// only (a literal in a build, vite.config.js __PRI_AU_BUILD__): Priyabhata keeps
+// sending an unknown address to its landing page, byte for byte, and its build
+// emits no NotFound chunk. A signed-out visitor still reaches Login at every
+// address that IS an app route (a bookmark to /practice signs in, then opens),
+// so the signed-out table below needs the list of real paths (the activation gate
+// must always run, so it keeps every address; the signed-in router then shows the page). client/test/not-found-routes-check.mjs holds it equal to the signed-in
+// route table.
+/* global __PRI_AU_BUILD__ */
+const NOT_FOUND_PAGE = typeof __PRI_AU_BUILD__ === 'boolean' && __PRI_AU_BUILD__;
+const NotFound = NOT_FOUND_PAGE ? React.lazy(() => import('./landing/NotFound.jsx')) : null;
+const APP_PATHS = NOT_FOUND_PAGE ? [
+  '/', '/practice', '/practise-photo', '/progress', '/plan', '/today', '/error-log', '/premium', '/insights',
+  '/parent-report', '/placement', '/map', '/signin', '/stats', '/badges', '/tasks', '/teach', '/exams', '/paper-generator',
+  '/exams/:id', '/papers/sit/:attemptId', '/notes', '/notes/:chapterId', '/library', '/library/:id', '/desk/import',
+  '/desk/:attemptId', '/rush', '/match', '/review', '/history', '/favorites', '/mistakes', '/classes', '/privacy', '/terms',
+  '/refund-policy', '/third-party-notices', '/welcome', '/welcome/marking', '/welcome/syllabus', '/welcome/teachers',
+  '/contact', '/grievance', '/refunds', '/settings', '/account-action', '/guardian/consent', '/account/delete-request',
+  '/parent/report-email', '/index.html'
+] : [];
+// react-router's own matching for these patterns (static segments, case-insensitive, ":param" for one segment,
+// a trailing slash allowed), written here so Priyabhata's and Prithagoras's builds import the same router exports.
+const isRoute = (pattern, pathname) => {
+  const a = pattern.split('/').filter(Boolean), b = pathname.split('/').filter(Boolean);
+  return a.length === b.length && a.every((seg, i) => seg.startsWith(':') ? b[i] !== '' : seg.toLowerCase() === b[i].toLowerCase());
+};
+/**
+ * The signed-in `*` route. A path in APP_PATHS that reaches it is one the signed-in router does not declare for this
+ * student: the public landing pages, /index.html, and a feature that is switched off (parent report, placement, library,
+ * desk). Those go home as they always did, so turning a flag off never shows a student an error page; any other address
+ * is not found.
+ */
+function SignedInUnknown({ home }) {
+  const { pathname } = useLocation();
+  return APP_PATHS.some(path => isRoute(path, pathname)) ? <Navigate to={home} replace /> : <NotFound to={home} signedIn />;
+}
+/** The `*` route before the shell: Login at a real app address, "not found" anywhere else (Prithagoras). */
+function UnknownAddress({ otherwise, to }) {
+  const { pathname } = useLocation();
+  const known = APP_PATHS.some(path => isRoute(path, pathname));
+  return known ? otherwise : <NotFound to={to} signedIn={false} />;
+}
+
 // The public landing (the verified page, §3) and its three plain pages are
 // signed-out web routes, each its own chunk: a student who opens the app never
 // downloads them.
@@ -626,7 +669,7 @@ export default function App() {
                 other address; a native shell keeps it as the first screen. */}
             {guestTrialAvailable() && <Route path="/" element={<FirstScreen />} />}
             <Route path="/signin" element={<Login />} />
-            <Route path="*" element={<Login />} />
+            <Route path="*" element={NOT_FOUND_PAGE ? <UnknownAddress otherwise={<Login />} to="/welcome" /> : <Login />} />
           </Routes>
         </React.Suspense>
         <ToastLayer toasts={toasts} />
@@ -786,7 +829,9 @@ export default function App() {
                     {LEGAL_ROUTES_EXTRA}
                     <Route path="/third-party-notices" element={<Legal />} />
                     <Route path="/settings" element={<Settings />} />
-                    <Route path="*" element={<Navigate to={roleLanding} replace />} />
+                    {NOT_FOUND_PAGE
+                      ? <Route path="*" element={<SignedInUnknown home={roleLanding} />} />
+                      : <Route path="*" element={<Navigate to={roleLanding} replace />} />}
                   </Routes>
                 </React.Suspense>
               </ErrorBoundary>

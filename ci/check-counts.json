@@ -497,7 +497,7 @@
       "pins": [
         {"has":"✓ guest-trial-check.mjs (177 checks)","note":"ADR-0003, the guest trial over real HTTP; 103 -> 177: worked steps after a wrong answer, one retry, one like it, parallel-guess races (re-derived by running)."},
         {"has":"✓ guest-steps-leak-check.mjs (3 checks)","note":"No worked step that states the answer is released while the retry is open, over every guest-issuable chapter and level of both editions, 20 seeds each (3 checks; added by the worked-steps flow)."},
-        {"has":"✓ guest-menu-issuable-check.mjs (3981 checks)","note":"Everything the guest picker lists, in both editions, is a request the edition's server issues (3981, re-derived by running; it follows the number of listed chapter-and-level cells)."}
+        {"has":"✓ guest-menu-issuable-check.mjs (3913 checks)","note":"3981 → 3913 (train 2, as printed by the workflow step: guest-menu-issuable-check.mjs tee -a guest-trial.log, run on the merged tree): task/one-topic-entry lists one entry per topic in the picker menus, so the picker lists fewer chapter-and-level entries (68 fewer checks); every remaining one is still issued. Before that: Everything the guest picker lists, in both editions, is a request the edition's server issues (3981, re-derived by running; it follows the number of listed chapter-and-level cells)."}
       ]
     },
     "platform/secret-shapes.log": {
@@ -765,8 +765,8 @@
       "job": "suites-contracts",
       "log": "edition-suites.log",
       "pins": [
-        {"has":"EDITION SUITES COVERAGE: PASS — 45 listed, 4 exempt, 31 importers accounted for","note":"30 → 31 importers (train banks-1, as printed by the CI run and by running the command locally): client/test/desk-ui-check.mjs now imports client/src/platform/edition.js (the quality sweep, QA round 2: the desk dates use the edition locale). It was already listed in EDITION_SUITES, so it is accounted for by the list, not exempted, and the Prithagoras run still covers it; the listed count stays 45. Earlier: 41 → 44 listed, 27 → 30 importers (Prithagoras focus, re-derived by running): offering-check, syllabus-board-check and nsw-offering-check import the edition table; the Prithagoras run is 44/44. 34 → 36 listed, 20 → 21 importers (train 24 integration, as printed by the CI run). Plan E6: every suite that reads the edition is listed in tools/edition-suites.mjs or exempt with a reason."},
-        {"has":"EDITION SUITES (prithagoras): PASS — 45/45 suites"}
+        {"has":"EDITION SUITES COVERAGE: PASS — 46 listed, 5 exempt, 33 importers accounted for","note":"Train 2 (as printed by running --verify-coverage and --run --edition=prithagoras on the merged tree): 4 → 5 exempt and 32 → 33 importers because client/test/share-image-check.mjs (Prithagoras launch polish) names both editions explicitly and is exempt in tools/edition-suites.mjs, on top of the 45 → 46 listed step below. 45 → 46 listed, 31 → 32 importers (one topic entry per syllabus topic, as printed by running --verify-coverage and --run --edition=prithagoras): client/test/topic-entries-check.mjs imports the edition table and is listed. 30 → 31 importers (train banks-1, as printed by the CI run and by running the command locally): client/test/desk-ui-check.mjs now imports client/src/platform/edition.js (the quality sweep, QA round 2: the desk dates use the edition locale). It was already listed in EDITION_SUITES, so it is accounted for by the list, not exempted, and the Prithagoras run still covers it; the listed count stays 45. Earlier: 41 → 44 listed, 27 → 30 importers (Prithagoras focus, re-derived by running): offering-check, syllabus-board-check and nsw-offering-check import the edition table; the Prithagoras run is 44/44. 34 → 36 listed, 20 → 21 importers (train 24 integration, as printed by the CI run). Plan E6: every suite that reads the edition is listed in tools/edition-suites.mjs or exempt with a reason."},
+        {"has":"EDITION SUITES (prithagoras): PASS — 46/46 suites"}
       ]
     },
     "build/install-budget-prithagoras.log": {
@@ -787,7 +787,8 @@
         {"has":"E2E SUITE PASSED — 36/36 checks across 1 flows","note":"Plan E6: OTP sign-up on a Prithagoras build and server (36: one more check, no phone channel, parent reached by email)."},
         {"has":"E2E SUITE PASSED — 72/72 checks across 1 flows","note":"The activation gate on a Prithagoras build."},
         {"has":"E2E SUITE PASSED — 5/5 checks across 1 flows","note":"The Exam Desk dark without its flag, Prithagoras."},
-        {"has":"E2E SUITE PASSED — 120/120 checks across 4 flows","note":"The Exam Desk sitting, import and desk journeys on Prithagoras."}
+        {"has":"E2E SUITE PASSED — 120/120 checks across 4 flows","note":"The Exam Desk sitting, import and desk journeys on Prithagoras."},
+        {"has":"NOT FOUND ROUTES: PASS — 232/232 checks","note":"New pin (train 2, as printed by running it with PRI_EDITION=prithagoras): the browser walk of client/test/not-found-routes-check.mjs, moved here from test:map because the suite shards have no browser; test:map keeps its --static half (131 checks)."}
       ]
     },
     "platform/classroom.log": {

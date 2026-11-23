@@ -31,6 +31,7 @@ import { difficultyPair } from '../lib/difficultyText.js';
 import DotpointPicker, { DotpointChip } from '../components/DotpointPicker.jsx';
 import { useAnnounce } from '../examShell/useAnnounce.js';
 import { chapterRowOf, dotpointChoices, readDotpointParam, withDotpoint } from '../lib/practiceDotpoints.js';
+import { requestOnEntry } from '../engine/curriculum.js';
 
 // Reuse the existing verified account flow; never create a parallel practice login.
 const PracticeAccountRecovery = React.lazy(() => import('../components/CloudAccountPanel.jsx'));
@@ -57,8 +58,17 @@ function ProfilePractice() {
   const sessionDoneShown = useRef(false);
   const [params, setParams] = useSearchParams();
   const location = useLocation();
-  const subtopic = params.get('subtopic');
-  const dotpoint = params.get('dotpoint');
+  // A link or saved state that names a `-forms` generator lands on the topic's one entry (engine/curriculum.js).
+  const { subtopic, dotpoint: entryDotpoint } = requestOnEntry(params.get('subtopic'), params.get('dotpoint'));
+  const dotpoint = entryDotpoint === undefined ? params.get('dotpoint') : String(entryDotpoint);
+  // The address names the topic's one entry: an old `-forms` link is rewritten in place (no history entry).
+  useEffect(() => {
+    if (!params.get('subtopic') || (subtopic === params.get('subtopic') && dotpoint === params.get('dotpoint'))) return;
+    const next = new URLSearchParams(params);
+    next.set('subtopic', subtopic);
+    if (dotpoint != null && dotpoint !== '') next.set('dotpoint', dotpoint);
+    setParams(next, { replace: true });
+  }, [params, subtopic, dotpoint, setParams]);
   const difficulty = params.get('difficulty');
   const track = params.get('track');
   const taskId = params.get('task');
