@@ -29,7 +29,7 @@ ok(/const NOT_FOUND_PAGE = typeof __PRI_AU_BUILD__ === 'boolean' && __PRI_AU_BUI
 ok(/NOT_FOUND_PAGE \? React\.lazy\(\(\) => import\('\.\/landing\/NotFound\.jsx'\)\) : null/.test(app), 'the page is a lazy chunk only a Prithagoras build has');
 ok(/path="\*" element=\{NOT_FOUND_PAGE \? <UnknownAddress otherwise=\{<Login \/>\} to="\/welcome" \/> : <Login \/>\}/.test(app), 'signed out: Login at real addresses, not-found elsewhere, button to /welcome; Priyabhata: Login');
 ok(/<Route path="\*" element=\{NOT_FOUND_PAGE \? <NotFound to=\{roleLanding\} signedIn \/> : <Navigate to=\{roleLanding\} replace \/>\}/.test(app), 'signed in: not-found with the button to the role\'s home; Priyabhata: the redirect it had');
-ok(/<UnknownAddress to="\/" otherwise=\{<AccountActivationGate/.test(app), 'the activation gate keeps its own screen at real addresses');
+ok(!/<UnknownAddress to="\/"/.test(app) && /<Route path="\*" element=\{<AccountActivationGate/.test(app), 'the activation gate runs at every address (an unknown one is judged after activation, by the signed-in router)');
 
 // The matcher itself, lifted from App.jsx and run: it must agree with react-router on these patterns.
 const matcher = app.match(/const isRoute = (\(pattern, pathname\) => \{[\s\S]*?\n\};)/);

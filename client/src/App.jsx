@@ -87,8 +87,8 @@ const LEGAL_ROUTES_EXTRA = EDITION === 'prithagoras' ? (
 // sending an unknown address to its landing page, byte for byte, and its build
 // emits no NotFound chunk. A signed-out visitor still reaches Login at every
 // address that IS an app route (a bookmark to /practice signs in, then opens),
-// so the signed-out and activation-gate tables below need the list of real
-// paths. client/test/not-found-routes-check.mjs holds it equal to the signed-in
+// so the signed-out table below needs the list of real paths (the activation gate
+// must always run, so it keeps every address; the signed-in router then shows the page). client/test/not-found-routes-check.mjs holds it equal to the signed-in
 // route table.
 /* global __PRI_AU_BUILD__ */
 const NOT_FOUND_PAGE = typeof __PRI_AU_BUILD__ === 'boolean' && __PRI_AU_BUILD__;
@@ -696,8 +696,7 @@ export default function App() {
             <Route path="/refund-policy" element={<Legal />} />
             {LEGAL_ROUTES_EXTRA}
             <Route path="/third-party-notices" element={<Legal />} />
-            <Route path="*" element={NOT_FOUND_PAGE
-              ? <UnknownAddress to="/" otherwise={<AccountActivationGate key={user.id} user={user} onReady={setActivated} onSwitch={switchLocal} />} />
+            <Route path="*" element={<AccountActivationGate key={user.id} user={user} onReady={setActivated} onSwitch={switchLocal} />} />
               : <AccountActivationGate key={user.id} user={user} onReady={setActivated} onSwitch={switchLocal} />} />
           </Routes>
         </React.Suspense>
