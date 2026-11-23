@@ -19,6 +19,7 @@
 import { _forChains as FC, _internals as SM, noteStep, noteValue, NOTE_GIVEN } from './solutionMatch.js';
 import { infoOf, cleanStatement, exactForm } from './arithmeticLines.js';
 import { evaluate, parse, normalize, withEvaluationBudget } from './expr.js';
+import { contextAllowsCross, pageBlocksCross, readingIsAmbiguous, falseStepFacts, readPoly, crossDiagnosis, readDefinitions, factorsOfQuestion, isProductRuleStatement, isContextLine } from './falseStep.js';
 
 const BUDGET = 120000;
 const MAX_LINES = 20;
@@ -266,10 +267,10 @@ const showVar = v => (v === 'theta' ? 'θ' : v);
  */
 export function lineChains(q, report, opts = null) {
   if (!q || !report || !Array.isArray(report.lines) || !report.lines.length) return { report, matched: 0, warned: 0 };
-  try { return withEvaluationBudget(BUDGET, () => run(q, report, !!(opts && opts.warn))); } catch { return { report, matched: 0, warned: 0 }; }
+  try { return withEvaluationBudget(BUDGET, () => run(q, report, !!(opts && opts.warn), opts)); } catch { return { report, matched: 0, warned: 0 }; }
 }
 
-function run(q, report, warn) {
+function run(q, report, warn, opts = null) {
   FC.setFunctions(q);
   const lines = report.lines.slice(0, MAX_LINES);
   const sol = SM.readSolution(q);
@@ -282,6 +283,13 @@ function run(q, report, warn) {
   let cur = -1, matched = 0, warned = 0, followed = 0, above = null, bad = false;   // bad: the line above was warned or contradicted and is not ticked
   const hist = [];   // every earlier line that could be read, nearest last
   const knownSubs = FC.knownSubstitutions(q);
+  // A false symbolic continuation becomes a CROSS only under every condition of engine/falseStep.js (and never after another break, never
+  // for a line that follows a line the reading floor dropped, never twice). Otherwise it is the slip warning note it always was.
+  const gaps = new Set(opts && Array.isArray(opts.gaps) ? opts.gaps : []);
+  const pageTexts = report.lines.map(x => String(x?.text ?? ''));
+  const crossOpen = warn && stop === Infinity && contextAllowsCross(world.prompt);
+  let crossedAt = -1, crossedDiagnosis = null, setups = 0, defs = null;
+  const contextLines = [];
 
   const stepFor = (vec) => { const h = world.vecSteps.find(v => v.vec.length === vec.length && v.vec.every((x, i) => close(x, vec[i]))); return h ? h.step : null; };
   const verified = (note, step) => ({ state: 'verified', note, step });
@@ -312,6 +320,26 @@ function run(q, report, warn) {
     }
     if (judged) { const st = stepOf(l); if (st !== null && st > cur) cur = st; above = describe(); if (above) hist.push(above); continue; }
     if (!unjudged) continue;
+    if (crossedAt >= 0) continue;   // nothing below the first cross is ticked as following from it
+    // the lines that set the page up: the factors the page names, the rule it states in them, the task or method it names
+    {
+      const named = readDefinitions(l.text);
+      if (named && factorsOfQuestion(named, world.prompt)) {
+        defs = named; setups++; above = null;
+        out[i] = { text: l.text, status: 'ok', state: 'given', note: `${named[0].name} and ${named[1].name} are the two factors of the function in the question: ${named[0].name} times ${named[1].name} comes to that function.`, fact: { kind: 'factors-of-question', names: [named[0].name, named[1].name] } };
+        continue;
+      }
+      if (defs && isProductRuleStatement(l.text, defs)) {
+        setups++; above = null;
+        out[i] = { text: l.text, status: 'ok', state: 'verified', note: `This is the product rule, written with ${defs[0].name} and ${defs[1].name}.`, fact: { kind: 'rule-statement', rule: 'product-rule' } };
+        continue;
+      }
+      if (isContextLine(l.text)) {
+        setups++; contextLines.push(i + 1); above = null;
+        out[i] = { text: l.text, status: 'note', state: 'unverified', unverified: true, context: true, note: 'This line states the task or names the method; there is no step in it to check.' };
+        continue;
+      }
+    }
     let tick = null;
 
     try { tick = tickLine(l, s, prevAbove); } catch { tick = null; }
@@ -324,10 +352,21 @@ function run(q, report, warn) {
     }
     let w = null;
     if (warn) { try { w = slipWarning(l, s, prevAbove) || substitutionWarning(l, s, hist); } catch { w = null; } }
-    if (w) { warned++; bad = true; out[i] = { text: l.text, status: 'note', state: 'unverified', unverified: true, note: w.note, slipWarning: true }; continue; }   // a warned line ticks nothing below it
+    if (w) {
+      warned++; bad = true;
+      let diag = null;
+      if (crossOpen && crossedAt < 0 && w.facts && w.facts.strict && !gaps.has(i) && !readingIsAmbiguous(l.text) && !readingIsAmbiguous(prevAbove ? prevAbove.text : '') && !pageBlocksCross(pageTexts, w.facts.vars)) {
+        // where both sides are polynomials in one letter the difference is EXACT, and an exactly equal pair is never crossed
+        const both = readPoly(w.facts.aboveSide) && readPoly(w.facts.writtenSide);
+        const f = falseStepFacts(w.facts.aboveSide, w.facts.writtenSide);
+        if (!both || f) diag = crossDiagnosis(f, w.facts.example);
+      }
+      if (diag) { crossedAt = i; crossedDiagnosis = diag; out[i] = { text: l.text, status: 'break', state: 'wrong', note: diag.message, diagnosis: diag }; continue; }
+      out[i] = { text: l.text, status: 'note', state: 'unverified', unverified: true, note: w.note, slipWarning: true }; continue;   // a warned line ticks nothing below it
+    }
     if (contradicted(s)) bad = true; else { above = describe(); if (above) hist.push(above); }
   }
-  if (!matched && !warned && !followed) return { report, matched: 0, warned: 0 };
+  if (!matched && !warned && !followed && !setups) return { report, matched: 0, warned: 0 };
 
   function tickLine(l, s0, up) {
     const text = l.text;
@@ -535,12 +574,15 @@ function run(q, report, warn) {
   const { arithmetic: _a, ...rest } = report;
   const anyOk = stated.some(x => x.solutionMatch === true || x.status === 'ok');
   return {
-    matched, warned: warned + followed,
+    matched: matched + setups, warned: warned + followed, crossed: crossedAt >= 0 ? crossedAt : -1,
     report: {
       ...(report.arithmetic === true && !anyOk ? report : rest), lines: stated, source: 'value-chain', ...(matched ? { solutionMatched: true } : {}),
+      // the first crossed line (zero-based, like every report's firstBreak) and its 1-based number: the client says "correct until line N"
+      ...(crossedAt >= 0 ? { firstBreak: crossedAt, firstBreakLine: crossedAt + 1, diagnosis: crossedDiagnosis } : {}),
       summary: {
         ...(report.summary || {}), total: stated.length, checked: stated.filter(x => x.status === 'ok').length,
         given: at('given'), verified: at('verified'), arithmetic: at('arithmetic'), conditions: at('condition'), wrong: at('wrong'), unverified, unread,
+        ...(contextLines.length ? { context: contextLines } : {}),
         reason: unverified.length ? (report.summary?.reason || 'Pri could not tie these lines to anything it can prove about this question, so it did not mark them.') : null
       }
     }
@@ -567,6 +609,8 @@ export function slipWarningOf(l, s, up) {
   // expressions). Two full statements `y = 2x + 1` / `y = 3x - 4` are two equations, never a rewrite: no warning.
   let side, label = null;
   if (s.continuation && s.parts.length === 1 && up.s.continuation && up.status === 'ok') side = s.parts[0];
+  // a continuation of a ticked statement `y = expr` (a name on the left, one expression on the right): the line is compared with that expression
+  else if (s.continuation && s.parts.length === 1 && up.status === 'ok' && !up.s.continuation && up.s.parts.length === 2 && /^(?:[A-Za-z]'{0,2}|d[A-Za-z]\s*\/\s*d[A-Za-z])$/.test(tidy(up.s.parts[0]).replace(/\s+/g, ''))) side = s.parts[0];
   else return null;
   if (/[≈≃~,:;<>%°|]|\bor\b|\band\b|\\|[°]/.test(text + above)) return null;
   if (AMBIGUOUS.test(text.replace(/\^\s*-?\d*/g, '')) || AMBIGUOUS.test(above)) { /* a bare x that is not part of a name: ambiguous */ if (/(?:^|[\s)\d])x\s+(?=[\d(a-z])|(?:[\d)])\s+x(?:\s|$)/i.test(text) || /(?:^|[\s)\d])x\s+(?=[\d(a-z])|(?:[\d)])\s+x(?:\s|$)/i.test(above)) return null; }
@@ -602,6 +646,18 @@ export function slipWarningOf(l, s, up) {
     if (Math.abs(a - b) > 1e-6 * Math.max(1, Math.abs(a), Math.abs(b))) { differ++; if (!shown) shown = { env, a, b }; }
   }
   if (defined < 6 || differ < 3) return null;
+  // The same points with both signs of every letter. A CROSS needs the two lines to differ at EVERY point where both are defined, on the positive
+  // samples and on the signed ones: a rewrite true for some of them (√(x^2) = x for x > 0, |x| = -x for x < 0) is never crossed.
+  let strict = defined >= 6 && differ === defined, signed = 0, signedDiffer = 0;
+  for (let j = 0; j < WSAMPLES.length && strict; j++) {
+    const env = sampleEnv(vars, j);
+    const a = val(last.info, env), b = val(mine, env);
+    if ((a === null) !== (b === null)) { strict = false; break; }
+    if (a === null) continue;
+    signed++;
+    if (Math.abs(a - b) > 1e-6 * Math.max(1, Math.abs(a), Math.abs(b))) signedDiffer++;
+  }
+  strict = strict && signed >= 6 && signedDiffer === signed;
   // a calculus step is not a rewrite
   for (const v of vars) {
     let deriv = true, anti = true, n = 0;
@@ -618,5 +674,9 @@ export function slipWarningOf(l, s, up) {
   }
   const fmt = x => String(Number(x.toPrecision(4)));
   const at = vars.map(v => `${showVar(v)} = ${fmt(shown.env[v])}`).join(', ');
-  return { note: `This is not equal to the line above for every value of ${vars.map(showVar).join(', ')} (for example at ${at}: ${fmt(shown.b)} against ${fmt(shown.a)}). Check this step.` };
+  return {
+    note: `This is not equal to the line above for every value of ${vars.map(showVar).join(', ')} (for example at ${at}: ${fmt(shown.b)} against ${fmt(shown.a)}). Check this step.`,
+    // structured facts for engine/falseStep.js; they change no note
+    facts: { vars, aboveSide: last.p, writtenSide: side, strict, example: { at: vars.map(v => ({ v: showVar(v), value: Number(shown.env[v].toPrecision(4)) })), written: Number(shown.b.toPrecision(4)), above: Number(shown.a.toPrecision(4)) } }
+  };
 }

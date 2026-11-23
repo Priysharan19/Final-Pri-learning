@@ -26,6 +26,7 @@ import { mathSpan, plainComment } from '../../client/src/engine/commentTex.js';
 import { chainDiagnosis } from '../../client/src/engine/reason-chain.js';
 import { normalize, parse } from '../../client/src/engine/expr.js';
 import * as G from '../../client/src/engine/generators/index.js';
+const SYMBOLIC_KINDS = ['crossTerms', 'crossExact', 'crossExample'];
 
 let pass = 0; const failures = [];
 const ok = (c, l) => { if (c) pass++; else failures.push(l); };
@@ -93,13 +94,15 @@ for (const id of families) {
         if (c.kind === 'stepValue') allowed.add('$' + line.fact.tex + '$');
         const dE = line.diagnosis?.expectedTex !== undefined ? '$' + line.diagnosis.expectedTex + '$' : line.diagnosis?.expected !== undefined ? tex(line.diagnosis.expected) : null;
         const dW = line.diagnosis?.writtenTex !== undefined ? '$' + line.diagnosis.writtenTex + '$' : line.diagnosis?.written !== undefined ? tex(line.diagnosis.written) : null;
-        if (CROSS_KINDS.includes(c.kind) && c.kind !== 'crossComputed' && c.kind !== 'crossSidesDiffer') { allowed.add(dE); allowed.add(dW); }
+        if (CROSS_KINDS.includes(c.kind) && !SYMBOLIC_KINDS.includes(c.kind) && c.kind !== 'crossComputed' && c.kind !== 'crossSidesDiffer') { allowed.add(dE); allowed.add(dW); }
+        // a false continuation: every span is a TeX string the engine produced (falseStep.js), nothing else
+        if (SYMBOLIC_KINDS.includes(c.kind)) { const d = line.diagnosis; for (const x of [d.aboveTex, d.writtenTex, d.correctedTex && '= ' + d.correctedTex, ...(d.changed || []).flatMap(t => [t.fromTex, t.toTex]), ...(d.same || [])]) if (x) allowed.add('$' + x + '$'); if (d.example) { allowed.add('$' + d.example.at.map(a => a.v + ' = ' + a.value).join(', ') + '$'); } }
         if (c.kind === 'ruleResult') { const rhs = mathSpan(String(line.text).split(/(?<![<>!=≤≥≠])=(?!=)/).pop().trim()); allowed.add(rhs); }
         const heading = c.kind === 'stepHeading' ? String(line.fact?.heading ?? '') : '';
         const sp = spansOf(heading ? c.text.replace(heading.replace(/\s+/g, ' ').trim().replace(/\.$/, ''), ' ') : c.text);
         for (const s of sp) if (!allowed.has(s)) problems.push(`maths span not from the line's facts (${s}): ${tag}`);
         // orientation: expected before written, and each is the engine's own
-        if (CROSS_KINDS.includes(c.kind) && c.kind !== 'crossComputed' && c.kind !== 'crossSidesDiffer') {
+        if (CROSS_KINDS.includes(c.kind) && !SYMBOLIC_KINDS.includes(c.kind) && c.kind !== 'crossComputed' && c.kind !== 'crossSidesDiffer') {
           const e = dE, w = dW;
           if (!(c.text.indexOf(e) >= 0 && c.text.indexOf(w) > c.text.indexOf(e))) problems.push(`expected/written swapped or missing: ${tag}`);
         }
@@ -224,10 +227,13 @@ const SAMPLE = {
   equalsAbove: { n: 2, status: 'checked', valueChain: 'arithmetic', text: '=7', fact: { kind: 'equals-line-above', value: 7 } },
   crossAbove: { n: 3, status: 'first-error', text: 'x', diagnosis: { expected: 5, written: 7, expectedFrom: 'line-above' } },
   crossComputed: sd(S('10 - 6', '4', false), S('14', '14', true)),
-  crossSidesDiffer: sd(S('3*4', '12', false), S('5*2', '10', false))
+  crossSidesDiffer: sd(S('3*4', '12', false), S('5*2', '10', false)),
+  crossTerms: { n: 3, status: 'first-error', text: '= 3x^2 - x', diagnosis: { expectedFrom: 'symbolic', exact: true, aboveTex: '3x^2 - 2x', writtenTex: '3x^2 - x', correctedTex: '3x^2 - 2x', changed: [{ fromTex: '-2x', toTex: '-x' }], same: ['3x^2'] } },
+  crossExact: { n: 3, status: 'first-error', text: '= x', diagnosis: { expectedFrom: 'symbolic', exact: true, aboveTex: '3x^2 - 2x', writtenTex: 'x', correctedTex: '3x^2 - 2x', changed: [], same: [] } },
+  crossExample: { n: 3, status: 'first-error', text: '= sin x', diagnosis: { expectedFrom: 'symbolic', exact: false, example: { at: [{ v: 'x', value: 0.37 }], above: -0.3293, written: 0.0407 } } }
 };
 ok(TEMPLATE_KINDS.every(k => SAMPLE[k]) && [...POSITIVE_KINDS, ...EQUALITY_KINDS, ...CROSS_KINDS].length === TEMPLATE_KINDS.length, 'every template kind has a polarity and a sample');
-const ENGLISH_ONLY = new Set(['stepValue', 'crossComputed', 'crossSidesDiffer']);
+const ENGLISH_ONLY = new Set(['stepValue', 'crossComputed', 'crossSidesDiffer', 'crossTerms', 'crossExact', 'crossExample']);
 for (const k of TEMPLATE_KINDS) {
   for (const lang of ['en', 'hi']) { if (lang === 'hi' && (ENGLISH_ONLY.has(k) || k === 'stepHeading')) { ok((k === 'stepHeading' || !variantsOf(k, 'hi').length) && commentFor({ ...SAMPLE[k], n: 1 }, { language: 'hi', ruleLabel: r => r.rule }) === null, `template ${k}: nothing in Hindi (English only, or never embeds the English heading)`); continue; } for (let n = 1; n < 40; n += 1) {
     const c = commentFor({ ...SAMPLE[k], n }, { language: lang, ruleLabel: r => (lang === 'hi' ? 'नियम' : 'Rule') + ' ' + r.rule });

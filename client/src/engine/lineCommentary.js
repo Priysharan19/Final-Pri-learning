@@ -69,6 +69,16 @@ export const CATALOGUE = Object.freeze({
   crossComputed: {
     en: ['{expr} comes to {expected}, but this line gives {written}.', 'Check this line: {expr} comes to {expected}, not {written}.', 'This line gives {written}, but {expr} comes to {expected}.']
   },
+  // a false continuation of a polynomial line: the engine's exact terms, and the line above in its simplest form
+  crossTerms: {
+    en: ['The line above comes to {above}, but this line comes to {written}. {change} The corrected line is {corrected}.', 'Check this line: the line above comes to {above}, not {written}. {change} The corrected line is {corrected}.']
+  },
+  crossExact: {
+    en: ['This line is not equal to the line above, which comes to {above}. The corrected line is {corrected}.', 'Check this line: it is not equal to the line above, which comes to {above}. The corrected line is {corrected}.']
+  },
+  crossExample: {
+    en: ['This line is not equal to the line above: at {at} the line above comes to {above}, but this line gives {written}.', 'Check this line: it is not equal to the line above. At {at} the line above comes to {above} and this line gives {written}.']
+  },
   crossSidesDiffer: {
     en: ['The two sides do not match: {left} comes to {leftValue}, and {right} comes to {rightValue}.', 'The two sides are not equal: {left} comes to {leftValue}, but {right} comes to {rightValue}.', 'The two sides differ: {left} comes to {leftValue} and {right} comes to {rightValue}.']
   }
@@ -77,7 +87,7 @@ export const CATALOGUE = Object.freeze({
 export const TEMPLATE_KINDS = Object.freeze(Object.keys(CATALOGUE));
 export const POSITIVE_KINDS = Object.freeze(['restates', 'stepHeading', 'step', 'stepValue', 'ruleResult', 'rule']);
 export const EQUALITY_KINDS = Object.freeze(['bothSides', 'equalsAbove']);
-export const CROSS_KINDS = Object.freeze(['crossAbove', 'crossComputed', 'crossSidesDiffer']);
+export const CROSS_KINDS = Object.freeze(['crossAbove', 'crossComputed', 'crossSidesDiffer', 'crossTerms', 'crossExact', 'crossExample']);
 
 const fill = (template, slots) => template.replace(/\{(\w+)\}/g, (_, k) => slots[k]);
 const rhsOf = text => { const raw = String(text ?? '').trim(); if (!raw.includes('=')) return null; const rhs = raw.split(/(?<![<>!=≤≥≠])=(?!=)/).pop().trim(); return rhs ? mathSpan(rhs) : null; };
@@ -109,6 +119,30 @@ export function commentFor(card, ctx = {}) {
       const expected = fromTex(d.expectedTex, d.expected), written = fromTex(d.writtenTex, d.written);
       if (expected === null || written === null || expected === written) return null;
       return done('crossAbove', { expected, written }, { expected, written });
+    }
+    if (d.expectedFrom === 'symbolic') {
+      const tex = x => (typeof x === 'string' && x.length > 0 && x.length <= 120 && !x.includes('$') ? `$${x}$` : null);
+      const numTex = x => (typeof x === 'number' && Number.isFinite(x) ? `$${exactForm(x).tex}$` : null);
+      if (d.exact === true) {
+        const above = tex(d.aboveTex), written = tex(d.writtenTex), corrected = tex(`= ${d.correctedTex}`);
+        if (!above || !corrected) return null;
+        const changed = Array.isArray(d.changed) ? d.changed : [];
+        if (changed.length >= 1 && changed.length <= 3 && written) {
+          // the terms that differ, named from the exact coefficients: "the -2x term became -x; the other terms are the same."
+          const parts = changed.map(c => { const f = tex(c.fromTex), t = tex(c.toTex); return f && t ? `the ${f} term became ${t}` : f ? `the ${f} term is missing` : t ? `an extra ${t} term appears` : null; });
+          if (parts.some(x => x === null)) return null;
+          const first = parts.join('; ');
+          const change = `${first.charAt(0).toUpperCase()}${first.slice(1)}${Array.isArray(d.same) && d.same.length ? '; the other terms are the same' : ''}.`;
+          return done('crossTerms', { above, written, change, corrected }, { above, written, change, corrected });
+        }
+        return done('crossExact', { above, corrected }, { above, corrected });
+      }
+      const ex = d.example;
+      if (ex && Array.isArray(ex.at) && ex.at.length && ex.at.every(a => typeof a.v === 'string' && /^[A-Za-zθ]$/.test(a.v))) {
+        const at = `$${ex.at.map(a => `${a.v} = ${a.value}`).join(', ')}$`, above = numTex(ex.above), written = numTex(ex.written);
+        return done('crossExample', { at, above, written }, { at, above, written });
+      }
+      return null;
     }
     if (d.expectedFrom === 'sides') {
       // the first two sides that disagree. A bare number against a computed expression: the expression is named, with its value.
