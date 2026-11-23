@@ -761,8 +761,8 @@
       "job": "suites-contracts",
       "log": "edition-suites.log",
       "pins": [
-        {"has":"EDITION SUITES COVERAGE: PASS — 45 listed, 4 exempt, 30 importers accounted for","note":"41 → 44 listed, 27 → 30 importers (Prithagoras focus, re-derived by running): offering-check, syllabus-board-check and nsw-offering-check import the edition table; the Prithagoras run is 44/44. 34 → 36 listed, 20 → 21 importers (train 24 integration, as printed by the CI run). Plan E6: every suite that reads the edition is listed in tools/edition-suites.mjs or exempt with a reason."},
-        {"has":"EDITION SUITES (prithagoras): PASS — 45/45 suites"}
+        {"has":"EDITION SUITES COVERAGE: PASS — 46 listed, 4 exempt, 31 importers accounted for","note":"45 → 46 listed, 30 → 31 importers (one topic entry per syllabus topic, re-derived by running --verify-coverage): client/test/topic-entries-check.mjs imports the edition table and is listed; the Prithagoras run is 46/46. 41 → 44 listed, 27 → 30 importers (Prithagoras focus, re-derived by running): offering-check, syllabus-board-check and nsw-offering-check import the edition table; the Prithagoras run is 44/44. 34 → 36 listed, 20 → 21 importers (train 24 integration, as printed by the CI run). Plan E6: every suite that reads the edition is listed in tools/edition-suites.mjs or exempt with a reason."},
+        {"has":"EDITION SUITES (prithagoras): PASS — 46/46 suites"}
       ]
     },
     "build/install-budget-prithagoras.log": {

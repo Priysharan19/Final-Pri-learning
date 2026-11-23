@@ -1,4 +1,5 @@
 import React from 'react';
+import { displayName, oneSessionPerTopic } from '../engine/curriculum.js';
 import { useNavigate } from 'react-router-dom';
 import { useT } from '../i18n/index.js';
 import { formatDate, formatWeekday } from '../lib/locale.js';
@@ -39,11 +40,11 @@ export default function PlanCard({ user, stats }) {
       ) : (
         <>
           <ul style={{ listStyle: 'none', padding: 0, margin: '8px 0 10px', display: 'grid', gap: 6 }}>
-            {progress.sessions.map(s => (
+            {oneSessionPerTopic(progress.sessions).map(s => (
               <li key={s.id} data-plan-session={s.type} style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
                 <span className="tag" style={{ flex: 'none' }}>{t(SESSION_TYPE_KEYS[s.type])}</span>
                 <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ fontWeight: 600 }}>{s.name || t('plan.type.mock')}</span>
+                  <span style={{ fontWeight: 600 }}>{displayName(s.name) || t('plan.type.mock')}</span>
                   {/* Touched today is started, not finished: a quiet mark, never a strike-through. */}
                   {s.done && <> {<span className="plan-started" data-plan-started><Icon name="check" size={13} />{t('plan.started')}</span>}</>}
                   <span className="muted" style={{ display: 'block', fontSize: 12.5 }}>{reasonText(t, s, v => formatDate(v, user))}</span>

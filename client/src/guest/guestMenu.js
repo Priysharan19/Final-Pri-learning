@@ -19,7 +19,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { indiaProductSections, indiaRequestableDifficulties, resolveIndiaTarget } from '../engine/indiaProduct.js';
 import { CURRICULUM, PATHWAYS, STREAM_CURRICULUM, streamSubtopics } from '../engine/curriculum.js';
-import { nswIssuedLevels } from '../engine/nswOffer.js';
+import { collapseList, entryIssuedLevels, resolveSide } from '../engine/curriculum.js';
 import { offeredYears, pathwayOffered, defaultOffering } from '../platform/edition.js';
 
 const YEARS = Object.freeze([7, 8, 9, 10, 11, 12]);
@@ -67,6 +67,7 @@ function indiaSection(year, courseKey) {
 }
 
 function nswChapters(year, courseKey) {
+  // One entry per topic: a `-forms` companion is listed under its base (engine/curriculum.js).
   if (courseKey === 'core' || courseKey === 'advanced') return (CURRICULUM.find(c => c.year === year)?.subtopics || []).map(s => ({ ...s, year }));
   const spec = NSW_SENIOR.find(c => c.key === courseKey);
   const stream = spec?.stream ? spec.stream(year) : null;
@@ -86,8 +87,8 @@ export function chaptersFor(edition, year, courseKey) {
       .map(ch => ({ id: ch.id, name: ch.name, strand: ch.strand || '', levels: indiaRequestableDifficulties(ch, { track: section.track, grade: section.year }) }))
       .filter(ch => ch.levels.length > 0);
   }
-  return nswChapters(y, courseKey)
-    .map(s => ({ id: s.id, name: s.name, strand: s.strand || '', levels: [...nswIssuedLevels(s.id)] }))
+  return collapseList(nswChapters(y, courseKey))
+    .map(s => ({ id: s.id, name: s.name, strand: s.strand || '', levels: entryIssuedLevels(s.id) }))
     .filter(ch => ch.levels.length > 0);
 }
 
@@ -102,7 +103,8 @@ export function guestTarget(edition, { year, course, chapter, difficulty }, rand
   const row = chaptersFor(edition, y, course).find(ch => ch.id === chapter);
   const d = Number(difficulty);
   if (!row || !row.levels.includes(d)) return null;
-  if (!isIndia(edition)) return { generator: row.id, difficulty: d, track: null };
+  // One of the generators behind a topic answers; the server still refuses any it does not issue.
+  if (!isIndia(edition)) return { generator: resolveSide(row.id, { difficulty: d, seed: random() }).subtopic, difficulty: d, track: null };
   const section = indiaSection(y, course);
   const target = resolveIndiaTarget(section.chapters.find(ch => ch.id === chapter), { difficulty: d, track: section.track, grade: section.year, random });
   // A past-paper archive question is never part of the trial.

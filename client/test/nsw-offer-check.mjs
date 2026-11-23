@@ -49,6 +49,9 @@ const idb = await import('../src/local/idb.js');
 const { loadAllBanks } = await import('../src/engine/generators/index.js');
 const { NSW_ISSUED_CELLS } = await import('../src/engine/nswIssuedCells.js');
 const { nswIssuedLevels, nswCellIssued, nswOfferedCell } = await import('../src/engine/nswOffer.js');
+// A `-forms` companion is listed under its base: a topic row is an ENTRY whose levels, dot points and questions come
+// from every generator behind it (engine/curriculum.js); the cells below are still asked for generator by generator.
+const { sidesOf, entryIssuedLevels } = await import('../src/engine/curriculum.js');
 const { SUBTOPICS, dotpointsFor } = await import('../src/engine/curriculum.js');
 const { selectableDifficulties, topicAvailability, practiceTargetAvailable } = await import('../src/engine/curriculumAvailability.js');
 const { pickNext } = await import('../src/engine/adaptive.js');
@@ -127,35 +130,42 @@ try {
     ok(`${tag}: the curriculum lists subtopics`, subtopics.length > 0);
     let agree = true, offeredUnissued = [];
     for (const s of subtopics) {
-      const issued = [...nswIssuedLevels(s.id)];
-      if (JSON.stringify(s.requestable) !== JSON.stringify(issued) || JSON.stringify(s.requestable) !== JSON.stringify(served[s.id]?.requestable || [])) agree = false;
+      const issued = entryIssuedLevels(s.id);
+      const servedUnion = [...new Set(sidesOf(s.id).flatMap(g => served[g]?.requestable || []))].sort((a, b) => a - b);
+      if (JSON.stringify(s.requestable) !== JSON.stringify(issued) || JSON.stringify(s.requestable) !== JSON.stringify(servedUnion)) agree = false;
       if (JSON.stringify(selectableDifficulties(LEVELS, s)) !== JSON.stringify(issued)) agree = false;
       if (topicAvailability(s).selectable !== s.dotpoints.some(dp => dp.requestable.length > 0)) agree = false;
       for (const [i, dp] of s.dotpoints.entries()) {
         if (dp.generated !== dp.requestable.length > 0 || JSON.stringify(dp.difficulties) !== JSON.stringify(dp.requestable)) agree = false;
         if (practiceTargetAvailable(s, i) !== dp.generated) agree = false;
-        for (const d of [...dp.requestable, ...dp.difficulties, ...selectableDifficulties(LEVELS, dp)]) if (!nswCell(s.id, d)) offeredUnissued.push(`${dp.id} D${d}`);
+        for (const d of [...dp.requestable, ...dp.difficulties, ...selectableDifficulties(LEVELS, dp)]) if (!nswCell(dp.id.slice(0, dp.id.lastIndexOf('.')), d)) offeredUnissued.push(`${dp.id} D${d}`);
       }
-      for (const d of s.requestable) if (!nswCell(s.id, d)) offeredUnissued.push(`${s.id} D${d}`);
+      for (const d of s.requestable) if (!sidesOf(s.id).some(g => nswCell(g, d))) offeredUnissued.push(`${s.id} D${d}`);
     }
     ok(`${tag}: every subtopic's and dot point's selectable levels are exactly the server's`, agree);
     same(`${tag}: no unissued cell is offered`, offeredUnissued, []);
 
     // OFFERED ⇒ ISSUED AND MARKED: every selectable cell, once across the suite.
-    for (const s of subtopics) for (const d of s.requestable) {
+    // Every GENERATOR cell, as before: a topic with a companion is asked for until the draw lands on the generator
+    // under test (bounded: each side has at least one authored form, so a miss ten times running is a defect).
+    for (const s of subtopics) for (const g of sidesOf(s.id)) for (const d of nswIssuedLevels(g)) {
       if (!offeredNow(s.id)) continue;          // hidden: see HIDDEN ⇒ REFUSED
-      if (done.has(`${s.id}|${d}`)) continue;
-      done.add(`${s.id}|${d}`);
+      if (done.has(`${g}|${d}`)) continue;
+      done.add(`${g}|${d}`);
       offeredCells++;
       authority.resetRateLimits?.();
       let got = null, row = null, sealed = null;
       const failed = await refusal(async () => {
         // A form answered by its working is passed over by the server; ask again if a seed lands oddly.
-        got = await POST('/practice/next', { mode: 'topic', subtopic: s.id, difficulty: d });
-        row = await idb.get('questions', got.question.id);
-        sealed = await authority.sealedQuestion(row.serverQuestionId);
+        for (let tries = 0; tries < 40; tries++) {
+          got = await POST('/practice/next', { mode: 'topic', subtopic: s.id, difficulty: d });
+          row = await idb.get('questions', got.question.id);
+          sealed = await authority.sealedQuestion(row.serverQuestionId);
+          if (sealed.subtopic === g) break;
+          await POST(`/practice/${got.question.id}/discard`, {}).catch(() => {});
+        }
       });
-      if (failed || got.question.checkState !== 'issued' || row.draftOnly || sealed.subtopic !== s.id || sealed.difficulty !== d) {
+      if (failed || got.question.checkState !== 'issued' || row.draftOnly || sealed.subtopic !== g || sealed.difficulty !== d) {
         failures.push(`${s.id} D${d} is offered but was not issued as asked: ${failed ? `${failed.code || ''} ${failed.message}` : `${got.question.checkState} ${sealed?.subtopic} D${sealed?.difficulty}`}`);
         continue;
       }

@@ -8,6 +8,7 @@ import { CheckRefusal } from '../components/CheckRefusal.jsx';
 import { saveBase64File } from '../lib/files.js';
 import { generatedRequest, optionsBody } from '../local/generatedPaperBackend.js';
 import Working from '../instrument/Working.jsx';
+import { groupOptionTopics } from '../engine/curriculum.js';
 
 // The Paper Generator (both editions). The student chooses; the server
 // assembles from the edition's approved banks and keeps the seed. The summary
@@ -73,10 +74,9 @@ export default function PaperGenerator() {
     return () => clearTimeout(timer);
   }, [choice, user]);
 
-  const names = useMemo(() => {
-    const byId = new Map((options?.topics || []).map(x => [x.id, x.name]));
-    return topics.map(id => byId.get(id)).filter(Boolean);
-  }, [options, topics]);
+  // A topic with extra question forms is ONE option; ticking it asks the server for every generator behind it.
+  const entries = useMemo(() => groupOptionTopics(options?.topics), [options]);
+  const names = useMemo(() => entries.filter(e => e.ids.every(id => topics.includes(id))).map(e => e.name), [entries, topics]);
   const list = useMemo(() => {
     const shown = names.slice(0, 2);
     const rest = names.length - shown.length;
@@ -86,7 +86,7 @@ export default function PaperGenerator() {
   }, [names, language, t]);
   const estimate = Math.max(1, Math.round(marks / AVG_MARKS[mix]));
 
-  const toggle = id => setTopics(cur => (cur.includes(id) ? cur.filter(x => x !== id) : (cur.length < MAX_TOPICS ? [...cur, id] : cur)));
+  const toggle = ids => setTopics(cur => (ids.every(id => cur.includes(id)) ? cur.filter(x => !ids.includes(x)) : [...new Set([...cur, ...ids])].slice(0, MAX_TOPICS)));
   const switchBy = next => { setBy(next); setLength(next === 'marks' ? 20 : 60); };
 
   async function start() {
@@ -143,12 +143,12 @@ export default function PaperGenerator() {
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => setTopics([])} disabled={!topics.length}>{t('gen.clear')}</button>
             </div>
             <ul className="pg-topics" aria-describedby="gen-topics-help">
-              {options.topics.map(x => {
-                const on = topics.includes(x.id);
+              {entries.map(x => {
+                const on = x.ids.every(id => topics.includes(id));
                 return (
                   <li key={x.id}>
                     <label className={`pg-check${on ? ' is-on' : ''}`}>
-                      <input type="checkbox" checked={on} onChange={() => toggle(x.id)} disabled={!on && topics.length >= MAX_TOPICS} data-topic={x.id} />
+                      <input type="checkbox" checked={on} onChange={() => toggle(x.ids)} disabled={!on && topics.length + x.ids.length > MAX_TOPICS} data-topic={x.id} />
                       <span>{x.name}</span>
                     </label>
                   </li>
