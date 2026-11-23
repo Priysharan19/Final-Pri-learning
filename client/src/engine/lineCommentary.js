@@ -138,6 +138,7 @@ export function commentFor(card, ctx = {}) {
   // an arithmetic tick: true as written. Equality sentences only.
   if (card.valueChain === 'arithmetic') {
     const f = card.fact;
+    if (f && f.simplifyNote === true) return null;   // the engine's note also carries advice on the simplified form: keep it
     const value = f && (f.kind === 'both-sides' || f.kind === 'equals-line-above') ? fromTex(f.tex, f.value) : null;
     if (value === null) return null;
     return done(f.kind === 'both-sides' ? 'bothSides' : 'equalsAbove', { value }, { value });

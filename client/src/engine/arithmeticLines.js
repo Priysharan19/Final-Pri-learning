@@ -1819,7 +1819,8 @@ function stepCheckArithmeticWithinBudget(workingText, prep = null, tickOnly = fa
         const written = new Set(raw.flatMap(l => l.split('=')).map(x => x.replace(/[\s−–—]/g, m => (/\s/.test(m) ? '' : '-'))));
         if (!more && k === out.length - 1) { const collected = collectLikeTerms(lastSides.get(k)); if (collected && !written.has(collected.replace(/\s/g, ''))) more = out[k].note.includes(mathSpan(collected)) ? ' Give the final answer in that simplified form.' : ` This simplifies to ${mathSpan(collected)}.`; }
       } catch { more = ''; }
-      if (more) out[k] = { ...out[k], note: out[k].note + more };
+      // `simplifyNote` on the fact tells engine/lineCommentary.js that the note carries simplify advice the commentary would drop
+      if (more) out[k] = { ...out[k], note: out[k].note + more, ...(out[k].fact ? { fact: { ...out[k].fact, simplifyNote: true } } : {}) };
     }
   }
   const state = l => l.state || (l.status === 'break' ? 'wrong' : l.unreadable ? 'unread' : 'unverified');

@@ -186,6 +186,15 @@ ok(commentFor({ n: 3, status: 'first-error', text: 'x', diagnosis: { expected: 5
   ok(commentFor({ n: 2, status: 'first-error', text: 'x', diagnosis: { code: 'arithmetic-not-equal', message: 'm' } }, ctx) === null, 'a constructed log diagnosis without facts: the old sentence');
   ok(commentFor({ n: 2, status: 'first-error', text: 'x', diagnosis: { code: 'arithmetic-not-equal', message: 'm', expectedTex: '1', writtenTex: '2' } }, ctx) === null, 'facts without a named cause: the old sentence');
 }
+// the tick for `1/2 = 2/4` keeps the engine's note, which carries the advice to give the answer simplified
+{
+  const lines = ['3 + 4 = 7', '1/2 = 2/4'];
+  const r = stepEvidence(G.generateQuestion('y12-integration', 1, 27), '1/2', lines.join('\n'), { correct: false }).stepReport;
+  const m = r?.lines?.length >= 2 ? buildAnnotatedWorking({ lines, stepReport: r }) : null;
+  const card = m?.cards?.[1];
+  ok(card && /simplified form|simplifies to/.test(r.lines[1].note || '') && r.lines[1].fact?.simplifyNote === true && commentFor(card, ctx) === null, `a tick whose note carries simplify advice keeps the engine sentence: ${JSON.stringify(r?.lines?.[1]?.note)} ${JSON.stringify(r?.lines?.[1]?.fact)}`);
+  ok(commentFor({ n: 2, status: 'checked', valueChain: 'arithmetic', text: '1/2=2/4', fact: { kind: 'both-sides', tex: '\\frac{1}{2}', simplifyNote: true } }, ctx) === null, 'a constructed simplify-advice fact gives nothing');
+}
 // ── 3. a rule or a step only when the engine said so ─────────────────────────────────────────────────
 ok(commentFor({ n: 2, status: 'checked', text: "y'=6x^2+18x", rules: [] }, ctx) === null, 'no rule named by the engine: no rule sentence');
 ok(commentFor({ n: 2, status: 'checked', text: "y'=6x^2+18x", rules: [{ rule: 'product' }] }, ctx)?.kind === 'ruleResult', 'a rule the engine named, with the line\'s own right-hand side');
