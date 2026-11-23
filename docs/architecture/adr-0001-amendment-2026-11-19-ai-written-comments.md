@@ -31,8 +31,8 @@ sentence is shown exactly as before. The wording varies by a stable hash of the 
   `AnnotatedWorking.jsx` for every student with no setting.
 * Structured facts added (feedback only, no verdict changed, additive JSON only: no schema or migration, and they ride in the
   already-stored `diagnosis` / `fact` objects): `fact` on a solution-matched tick (`step`, `heading`; or `step`, `valueOnly`, `tex`
-  for a value-only match) and on an arithmetic tick (`kind`, `tex`); on the diagnosis created in `reason-chain.js`
-  (`chainDiagnosis`) and `vectorChain.js` (`vector-chain-not-equal`) `expected` / `written` / `expectedFrom`; in `arithmeticLines.js`
+  for a value-only match) and on an arithmetic tick (`kind`, `tex`); `expectedFrom: 'sides'` with `sides` (each side's text, value and bare-number flag) on the diagnosis created in
+  `reason-chain.js` (`chainDiagnosis`); the vector diagnosis carries none, so the engine's sentence stays; in `arithmeticLines.js`
   (`arithmetic-not-equal`) `expectedTex` / `writtenTex` / `expectedFrom: 'line-above'`, or `expectedFrom: 'sides'` with `sides`.
 * Owner decision, 23 November 2026: new templates (value-only tick, cross between sides) are English only (Prithagoras). In Hindi they give nothing
   and the engine's own sentence shows; a Hindi sentence never embeds the worked solution's English step heading.

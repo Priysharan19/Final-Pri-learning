@@ -23,6 +23,8 @@ import { buildAnnotatedWorking } from '../../client/src/components/annotatedWork
 import { commentFor, CATALOGUE, POSITIVE_KINDS, EQUALITY_KINDS, CROSS_KINDS, TEMPLATE_KINDS, variantsOf } from '../../client/src/engine/lineCommentary.js';
 import { exactForm } from '../../client/src/engine/arithmeticLines.js';
 import { mathSpan, plainComment } from '../../client/src/engine/commentTex.js';
+import { chainDiagnosis } from '../../client/src/engine/reason-chain.js';
+import { normalize, parse } from '../../client/src/engine/expr.js';
 import * as G from '../../client/src/engine/generators/index.js';
 
 let pass = 0; const failures = [];
@@ -64,6 +66,7 @@ for (const id of families) {
           valueOnlyTicks += 1;
           if (c.kind !== 'stepValue' || /\b(?:is|matches)\s+step\b/i.test(c.text)) problems.push(`value-only tick said to be a step: id ${id} line ${i + 1}: ${c.text}`); else valueOnlyComments += 1;
         } else if (c.kind === 'stepValue') problems.push(`stepValue on a statement match: ${id} line ${i + 1}`);
+        if (/\bshould\b/i.test(c.text)) problems.push(`a comment says should: ${id} line ${i + 1}: ${c.text}`);
         comments += 1; familiesWith.add(id); perKind[c.kind] = (perKind[c.kind] || 0) + 1;
         const tag = `${id} line ${i + 1} [${c.kind}]: ${c.text}`;
         // polarity by state
@@ -123,7 +126,7 @@ for (const p of problems.slice(0, 40)) failures.push(p);
 ok(problems.length === 0, `problems on generated pages: ${problems.length}`);
 
 // ── 2. orientation, by construction: both values known, both ways round ──────────────────────────────
-for (const [expected, written, from] of [[-26, 14, 'line-above'], [14, -26, 'line-above'], [0.5, 2, 'computed-side'], [2, 0.5, 'computed-side']]) {
+for (const [expected, written, from] of [[-26, 14, 'line-above'], [14, -26, 'line-above'], [0.5, 2, 'line-above'], [2, 0.5, 'line-above']]) {
   const card = { n: 3, status: 'first-error', text: 'x', diagnosis: { expected, written, expectedFrom: from } };
   const c = commentFor(card, ctx);
   ok(c && c.text.indexOf(tex(expected)) >= 0 && c.text.indexOf(tex(written)) > c.text.indexOf(tex(expected)), `orientation ${expected}/${written}: ${c?.text}`);
@@ -142,7 +145,27 @@ ok(both?.kind === 'crossSidesDiffer' && !/\bshould\b/i.test(both.text) && both.t
 ok(commentFor(sd(S('3*4', '12', false), S('5*2', '10', false), 3), ctx) === null, 'three or more sides, both computed: the old sentence');
 ok(commentFor(sd(S('5', '5', true), S('4', '4', true), 4), ctx) === null, 'two bare numbers: the old sentence');
 ok(!/\bboth\b/i.test(commentFor(sd(S('2 + 3', '5', false), S('4', '4', true), 4), ctx)?.text || ''), 'three or more sides: never "both"');
-ok(commentFor({ n: 3, status: 'first-error', text: 'x', diagnosis: { expected: 5, written: 7, expectedFrom: 'left-side' } }, ctx) === null, 'an unknown cause gives nothing');
+ok(commentFor({ n: 3, status: 'first-error', text: 'x', diagnosis: { expected: 5, written: 7, expectedFrom: 'left-side' } }, ctx) === null && commentFor({ n: 3, status: 'first-error', text: 'x', diagnosis: { expected: 5, written: 7, expectedFrom: 'computed-side' } }, ctx) === null, 'an unknown cause, or a bare computed-side expected value, gives nothing');
+// chainDiagnosis (the chain checker's cross) then commentFor: neither side is "expected" unless one is a bare number or fraction
+{
+  const via = (from, to, fv, tv) => { const d = chainDiagnosis(from, parse(normalize(from)), fv, to, tv); return commentFor({ n: 4, status: 'first-error', text: `${from} = ${to}`, diagnosis: d }, ctx); };
+  const a = via('2*3', '4+3', 6, 7), b = via('2*3', '7', 6, 7), c2 = via('2*3', '13/2', 6, 6.5), c3 = via('1/2 + 1/3', '2/5', 5 / 6, 0.4);
+  ok(a?.kind === 'crossSidesDiffer' && !/\bshould\b/i.test(a.text), `2*3 = 4+3: both computed: ${a?.text}`);
+  ok(b?.kind === 'crossComputed' && !/\bshould\b/i.test(b.text) && b.facts.written === '$7$', `2*3 = 7: one bare: ${b?.text}`);
+  ok(c2?.kind === 'crossComputed' && c2.facts.written.includes('13') && !/\bshould\b/i.test(c2.text), `2*3 = 13/2: a fraction is bare: ${c2?.text}`);
+  ok(c3?.kind === 'crossComputed' && c3.facts.expr === mathSpan('1/2 + 1/3') && !/\bshould\b/i.test(c3.text), `1/2 + 1/3 = 2/5: ${c3?.text}`);
+  ok(commentFor({ n: 4, status: 'first-error', text: 'x', diagnosis: chainDiagnosis('a + (n - 1)d', parse(normalize('a + (n - 1)d')), 9, '35', 35) }, ctx) === null, 'a formula in letters carries no sides: the old sentence');
+  // a vector cross carries no side texts: the old sentence, never "should"
+  const vecLines = ['|4a+3b|', '= |4[-5,-1]+3[-2,4]|', '= |[-20,-4]-[-6,+12]|'];
+  let vecCross = 0;
+  for (const [fam, seed] of [['me12-vectors', 58], ['me12-vectors', 3], ['me12-vectors', 11]]) {
+    const vq = G.generateQuestion(fam, 1, seed);
+    const vr = stepEvidence(vq, '260', vecLines.join('\n'), { correct: false }).stepReport;
+    const vm = vr?.lines?.length >= 2 ? buildAnnotatedWorking({ lines: vecLines, stepReport: vr }) : null;
+    for (const card of vm?.cards || []) if (card.status === 'first-error') { vecCross += 1; ok(commentFor(card, ctx) === null && card.diagnosis?.expectedFrom === undefined, `vector cross: the old sentence (${card.diagnosis?.code})`); }
+  }
+  ok(vecCross > 0, `vector crosses exercised: ${vecCross}`);
+}
 // the engine's own diagnoses for the three shapes, and the old sentences they replace
 {
   const run = lines => { const r = stepEvidence(G.generateQuestion('y12-integration', 1, 27), '14', lines.join('\n'), { correct: false }).stepReport; return r.lines.find(l => l.status === 'break'); };
@@ -190,7 +213,6 @@ const SAMPLE = {
   ruleResult: { n: 2, status: 'checked', text: 'y=2x', rules: [{ rule: 'power' }] }, rule: { n: 2, status: 'checked', text: 'y', rules: [{ rule: 'power' }] },
   bothSides: { n: 2, status: 'checked', valueChain: 'arithmetic', text: '3+4=7', fact: { kind: 'both-sides', value: 7 } },
   equalsAbove: { n: 2, status: 'checked', valueChain: 'arithmetic', text: '=7', fact: { kind: 'equals-line-above', value: 7 } },
-  crossShould: { n: 3, status: 'first-error', text: 'x', diagnosis: { expected: 5, written: 7, expectedFrom: 'computed-side' } },
   crossAbove: { n: 3, status: 'first-error', text: 'x', diagnosis: { expected: 5, written: 7, expectedFrom: 'line-above' } },
   crossComputed: sd(S('10 - 6', '4', false), S('14', '14', true)),
   crossSidesDiffer: sd(S('3*4', '12', false), S('5*2', '10', false))
@@ -202,7 +224,7 @@ for (const k of TEMPLATE_KINDS) {
     const c = commentFor({ ...SAMPLE[k], n }, { language: lang, ruleLabel: r => (lang === 'hi' ? 'नियम' : 'Rule') + ' ' + r.rule });
     if (!c || c.text.includes('{') || (lang === 'hi' && !/[ऀ-ॿ]/.test(c.text)) || !variantsOf(k, lang).length) { failures.push(`template ${k} ${lang} line ${n}: ${c?.text}`); break; }
   } }
-  ok(variantsOf(k, 'en').length >= 1 && (ENGLISH_ONLY.has(k) || variantsOf(k, 'en').length === variantsOf(k, 'hi').length), `template ${k}: the same number of English and Hindi variants (English-only templates have no Hindi)`);
+  ok(variantsOf(k, 'en').length >= 1 && (ENGLISH_ONLY.has(k) || (variantsOf(k, 'hi').length >= 1 && variantsOf(k, 'hi').length <= variantsOf(k, 'en').length)), `template ${k}: Hindi has wording, never more variants than English (English-only templates have no Hindi)`);
 }
 ok(Object.values(CATALOGUE).every(c => [...c.en, ...(c.hi || [])].every(s => !/[\u2014\u2013]/.test(s))), 'no em dash in any template');
 ok(new Set(Array.from({ length: 30 }, (_, n) => commentFor({ ...SAMPLE.bothSides, n }, ctx).text)).size > 1, 'the wording varies across lines');

@@ -10,8 +10,8 @@
 //
 //   · a tick never gets a negative sentence; a cross never gets a positive one (the template set is chosen by state)
 //   · an arithmetic tick (true as written) gets EQUALITY sentences only: nothing about the line's role
-//   · for a cross, {expected} and {written} come only from the diagnosis's own facts and cannot swap; two computed sides are never
-//     given an "expected" (either may be the slip); a value-only solution tick is never said to BE the step
+//   · a cross that continues the line above names the value the working reached; a cross between two sides never says what a side
+//     "should" be (either may be the slip); a value-only solution tick is never said to BE the step
 //   · a rule is named only when the engine named it for that line
 //   · the wording varies by a stable hash of the line's number and text, so the same line always reads the same
 //
@@ -62,26 +62,22 @@ export const CATALOGUE = Object.freeze({
     en: ['This equals the line above: {value}.', 'This comes to the same value as the line above, {value}.', 'Same value as the line above: {value}.'],
     hi: ['यह ऊपर वाली पंक्ति के बराबर है: {value}।', 'यह ऊपर वाली पंक्ति के समान मान देती है, {value}।', 'ऊपर वाली पंक्ति जैसा ही मान: {value}।']
   },
-  crossShould: {
-    en: ['This line should come to {expected}, but it has {written}.', 'Check this line: it should come to {expected}, not {written}.'],
-    hi: ['इस पंक्ति का मान {expected} होना चाहिए, पर इसमें {written} है।', 'इस पंक्ति को जाँचें: मान {expected} होना चाहिए, {written} नहीं।']
-  },
   crossAbove: {
-    en: ['The working above reaches {expected}, but this line has {written}.', 'This line should come to {expected}, but it has {written}.', 'Check this line: it should come to {expected}, not {written}.'],
-    hi: ['ऊपर का हल {expected} तक पहुँचता है, पर इस पंक्ति में {written} है।', 'इस पंक्ति का मान {expected} होना चाहिए, पर इसमें {written} है।', 'इस पंक्ति को जाँचें: मान {expected} होना चाहिए, {written} नहीं।']
+    en: ['The working above reaches {expected}, but this line has {written}.', 'Check this line: the working above reaches {expected}, not {written}.'],
+    hi: ['ऊपर का हल {expected} तक पहुँचता है, पर इस पंक्ति में {written} है।']
   },
   crossComputed: {
     en: ['{expr} comes to {expected}, but this line gives {written}.', 'Check this line: {expr} comes to {expected}, not {written}.', 'This line gives {written}, but {expr} comes to {expected}.']
   },
   crossSidesDiffer: {
-    en: ['The two sides do not match: {left} comes to {leftValue}, {right} comes to {rightValue}.', 'The two sides are not equal: {left} comes to {leftValue}, but {right} comes to {rightValue}.', 'The two sides differ: {left} comes to {leftValue} and {right} comes to {rightValue}.']
+    en: ['The two sides do not match: {left} comes to {leftValue}, and {right} comes to {rightValue}.', 'The two sides are not equal: {left} comes to {leftValue}, but {right} comes to {rightValue}.', 'The two sides differ: {left} comes to {leftValue} and {right} comes to {rightValue}.']
   }
 });
 /** Every template kind, grouped by polarity, for the tests. */
 export const TEMPLATE_KINDS = Object.freeze(Object.keys(CATALOGUE));
 export const POSITIVE_KINDS = Object.freeze(['restates', 'stepHeading', 'step', 'stepValue', 'ruleResult', 'rule']);
 export const EQUALITY_KINDS = Object.freeze(['bothSides', 'equalsAbove']);
-export const CROSS_KINDS = Object.freeze(['crossShould', 'crossAbove', 'crossComputed', 'crossSidesDiffer']);
+export const CROSS_KINDS = Object.freeze(['crossAbove', 'crossComputed', 'crossSidesDiffer']);
 
 const fill = (template, slots) => template.replace(/\{(\w+)\}/g, (_, k) => slots[k]);
 const rhsOf = text => { const raw = String(text ?? '').trim(); if (!raw.includes('=')) return null; const rhs = raw.split(/(?<![<>!=≤≥≠])=(?!=)/).pop().trim(); return rhs ? mathSpan(rhs) : null; };
@@ -107,18 +103,24 @@ export function commentFor(card, ctx = {}) {
     if (!d || typeof d !== 'object') return null;
     // only a cause the engine named, with the facts that cause needs; anything else (a log line false under both readings, an
     // unknown cause) keeps the engine's own sentence
-    if (d.expectedFrom === 'line-above' || d.expectedFrom === 'computed-side') {
+    // (no "should" sentence exists: when two sides disagree, either may be the slip, so only a cross that continues the line
+    // above, where the working above is the established value, says what it "reaches")
+    if (d.expectedFrom === 'line-above') {
       const expected = fromTex(d.expectedTex, d.expected), written = fromTex(d.writtenTex, d.written);
       if (expected === null || written === null || expected === written) return null;
-      return done(d.expectedFrom === 'line-above' ? 'crossAbove' : 'crossShould', { expected, written }, { expected, written });
+      return done('crossAbove', { expected, written }, { expected, written });
     }
     if (d.expectedFrom === 'sides') {
       // the first two sides that disagree. A bare number against a computed expression: the expression is named, with its value.
       // Two computed expressions: either may be the slip, so neither is "expected". Three or more sides: only a computed
       // expression against a bare number is said, never "both"; two computed expressions among many is left to the old sentence.
-      const L = d.sides?.left, R = d.sides?.right, count = d.sides?.count;
-      const ok = x => x && typeof x.text === 'string' && x.text.trim() && typeof x.tex === 'string' && x.tex.length > 0 && x.tex.length <= 120 && !x.tex.includes('$') && typeof x.bare === 'boolean';
-      if (!ok(L) || !ok(R) || L.tex === R.tex) return null;
+      const count = d.sides?.count;
+      // a side's value is the engine's TeX, or the number the engine evaluated (formatted by exactForm)
+      const norm = x => { if (!x || typeof x.text !== 'string' || !x.text.trim() || typeof x.bare !== 'boolean') return null;
+        const tex = typeof x.tex === 'string' ? x.tex : (typeof x.value === 'number' && Number.isFinite(x.value) ? exactForm(x.value).tex : null);
+        return tex && tex.length <= 120 && !tex.includes('$') ? { text: x.text, tex, bare: x.bare } : null; };
+      const L = norm(d.sides?.left), R = norm(d.sides?.right);
+      if (!L || !R || L.tex === R.tex) return null;
       if (L.bare !== R.bare) {
         const [comp, bare] = L.bare ? [R, L] : [L, R];
         const expr = mathSpan(comp.text), expected = `$${comp.tex}$`, written = `$${bare.tex}$`;

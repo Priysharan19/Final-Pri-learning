@@ -424,6 +424,8 @@ export function matchesShape(ast, shapes) {
 // ── The diagnosis of a false segment ─────────────────────────────────────────
 const OPERATION = { '+': 'addition', '-': 'subtraction', '*': 'multiplication', '/': 'division', '^': 'power' };
 
+const BARE_VALUE = /^[-+]?\d+(?:\.\d+)?(?:\s*\/\s*\d+(?:\.\d+)?)?$/;
+
 /** "Check the addition: 9 + 24 equals 33, not 35." */
 export function chainDiagnosis(fromText, fromAst, fromValue, toText, toValue) {
   // The computed side names the operation; the bare number is what it was called.
@@ -459,8 +461,12 @@ export function chainDiagnosis(fromText, fromAst, fromValue, toText, toValue) {
     message,
     fix: 'Redo this one calculation, then carry the rest of the working forward.',
     confidence: 'high',
-    // Structured facts (never parsed from the message): the value of the computed side, and the value the student wrote.
-    expected: fromValue, written: toValue, expectedFrom: 'computed-side'
+    // Structured facts (never parsed from the message), for engine/lineCommentary.js: the two sides, each with its text, its
+    // value and whether it is a bare number or fraction. Neither is "expected": when both are computed either may be the slip.
+    // A formula in letters carries none (its value depends on the givens put in).
+    ...(!lettered && Number.isFinite(fromValue) && Number.isFinite(toValue) ? { expectedFrom: 'sides', sides: { count: 2,
+      left: { text: fromText, value: fromValue, bare: BARE_VALUE.test(String(fromText).trim()) },
+      right: { text: toText, value: toValue, bare: BARE_VALUE.test(String(toText).trim()) } } } : {})
   };
 }
 

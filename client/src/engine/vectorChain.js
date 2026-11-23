@@ -245,8 +245,8 @@ export function stepCheckVectorChain(meta, workingText) {
 
   const note = (text, why, { keep = false, ...extra } = {}) => { out.push({ text, status: 'note', note: why, unverified: true, ...extra }); if (!keep) chain = null; };
   const tick = (text, rule, extra = {}) => out.push({ text, status: 'ok', valueChain: { rule }, ...extra });
-  const cross = (text, i, message, facts = null) => {
-    diagnosis = { code: 'vector-chain-not-equal', title: 'This line does not equal the line it follows from', message, fix: 'Work each component again, one row at a time.', confidence: 'high', ...(facts || {}) };
+  const cross = (text, i, message) => {
+    diagnosis = { code: 'vector-chain-not-equal', title: 'This line does not equal the line it follows from', message, fix: 'Work each component again, one row at a time.', confidence: 'high' };
     firstBreak = i;
     out.push({ text, status: 'break', note: message, diagnosis });
     chain = null;
@@ -292,7 +292,7 @@ export function stepCheckVectorChain(meta, workingText) {
     if (truth) {
       const results = segs.map(s => { const got = compare(s, truth); return got === 'wrong' && soft(s) ? 'unsure' : got; });
       const bad = results.indexOf('wrong');
-      if (bad !== -1) return cross(line, i, mismatch(segs[bad], truth), typeof truth.value === 'number' && typeof segs[bad].value === 'number' ? { expected: truth.value, written: segs[bad].value, expectedFrom: 'computed-side' } : null);
+      if (bad !== -1) return cross(line, i, mismatch(segs[bad], truth));
       chain = truth;
       if (results.some(r => r === 'unsure')) return note(line, GENERIC_NOTE, { keep: true });
       if (first && segs.length === 1 && !continuation) return tick(line, 'restated', { restates: true, note: 'Restates what the question asks for.' });

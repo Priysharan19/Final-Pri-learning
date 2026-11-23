@@ -36,7 +36,7 @@ Rule names below are shown as `Rule <id>`; the page uses the interface’s own r
 | Line | Working | Engine verdict | Old sentence | New sentence |
 |---|---|---|---|---|
 | 1 | `\|4a+3b\|` | tick | Restates what the question asks for. | (unchanged) |
-| 2 | `= \|4[-5,-1]+3[-2,4]\|` | cross | This should come to 28.79236, but this line gives 27.202941. | Check this line: it should come to 28.7924, not 27.2029. |
+| 2 | `= \|4[-5,-1]+3[-2,4]\|` | cross | This should come to 28.79236, but this line gives 27.202941. | (unchanged) |
 | 3 | `= \|[-20,-4]-[-6,+12]\|` | note | Follows from the earlier slip. | (unchanged) |
 | 4 | `196` | note | Follows from the earlier slip. | (unchanged) |
 | 5 | `+64` | note | Follows from the earlier slip. | (unchanged) |

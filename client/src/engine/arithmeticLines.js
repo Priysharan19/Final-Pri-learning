@@ -1754,7 +1754,7 @@ function stepCheckArithmeticWithinBudget(workingText, prep = null, tickOnly = fa
     //   · otherwise the first two sides that disagree (side 1 and side k), each with its text, its value and whether it is a bare
     //     number, because either side may be the slip when both are computed expressions;
     //   · a log line that is false under both readings carries no value: no single reading is "the" value.
-    const bareNumber = x => /^\s*-?\d+(?:\.\d+)?\s*$/.test(x);
+    const bareNumber = x => /^\s*-?\d+(?:\.\d+)?(?:\s*\/\s*\d+(?:\.\d+)?)?\s*$/.test(x);   // a number or a plain fraction
     const fromAbove = continuation && before && k >= 1;
     const facts = logFalseInBoth ? {}
       : fromAbove ? { expectedTex: exactForm(allValues[0]).tex, writtenTex: exactForm(allValues[k]).tex, expectedFrom: 'line-above' }
