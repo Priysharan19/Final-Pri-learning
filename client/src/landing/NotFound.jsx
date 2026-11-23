@@ -8,20 +8,18 @@
 // written here in en-AU rather than in the shared catalogue, which every
 // registered language must mirror.
 // ─────────────────────────────────────────────────────────────────────────────
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import PageLink from '../components/PageLink.jsx';
 
 export default function NotFound({ to, signedIn }) {
-  const card = useRef(null);
   useEffect(() => {
     const before = document.title;
     document.title = 'Page not found · Prithagoras';
-    card.current?.focus({ preventScroll: true });
     return () => { document.title = before; };
   }, []);
   return (
     <div className="crash-wrap" data-testid="not-found">
-      <section className="card crash-card" aria-labelledby="not-found-title" tabIndex={-1} ref={card}>
+      <section className="card crash-card" aria-labelledby="not-found-title">
         <h1 className="crash-title" id="not-found-title" style={{ marginTop: 18 }}>Page not found</h1>
         <p className="sub crash-copy">There is no page at this address. The link may be old or mistyped.</p>
         <div className="row crash-actions">
