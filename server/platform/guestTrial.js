@@ -151,11 +151,36 @@ function answerTokens(q, keep) {
   return [...out].filter(Boolean);
 }
 /**
+ * A second, cruder reading of the same question, kept deliberately independent of bareText: every character that is not a letter, digit,
+ * point, minus, root, pi, slash or equals sign becomes a space, so digits that LaTeX glues together (a limit's ^1 against the next numerator)
+ * stay separate, and each token must stand alone between spaces. It adds tokens (the displayed answer, its canonical input, the value
+ * without its label, the leading number of a fraction or decimal of a numeric answer, and each solution of a set) and so can only ever
+ * close a question EARLIER, never later: statesAnswer is true when either reading finds the answer.
+ */
+const crudeText = s => String(s ?? '').replace(/\\(?:d?frac|left|right|Rightarrow|rightarrow|times|cdot|text|quad)/g, ' ').replace(/\\sqrt/g, '√').replace(/[−–]/g, '-').replace(/\+\s*-/g, '-').replace(/[^0-9a-zA-Z.\-√π/=]+/g, ' ').toLowerCase();
+const flatText = s => crudeText(s).replace(/\s+/g, '');
+function flatTokens(q) {
+  const shown = flatText(answerTextFor(q));
+  const out = new Set([shown, flatText(q?.answer?.canonicalInput), shown.replace(/^[a-z]'?(\([a-z0-9]\))?=/, ''), shown.replace(/^[a-z]=/, '').replace(/^[×*]/, '')]);
+  const lead = shown.replace(/^[a-z]=/, '').match(/^-?\d+(?:\.\d+)?(?![\d.a-z])/)?.[0];
+  if (lead && q?.answerType === 'numeric') out.add(lead);
+  for (const part of String(answerTextFor(q)).replace(/\\[,;! ]/g, ' ').split(/[,;]|\bor\b|\band\b/)) out.add(flatText(part).replace(/^[a-z]=/, ''));
+  return [...out].filter(t => t.length > 0);
+}
+function flatStatesAnswer(step, q) {
+  const tokens = flatTokens(q);
+  return [step?.d, step?.h].some(raw => {
+    const text = ' ' + crudeText(raw).replace(/=/g, ' = ').replace(/,/g, ' ') + ' ';
+    return tokens.some(token => { for (let at = text.indexOf(token); at !== -1; at = text.indexOf(token, at + 1)) { if (!/[0-9a-z.]/.test(text[at - 1] ?? ' ') && !/[0-9a-z.]/.test(text[at + token.length] ?? ' ')) return true; } return false; });
+  });
+}
+/**
  * Whether a step states the answer anywhere in its working or heading, as a whole token (not inside a longer number): showing it releases the answer, so it ends the question as the answer does. Deliberately conservative: a middle
  * step that merely contains a number equal to the answer closes the question there, and a step this cannot decide is treated as stating it.
  */
 function statesAnswer(step, q) {
   if (!answerTokens(q, false).length) return true;
+  if (flatStatesAnswer(step, q)) return true;
   return [false, true].some(keep => {
     const tokens = answerTokens(q, keep);
     return [step?.d, step?.h].some(raw => {
