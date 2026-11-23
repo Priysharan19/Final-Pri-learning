@@ -25,26 +25,26 @@ Generator families: `y11-diff`.
 
 | Criterion | Marks | How the engine decides it |
 |---|---:|---|
-| Writes a correct derivative. | 1 | the engine tags a line "ok" against the question's derivative step (decided by: engine) |
-| Gives the final answer correctly. | 1 | the last line, read as the final answer, is checked by the answer checker (the same check that marks a one-line answer) (decided by: answer checker) |
+| Writes a correct derivative. | 1 | a line the step check ticks against the question's derivative step |
+| Gives the final answer correctly. | 1 | the answer checker marks the final answer, the same check that marks a one-line answer |
 
 Total: 2 marks. The marks per criterion are a first guess for the author to correct.
 
 ## What the engine can and cannot verify for this type
 
-The engine is the marking code. The interpreter is the part that reads one line of working and checks it against the question. The answer checker is the code that marks a final answer.
+The page is the marked page the student sees: each line of working is ticked, crossed or left unchecked by the checker. The answer checker is the code that marks a final answer. The server pays exactly the criteria below, from exactly that page.
 
 It can verify:
 
-- Writes a correct derivative. (engine).
-- Gives the final answer correctly. (answer checker).
+- Writes a correct derivative.
+- Gives the final answer correctly.
 
 It cannot verify:
 
 - It cannot tell a rule line from the final line, so one correct line can earn both criteria.
 - It does not check each term separately.
 
-Rule used in every award below: a line earns a criterion only if the engine or interpreter finds it true. The first wrong line stops all further credit. The final-answer criterion looks at the last line only.
+Rule used in every award below: a line earns a criterion only if the marked page ticks it. A line the page crosses, and every line after it, earns nothing. A correct final answer is the full mark, as it always was. A wrong final answer can never reach full marks.
 
 ## Worked awards
 
@@ -52,28 +52,28 @@ These come from running the engine on built transcripts for the first sample que
 
 ### Full marks
 
-| # | What the student wrote | Engine says | Interpreter says | Counts toward |
-|---:|---|---|---|---|
-| 1 | `dy/dx = -72x^8` | true line | checked | derivative, answer |
+| # | What the student wrote | What the marked page shows | Counts toward |
+|---:|---|---|---|
+| 1 | `dy/dx = -72x^8` | true line | derivative |
 
 Award: **2 of 2**. Criteria earned: derivative (1), answer (1).
 Final answer check: correct.
 
 ### Partial marks
 
-| # | What the student wrote | Engine says | Interpreter says | Counts toward |
-|---:|---|---|---|---|
-| 1 | `dy/dx = -72x^8` | true line | checked | derivative |
-| 2 | `dy/dx = -73x^8` | wrong here (Your power is right (x⁸). Check the coefficient: -8 × 9 = -72.) | wrong here | nothing |
+| # | What the student wrote | What the marked page shows | Counts toward |
+|---:|---|---|---|
+| 1 | `dy/dx = -72x^8` | true line | derivative |
+| 2 | `dy/dx = -73x^8` | wrong here (Your power is right (x⁸). Check the coefficient: -8 × 9 = -72.) | nothing |
 
 Award: **1 of 2**. Criteria earned: derivative (1).
 Final answer check: not correct.
 
 ### Zero marks
 
-| # | What the student wrote | Engine says | Interpreter says | Counts toward |
-|---:|---|---|---|---|
-| 1 | `dy/dx = -73x^8` | wrong here (Your power is right (x⁸). Check the coefficient: -8 × 9 = -72.) | wrong here | nothing |
+| # | What the student wrote | What the marked page shows | Counts toward |
+|---:|---|---|---|
+| 1 | `dy/dx = -73x^8` | wrong here (Your power is right (x⁸). Check the coefficient: -8 × 9 = -72.) | nothing |
 
 Award: **0 of 2**. Criteria earned: none.
 Final answer check: not correct.
@@ -82,15 +82,15 @@ Final answer check: not correct.
 
 Transcript with an earlier slip, on the same question:
 
-| # | What the student wrote | Engine says | Interpreter says | Counts toward |
-|---:|---|---|---|---|
-| 1 | `dy/dx = -73x^8` | wrong here (Your power is right (x⁸). Check the coefficient: -8 × 9 = -72.) | wrong here | nothing |
-| 2 | `= -73x^8` | no verdict (Follows from the earlier slip.) | follows from the earlier mistake | nothing |
+| # | What the student wrote | What the marked page shows | Counts toward |
+|---:|---|---|---|
+| 1 | `dy/dx = -73x^8` | wrong here (Your power is right (x⁸). Check the coefficient: -8 × 9 = -72.) | nothing |
+| 2 | `= -73x^8` | no verdict (Follows from the earlier slip.) | nothing |
 
 Award: **0 of 2**. Criteria earned: none.
 Final answer check: not correct.
 
-What the engine actually did: the first wrong line was line 1. After it, line 2: engine no verdict, interpreter follows from the earlier mistake.
+What the engine actually did: the first wrong line was line 1. After it, line 2: no verdict.
 
 The engine named line(s) 2 as following from the earlier mistake, and gave them no tick. No later line was found true. The engine pays nothing for a line that follows correctly from an earlier error here: the only rule that does so is a question plan marked for error carried forward, and this type has none. Whether a later criterion should earn after an earlier error is the author's decision, not the engine's.
 
@@ -102,4 +102,4 @@ To be filled in by the author (the tutor). Leave blank until reviewed.
 - Note: 
 - Name: 
 - Date: 
-- Scheme digest: `9c576f1338d510d4ae084bb8db6d86fb50f528359b149d21ee65940ce8b95e7d`
+- Scheme digest: `e5a76c6648ec88c8fc35e8ff4ef8f1eec201fa8a9edfb94f64fd4f977af30689`

@@ -16,106 +16,16 @@
           "key": "derivative",
           "text": "Writes a correct derivative of the given function (any equivalent form).",
           "marks": 1,
-          "decidedBy": "interpreter"
+          "by": "line"
         },
         {
           "key": "answer",
           "text": "Gives the final answer correctly, in the form the question asks.",
           "marks": 1,
-          "decidedBy": "answer checker"
+          "by": "final"
         }
       ],
-      "digest": "cf7cfc7d6d8ffaa4ccd53b8a7f335c138190ea80ea333817ff6aecb847083e42"
-    },
-    {
-      "id": "y12-diff-gradient",
-      "title": "Differentiate, then find the gradient at a point",
-      "course": "Year 12 Mathematics Advanced",
-      "year": 12,
-      "families": [
-        "y12-diff"
-      ],
-      "file": "y12-diff-gradient.md",
-      "totalMarks": 2,
-      "criteria": [
-        {
-          "key": "derivative",
-          "text": "Differentiates the given function correctly.",
-          "marks": 1,
-          "decidedBy": "interpreter"
-        },
-        {
-          "key": "answer",
-          "text": "Substitutes the x-value and states the gradient correctly.",
-          "marks": 1,
-          "decidedBy": "answer checker"
-        }
-      ],
-      "digest": "6835749f95f2fedd805686d2a870c25df14f2e5260fffb596e0fa42c02352344"
-    },
-    {
-      "id": "y12-stationary-x",
-      "title": "Find the x-coordinates of the stationary points",
-      "course": "Year 12 Mathematics Advanced",
-      "year": 12,
-      "families": [
-        "y12-appdiff"
-      ],
-      "file": "y12-stationary-x.md",
-      "totalMarks": 3,
-      "criteria": [
-        {
-          "key": "derivative",
-          "text": "Differentiates the function correctly.",
-          "marks": 1,
-          "decidedBy": "interpreter"
-        },
-        {
-          "key": "zero",
-          "text": "Sets the derivative equal to zero.",
-          "marks": 1,
-          "decidedBy": "interpreter"
-        },
-        {
-          "key": "solve",
-          "text": "Solves to find the x-coordinates.",
-          "marks": 1,
-          "decidedBy": "interpreter"
-        }
-      ],
-      "digest": "18d08c2aee3dfccd6e2ec1f9e04ee9e1ef7eed4100f2ad14321dad22f540d857"
-    },
-    {
-      "id": "y12-tangent",
-      "title": "Find the equation of a tangent",
-      "course": "Year 12 Mathematics Advanced",
-      "year": 12,
-      "families": [
-        "y12-appdiff"
-      ],
-      "file": "y12-tangent.md",
-      "totalMarks": 3,
-      "criteria": [
-        {
-          "key": "derivative",
-          "text": "Differentiates the function correctly.",
-          "marks": 1,
-          "decidedBy": "interpreter"
-        },
-        {
-          "key": "ypoint",
-          "text": "Finds the y-value of the point of contact.",
-          "marks": 1,
-          "decidedBy": "interpreter"
-        },
-        {
-          "key": "answer",
-          "text": "Gives the correct equation of the tangent.",
-          "marks": 1,
-          "decidedBy": "answer checker"
-        }
-      ],
-      "digest": "e1c1adc9b2320ae1bbcf230f0ece79e186d7d3fee189ad041f33db9cece9cffe"
+      "digest": "f58d2e8cff6862a00a638a38a2e0356697c642d9be08d2594681b11549ecd701"
     },
     {
       "id": "y12-trig-extreme",
@@ -132,22 +42,22 @@
           "key": "amplitude",
           "text": "States the amplitude correctly.",
           "marks": 1,
-          "decidedBy": "interpreter"
+          "by": "line"
         },
         {
           "key": "midline",
           "text": "States the midline (centre value) correctly.",
           "marks": 1,
-          "decidedBy": "interpreter"
+          "by": "line"
         },
         {
           "key": "extreme",
-          "text": "States the maximum or minimum value asked for, correctly.",
+          "text": "States the maximum or minimum value asked for, correctly (the final answer).",
           "marks": 1,
-          "decidedBy": "interpreter"
+          "by": "final"
         }
       ],
-      "digest": "6e34ad8532c9f09b60ec7fc0e444805b220b8806dde224404f911ec23ca5d96d"
+      "digest": "9e37098253118df9b4ee3f6835251440577c093ade8f29c652106809f6fda786"
     },
     {
       "id": "y12-trig-evaluate",
@@ -164,16 +74,16 @@
           "key": "substitute",
           "text": "Substitutes the value of t into the model correctly.",
           "marks": 1,
-          "decidedBy": "interpreter"
+          "by": "line"
         },
         {
           "key": "answer",
           "text": "States the value correctly.",
           "marks": 1,
-          "decidedBy": "answer checker"
+          "by": "final"
         }
       ],
-      "digest": "ec83c0aafa5924efa40e02454f5ffa7913733f8770dab6c0a28ba69779fb30d4"
+      "digest": "dfd011c6853f49fe9d7c646e058e4297c7f1707da2a32f0ee2ec19390bdf7dbf"
     },
     {
       "id": "y12-diff-explog",
@@ -190,16 +100,16 @@
           "key": "derivative",
           "text": "Writes a correct derivative (any equivalent form).",
           "marks": 1,
-          "decidedBy": "engine"
+          "by": "line"
         },
         {
           "key": "answer",
           "text": "Gives the final answer correctly, in the form the question asks.",
           "marks": 1,
-          "decidedBy": "answer checker"
+          "by": "final"
         }
       ],
-      "digest": "f58e0aa8654e1cbe8a0760730c56be3459ffb874c9606969ff9f1b0d2eee6f10"
+      "digest": "58f14f247f31579ba253f04c6697e6dbd71d541be8519c88e3bd58f4ed09753f"
     },
     {
       "id": "y11-poly-evaluate",
@@ -216,16 +126,16 @@
           "key": "substitute",
           "text": "Substitutes the correct value into P(x).",
           "marks": 1,
-          "decidedBy": "interpreter"
+          "by": "line"
         },
         {
           "key": "answer",
           "text": "Evaluates correctly to give the value or remainder.",
           "marks": 1,
-          "decidedBy": "answer checker"
+          "by": "final"
         }
       ],
-      "digest": "07b48f570fbcc9411b66b74850ce495858ceb31a707c9cceaf9054e15c7ea8a4"
+      "digest": "5be5abaa89ec8e7a4c799a40b8e24914134ebd28b8f11ab219aec2557b2113b5"
     },
     {
       "id": "y11-diff-gradient-plan",
@@ -242,16 +152,16 @@
           "key": "derivative",
           "text": "Differentiates the function correctly (stage 1 of the plan).",
           "marks": 1,
-          "decidedBy": "engine plan stage"
+          "by": "line"
         },
         {
           "key": "gradient",
-          "text": "Substitutes the x-value and finds the gradient (stage 2 of the plan).",
+          "text": "Substitutes the x-value and finds the gradient correctly (the final answer).",
           "marks": 1,
-          "decidedBy": "engine plan stage"
+          "by": "final"
         }
       ],
-      "digest": "8c8eba64e50f941ad2501bbc99131020303fd6bf1180dae9fe36088ffbd6fb70"
+      "digest": "c9d8465b12841281dec30c8bb4b9bdebef94bb375c47c06e7e4f32838d86865b"
     },
     {
       "id": "y11-diff-power-rule",
@@ -268,19 +178,49 @@
           "key": "derivative",
           "text": "Writes a correct derivative.",
           "marks": 1,
-          "decidedBy": "engine"
+          "by": "line"
         },
         {
           "key": "answer",
           "text": "Gives the final answer correctly.",
           "marks": 1,
-          "decidedBy": "answer checker"
+          "by": "final"
         }
       ],
-      "digest": "9c576f1338d510d4ae084bb8db6d86fb50f528359b149d21ee65940ce8b95e7d"
+      "digest": "e5a76c6648ec88c8fc35e8ff4ef8f1eec201fa8a9edfb94f64fd4f977af30689"
     }
   ],
   "notProvable": [
+    {
+      "id": "y12-diff-gradient",
+      "title": "Differentiate, then find the gradient at a point",
+      "course": "Year 12 Mathematics Advanced",
+      "families": [
+        "y12-diff"
+      ],
+      "reason": "The question has no step plan, so the page leaves the derivative line unchecked; only the final value is verified. \"Differentiates correctly\" cannot be decided from the lines the student sees.",
+      "unavailable": true
+    },
+    {
+      "id": "y12-stationary-x",
+      "title": "Find the x-coordinates of the stationary points",
+      "course": "Year 12 Mathematics Advanced",
+      "families": [
+        "y12-appdiff"
+      ],
+      "reason": "The page leaves the derivative line and the \"let the derivative equal zero\" line unchecked (it checks the equation and the roots only), so two of the three criteria cannot be decided from the lines the student sees.",
+      "unavailable": true
+    },
+    {
+      "id": "y12-tangent",
+      "title": "Find the equation of a tangent",
+      "course": "Year 12 Mathematics Advanced",
+      "families": [
+        "y12-appdiff"
+      ],
+      "reason": "The page ticks the line that finds the point of contact but leaves the derivative line unchecked, so \"differentiates correctly\" cannot be decided from the lines the student sees.",
+      "unavailable": true
+    },
     {
       "id": "y12-integrals",
       "title": "Definite integrals and areas under a curve",
@@ -309,7 +249,7 @@
       "families": [
         "y12-appdiff"
       ],
-      "reason": "The nature question is multiple choice, and the second derivative is not a line the interpreter can read, so \"determines the nature\" cannot be decided from the lines."
+      "reason": "The nature question is multiple choice, and the second derivative is not a line the page can check, so \"determines the nature\" cannot be decided from the lines."
     },
     {
       "id": "y12-optimisation",

@@ -25,26 +25,26 @@ Generator families: `y12-explogcalc`.
 
 | Criterion | Marks | How the engine decides it |
 |---|---:|---|
-| Writes a correct derivative (any equivalent form). | 1 | the engine tags a line "ok" when it is equivalent to the question's derivative (decided by: engine) |
-| Gives the final answer correctly, in the form the question asks. | 1 | the last line, read as the final answer, is checked by the answer checker (the same check that marks a one-line answer) (decided by: answer checker) |
+| Writes a correct derivative (any equivalent form). | 1 | a line the step check ticks as equal to the derivative of the given function, in any form |
+| Gives the final answer correctly, in the form the question asks. | 1 | the answer checker marks the final answer, the same check that marks a one-line answer |
 
 Total: 2 marks. The marks per criterion are a first guess for the author to correct.
 
 ## What the engine can and cannot verify for this type
 
-The engine is the marking code. The interpreter is the part that reads one line of working and checks it against the question. The answer checker is the code that marks a final answer.
+The page is the marked page the student sees: each line of working is ticked, crossed or left unchecked by the checker. The answer checker is the code that marks a final answer. The server pays exactly the criteria below, from exactly that page.
 
 It can verify:
 
-- Writes a correct derivative (any equivalent form). (engine).
-- Gives the final answer correctly, in the form the question asks. (answer checker).
+- Writes a correct derivative (any equivalent form).
+- Gives the final answer correctly, in the form the question asks.
 
 It cannot verify:
 
 - It cannot tell which rule the student used, or an unsimplified rule line from the final line. One correct line can earn both criteria.
-- The line interpreter does not read these derivatives; only the engine's own equivalence check decides.
+- Only the step check's own equivalence test decides whether a line is a correct derivative.
 
-Rule used in every award below: a line earns a criterion only if the engine or interpreter finds it true. The first wrong line stops all further credit. The final-answer criterion looks at the last line only.
+Rule used in every award below: a line earns a criterion only if the marked page ticks it. A line the page crosses, and every line after it, earns nothing. A correct final answer is the full mark, as it always was. A wrong final answer can never reach full marks.
 
 ## Worked awards
 
@@ -52,28 +52,28 @@ These come from running the engine on built transcripts for the first sample que
 
 ### Full marks
 
-| # | What the student wrote | Engine says | Interpreter says | Counts toward |
-|---:|---|---|---|---|
-| 1 | `dy/dx = 9*e^(9*x+9)` | true line | could not verify (the question gives no single function to differentiate) | derivative, answer |
+| # | What the student wrote | What the marked page shows | Counts toward |
+|---:|---|---|---|
+| 1 | `dy/dx = 9*e^(9*x+9)` | true line | derivative |
 
 Award: **2 of 2**. Criteria earned: derivative (1), answer (1).
 Final answer check: correct.
 
 ### Partial marks
 
-| # | What the student wrote | Engine says | Interpreter says | Counts toward |
-|---:|---|---|---|---|
-| 1 | `dy/dx = 9*e^(9*x+9)` | true line | could not verify (the question gives no single function to differentiate) | derivative |
-| 2 | `dy/dx = 10*e^(9*x+9)` | no verdict (Not checked: the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | could not verify (the question gives no single function to differentiate) | nothing |
+| # | What the student wrote | What the marked page shows | Counts toward |
+|---:|---|---|---|
+| 1 | `dy/dx = 9*e^(9*x+9)` | true line | derivative |
+| 2 | `dy/dx = 10*e^(9*x+9)` | no verdict (Not checked: the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | nothing |
 
 Award: **1 of 2**. Criteria earned: derivative (1).
 Final answer check: not correct.
 
 ### Zero marks
 
-| # | What the student wrote | Engine says | Interpreter says | Counts toward |
-|---:|---|---|---|---|
-| 1 | `dy/dx = 10*e^(9*x+9)` | no verdict (Not checked: the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | could not verify (the question gives no single function to differentiate) | nothing |
+| # | What the student wrote | What the marked page shows | Counts toward |
+|---:|---|---|---|
+| 1 | `dy/dx = 10*e^(9*x+9)` | no verdict (Not checked: the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | nothing |
 
 Award: **0 of 2**. Criteria earned: none.
 Final answer check: not correct.
@@ -82,17 +82,17 @@ Final answer check: not correct.
 
 Transcript with an earlier slip, on the same question:
 
-| # | What the student wrote | Engine says | Interpreter says | Counts toward |
-|---:|---|---|---|---|
-| 1 | `dy/dx = 10*e^(9*x+9)` | no verdict (Not checked: the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | could not verify (the question gives no single function to differentiate) | nothing |
-| 2 | `= 10*e^(9*x+9)` | no verdict (Not checked: the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | could not verify (depends on the line above, which could not be verified) | nothing |
+| # | What the student wrote | What the marked page shows | Counts toward |
+|---:|---|---|---|
+| 1 | `dy/dx = 10*e^(9*x+9)` | no verdict (Not checked: the checker cannot place this line on the way to the answer, so it is not marked right or wrong.) | nothing |
+| 2 | `= 10*e^(9*x+9)` | true line (Equal to the line above for every value of x.) | nothing |
 
 Award: **0 of 2**. Criteria earned: none.
 Final answer check: not correct.
 
 What the engine actually did: it did not name any line as wrong, so the slip showed only as lines that earned no tick.
 
-The engine did not name any later line as following from the earlier mistake. No later line was found true. The engine pays nothing for a line that follows correctly from an earlier error here: the only rule that does so is a question plan marked for error carried forward, and this type has none. Whether a later criterion should earn after an earlier error is the author's decision, not the engine's.
+The engine did not name any later line as following from the earlier mistake. Line(s) 2 were found true on their own, but they come after the first wrong line, so this draft does not count them. The engine pays nothing for a line that follows correctly from an earlier error here: the only rule that does so is a question plan marked for error carried forward, and this type has none. Whether a later criterion should earn after an earlier error is the author's decision, not the engine's.
 
 ## Review record
 
@@ -102,4 +102,4 @@ To be filled in by the author (the tutor). Leave blank until reviewed.
 - Note: 
 - Name: 
 - Date: 
-- Scheme digest: `f58e0aa8654e1cbe8a0760730c56be3459ffb874c9606969ff9f1b0d2eee6f10`
+- Scheme digest: `58f14f247f31579ba253f04c6697e6dbd71d541be8519c88e3bd58f4ed09753f`

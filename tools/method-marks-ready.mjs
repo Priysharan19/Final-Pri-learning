@@ -1,6 +1,6 @@
 // Pri Learning · are method marks safe to switch on? A measurement, not a switch.
 //
-// For each of the ten question types that have a draft scheme (tools/method-marks-drafts.mjs) this builds many pages
+// For each question type that has a scheme (server/platform/schemeAward.js; the generic rubric is measured here, the scheme in method-marks-scheme-check) this builds many pages
 // (the draft's own full / partial / zero / earlier-slip transcripts, the understanding-audit corpus transcripts, and a page
 // with one line falsified at each position), marks every page through the server's own evidence path with method marks ON
 // (markerOps.stepEvidence + practiceMarksEarned, exactly what MARKER_OPS.practice runs when `policy.methodMarks === true`;
@@ -26,22 +26,14 @@
 //   unflagged    ... and the reply would not tell the card so (no markingReport), so the card could not fix the sentence
 //   residual     ... and the card's own wording (lostMarksForPage) still contradicts the page after it ran
 //
-// The draft scheme's table (tools/method-marks-drafts.mjs: criteria decided by the interpreter) is NOT what the server's method
-// marks pay today, so it is measured against the server's mark and the page too (draft pages only):
-//   tableOff     the table would not be shown: its total is not the server's mark, or its marks possible are not the server's
-//   schemeLess   the final answer is right and the scheme's criteria add up to less than full
-//   schemeOver   a criterion of the scheme is earned on a line the page does not show as a tick
-//   schemeWrong  a criterion of the scheme is earned on a line at or after a line known to be wrong
-//
 // Deterministic: fixed seeds, no clock, no network, no model.
 import * as G from '../client/src/engine/generators/index.js';
 import { stepEvidence, marksPossibleFor, practiceMarksEarned } from '../server/platform/markerOps.js';
 import { checkAnswer } from '../client/src/engine/checker.js';
 import { transcriptsFor } from './understanding-audit/corpus.mjs';
-import { TYPES, runCase } from './method-marks-drafts.mjs';
+import { TYPES } from './method-marks-drafts.mjs';
 import { reconcileLostRows, displayOnlyCross } from '../client/src/engine/markExplanation.js';
 import { lostMarksForPage } from '../client/src/components/attemptEvidence.js';
-import { interpretAfterStepCheck, reportWithInterpretation } from '../server/platform/lineInterpreter/overlay.js';
 
 export const SEED_LIMIT = 60;
 export const TYPE_IDS = TYPES.map(t => t.id);
@@ -98,7 +90,7 @@ export async function pagesFor(type, q) {
   return pages;
 }
 
-const EMPTY = () => ({ pages: 0, withMethod: 0, creditedLines: 0, disagree: 0, afterCross: 0, over: 0, correctLess: 0, wrongPays: 0, afterBreak: 0, falseTick: 0, heldBack: 0, markingReport: 0, contradicts: 0, unflagged: 0, residual: 0, afterUnseen: 0, schemePages: 0, tableOff: 0, schemeLess: 0, schemeOver: 0, schemeWrong: 0 });
+const EMPTY = () => ({ pages: 0, withMethod: 0, creditedLines: 0, disagree: 0, afterCross: 0, over: 0, correctLess: 0, wrongPays: 0, afterBreak: 0, falseTick: 0, heldBack: 0, markingReport: 0, contradicts: 0, unflagged: 0, residual: 0, afterUnseen: 0 });
 
 /** Mark one page with method marks on and compare the marks with what the student sees. */
 export function judgePage(q, page, { reconcile = true } = {}) {
@@ -148,27 +140,6 @@ export function judgePage(q, page, { reconcile = true } = {}) {
   return out;
 }
 
-/** The draft scheme's table for one page, against the server's mark and the page the student sees (draft pages only). */
-export async function judgeScheme(type, q, page, j) {
-  const c = await runCase(type, q, page.lines);
-  const possible = type.criteria.reduce((n, k) => n + k.marks, 0);
-  // The page the student sees: the engine's report, then the interpreter's reading of the lines the engine left alone.
-  let shown = j.ev.stepReport;
-  try {
-    const li = await interpretAfterStepCheck({ question: q, working: page.lines.join('\n'), stepReport: j.ev.stepReport, env: { PRI_FEATURE_LINE_INTERPRETER: '1' } });
-    shown = reportWithInterpretation({ stepReport: j.ev.stepReport, lineInterpretation: li, working: page.lines.join('\n') }) || shown;
-  } catch { /* the engine's report stands */ }
-  const lines = shown?.lines || [];
-  const byFinal = k => type.criteria.find(x => x.key === k)?.by === 'final';
-  const earned = c.award.earned.filter(e => e.earned && !byFinal(e.key));
-  return {
-    tableOff: !(c.award.total === j.marks && possible === j.possible),
-    schemeLess: c.finalOk === true && c.award.total < possible,
-    schemeOver: earned.some(e => lines[e.line]?.status !== 'ok'),
-    schemeWrong: !c.finalOk && earned.some(e => (page.wrong || []).includes(e.line))
-  };
-}
-
 // The owner's product-rule page (23 November 2026): the first wrong step is crossed by the page, not by the topic check.
 export const OWNER_QUESTION = { id: 'owner-product-rule', answerType: 'expression', difficulty: 3, steps: [], answer: { expr: '3x^2-2x' },
   prompt: 'Use the product rule to differentiate $y = x^{2}(x - 1)$, giving your answer expanded and simplified.' };
@@ -200,10 +171,8 @@ export async function runSweep({ reconcile = true, perType = Infinity, onlyTypes
       const pages = await pagesFor(type, q);
       for (const page of pages) for (const [mode, qq] of [['asWritten', q], ['stress', asFourMarks(q)]]) {
         let j; try { j = judgePage(qq, page, { reconcile }); } catch (e) { throw new Error(`${type.id} ${page.source}: ${e.message}`); }
-        const sch = mode === 'asWritten' && page.source.startsWith('draft-') ? await judgeScheme(type, q, page, j) : null;
         for (const acc of [row[mode], total[mode]]) {
           acc.pages++;
-          if (sch) { acc.schemePages++; for (const k of ['tableOff', 'schemeLess', 'schemeOver', 'schemeWrong']) if (sch[k]) acc[k]++; }
           if (j.ev.partial) acc.withMethod++;
           acc.creditedLines += j.credited.length;
           if (j.ev.markingReport) acc.markingReport++;
@@ -229,8 +198,7 @@ export async function runSweep({ reconcile = true, perType = Infinity, onlyTypes
 }
 
 export const CATEGORIES = ['disagree', 'afterCross', 'over', 'correctLess', 'wrongPays', 'afterBreak', 'falseTick', 'contradicts', 'unflagged', 'residual', 'afterUnseen'];
-export const SCHEME = ['tableOff', 'schemeLess', 'schemeOver', 'schemeWrong'];
 export const printCounts = (label, r) => {
-  const line = (name, a) => `  ${name.padEnd(10)} pages ${String(a.pages).padStart(6)}  paying ${String(a.withMethod).padStart(5)}  credited lines ${String(a.creditedLines).padStart(5)}  ` + CATEGORIES.map(k => `${k} ${a[k]}`).join('  ') + `  heldBack ${a.heldBack}  markingReport ${a.markingReport}\n             scheme pages ${a.schemePages}  ` + SCHEME.map(k => `${k} ${a[k]}`).join('  ');
+  const line = (name, a) => `  ${name.padEnd(10)} pages ${String(a.pages).padStart(6)}  paying ${String(a.withMethod).padStart(5)}  credited lines ${String(a.creditedLines).padStart(5)}  ` + CATEGORIES.map(k => `${k} ${a[k]}`).join('  ') + `  heldBack ${a.heldBack}  markingReport ${a.markingReport}`;
   console.log(`${label}\n${line('as written', r.total.asWritten)}\n${line('4-mark', r.total.stress)}`);
 };

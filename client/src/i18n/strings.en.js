@@ -4489,6 +4489,7 @@ export default {
   "mp.criteria.result": "Result",
   "mp.criteria.awarded": {"one": "{marks} mark awarded", "other": "{marks} marks awarded"},
   "mp.criteria.notAwarded": {"one": "{marks} mark not awarded", "other": "{marks} marks not awarded"},
+  "mp.criteria.notVerified": {"one": "{marks} mark not verified: Pri could not check a line for it", "other": "{marks} marks not verified: Pri could not check a line for it"},
   "mp.criteria.onLines": {"one": "Line {list}", "other": "Lines {list}"},
   "mp.criteria.total": "Total",
   "mp.criteria.label": "Pri practice marking, approved by the author (Priysharan Tripathi, tutor). Not an official NESA guideline.",

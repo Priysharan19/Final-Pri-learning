@@ -20,6 +20,7 @@
 import { serverEdition } from './edition.js';
 import { indiaBank, BANK_OUTSIDE_INDIA } from './indiaBanks.js';
 import { indiaQuestionIdentity } from './indiaIdentity.js';
+import { APPROVED_SCHEME_TYPES, schemeTypeOf, isApproved } from './schemeAward.js';
 import { nswBank, nswIssuable, nswQuestionIdentity, BANK_OUTSIDE_NSW, NSW_COURSE } from './nswBanks.js';
 
 /** Sealed on a question whose mark is its final answer's alone, whatever the working shows. */
@@ -32,7 +33,9 @@ const POLICIES = Object.freeze({
   }),
   prithagoras: Object.freeze({
     edition: 'prithagoras', curriculum: NSW_COURSE, issues: nswBank, outside: BANK_OUTSIDE_NSW,
-    admits: nswIssuable, identityOf: nswQuestionIdentity, marking: FINAL_ANSWER_MARKING
+    admits: nswIssuable, identityOf: nswQuestionIdentity, marking: FINAL_ANSWER_MARKING,
+    // The question types the author has approved for payment by a scheme (schemeAward.js). EMPTY: every question is sealed.
+    methodSchemeTypes: APPROVED_SCHEME_TYPES
   })
 });
 
@@ -56,6 +59,12 @@ export function sealForEdition(q, banks, generator = q?._generator ?? q?.subtopi
     if (!identity) return false;
     q._curriculum = identity;
   }
-  if (banks.marking) q._marking = banks.marking;
+  if (banks.marking) {
+    // An allow-listed type, at the digest the author read, is stamped with its scheme instead of the final-answer seal.
+    // With the list empty (the repository default) this never looks at the question: every question is sealed as before.
+    const typeId = banks.methodSchemeTypes?.length ? schemeTypeOf(q, generator) : null;
+    if (typeId && isApproved(typeId, banks.methodSchemeTypes)) q._methodScheme = typeId;
+    else q._marking = banks.marking;
+  }
   return true;
 }

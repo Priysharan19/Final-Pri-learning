@@ -353,11 +353,11 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
             <thead><tr><th scope="col">{t('mp.criteria.criterion')}</th><th scope="col">{t('mp.criteria.result')}</th></tr></thead>
             <tbody>
               {table.rows.map(r => (
-                <tr key={r.key} data-mp-criterion={r.key} data-awarded={r.awarded ? 'yes' : 'no'}>
+                <tr key={r.key} data-mp-criterion={r.key} data-awarded={r.awarded ? 'yes' : r.verified ? 'no' : 'unverified'}>
                   <td><span>{r.text}</span>{r.reason ? <span className="mp-why">{r.reason}</span> : null}</td>
                   <td>
                     <Icon name={r.awarded ? 'check' : 'uncertain'} size={14} />
-                    <span>{r.awarded ? t('mp.criteria.awarded', { marks: r.marks, count: r.marks }) : t('mp.criteria.notAwarded', { marks: r.marks, count: r.marks })}</span>
+                    <span>{r.awarded ? t('mp.criteria.awarded', { marks: r.marks, count: r.marks }) : t(r.verified ? 'mp.criteria.notAwarded' : 'mp.criteria.notVerified', { marks: r.marks, count: r.marks })}</span>
                     {r.lines.length > 0 && <span className="mp-why">{t('mp.criteria.onLines', { count: r.lines.length, list: listOf(r.lines) })}</span>}
                   </td>
                 </tr>

@@ -4537,6 +4537,7 @@ export default {
   "mp.criteria.result": "परिणाम",
   "mp.criteria.awarded": {"one": "{marks} अंक मिला", "other": "{marks} अंक मिले"},
   "mp.criteria.notAwarded": {"one": "{marks} अंक नहीं मिला", "other": "{marks} अंक नहीं मिले"},
+  "mp.criteria.notVerified": {"one": "{marks} अंक सत्यापित नहीं: Pri इसके लिए कोई पंक्ति जाँच नहीं सका", "other": "{marks} अंक सत्यापित नहीं: Pri इसके लिए कोई पंक्ति जाँच नहीं सका"},
   "mp.criteria.onLines": {"one": "पंक्ति {list}", "other": "पंक्तियाँ {list}"},
   "mp.criteria.total": "कुल",
   "mp.criteria.label": "Pri का अभ्यास-अंकन, लेखक (प्रियशरण त्रिपाठी, ट्यूटर) द्वारा अनुमोदित। यह NESA का आधिकारिक दिशानिर्देश नहीं है।",

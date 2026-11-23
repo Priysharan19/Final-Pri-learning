@@ -39,6 +39,7 @@ import { loadAllBanks, loadBanksFor, generateQuestion } from '../../client/src/e
 import { stepMetaFor, marksPossibleFor, practiceMarksEarned } from './markerOps.js';
 import { LINE_CHECKS_PER_QUESTION, LINE_CHECK_WINDOW_MS, lineCheckFeatureEnabled, tutorDailyLimit } from './tutor.js';
 import { markRowsFor } from './markRows.js';
+import { schemePay } from './schemeAward.js';
 import {
   markerPool, markerCooldownUntil, recordMarkerKills, sendMarkerCooldown, sendMarkerBusy,
   MARKING_TOO_COMPLEX, MARKING_BUSY, TOO_COMPLEX_MESSAGE, WORKING_NOT_READ_NOTE
@@ -1626,15 +1627,21 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // try's trap whatever this answer was, so a misconception shown on the
       // first try is not lost when the second try is right.
       const trapWhy = !resolved || result.correct ? null : ownTrap || deferredTrap;
+      // A question of an approved type is paid by its signed scheme (schemeAward.js), from the very report this reply shows.
+      // Anything else (no scheme, not approved, switch off, criteria not the question's marks) is marked exactly as before.
+      const shownReport = invalid ? null : reportWithInterpretation({ stepReport, lineInterpretation, working });
+      const scheme = resolved && !invalid && !finalAnswerOnly && q._methodScheme
+        ? schemePay({ q, report: shownReport, topic: counted?.topicTicks ?? null, correct: result.correct === true, marksPossible, env }) : null;
+      const markedPartial = scheme?.paid && !result.correct ? scheme.partial : partial;
       // Blank final answers are not automatically attempts: verified positive
       // method evidence alone makes an otherwise blank response gradable.
       // Unreadable working or an invalid NONBLANK answer still cannot earn
       // marks. This prevents rewarding a mere copy of the question.
-      const workingOnlyCredit = workingOnly && Number.isInteger(partial?.awarded) && partial.awarded > 0;
+      const workingOnlyCredit = workingOnly && Number.isInteger(markedPartial?.awarded) && markedPartial.awarded > 0;
       // A question carrying the Board's scheme is marked by it whether the
       // answer is right or wrong (markerOps.practiceMarksEarned).
-      const marksEarned = invalid ? 0 : practiceMarksEarned(q, result, resolved ? counted : null, marksPossible);
-      const said = !resolved ? feedback : workingOnlyCredit ? partial.note : workingOnly ? (partial?.note || 'There is no final answer here, and this working does not earn a mark.') : feedback;
+      const marksEarned = invalid ? 0 : practiceMarksEarned(q, result, resolved ? (scheme?.paid && !result.correct ? { ...counted, partial: markedPartial } : counted) : null, marksPossible);
+      const said = !resolved ? feedback : workingOnlyCredit ? markedPartial.note : workingOnly ? (markedPartial?.note || 'There is no final answer here, and this working does not earn a mark.') : feedback;
       const attemptId = randomUUID();
       // The hint ladder's charge, from the level committed under this lock.
       // `marksEarned` stays the deterministic engine's mark; `creditedMarks`
@@ -1674,7 +1681,10 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         // line-by-line verdicts either: they would be a free answer oracle.
         // What the marked page draws: the engine's report with the interpreter's line verdicts folded in (feedback only;
         // `partial` and every mark above were computed from the engine's report alone).
-        stepReport: invalid ? null : reportWithInterpretation({ stepReport, lineInterpretation, working }), partial: invalid ? null : partial,
+        stepReport: shownReport, partial: invalid ? null : markedPartial,
+        // The signed scheme's criteria, each tied to the lines of the report above that earned it; only when the scheme paid.
+        ...(scheme?.paid ? { methodCriteria: { typeId: scheme.typeId, digest: scheme.digest, items: scheme.items } } : {}),
+        ...(scheme ? { methodScheme: scheme.paid ? { typeId: scheme.typeId, paid: true } : { typeId: scheme.typeId ?? null, paid: false, reason: scheme.reason } } : {}),
         // The report that decided `partial`, only when the displayed one differs (markerOps.stepEvidence): stored with the reply.
         ...(resolved && !invalid && markingReport ? { markingReport } : {}),
         ...(resolved && !invalid && lineInterpretation ? { lineInterpretation } : {}), ...(resolved ? {
@@ -1683,7 +1693,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
           ...(!invalid ? { markRows: finalAnswerRows(q, markRowsFor(q, {
             marksEarned, marksPossible, creditedMarks, attemptId, submissionId,
             correct: result.correct === true,
-            partial, workingNotRead: notRead, resolved
+            partial: markedPartial, workingNotRead: notRead, resolved
           })) } : {}),
           // Only a committed resolution may disclose opportunity explanations.
           // Their ontology identity is derived by the client from these

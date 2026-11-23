@@ -6,7 +6,7 @@
 // test process only; PRI_METHOD_MARKS is neither read nor set, and no deployed environment is touched. The sweep is
 // tools/method-marks-ready.mjs; it prints its counts before and after the reconciliation (engine/markExplanation.js).
 //
-//   1. the sweep, ten question types with a draft scheme, every difficulty, seeds 1..60, draft + corpus + falsified pages,
+//   1. the sweep, the question types with a scheme, every difficulty, seeds 1..60, draft + corpus + falsified pages,
 //      as written and as a four-mark copy: zero over-marking, zero credit on a crossed or after-mistake line, zero wrong
 //      line paid, zero false tick, zero correct answers below full marks, and no reason for a mark that contradicts the page
 //   2. the join, in isolation (constrainToShown, unsupportedCredit, reconcileLostRows)
@@ -38,10 +38,10 @@ const after = await R.runSweep({ reconcile: true });
 R.printCounts('BEFORE (no reconciliation: the card of the day before)', before);
 R.printCounts('AFTER', after);
 const A = after.total, B = before.total;
-ok(A.asWritten.pages === B.asWritten.pages && A.asWritten.pages >= 2500, `${A.asWritten.pages} pages as written over ${R.TYPE_IDS.length} types`);
-ok(R.TYPE_IDS.length === 10 && Object.keys(after.byType).length === 11, 'ten types with a draft scheme, and the first-wrong-step pages');
+ok(A.asWritten.pages === B.asWritten.pages && A.asWritten.pages >= 1800, `${A.asWritten.pages} pages as written over ${R.TYPE_IDS.length} types`);
+ok(R.TYPE_IDS.length === 7 && Object.keys(after.byType).length === 8, 'seven types with a scheme, and the first-wrong-step pages');
 ok(A.asWritten.withMethod === B.asWritten.withMethod && A.stress.withMethod === B.stress.withMethod, 'the reconciliation changes no page that pays a method mark');
-ok(A.stress.creditedLines >= 100, `the four-mark copy exercises the payment path: ${A.stress.creditedLines} credited lines`);
+ok(A.stress.creditedLines >= 60, `the four-mark copy exercises the payment path: ${A.stress.creditedLines} credited lines`);
 for (const mode of ['asWritten', 'stress']) for (const k of ['disagree', 'afterCross', 'over', 'correctLess', 'wrongPays', 'afterBreak', 'falseTick', 'unflagged', 'residual']) {
   ok(A[mode][k] === 0, `${mode}: ${k} = ${A[mode][k]} (must be 0)`);
 }
@@ -52,9 +52,6 @@ ok(B.asWritten.residual === B.asWritten.contradicts && B.stress.residual === B.s
 ok(B.stress.afterUnseen === A.stress.afterUnseen && A.stress.afterUnseen > 0, `a wrong line the engine cannot judge, shown as a note, with a mark paid below it: ${A.stress.afterUnseen} four-mark pages (said, not hidden)`);
 // Every page whose reasons contradict the page keeps the report that decided the marks beside the displayed one.
 ok(A.asWritten.markingReport >= A.asWritten.contradicts && A.stress.markingReport >= A.stress.contradicts, `markingReport kept on ${A.asWritten.markingReport} / ${A.stress.markingReport} pages`);
-// The draft scheme's table is not what the server pays: counted, so it cannot be assumed.
-ok(A.asWritten.schemePages > 1000 && A.asWritten.tableOff > 0, `the draft scheme's table would be hidden on ${A.asWritten.tableOff} of ${A.asWritten.schemePages} draft pages (its total is not the server's mark)`);
-console.log(`  draft table: tableOff ${A.asWritten.tableOff}, correct answer below full ${A.asWritten.schemeLess}, criterion on an unticked line ${A.asWritten.schemeOver}, criterion on a wrong line ${A.asWritten.schemeWrong} of ${A.asWritten.schemePages} draft pages`);
 for (const [id, row] of Object.entries(after.byType)) ok(row.questions > 0, `${id}: ${row.questions} questions`);
 
 // ── 2. the join ───────────────────────────────────────────────────────────────────────────────────────────────────
@@ -154,9 +151,8 @@ const page = (lines, wrongFrom = null) => ({ source: 'fixture', lines, wrongFrom
   // The wrong line is never a plain tick, wherever it falls in the sweep.
   ok(A.asWritten.falseTick === 0 && A.stress.falseTick === 0, 'no wrong line is ticked in the sweep');
 }
-// An equation question: after the first mistake of the report that decided the marks, nothing earns (the sweep's afterBreak is 0 on
-// every type, including the equation type of stationary points).
-ok(after.byType['y12-stationary-x'].stress.afterBreak === 0 && after.byType['y12-stationary-x'].stress.pages > 50, `stationary points: ${after.byType["y12-stationary-x"].stress.pages} pages, nothing earned after a mistake`);
+// Error carried forward on every type: after the first mistake of the report that decided the marks, nothing earns.
+for (const [id, row] of Object.entries(after.byType)) ok(row.stress.afterBreak === 0 && row.asWritten.afterBreak === 0, `${id}: nothing earned after a mistake`);
 
 // ── 5. wording ────────────────────────────────────────────────────────────────────────────────────────────────────
 for (const k of ['marks.lost.tickedNotCounted', 'marks.lost.crossedNoMark']) {
