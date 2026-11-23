@@ -146,6 +146,14 @@ function markingReportOf(report) {
   return out;
 }
 
+/** Positions (in the non-blank lines) that follow a blank line: the student left a gap, so the line after it is not a continuation of the one before it. */
+function blankGaps(steps) {
+  if (typeof steps !== 'string') return [];
+  const out = []; let kept = 0, blank = false;
+  for (const raw of steps.split('\n')) { if (!raw.trim()) { blank = kept > 0; continue; } if (blank) out.push(kept); blank = false; kept++; }
+  return out;
+}
+
 export function stepEvidence(q, answer, steps, result, opts = null) {
   const meta = stepMetaFor(q);
   let report = result.stepReport || null;
@@ -236,7 +244,7 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
     // Feedback only, after solutionMatch: chains, integrals, vectors and a slip warning (engine/lineChains.js). Never a mark, never a cross.
     try {
       const base2 = report || trueAsWritten(q, steps, opts);
-      const more = base2 && !(opts && opts.fold === false) ? lineChains(q, base2, { warn: !!(opts && opts.slipWarnings === true) }) : null;
+      const more = base2 && !(opts && opts.fold === false) ? lineChains(q, base2, { warn: !!(opts && opts.slipWarnings === true), gaps: [...(opts && Array.isArray(opts.gaps) ? opts.gaps : []), ...blankGaps(steps)] }) : null;
       if (more && (more.matched > 0 || more.warned > 0)) report = more.report;
     } catch { /* the report stands */ }
   }
@@ -443,6 +451,15 @@ export function tutorEvidence(q, lines) {
     if (typeof code === 'string' && /^[a-z0-9._:-]{1,80}$/i.test(code)) evidence.misconception = code;
     const at = judged.findIndex(line => line?.status === 'break');
     if (at >= 0 && at < lines.length) evidence.firstBreak = at;
+    // The topic check places no break on a page of rewrites it cannot tie to the answer. The displayed report may still cross a line that
+    // is provably not equal to the line above (engine/falseStep.js); that cross is the first break the diagnosis names. Never a mark.
+    else if (at < 0) {
+      try {
+        const shown = stepEvidence(q, '', lines.join('\n'), { correct: false }, { slipWarnings: true }).stepReport;
+        const cross = Array.isArray(shown?.lines) ? shown.lines.findIndex(line => line?.status === 'break' && line?.diagnosis?.code === 'false-continuation') : -1;
+        if (cross >= 0 && cross < lines.length) evidence.firstBreak = cross;
+      } catch { /* the checker's silence is not evidence */ }
+    }
     while (evidence.verifiedLines < judged.length && evidence.verifiedLines < lines.length &&
       judged[evidence.verifiedLines]?.status === 'ok') evidence.verifiedLines += 1;
   } catch { /* the checker's silence is not evidence */ }
@@ -521,12 +538,12 @@ export const MARKER_OPS = Object.freeze({
    * under its transaction and asks again if it turns out to need evidence that
    * was not computed. Blank working costs nothing, so it is always "computed".
    */
-  practice({ q, answer, working, workingLatex, evidenceIfWrong, policy }, emit) {
+  practice({ q, answer, working, workingLatex, workingGaps, evidenceIfWrong, policy }, emit) {
     const result = sketchReport(q, answer, checkAnswer(q, answer));
     emit({ result });
     const wanted = result.correct || evidenceIfWrong || !String(working || '').trim();
     if (!wanted) return { result, evidence: null };
-    const evidence = stepEvidence(q, answer, working, result, { slipWarnings: true, ...(Array.isArray(workingLatex) ? { latex: workingLatex } : {}) });
+    const evidence = stepEvidence(q, answer, working, result, { slipWarnings: true, ...(Array.isArray(workingGaps) ? { gaps: workingGaps } : {}), ...(Array.isArray(workingLatex) ? { latex: workingLatex } : {}) });
     // Final answer only: the step report stays, the method mark does not.
     return { result, evidence: policyOf({ policy }).methodMarks ? evidence : { stepReport: evidence.stepReport, partial: null, ...(evidence.board ? { board: evidence.board } : {}) } };
   },

@@ -849,6 +849,7 @@ function pageDefinitionsOnce(raw, out, firstBreak, prep, degreePrimed, tickOnly,
   let carry = null;           // { text, variable }: what the last line this pass ticked came to, for the `=` line below
   let pendingGlue = null;
   let zeroed = null;          // { line, expr, variable }: `y' = 0` was stated straight after a derivative the page set
+  let chain = null;           // { name, value, line }: the quantity the line above named and what it came to (see "A named quantity")
   const limit = firstBreak === -1 ? raw.length : firstBreak;
   for (let i = 0; i < Math.min(limit, LIMITS.lines); i++) {
     if (raw[i].length > LIMITS.chars) continue;
@@ -900,6 +901,38 @@ function pageDefinitionsOnce(raw, out, firstBreak, prep, degreePrimed, tickOnly,
       if (area && areaLineHolds(area[1], prep)) line = 'This integral is the area bounded by the curve and the x-axis.';
       if (line) { out[i] = { text: out[i].text, status: 'ok', state: 'arithmetic', note: line, valueChain: { rule: 'question-given' } }; carry = null; continue; }
     }
+    // A named quantity carried down the page (`A = 8000(1.05)^3`, `A = 8000(1.157625)`, `A = 9261`; `Interest = A - P`, `= 9261 - 8000`,
+    // `1261`). A line that names the same quantity as the line straight above (or continues it with `=`, or is the bare value) is TICKED
+    // when its value is the value the line above came to. TICK ONLY: a line that differs is left a note (never crossed, and it does not
+    // become the value the next line is held to), and the line that starts a chain is a note (it is a definition or a first step).
+    {
+      const s = src.replace(/\s*\.\s*$/, '').replace(/[−–—]/g, '-').replace(/[×·]/g, '*').replace(/÷/g, '/').trim();
+      const above = chain && chain.line === i - 1 ? chain : null;
+      chain = null;
+      let parsed = null;
+      if (!/[<>≤≥≠≈~%°,;:']|==|!=|∫|\]_|√\s*\[/.test(s)) {
+        const named = /^([A-Za-z]{1,14})\s*=\s*(\S.*)$/.exec(s), cont = /^=\s*(\S.*)$/.exec(s);
+        if (named && !KEEP.test(named[1])) parsed = { name: named[1], parts: named[2].split('=').map(x => x.trim()) };
+        else if (cont) parsed = { name: null, parts: cont[1].split('=').map(x => x.trim()) };
+        else if (/^-?\d+(?:\.\d+)?$/.test(s)) parsed = { name: null, parts: [s], bare: true };
+      }
+      if (parsed && parsed.parts.every(Boolean)) {
+        const vals = parsed.parts.map(p => { const put = putIn(cleanStatement(p), defs, null); return put ? numberOf(put.text) : null; });
+        if (vals.every(v => v !== null) && vals.every(v => close(v, vals[0]))) {
+          const v = vals[0];
+          const linked = above && (parsed.name === null || parsed.name === above.name || /^(?:ans|answer)$/i.test(parsed.name));
+          if (linked) {
+            if (close(v, above.value)) {
+              chain = { name: above.name, value: above.value, line: i };
+              if (out[i].status === 'note') out[i] = { text: out[i].text, status: 'ok', state: 'arithmetic', note: `This comes to the same value as the line above: ${shown(v)}.`, valueChain: { rule: 'page-definitions' } };
+            }
+          } else if (parsed.name) {
+            chain = { name: parsed.name, value: v, line: i };
+            if (parsed.parts.length >= 2 && out[i].status === 'note') out[i] = { text: out[i].text, status: 'ok', state: 'arithmetic', note: `Each side comes to ${shown(v)}.`, valueChain: { rule: 'page-definitions' } };
+          }
+        }
+      }
+    }
     if (/[<>≤≥≠≈%°,;:]|==|!=|√\s*\[|∫|\]_/.test(src)) continue;
     const decimal = /\d\.\d|(?:^|[^\d])\.\d/.test(src);
     const ticks = [], facts = [];
@@ -929,7 +962,7 @@ function pageDefinitionsOnce(raw, out, firstBreak, prep, degreePrimed, tickOnly,
       const text = cleanStatement(stmt);
       const parts = text.split('=').map(x => x.trim());
       if (parts.length < 2 || parts.some(x => !x)) return;
-      const head = parts[0];
+      const head = parts[0].replace(/^(?:then\s+)?(?:(?:let|take|put|set)\s+)?/i, '');
       // The derivative the page set, put equal to zero (`0 = 6x^2 + 18x` after `y' = 6x^2 + 18x` and `y' = 0`): true as written, never crossed.
       if (zeroFor && parts.length === 2 && (parts[0] === '0' || parts[1] === '0')) {
         const side = parts[0] === '0' ? parts[1] : parts[0];
@@ -1055,6 +1088,10 @@ function pageDefinitionsOnce(raw, out, firstBreak, prep, degreePrimed, tickOnly,
       // A statement about the unknown of the equation before it that this pass could not tick (`x = 3`, `2x = 5` after
       // `2x = 4`) is not a premise: it may be false, so the line is not ticked (independent review, rounds 2 and 3).
       if (sides.length >= 2 && equationBefore && sides.some(x => lettersOf(x).includes(equationBefore.variable))) { verdicts.push('bad'); continue; }
+      // A claim about a DERIVED quantity of a symbol the page defined (`u' = 3x`, `v' = cos x`, `f'(x) = ...`, `y'' = ...`) that this pass did not tick is
+      // never a premise: it may be false (review of 23 November 2026), so the line is not ticked. It ticks only when verified above.
+      { const dc = /(?:^|\s)([A-Za-z])'{1,2}(?:\(\s*[a-z]\s*\))?$/.exec(sides[0]) || /(?:^|\s)d{1,2}([a-z])\s*\/\s*d[a-z]\^?2?$/.exec(sides[0]);
+        if (dc && sides.length >= 2 && (defs[dc[1]] || raw.slice(0, i).some(l0 => new RegExp(`(?<![A-Za-z'])${dc[1]}\\s*=`).test(l0)))) { verdicts.push('bad'); continue; } }
       const plain = sides.length >= 2 && sides.every(x => x && !lettersOf(x).length);
       const values = plain ? sides.map(numberOf) : [];
       verdicts.push(plain && !(values.every(v => v !== null) && values.every(v => close(v, values[0]))) ? 'bad' : 'premise');
@@ -1200,8 +1237,25 @@ function withTexReading(workingText, base, pairs, prep = null) {
 //     a longer word) and before `=` or `(` is a prime. `30°` and `sin 30° = 1/2` are untouched;
 //   · `integral_2^4` is ∫_2^4, and a space after the underscore of a limit (`]_ -2^4`) is not part of the limit.
 const DEGREE_FOR_PRIME = /(?<![A-Za-z0-9])[A-Za-z]°(?=\s*[=(])/;
+// Money as it is written on a typeset or printed page: `$9261`, `A$9,261`, `1,261` and a gloss in brackets at the end of a definition
+// (`P = 8000 (principal)`). The line shown stays as written; only the reading drops the currency sign, the thousands commas (a comma
+// with exactly three digits after it, not in front of a bracket, so a point (2,100) is not read as 2100) and a trailing bracketed
+// gloss of two or more plain words (not a function name, never a lone letter such as (x)).
+const GLOSS_WORDS = new Set(('principal interest rate annual number of years year months month total amount value cost price deposit balance new old initial final given approx approximately units unit per the an in at to for and or compound simple payment payments loan investment profit loss time period term length width height area volume mass weight speed distance population sales discount tax fee rent').split(' '));
+// Closed rule: a trailing bracket is a gloss only when EVERY token inside is a word of GLOSS_WORDS (no letters on their own, digits, operators or
+// function names) and at least one of them has 5 or more letters (a bracket of short words, (in) (of) (the), reads as a product of letters); anything else, such as (abc), (xy), (sin x) or (new x), stays in the line as maths and the line is not checkable.
+function dropGloss(s) {
+  const m = /\s+\(([A-Za-z]+(?:\s+[A-Za-z]+)*)\)\s*$/.exec(s);
+  const words = m ? m[1].toLowerCase().split(/\s+/) : [];
+  return m && words.every(w => GLOSS_WORDS.has(w)) && words.some(w => w.length >= 5) ? s.slice(0, m.index) : s;
+}
+function moneyReading(s) {
+  return dropGloss(s)
+    .replace(/(?<![A-Za-z])(?:A|AU|AUD)?\\?\$\s*(?=\d)/g, '')
+    .replace(/(?<![\d.,(\[;])\d{1,3}(?:,\d{3})+(?:\.\d+)?(?![\d,])/g, m => m.replace(/,/g, ''));
+}
 function normaliseInk(line) {
-  return String(line)
+  return moneyReading(String(line))
     .replace(/(?<=[A-Za-z)])\s*(?:″|′′|’’|ʹʹ|´´)/g, "''")
     .replace(/(?<=[A-Za-z)])[′’ʹ´]/g, "'")
     .replace(/(?<![A-Za-z0-9])([A-Za-z])°(?=\s*[=(])/g, "$1'")

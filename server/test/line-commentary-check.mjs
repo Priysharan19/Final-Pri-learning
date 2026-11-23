@@ -20,12 +20,14 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { SEEDS, loadFamilies, questionsFor, transcriptsFor } from '../../tools/understanding-audit/corpus.mjs';
 import { stepEvidence, stepMetaFor } from '../platform/markerOps.js';
 import { buildAnnotatedWorking } from '../../client/src/components/annotatedWorkingModel.js';
-import { commentFor, CATALOGUE, POSITIVE_KINDS, EQUALITY_KINDS, CROSS_KINDS, TEMPLATE_KINDS, variantsOf } from '../../client/src/engine/lineCommentary.js';
+import { commentFor, CATALOGUE, HOW_KINDS, POSITIVE_KINDS, EQUALITY_KINDS, CROSS_KINDS, TEMPLATE_KINDS, variantsOf } from '../../client/src/engine/lineCommentary.js';
 import { exactForm } from '../../client/src/engine/arithmeticLines.js';
+import { stepHow } from '../../client/src/engine/falseStep.js';
 import { mathSpan, plainComment } from '../../client/src/engine/commentTex.js';
 import { chainDiagnosis } from '../../client/src/engine/reason-chain.js';
 import { normalize, parse } from '../../client/src/engine/expr.js';
 import * as G from '../../client/src/engine/generators/index.js';
+const SYMBOLIC_KINDS = ['crossTerms', 'crossExact', 'crossExample'];
 
 let pass = 0; const failures = [];
 const ok = (c, l) => { if (c) pass++; else failures.push(l); };
@@ -41,7 +43,7 @@ const NEGATIVE = /\b(wrong|incorrect|mistake|error|slip|not|but|false|invalid)\b
 // ── 1. generated pages ───────────────────────────────────────────────────────────────────────────────
 await G.loadAllBanks();
 const families = await loadFamilies();
-let pages = 0, comments = 0, valueOnlyTicks = 0, valueOnlyComments = 0, sidesCrosses = 0, sidesComments = 0; const perKind = {}; const familiesWith = new Set(); const problems = [];
+let howRecomputed = 0; let pages = 0, comments = 0, valueOnlyTicks = 0, valueOnlyComments = 0, sidesCrosses = 0, sidesComments = 0; const perKind = {}; const familiesWith = new Set(); const problems = [];
 const spansOf = t => [...String(t).matchAll(/\$[^$]+\$/g)].map(m => m[0]);
 for (const id of families) {
   for (const q of questionsFor(id, SEEDS)) {
@@ -76,10 +78,19 @@ for (const id of families) {
           if (NEGATIVE.test(c.text.replace(/\$[^$]*\$/g, ' '))) problems.push(`tick with a negative word: ${tag}`);
           if (line.status !== 'ok') problems.push(`positive comment on a line the engine did not tick: ${tag}`);
         }
-        if (card.valueChain === 'arithmetic' && !EQUALITY_KINDS.includes(c.kind)) problems.push(`arithmetic tick with a non-equality template: ${tag}`);
+        // a how-comment (what the line DID) is recomputed from the line and the line above, here, independently of the card: it holds term by term
+        if (HOW_KINDS.includes(c.kind) && ['howExpanded', 'howCollected', 'howOne', 'howEqualAbove'].includes(c.kind)) {
+          const upText = String(report.lines[i - 1]?.text ?? ''), side = upText.split('=').pop(), mine = String(line.text).replace(/^\s*=\s*/, '');
+          const again = i > 0 ? stepHow(side, mine) : null;
+          const want = { howExpanded: 'expanded', howCollected: 'collected', howOne: 'one', howEqualAbove: 'equal-above' }[c.kind];
+          if (!again || again.kind !== want) problems.push(`how-comment not recomputed (${want}): ${tag}`);
+          howRecomputed += 1;
+        }
+        if (card.valueChain === 'arithmetic' && !EQUALITY_KINDS.includes(c.kind) && !HOW_KINDS.includes(c.kind)) problems.push(`arithmetic tick with a non-equality template: ${tag}`);
         if (EQUALITY_KINDS.includes(c.kind) && card.valueChain !== 'arithmetic') problems.push(`equality template on a non-arithmetic line: ${tag}`);
         // maths comes only from the line's structured facts
         const allowed = new Set();
+        if (HOW_KINDS.includes(c.kind) && card.how) { for (const it of card.how.items || []) { allowed.add('$' + String(it.nameTex ?? '') + ' = ' + String(it.exprTex ?? '') + '$'); } }
         if (c.kind === 'bothSides' || c.kind === 'equalsAbove') allowed.add(line.fact.tex !== undefined ? '$' + line.fact.tex + '$' : tex(line.fact.value));
         if (card.status === 'first-error' && line.diagnosis?.expectedFrom === 'sides') sidesCrosses += 1;
         if (c.kind === 'crossComputed' || c.kind === 'crossSidesDiffer') {
@@ -91,15 +102,21 @@ for (const id of families) {
           if (c.kind === 'crossSidesDiffer' && !(sd.count === 2 && !sd.left.bare && !sd.right.bare)) problems.push(`crossSidesDiffer not on two computed sides: ${tag}`);
         }
         if (c.kind === 'stepValue') allowed.add('$' + line.fact.tex + '$');
+        if (card.how && ['howExpanded', 'howCollected', 'howDerivatives'].includes(c.kind)) for (const it of [...(card.how.items || []), ...(card.how.groups || [])]) { const sp = (it.fromText ? '$' + (mathSpan(it.fromText).slice(1, -1)) + ' = ' + it.toTex + '$' : it.fromTex ? '$' + it.fromTex + ' = ' + it.toTex + '$' : '$' + it.nameTex + ' = ' + it.exprTex + '$'); allowed.add(sp); }
+        if (c.kind === 'howOne') allowed.add('$1$');
+        if (c.kind === 'howFactors') for (const n of line.fact.names) allowed.add('$' + n + '$');
+        if (c.kind === 'howSubstituted') for (const n of card.how.names) { allowed.add('$' + n + '$'); allowed.add('$' + n + "'$"); }
         const dE = line.diagnosis?.expectedTex !== undefined ? '$' + line.diagnosis.expectedTex + '$' : line.diagnosis?.expected !== undefined ? tex(line.diagnosis.expected) : null;
         const dW = line.diagnosis?.writtenTex !== undefined ? '$' + line.diagnosis.writtenTex + '$' : line.diagnosis?.written !== undefined ? tex(line.diagnosis.written) : null;
-        if (CROSS_KINDS.includes(c.kind) && c.kind !== 'crossComputed' && c.kind !== 'crossSidesDiffer') { allowed.add(dE); allowed.add(dW); }
+        if (CROSS_KINDS.includes(c.kind) && !SYMBOLIC_KINDS.includes(c.kind) && c.kind !== 'crossComputed' && c.kind !== 'crossSidesDiffer') { allowed.add(dE); allowed.add(dW); }
+        // a false continuation: every span is a TeX string the engine produced (falseStep.js), nothing else
+        if (SYMBOLIC_KINDS.includes(c.kind)) { const d = line.diagnosis; for (const x of [d.aboveTex, d.writtenTex, d.correctedTex && '= ' + d.correctedTex, ...(d.changed || []).flatMap(t => [t.fromTex, t.toTex]), ...(d.same || [])]) if (x) allowed.add('$' + x + '$'); if (d.example) { allowed.add('$' + d.example.at.map(a => a.v + ' = ' + a.value).join(', ') + '$'); } }
         if (c.kind === 'ruleResult') { const rhs = mathSpan(String(line.text).split(/(?<![<>!=≤≥≠])=(?!=)/).pop().trim()); allowed.add(rhs); }
         const heading = c.kind === 'stepHeading' ? String(line.fact?.heading ?? '') : '';
         const sp = spansOf(heading ? c.text.replace(heading.replace(/\s+/g, ' ').trim().replace(/\.$/, ''), ' ') : c.text);
         for (const s of sp) if (!allowed.has(s)) problems.push(`maths span not from the line's facts (${s}): ${tag}`);
         // orientation: expected before written, and each is the engine's own
-        if (CROSS_KINDS.includes(c.kind) && c.kind !== 'crossComputed' && c.kind !== 'crossSidesDiffer') {
+        if (CROSS_KINDS.includes(c.kind) && !SYMBOLIC_KINDS.includes(c.kind) && c.kind !== 'crossComputed' && c.kind !== 'crossSidesDiffer') {
           const e = dE, w = dW;
           if (!(c.text.indexOf(e) >= 0 && c.text.indexOf(w) > c.text.indexOf(e))) problems.push(`expected/written swapped or missing: ${tag}`);
         }
@@ -224,10 +241,21 @@ const SAMPLE = {
   equalsAbove: { n: 2, status: 'checked', valueChain: 'arithmetic', text: '=7', fact: { kind: 'equals-line-above', value: 7 } },
   crossAbove: { n: 3, status: 'first-error', text: 'x', diagnosis: { expected: 5, written: 7, expectedFrom: 'line-above' } },
   crossComputed: sd(S('10 - 6', '4', false), S('14', '14', true)),
-  crossSidesDiffer: sd(S('3*4', '12', false), S('5*2', '10', false))
+  crossSidesDiffer: sd(S('3*4', '12', false), S('5*2', '10', false)),
+  howFactors: { n: 2, status: 'checked', valueChain: 'given', text: 'Let u = x and v = x', fact: { kind: 'factors-of-question', names: ['u', 'v'] } },
+  howRule: { n: 2, status: 'checked', valueChain: 'verified', text: "dy/dx = u'v + uv'", fact: { kind: 'rule-statement', rule: 'product-rule' } },
+  howDerivatives: { n: 2, status: 'checked', valueChain: 'arithmetic', text: "u' = 2x", how: { kind: 'derivatives', items: [{ nameTex: "u'", exprTex: '2x' }] } },
+  howSubstituted: { n: 2, status: 'checked', valueChain: 'verified', text: '= 2x(x - 1)', how: { kind: 'substituted', names: ['u', 'v'] } },
+  howOne: { n: 2, status: 'checked', valueChain: 'verified', text: '= x', how: { kind: 'one' } },
+  howExpanded: { n: 2, status: 'checked', valueChain: 'verified', text: '= 2x^2 - 2x', how: { kind: 'expanded', items: [{ fromText: '2x(x - 1)', toTex: '2x^2 - 2x' }] } },
+  howCollected: { n: 2, status: 'checked', valueChain: 'verified', text: '= 3x^2', how: { kind: 'collected', groups: [{ fromTex: '2x^2 + x^2', toTex: '3x^2' }] } },
+  howEqualAbove: { n: 2, status: 'checked', valueChain: 'verified', text: '= x', how: { kind: 'equal-above' } },
+  crossTerms: { n: 3, status: 'first-error', text: '= 3x^2 - x', diagnosis: { expectedFrom: 'symbolic', exact: true, aboveTex: '3x^2 - 2x', writtenTex: '3x^2 - x', correctedTex: '3x^2 - 2x', changed: [{ fromTex: '-2x', toTex: '-x' }], same: ['3x^2'] } },
+  crossExact: { n: 3, status: 'first-error', text: '= x', diagnosis: { expectedFrom: 'symbolic', exact: true, aboveTex: '3x^2 - 2x', writtenTex: 'x', correctedTex: '3x^2 - 2x', changed: [], same: [] } },
+  crossExample: { n: 3, status: 'first-error', text: '= sin x', diagnosis: { expectedFrom: 'symbolic', exact: false, example: { at: [{ v: 'x', value: 0.37 }], above: -0.3293, written: 0.0407 } } }
 };
 ok(TEMPLATE_KINDS.every(k => SAMPLE[k]) && [...POSITIVE_KINDS, ...EQUALITY_KINDS, ...CROSS_KINDS].length === TEMPLATE_KINDS.length, 'every template kind has a polarity and a sample');
-const ENGLISH_ONLY = new Set(['stepValue', 'crossComputed', 'crossSidesDiffer']);
+const ENGLISH_ONLY = new Set([...HOW_KINDS, 'stepValue', 'crossComputed', 'crossSidesDiffer', 'crossTerms', 'crossExact', 'crossExample']);
 for (const k of TEMPLATE_KINDS) {
   for (const lang of ['en', 'hi']) { if (lang === 'hi' && (ENGLISH_ONLY.has(k) || k === 'stepHeading')) { ok((k === 'stepHeading' || !variantsOf(k, 'hi').length) && commentFor({ ...SAMPLE[k], n: 1 }, { language: 'hi', ruleLabel: r => r.rule }) === null, `template ${k}: nothing in Hindi (English only, or never embeds the English heading)`); continue; } for (let n = 1; n < 40; n += 1) {
     const c = commentFor({ ...SAMPLE[k], n }, { language: lang, ruleLabel: r => (lang === 'hi' ? 'नियम' : 'Rule') + ' ' + r.rule });
@@ -245,6 +273,16 @@ const q = G.generateQuestion('y12-integration', 3, 4);
 const rep = stepEvidence(q, '64/3', ['y = 2x(4-x)', 'Area = ∫_0^4 2x(4-x) dx', '= 2∫_0^4 4x-x^2 dx', '= 2[4x^2/2 - x^3/3]_0^4'].join('\n'), { correct: false }).stepReport;
 ok(rep.lines.every(l => ['ok', 'break', 'note'].includes(l.status)) && JSON.stringify(rep.lines.map(l => l.status)) === JSON.stringify(rep.lines.map(l => { const c = { ...l }; for (const k of STRIP) delete c[k]; return c.status; })), 'removing the structured facts changes no status');
 void stepMetaFor; void plainComment;
+
+// ── 5b. the derivative comment's maths comes only from the engine's `how.items` (the allowance in section 1 is only reached on a page with derivatives) ──
+{
+  const saved = JSON.parse(readFileSync(new URL('../../client/test/support/product-rule-real-report.json', import.meta.url), 'utf8'));
+  const m = buildAnnotatedWorking({ lines: saved.lines, stepReport: saved.stepReport });
+  const dc = m.cards.map(card => ({ card, c: commentFor(card, ctx) })).find(x => x.c?.kind === 'howDerivatives');
+  ok(!!dc && Array.isArray(dc.card.how?.items) && dc.card.how.items.length === 2, 'the owner page has a derivatives tick with two engine items');
+  const allowedHow = new Set(dc ? dc.card.how.items.map(it => '$' + it.nameTex + ' = ' + it.exprTex + '$') : []);
+  ok(dc && spansOf(dc.c.text).length === 2 && spansOf(dc.c.text).every(sp => allowedHow.has(sp)), `every maths span of the derivative comment is an engine item: ${dc?.c.text}`);
+}
 
 // ── 6. the owner's pages, old sentence and new sentence ─────────────────────────────────────────────
 const AREA = ['8 y = 2x(4-x)', 'Area = ∫_0^4 2x(4-x) dx', '= 2∫_0^4 4x-x^2 dx', '= 2[4x^2/2 - x^3/3]_0^4', '= 2[2x^2 - x^3/3]_0^4', '= 2[2(4)^2 - 4^3/3] = 2[32 - 64/3]', '16/2', '64/3'];

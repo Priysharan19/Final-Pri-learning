@@ -1300,6 +1300,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     // A submitted line is matched to it only by identical text, so a line the student edited carries none. The line
     // checker may use it to tick or to leave a note, never to cross (arithmeticLines.js).
     let workingLatex = null;
+    let workingGaps = null;
 
     // ── Mark first, with no transaction open; then commit under the lock ────
     // The marker runs in a worker thread (markerPool.js) and is awaited, so it
@@ -1481,6 +1482,12 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         }
         if (byWorking && floored.excluded.length) markAnswer = answerLines.filter((_, i) => !floored.excluded.includes(i)).join('\n');
         else if (floored.excluded.length) working = stepsSent.filter((_, i) => !floored.excluded.includes(i)).join('\n');
+        // Where the reading floor dropped a line: the kept line at each of these positions follows a line the engine never saw, so a
+        // line there is never crossed as a false continuation of the line above it (engine/lineChains.js, `gaps`).
+        if (!byWorking && floored.excluded.length) {
+          workingGaps = []; let kept = 0;
+          stepsSent.forEach((t, i) => { if (floored.excluded.includes(i)) { if (!workingGaps.includes(kept)) workingGaps.push(kept); } else if (String(t).trim()) kept++; });
+        }
         if (!byWorking) workingLatex = readLines.filter(l => cleanLatex(l?.latex)).map(l => ({ text: String(l.text ?? ''), latex: cleanLatex(l.latex) }));
         reading = { text, needsConfirmation, corrected, reused: read.reused === true, recognizedAt: Date.now(),
           studentConfirmed: false, excludedLines: floored.excluded, lineStates,
@@ -1491,7 +1498,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // One round trip: the answer, and the working only when the reply could
       // use it (the answer is right, or a wrong answer resolves the question).
       const marked = await timePhase('marker', () => markerPool().run('practice', {
-        q: forecast.q, answer: markAnswer, working, ...(workingLatex?.length ? { workingLatex } : {}),
+        q: forecast.q, answer: markAnswer, working, ...(workingLatex?.length ? { workingLatex } : {}), ...(workingGaps?.length ? { workingGaps } : {}),
         evidenceIfWrong: evidenceForced || writtenWorking || forecast.spent || ONE_TRY_MODES.includes(forecast.q._practiceMode)
       }, { key: accountId }));
       // Refused before it ran: nothing marked, nothing spent, same key retries.
