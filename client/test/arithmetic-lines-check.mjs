@@ -286,10 +286,13 @@ ok(model?.cards?.length === 2 && model.cards.every(c => c.status === 'checked' &
   // 5.0 no verdict moved: every page the sweeps above ran (24497 of them, every one of their lines' status and state,
   // and where the first cross fell) hashes to the value recorded BEFORE these words were added. Re-recorded on 21 November 2026 (the owner's vector slip
   // is now a warning note, see PAGE above; hashing every page but that one gives the same digest on the old and the new engine, 4d0ecafa1c49).
+  // Re-recorded on 23 November 2026 (money and bracketed glosses are read, a named quantity is carried down the page, see "A named quantity"):
+  // exactly two page shapes moved, each twice (4 of 24497 pages), both from a note to a TICK on a line that is true: `1,000 + 1 = 1,001` (thousands comma) and
+  // `A = πr^2 = 9π` after `r = 3 (new)` (the gloss no longer hides the new value). Found by running the previous engine over the same pages and diffing every line; no cross moved.
   // Re-recorded on 20 November 2026:
   // exactly one of those pages moved, the owner's vector page (PAGE above: its magnitude line and `= sqrt(260)` are now ticked, tick only);
   // the other 24496 verdicts are those of the previous digest, found by running the previous engine over the same pages.
-  ok(reportsSeen === 24497 && verdictHash.copy().digest('hex') === 'f2c42cfd16afc3e4e5cd6ab18e7dec53289d0d2e0f832cf84ffa05b7abce8ade', `no verdict changed across ${reportsSeen} pages (digest ${verdictHash.copy().digest('hex').slice(0, 12)})`);
+  ok(reportsSeen === 24497 && verdictHash.copy().digest('hex') === '0d3ffa272d739a93d2c52e43fa6b7d954fa8095d523479cd82c4598066c47440', `no verdict changed across ${reportsSeen} pages (digest ${verdictHash.copy().digest('hex').slice(0, 12)})`);
   // (placed after 5.0 so the pages it runs are not part of the recorded digest)
   // independent review of the typesetting: a whole number with float noise is printed as that whole number
   ok(!/144/.test(JSON.stringify(run(['6[4^2 - 2^2] = 6(16 - 4)', '= 72']).lines)) && !/\\frac\{\d+\}\{2\}\$\./.test(run(['0.1 + 0.2 + 71.7 = 72']).lines[0].note || ''), 'no value is printed as an unreduced fraction of a whole number');
