@@ -364,9 +364,7 @@ function run(q, report, warn, opts = null) {
         const earlier = [];
         for (let k = 0; k < i - 1; k++) for (const part of String(pageTexts[k] || '').split('=')) { const t = part.trim(); if (t) earlier.push(t); }
         if (f && letter && (!pa.v || !pb.v || pa.v === pb.v) && isRealVariable(world.prompt, letter) && !isPartialWork(w.facts.aboveSide, w.facts.writtenSide, earlier)) {
-          // every line before the cross must be a verified tick (or a line that only sets the page up) for "everything before is correct" to be said
-          const before = out.slice(0, i);
-          const allTicked = before.length > 0 && before.every(x => x && (x.status === 'ok' || x.context === true));
+          // ("everything before is correct" is said later, over the FINAL ticks: see the `kept` gate below, once downgrades are known)
           diag = crossDiagnosis(f, w.facts.example, { aboveSide: w.facts.aboveSide, writtenSide: w.facts.writtenSide, lineNo: i + 1, checkedBefore: 0 });
         }
       }

@@ -76,7 +76,7 @@ const states = r => (r.report?.lines || []).map(l => l.status);
 
 // with the reader's TeX alongside, as the server passes it: the same verdicts
 {
-  const latex = PAGE.map(t => ({ text: t, latex: t.replace(/\$/g, '\\$').replace(/\^(\d|n)/g, '^{$1}') }));
+  const latex = PAGE.map(t => ({ text: t, latex: t.replace(/\\/g, '\\\\').replace(/\$/g, '\\$').replace(/\^(\d|n)/g, '^{$1}') }));
   const res = checkAnswer(q, '1261');
   const st = states({ report: stepEvidence(q, '1261', PAGE.join('\n'), res, { latex }).stepReport });
   PAGE.forEach((_, i) => ok(st[i] === (TICKED.has(i) ? 'ok' : 'note'), `with latex: line ${i + 1} is ${TICKED.has(i) ? 'ticked' : 'a note'}, got ${st[i]}`));
