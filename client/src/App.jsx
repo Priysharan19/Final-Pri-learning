@@ -2,7 +2,7 @@ import { featureEnabled, INTERFACE_SKIN_UI } from './platform/features.js';
 import Aurora from './instrument/Aurora.jsx';
 import Working from './instrument/Working.jsx';
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from 'react';
-import { Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
+import { Routes, Route, useLocation, useNavigate, Navigate, matchPath } from 'react-router-dom';
 import { EDITION } from './platform/edition.js';
 import PageLink from './components/PageLink.jsx';
 import { api } from './api.js';
@@ -82,6 +82,33 @@ const LEGAL_ROUTES_EXTRA = EDITION === 'prithagoras' ? (
     <Route path="/refunds" element={<Navigate to="/refund-policy" replace />} />
   </>
 ) : <Route path="/grievance" element={<Legal />} />;
+// A real "page not found" for an address that is no route at all. Prithagoras
+// only (a literal in a build, vite.config.js __PRI_EDITION__): Priyabhata keeps
+// sending an unknown address to its landing page, byte for byte, and its build
+// emits no NotFound chunk. A signed-out visitor still reaches Login at every
+// address that IS an app route (a bookmark to /practice signs in, then opens),
+// so the signed-out and activation-gate tables below need the list of real
+// paths. client/test/not-found-routes-check.mjs holds it equal to the signed-in
+// route table.
+/* global __PRI_EDITION__ */
+const NOT_FOUND_PAGE = typeof __PRI_EDITION__ === 'string' && __PRI_EDITION__ === 'prithagoras';
+const NotFound = NOT_FOUND_PAGE ? React.lazy(() => import('./landing/NotFound.jsx')) : null;
+const APP_PATHS = NOT_FOUND_PAGE ? [
+  '/', '/practice', '/practise-photo', '/progress', '/plan', '/today', '/error-log', '/premium', '/insights',
+  '/parent-report', '/placement', '/map', '/signin', '/stats', '/badges', '/tasks', '/teach', '/exams', '/paper-generator',
+  '/exams/:id', '/papers/sit/:attemptId', '/notes', '/notes/:chapterId', '/library', '/library/:id', '/desk/import',
+  '/desk/:attemptId', '/rush', '/match', '/review', '/history', '/favorites', '/mistakes', '/classes', '/privacy', '/terms',
+  '/refund-policy', '/third-party-notices', '/welcome', '/welcome/marking', '/welcome/syllabus', '/welcome/teachers',
+  '/contact', '/grievance', '/refunds', '/settings', '/account-action', '/guardian/consent', '/account/delete-request',
+  '/parent/report-email'
+] : [];
+/** The `*` route before the shell: Login at a real app address, "not found" anywhere else (Prithagoras). */
+function UnknownAddress({ otherwise, to }) {
+  const { pathname } = useLocation();
+  const known = APP_PATHS.some(path => matchPath({ path, end: true }, pathname));
+  return known ? otherwise : <NotFound to={to} signedIn={false} />;
+}
+
 // The public landing (the verified page, §3) and its three plain pages are
 // signed-out web routes, each its own chunk: a student who opens the app never
 // downloads them.
@@ -626,7 +653,7 @@ export default function App() {
                 other address; a native shell keeps it as the first screen. */}
             {guestTrialAvailable() && <Route path="/" element={<FirstScreen />} />}
             <Route path="/signin" element={<Login />} />
-            <Route path="*" element={<Login />} />
+            <Route path="*" element={NOT_FOUND_PAGE ? <UnknownAddress otherwise={<Login />} to="/welcome" /> : <Login />} />
           </Routes>
         </React.Suspense>
         <ToastLayer toasts={toasts} />
@@ -663,7 +690,9 @@ export default function App() {
             <Route path="/refund-policy" element={<Legal />} />
             {LEGAL_ROUTES_EXTRA}
             <Route path="/third-party-notices" element={<Legal />} />
-            <Route path="*" element={<AccountActivationGate key={user.id} user={user} onReady={setActivated} onSwitch={switchLocal} />} />
+            <Route path="*" element={NOT_FOUND_PAGE
+              ? <UnknownAddress to="/" otherwise={<AccountActivationGate key={user.id} user={user} onReady={setActivated} onSwitch={switchLocal} />} />
+              : <AccountActivationGate key={user.id} user={user} onReady={setActivated} onSwitch={switchLocal} />} />
           </Routes>
         </React.Suspense>
         <ToastLayer toasts={toasts} />
@@ -786,7 +815,7 @@ export default function App() {
                     {LEGAL_ROUTES_EXTRA}
                     <Route path="/third-party-notices" element={<Legal />} />
                     <Route path="/settings" element={<Settings />} />
-                    <Route path="*" element={<Navigate to={roleLanding} replace />} />
+                    <Route path="*" element={NOT_FOUND_PAGE ? <NotFound to={roleLanding} signedIn /> : <Navigate to={roleLanding} replace />} />
                   </Routes>
                 </React.Suspense>
               </ErrorBoundary>

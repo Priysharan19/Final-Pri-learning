@@ -208,7 +208,21 @@ export const EDITIONS = Object.freeze({
       cut: 'square',                         // icon counter cut: the right-angle box
       accent: Object.freeze({ light: '#7d5a00', dark: '#e0b44a' }),
       onAccent: Object.freeze({ light: '#f4f3ef', dark: '#1a1a1b' }),
-      description: 'Maths practice for NSW students, Years 11 and 12 and the HSC. Handwriting read line by line, worked solutions. Answers are checked by our server with a Prithagoras account.'
+      description: 'Maths practice for NSW students, Years 11 and 12 and the HSC. Handwriting read line by line, worked solutions. Answers are checked by our server with a Prithagoras account.',
+      // What a link to this edition shows when it is shared (og:/twitter: tags in
+      // index.html, client/brand/edition-brand.mjs). `origin` is the edition's
+      // public origin (the same one scripts/check-native-archive.mjs holds the app
+      // to); `image` is client/brand/prithagoras/share.png, drawn from
+      // source/share-image.svg by tools/brand/share-image.mjs. Priyabhata has none:
+      // its page keeps the plain summary card it has always had.
+      share: Object.freeze({
+        origin: 'https://au.prilearning.com',
+        image: 'share.png',
+        width: 1200,
+        height: 630,
+        title: 'Prithagoras · HSC Mathematics Advanced and Extension 1',
+        alt: 'Prithagoras. HSC Mathematics Advanced and Extension 1.'
+      })
     }),
     region: 'AU',
     defaultCourse: 'nsw',

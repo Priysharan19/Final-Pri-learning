@@ -69,6 +69,40 @@ export function editionTokensCss(id) {
 
 const escapeHtml = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
+/** The absolute URL of an edition's share image (what og:image and twitter:image must be). */
+export const shareImageUrl = share => new URL(`/${share.image}`, share.origin).href;
+
+/**
+ * An edition with a `share` record presents a large-image card when its link is
+ * shared: its own og:title, plus og:url, og:image (absolute) and the Twitter
+ * large-image card. Done by replacing the two lines index.html already has, so
+ * a page never carries a tag twice, and an edition without `share` is untouched.
+ */
+function withShareCard(html, e, share) {
+  const url = new URL('/', share.origin).href;
+  const image = shareImageUrl(share);
+  const a = escapeHtml;
+  const swap = (from, to) => {
+    if (!html.includes(from)) throw new Error(`client/index.html has no ${from} to build the share card from`);
+    html = html.replace(from, to);
+  };
+  swap('<meta property="og:title" content="%PRI_BRAND%">', `<meta property="og:title" content="${a(share.title)}">`);
+  swap('<meta name="twitter:card" content="summary">', [
+    `<meta property="og:url" content="${a(url)}">`,
+    `<meta property="og:image" content="${a(image)}">`,
+    `<meta property="og:image:type" content="image/png">`,
+    `<meta property="og:image:width" content="${share.width}">`,
+    `<meta property="og:image:height" content="${share.height}">`,
+    `<meta property="og:image:alt" content="${a(share.alt)}">`,
+    `<meta name="twitter:card" content="summary_large_image">`,
+    `<meta name="twitter:title" content="${a(share.title)}">`,
+    `<meta name="twitter:description" content="${a(e.identity.description)}">`,
+    `<meta name="twitter:image" content="${a(image)}">`,
+    `<meta name="twitter:image:alt" content="${a(share.alt)}">`
+  ].join('\n'));
+  return html;
+}
+
 /**
  * Fill client/index.html's %PRI_…% placeholders for an edition. Throws if one
  * is left, so a new placeholder can never reach a shipped page unfilled.
@@ -92,6 +126,8 @@ export function brandIndexHtml(html, id) {
       ? `Reload ${escapeHtml(e.brand)} · ${hi} फिर से लोड करें`
       : `Reload ${escapeHtml(e.brand)}`
   };
+  const share = e.identity.share;
+  if (share) html = withShareCard(html, e, share);
   const out = html.replace(/%(PRI_[A-Z_]+)%/g, (whole, name) => (Object.hasOwn(values, name) ? values[name] : whole));
   const left = out.match(/%PRI_[A-Z_]+%/);
   if (left) throw new Error(`client/index.html has an unfilled brand placeholder ${left[0]}`);
