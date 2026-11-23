@@ -79,13 +79,23 @@ export const CATALOGUE = Object.freeze({
   crossExample: {
     en: ['This line is not equal to the line above: at {at} the line above comes to {above}, but this line gives {written}.', 'Check this line: it is not equal to the line above. At {at} the line above comes to {above} and this line gives {written}.']
   },
+  // what a ticked line DID, each claim recomputed by the engine (engine/falseStep.js); English only
+  howFactors: { en: ['Good choice of {u} and {v}: their product is the function in the question.'] },
+  howRule: { en: ['Correct statement of the product rule.'] },
+  howDerivatives: { en: ['{lead}: {list}.'] },
+  howSubstituted: { en: ['Correct substitution of {names} into the product rule.'] },
+  howOne: { en: ['Multiplying by $1$ changes nothing, so this equals the line above.'] },
+  howExpanded: { en: ['Correct expansion: {items}.'] },
+  howCollected: { en: ['Like terms collected correctly: {items}.'] },
+  howEqualAbove: { en: ['Equal to the line above.'] },
   crossSidesDiffer: {
     en: ['The two sides do not match: {left} comes to {leftValue}, and {right} comes to {rightValue}.', 'The two sides are not equal: {left} comes to {leftValue}, but {right} comes to {rightValue}.', 'The two sides differ: {left} comes to {leftValue} and {right} comes to {rightValue}.']
   }
 });
 /** Every template kind, grouped by polarity, for the tests. */
 export const TEMPLATE_KINDS = Object.freeze(Object.keys(CATALOGUE));
-export const POSITIVE_KINDS = Object.freeze(['restates', 'stepHeading', 'step', 'stepValue', 'ruleResult', 'rule']);
+export const HOW_KINDS = Object.freeze(['howFactors', 'howRule', 'howDerivatives', 'howSubstituted', 'howOne', 'howExpanded', 'howCollected', 'howEqualAbove']);
+export const POSITIVE_KINDS = Object.freeze(['restates', 'stepHeading', 'step', 'stepValue', 'ruleResult', 'rule', ...HOW_KINDS]);
 export const EQUALITY_KINDS = Object.freeze(['bothSides', 'equalsAbove']);
 export const CROSS_KINDS = Object.freeze(['crossAbove', 'crossComputed', 'crossSidesDiffer', 'crossTerms', 'crossExact', 'crossExample']);
 
@@ -97,7 +107,7 @@ const rhsOf = text => { const raw = String(text ?? '').trim(); if (!raw.includes
  * @param {{ language?: 'en'|'hi', ruleLabel?: (rule: object) => string }} ctx
  * @returns {{ text: string, kind: string, facts: object } | null}  null: keep the engine's own sentence
  */
-export function commentFor(card, ctx = {}) {
+function baseComment(card, ctx = {}) {
   if (!card || typeof card !== 'object') return null;
   const lang = ctx.language === 'hi' ? 'hi' : 'en';
   const key = `${card.n}|${card.text}`;
@@ -201,6 +211,45 @@ export function commentFor(card, ctx = {}) {
     const rules = card.rules.map(r => r.rule);
     return result ? done('ruleResult', { rule, result }, { rules, result: card.text }) : done('rule', { rule }, { rules });
   }
+  return null;
+}
+
+const inner = span => (typeof span === 'string' && span.startsWith('$') && span.endsWith('$') && span.indexOf('$', 1) === span.length - 1 ? span.slice(1, -1) : null);
+const okTex = x => (typeof x === 'string' && x.length > 0 && x.length <= 120 && !x.includes('$') ? x : null);
+/** A tick says what the engine recomputed the line did (never a bare "Correct"): facts `card.how` and `card.fact`. English only. */
+function howComment(card, ctx = {}) {
+  if (!card || card.status !== 'checked' || ctx.language === 'hi') return null;
+  const key = `${card.n}|${card.text}`;
+  const done = (kind, slots, facts) => { for (const v of Object.values(slots)) if (v === null || v === undefined || v === '') return null; return { text: fill(pick(CATALOGUE[kind].en, key), slots), kind, facts }; };
+  const f = card.fact, h = card.how;
+  if (f && f.kind === 'factors-of-question' && Array.isArray(f.names) && f.names.length === 2 && f.names.every(n => /^[a-z]$/.test(n))) return done('howFactors', { u: `$${f.names[0]}$`, v: `$${f.names[1]}$` }, { names: f.names });
+  if (f && f.kind === 'rule-statement' && f.rule === 'product-rule') return done('howRule', { x: 'x' }, {});
+  if (!h || typeof h !== 'object') return null;
+  if (h.kind === 'derivatives' && Array.isArray(h.items) && h.items.length >= 1 && h.items.length <= 3) {
+    const parts = h.items.map(i => (okTex(i.nameTex) && okTex(i.exprTex) ? `$${i.nameTex} = ${i.exprTex}$` : null));
+    if (parts.some(x => x === null)) return null;
+    const list = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+    return done('howDerivatives', { lead: parts.length === 1 ? 'The derivative is right' : parts.length === 2 ? 'Both derivatives are right' : 'All the derivatives are right', list }, { items: h.items });
+  }
+  if (h.kind === 'substituted' && Array.isArray(h.names) && h.names.length === 2) { const [a, b] = h.names; return done('howSubstituted', { names: `$${a}$, $${b}$, $${a}'$ and $${b}'$` }, { names: h.names }); }
+  if (h.kind === 'one') return done('howOne', { x: 'x' }, {});
+  if (h.kind === 'expanded' && Array.isArray(h.items) && h.items.length >= 1) {
+    const parts = h.items.map(i => { const from = typeof i.fromText === 'string' ? inner(mathSpan(i.fromText)) : null, to = okTex(i.toTex); return from && to ? `$${from} = ${to}$` : null; });
+    return parts.some(x => x === null) ? null : done('howExpanded', { items: parts.join(' and ') }, { items: h.items });
+  }
+  if (h.kind === 'collected' && Array.isArray(h.groups) && h.groups.length >= 1) {
+    const parts = h.groups.map(g => (okTex(g.fromTex) && okTex(g.toTex) ? `$${g.fromTex} = ${g.toTex}$` : null));
+    return parts.some(x => x === null) ? null : done('howCollected', { items: parts.join(' and ') }, { groups: h.groups });
+  }
+  return null;
+}
+/** The comment on a card: what the engine computed the line did, else the engine's equality or rule sentence, else only "Equal to the line above." where that was computed. */
+export function commentFor(card, ctx = {}) {
+  const how = howComment(card, ctx);
+  if (how) return how;
+  const base = baseComment(card, ctx);
+  if (base) return base;
+  if (card && card.status === 'checked' && card.how && card.how.kind === 'equal-above' && !card.note && ctx.language !== 'hi') return { text: CATALOGUE.howEqualAbove.en[0], kind: 'howEqualAbove', facts: {} };
   return null;
 }
 

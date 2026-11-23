@@ -185,20 +185,38 @@ const MAX_CHANGES = 3;
  * falseStepFacts(...) or null; `example` the slip warning's own numeric example. `message` is the engine's plain sentence;
  * engine/lineCommentary.js writes the typeset one from the same structured fields.
  */
-export function crossDiagnosis(facts, example) {
+export function crossDiagnosis(facts, example, ctx = null) {
   const fix = 'Work this line out again from the line above, one term at a time.';
   const base = { code: 'false-continuation', title: 'This line is not equal to the line above', fix, confidence: 'high', expectedFrom: 'symbolic' };
+  let d;
   if (facts && facts.changed.length <= MAX_CHANGES) {
-    const message = `The line above simplifies to ${facts.aboveText}, but this line comes to ${facts.writtenText}: ${changeWords(facts.changed)}${facts.same.length ? '; the other terms are the same' : ''}. The corrected line is = ${facts.correctedText}.`;
-    return { ...base, message, exact: true, aboveTex: facts.aboveTex, writtenTex: facts.writtenTex, correctedTex: facts.correctedTex, correctedText: facts.correctedText,
+    d = { ...base, exact: true, aboveTex: facts.aboveTex, writtenTex: facts.writtenTex, correctedTex: facts.correctedTex, correctedText: facts.correctedText,
       changed: facts.changed.map(c => ({ fromTex: c.fromTex, toTex: c.toTex })), same: facts.same.slice(0, 6) };
+  } else if (facts) {
+    d = { ...base, exact: true, aboveTex: facts.aboveTex, writtenTex: facts.writtenTex, correctedTex: facts.correctedTex, correctedText: facts.correctedText, changed: [], same: [] };
+  } else {
+    d = { ...base, exact: false, ...(example ? { example: { at: example.at.map(a => ({ v: a.v, value: a.value })), above: example.above, written: example.written } } : {}) };
   }
-  if (facts) {
-    return { ...base, message: `This line is not equal to the line above, which simplifies to ${facts.aboveText}. The corrected line is = ${facts.correctedText}.`, exact: true, aboveTex: facts.aboveTex, writtenTex: facts.writtenTex, correctedTex: facts.correctedTex, correctedText: facts.correctedText, changed: [], same: [] };
+  // the annotation: structured, each field only when the engine computed it
+  let ex = null;
+  if (ctx && ctx.aboveSide && ctx.writtenSide) { try { ex = explainFalseStep(ctx.aboveSide, ctx.writtenSide); } catch { ex = null; } }
+  if (ex) {
+    if (ex.whatChanged) d.whatChanged = ex.whatChanged;
+    if (ex.whyWrong) { d.whyWrong = ex.whyWrong; d.errorType = ex.type; }
+    if (ex.corrected) d.corrected = ex.corrected;
+    if (ex.check) { d.check = ex.check; d.checkAt = ex.checkAt; }
+  } else if (example && example.at && example.at.length) {
+    d.check = `At ${example.at.map(a => `${a.v} = ${a.value}`).join(', ')} the line above gives ${example.above} but this line gives ${example.written}.`;
   }
-  const at = example && Array.isArray(example.at) ? example.at.map(a => `${a.v} = ${a.value}`).join(', ') : '';
-  const message = example ? `This line is not equal to the line above (for example at ${at} the line above comes to ${example.above} and this line gives ${example.written}).` : 'This line is not equal to the line above.';
-  return { ...base, message, exact: false, ...(example ? { example: { at: example.at.map(a => ({ v: a.v, value: a.value })), above: example.above, written: example.written } } : {}) };
+  if (ctx && Number.isInteger(ctx.lineNo) && ctx.lineNo >= 2) d.fromLine = ctx.lineNo - 1;
+  if (ctx && Number.isInteger(ctx.lineNo) && ctx.lineNo >= 2 && Number.isInteger(ctx.checkedBefore) && ctx.checkedBefore >= 1) {
+    d.kept = `Every line checked before line ${ctx.lineNo} is correct.${ctx.ruleApplied ? ' The product rule was applied correctly; this is an algebra slip.' : ''}`;
+  }
+  // the plain-text sentence old clients read: a concise join of the fields, or the engine's own sentence when none was computed
+  const parts = [d.whatChanged, d.whyWrong, d.corrected ? `Corrected line: ${d.corrected}.` : null, d.check, d.kept].filter(Boolean);
+  d.comment = parts.length ? parts.join(' ') : (facts ? `This line is not equal to the line above, which simplifies to ${facts.aboveText}.` : 'This line is not equal to the line above.');
+  d.message = d.comment;
+  return d;
 }
 
 // ── a page that names its factors and the rule it uses (product rule, owner's page 23 November 2026) ──────────────────────
@@ -287,4 +305,218 @@ export function isContextLine(text) {
   if (!t || t.length > 140) return false;
   if (INSTRUCTION.test(t) && RULE_WORD.test(t) && !/[<>]/.test(t)) return true;
   return !/[=<>0-9]/.test(t) && LEAD_IN.test(t) && RULE_WORD.test(t);
+}
+
+// ── what a ticked continuation DID (owner, 23 November 2026: "it should not just say correct, I need details") ───────────────────
+// Each claim is recomputed here from the two lines, exactly (polynomials in one letter, BigInt fractions). A kind is returned only when its
+// claim holds term by term; otherwise `equal-above` (equal, nothing more said) or null.
+/** The terms of a side at depth 0, each with its sign: `2x(x - 1) + x^2` gives ['2x(x - 1)', '+ x^2']. null on an unbalanced side. */
+export function topTerms(side) {
+  const t = tidy(side).replace(/\s+/g, ' ').trim();
+  const out = []; let depth = 0, cur = '';
+  for (let i = 0; i < t.length; i++) {
+    const ch = t[i];
+    if (ch === '(' || ch === '[') depth++;
+    if (ch === ')' || ch === ']') depth--;
+    if (depth < 0) return null;
+    const prev = t.slice(0, i).trimEnd().slice(-1);
+    if (depth === 0 && (ch === '+' || ch === '-') && cur.trim() !== '' && prev !== '^' && prev !== '(' && prev !== '*' && prev !== '/') { out.push(cur.trim()); cur = ch; continue; }
+    cur += ch;
+  }
+  if (depth !== 0) return null;
+  if (cur.trim()) out.push(cur.trim());
+  return out;
+}
+const sameC = (a, b) => !!a && !!b && fEq(a, b);
+const termKey = (c, d) => `${d}:${c.n}/${c.d}`;
+/** A term (signed text) as one monomial { c, d, v } when it is one, else null. */
+function monomial(text) {
+  const p = readPoly(text);
+  if (!p || p.c.size > 1) return p && p.c.size === 0 ? { c: frac(0n), d: 0, v: p.v } : null;
+  const [[d, c]] = [...p.c.entries()];
+  return { c, d, v: p.v };
+}
+const polyEqual = (a, b) => { if (!a || !b) return false; const ks = new Set([...a.c.keys(), ...b.c.keys()]); for (const k of ks) if (!sameC(a.c.get(k), b.c.get(k))) return false; return !(a.v && b.v && a.v !== b.v && a.c.size); };
+const signedText = (terms, tex) => terms.map((t, i) => { const s = termText(t.v || 'x', t.d, t.c, tex); return i === 0 ? s : (s.startsWith('-') ? ` - ${s.slice(1)}` : ` + ${s}`); }).join('');
+
+/**
+ * How `thisSide` follows from `aboveSide` (both the part after `=`): { kind, ... } | null. Only claims that recompute exactly.
+ *   one         a factor (1) was dropped and nothing else changed
+ *   expanded    each bracketed summand of the line above is replaced by its exact expansion, term by term, the other summands unchanged
+ *   collected   like terms combined: each degree appears once and its coefficient is the sum of the line above's
+ *   equal-above equal as polynomials, no operation detected
+ */
+export function stepHow(aboveSide, thisSide) {
+  const a = readPoly(aboveSide), b = readPoly(thisSide);
+  if (!a || !b || !polyEqual(a, b)) return null;
+  const norm = s => tidy(s).replace(/\s+/g, '');
+  // multiplying by one: the line above carries a factor (1) or *1 and removing it gives this line, character for character
+  const A = norm(aboveSide), B = norm(thisSide);
+  if (A !== B) for (const re of [/\(1\)/, /\*1(?![\d.])/, /(?<![\d.\w)])1\*/]) { if (re.test(A) && A.replace(re, '') === B) return { kind: 'one' }; }
+  const at = topTerms(aboveSide), bt = topTerms(thisSide);
+  if (!at || !bt || A === B) return A === B ? null : { kind: 'equal-above' };
+  const bracketed = s => /[()]/.test(s);
+  // expanded: bracketed summands replaced by their exact expansion, the others kept as they are
+  if (at.some(bracketed) && !bt.some(bracketed)) {
+    const expected = []; const shown = [];
+    for (const s of at) {
+      if (!bracketed(s)) { expected.push(norm(s.replace(/^\+/, ''))); continue; }
+      const p = readPoly(s); if (!p || !p.v) return { kind: 'equal-above' };   // a bracket of numbers is evaluated, not expanded
+      const ms = [...p.c.entries()].sort((x, y) => y[0] - x[0]);
+      for (const [d, c] of ms) expected.push(`${d}:${c.n}/${c.d}`);
+      shown.push({ fromText: s.replace(/^\+\s*/, ''), toTex: polyText(p, true) });
+    }
+    const keyOf = s => { const m = monomial(s); return m ? termKey(m.c, m.d) : null; };
+    const want = expected.map(x => (/^\d+:-?\d+\/\d+$/.test(x) ? x : keyOf(x))).sort();
+    const have = bt.map(keyOf).sort();
+    if (want.every(Boolean) && JSON.stringify(want) === JSON.stringify(have) && shown.length <= 2) return { kind: 'expanded', items: shown };
+    return { kind: 'equal-above' };
+  }
+  // collected: no brackets, each degree once, coefficient the sum of the line above's
+  if (!at.some(bracketed) && !bt.some(bracketed)) {
+    const am = at.map(monomial), bm = bt.map(monomial);
+    if (am.every(Boolean) && bm.every(Boolean) && bm.length < am.length) {
+      const by = new Map();
+      for (const m of am) by.set(m.d, [...(by.get(m.d) || []), m]);
+      const degs = bm.map(m => m.d);
+      if (new Set(degs).size === degs.length && degs.every(d => by.has(d)) && by.size === degs.length) {
+        const groups = [];
+        for (const m of bm) {
+          const g = by.get(m.d); const sum = g.reduce((s, x) => fAdd(s, x.c), frac(0n));
+          if (!sameC(sum, m.c)) return { kind: 'equal-above' };
+          if (g.length >= 2) groups.push({ fromTex: signedText(g.map(x => ({ ...x, v: x.v || m.v })), true), toTex: termText(m.v || 'x', m.d, m.c, true) });
+        }
+        if (groups.length && groups.length <= 2 && bm.some(m => m.d > 0 && by.get(m.d).length >= 2)) return { kind: 'collected', groups };   // like TERMS: at least one group carries the letter
+      }
+    }
+  }
+  return { kind: 'equal-above' };
+}
+
+/** `u' = 2x and v' = 1.`: when each statement is the exact derivative of that factor, [{ nameTex, exprTex }] in the order written; else null. */
+export function readDerivativeStatements(text, defs) {
+  if (!defs) return null;
+  const t = tidy(text).replace(/^then\b\s*/i, '').replace(/[.;]\s*$/, '');
+  const pieces = t.split(/\s*(?:,|;|\band\b|&)\s*/i).map(x => x.trim()).filter(Boolean);
+  if (!pieces.length || pieces.length > 3) return null;
+  const items = [];
+  for (const piece of pieces) {
+    const m = /^([a-z])'\s*=\s*([^=]+)$/.exec(piece);
+    if (!m) return null;
+    const def = defs.find(d => d.name === m[1]);
+    const mine = readPoly(m[2]), src = def && readPoly(def.expr);
+    if (!def || !mine || !src) return null;
+    const dsrc = { v: src.v, c: new Map([...src.c.entries()].filter(([d]) => d > 0).map(([d, c]) => [d - 1, fMul(c, frac(BigInt(d)))])) };
+    if (!polyEqual(mine, dsrc)) return null;
+    items.push({ nameTex: `${m[1]}'`, exprTex: polyText({ v: src.v || 'x', c: dsrc.c }, true), name: m[1], expr: m[2].trim() });
+  }
+  return new Set(items.map(i => i.name)).size === items.length ? items : null;
+}
+
+/** The product rule's right-hand side with u, v, u', v' put in: true when `thisSide` equals it and carries the page's own expressions. */
+export function isRuleSubstitution(ruleSide, thisSide, defs, derivs) {
+  if (!defs || defs.length !== 2 || !derivs || derivs.length !== 2) return false;
+  const rule = tidy(ruleSide).replace(/\s+/g, '');
+  const sub = { u: defs[0].name, v: defs[1].name };
+  void sub;
+  const built = rule.replace(/([a-z])('?)/g, (_, n, pr) => { const d = pr ? derivs.find(x => x.name === n) : defs.find(x => x.name === n); return d ? `(${d.expr})` : '#'; });
+  if (built.includes('#')) return false;
+  const want = readPoly(built), got = readPoly(thisSide);
+  if (!want || !got || !polyEqual(want, got)) return false;
+  const T = tidy(thisSide).replace(/\s+/g, '');
+  return defs.every(d => T.includes(tidy(d.expr).replace(/\s+/g, ''))) && derivs.every(d => T.includes(tidy(d.expr).replace(/\s+/g, '')));
+}
+
+// ── the annotation of a crossed line (owner, 23 November 2026: "very detailed quality annotation when the user makes a mistake") ─────
+// A closed catalogue keyed by the error type the engine DETECTS by exact term-by-term comparison of the two lines' expanded forms. Every
+// field is optional and omitted when it was not computed: nothing here is a guess, and a type that cannot be told gets no `whyWrong`.
+const QUOTE = t => t;
+const ERROR_CATALOGUE = Object.freeze({
+  // owner's page: the like terms were collected and the lone term beside them was changed
+  'coefficient-beside-collected': 'Collecting {group} gives {sum} and leaves the {term} term alone, so {term} stays {term}.',
+  'coefficient-alone': 'Nothing in the line above combines with the {term} term, so its coefficient stays {coef}.',
+  'like-terms-wrong': 'Adding {terms} gives {sum}, not {written}.',
+  'dropped-term': 'Every term of the line above has to be carried down: the {term} term is missing here.',
+  'extra-term': 'The line above has no {term} term, so nothing here can produce one.',
+  'sign-error': 'The sign of the {term} term changed. A sign changes only when a term is multiplied by a negative or moved across the equals sign, and neither happens between these two lines.',
+  'exponent-changed': 'The power {from} became {to}. A power keeps its exponent unless it is multiplied or divided by another power of the same letter.',
+  'bracket-product': 'Each term of one bracket multiplies each term of the other: {product} {state}.'
+});
+const monos = side => { const ts = topTerms(side); if (!ts) return null; const ms = ts.map(monomial); return ms.every(Boolean) ? ms : null; };
+const evalAt = (p, x) => { let sum = frac(0n); for (const [d, c] of p.c) { let pw = frac(1n); for (let k = 0; k < d; k++) pw = fMul(pw, x); sum = fAdd(sum, fMul(c, pw)); } return sum; };
+const fText = a => (a.d === 1n ? String(a.n) : `${a.n}/${a.d}`);
+const sentence = s => `${s.charAt(0).toUpperCase()}${s.slice(1)}`;
+const fill = (t, slots) => t.replace(/\{(\w+)\}/g, (_, k) => slots[k]);
+
+/** The product terms of a bracketed summand `2x(x - 1)` of exactly two factors: [{ a, b, prod }] as signed texts, or null. */
+function productPairs(summand) {
+  const ast = astOf(summand.replace(/^\s*\+\s*/, ''));
+  const flat = [];
+  const walk = n => { while (n && n.t === 'group' && false) n = n.v; if (n && n.t === 'bin' && n.op === '*') { walk(n.l); walk(n.r); } else flat.push(n); };
+  walk(ast);
+  if (flat.length !== 2) return null;
+  const toTerms = n => { const st = { v: null }; const p = polyOf(n, st); return p ? { v: st.v, terms: [...p.entries()].map(([d, c]) => ({ d, c })).sort((x, y) => y.d - x.d) } : null; };
+  const [A, B] = [toTerms(flat[0]), toTerms(flat[1])];
+  if (!A || !B || A.terms.length * B.terms.length > 9) return null;
+  const v = A.v || B.v || 'x';
+  const out = [];
+  for (const x of A.terms) for (const y of B.terms) out.push({ a: termText(v, x.d, x.c, false), b: termText(v, y.d, y.c, false), d: x.d + y.d, c: fMul(x.c, y.c), prod: termText(v, x.d + y.d, fMul(x.c, y.c), false) });
+  return out;
+}
+
+/**
+ * Everything the engine computed about a false continuation of polynomial lines, as plain-text facts. null when either side is not a
+ * polynomial in one letter. Fields: type, whatChanged, whyWrong, corrected, check (each omitted when not computed).
+ */
+export function explainFalseStep(aboveSide, writtenSide) {
+  const a = readPoly(aboveSide), b = readPoly(writtenSide);
+  if (!a || !b || (a.v && b.v && a.v !== b.v)) return null;
+  const v = a.v || b.v || 'x';
+  const degs = [...new Set([...a.c.keys(), ...b.c.keys()])].sort((x, y) => y - x);
+  const rows = degs.filter(d => !(a.c.get(d) && b.c.get(d) && fEq(a.c.get(d), b.c.get(d)))).map(d => ({ d, a: a.c.get(d) || null, b: b.c.get(d) || null }));
+  if (!rows.length) return null;
+  const T = (d, c) => termText(v, d, c, false);
+  const out = { exact: true };
+  out.corrected = `= ${polyText({ v, c: a.c }, false)}`;
+  // a one-line self-check: the first of a few values at which the two lines differ
+  for (const k of [1n, 2n, -1n, 3n]) {
+    const x = frac(k), ya = evalAt({ c: a.c }, x), yb = evalAt({ c: b.c }, x);
+    if (!fEq(ya, yb)) { out.check = `At ${v} = ${k} the line above gives ${fText(ya)} but this line gives ${fText(yb)}.`; out.checkAt = { v, x: Number(k), above: fText(ya), written: fText(yb) }; break; }
+  }
+  if (rows.length <= 3) out.whatChanged = rows.map(r => (r.a && r.b ? `The term ${T(r.d, r.a)} became ${T(r.d, r.b)}.` : r.a ? `The term ${T(r.d, r.a)} is missing.` : `An extra term ${T(r.d, r.b)} appears.`)).join(' ');
+  // the type: exact, from the terms of the line above as written (a bracketed line above is expanded by the distributive law first)
+  const written = monos(aboveSide);
+  const brackets = topTerms(aboveSide);
+  let type = null, slots = null;
+  if (rows.length === 1) {
+    const r = rows[0];
+    // 1  a bracket whose product is missing or wrong
+    if (brackets && brackets.some(s => /[()]/.test(s))) {
+      for (const s of brackets.filter(x => /[()]/.test(x))) {
+        const pairs = productPairs(s); if (!pairs) continue;
+        const diff = fAdd(r.a || frac(0n), fMul(r.b || frac(0n), frac(-1n)));
+        const hit = pairs.find(p => p.d === r.d && fEq(p.c, diff));
+        if (hit) { type = 'bracket-product'; slots = { product: `${hit.a} \u00d7 ${hit.b} = ${hit.prod}`, state: r.b ? 'is not what is written' : 'is missing' }; break; }
+      }
+    }
+    const hasBrackets = !!(brackets && brackets.some(x => /[()]/.test(x)));   // a bracketed line above: only the bracket rule is told, the others cannot be (signs change when a bracket is multiplied out)
+    if (!type && hasBrackets) { /* unclassified */ }
+    else if (!type && r.a && !r.b) { type = 'dropped-term'; slots = { term: T(r.d, r.a) }; }
+    else if (!type && !r.a && r.b) { type = 'extra-term'; slots = { term: T(r.d, r.b) }; }
+    else if (!type && r.a && r.b && fEq(r.b, frac(-r.a.n, r.a.d))) { type = 'sign-error'; slots = { term: T(r.d, r.a) }; }
+    else if (!type && r.a && r.b && written) {
+      const at = written.filter(m => m.d === r.d);
+      const groups = [...new Set(written.map(m => m.d))].filter(d => d !== r.d && written.filter(m => m.d === d).length >= 2);
+      if (at.length >= 2) { type = 'like-terms-wrong'; slots = { terms: signedText(at.map(m => ({ ...m, v })), false), sum: T(r.d, r.a), written: T(r.d, r.b) }; }
+      else if (at.length === 1 && groups.length) { const d = groups[0]; const g = written.filter(m => m.d === d); type = 'coefficient-beside-collected'; slots = { group: signedText(g.map(m => ({ ...m, v })), false), sum: T(d, a.c.get(d)), term: T(r.d, r.a) }; }
+      else if (at.length === 1) { type = 'coefficient-alone'; slots = { term: T(r.d, r.a), coef: fText(r.a) }; }
+    }
+  } else if (rows.length === 2) {
+    const [p, q] = rows;
+    const from = p.a && !p.b ? p : q.a && !q.b ? q : null, to = from === p ? q : p;
+    if (from && !to.a && to.b && fEq(from.a, to.b) && from.d !== to.d && from.d >= 1 && to.d >= 1) { type = 'exponent-changed'; slots = { from: T(from.d, from.a), to: T(to.d, to.b) }; }
+  }
+  if (type) { out.type = type; out.whyWrong = sentence(fill(ERROR_CATALOGUE[type], slots)); }
+  void QUOTE;
+  return out;
 }

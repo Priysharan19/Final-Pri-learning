@@ -19,7 +19,7 @@
 import { _forChains as FC, _internals as SM, noteStep, noteValue, NOTE_GIVEN } from './solutionMatch.js';
 import { infoOf, cleanStatement, exactForm } from './arithmeticLines.js';
 import { evaluate, parse, normalize, withEvaluationBudget } from './expr.js';
-import { contextAllowsCross, pageBlocksCross, readingIsAmbiguous, falseStepFacts, readPoly, crossDiagnosis, readDefinitions, factorsOfQuestion, isProductRuleStatement, isContextLine } from './falseStep.js';
+import { contextAllowsCross, pageBlocksCross, readingIsAmbiguous, falseStepFacts, readPoly, crossDiagnosis, readDefinitions, factorsOfQuestion, isProductRuleStatement, isContextLine, stepHow, readDerivativeStatements, isRuleSubstitution } from './falseStep.js';
 
 const BUDGET = 120000;
 const MAX_LINES = 20;
@@ -359,14 +359,46 @@ function run(q, report, warn, opts = null) {
         // where both sides are polynomials in one letter the difference is EXACT, and an exactly equal pair is never crossed
         const both = readPoly(w.facts.aboveSide) && readPoly(w.facts.writtenSide);
         const f = falseStepFacts(w.facts.aboveSide, w.facts.writtenSide);
-        if (!both || f) diag = crossDiagnosis(f, w.facts.example);
+        if (!both || f) {
+          const priorOk = out.slice(0, i).filter(x => x && x.status === 'ok').length;
+          diag = crossDiagnosis(f, w.facts.example, { aboveSide: w.facts.aboveSide, writtenSide: w.facts.writtenSide, lineNo: i + 1, checkedBefore: priorOk, ruleApplied: out.slice(0, i).some(x => x && x.how && x.how.kind === 'substituted') });
+        }
       }
       if (diag) { crossedAt = i; crossedDiagnosis = diag; out[i] = { text: l.text, status: 'break', state: 'wrong', note: diag.message, diagnosis: diag }; continue; }
       out[i] = { text: l.text, status: 'note', state: 'unverified', unverified: true, note: w.note, slipWarning: true }; continue;   // a warned line ticks nothing below it
     }
     if (contradicted(s)) bad = true; else { above = describe(); if (above) hist.push(above); }
   }
-  if (!matched && !warned && !followed && !setups) return { report, matched: 0, warned: 0 };
+  // What each ticked line DID (engine/falseStep.js stepHow): recomputed from the line and the line above, never from a note. Words only.
+  let howed = 0;
+  {
+    let derivs = null, ruleRhs = null, ruleAt = -1;
+    const after = t => String(t).replace(/^\s*=\s*/, '');
+    for (let i = 0; i < out.length; i++) {
+      const l = out[i];
+      if (!l || l.status !== 'ok' || typeof l.text !== 'string') continue;
+      if (defs && !derivs) {
+        const items = readDerivativeStatements(l.text, defs);
+        if (items && items.length === defs.length) { derivs = items; out[i] = { ...l, how: { kind: 'derivatives', items: items.map(x => ({ nameTex: x.nameTex, exprTex: x.exprTex })) } }; howed++; continue; }
+      }
+      if (l.fact && l.fact.kind === 'rule-statement') { ruleRhs = String(l.text).split('=').slice(1).join('='); ruleAt = i; continue; }
+      if (!/^\s*=/.test(l.text) || after(l.text).includes('=') || i === 0) continue;
+      const up = out[i - 1];
+      if (!up || up.status !== 'ok' || typeof up.text !== 'string') continue;
+      let how = null;
+      if (i - 1 === ruleAt && ruleRhs && defs && derivs && isRuleSubstitution(ruleRhs, after(l.text), defs, derivs)) how = { kind: 'substituted', names: [defs[0].name, defs[1].name] };
+      else { const sides = String(up.text).split('='); how = stepHow(sides[sides.length - 1], after(l.text)); }
+      if (how) { out[i] = { ...l, how }; howed++; }
+    }
+  }
+  // the method was applied correctly on a line above the cross: the annotation says the slip is in the algebra, not the rule
+  if (crossedAt >= 0 && crossedDiagnosis && crossedDiagnosis.kept && !/product rule/.test(crossedDiagnosis.kept) && out.slice(0, crossedAt).some(x => x && x.how && x.how.kind === 'substituted')) {
+    const kept = `${crossedDiagnosis.kept} The product rule was applied correctly; this is an algebra slip.`;
+    const comment = String(crossedDiagnosis.comment).replace(crossedDiagnosis.kept, kept);
+    crossedDiagnosis = { ...crossedDiagnosis, kept, comment, message: comment };
+    out[crossedAt] = { ...out[crossedAt], note: comment, diagnosis: crossedDiagnosis };
+  }
+  if (!matched && !warned && !followed && !setups && !howed) return { report, matched: 0, warned: 0 };
 
   function tickLine(l, s0, up) {
     const text = l.text;
@@ -574,7 +606,7 @@ function run(q, report, warn, opts = null) {
   const { arithmetic: _a, ...rest } = report;
   const anyOk = stated.some(x => x.solutionMatch === true || x.status === 'ok');
   return {
-    matched: matched + setups, warned: warned + followed, crossed: crossedAt >= 0 ? crossedAt : -1,
+    matched: matched + setups + howed, warned: warned + followed, crossed: crossedAt >= 0 ? crossedAt : -1,
     report: {
       ...(report.arithmetic === true && !anyOk ? report : rest), lines: stated, source: 'value-chain', ...(matched ? { solutionMatched: true } : {}),
       // the first crossed line (zero-based, like every report's firstBreak) and its 1-based number: the client says "correct until line N"

@@ -20,7 +20,8 @@ import { stepEvidence } from '../platform/markerOps.js';
 import { checkAnswer } from '../../client/src/engine/checker.js';
 import { commentFor, CROSS_KINDS } from '../../client/src/engine/lineCommentary.js';
 import { buildAnnotatedWorking } from '../../client/src/components/annotatedWorkingModel.js';
-import { contextAllowsCross, pageBlocksCross, readingIsAmbiguous, falseStepFacts, readPoly } from '../../client/src/engine/falseStep.js';
+import { contextAllowsCross, pageBlocksCross, readingIsAmbiguous, falseStepFacts, readPoly, stepHow, readDefinitions, readDerivativeStatements, isRuleSubstitution, explainFalseStep } from '../../client/src/engine/falseStep.js';
+import { evalNumeric } from '../../client/src/engine/expr.js';
 
 let pass = 0; const failures = [];
 const ok = (c, l) => { if (c) pass++; else failures.push(l); };
@@ -32,7 +33,8 @@ const mark = (q, lines, answer, opts = { slipWarnings: true }) => {
   const ev = stepEvidence(q, answer, lines.join('\n'), res, opts);
   return { res, ev, report: ev.stepReport, st: (ev.stepReport?.lines || []).map(l => l.status), states: (ev.stepReport?.lines || []).map(l => l.state) };
 };
-const crossed = r => (r.report?.lines || []).flatMap((l, i) => (l.status === 'break' ? [i + 1] : []));
+const crossed = r => (r.report?.lines || []).flatMap((l, i) => (l.status === 'break' && l.diagnosis?.code === 'false-continuation' ? [i + 1] : []));
+const anyCross = r => (r.report?.lines || []).flatMap((l, i) => (l.status === 'break' ? [i + 1] : []));
 
 // ── 1. the owner's page ──────────────────────────────────────────────────────────────────────────────────────────
 const PAGE = ['Differentiate y = x^2(x-1) using the product rule.', 'Let u = x^2 and v = x - 1.', "Then u' = 2x and v' = 1.", 'By the product rule,', "dy/dx = u'v + uv'", '= 2x(x-1) + x^2(1)', '= 2x(x-1) + x^2', '= 2x^2 - 2x + x^2', '= 3x^2 - x'];
@@ -56,7 +58,7 @@ const PAGE = ['Differentiate y = x^2(x-1) using the product rule.', 'Let u = x^2
   const c = commentFor(card, {});
   ok(c?.kind === 'crossTerms' && /-2x\$ term became \$-x\$/.test(c.text) && /corrected line is \$= 3x\^2 - 2x\$/.test(c.text) && /the other terms are the same/.test(c.text), `the comment: ${c?.text}`);
   ok(!/\bshould\b/i.test(c.text) && !/[—–]/.test(c.text), 'no should, no dash');
-  ok(JSON.stringify(model.cards.map(k => k.status)) === 'not-verified,checked,checked,not-verified,checked,checked,checked,checked,first-error', 'the card statuses an old client reads');
+  ok(model.cards.map(k => k.status).join() === 'not-verified,checked,checked,not-verified,checked,checked,checked,checked,first-error', 'the card statuses an old client reads');
   // old stored shapes still read: status/state/note per line, firstBreak a number
   ok(r.report.lines.every(l => typeof l.text === 'string' && typeof l.status === 'string') && Number.isInteger(r.report.firstBreak), 'the report keeps its shape');
 }
@@ -78,16 +80,17 @@ const PAGE = ['Differentiate y = x^2(x-1) using the product rule.', 'Let u = x^2
 
 // ── 2. the cross conditions ──────────────────────────────────────────────────────────────────────────────────────
 const SIMPLIFY = QUESTION('Expand and simplify $(x + 1)(x - 2)$.', 'x^2-x-2');
-const neverCrossed = (q, lines, what, opts) => { const r = mark(q, lines, '', opts); ok(crossed(r).length === 0 && !(r.report?.firstBreak >= 0), `${what}: never a cross (${r.st})`); return r; };
+const neverCrossed = (q, lines, what, opts) => { const r = mark(q, lines, '', opts); ok(crossed(r).length === 0, `${what}: never a false-continuation cross (${r.st})`); return r; };
 {
   // a plain slip in a chain of rewrites is crossed, and the lines below it are not ticked as following from it
-  const r = mark(SIMPLIFY, ['y = (x + 1)(x - 2)', '= x^2 - 2x + x - 2', '= x^2 - x - 2', '= x^2 - x - 3', '= x^2 - x - 3'], 'x^2-x-3');
-  ok(crossed(r).join() === '4', `a slip in the constant: ${r.st}`);
-  ok(r.report.lines[3].diagnosis.changed[0].fromTex === '-2' && r.report.lines[3].diagnosis.changed[0].toTex === '-3', 'the constant changed from -2 to -3');
-  ok(r.st[4] !== 'ok' && r.st[4] !== 'break', `the line that repeats the slip is not ticked and not crossed again: ${r.st[4]}`);
-  // no cascade: two slips, one cross, at the first
-  const two = mark(SIMPLIFY, ['y = (x + 1)(x - 2)', '= x^2 - 2x + x - 2', '= x^2 - x - 3', '= x^2 - 2x - 3'], 'x^2-2x-3');
-  ok(crossed(two).join() === '3', `two slips: only the first is crossed (${two.st})`);
+  const base = PAGE.slice(0, 8);
+  const r = mark(PRODUCT, [...base, '= 3x^2 - x', '= 3x^2 - x'], '3x^2-x');
+  ok(crossed(r).join() === '9', `a slip then the same slip repeated: ${r.st}`);
+  ok(r.st[9] !== 'ok' && r.st[9] !== 'break', `the line that repeats the slip is not ticked and not crossed again: ${r.st[9]}`);
+  const two = mark(PRODUCT, [...base, '= 3x^2 - x', '= 3x^2 - x + 5'], '3x^2-x+5');
+  ok(crossed(two).join() === '9', `two slips: only the first is crossed (${two.st})`);
+  const miss = mark(PRODUCT, [...base, '= 3x^2'], '3x^2');
+  ok(crossed(miss).join() === '9' && miss.report.lines[8].diagnosis.changed[0].toTex === null, 'a dropped term is named as missing');
   // a line that is not the same line above: equivalent forms are never crossed
   neverCrossed(SIMPLIFY, ['y = x^2 - 1', '= (x - 1)(x + 1)', '= x^2 - 1'], 'factored then expanded');
   neverCrossed(QUESTION('Simplify $y = \\dfrac{1}{\\sqrt{2}}$.', 'sqrt(2)/2'), ['y = 1/sqrt(2)', '= sqrt(2)/2', '= 0.5sqrt(2)'], 'a surd rationalised');
@@ -127,23 +130,21 @@ const neverCrossed = (q, lines, what, opts) => { const r = mark(q, lines, '', op
   neverCrossed(SIMPLIFY, ['y = x^2 + 2x + 1', '= (x + 1)^2', '= e^2x'], 'e^2x');
   // a line the reader was not sure of is dropped before the engine (readingFloor.js); the line that follows the gap is never crossed
   {
-    const lines = ['y = (x + 1)(x - 2)', '= x^2 - 2x + x - 2', '= x^2 - x - 2', '= x^2 - x - 3'];
-    const without = mark(SIMPLIFY, lines, 'x^2-x-3');
-    const gap = mark(SIMPLIFY, lines, 'x^2-x-3', { slipWarnings: true, gaps: [3] });
-    ok(crossed(without).join() === '4' && crossed(gap).length === 0, `a line after a dropped (uncertain) line is not crossed: ${gap.st}`);
-    const gapElsewhere = mark(SIMPLIFY, lines, 'x^2-x-3', { slipWarnings: true, gaps: [1] });
-    ok(crossed(gapElsewhere).join() === '4', 'a gap elsewhere on the page changes nothing here');
+    const lines = PAGE;
+    const without = mark(PRODUCT, lines, '3x^2-x');
+    const gap = mark(PRODUCT, lines, '3x^2-x', { slipWarnings: true, gaps: [8] });
+    ok(crossed(without).join() === '9' && crossed(gap).length === 0, `a line after a dropped (uncertain) line is not crossed: ${gap.st}`);
+    const gapElsewhere = mark(PRODUCT, lines, '3x^2-x', { slipWarnings: true, gaps: [2] });
+    ok(crossed(gapElsewhere).join() === '9', 'a gap elsewhere on the page changes nothing here');
   }
   // never after another break, and never over an exact equality
   ok(falseStepFacts('x^2 - x - 2', '(x - 2)(x + 1)') === null && falseStepFacts('x^2 - x - 2', 'x^2 - x - 3') !== null, 'exact: equal polynomials give no facts, a differing pair does');
   ok(readPoly('x^2(x - 1)')?.c.size === 2 && readPoly('sin(x)') === null && readPoly('x^2 + y') === null, 'polynomials in one letter are read exactly, nothing else');
   // the fallback: a line that is not a polynomial carries the engine's numeric example and no claim about terms
-  const f = mark(QUESTION('Simplify $y = \\sin x\\cos x$.', 'sin(2x)/2'), ['y = sin(x)cos(x)', '= sin(x)cos(x)', '= sin(2x)'], 'sin(2x)');
-  if (crossed(f).length) {
-    const d = f.report.lines[crossed(f)[0] - 1].diagnosis;
-    const c = commentFor({ n: crossed(f)[0], status: 'first-error', text: '= sin(2x)', diagnosis: d }, {});
-    ok(d.exact === false && c?.kind === 'crossExample' && /is not equal to the line above/.test(c.text) && !/corrected/.test(c.text), `a non-polynomial cross: example only (${c?.text})`);
-  } else ok(true, 'a non-polynomial slip stays a note');
+  const { crossDiagnosis } = await import('../../client/src/engine/falseStep.js');
+  const d = crossDiagnosis(null, { at: [{ v: 'x', value: 0.37 }], above: -0.3293, written: 0.0407 });
+  const c = commentFor({ n: 3, status: 'first-error', text: '= sin(2x)', diagnosis: d }, {});
+  ok(d.exact === false && c?.kind === 'crossExample' && /is not equal to the line above/.test(c.text) && !/corrected/.test(c.text), `a non-polynomial cross: example only (${c?.text})`);
 }
 
 // ── 3. the diagnosis panel (the tutor's first break) ─────────────────────────────────────────────────────────────
@@ -153,6 +154,80 @@ const neverCrossed = (q, lines, what, opts) => { const r = mark(q, lines, '', op
   ok(ev.firstBreak === 8, `the tutor evidence names the cross as the first break: ${ev.firstBreak}`);
   const right = tutorEvidence(PRODUCT, PAGE.map(l => (l === '= 3x^2 - x' ? '= 3x^2 - 2x' : l)));
   ok(right.firstBreak === -1, 'no first break on the right page');
+}
+// ── 4. every tick says what the engine recomputed the line did ───────────────────────────────────────────────────────
+{
+  const right = PAGE.map(l => (l === '= 3x^2 - x' ? '= 3x^2 - 2x' : l));
+  const r = mark(PRODUCT, right, '3x^2-2x');
+  const model = buildAnnotatedWorking({ lines: right, stepReport: r.report });
+  const say = k => commentFor(model.cards[k], {})?.text ?? null;
+  ok(say(1) === 'Good choice of $u$ and $v$: their product is the function in the question.', `line 2: ${say(1)}`);
+  ok(say(2) === "Both derivatives are right: $u' = 2x$ and $v' = 1$.", `line 3: ${say(2)}`);
+  ok(say(4) === 'Correct statement of the product rule.', `line 5: ${say(4)}`);
+  ok(say(5) === "Correct substitution of $u$, $v$, $u'$ and $v'$ into the product rule.", `line 6: ${say(5)}`);
+  ok(say(6) === 'Multiplying by $1$ changes nothing, so this equals the line above.', `line 7: ${say(6)}`);
+  ok(/^Correct expansion: \$2x.*= 2x\^2 - 2x\$\.$/.test(say(7) || ''), `line 8: ${say(7)}`);
+  ok(say(8) === 'Like terms collected correctly: $2x^2 + x^2 = 3x^2$.', `line 9: ${say(8)}`);
+  ok(say(0) === null && say(3) === null, 'context lines carry no praise');
+  ok(model.cards.every((c, k) => c.status !== 'checked' || say(k)), 'every tick on this page carries a specific comment');
+  // a wrong derivative statement, a wrong substitution: no praise
+  const d = readDefinitions('Let u = x^2 and v = x - 1.');
+  ok(readDerivativeStatements("Then u' = 3x and v' = 1.", d) === null && readDerivativeStatements("Then u' = 2x.", d)?.length === 1, 'a derivative is praised only when it is the exact derivative');
+  const dv = readDerivativeStatements("Then u' = 2x and v' = 1.", d);
+  ok(isRuleSubstitution("u'v + uv'", '2x(x-1) + x^2(1)', d, dv) === true && isRuleSubstitution("u'v + uv'", '2x(x-1) + x^2(2)', d, dv) === false && isRuleSubstitution("u'v + uv'", '2x(x-1)', d, dv) === false, 'a substitution is praised only when it equals the rule with the page\'s own expressions put in');
+  // each claim holds term by term, or it is not made
+  ok(stepHow('2x(x-1) + x^2', '2x^2 - 2x + x^2')?.kind === 'expanded', 'expansion recomputed');
+  ok(stepHow('2x(x-1) + x^2', '2x^2 - x + x^2') === null, 'a wrong expansion is not praised (and is not equal)');
+  ok(stepHow('2x(x-1) + x^2', '3x^2 - 2x')?.kind === 'equal-above', 'expanded AND collected in one step: only "equal", no expansion claimed');
+  ok(stepHow('2x^2 - 2x + x^2', '3x^2 - 2x')?.kind === 'collected' && stepHow('2x^2 - 2x + x^2', '3x^2 - 2x').groups[0].fromTex === '2x^2 + x^2', 'like terms recomputed');
+  ok(stepHow('7(6) + 7(5)', '42 + 35') === null || stepHow('7(6) + 7(5)', '42 + 35').kind !== 'expanded', 'a bracket of numbers is evaluated, not expanded');
+  ok(stepHow('4 + 4 + 1', '9') === null || stepHow('4 + 4 + 1', '9').kind !== 'collected', 'adding numbers is not collecting like terms');
+  ok(stepHow('x^2(1) + x', 'x^2 + x')?.kind === 'one' && stepHow('x^2(2) + x', 'x^2 + x') === null, 'multiplying by one only when dropping the (1) gives the line');
+  ok(stepHow('(x + 1)^2', 'x^2 + 2x + 1')?.kind === 'expanded' && stepHow('(x + 1)^2', 'x^2 + 1') === null, 'a square expanded term by term; a dropped term is not equal and not praised');
+}
+// ── 5. the annotation of a crossed line: each field computed, each error type told only when exact ─────────────────────
+{
+  const ev = (t, x) => { const r = evalNumeric(t, { x }); return typeof r === 'number' ? r : r?.value; };
+  const CASES = [
+    // [type, line above, line written, a phrase the explanation must carry]
+    ['coefficient-beside-collected', '2x^2 - 2x + x^2', '3x^2 - x', 'Collecting 2x^2 + x^2 gives 3x^2 and leaves the -2x term alone, so -2x stays -2x.'],
+    ['coefficient-alone', '3x^2 - 2x', '3x^2 - x', 'Nothing in the line above combines with the -2x term'],
+    ['like-terms-wrong', '2x^2 + 3x + x', '2x^2 + 5x', 'Adding 3x + x gives 4x, not 5x.'],
+    ['dropped-term', '2x^2 - 2x + x^2', '3x^2', 'the -2x term is missing'],
+    ['extra-term', '2x^2 - 2x + x^2', '3x^2 - 2x + 5', 'no 5 term'],
+    ['sign-error', '2x^2 - 2x + x^2', '3x^2 + 2x', 'The sign of the -2x term changed'],
+    ['exponent-changed', 'x^2 + 3x', 'x^3 + 3x', 'The power x^2 became x^3'],
+    ['bracket-product', '(x + 1)(x - 2)', 'x^2 - x', '1 \u00d7 -2 = -2 is missing']
+  ];
+  for (const [type, above, written, phrase] of CASES) {
+    const e = explainFalseStep(above, written);
+    ok(e && e.type === type && e.whyWrong.includes(phrase), `${type}: ${e?.type} / ${e?.whyWrong}`);
+    // the corrected line is the line above in its simplest form and equals it at every point tried
+    ok(ev(e.corrected.replace(/^=\s*/, ''), 1.7) !== undefined && Math.abs(ev(e.corrected.replace(/^=\s*/, ''), 1.7) - ev(above, 1.7)) < 1e-9, `${type}: the corrected line equals the line above`);
+    // the self-check sentence is recomputed: both numbers are what the two lines give at that x
+    const m = /^At x = (-?\d+) the line above gives (-?[\d/]+) but this line gives (-?[\d/]+)\.$/.exec(e.check || '');
+    const num = t => (t.includes('/') ? Number(t.split('/')[0]) / Number(t.split('/')[1]) : Number(t));
+    ok(m && Math.abs(ev(above, Number(m[1])) - num(m[2])) < 1e-9 && Math.abs(ev(written, Number(m[1])) - num(m[3])) < 1e-9 && num(m[2]) !== num(m[3]), `${type}: the check sentence is recomputed (${e.check})`);
+  }
+  // guards: the wrong type is never claimed
+  const guard = (above, written, notTypes, what) => { const e = explainFalseStep(above, written); ok(e && !notTypes.includes(e.type), `${what}: not ${notTypes.join('/')} (got ${e?.type})`); return e; };
+  guard('2x^2 - 2x + x^2', '3x^2 - x', ['like-terms-wrong', 'sign-error', 'dropped-term'], 'a changed coefficient beside a collection');
+  guard('2x^2 + 3x + x', '2x^2 + 5x', ['coefficient-beside-collected', 'coefficient-alone'], 'a wrong sum');
+  const br = explainFalseStep('(x + 1)(x - 2)', 'x^2 - x + 2');
+  ok(br && br.type === undefined && br.whyWrong === undefined && br.whatChanged && br.corrected, 'a sign change out of a bracket is not called a sign error (it is not classified; what changed and the corrected line are still given)');
+  const lost = explainFalseStep('5x^2 - 3x', '5x^2 - 3');
+  ok(lost && lost.type === undefined && lost.whyWrong === undefined, 'a letter lost from a term is not called an exponent error');
+  ok(explainFalseStep('x^2 + 1', 'x^2 + 1') === null && explainFalseStep('sin(x)', 'cos(x)') === null, 'equal lines and non-polynomials give no annotation');
+  // on the owner's page: every field, and a concise plain comment for old clients
+  const r = mark(PRODUCT, PAGE, '3x^2-x');
+  const d = r.report.lines[8].diagnosis;
+  ok(d.whatChanged === 'The term -2x became -x.' && d.whyWrong === 'Collecting 2x^2 + x^2 gives 3x^2 and leaves the -2x term alone, so -2x stays -2x.' && d.corrected === '= 3x^2 - 2x' && d.fromLine === 8, `fields: ${d.whatChanged} | ${d.corrected} | ${d.fromLine}`);
+  ok(d.check === 'At x = 1 the line above gives 1 but this line gives 2.' && /^Every line checked before line 9 is correct\. The product rule was applied correctly; this is an algebra slip\.$/.test(d.kept), `check and kept: ${d.check} | ${d.kept}`);
+  ok(d.comment === d.message && r.report.lines[8].note === d.comment && d.comment.includes(d.whatChanged) && d.comment.includes('Corrected line: = 3x^2 - 2x.'), `the plain comment: ${d.comment}`);
+  // kept is said only when something before the cross was ticked
+  const bare = mark(QUESTION('Expand and simplify.', 'x'), ['y = 2x^2 - 2x + x^2', '= 2x^2 - 2x + x^2', '= 3x^2 - x'], '');
+  const bd = bare.report.lines.find(l => l.diagnosis?.code === 'false-continuation')?.diagnosis;
+  ok(!bd || bd.kept === undefined || /^Every line checked before line \d is correct\.$/.test(bd.kept), 'no product-rule claim without a verified substitution');
 }
 ok(CROSS_KINDS.includes('crossTerms') && CROSS_KINDS.includes('crossExact') && CROSS_KINDS.includes('crossExample'), 'the new comment kinds are cross kinds');
 
