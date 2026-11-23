@@ -23,6 +23,8 @@ import { cloud } from '../platform/cloudTransport.js';
 import { tLater, useT } from '../i18n/index.js';
 import { MathText } from '../lib/latex.jsx';
 import { CRITERION_HELP, CRITERION_WORD, LINE_WORD, inkShort, misconceptionName } from './classroomWords.js';
+import { formatDateTime } from '../lib/locale.js';
+import { defaultCourse } from '../platform/edition.js';
 
 // SWAP POINT (original-ink lane, PR #1019): when client/src/components/OriginalWork.jsx
 // exists, replace the next line with
@@ -104,7 +106,7 @@ export function ReviewOriginal({ item, classId }) {
 }
 
 function historyLine(t, h) {
-  const when = new Date(h.decidedAt).toLocaleString();
+  const when = formatDateTime(h.decidedAt, defaultCourse());
   return h.decision === 'award'
     ? t('tw.review.historyAward', { count: h.marks, n: h.marks, when })
     : t('tw.review.historyDecline', { when });

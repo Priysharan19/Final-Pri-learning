@@ -14,7 +14,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import Icon from './Icon.jsx';
-import { useT } from '../i18n/index.js';
+import { useT, useLanguage } from '../i18n/index.js';
+import { commentFor } from '../engine/lineCommentary.js';
 import { buildAnnotatedWorking } from './annotatedWorkingModel.js';
 import { CardBody, ruleLabel } from './AnnotatedWorking.jsx';
 import { Typeset } from './Typeset.jsx';
@@ -113,6 +114,9 @@ function Sheet({ source, geometry, page, active, setActive, t, cleaned }) {
  */
 export default function MarkedPage({ input, source, texOf = s => s, markReady = true, scoreShown = false, criteria = null, approved, reading = null, onCorrect = null }) {
   const t = useT();
+  const { language } = useLanguage();
+  // The engine's own commentary from its structured facts (engine/lineCommentary.js): null keeps the engine's sentence as it was.
+  const say = useMemo(() => Object.assign(card => commentFor(card, { language, ruleLabel: r => ruleLabel(r, t) }), { language }), [language, t]);
   const uid = useId();
   // A read line is shown as maths: stacked fractions and proper powers where it parses, else the reader's own text via texOf.
   // (The reader's TeX never reaches the client: the transcript keeps `text` only.)
@@ -245,17 +249,19 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
             // A verified line is ONE compact row: tick, "Line n", and the engine's own reason where it has one
             // (a named rule, the question, a stated condition, the line before). No specific reason: just tick and number.
             if (status === 'checked' || status === 'condition') {
-              const why = whyOf(card, t);
+              const said = say(card);
+              const why = said ? said.text : whyOf(card, t);
               return (
                 <li key={it.id} className={`mp-card mp-row is-${status}${reading ? ' has-read' : ''}${active === n ? ' is-active' : ''}`} data-mp-card={n} data-mp-status={status} tabIndex={0} style={pos} {...on(n)}>
                   <Icon name={st.icon} size={14} />
                   <span className="mp-row-n">{t('mp.line', { n })}</span>
-                  {why && <span className="mp-row-why" data-mp-why>{whyIsEngine(card) ? <EngineComment text={why} /> : why}</span>}
+                  {why && <span className="mp-row-why" data-mp-why data-mp-said={said ? said.kind : undefined}>{said ? <EngineComment text={why} lang={language} /> : whyIsEngine(card) ? <EngineComment text={why} /> : why}</span>}
                   <span className="sr-only">{t(st.word)}</span>
                   {reading && readingOfLine(n)}
                 </li>
               );
             }
+            const saidCross = status === 'first-error' ? say(card) : null;
             const sentence = status === 'first-error' ? firstSentence(card.diagnosis?.message || card.diagnosis?.title || card.note || '') : '';
             return (
               <li key={it.id} className={`mp-card is-${status}${active === n ? ' is-active' : ''}`} data-mp-card={n} data-mp-status={status} tabIndex={0} style={pos} {...on(n)}>
@@ -268,7 +274,7 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
                   <p className="mp-expr" data-mp-expr><Typeset text={card.text} texOf={lineOf} tex={textOf(n).replace(/\s+/g, '') === String(card.text).replace(/\s+/g, '') ? latexOf(n) : null} /></p>
                 )}
                 {status === 'first-error'
-                  ? <p className="mp-text mp-sentence-1" data-mp-why-error>{sentence ? (sentence.includes('$') && dollarsBalanced(sentence) ? <EngineComment text={sentence} /> : <Typeset text={sentence} texOf={texOf} />) : (n > 1 ? t('aw.body.firstError', { n: n - 1 }) : t('aw.body.firstErrorStart'))}</p>
+                  ? <p className="mp-text mp-sentence-1" data-mp-why-error>{saidCross ? <EngineComment text={saidCross.text} lang={language} /> : sentence ? (sentence.includes('$') && dollarsBalanced(sentence) ? <EngineComment text={sentence} /> : <Typeset text={sentence} texOf={texOf} />) : (n > 1 ? t('aw.body.firstError', { n: n - 1 }) : t('aw.body.firstErrorStart'))}</p>
                   : <div className="mp-text"><CardBody card={card} model={model} t={t} /></div>}
                 {reading && status !== 'unread' && readingOfLine(n)}
               </li>

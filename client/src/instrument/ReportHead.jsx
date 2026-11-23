@@ -34,7 +34,7 @@ const noon = key => `${key}T12:00:00Z`;
 function dateName(key, user, options) {
   try { return new Intl.DateTimeFormat(user?.language === 'hi' ? 'hi-IN' : localeOf(user), { timeZone: 'UTC', ...options }).format(new Date(noon(key))); } catch { return key; }
 }
-const fmtPct = v => (v == null ? '—' : `${Math.round(v)}%`);
+const fmtPct = (v, none = '—') => (v == null ? none : `${Math.round(v)}%`);
 
 /** A signed change, or nothing when there is none to state. The direction is
  *  said in a word as well as drawn in colour and a sign (a11y-check's rule:
@@ -188,7 +188,7 @@ export default function ReportHead() {
     : t('inst.chartWk', { n: i + 1 })));
   const spoken = `${t('inst.chartTitle')}. ` + series.map((p, i) => (p.methodPct == null && p.accuracyPct == null
     ? t('inst.chartPointNone', { label: labels[i] })
-    : t('inst.chartPoint', { label: labels[i], m: fmtPct(p.methodPct), a: fmtPct(p.accuracyPct) }))).join('; ');
+    : t('inst.chartPoint', { label: labels[i], m: fmtPct(p.methodPct, t('inst.noneYet')), a: fmtPct(p.accuracyPct, t('inst.noneYet')) }))).join('; ');
 
   // The lede: a fixed template over the figures above, nothing generated.
   const lede = [];
@@ -230,12 +230,12 @@ export default function ReportHead() {
       </div>
       {failed && <p className="in-note" role="status">{t('inst.reportSeriesFailed')}</p>}
       <div className="in-report-figs">
-        <div data-report-questions><b>{cur ? cur.questions : '—'}</b><small>{t('inst.reportQuestions')}</small>{cur && <Delta n={shown.delta?.questions} t={t} />}</div>
-        <div data-report-marks><b>{cur?.marksPossible ? `${cur.marksEarned}` : '—'}{cur?.marksPossible ? <span>/{cur.marksPossible}</span> : null}</b>
+        <div data-report-questions><b className={cur ? undefined : 'is-none'}>{cur ? cur.questions : t('inst.noneYet')}</b><small>{t('inst.reportQuestions')}</small>{cur && <Delta n={shown.delta?.questions} t={t} />}</div>
+        <div data-report-marks><b className={cur?.marksPossible ? undefined : 'is-none'}>{cur?.marksPossible ? `${cur.marksEarned}` : t('inst.noneYet')}{cur?.marksPossible ? <span>/{cur.marksPossible}</span> : null}</b>
           <small>{cur?.marksPct != null ? t('inst.reportMarksEarnedPct', { p: Math.round(cur.marksPct) }) : t('inst.reportMarksEarned')}</small>
           {cur?.marksPossible > 0 && <Delta n={shown.delta?.marksEarned} t={t} />}</div>
-        <div data-report-method><b>{fmtPct(cur?.methodPct)}</b><small>{t('inst.reportMethod')}</small>{cur?.methodPct != null && <Delta n={shown.delta?.methodPct} unit={t('inst.reportPts')} t={t} />}</div>
-        <div data-report-days><b>{cur ? cur.daysPractised : '—'}</b><small>{t('inst.reportDaysPractised')}</small>{cur?.streak > 0 && <> <em>{t('inst.reportStreakEm', { n: cur.streak })}</em></>}</div>
+        <div data-report-method><b className={cur?.methodPct == null ? 'is-none' : undefined}>{fmtPct(cur?.methodPct, t('inst.noneYet'))}</b><small>{t('inst.reportMethod')}</small>{cur?.methodPct != null && <Delta n={shown.delta?.methodPct} unit={t('inst.reportPts')} t={t} />}</div>
+        <div data-report-days><b className={cur ? undefined : 'is-none'}>{cur ? cur.daysPractised : t('inst.noneYet')}</b><small>{t('inst.reportDaysPractised')}</small>{cur?.streak > 0 && <> <em>{t('inst.reportStreakEm', { n: cur.streak })}</em></>}</div>
       </div>
       <div className="in-rp">
         <Chart series={series} labels={labels} t={t} spoken={spoken} failed={failed} />

@@ -116,7 +116,7 @@ export function foldTrueAsWritten(report, arithmetic) {
     const unjudged = l?.status === 'note' && (l.state === undefined || l.state === 'unverified' || l.state === 'unread') && l.note !== 'Follows from the earlier slip.';
     if (i >= limit || !unjudged || a?.status !== 'ok' || a.state !== 'arithmetic') return l;
     folded++;
-    return { text: l.text, status: 'ok', state: 'arithmetic', note: a.note, valueChain: a.valueChain };
+    return { text: l.text, status: 'ok', state: 'arithmetic', note: a.note, valueChain: a.valueChain, ...(a.fact ? { fact: a.fact } : {}) };
   });
   if (!folded) return report;
   // The report is now one that judges each line on its own (a state on every line), so the card says WHICH lines were checked.

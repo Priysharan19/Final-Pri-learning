@@ -113,12 +113,13 @@ export function guestTarget(edition, { year, course, chapter, difficulty }, rand
 }
 
 /** A saved or defaulted choice, brought back to something this edition offers (never throws). */
-export function settleChoice(edition, choice = {}, { defaultYear = 9 } = {}) {
+export function settleChoice(edition, choice = {}, { defaultYear = 9, defaultCourse = null } = {}) {
   const years = guestYears();
   // (a year the edition does not offer falls back to its own default: Prithagoras Year 12, owner decision 19 Nov 2026)
   const year = years.includes(Number(choice.year)) ? Number(choice.year) : (years.includes(Number(defaultYear)) ? Number(defaultYear) : (defaultOffering()?.year ?? 9));
   const courses = coursesFor(edition, year);
-  const course = courses.some(c => c.key === choice.course) ? choice.course : courses[0]?.key || null;
+  // (a student's own course is the first choice when nothing valid was picked: an Extension 1 student's Home does not open on Advanced)
+  const course = courses.some(c => c.key === choice.course) ? choice.course : courses.some(c => c.key === defaultCourse) ? defaultCourse : courses[0]?.key || null;
   const chapters = course ? chaptersFor(edition, year, course) : [];
   const chapter = chapters.some(c => c.id === choice.chapter) ? choice.chapter : chapters[0]?.id || null;
   const levels = chapters.find(c => c.id === chapter)?.levels || [];

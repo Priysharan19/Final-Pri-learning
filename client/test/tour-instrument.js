@@ -117,7 +117,7 @@ export const flow = {
     // The plate's three figures (design s2): certified marks, questions, covered.
     const kpis = (await page.locator('.in-kpis b').allTextContents()).map(x => x.trim());
     await check('the plate has the three figures: marks, questions, covered', kpis.length === 3 && await page.locator('.in-kpis [data-plate-marks], .in-kpis [data-plate-questions], .in-kpis [data-plate-covered]').count() === 3, JSON.stringify(kpis));
-    await check('a new student’s plate states no certified marks, 0 questions and 0% covered', kpis[0] === '—' && kpis[1] === '0' && /^(0%|—)$/.test(kpis[2]), JSON.stringify(kpis));
+    await check('a new student’s plate states no certified marks, 0 questions and 0% covered', kpis[0] === 'None yet' && kpis[1] === '0' && /^(0%|—)$/.test(kpis[2]), JSON.stringify(kpis));
     await check('accuracy stays behind the floor: no topic states a percentage for a new student', !/\d%/.test(await page.locator('.in-exs').textContent().catch(() => '')));
     const drawn = await page.evaluate(() => {
       const c = document.querySelector('[data-instrument-scope] canvas'); if (!c || !c.width) return 0;
@@ -136,7 +136,7 @@ export const flow = {
       const href = await dot.getAttribute('href');
       await check('a topic opens practice for exactly that topic', /subtopic=/.test(href) && /dotpoint=0/.test(href), href);
     }
-    await check('the plate states certified marks (none yet: —)', (await page.locator('[data-plate-marks] b').textContent()).trim() === '—');
+    await check('the plate states certified marks (none yet: None yet)', (await page.locator('[data-plate-marks] b').textContent()).trim() === 'None yet');
 
     // Practise this chapter → Practice for that chapter.
     await page.locator('[data-instrument-practise]').click();
@@ -596,7 +596,7 @@ export const writeFlow = {
       // One question is under every evidence floor: the chart draws no line,
       // never a zero, and says why.
       await check('below the floor the chart draws no point and says so', await page.locator('[data-report-chart="empty"] [data-chart-empty]').count() === 1 && await page.locator('[data-chart-line]').count() === 0);
-      await check('method marks are withheld below the floor', (await page.locator('[data-report-method] b').textContent()).trim() === '—');
+      await check('method marks are withheld below the floor', (await page.locator('[data-report-method] b').textContent()).trim() === 'None yet');
       await check('the lede is the fixed template over the figures', /^1 question answered in this period/.test(await page.locator('[data-report-lede]').textContent().catch(() => '')), await page.locator('[data-report-lede]').textContent().catch(() => ''));
       await check('Report: the period switch is in the top bar (design s7)', await page.locator('[data-instrument-bar-slot] [data-report-periods]').count() === 1);
       await check('Report: the online dot stays in the bar', await page.locator('.in-status i').isVisible());

@@ -6,10 +6,12 @@ import { tLater, useT } from '../i18n/index.js';
 import { downloadJSON } from '../lib/files.js';
 import { cloudErrorCopy, cloudErrorText, signOutEverywhereFailureKey } from '../platform/cloudErrorCopy.js';
 import OtpInput, { OTP_LENGTH } from './OtpInput.jsx';
+import { formatDateTime } from '../lib/locale.js';
+import { defaultCourse } from '../platform/edition.js';
 
 function when(value, t) {
   if (!value) return t('cloud.unknown');
-  try { return new Date(value).toLocaleString(); } catch { return t('cloud.unknown'); }
+  try { return formatDateTime(value, defaultCourse()); } catch { return t('cloud.unknown'); }
 }
 
 export default function CloudAccountSecurity({ pid, account, onChanged, onDeleted }) {

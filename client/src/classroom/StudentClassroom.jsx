@@ -16,6 +16,8 @@ import { cloud } from '../platform/cloudTransport.js';
 import { featureEnabled } from '../platform/features.js';
 import { tLater, useT } from '../i18n/index.js';
 import { CRITERION_WORD, HANDIN_ERROR, NEVER_WORD, SEES_WORD, paperLabel } from './classroomWords.js';
+import { formatDate } from '../lib/locale.js';
+import { defaultCourse } from '../platform/edition.js';
 
 const UUID = /^[0-9a-f-]{36}$/i;
 const lengthFor = minutes => (minutes >= 45 ? 15 : 10);
@@ -79,7 +81,7 @@ export function PaperAssignment({ row, handin, onHandedIn }) {
     <div className="tw-student-paper" data-paper-assignment={row.id}>
       <div className="muted">{paperLabel(t, paper)} · {t('tw.student.timed')}</div>
       {handin ? (
-        <p className="tw-note" data-handed-in>{t('tw.student.handedIn', { date: new Date(handin.handedInAt).toLocaleDateString(), score: handin.engine.score, total: handin.engine.total })}</p>
+        <p className="tw-note" data-handed-in>{t('tw.student.handedIn', { date: formatDate(handin.handedInAt, defaultCourse(), { day: 'numeric', month: 'short', year: 'numeric' }), score: handin.engine.score, total: handin.engine.total })}</p>
       ) : (
         <>
           {!body && <p className="tw-note">{t('tw.student.sitOnExams', { paper: paperLabel(t, paper) })}</p>}
@@ -93,7 +95,7 @@ export function PaperAssignment({ row, handin, onHandedIn }) {
                 <div className="field">
                   <label className="label" htmlFor={`tw-handin-${row.id}`}>{t('tw.student.choosePaper')}</label>
                   <select className="input" id={`tw-handin-${row.id}`} value={choice} onChange={e => setChoice(e.target.value)}>
-                    {papers.map(p => <option key={p.id} value={p.id}>{t('tw.student.paperOption', { title: p.title, date: new Date(p.finished_at).toLocaleDateString(), score: p.score ?? 0, total: p.total ?? 0 })}</option>)}
+                    {papers.map(p => <option key={p.id} value={p.id}>{t('tw.student.paperOption', { title: p.title, date: formatDate(p.finished_at, defaultCourse(), { day: 'numeric', month: 'short', year: 'numeric' }), score: p.score ?? 0, total: p.total ?? 0 })}</option>)}
                   </select>
                 </div>
                 <p className="tw-note">{t('tw.student.handInNote')}</p>

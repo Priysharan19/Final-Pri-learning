@@ -7,6 +7,7 @@ import Class10NCERTLibrary from '../components/Class10NCERTLibrary.jsx';
 import { readJSONFile } from '../lib/files.js';
 import { useT } from '../i18n/index.js';
 import { offersCourse } from '../platform/edition.js';
+import { formatDate } from '../lib/locale.js';
 
 export default function Classes() {
   const { user, toast } = useApp();
@@ -79,7 +80,7 @@ export default function Classes() {
                 </div>
                 <p className="muted" style={{ margin: '6px 0 14px' }}>
                   {t('common.questionsCounted', { count: task.count, n: task.count })}
-                  {task.dueAt ? t('classes.dueOn', { date: new Date(task.dueAt).toLocaleDateString(user.locale) }) : ''}
+                  {task.dueAt ? t('classes.dueOn', { date: formatDate(task.dueAt, user, { day: 'numeric', month: 'short', year: 'numeric' }) }) : ''}
                 </p>
                 <div className="row">
                   <button className="btn btn-primary btn-sm" onClick={() => nav(`/practice?task=${task.id}`)}>{t('classes.continue')}</button>

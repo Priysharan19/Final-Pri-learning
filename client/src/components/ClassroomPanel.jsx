@@ -4,6 +4,8 @@ import { assignmentSubmissions } from '../platform/assignmentReview.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
 import { tLater, useT } from '../i18n/index.js';
 import { cloudErrorCopy } from '../platform/cloudErrorCopy.js';
+import { formatDateTime } from '../lib/locale.js';
+import { defaultCourse } from '../platform/edition.js';
 
 // The class board, papers and review queue: loaded only when a teacher opens a class on /teach.
 const TeacherWorkspace = React.lazy(() => import('../classroom/TeacherWorkspace.jsx'));
@@ -31,7 +33,7 @@ function JoinCode({ code, fresh = false }) {
 
 function niceDate(t, value) {
   if (!value) return t('classroom.noDueDate');
-  try { return new Date(value).toLocaleString(); } catch { return t('classroom.dueUnavailable'); }
+  try { return formatDateTime(value, defaultCourse()); } catch { return t('classroom.dueUnavailable'); }
 }
 
 function roleLabel(t, role) {
