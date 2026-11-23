@@ -13,7 +13,8 @@ import React, { useEffect, useMemo } from 'react';
 import { MathText } from '../lib/latex.jsx';
 import Icon from './Icon.jsx';
 import { EngineComment } from './EngineComment.jsx';
-import { useT } from '../i18n/index.js';
+import { useT, useLanguage } from '../i18n/index.js';
+import { commentFor } from '../engine/lineCommentary.js';
 import { buildAnnotatedWorking, lineRange } from './annotatedWorkingModel.js';
 import './AnnotatedWorking.css';
 
@@ -64,8 +65,12 @@ function RuleLine({ rule, t }) {
   );
 }
 
-export function CardBody({ card, model, t, renderBreakDetail }) {
+export function CardBody({ card, model, t, renderBreakDetail, say = null }) {
+  // The engine's own commentary, written from its structured facts (engine/lineCommentary.js); null keeps the sentence below.
+  const said = say ? say(card) : null;
+  const saidLine = said ? <EngineComment text={said.text} lang={say.language || 'en'} /> : null;
   if (card.status === 'unread') return <p>{t('aw.body.unread')}</p>;
+  if (saidLine && card.status === 'checked' && (card.valueChain === 'given' || card.valueChain === 'verified' || card.valueChain === 'arithmetic')) return <p>{saidLine}</p>;
   if (card.valueChain === 'given') return <p>{card.restated ? t('aw.body.restates') : t('aw.body.given')}</p>;
   if (card.valueChain === 'verified') return <p>{t('aw.body.valueVerified')}{card.note ? <> <EngineComment text={card.note} /></> : ''}</p>;
   // The caveat (true as written, not checked to be the right step) is said ONCE for the page, in the result's summary sentence, never on every line.
@@ -79,6 +84,7 @@ export function CardBody({ card, model, t, renderBreakDetail }) {
     return (
       <>
         <p>{card.n > 1 ? t('aw.body.firstError', { n: card.n - 1 }) : t('aw.body.firstErrorStart')}</p>
+        {saidLine && <p className="aw-said" data-aw-said>{saidLine}</p>}
         {card.diagnosis?.title && <p className="aw-diag"><b>{card.diagnosis.title}</b>{card.diagnosis.message ? <>: <EngineComment text={card.diagnosis.message} /></> : null}</p>}
         {!card.diagnosis && card.note && <p className="aw-diag"><EngineComment text={card.note} /></p>}
         {card.diagnosis?.fix && <p className="aw-fix">{card.diagnosis.fix}</p>}
@@ -108,6 +114,8 @@ export function CardBody({ card, model, t, renderBreakDetail }) {
 
 export function AnnotatedComments({ model, renderBreakDetail = null }) {
   const t = useT();
+  const { language } = useLanguage();
+  const say = useMemo(() => Object.assign(card => commentFor(card, { language, ruleLabel: r => ruleLabel(r, t) }), { language }), [language, t]);
   if (!model) return null;
   return (
     <section className="aw-comments" aria-labelledby="aw-comments-title" data-annotated-working={model.cards.length}>
@@ -123,7 +131,7 @@ export function AnnotatedComments({ model, renderBreakDetail = null }) {
               </span>
               <span className="aw-line">{t('aw.line', { n: card.n })}</span>
             </div>
-            <div className="aw-body"><CardBody card={card} model={model} t={t} renderBreakDetail={renderBreakDetail} /></div>
+            <div className="aw-body"><CardBody card={card} model={model} t={t} renderBreakDetail={renderBreakDetail} say={say} /></div>
           </li>
         ))}
       </ol>

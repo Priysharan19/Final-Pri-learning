@@ -424,6 +424,8 @@ export function matchesShape(ast, shapes) {
 // ── The diagnosis of a false segment ─────────────────────────────────────────
 const OPERATION = { '+': 'addition', '-': 'subtraction', '*': 'multiplication', '/': 'division', '^': 'power' };
 
+const BARE_VALUE = /^[-+]?\d+(?:\.\d+)?(?:\s*\/\s*\d+(?:\.\d+)?)?$/;
+
 /** "Check the addition: 9 + 24 equals 33, not 35." */
 export function chainDiagnosis(fromText, fromAst, fromValue, toText, toValue) {
   // The computed side names the operation; the bare number is what it was called.
@@ -440,7 +442,8 @@ export function chainDiagnosis(fromText, fromAst, fromValue, toText, toValue) {
       title: 'A value changed between lines',
       message: `${fmt(toValue)} does not follow: the working above reached ${fmt(fromValue)}.`,
       fix: 'Carry the value the working reached, or redo the step that changed it.',
-      confidence: 'high'
+      confidence: 'high',
+      expected: fromValue, written: toValue, expectedFrom: 'line-above'
     };
   }
   // A formula in letters (`a + (n - 1)d = 35`) is wrong once its values are put in.
@@ -457,7 +460,13 @@ export function chainDiagnosis(fromText, fromAst, fromValue, toText, toValue) {
     title: 'Arithmetic slip',
     message,
     fix: 'Redo this one calculation, then carry the rest of the working forward.',
-    confidence: 'high'
+    confidence: 'high',
+    // Structured facts (never parsed from the message), for engine/lineCommentary.js: the two sides, each with its text, its
+    // value and whether it is a bare number or fraction. Neither is "expected": when both are computed either may be the slip.
+    // A formula in letters carries none (its value depends on the givens put in).
+    ...(!lettered && Number.isFinite(fromValue) && Number.isFinite(toValue) ? { expectedFrom: 'sides', sides: { count: 2,
+      left: { text: fromText, value: fromValue, bare: BARE_VALUE.test(String(fromText).trim()) },
+      right: { text: toText, value: toValue, bare: BARE_VALUE.test(String(toText).trim()) } } } : {})
   };
 }
 
