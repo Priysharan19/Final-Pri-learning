@@ -31,6 +31,16 @@ ok(/path="\*" element=\{NOT_FOUND_PAGE \? <UnknownAddress otherwise=\{<Login \/>
 ok(/<Route path="\*" element=\{NOT_FOUND_PAGE \? <NotFound to=\{roleLanding\} signedIn \/> : <Navigate to=\{roleLanding\} replace \/>\}/.test(app), 'signed in: not-found with the button to the role\'s home; Priyabhata: the redirect it had');
 ok(/<UnknownAddress to="\/" otherwise=\{<AccountActivationGate/.test(app), 'the activation gate keeps its own screen at real addresses');
 
+// The matcher itself, lifted from App.jsx and run: it must agree with react-router on these patterns.
+const matcher = app.match(/const isRoute = (\(pattern, pathname\) => \{[\s\S]*?\n\};)/);
+ok(matcher, 'App.jsx declares isRoute');
+const isRoute = new Function(`return ${matcher[1].replace(/;$/, '')}`)();
+for (const [pattern, path, want] of [
+  ['/practice', '/practice', true], ['/practice', '/practice/', true], ['/Practice', '/practice', true], ['/practice', '/practise', false],
+  ['/exams/:id', '/exams/abc', true], ['/exams/:id', '/exams', false], ['/exams/:id', '/exams/a/b', false],
+  ['/', '/', true], ['/', '/x', false], ['/welcome/marking', '/welcome/marking', true], ['/welcome', '/this-does-not-exist', false]
+]) ok(isRoute(pattern, path) === want, `isRoute(${pattern}, ${path}) is ${want}`);
+
 ok((page.match(/<h1\b/g) || []).length === 1, 'the page has exactly one h1');
 ok((page.match(/<p\b/g) || []).length === 1, 'the page has exactly one sentence');
 ok((page.match(/<PageLink\b/g) || []).length === 1 && !/<button\b/.test(page), 'the page has exactly one button');

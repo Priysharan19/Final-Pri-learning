@@ -2,7 +2,7 @@ import { featureEnabled, INTERFACE_SKIN_UI } from './platform/features.js';
 import Aurora from './instrument/Aurora.jsx';
 import Working from './instrument/Working.jsx';
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from 'react';
-import { Routes, Route, useLocation, useNavigate, Navigate, matchPath } from 'react-router-dom';
+import { Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { EDITION } from './platform/edition.js';
 import PageLink from './components/PageLink.jsx';
 import { api } from './api.js';
@@ -102,10 +102,16 @@ const APP_PATHS = NOT_FOUND_PAGE ? [
   '/contact', '/grievance', '/refunds', '/settings', '/account-action', '/guardian/consent', '/account/delete-request',
   '/parent/report-email'
 ] : [];
+// react-router's own matching for these patterns (static segments, case-insensitive, ":param" for one segment,
+// a trailing slash allowed), written here so Priyabhata's and Prithagoras's builds import the same router exports.
+const isRoute = (pattern, pathname) => {
+  const a = pattern.split('/').filter(Boolean), b = pathname.split('/').filter(Boolean);
+  return a.length === b.length && a.every((seg, i) => seg.startsWith(':') ? b[i] !== '' : seg.toLowerCase() === b[i].toLowerCase());
+};
 /** The `*` route before the shell: Login at a real app address, "not found" anywhere else (Prithagoras). */
 function UnknownAddress({ otherwise, to }) {
   const { pathname } = useLocation();
-  const known = APP_PATHS.some(path => matchPath({ path, end: true }, pathname));
+  const known = APP_PATHS.some(path => isRoute(path, pathname));
   return known ? otherwise : <NotFound to={to} signedIn={false} />;
 }
 

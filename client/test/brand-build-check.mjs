@@ -83,6 +83,9 @@ function checkBuild(dist) {
 export const NOTES_CHUNK = /^(?:notes-.+|Notes|NswNotes|notesIndex|e3|studyJourney)$/;
 // Owner decision, 19 Nov 2026: Prithagoras hides Rapid Fire and Match, so its build (vite.config.js __PRI_GAMES__) emits neither page.
 export const GAMES_CHUNK = /^(?:Rush|Match)$/;
+// Launch polish: the Prithagoras build emits a not-found page, and neither India's four NCERT Class 8 and 9 sections nor the Class 8 and 9
+// banks only they reach (App.jsx NOT_FOUND_PAGE, pages/Practice.jsx NCERT_SECTIONS; __PRI_AU_BUILD__ in vite.config.js).
+export const EDITION_PAGE_CHUNK = /^(?:NotFound|LinearEquationsTopperSectionProduction|RationalNumbersTopperSectionProduction|NcertClass8ChapterSection|NcertClass9ChapterSection|class8-chapters-3-13-production|class8-linear-production|class8-rational-production|class9-chapters-production)$/;
 const NOTES_REF = /\b(?:notes-[A-Za-z0-9_-]+?|NswNotes|Notes|notesIndex|e3|studyJourney)-#\.(js|css)\b/g;
 const norm = s => s.replace(/-[A-Za-z0-9_-]{8}\.(js|css|woff2?|ttf|png|svg|json)\b/g, '-#.$1').replace(/pri-[0-9a-f]{12}/g, 'pri-#').replace(NOTES_REF, 'NOTES-#.$1');
 function contents(dist) {
@@ -107,7 +110,7 @@ if (BOTH) {
     const rootOf = rel => rel.replace(/^assets\//, '').replace(/-[A-Za-z0-9_-]{8}\.\w+$/, '').replace(/^_pri-legal-hindi-none$/, 'legalHindi');
     const roots = m => new Set([...m.keys()].filter(rel => /-[A-Za-z0-9_-]{8}\.\w+$/.test(rel)).map(rootOf));
     const aOnly = [...roots(A)].filter(r => !roots(B).has(r)), bOnly = [...roots(B)].filter(r => !roots(A).has(r));
-    ok(A.size === B.size || [...aOnly, ...bOnly].every(r => NOTES_CHUNK.test(r) || GAMES_CHUNK.test(r)), `the two builds have the same files, but for each edition's notes (${A.size}, ${B.size}; only in ${first}: ${aOnly.join(', ') || 'none'}; only in ${other}: ${bOnly.join(', ') || 'none'})`);
+    ok(A.size === B.size || [...aOnly, ...bOnly].every(r => NOTES_CHUNK.test(r) || GAMES_CHUNK.test(r) || EDITION_PAGE_CHUNK.test(r)), `the two builds have the same files, but for each edition's notes, games and pages (${A.size}, ${B.size}; only in ${first}: ${aOnly.join(', ') || 'none'}; only in ${other}: ${bOnly.join(', ') || 'none'})`);
     // Files that keep their name (no content hash) are compared by name; hashed
     // chunks are compared as a set of normalised contents.
     const plain = rel => !/-[A-Za-z0-9_-]{8}\.\w+$/.test(rel);
@@ -171,8 +174,8 @@ if (BOTH) {
     const names = list => [...new Set(list.map(([rel]) => base(rel)))].sort();
     // The notes chunks are each edition's own (named differently, so compared as a set per side); every other chunk that
     // differs must differ in BOTH builds, and each must be one of the allowed names above.
-    const outsideNotes = list => names(list).filter(n => !NOTES_CHUNK.test(n) && !GAMES_CHUNK.test(n));
-    ok(JSON.stringify(outsideNotes(onlyA)) === JSON.stringify(outsideNotes(onlyB)) && [...names(onlyA), ...names(onlyB)].every(n => (Object.hasOwn(MAY_DIFFER, n) || NOTES_CHUNK.test(n) || GAMES_CHUNK.test(n))),
+    const outsideNotes = list => names(list).filter(n => !NOTES_CHUNK.test(n) && !GAMES_CHUNK.test(n) && !EDITION_PAGE_CHUNK.test(n));
+    ok(JSON.stringify(outsideNotes(onlyA)) === JSON.stringify(outsideNotes(onlyB)) && [...names(onlyA), ...names(onlyB)].every(n => (Object.hasOwn(MAY_DIFFER, n) || NOTES_CHUNK.test(n) || GAMES_CHUNK.test(n) || EDITION_PAGE_CHUNK.test(n))),
       `hashed chunks differ only where an edition should (${names(onlyA).join(', ')} | ${names(onlyB).join(', ')})`);
     const brandChunks = (list, id) => list.filter(([, c]) => c.includes(wordmarkTail(id)));
     ok(brandChunks(onlyA, first).length === 1 && base(brandChunks(onlyA, first)[0][0]) === 'edition' && brandChunks(onlyB, other).length === 1 && base(brandChunks(onlyB, other)[0][0]) === 'edition',
