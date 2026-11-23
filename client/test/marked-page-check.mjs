@@ -1,6 +1,7 @@
 // The marked page's pure model: where each judged line sits on the student's own page, where its
 // comment goes, the one collapsed "not checked" card, and the header sentence. No DOM.
 import { buildAnnotatedWorking } from '../src/components/annotatedWorkingModel.js';
+import { typesetProse } from '../src/components/typesetProse.js';
 import { boxesFromInk, boxesFromPhoto, alignCards, buildMarkedPage, commentItems, defaultLine, stateOf } from '../src/components/markedPageModel.js';
 
 let pass = 0; const fail = [];
@@ -90,12 +91,14 @@ ok(ci.every(i => typeof i.y === 'number'), 'every comment has a level when the p
 ok(Math.abs(ci.find(i => i.kind === 'collapsed').y - (boxes[2].y + boxes[2].h / 2)) < 1e-9, 'the collapsed card is level with the first line it speaks about');
 ok(commentItems(p8).every(i => i.y === null || i.kind === 'collapsed' && i.y === null), 'without geometry no comment claims a level');
 
+eq([typesetProse('The term -2x became -x.'), typesetProse('At x = 1 the line above gives 1 but this line gives 2.'), typesetProse('Already $x$ done'), typesetProse('Every line before line 9 is correct.')],
+  ['The term $-2x$ became $-x$.', 'At $x = 1$ the line above gives 1 but this line gives 2.', 'Already $x$ done', 'Every line before line 9 is correct.'], 'engine sentences get their maths typeset; plain numbers, marked maths and prose are left alone');
 // ── the engine's optional per-line fields reach the cards, and only when present ─────────────────────────────
 {
-  const rep = { source: 'value-chain', firstBreak: 2, lines: [
-    { text: 'y=2x', status: 'ok', state: 'given', comment: 'Restates the question.' },
+  const rep = { source: 'value-chain', firstBreakLine: 3, lines: [
+    { text: 'y=2x', status: 'ok', state: 'given', how: 'Restates the question.' },
     { text: 'y=3x', status: 'ok', state: 'verified' },
-    { text: 'y=4x', status: 'break', state: 'wrong', note: 'Wrong.', comment: 'Not equal to line 2.', whatChanged: 'a', whyWrong: 'b', corrected: 'y=5x', fromLine: 2, check: 'c', kept: 'd' }] };
+    { text: 'y=4x', status: 'break', state: 'wrong', note: 'Wrong.', diagnosis: { comment: 'Not equal to line 2.', whatChanged: 'a', whyWrong: 'b', errorType: 'slip', corrected: 'y=5x', fromLine: 2, check: 'c', kept: 'd' } }] };
   const m = buildAnnotatedWorking({ lines: rep.lines.map(l => l.text), stepReport: rep });
   eq(m.cards.map(c => c.comment), ['Restates the question.', null, 'Not equal to line 2.'], 'a line comment from the engine reaches its card; none is invented');
   eq(m.cards[2].facts, { whatChanged: 'a', whyWrong: 'b', fromLine: 2, check: 'c', kept: 'd' }, 'the wrong line carries the engine\'s what changed, why, from line, quick check and kept');

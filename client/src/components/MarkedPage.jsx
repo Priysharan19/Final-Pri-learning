@@ -24,6 +24,7 @@ import { strokePath } from './originalWorkModel.js';
 import { STATE, STATE_WORD, boxesFromInk, boxesFromPhoto, buildMarkedPage, defaultLine, listOf, markerOf, stateOf } from './markedPageModel.js';
 import { criteriaView } from './criteriaTableModel.js';
 import { firstSentence } from './lineReportText.js';
+import { typesetProse } from './typesetProse.js';
 import './MarkedPage.css';
 
 const pointsOf = s => (Array.isArray(s) ? s : Array.isArray(s?.points) ? s.points : []);
@@ -244,18 +245,18 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
     if (status === 'checked' || status === 'condition') {
       const said = say(card);
       const why = card.comment || (said ? said.text : whyOf(card, t));
-      if (why) comment = <p className="mp-text" data-mp-why data-mp-said={said && !card.comment ? said.kind : undefined}>{card.comment || said || whyIsEngine(card) ? <EngineComment text={why} lang={card.comment ? 'en' : language} /> : why}</p>;
+      if (why) comment = <p className="mp-text" data-mp-why data-mp-said={said && !card.comment ? said.kind : undefined}>{card.comment || said || whyIsEngine(card) ? <EngineComment text={card.comment ? typesetProse(why) : why} lang={card.comment ? 'en' : language} /> : why}</p>;
     } else if (status === 'first-error') {
       const saidCross = say(card);
       const sentence = firstSentence(card.diagnosis?.message || card.diagnosis?.title || card.note || '');
-      const text = card.comment || (saidCross ? saidCross.text : '');
+      const text = card.comment ? typesetProse(card.comment) : (saidCross ? saidCross.text : '');
       comment = <p className="mp-text mp-sentence-1" data-mp-why-error>{text ? <EngineComment text={text} lang={language} /> : sentence ? (sentence.includes('$') && dollarsBalanced(sentence) ? <EngineComment text={sentence} /> : <Typeset text={sentence} texOf={texOf} />) : (n > 1 ? t('aw.body.firstError', { n: n - 1 }) : t('aw.body.firstErrorStart'))}</p>;
     } else if (status === 'unread') {
       comment = <><p className="mp-text" data-mp-unread={String(n)}>{t('mp.unread', { count: 1, list: String(n) })}</p><p className="mp-text mp-how" data-mp-unread-how>{t('mp.unreadHow')}</p></>;
     } else if (status === 'not-verified') {
-      comment = <p className="mp-text">{card.comment ? <EngineComment text={card.comment} /> : t('mp.collapsed', { count: 1, list: String(n) })}</p>;
+      comment = <p className="mp-text">{card.comment ? <EngineComment text={typesetProse(card.comment)} /> : t('mp.collapsed', { count: 1, list: String(n) })}</p>;
     } else {
-      comment = <div className="mp-text">{card.comment ? <p><EngineComment text={card.comment} /></p> : <CardBody card={card} model={model} t={t} />}</div>;
+      comment = <div className="mp-text">{card.comment ? <p><EngineComment text={typesetProse(card.comment)} /></p> : <CardBody card={card} model={model} t={t} />}</div>;
     }
     const wrong = status === 'first-error';
     const inlineRead = wrong && !!reading;
@@ -280,11 +281,11 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
         {inlineRead && readingOfLine(n, true)}
         {showRead && card.text && field('read', t('mp.readAs'), <p className="mp-expr" data-mp-expr><Typeset text={card.text} texOf={lineOf} tex={textOf(n).replace(/\s+/g, '') === String(card.text).replace(/\s+/g, '') ? latexOf(n) : null} /></p>)}
         {comment}
-        {wrong && facts.whatChanged && field('whatChanged', t('mp.whatChanged'), <p className="mp-text"><EngineComment text={facts.whatChanged} lang="en" /></p>)}
-        {wrong && facts.whyWrong && field('whyWrong', t('mp.whyWrong'), <p className="mp-text"><EngineComment text={facts.whyWrong} lang="en" /></p>)}
+        {wrong && facts.whatChanged && field('whatChanged', t('mp.whatChanged'), <p className="mp-text"><EngineComment text={typesetProse(facts.whatChanged)} lang="en" /></p>)}
+        {wrong && facts.whyWrong && field('whyWrong', t('mp.whyWrong'), <p className="mp-text"><EngineComment text={typesetProse(facts.whyWrong)} lang="en" /></p>)}
         {wrong && card.corrected && field('corrected', t('mp.corrected'), <p className="mp-expr mp-fix" data-mp-corrected><Typeset text={card.corrected} texOf={lineOf} /></p>, 'is-fix')}
-        {wrong && facts.check && field('check', t('mp.quickCheck'), <p className="mp-text"><EngineComment text={facts.check} lang="en" /></p>)}
-        {wrong && facts.kept && <p className="mp-text mp-kept" data-mp-kept><EngineComment text={facts.kept} lang="en" /></p>}
+        {wrong && facts.check && field('check', t('mp.quickCheck'), <p className="mp-text"><EngineComment text={typesetProse(facts.check)} lang="en" /></p>)}
+        {wrong && facts.kept && <p className="mp-text mp-kept" data-mp-kept><EngineComment text={typesetProse(facts.kept)} lang="en" /></p>}
         {reading && status !== 'unread' && !inlineRead && readingOfLine(n)}
       </div>
     );
