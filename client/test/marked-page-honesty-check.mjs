@@ -52,9 +52,9 @@ ok(geometry && geometry.boxes.length === READER.length, 'the reader\'s boxes sti
   ok(items.every((it, i) => Math.abs(it.y - (READER[i].y + READER[i].h / 2)) < 1e-9), 'each comment is level with the centre of its line\'s box');
 }
 const sheet = read('../src/components/MarkedPage.jsx');
-ok(/const approx = source\.kind === 'photo'/.test(sheet) && /markerOf\(box\)/.test(sheet) && /mp-box is-\$\{l\.status\}.*approx \? ' is-approx'/.test(sheet),
+ok(/const approx = source\.kind === 'photo'/.test(sheet) && /approx \? markerOf\(l\.box\) : l\.box/.test(sheet) && /className=\{`mp-marker is-\$\{l\.status\}/.test(sheet),
   'the sheet draws a photo with markerOf and ink with its own measured boxes');
-ok(/\.mp-box\.is-approx \{ border-width: 0 0 0 2px/.test(read('../src/components/MarkedPage.css')), 'the approximate marker is a left bar');
+ok(/\.mp-marker \{ position: absolute;/.test(read('../src/components/MarkedPage.css')) && !/\.mp-box/.test(read('../src/components/MarkedPage.css')), 'the approximate marker is a small button in the margin, never an outline');
 ok(tEn('mp.photoNote').length > 10 && tHi('mp.photoNote').length > 10 && !/—/.test(tEn('mp.photoNote') + tHi('mp.photoNote')), 'the page says the markers are approximate, in both languages');
 
 // ── 2. the reason is per line state ──────────────────────────────────────────────
@@ -66,9 +66,9 @@ const card = (n, status, extra = {}) => ({ n, status, valueChain: status === 'no
   eq(page.collapsed.lines, [1, 2, 4, 5], 'the unchecked lines are one card');
   eq(page.collapsed.unread, [4], 'only the line the reader could not read is called unread');
   const jsx = sheet;
-  ok(/it\.lines\.length > it\.unread\.length && <p className="mp-text">\{t\('mp\.collapsed', \{ count: it\.lines\.length - it\.unread\.length, list: listOf\(it\.lines\.filter\(n => !it\.unread\.includes\(n\)\)\) \}\)\}/.test(jsx),
+  ok(/status === 'not-verified'\) \{\s*comment = <p className="mp-text">\{t\('mp\.collapsed', \{ count: 1, list: String\(n\) \}\)\}/.test(jsx),
     'the "read but nothing to check" sentence names only the lines that were read');
-  ok(/t\('mp\.unread', \{ count: it\.unread\.length, list: listOf\(it\.unread\) \}\)/.test(jsx), 'the "could not read" sentence names only the unread lines');
+  ok(/status === 'unread'\) \{[\s\S]{0,160}?t\('mp\.unread', \{ count: 1, list: String\(n\) \}\)/.test(jsx), 'the "could not read" sentence names only the unread lines');
 }
 const readButUnchecked = [tEn('mp.collapsed', { count: 1, list: '1' }), tEn('mp.collapsed', { count: 3, list: '1, 2, 7' }), tHi('mp.collapsed', { count: 1, list: '1' }), tHi('mp.collapsed', { count: 3, list: '1, 2, 7' })];
 ok(readButUnchecked.every(s => !/couldn.t read|could not read|पढ़ नहीं सका/.test(s)), `a line that was read is never said to be unreadable (${readButUnchecked[1]})`);

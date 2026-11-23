@@ -94,7 +94,8 @@ export function buildAnnotatedWorking({ lines, stepReport, receipt = null, solut
       diagnosis: status === 'first-error' ? (l.diagnosis || null) : null,
       note: status === 'first-error' ? (l.note || null) : null,
       previousText: status === 'first-error' && i > 0 && report[i - 1]?.status === 'ok' ? texts[i - 1] : null,
-      text: texts[i]
+      text: texts[i],
+      corrected: status === 'first-error' && typeof l?.corrected === 'string' && l.corrected.trim() ? l.corrected.trim().slice(0, 200) : null
     };
   });
 
@@ -130,7 +131,8 @@ export function buildAnnotatedWorking({ lines, stepReport, receipt = null, solut
 
   const marks = receipt && Number.isFinite(Number(receipt.awarded)) && Number(receipt.possible) > 0
     ? { awarded: Number(receipt.awarded), possible: Number(receipt.possible), receiptId: typeof receipt.id === 'string' && receipt.id ? receipt.id.slice(-8) : null } : null;
-  return { cards, proof, summary, marks, criteria, jumps, followThrough, source, allChecked, noneChecked, attempt: Number.isInteger(attempt) && attempt > 1 ? attempt : null };
+  const firstBreakIndex = Number.isInteger(stepReport?.firstBreak) ? stepReport.firstBreak : null;
+  return { cards, proof, summary, marks, criteria, jumps, followThrough, source, firstBreakIndex, allChecked, noneChecked, attempt: Number.isInteger(attempt) && attempt > 1 ? attempt : null };
 }
 
 /**
@@ -149,7 +151,8 @@ function buildValueChainModel({ report: reportIn, stepReport, receipt, source, a
     n: i + 1, line: i, status: STATUS[l?.state] || 'not-verified', valueChain: l?.state || 'unverified',
     start: false, startSide: null, rules: [], more: false, same: false, unnamed: false, followsFrom: null,
     diagnosis: l?.state === 'wrong' ? (l.diagnosis || null) : null, note: l?.state === 'wrong' || l?.state === 'given' || l?.state === 'incomplete' || l?.state === 'arithmetic' || l?.state === 'verified' ? (l.note || null) : null,
-    previousText: null, text: String(l?.text ?? ''), restated: l?.state === 'given' && l?.solutionMatch === true, fact: l?.fact || null
+    previousText: null, text: String(l?.text ?? ''), restated: l?.state === 'given' && l?.solutionMatch === true, fact: l?.fact || null,
+    corrected: l?.state === 'wrong' && typeof l?.corrected === 'string' && l.corrected.trim() ? l.corrected.trim().slice(0, 200) : null
   }));
   const summaryOf = stepReport.summary || {};
   const unverified = cards.filter(c => c.status === 'not-verified' || c.status === 'unread').map(c => c.n);
@@ -165,6 +168,7 @@ function buildValueChainModel({ report: reportIn, stepReport, receipt, source, a
     : (unverified.length || cards.some(c => c.status === 'incomplete')) ? { key: 'aw.summary.some', vars: { checked, total } }
       : { key: 'aw.summary.valueAll', vars: { checked, total } };
   return {
+    firstBreakIndex: Number.isInteger(stepReport?.firstBreak) ? stepReport.firstBreak : null,
     cards, proof: null, summary, marks: receipt && Number.isFinite(Number(receipt.awarded)) && Number(receipt.possible) > 0 ? { awarded: Number(receipt.awarded), possible: Number(receipt.possible), receiptId: typeof receipt.id === 'string' && receipt.id ? receipt.id.slice(-8) : null } : null,
     criteria: [], jumps: [], followThrough: [], source, attempt: Number.isInteger(attempt) && attempt > 1 ? attempt : null,
     allChecked: unverified.length === 0 && firstBreak < 0 && !cards.some(c => c.status === 'incomplete'),

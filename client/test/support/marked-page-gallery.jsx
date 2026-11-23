@@ -32,13 +32,22 @@ const OWNER = ['y=2x³+9x²', "y'=6x²+18x", "for stat points y'=0", '0=6x²+18x
 const CASES = {
   buoy: { meta: BUOY, lines: ['22 + 5sin(πt/6)', 'max = 22 + 5', '= 27'], receipt: { awarded: 2, possible: 2 } },
   stationary: { meta: STAT, lines: [...OWNER, 'y(0)=0', 'smallest: (0,0)'], receipt: { awarded: 0, possible: 3 } },
-  mixed: { meta: STAT, lines: ['y=2x³+9x²', '@@@', "y'=6x²+18x", 'foo', '0=6x[x+3]', 'x=0 or x=-3'], receipt: { awarded: 0, possible: 3 } }
+  mixed: { meta: STAT, lines: ['y=2x³+9x²', '@@@', "y'=6x²+18x", 'foo', '0=6x[x+3]', 'x=0 or x=-3'], receipt: { awarded: 0, possible: 3 } },
+  // ticks, lines the engine could not check (one unread), a tick, then the cross on the last line
+  crossed: { meta: STAT, lines: [...OWNER.slice(0, 4), '0=6x[x+4]', '@@@', 'foo', 'x=0 or x=-3', 'smallest: (0,0)'], receipt: { awarded: 0, possible: 3 } },
+  // every line the engine could check is a tick; the final answer is the server's 0 of 3
+  wrongfinal: { meta: STAT, lines: [...OWNER, 'y(0)=0'], receipt: { awarded: 0, possible: 3 } }
 };
 // A test may hand the page its own picture and reader boxes (window.__markedPageFixture = { src, lines: [{ text, box }] }),
 // to check where the outlines fall on that picture. Nothing in the real build reads this.
 const FIXTURE_PAGE = typeof window !== 'undefined' && window.__markedPageFixture && source === 'photo' ? window.__markedPageFixture : null;
 const c = FIXTURE_PAGE ? { ...CASES.buoy, lines: FIXTURE_PAGE.lines.map(l => l.text) } : (CASES[which] || CASES.buoy);
 const stepReport = stepCheck(c.meta, c.lines.join('\n'));
+// ?facts=1: the optional fields the engine may add (a first-break index, a corrected line on the crossed line). Absent otherwise.
+if (q.get('facts') === '1') {
+  const at = stepReport.lines.findIndex(l => l.state === 'wrong' || l.status === 'break');
+  if (at >= 0) { stepReport.firstBreak = at; stepReport.lines[at] = { ...stepReport.lines[at], corrected: '0=6x[x+3]' }; }
+}
 const input = { lines: c.lines, stepReport, solution: null, source: source === 'ink' ? 'handwriting' : 'typed', receipt: { ...c.receipt, id: 'synthetic-0000' }, attempt: 1 };
 
 // ── a synthetic page ─────────────────────────────────────────────────────────

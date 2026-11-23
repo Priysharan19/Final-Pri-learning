@@ -3251,6 +3251,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                       questionId={question.id}
                       work={{ lines, typed: isMcq ? '' : String(answer || '').slice(0, 300) }}
                       finalAnswer={finalAnswerStatus(state.res)}
+                      lineInput={awInput}
                       locale={language === 'hi' ? 'hi' : 'en'}
                       onUsed={level => setTutorUsed(u => Math.max(u, level))}
                       onClose={() => setDiagnoseFor(null)}

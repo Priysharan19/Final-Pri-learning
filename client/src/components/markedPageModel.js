@@ -30,6 +30,11 @@ export const STATE = Object.freeze({
   'not-verified': { word: 'aw.status.notVerified', icon: 'uncertain', tone: 'quiet' },
   unread: { word: 'aw.status.unread', icon: 'uncertain', tone: 'quiet' }
 });
+/** The four things the page says about a line, in plain words: right, wrong, unchecked or context. */
+export const stateOf = status => (status === 'checked' ? 'right' : status === 'first-error' ? 'wrong' : status === 'condition' ? 'context' : 'unchecked');
+export const STATE_WORD = Object.freeze({ right: 'mp.state.right', wrong: 'mp.state.wrong', unchecked: 'mp.state.unchecked', context: 'mp.state.context' });
+/** The line shown first: the first cross; else the engine's own first-break index when it gives one; else line 1. */
+export const defaultLine = page => page?.firstError ?? page?.firstBreakLine ?? (page?.lines?.[0]?.n ?? null);
 export const isQuiet = status => status === 'not-verified' || status === 'unread';
 
 const clamp01 = v => Math.min(1, Math.max(0, v));
@@ -128,28 +133,38 @@ export function buildMarkedPage({ model, boxes = null, markReady = true } = {}) 
   const quiet = cards.filter(c => isQuiet(c.status)).map(c => c.n);
   const everyLine = !first && !quiet.length && !notFinished.length && cards.every(c => c.status === 'checked') && model.allChecked !== false && model.onlyArithmetic !== true && model.mixedAll !== true;
 
-  const parts = [];
-  if (everyLine) parts.push({ key: 'mp.head.every', vars: { total } });
-  else if (model.onlyArithmetic === true && !first && !quiet.length && !notFinished.length) parts.push({ key: 'mp.head.arithmetic', vars: { total } });
-  else if (model.mixedAll === true && !first && !quiet.length && !notFinished.length) parts.push({ key: 'mp.head.mixedAll', vars: { total } });
-  else {
-    parts.push({ key: 'mp.head.checked', vars: { checked, total } });
-    if (first) parts.push({ key: 'mp.head.firstError', vars: { n: first.n } });
-    if (notFinished.length) parts.push({ key: 'mp.head.notFinished', vars: { count: notFinished.length, list: listOf(notFinished) } });
-  }
+  const counts = { right: checked, wrong: first ? 1 : 0, unchecked: cards.filter(c => c.status !== 'checked' && c.status !== 'condition' && c.status !== 'first-error').length };
   // The mark is the server's, copied as it is; a page that is not a marked result shows none.
-  const mark = markReady && model.marks && Number.isFinite(Number(model.marks.awarded)) && Number(model.marks.possible) > 0
+  const markOf = markReady && model.marks && Number.isFinite(Number(model.marks.awarded)) && Number(model.marks.possible) > 0
     ? { awarded: Number(model.marks.awarded), possible: Number(model.marks.possible) } : null;
+  const finalWrong = !!markOf && markOf.awarded === 0;
+  // "Correct up to line N" is said only when every line above the cross is a tick or a stated condition: never over an unchecked line.
+  const cleanAbove = first ? cards.filter(c => c.n < first.n).every(c => c.status === 'checked' || c.status === 'condition') : false;
+  const parts = [];
+  if (everyLine && !finalWrong) parts.push({ key: 'mp.head.every', vars: { total } });
+  else if (!finalWrong && model.onlyArithmetic === true && !first && !quiet.length && !notFinished.length) parts.push({ key: 'mp.head.arithmetic', vars: { total } });
+  else if (!finalWrong && model.mixedAll === true && !first && !quiet.length && !notFinished.length) parts.push({ key: 'mp.head.mixedAll', vars: { total } });
+  else {
+    // Where first, in words; then three separate counts. An unchecked line is never called wrong or right, and a zero part is left out.
+    if (first) parts.push(first.n > 1 && cleanAbove ? { key: 'mp.sum.upTo', vars: { n: first.n - 1, m: first.n } } : { key: 'mp.sum.firstError', vars: { n: first.n } });
+    else if (finalWrong) parts.push(counts.right > 0 ? { key: 'mp.sum.finalWrongChecked' } : { key: 'mp.sum.finalWrongNone' });
+    if (counts.right) parts.push({ key: 'mp.sum.right', vars: { count: counts.right }, count: true });
+    if (counts.wrong) parts.push({ key: 'mp.sum.wrong', vars: { count: counts.wrong }, count: true });
+    if (counts.unchecked) parts.push({ key: 'mp.sum.unchecked', vars: { count: counts.unchecked }, count: true });
+  }
+  const mark = markOf;
 
   const judged = cards.map((card, i) => ({ n: card.n, index: i, card, status: card.status, box: aligned ? boxes[i] : null, collapsed: isQuiet(card.status) }));
   return {
-    header: { parts, mark, everyLine },
+    header: { parts, mark, everyLine, counts, finalWrong },
     lines: judged,
     // Lines Pri could not read as maths are ONE card, not one each.
     // `unread`: the lines Pri could not read at all (the reading floor), a subset of `lines`; they get their own sentence.
     collapsed: quiet.length ? { lines: quiet, count: quiet.length, list: listOf(quiet), unread: cards.filter(c => c.status === 'unread').map(c => c.n), reason: model.unverified?.reason || null } : null,
     aligned,
-    firstError: first ? first.n : null
+    firstError: first ? first.n : null,
+    // The engine's own index of the first break (0-based line index), when its report carries one.
+    firstBreakLine: Number.isInteger(model.firstBreakIndex) && model.firstBreakIndex >= 0 && model.firstBreakIndex < cards.length ? model.firstBreakIndex + 1 : null
   };
 }
 
