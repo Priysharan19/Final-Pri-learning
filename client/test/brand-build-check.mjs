@@ -121,7 +121,10 @@ if (BOTH) {
     const plainDiffer = plainNames.filter(rel => A.get(rel) !== B.get(rel));
     const ownShareImage = rel => (A.has(rel) && !B.has(rel) && editionOf(first).identity.share?.image === rel)
       || (B.has(rel) && !A.has(rel) && editionOf(other).identity.share?.image === rel);
-    ok(plainDiffer.every(rel => BRAND.has(rel) || ownShareImage(rel)), `unhashed files differ only where the brand is: ${plainDiffer.filter(r => !BRAND.has(r) && !ownShareImage(r)).join(', ')}`);
+    // And each build ships exactly its own edition's share image: the edition that declares one has it, the other has none.
+    const shareNames = EDITION_IDS.map(id => editionOf(id).identity.share?.image).filter(Boolean);
+    const shareShipping = [[A, first], [B, other]].every(([m, id]) => shareNames.every(f => m.has(f) === (editionOf(id).identity.share?.image === f)));
+    ok(shareShipping && plainDiffer.every(rel => BRAND.has(rel) || ownShareImage(rel)), `unhashed files differ only where the brand is: ${plainDiffer.filter(r => !BRAND.has(r) && !ownShareImage(r)).join(', ')}${shareShipping ? '' : ' (a build does not ship exactly its own edition\'s share image)'}`);
     ok(WEB_FILES.every(rel => plainDiffer.includes(rel)) && ['index.html', 'manifest.webmanifest'].every(rel => plainDiffer.includes(rel)), 'and every brand file does differ');
     const swLines = (m, f) => m.get('sw.js').split('\n').filter(l => !/^const (VERSION|PRECACHE|WARM|OPTIONAL) = /.test(l)).join('\n');
     ok(swLines(A) === swLines(B), 'sw.js differs only in its generated version and file lists');
