@@ -12,17 +12,17 @@ import React, { useEffect, useRef } from 'react';
 import PageLink from '../components/PageLink.jsx';
 
 export default function NotFound({ to, signedIn }) {
-  const heading = useRef(null);
+  const card = useRef(null);
   useEffect(() => {
     const before = document.title;
     document.title = 'Page not found · Prithagoras';
-    heading.current?.focus({ preventScroll: true });
+    card.current?.focus({ preventScroll: true });
     return () => { document.title = before; };
   }, []);
   return (
     <div className="crash-wrap" data-testid="not-found">
-      <section className="card crash-card" aria-labelledby="not-found-title">
-        <h1 className="crash-title" id="not-found-title" tabIndex={-1} ref={heading}>Page not found</h1>
+      <section className="card crash-card" aria-labelledby="not-found-title" tabIndex={-1} ref={card}>
+        <h1 className="crash-title" id="not-found-title" style={{ marginTop: 18 }}>Page not found</h1>
         <p className="sub crash-copy">There is no page at this address. The link may be old or mistyped.</p>
         <div className="row crash-actions">
           <PageLink to={to} replace className="btn btn-primary" data-testid="not-found-home">
