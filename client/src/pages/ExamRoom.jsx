@@ -56,7 +56,7 @@ import { useExamShortcuts } from '../examShell/useExamShortcuts.js';
 import '../workspace.css';
 import Working from '../instrument/Working.jsx';
 import { walkthroughFixes } from '../platform/edition.js';
-import { formatDate, formatDateTime } from '../lib/locale.js';
+import { formatDateTime } from '../lib/locale.js';
 import { defaultCourse } from '../platform/edition.js';
 
 const SAVE_DEBOUNCE_MS = 600;

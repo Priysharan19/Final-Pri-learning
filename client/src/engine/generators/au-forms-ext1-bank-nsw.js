@@ -1039,7 +1039,6 @@ const calcMap = {
 
 // ═══════════════════════════ proof by induction ═════════════════════════════════════════
 const pv = v => (/^\w$/.test(v) ? v : `(${v})`);
-const nth = n => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10 > 3 ? 0 : n % 10]}`;
 
 /** A summation family with its terms, closed form and every rendering the forms need. */
 function family(rng, kinds) {

@@ -72,7 +72,6 @@ const texToJs = (tex, v) => {
 };
 const evalAt = (js, a) => Function('Math', `"use strict"; return (${js});`)(Math, a);
 const evalAngle = (tex, ang) => { const v = String(ang); return evalAt(texToJs(tex, v)); };
-const evalTexSide = (side, ang) => evalAngle(side, ang);
 const planeFn = expr => { const ast = parse(String(expr)); return x => evaluate(ast, { x }); };
 
 // ── per-kind independent recomputation ───────────────────────────────────────
@@ -80,7 +79,6 @@ const CUR = {};
 // ── Answers derived from the PROMPT TEXT alone ──────────────────────────────
 // Each check reads the numbers and structure out of the rendered prompt (and options), as a student or a
 // reviewer would, and computes the expected answer by its own route. It never reads the form's parameters.
-const num = s => Number(String(s).replace(/,/g, ''));
 const strip = s => s.replace(/\\\$/g, '').replace(/(?<=\d),(?=\d{3})/g, '');
 const math = s => [...s.matchAll(/\$([^$]+)\$/g)].map(m => m[1]);
 const isGroup = (s, re) => { const m = s.match(re); assert.ok(m, `prompt did not match ${re}: ${s.slice(0, 160)}`); return m; };
@@ -113,16 +111,13 @@ const solveEq = p => {
   const eq = math(p)[0].replace(/^Solve\s*/, ''); const [lo, hi] = range(p);
   return rootsDeg(eqGap(eq), lo, hi).filter(t => !/\\tan/.test(eq) || Math.abs(cosD(t)) > 1e-9);
 };
-const T = (re, f) => (q, d) => f(q.prompt, q, d, strip(q.prompt));
 const pickOpt = (q, pred) => { const hits = q.mcqOptions.map((o, i) => (pred(o) ? i : -1)).filter(i => i >= 0); assert.deepEqual(hits, [q.answer.correctIndex], 'exactly the keyed option satisfies the rule'); checks++; };
-const fmtNum = x => (Math.abs(x - Math.round(x)) < 1e-9 ? String(Math.round(x)) : String(x));
 const answerIs = (q, e) => {
   if (e.n !== undefined) { assert.ok(q.answerType === 'numeric'); near(q.answer.value, e.n, (e.tol ?? q.answer.tol ?? 0) + 1e-9, 'numeric key'); }
   else if (e.set) { const nz0 = v => (Math.round(v * 1e6) / 1e6) || 0; assert.deepEqual(q.answer.values.map(nz0).sort((a, b) => a - b), e.set.map(nz0).sort((a, b) => a - b)); checks++; }
   else if (e.pt) { near(q.answer.x, e.pt[0], 1e-9, 'x'); near(q.answer.y, e.pt[1], 1e-9, 'y'); }
   else if (e.expr) { const f = planeFn(q.answer.expr); for (const x of [-3, -1.2, 0.7, 2.4, 4]) near(f(x), e.expr(x), 1e-9, 'expression'); }
 };
-const sets = q => q.answer.values;
 const deg = { sin: sinD, cos: cosD, tan: tanD };
 const opsFromText = (p, startFn) => {
   // clauses in the order they are stated
@@ -135,9 +130,6 @@ const opsFromText = (p, startFn) => {
   }
   return t => ops.reduce((f, [op, c]) => (op === 'tx' ? u => f(u - c) : op === 'sy' ? u => c * f(u) : op === 'ty' ? u => f(u) + c : u => f(u / c)), startFn)(t);
 };
-const parsePolyList = s => exprFn(s);
-const tableRows = p => { const m = isGroup(p, /\\text\{(?:Value|Frequency)\}.*?\\end\{array\}|x & .*?\\end\{array\}/s); return m[0]; };
-const rowNums = (tex, label) => { const m = tex.match(new RegExp(`${label}\\s*&([^\\\\]+)`)); assert.ok(m, `row ${label}`); return m[1].split('&').map(s => s.trim()); };
 const sgn = s => (s === '-' ? -1 : 1);
 const coef = s => (s === '' || s === undefined ? 1 : s === '-' ? -1 : Number(s));
 const CHECKS = {};
@@ -399,6 +391,12 @@ CHECKS['y11-data-sets'] = [
 // ── y12-stats ────────────────────────────────────────────────────────────────
 const pTable = tex => { const x = list(tex.match(/ x & ([^\\]+)\\\\/)[1].replace(/&/g, ',')), ps = tex.match(/P\(X = x\) & ([^\\]+)\\end/)[1].split('&').map(s => s.trim()); return { x, ps }; };
 const tailPct = { 1: 16, 2: 2.5, 3: 0.15 }, bandPct = { 1: 68, 2: 95, 3: 99.7 };
+// The empirical-rule tables the checks below key to, held against the normal distribution itself (Phi): each is the rule's own rounding of it (within 0.25 for a tail, 0.5 for a band), so the table the independent checks lean on is not a second place a slip could hide.
+for (const k of [1, 2, 3]) {
+  assert.ok(Math.abs(tailPct[k] - 100 * (1 - Phi(k))) < 0.25, `one tail beyond ${k} SD: ${tailPct[k]} against ${100 * (1 - Phi(k))}`);
+  assert.ok(Math.abs(bandPct[k] - 100 * (2 * Phi(k) - 1)) < 0.5, `within ${k} SD: ${bandPct[k]} against ${100 * (2 * Phi(k) - 1)}`);
+  checks += 2;
+}
 CHECKS['y12-stats'] = [
   p => {
     const { x, ps } = pTable(p); const known = ps.filter(v => v !== 'k').map(Number), k = 1 - known.reduce((s, v) => s + v, 0); const pv = ps.map(v => (v === 'k' ? k : Number(v)));

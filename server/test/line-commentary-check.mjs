@@ -275,9 +275,11 @@ const md = ['# Engine commentary: old sentence and new sentence on the owner\u20
   'from structured engine facts (the value both sides come to, the worked-solution step, the rule the engine named, the value the working reached',
   'and the value the line gives). Where the engine has no such fact the line keeps its old sentence ("unchanged"). Ticks, crosses and notes are not changed.',
   'Rule names below are shown as `Rule <id>`; the page uses the interface\u2019s own rule names.', ''];
+// A markdown table cell: backslash first (so an existing backslash is not read as an escape), then every pipe, globally.
+const cell = text => String(text).replace(/\\/g, '\\\\').replace(/\|/g, '\\|');
 for (const p of pagesOut) {
   md.push(`## ${p.title}`, '', '| Line | Working | Engine verdict | Old sentence | New sentence |', '|---|---|---|---|---|');
-  for (const r of p.rows) md.push(`| ${r.n} | \`${r.text.replace(/\|/g, '\\|')}\` | ${r.status} | ${r.old.replace(/\|/g, '\\|')} | ${r.now.replace(/\|/g, '\\|')} |`);
+  for (const r of p.rows) md.push(`| ${r.n} | \`${cell(r.text)}\` | ${r.status} | ${cell(r.old)} | ${cell(r.now)} |`);
   md.push('');
 }
 const mdText = md.join('\n');

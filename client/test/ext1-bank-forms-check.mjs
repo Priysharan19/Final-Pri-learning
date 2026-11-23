@@ -17,8 +17,6 @@
 // Usage: node client/test/ext1-bank-forms-check.mjs [seeds-per-difficulty]
 // SYNTHETIC: deterministic in-process checks, not evidence about real students.
 // ─────────────────────────────────────────────────────────────────────────────
-import assert from 'node:assert/strict';
-
 const SRC = new URL('../src/', import.meta.url).href;
 const { makeRng } = await import(`${SRC}engine/qhelpers.js`);
 const { checkAnswer } = await import(`${SRC}engine/checker.js`);

@@ -125,8 +125,6 @@ const fr = (n, d) => {
   return b === 1 ? String(a) : `${a < 0 ? '-' : ''}\\dfrac{${Math.abs(a)}}{${b}}`;
 };
 
-const rnd = (v, places) => Math.round(v * 10 ** places) / 10 ** places;
-
 const un = n => (n === 1 ? '1 unit' : `${n} units`);
 const sgn1 = c => (c < 0 ? '-' : '+');
 /** coefficients, highest power first, as TeX: [2,-3,1] -> 2x^2 - 3x + 1 */

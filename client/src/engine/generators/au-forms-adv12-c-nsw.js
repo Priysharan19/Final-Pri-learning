@@ -77,16 +77,6 @@ function Fr(prompt, n, d, o) {
   return N(prompt, n / d, { ...o, frac: { n: sg * nn, d: sg * dd } });
 }
 
-/** a set of values (any order). */
-function S(prompt, values, o) {
-  const traps = (o.traps || []).filter(([v]) => fin(v) && !values.some(x => Math.abs(x - v) < 1e-9)).map(([v, why]) => ({ value: v, why }));
-  const q = { prompt, answerType: 'set', answer: { values }, traps, hints: o.hints, steps: steps4(o.steps) };
-  if (o.suffix) q.answerSuffix = o.suffix;
-  if (o.dotpoint != null) q.dotpoint = o.dotpoint;
-  if (o.figure) q.figure = o.figure;
-  return attach(q, o.audit);
-}
-
 /** multiple choice: correct text and distractors [{text, why}]. */
 function M(rng, prompt, correct, ds, o) {
   const m = mcq(rng, correct, ds);
@@ -121,7 +111,6 @@ const polyInt = (cs, lo, hi) => {
   });
   return tot;
 };
-const evalP = (cs, x) => cs.reduce((s, c) => s * x + c, 0);
 const polyTex = cs => {
   const n = cs.length - 1;
   let out = '';
