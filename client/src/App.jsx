@@ -829,7 +829,9 @@ export default function App() {
                     {LEGAL_ROUTES_EXTRA}
                     <Route path="/third-party-notices" element={<Legal />} />
                     <Route path="/settings" element={<Settings />} />
-                    <Route path="*" element={NOT_FOUND_PAGE ? <SignedInUnknown home={roleLanding} /> : <Navigate to={roleLanding} replace />} />
+                    {NOT_FOUND_PAGE
+                      ? <Route path="*" element={<SignedInUnknown home={roleLanding} />} />
+                      : <Route path="*" element={<Navigate to={roleLanding} replace />} />}
                   </Routes>
                 </React.Suspense>
               </ErrorBoundary>

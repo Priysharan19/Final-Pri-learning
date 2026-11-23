@@ -28,7 +28,7 @@ for (const p of known) ok(declared.includes(p) || main.includes(`'${p}'`) || p =
 ok(/const NOT_FOUND_PAGE = typeof __PRI_AU_BUILD__ === 'boolean' && __PRI_AU_BUILD__;/.test(app), 'the page is a Prithagoras build literal, so Priyabhata\'s build never includes it');
 ok(/NOT_FOUND_PAGE \? React\.lazy\(\(\) => import\('\.\/landing\/NotFound\.jsx'\)\) : null/.test(app), 'the page is a lazy chunk only a Prithagoras build has');
 ok(/path="\*" element=\{NOT_FOUND_PAGE \? <UnknownAddress otherwise=\{<Login \/>\} to="\/welcome" \/> : <Login \/>\}/.test(app), 'signed out: Login at real addresses, not-found elsewhere, button to /welcome; Priyabhata: Login');
-ok(/<Route path="\*" element=\{NOT_FOUND_PAGE \? <SignedInUnknown home=\{roleLanding\} \/> : <Navigate to=\{roleLanding\} replace \/>\}/.test(app), 'signed in: public and switched-off paths go home, other paths are not found; Priyabhata: the redirect it had');
+ok(/\{NOT_FOUND_PAGE\s*\? <Route path="\*" element=\{<SignedInUnknown home=\{roleLanding\} \/>\} \/>\s*: <Route path="\*" element=\{<Navigate to=\{roleLanding\} replace \/>\} \/>\}/.test(app), 'signed in: public and switched-off paths go home, other paths are not found; Priyabhata: the redirect it had');
 ok(!/<UnknownAddress to="\/"/.test(app) && /<Route path="\*" element=\{<AccountActivationGate/.test(app), 'the activation gate runs at every address (an unknown one is judged after activation, by the signed-in router)');
 
 // The matcher itself, lifted from App.jsx and run: it must agree with react-router on these patterns.
