@@ -29,6 +29,7 @@ import { acceptedCheckoutUrl } from '../platform/checkoutHosts.js';
 import { sellsPremium } from '../paywall/useSaleAvailable.js';
 import InviteFriend from './InviteFriend.jsx';
 import TrialNotice from './TrialNotice.jsx';
+import { formatDateTime } from '../lib/locale.js';
 
 // The optional reasons after cancelling: server/platform/billing.js CANCEL_REASONS.
 const CANCEL_REASONS = Object.freeze(['price', 'notUsing', 'examDone', 'missing', 'other']);
@@ -39,7 +40,7 @@ const CANCEL_REASON_KEYS = Object.freeze({
 
 function when(value, t) {
   if (!value) return t('cloud.never');
-  try { return new Date(value).toLocaleString(); } catch { return t('cloud.unknown'); }
+  try { return formatDateTime(value, defaultCourse()); } catch { return t('cloud.unknown'); }
 }
 
 function price(value, currency) {

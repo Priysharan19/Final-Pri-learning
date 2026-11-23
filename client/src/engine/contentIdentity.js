@@ -74,6 +74,15 @@
 // 2026.11.45 — y12-integration D2 (definite integral of a quadratic from 0): the worked solution prints coefficients in lowest
 //              terms (x^2, not 2/2 x^2) and the exact value beside its rounding (F(1) = -2/3 ≈ -0.667). Display only: every seed draws the
 //              same question with the same key, tolerance and traps; only the steps text of that form changes.
+// 2026.11.46 — Advanced variety forms (nine Advanced cells that served one question shape: y11-explog-more, y11-trig-ident,
+//              y11-transform, y11-functions-more, y11-data-sets, y12-financial, y12-stats, y12-integration, y12-series). Each gains new
+//              forms that ask for a different decision (au-forms-adv11-c/d, au-forms-adv12-c/d); the overlay draws one form uniformly from
+//              the established form and the new ones, so a given seed in those cells now draws a different question from 2026.11.45's.
+// 2026.11.46 — Extension 1 bank variety: me12-further-calc, me11-binomial, me11-functions (D1, D3), me12-vectors-forms (D1) and the two induction
+//              generators gain decision-different forms (80 forms; inverse sine versus tangent, substitutions, split numerators, constants found from
+//              an integral, binomial terms and sums, inverses of restricted functions, and the single steps of an induction proof as expression and
+//              multiple-choice answers). Adding forms to those cells changes which question a given seed draws, so every seed in them is a different
+//              question from 2026.11.45's; every other generator is unchanged.
 // 2026.11.42 — Past-paper keys carry the paper's own published acceptance band (answer.officialRange) in the served payload, so the
 //              marker's exact-value and uncalled-for-band rules leave that band alone (16 JEE Advanced chapter digests).
 // 2026.11.41 — Walk-through maths fixes: a grouped-data mode question has one modal class; a numeric key is judged
@@ -87,7 +96,7 @@
 // of rational solutions prints as fractions; a previous-year question keeps the exam's published band; the key-format
 // repairs (a constant key, a plain percentage box, a plain value box) and the wider parameter ranges change what
 // those generators serve.
-export const CONTENT_VERSION = '2026.11.45';
+export const CONTENT_VERSION = '2026.11.46';
 /**
  * A sealed token that re-generates a question from (generator, difficulty, seed) (a prepared practice question, a guest
  * ticket) carries the content version it was minted under (`c`). A token with no `c` was minted before that field existed,

@@ -47,6 +47,8 @@ import { composeDeskExport } from './deskExport.js';
 import { changesOf, confirmQuestions, editQuestion, entryOf, fromCache, groupsOf, nextFlagged, overlay, projectEvents, sectionOf, settleSave, timeLedger } from './deskState.js';
 import '../examShell/examShell.css';
 import './desk.css';
+import { formatDate } from '../lib/locale.js';
+import { defaultCourse } from '../platform/edition.js';
 
 const MINUTE = 60000;
 // The i18n keys, written out so client/test/i18n-check.mjs can see each one.
@@ -75,7 +77,7 @@ export function ClosedSummary({ t, attempt, clock, questions, groups, estimate, 
   const ledger = timeLedger(paper, clock, questions, groups);
   const imported = attempt.origin === 'prithagoras-import';
   const exportedOn = imported && attempt.imported?.exportedAt
-    ? new Date(attempt.imported.exportedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) : null;
+    ? formatDate(attempt.imported.exportedAt, defaultCourse(), { day: 'numeric', month: 'long', year: 'numeric' }) : null;
   return (
     <section className="dk-closed" aria-labelledby="dk-closed-title" data-desk-closed={imported ? 'imported' : 'closed'}>
       <h2 id="dk-closed-title">{t('desk.closedTitle')}</h2>

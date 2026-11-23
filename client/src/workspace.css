@@ -328,3 +328,6 @@ html[data-edition=prithagoras] .qpage.ws .verdict{scroll-margin-bottom:148px}
   .ws-filter-inline .dp-chip-phone { display: inline-flex; flex: 0 1 auto; max-width: calc(100% - 120px); min-height: 32px; margin-left: 8px; padding: 2px 8px; font-size: 13px; }
   .ws-filter-inline { flex-wrap: nowrap; align-items: center; min-width: 0; overflow: hidden; }
 }
+
+/* The dot-point picker sits in the question's own column (it was 80px wider than the prompt below it on a desktop). */
+html[data-edition=prithagoras] .ws-notices { width: min(820px, 100%); }

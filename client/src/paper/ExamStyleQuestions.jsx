@@ -41,7 +41,7 @@ export default function ExamStyleQuestions({ chapter }) {
   }
 
   return (
-    <section className="card" aria-labelledby="exam-style-h" data-exam-style={chapter} style={{ marginBottom: 16 }}>
+    <section className="card" aria-labelledby="exam-style-h" data-exam-style={chapter} style={{ margin: '16px 0' }}>
       <h2 className="card-title" id="exam-style-h" style={{ textTransform: 'none', letterSpacing: 0 }}>{t('paper.examStyle.heading')}</h2>
       <p className="sub" style={{ marginBottom: 12 }}>{t(items.every(i => i.generated) ? 'paper.examStyle.noteSets' : 'paper.examStyle.note', { brand: BRAND })}</p>
       <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 12 }}>

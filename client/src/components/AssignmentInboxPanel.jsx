@@ -5,10 +5,12 @@ import { onCloudSessionChange } from '../platform/cloudSession.js';
 import { tLater, useT } from '../i18n/index.js';
 import { PaperAssignment, WhatTeacherSees, useClassroomMine } from '../classroom/StudentClassroom.jsx';
 import { isPaperAssignment } from '../classroom/classroomWords.js';
+import { formatDateTime } from '../lib/locale.js';
+import { defaultCourse } from '../platform/edition.js';
 
 function dueText(t, value) {
   if (!value) return t('classroom.noDueDate');
-  try { return t('inbox.dueOn', { date: new Date(value).toLocaleString() }); } catch { return t('classroom.dueUnavailable'); }
+  try { return t('inbox.dueOn', { date: formatDateTime(value, defaultCourse()) }); } catch { return t('classroom.dueUnavailable'); }
 }
 
 function stateText(t, state) {

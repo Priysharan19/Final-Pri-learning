@@ -526,7 +526,7 @@ export default function Settings() {
           <div className="card">
             <h2 style={{ marginBottom: 8 }}>{t('settings.accountInfo')}</h2>
             <div className="set-row"><span className="set-k">{t('settings.dataLocation')}</span><span className="set-v">{t(storageInfo?.native ? 'settings.dataLocationNative' : 'settings.dataLocationBrowser')}</span></div>
-            <div className="set-row">
+            <div className="set-row set-row-note">
               <span className="set-k">{t('settings.storageProtection')}</span>
               <span className="set-v" style={{ color: storageInfo?.native || storageInfo?.persisted ? 'var(--good)' : 'var(--warn)' }}>
                 {t(storageInfo?.native ? 'settings.storageSandbox' : storageInfo?.persisted ? 'settings.storagePersisted' : 'settings.storagePending')}
@@ -535,7 +535,7 @@ export default function Settings() {
             {storageInfo && storageInfo.quota > 0 && (
               <div className="set-row"><span className="set-k">{t('settings.spaceUsed')}</span><span className="set-v">{t('settings.spaceOf', { used: fmtBytes(storageInfo.usage), total: fmtBytes(storageInfo.quota), percent: usagePct })}</span></div>
             )}
-            <div className="set-row"><span className="set-k">{t('settings.accounts')}</span><span className="set-v" data-accounts-value={user.cloudLinked ? 'linked' : 'local'}>{t(user.cloudLinked ? 'settings.accountsValueLinked' : 'settings.accountsValue')}</span></div>
+            <div className="set-row set-row-note"><span className="set-k">{t('settings.accounts')}</span><span className="set-v" data-accounts-value={user.cloudLinked ? 'linked' : 'local'}>{t(user.cloudLinked ? 'settings.accountsValueLinked' : 'settings.accountsValue')}</span></div>
           </div>
 
           {/* ── Profile ── */}

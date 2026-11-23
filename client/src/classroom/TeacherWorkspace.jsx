@@ -25,6 +25,7 @@ import {
   INDIA_PAPERS, PAPER_MINUTES, isPaperAssignment, misconceptionName, paperLabel, pathwaysForYear, questionLabel
 } from './classroomWords.js';
 import ReviewQueue from './ReviewQueue.jsx';
+import { formatDate, formatDateTime } from '../lib/locale.js';
 
 const errText = (err, fallback) => (err?.code === 'CLOUD_WEB_ONLY' ? tLater('tw.webOnly') : (err?.message || tLater(fallback)));
 
@@ -416,7 +417,7 @@ function PaperResults({ classId, assignment, label, onClose }) {
                 <tr key={r.student.id}>
                   <th scope="row">{r.student.name}</th>
                   {r.handedIn ? <>
-                    <td>{new Date(r.handedInAt).toLocaleDateString()}</td>
+                    <td>{formatDate(r.handedInAt, defaultCourse(), { day: 'numeric', month: 'short', year: 'numeric' })}</td>
                     <td>{t('tw.results.marksOf', { awarded: r.engine.score, marks: r.engine.total })}</td>
                     <td className="tw-teacher-col">{r.teacher.awarded}</td>
                     <td>{t('tw.results.marksOf', { awarded: r.withTeacherMarks.score, marks: r.withTeacherMarks.total })}</td>
@@ -464,7 +465,7 @@ function Papers({ classId, onUntimed }) {
               <li key={a.id} className="tw-list-row">
                 <div>
                   <strong>{a.title}</strong>
-                  <div className="muted">{paperLabel(t, a.specification.paper, titles)} · {a.dueAt ? t('inbox.dueOn', { date: new Date(a.dueAt).toLocaleString() }) : t('classroom.noDueDate')}</div>
+                  <div className="muted">{paperLabel(t, a.specification.paper, titles)} · {a.dueAt ? t('inbox.dueOn', { date: formatDateTime(a.dueAt, defaultCourse()) }) : t('classroom.noDueDate')}</div>
                 </div>
                 <button type="button" className="btn btn-ghost btn-sm" aria-expanded={open?.id === a.id} onClick={() => setOpen(open?.id === a.id ? null : a)} data-open-results={a.id}>
                   {t('tw.results.open')}

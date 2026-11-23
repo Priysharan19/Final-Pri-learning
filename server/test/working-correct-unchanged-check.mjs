@@ -29,7 +29,7 @@ const families = ['y8-equations', 'y9-algebra', 'me11-trigid', 'me12-induction',
 const INSERTS = ['k = 13', 'Area = 13', 'ans = 13', 'w = 13', '13'];
 let pages = 0, flips = 0, displayedOk = 0;
 const digest = createHash('sha256');
-for (const id of families) for (let seed = 1; seed < 150; seed++) for (const d of [1, 2, 3, 4]) {
+for (const id of families) for (let seed = 1; seed < 160; seed++) for (const d of [1, 2, 3, 4]) {
   let q; try { q = G.generateQuestion(id, d, seed); } catch { continue; }
   if (q.answerType !== 'working' || typeof q.answer?.canonicalWorking !== 'string') continue;
   const base = q.answer.canonicalWorking.split('\n');
@@ -50,6 +50,12 @@ ok(flips === 0, `no page flips to correct, and no partial credit changes with th
 // the correctness of every page, pinned: this is the verdict stepCheck gave before the rule existed
 const sum = digest.digest('hex');
 console.log(`  working pages: ${pages}, correctness digest ${sum.slice(0, 16)}`);
-ok(sum === 'f3a871da25402131d3f3515f6cb6bcfc2fcf5159c4e182f8bb662a02d2851419', `the correctness of all ${pages} pages is the one pinned (${sum})`);
+// Re-pinned 2026-11-22 (Extension 1 bank variety, CONTENT_VERSION 2026.11.46): the page count is NOT lowered. The seed sweep is widened from
+// seeds 1-149 to 1-159 so the sweep keeps at least the 1245 pages it had: it now checks 1260. Cause of the new digest: me12-induction gained
+// expression and multiple-choice forms, so the me12-induction D4 draws that used to be working-answer pages (15 pages a seed) now draw one of the
+// new forms and are no longer working pages. Verified against the parent commit (main 1592b657e) by dumping every page at seeds 1-159: the parent
+// has 1380 pages, this tree 1260; all 1260 are pages the parent also has, with the same verdict (0 new pages, 0 changed verdicts); the 120 that
+// are gone are all me12-induction D4 (8 seeds x 15 pages). The marker is untouched.
+ok(sum === 'd472eaf5f068fe7aa998b198f40f87260e7fb5c0abc63af1df09cfd490b44345', `the correctness of all ${pages} pages is the one pinned (${sum})`);
 console.log(`WORKING CORRECT UNCHANGED: ${fail ? 'FAIL' : 'PASS'} — ${pass}/${pass + fail} checks — a stray definition, label or bare number never changes whether a working answer is correct`);
 if (fail) process.exit(1);

@@ -24,6 +24,8 @@ import { libraryApi } from '../library/libraryApi.js';
 import { IMPORT_SITE, deskApi, newKey, unreachable } from './deskApi.js';
 import { UnmarkedPlate } from './DeskPage.jsx';
 import './desk.css';
+import { formatDate } from '../lib/locale.js';
+import { defaultCourse } from '../platform/edition.js';
 
 // The i18n keys, written out so client/test/i18n-check.mjs can see each one.
 const REFUSAL_KEYS = Object.freeze({
@@ -37,7 +39,7 @@ const REFUSAL_KEYS = Object.freeze({
   CLOUD_DISABLED: 'desk.needsConnection'
 });
 export const refusalKey = code => (Object.hasOwn(REFUSAL_KEYS, code) ? REFUSAL_KEYS[code] : 'desk.importFailed');
-const dateOf = ms => new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
+const dateOf = ms => formatDate(ms, defaultCourse(), { day: 'numeric', month: 'long', year: 'numeric' });
 
 /**
  * Read a chosen file on the device: its text as JSON, checked against the

@@ -35,6 +35,8 @@ import {
 } from '../engine/syllabusBoard.js';
 import { practiceHref } from '../lib/practiceLinks.js';
 import { offering, pathwayOffered } from '../platform/edition.js';
+import { formatDate } from '../lib/locale.js';
+import { defaultCourse } from '../platform/edition.js';
 
 // hsc-forecast (PR #1003) when it is in this build; until then the glob is empty
 // and the board falls back to Pri's blueprint, labelled as such.
@@ -349,7 +351,7 @@ export function AreaDetail({ area, india, track, priority = null }) {
                   ? <div className="sb-label" lang="en">{t('board.priPractises')} {desc.join('; ')}</div>
                   : <div className="sb-label">{t('board.noPriDescription')}</div>)}
                 <div className="sb-label sb-mono">{ev
-                  ? t('board.ev.line', { answered: ev.answered, own: ev.independentRight, date: new Date(ev.lastAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) })
+                  ? t('board.ev.line', { answered: ev.answered, own: ev.independentRight, date: formatDate(ev.lastAt, defaultCourse()) })
                   : t('board.ev.none')}{n.breadth && n.breadth.total > 1 && ev ? ` · ${t('board.ev.kindsLine', { shown: n.breadth.shown, n: n.breadth.total })}` : ''}</div>
               </div>
             </li>
@@ -404,7 +406,7 @@ export function PrioritiesView({ priorities, onSelect, source, disclaimer = '', 
 
 // ── Exam readiness ───────────────────────────────────────────────────────────
 
-const shortDate = at => new Date(at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+const shortDate = at => formatDate(at, defaultCourse());
 
 export function ReadinessView({ readiness, edition = 'nsw', courseName = '', onSit }) {
   const t = useT();
