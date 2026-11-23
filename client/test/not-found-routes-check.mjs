@@ -115,7 +115,8 @@ if (!process.argv.includes('--static')) {
       await visit('/this-does-not-exist');
       await page.getByTestId('not-found-home').click();
       await page.waitForFunction(() => location.pathname === '/', null, { timeout: 15000 });
-      ok(await page.locator(NOT_FOUND).count() === 0, `${label} signed in: the button goes to the student's home`);
+      await page.waitForSelector(NOT_FOUND, { state: 'detached', timeout: 15000 });
+      ok(await page.locator('.shell').count() === 1, `${label} signed in: the button goes to the student's home`);
       ok(errors.length === 0, `${label}: no page errors (${errors.slice(0, 2).join(' | ')})`);
       await ctx.close();
     }
