@@ -203,7 +203,7 @@ export const flow = {
         await check('staging case: the card does NOT say the working was checked, read and verified, or that it reached the result through a logical chain',
           !INFERRED.test(text) && !/checks out/i.test(text), text.match(INFERRED)?.[0] || text.match(/[^.]*checks out[^.]*/i)?.[0] || '');
         await check('staging case: whatever the card says about the working is exactly what the server established (nothing when the working was not verified), and no line of the misread transcript is ticked',
-          (said === '' || said === (want.text || '')) && await ticksOnInk() === 0 && await page.locator('[data-mp-box][data-mp-status="checked"]').count() === (grade?.json?.stepReport?.lines || []).filter(l => l.status === 'ok').length && !/Line 3 checks out/.test(text),
+          (said === '' || said === (want.text || '')) && await ticksOnInk() === 0 && await page.locator('[data-mp-card][data-mp-status="checked"]').count() === (grade?.json?.stepReport?.lines || []).filter(l => l.status === 'ok').length && !/Line 3 checks out/.test(text),
           `card: ${JSON.stringify(said)}; server evidence: ${JSON.stringify(want.evidence)}; server stepReport: ${JSON.stringify(grade?.json?.stepReport)}`);
         await check(`staging case: "Your answer" is never the last ink line "+"`, !/Your answer:\s*\+/.test(text), text.slice(0, 200));
 
@@ -247,8 +247,8 @@ export const flow = {
             (said === '' || said === want.text),
           `card ${JSON.stringify(said)}; expected ${JSON.stringify(want.text)}; report ${JSON.stringify(grade?.json?.stepReport)}`);
         await check('checked method: the lines shown as checked on the marked page are the server\'s "ok" lines, no others',
-          await page.locator('[data-mp-box][data-mp-status="checked"]').count() === grade.json.stepReport.lines.filter(l => l.status === 'ok').length && await page.locator('[data-mp-box][data-mp-status="first-error"]').count() === 0,
-          `${await page.locator('[data-mp-box][data-mp-status="checked"]').count()} checked on the page; ${await page.locator('[data-mp-box][data-mp-status="first-error"]').count()} first error(s)`);
+          await page.locator('[data-mp-card][data-mp-status="checked"]').count() === grade.json.stepReport.lines.filter(l => l.status === 'ok').length && await page.locator('[data-mp-card][data-mp-status="first-error"]').count() === 0,
+          `${await page.locator('[data-mp-card][data-mp-status="checked"]').count()} checked on the page; ${await page.locator('[data-mp-card][data-mp-status="first-error"]').count()} first error(s)`);
       }
     }
 
@@ -273,8 +273,8 @@ export const flow = {
         note(`wrong final: server stepReport ${JSON.stringify(first?.json?.stepReport?.lines?.map(l => l.status) || null)}; partial ${JSON.stringify(first?.json?.partial && { awarded: first.json.partial.awarded })} → "${said}"`);
         const okLines = (first?.json?.stepReport?.lines || []).filter(l => l.status === 'ok').length;
         await check('wrong final: the working sentence and the lines shown as checked are exactly the server\'s evidence, and no line is ticked that the server did not establish',
-          (said === '' || said === (want.text || '')) && await page.locator('[data-mp-box][data-mp-status="checked"]').count() === okLines && !INFERRED.test(await cardText()),
-          `card ${JSON.stringify(said)} vs ${JSON.stringify(want.text)}; checked ${await page.locator('[data-mp-box][data-mp-status="checked"]').count()} vs ${okLines}`);
+          (said === '' || said === (want.text || '')) && await page.locator('[data-mp-card][data-mp-status="checked"]').count() === okLines && !INFERRED.test(await cardText()),
+          `card ${JSON.stringify(said)} vs ${JSON.stringify(want.text)}; checked ${await page.locator('[data-mp-card][data-mp-status="checked"]').count()} vs ${okLines}`);
 
         // Redo = the same question again, no new credit: nothing of the attempt stays on the new page.
         const before = await card.getAttribute('data-question-id');
