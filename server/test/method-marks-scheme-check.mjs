@@ -263,7 +263,7 @@ for (const s of SCHEMES) ok(R.questionsOfType(s, { limit: 3 }).length === 3, `${
   ok(/1 of 2/.test(readme.slice(0, 5200)) && /I approve the seven step-mark schemes/.test(readme.slice(0, 5200)) && !/[—–]/.test(readme.slice(0, 5200)), 'the owner note opens with the plain summary, the worked example (1 of 2) and one line to approve, no dashes');
   // unavailable types are never typed as a scheme question
   let leaked = 0;
-  for (const u of UNAVAILABLE) for (const fam of u.families) for (let d = 1; d <= 4; d++) for (let seed = 1; seed <= 20; seed++) { let q; try { q = G.generateQuestion(fam, d, seed); } catch { continue; } const id = schemeTypeOf(q, fam); if (id && /stationary|tangent|gradient$/.test(id) && !SCHEMES.some(s => s.id === id)) leaked++; }
+  for (const u of UNAVAILABLE) for (const fam of u.families) for (let d = 1; d <= 4; d++) for (let seed = 1; seed <= 20; seed++) { let q; try { q = G.generateQuestion(fam, d, seed); } catch { continue; } const id = schemeTypeOf(q, fam); if (id && /(?:stationary|tangent)|gradient$/.test(id) && !SCHEMES.some(s => s.id === id)) leaked++; }
   ok(leaked === 0, 'no unavailable type is ever typed as a scheme question');
   ok(SCHEMES.every(s => s.criteria.filter(c => c.by === 'final').length === 1), 'every scheme has exactly one final-answer criterion, so a wrong answer is never full marks');
 }
