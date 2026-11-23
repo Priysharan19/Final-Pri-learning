@@ -247,10 +247,14 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
       const why = card.comment || (said ? said.text : whyOf(card, t));
       if (why) comment = <p className="mp-text" data-mp-why data-mp-said={said && !card.comment ? said.kind : undefined}>{card.comment || said || whyIsEngine(card) ? <EngineComment text={card.comment ? typesetProse(why) : why} lang={card.comment ? 'en' : language} /> : why}</p>;
     } else if (status === 'first-error') {
-      const saidCross = say(card);
-      const sentence = firstSentence(card.diagnosis?.message || card.diagnosis?.title || card.note || '');
-      const text = card.comment ? typesetProse(card.comment) : (saidCross ? saidCross.text : '');
-      comment = <p className="mp-text mp-sentence-1" data-mp-why-error>{text ? <EngineComment text={text} lang={language} /> : sentence ? (sentence.includes('$') && dollarsBalanced(sentence) ? <EngineComment text={sentence} /> : <Typeset text={sentence} texOf={texOf} />) : (n > 1 ? t('aw.body.firstError', { n: n - 1 }) : t('aw.body.firstErrorStart'))}</p>;
+      // The engine's own `comment` on a crossed line is its whole plain message (what changed, why, the corrected line, the check): the
+      // panel shows each of those under its own heading below, so with them present the lead is only where the working stops being equal.
+      const detailed = !!(facts.whatChanged || facts.whyWrong);
+      const saidCross = detailed ? null : say(card);
+      const sentence = detailed ? '' : firstSentence(card.diagnosis?.message || card.diagnosis?.title || card.note || '');
+      const text = detailed ? '' : card.comment ? typesetProse(card.comment) : (saidCross ? saidCross.text : '');
+      const leadFrom = facts.fromLine && facts.fromLine < n ? facts.fromLine : n - 1;
+      comment = <p className="mp-text mp-sentence-1" data-mp-why-error>{text ? <EngineComment text={text} lang={language} /> : sentence ? (sentence.includes('$') && dollarsBalanced(sentence) ? <EngineComment text={sentence} /> : <Typeset text={sentence} texOf={texOf} />) : (n > 1 ? t('aw.body.firstError', { n: leadFrom }) : t('aw.body.firstErrorStart'))}</p>;
     } else if (status === 'unread') {
       comment = <><p className="mp-text" data-mp-unread={String(n)}>{t('mp.unread', { count: 1, list: String(n) })}</p><p className="mp-text mp-how" data-mp-unread-how>{t('mp.unreadHow')}</p></>;
     } else if (status === 'not-verified') {

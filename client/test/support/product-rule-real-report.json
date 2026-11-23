@@ -1,0 +1,225 @@
+{
+ "about": "The real engine step report for the owner's product-rule page, saved so the marked-page gallery (a browser page) can show it. server/test/marked-page-real-report-check.mjs fails if this file differs from what the engine returns today. Not a synthetic report.",
+ "lines": [
+  "Differentiate y = x^2(x-1) using the product rule.",
+  "Let u = x^2 and v = x - 1.",
+  "Then u' = 2x and v' = 1.",
+  "By the product rule,",
+  "dy/dx = u'v + uv'",
+  "= 2x(x-1) + x^2(1)",
+  "= 2x(x-1) + x^2",
+  "= 2x^2 - 2x + x^2",
+  "= 3x^2 - x"
+ ],
+ "stepReport": {
+  "lines": [
+   {
+    "text": "Differentiate y = x^2(x-1) using the product rule.",
+    "status": "note",
+    "state": "unverified",
+    "unverified": true,
+    "context": true,
+    "note": "This line states the task or names the method; there is no step in it to check."
+   },
+   {
+    "text": "Let u = x^2 and v = x - 1.",
+    "status": "ok",
+    "state": "given",
+    "note": "u and v are the two factors of the function in the question: u times v comes to that function.",
+    "fact": {
+     "kind": "factors-of-question",
+     "names": [
+      "u",
+      "v"
+     ]
+    }
+   },
+   {
+    "text": "Then u' = 2x and v' = 1.",
+    "status": "ok",
+    "state": "arithmetic",
+    "note": "This is the derivative of $u = x^{2}$, by the power rule. This is the derivative of $v = x - 1$.",
+    "valueChain": {
+     "rule": "page-definitions"
+    },
+    "how": {
+     "kind": "derivatives",
+     "items": [
+      {
+       "nameTex": "u'",
+       "exprTex": "2x"
+      },
+      {
+       "nameTex": "v'",
+       "exprTex": "1"
+      }
+     ]
+    }
+   },
+   {
+    "text": "By the product rule,",
+    "status": "note",
+    "state": "unverified",
+    "unverified": true,
+    "context": true,
+    "note": "This line states the task or names the method; there is no step in it to check."
+   },
+   {
+    "text": "dy/dx = u'v + uv'",
+    "status": "ok",
+    "state": "verified",
+    "note": "This is the product rule, written with u and v.",
+    "fact": {
+     "kind": "rule-statement",
+     "rule": "product-rule"
+    }
+   },
+   {
+    "text": "= 2x(x-1) + x^2(1)",
+    "status": "ok",
+    "state": "verified",
+    "how": {
+     "kind": "substituted",
+     "names": [
+      "u",
+      "v"
+     ]
+    }
+   },
+   {
+    "text": "= 2x(x-1) + x^2",
+    "status": "ok",
+    "state": "verified",
+    "how": {
+     "kind": "one"
+    }
+   },
+   {
+    "text": "= 2x^2 - 2x + x^2",
+    "status": "ok",
+    "state": "verified",
+    "how": {
+     "kind": "expanded",
+     "items": [
+      {
+       "fromText": "2x(x-1)",
+       "toTex": "2x^2 - 2x"
+      }
+     ]
+    }
+   },
+   {
+    "text": "= 3x^2 - x",
+    "status": "break",
+    "state": "wrong",
+    "note": "The term -2x became -x. Collecting 2x^2 + x^2 gives 3x^2 and leaves the -2x term alone, so -2x stays -2x. Corrected line: = 3x^2 - 2x. At x = 1 the line above gives 1 but this line gives 2. Every line checked before line 9 is correct. The product rule was applied correctly; this is an algebra slip.",
+    "diagnosis": {
+     "code": "false-continuation",
+     "title": "This line is not equal to the line above",
+     "fix": "Work this line out again from the line above, one term at a time.",
+     "confidence": "high",
+     "expectedFrom": "symbolic",
+     "exact": true,
+     "aboveTex": "3x^2 - 2x",
+     "writtenTex": "3x^2 - x",
+     "correctedTex": "3x^2 - 2x",
+     "correctedText": "3x^2 - 2x",
+     "changed": [
+      {
+       "fromTex": "-2x",
+       "toTex": "-x"
+      }
+     ],
+     "same": [
+      "3x^2"
+     ],
+     "whatChanged": "The term -2x became -x.",
+     "whyWrong": "Collecting 2x^2 + x^2 gives 3x^2 and leaves the -2x term alone, so -2x stays -2x.",
+     "errorType": "coefficient-beside-collected",
+     "corrected": "= 3x^2 - 2x",
+     "check": "At x = 1 the line above gives 1 but this line gives 2.",
+     "checkAt": {
+      "v": "x",
+      "x": 1,
+      "above": "1",
+      "written": "2"
+     },
+     "fromLine": 8,
+     "comment": "The term -2x became -x. Collecting 2x^2 + x^2 gives 3x^2 and leaves the -2x term alone, so -2x stays -2x. Corrected line: = 3x^2 - 2x. At x = 1 the line above gives 1 but this line gives 2. Every line checked before line 9 is correct. The product rule was applied correctly; this is an algebra slip.",
+     "message": "The term -2x became -x. Collecting 2x^2 + x^2 gives 3x^2 and leaves the -2x term alone, so -2x stays -2x. Corrected line: = 3x^2 - 2x. At x = 1 the line above gives 1 but this line gives 2. Every line checked before line 9 is correct. The product rule was applied correctly; this is an algebra slip.",
+     "kept": "Every line checked before line 9 is correct. The product rule was applied correctly; this is an algebra slip."
+    }
+   }
+  ],
+  "firstBreak": 8,
+  "diagnosis": {
+   "code": "false-continuation",
+   "title": "This line is not equal to the line above",
+   "fix": "Work this line out again from the line above, one term at a time.",
+   "confidence": "high",
+   "expectedFrom": "symbolic",
+   "exact": true,
+   "aboveTex": "3x^2 - 2x",
+   "writtenTex": "3x^2 - x",
+   "correctedTex": "3x^2 - 2x",
+   "correctedText": "3x^2 - 2x",
+   "changed": [
+    {
+     "fromTex": "-2x",
+     "toTex": "-x"
+    }
+   ],
+   "same": [
+    "3x^2"
+   ],
+   "whatChanged": "The term -2x became -x.",
+   "whyWrong": "Collecting 2x^2 + x^2 gives 3x^2 and leaves the -2x term alone, so -2x stays -2x.",
+   "errorType": "coefficient-beside-collected",
+   "corrected": "= 3x^2 - 2x",
+   "check": "At x = 1 the line above gives 1 but this line gives 2.",
+   "checkAt": {
+    "v": "x",
+    "x": 1,
+    "above": "1",
+    "written": "2"
+   },
+   "fromLine": 8,
+   "comment": "The term -2x became -x. Collecting 2x^2 + x^2 gives 3x^2 and leaves the -2x term alone, so -2x stays -2x. Corrected line: = 3x^2 - 2x. At x = 1 the line above gives 1 but this line gives 2. Every line checked before line 9 is correct. The product rule was applied correctly; this is an algebra slip.",
+   "message": "The term -2x became -x. Collecting 2x^2 + x^2 gives 3x^2 and leaves the -2x term alone, so -2x stays -2x. Corrected line: = 3x^2 - 2x. At x = 1 the line above gives 1 but this line gives 2. Every line checked before line 9 is correct. The product rule was applied correctly; this is an algebra slip.",
+   "kept": "Every line checked before line 9 is correct. The product rule was applied correctly; this is an algebra slip."
+  },
+  "source": "value-chain",
+  "folded": true,
+  "summary": {
+   "total": 9,
+   "checked": 6,
+   "given": [
+    2
+   ],
+   "verified": [
+    5,
+    6,
+    7,
+    8
+   ],
+   "arithmetic": [
+    3
+   ],
+   "conditions": [],
+   "wrong": [
+    9
+   ],
+   "unverified": [
+    1,
+    4
+   ],
+   "unread": [],
+   "reason": "Pri could not tie these lines to anything it can prove about this question, so it did not mark them.",
+   "context": [
+    1,
+    4
+   ]
+  },
+  "firstBreakLine": 9
+ }
+}

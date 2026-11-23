@@ -58,7 +58,7 @@ const PAGE = ['Differentiate y = x^2(x-1) using the product rule.', 'Let u = x^2
   const c = commentFor(card, {});
   ok(c?.kind === 'crossTerms' && /-2x\$ term became \$-x\$/.test(c.text) && /corrected line is \$= 3x\^2 - 2x\$/.test(c.text) && /the other terms are the same/.test(c.text), `the comment: ${c?.text}`);
   ok(!/\bshould\b/i.test(c.text) && !/[—–]/.test(c.text), 'no should, no dash');
-  ok(model.cards.map(k => k.status).join() === 'not-verified,checked,checked,not-verified,checked,checked,checked,checked,first-error', 'the card statuses an old client reads');
+  ok(model.cards.map(k => k.status).join() === 'condition,checked,checked,condition,checked,checked,checked,checked,first-error', 'the card statuses: lines 1 and 4 are context (a plain dash on the marked page), never a tick, never "not checked"');
   // old stored shapes still read: status/state/note per line, firstBreak a number
   ok(r.report.lines.every(l => typeof l.text === 'string' && typeof l.status === 'string') && Number.isInteger(r.report.firstBreak), 'the report keeps its shape');
 }

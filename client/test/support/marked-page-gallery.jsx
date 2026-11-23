@@ -1,5 +1,5 @@
 // The marked page (components/MarkedPage.jsx) drawn on its own, with the REAL engine's verdicts on the
-// owner's two live cases (2026-11-18) and a SYNTHETIC page: invented strokes for ink, a canvas drawing
+// owner's live cases (2026-11-18, and the product-rule page of 2026-11-23) and a SYNTHETIC page: invented strokes for ink, a canvas drawing
 // for the photo. Nothing here is a real student, a real photo or a real reader. Test support only.
 // ?case=buoy|stationary|mixed&source=ink|photo&edition=prithagoras|priyabhata&theme=light|dark
 import React from 'react';
@@ -12,6 +12,7 @@ import MarkedPage from '../../src/components/MarkedPage.jsx';
 import { stepCheck } from '../../src/engine/checker.js';
 import { exprToLatex } from '../../src/ink/inkLatex.js';
 import { setLanguage } from '../../src/i18n/index.js';
+import realProductRule from './product-rule-real-report.json';
 
 const q = new URLSearchParams(location.search);
 const theme = q.get('theme') === 'dark' ? 'dark' : 'light';
@@ -29,21 +30,11 @@ if (edition === 'priyabhata') setLanguage('hi');
 const BUOY = { kind: 'value-chain', fn: { name: 'h', variable: 't', expr: '22+5*sin(pi*t/6)' }, quantities: { max: 27, min: 17, amplitude: 5, midline: 22, period: 12 }, fullDomain: true };
 const STAT = { kind: 'value-chain', fn: { name: 'y', variable: 'x', expr: '(2)*x^3+(9)*x^2' }, curve: { derivative: '(6)*x^2+(18)*x', stationary: [-3, 0], choose: 'smaller' } };
 const OWNER = ['y=2x³+9x²', "y'=6x²+18x", "for stat points y'=0", '0=6x²+18x', '0=6x[x+3]', 'x=0 or x=-3'];
-// SYNTHETIC report for the product-rule page (y = x^2(x - 1)): the shape the engine's value-chain report takes, carrying the optional
-// per-line `comment` and, on the wrong line, whatChanged, whyWrong, corrected, fromLine, check and kept. Not an engine verdict.
-const PRODUCT_LINES = ['y = x^2(x - 1)', 'u = x^2', 'v = x - 1', "u' = 2x", "v' = 1", "y' = u'v + uv'", "y' = 2x(x - 1) + x^2(1)", "y' = 2x^2 - 2x + x^2", '= 3x^2 - x'];
-const PRODUCT_HOW = ['Restates the function from the question.', 'Correct choice: u = x^2 is the first factor.', 'Correct choice: v = x - 1 is the second factor.', "Correct: the derivative of x^2 is 2x, so u' = 2x.", "Correct: the derivative of x - 1 is 1.", "Correct statement of the product rule: y' = u'v + uv'.", "Correct substitution: y' = 2x(x - 1) + x^2(1).", 'Correct expansion: 2x(x - 1) = 2x^2 - 2x.'];
-// The engine's field names (task/first-wrong-step): `how` on a ticked line; `diagnosis` { whatChanged, whyWrong, errorType, corrected, fromLine, check, kept, comment } on the wrong one.
-const PRODUCT_REPORT = {
-  source: 'value-chain', firstBreak: 8, firstBreakLine: 9, summary: { total: 9, checked: 8, given: [1], verified: [2, 3, 4, 5, 6, 7, 8], conditions: [], wrong: [9], unverified: [], unread: [], reason: null },
-  lines: PRODUCT_LINES.map((text, i) => (i < 8
-    ? { text, status: 'ok', state: i === 0 ? 'given' : 'verified', how: PRODUCT_HOW[i], ...(i === 0 ? { restates: true, note: PRODUCT_HOW[0] } : {}) }
-    : { text, status: 'break', state: 'wrong', note: 'This line does not follow from line 8.', diagnosis: { code: 'combine-like-terms', errorType: 'algebra-slip', title: 'Like terms combined wrongly', confidence: 'high',
-        comment: 'This line does not follow from line 8.', whatChanged: 'The term -2x became -x.', whyWrong: 'Collecting 2x^2 + x^2 gives 3x^2 and leaves the -2x term alone, so -2x stays -2x.',
-        corrected: '= 3x^2 - 2x', fromLine: 8, check: 'At x = 1 the line above gives 1 but this line gives 2.', kept: 'Every line checked before line 9 is correct. The product rule was applied correctly; this is an algebra slip.' } }))
-};
+// The product-rule page (y = x^2(x - 1)): the REAL engine report for the owner's nine lines, saved in product-rule-real-report.json
+// (server/test/marked-page-real-report-check.mjs fails if it drifts from the engine). Only the page drawn around it is synthetic.
+const PRODUCT_REAL = realProductRule;
 const CASES = {
-  product: { meta: null, lines: PRODUCT_LINES, report: PRODUCT_REPORT, receipt: { awarded: 0, possible: 3 } },
+  product: { meta: null, lines: PRODUCT_REAL.lines, report: PRODUCT_REAL.stepReport, receipt: { awarded: 0, possible: 3 } },
   buoy: { meta: BUOY, lines: ['22 + 5sin(πt/6)', 'max = 22 + 5', '= 27'], receipt: { awarded: 2, possible: 2 } },
   stationary: { meta: STAT, lines: [...OWNER, 'y(0)=0', 'smallest: (0,0)'], receipt: { awarded: 0, possible: 3 } },
   mixed: { meta: STAT, lines: ['y=2x³+9x²', '@@@', "y'=6x²+18x", 'foo', '0=6x[x+3]', 'x=0 or x=-3'], receipt: { awarded: 0, possible: 3 } },

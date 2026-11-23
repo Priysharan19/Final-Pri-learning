@@ -34,7 +34,7 @@ const EXPECT = {
   stationary: { statuses: ['checked', 'checked', 'condition', 'checked', 'checked', 'checked', 'checked', 'first-error'], sentence: 'Correct up to line 7. The first error is on line 8. 6 lines checked and correct. 1 line wrong.', mark: '0/3', selected: 8, word: 'Wrong', cross: 8 },
   mixed: { statuses: ['checked', 'unread', 'checked', 'not-verified', 'checked', 'checked'], sentence: 'The lines Pri could check are correct. The final answer is not. 4 lines checked and correct. 2 lines not checked.', mark: '0/3', selected: 1, word: 'Correct', cross: null },
   crossed: { statuses: ['checked', 'checked', 'condition', 'checked', 'not-verified', 'unread', 'not-verified', 'checked', 'first-error'], sentence: 'The first error is on line 9. 4 lines checked and correct. 1 line wrong. 3 lines not checked.', mark: '0/3', selected: 9, word: 'Wrong', cross: 9 },
-  product: { statuses: ['checked', 'checked', 'checked', 'checked', 'checked', 'checked', 'checked', 'checked', 'first-error'], sentence: 'Correct up to line 8. The first error is on line 9. 8 lines checked and correct. 1 line wrong.', mark: '0/3', selected: 9, word: 'Wrong', cross: 9 },
+  product: { statuses: ['condition', 'checked', 'checked', 'condition', 'checked', 'checked', 'checked', 'checked', 'first-error'], sentence: 'Correct up to line 8. The first error is on line 9. 6 lines checked and correct. 1 line wrong.', mark: '0/3', selected: 9, word: 'Wrong', cross: 9 },
   wrongfinal: { statuses: ['checked', 'checked', 'condition', 'checked', 'checked', 'checked', 'checked'], sentence: 'The lines Pri could check are correct. The final answer is not. 6 lines checked and correct.', mark: '0/3', selected: 1, word: 'Correct', cross: null }
 };
 const WORDS = { checked: 'Correct', 'first-error': 'Wrong', condition: 'Context', 'not-verified': 'Not checked', unread: 'Not checked', follows: 'Not checked', incomplete: 'Not checked' };
@@ -128,7 +128,7 @@ const browser0 = await chromium.launch();
   await ctx.close();
 }
 {
-  // The product-rule page: a specific comment on every correct line and a detailed annotation on the wrong one (SYNTHETIC report).
+  // The product-rule page: a specific comment on every correct line and a detailed annotation on the wrong one (the REAL engine report).
   for (const [w, h] of [[1440, 900], [390, 844]]) {
     const ctx = await browser0.newContext({ viewport: { width: w, height: h } }); const pg = await ctx.newPage();
     await pg.goto(`${url('product', 'photo', 'prithagoras', 'light')}`, { waitUntil: 'networkidle' }); await pg.waitForSelector('[data-marked-page]');
@@ -144,7 +144,7 @@ const browser0 = await chromium.launch();
     const d8 = await pg.locator('[data-mp-detail]').innerText();
     ok(/Correct/.test(d8) && /Correct expansion: 2x\s*\(x\s*-\s*1\)/.test(d8.replace(/\s+/g, ' ')) || /Correct expansion/.test(d8), `${w}: a correct line shows the engine's specific comment as its detail`);
     ok(await pg.locator('[data-mp-detail] [data-mp-fact]').count() === 0, `${w}: a correct line has no wrong-line parts`);
-    for (let n = 1; n <= 8; n++) { await pg.locator(`[data-mp-box="${n}"]`).click(); if (!(await pg.locator('[data-mp-detail] [data-mp-why]').count())) { ok(false, `${w}: line ${n} has a specific comment`); break; } }
+    for (const n of [2, 3, 5, 6, 7, 8]) { await pg.locator(`[data-mp-box="${n}"]`).click(); if (!(await pg.locator('[data-mp-detail] [data-mp-why]').count())) { ok(false, `${w}: line ${n} has a specific comment`); break; } }
     ok(true, `${w}: every correct line was walked`);
     await ctx.close();
   }
