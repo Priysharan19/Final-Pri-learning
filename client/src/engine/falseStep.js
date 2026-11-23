@@ -195,10 +195,6 @@ export function falseStepFacts(aboveSide, writtenSide) {
   };
 }
 
-/** What changed, in plain words from the exact terms (never from the student's text). */
-function changeWords(changed) {
-  return changed.map(c => (c.fromText && c.toText ? `the ${c.fromText} term became ${c.toText}` : c.fromText ? `the ${c.fromText} term is missing` : `an extra ${c.toText} term appears`)).join('; ');
-}
 const MAX_CHANGES = 3;
 /**
  * The diagnosis a crossed false continuation carries (the shape engine/lineChains.js and the result card read). `facts` is
@@ -472,7 +468,7 @@ const fill = (t, slots) => t.replace(/\{(\w+)\}/g, (_, k) => slots[k]);
 function productPairs(summand) {
   const ast = astOf(summand.replace(/^\s*\+\s*/, ''));
   const flat = [];
-  const walk = n => { while (n && n.t === 'group' && false) n = n.v; if (n && n.t === 'bin' && n.op === '*') { walk(n.l); walk(n.r); } else flat.push(n); };
+  const walk = n => { if (n && n.t === 'bin' && n.op === '*') { walk(n.l); walk(n.r); } else flat.push(n); };
   walk(ast);
   if (flat.length !== 2) return null;
   const toTerms = n => { const st = { v: null }; const p = polyOf(n, st); return p ? { v: st.v, terms: [...p.entries()].map(([d, c]) => ({ d, c })).sort((x, y) => y.d - x.d) } : null; };

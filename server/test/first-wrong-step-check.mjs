@@ -159,6 +159,7 @@ const neverCrossed = (q, lines, what, opts) => { const r = mark(q, lines, '', op
 {
   const right = PAGE.map(l => (l === '= 3x^2 - x' ? '= 3x^2 - 2x' : l));
   const r = mark(PRODUCT, right, '3x^2-2x');
+  ok(anyCross(r).length === 0 && !(r.report.firstBreak >= 0), `no cross anywhere on the true page: ${anyCross(r)}`);
   const model = buildAnnotatedWorking({ lines: right, stepReport: r.report });
   const say = k => commentFor(model.cards[k], {})?.text ?? null;
   ok(say(1) === 'Good choice of $u$ and $v$: their product is the function in the question.', `line 2: ${say(1)}`);

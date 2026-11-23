@@ -86,11 +86,11 @@ for (const id of families) {
           if (!again || again.kind !== want) problems.push(`how-comment not recomputed (${want}): ${tag}`);
           howRecomputed += 1;
         }
-        if (HOW_KINDS.includes(c.kind) && card.how) { for (const it of card.how.items || []) { allowed.add('$' + String(it.nameTex ?? '') + ' = ' + String(it.exprTex ?? '') + '$'); } }
         if (card.valueChain === 'arithmetic' && !EQUALITY_KINDS.includes(c.kind) && !HOW_KINDS.includes(c.kind)) problems.push(`arithmetic tick with a non-equality template: ${tag}`);
         if (EQUALITY_KINDS.includes(c.kind) && card.valueChain !== 'arithmetic') problems.push(`equality template on a non-arithmetic line: ${tag}`);
         // maths comes only from the line's structured facts
         const allowed = new Set();
+        if (HOW_KINDS.includes(c.kind) && card.how) { for (const it of card.how.items || []) { allowed.add('$' + String(it.nameTex ?? '') + ' = ' + String(it.exprTex ?? '') + '$'); } }
         if (c.kind === 'bothSides' || c.kind === 'equalsAbove') allowed.add(line.fact.tex !== undefined ? '$' + line.fact.tex + '$' : tex(line.fact.value));
         if (card.status === 'first-error' && line.diagnosis?.expectedFrom === 'sides') sidesCrosses += 1;
         if (c.kind === 'crossComputed' || c.kind === 'crossSidesDiffer') {
@@ -273,6 +273,16 @@ const q = G.generateQuestion('y12-integration', 3, 4);
 const rep = stepEvidence(q, '64/3', ['y = 2x(4-x)', 'Area = ∫_0^4 2x(4-x) dx', '= 2∫_0^4 4x-x^2 dx', '= 2[4x^2/2 - x^3/3]_0^4'].join('\n'), { correct: false }).stepReport;
 ok(rep.lines.every(l => ['ok', 'break', 'note'].includes(l.status)) && JSON.stringify(rep.lines.map(l => l.status)) === JSON.stringify(rep.lines.map(l => { const c = { ...l }; for (const k of STRIP) delete c[k]; return c.status; })), 'removing the structured facts changes no status');
 void stepMetaFor; void plainComment;
+
+// ── 5b. the derivative comment's maths comes only from the engine's `how.items` (the allowance in section 1 is only reached on a page with derivatives) ──
+{
+  const saved = JSON.parse(readFileSync(new URL('../../client/test/support/product-rule-real-report.json', import.meta.url), 'utf8'));
+  const m = buildAnnotatedWorking({ lines: saved.lines, stepReport: saved.stepReport });
+  const dc = m.cards.map(card => ({ card, c: commentFor(card, ctx) })).find(x => x.c?.kind === 'howDerivatives');
+  ok(!!dc && Array.isArray(dc.card.how?.items) && dc.card.how.items.length === 2, 'the owner page has a derivatives tick with two engine items');
+  const allowedHow = new Set(dc ? dc.card.how.items.map(it => '$' + it.nameTex + ' = ' + it.exprTex + '$') : []);
+  ok(dc && spansOf(dc.c.text).length === 2 && spansOf(dc.c.text).every(sp => allowedHow.has(sp)), `every maths span of the derivative comment is an engine item: ${dc?.c.text}`);
+}
 
 // ── 6. the owner's pages, old sentence and new sentence ─────────────────────────────────────────────
 const AREA = ['8 y = 2x(4-x)', 'Area = ∫_0^4 2x(4-x) dx', '= 2∫_0^4 4x-x^2 dx', '= 2[4x^2/2 - x^3/3]_0^4', '= 2[2x^2 - x^3/3]_0^4', '= 2[2(4)^2 - 4^3/3] = 2[32 - 64/3]', '16/2', '64/3'];

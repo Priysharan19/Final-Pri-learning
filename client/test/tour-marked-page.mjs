@@ -273,7 +273,8 @@ try {
         await page.locator('[data-mp-photo-toggle]').click();
       }
       if (c === 'crossed' && source === 'photo' && edition === 'prithagoras') {
-        const cross = await page.evaluate(() => { const li = document.querySelector('[data-mp-detail] [data-mp-why-error]'); return { typeset: !!document.querySelector('[data-mp-detail] .katex') }; });
+        const cross = await page.evaluate(() => ({ lead: !!document.querySelector('[data-mp-detail] [data-mp-why-error]'), typeset: !!document.querySelector('[data-mp-detail] .katex') }));
+        ok(cross.lead, `${where}: the wrong line has its one lead sentence`);
         ok(cross.typeset, `${where}: the wrong line's text is typeset mathematics`);
       }
       // the panel never covers the page, and a tall page does not push the cross out of reach
