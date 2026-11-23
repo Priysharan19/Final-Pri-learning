@@ -49,7 +49,7 @@ async function one(cfg, c, rep) {
     input: [
       { role: 'system', content: [{ type: 'input_text', text: mod.SYSTEM_INSTRUCTIONS }] },
       { role: 'user', content: [
-        { type: 'input_text', text: cfg.hint && mod.userTextFor ? mod.userTextFor(hintFor(c, cfg.hint)) : 'Transcribe every line of handwriting in this image. Do not solve it.' },
+        { type: 'input_text', text: cfg.hint && mod.userTextFor ? mod.userTextFor(hintFor(c, cfg.hint)) : 'Transcribe every line of working in this image, whether handwritten, typed or printed. Do not solve it.' },
         { type: 'input_image', image_url: dataUrl, detail: cfg.detail || 'high' }] }
     ],
     text: { format: { type: 'json_schema', name: 'pri_handwriting_transcription', strict: true, schema: mod.TRANSCRIPTION_SCHEMA } }
