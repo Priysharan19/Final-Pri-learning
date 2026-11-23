@@ -1455,7 +1455,10 @@ async function run() {
       } : null;
     }, selector);
 
-    await step('exams · refused, session ended', '/exams', async () => {
+    // On Prithagoras the Exams page offers no start for a generated practice paper (the server composes none outside the India course, so
+    // that button could only fail; Exams.jsx removes it), so there is no refusal to audit there: the step still signs the second student
+    // in and ends the session, which the steps below start from, and the refusal itself is audited on the India course only.
+    await step(INDIA ? 'exams · refused, session ended' : 'exams · session ended', '/exams', async () => {
       await goTo(page, BASE, '/');
       await click(page, '.user-chip');
       await click(page, '[role="menuitem"]', { text: 'Switch profile' });
@@ -1482,10 +1485,15 @@ async function run() {
       // The session ended, a paper does not start: the refusal is the state audited here.
       await goTo(page, BASE, '/exams');
       endSession();
-      await page.getByRole('button', { name: INDIA ? 'Start JEE Main Mathematics simulation' : 'Start practice paper' }).click();
-      await page.waitForSelector('[data-exam-start-refused]', { timeout: 30000 });
-      await wait(page, 400);
-      refusals.exam = { ...(await refusalBlock('[data-exam-start-refused]')), room: await page.locator('.exam-nav').count() };
+      if (INDIA) {
+        await page.getByRole('button', { name: 'Start JEE Main Mathematics simulation' }).click();
+        await page.waitForSelector('[data-exam-start-refused]', { timeout: 30000 });
+        await wait(page, 400);
+        refusals.exam = { ...(await refusalBlock('[data-exam-start-refused]')), room: await page.locator('.exam-nav').count() };
+      } else {
+        ok('Prithagoras: the Exams page offers no start for a generated practice paper, so a paper that does not start cannot be reached there',
+          (await page.getByRole('button', { name: 'Start practice paper' }).count()) === 0, 'the Start practice paper button is on the Exams page');
+      }
     });
 
     // Each refusal below starts from a student who is inside the app with a
@@ -1730,7 +1738,7 @@ async function run() {
       r.button?.tag === 'button' && /\p{L}/u.test(r.button.name) && r.button.expanded === 'false' && r.button.disabled === false;
     if (INDIA) ok('the session ended, a placement check that does not start is an alert in words (its icon named), with a real, named sign-in button in place',
       announced(refusals.placement), JSON.stringify(refusals.placement));
-    ok('the session ended, an exam paper that does not start is an alert in words with the same named sign-in — and no exam room opens',
+    if (INDIA) ok('the session ended, an exam paper that does not start is an alert in words with the same named sign-in — and no exam room opens',
       // (Its icon alone has no word yet — Exams.jsx:82, tracked under "owned elsewhere".)
       announced({ ...refusals.exam, iconWord: refusals.exam?.iconWord || 'tracked elsewhere' }) && refusals.exam.room === 0, JSON.stringify(refusals.exam));
     if (INDIA) ok('the session ended, Rapid Fire and Match that do not start are alerts in words with the same named sign-in — and no clock or question appears',
