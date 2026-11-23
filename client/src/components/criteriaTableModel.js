@@ -14,11 +14,11 @@ const MAX_ITEMS = 12;
 const text = (v, n) => (typeof v === 'string' ? v.trim().slice(0, n) : '');
 
 /**
- * @param criteria  the server's { typeId, digest, items: [{ key, text, marks, awarded, lines, reason }] } or undefined
+ * @param criteria  the server's { typeId, digest, items: [{ key, text, marks, awarded, verified, lines, reason }] } or undefined
  * @param mark      the server's mark { awarded, possible } for this attempt, or null
  * @param cards     the marked page's cards ({ n, status })
  * @param approved  the approved types (defaults to the build's copy)
- * @returns null | { typeId, rows: [{ key, text, marks, awarded, lines, reason }], earned, possible }
+ * @returns null | { typeId, rows: [{ key, text, marks, awarded, verified, lines, reason }], earned, possible }
  */
 export function criteriaView({ criteria, mark, cards, approved = AUTHOR_APPROVED } = {}) {
   if (!criteria || typeof criteria !== 'object' || !mark) return null;
@@ -32,9 +32,11 @@ export function criteriaView({ criteria, mark, cards, approved = AUTHOR_APPROVED
     const marks = Number(it?.marks);
     if (!Number.isInteger(marks) || marks <= 0 || typeof it?.awarded !== 'boolean') return null;
     const lines = Array.isArray(it.lines) ? it.lines.filter(n => Number.isInteger(n)).slice(0, 20) : [];
-    // A criterion is earned on ticked lines only.
-    if (it.awarded && (!lines.length || lines.some(n => statusOf.get(n) !== 'checked'))) return null;
-    rows.push({ key: text(it.key, 40), text: text(it.text, 240), marks, awarded: it.awarded, lines, reason: text(it.reason, 240) });
+    // A criterion is earned on ticked lines only, or (basis 'answer') by the final answer the server marked right, with no line.
+    const byAnswer = it.basis === 'answer' && it.awarded && !lines.length;
+    if (it.awarded && !byAnswer && (!lines.length || lines.some(n => statusOf.get(n) !== 'checked'))) return null;
+    // `verified: false` on an unearned criterion says Pri could not verify a line for it; it never says the student was wrong.
+    rows.push({ key: text(it.key, 40), text: text(it.text, 240), marks, awarded: it.awarded, verified: it.verified !== false, lines, reason: text(it.reason, 240) });
   }
   const possible = rows.reduce((s, r) => s + r.marks, 0);
   const earned = rows.reduce((s, r) => s + (r.awarded ? r.marks : 0), 0);

@@ -32,6 +32,7 @@ import { annotateMilestones } from '../../client/src/engine/milestones.js';
 import { solutionMatch } from '../../client/src/engine/solutionMatch.js';
 import { lineChains } from '../../client/src/engine/lineChains.js';
 import { awardBoardScheme, matchBoardPoints } from '../../client/src/engine/boardScheme.js';
+import { constrainToShown, unsupportedCredit } from '../../client/src/engine/markExplanation.js';
 import { answerForm, effectiveSymbols, firstFinalAttempt, planGivens, readClaimForm } from './finalAttempt.js';
 
 // Mirrors the shared deterministic checker input used by local practice;
@@ -199,7 +200,7 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
     }
     return out;
   };
-  const partial = partialOf(report);
+  let partial = partialOf(report);
   // Feedback only, after the mark is computed: a correct intermediate line
   // that matches a step of the worked solution is ticked (milestones.js).
   // A question whose working is not checked (no Step Check: supportsSteps
@@ -210,7 +211,7 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
   // worth the answer point alone, never the printed marks (D25 delta review).
   const board = Array.isArray(q.boardScheme) ? boardAward(q, meta, report, result.correct === true) : null;
   // What decided the marks above; the display passes below may change `report`.
-  const decided = meta && steps ? report : null;
+  let decided = meta && steps ? report : null;
   // Feedback only, after every mark: the topic check's CROSS on a definition, a label or a bare margin number is shown as a note,
   // and the lines after it are judged as if it were absent (checker.claimFreeReport). Every mark, `correct`, method mark and
   // board tick above was computed from the report the topic check made, unchanged. `opts.claims === false` is the test switch.
@@ -275,13 +276,28 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
   try { if (report && result.correct !== true && typeof steps === 'string') { const gap = missingSteps(q, steps); if (gap) report = { ...report, missing: gap.missing, stepsFound: gap.found, stepsReadable: gap.total }; } } catch { /* the report stands */ }
   // The displayed report is kept as it was. Where running the marks again on it would NOT give the stored `partial` (or the
   // Board's ticks), the report that decided them is kept beside it, reduced to what reproduces the decision.
+  // BEHAVIOUR CHANGE of the generic method-marks path (not of final-answer marking). The marks rest only on lines the page shows as ticks,
+  // and not after a cross that only the page makes (the first wrong step): a mark that main paid on a true line AFTER the page's own cross
+  // (owner's product-rule page, line 9 true again after a crossed line 8: 3 marks, now 2) is no longer paid. A cross the deciding report
+  // also made stays the rubric's own (an authored plan lets an independent stage earn). It can lower a method mark wherever method marks
+  // are computed, whatever the allow-list says. Where method marks are off (production today, and every Prithagoras request) `partial` is
+  // dropped by MARKER_OPS.practice, so this is a no-op for every reply: server/test/method-marks-ready-check.mjs proves the stripped
+  // evidence identical with and without it. `opts.reconcile === false` is the measurement's "before" switch.
+  if (decided && partial && !Array.isArray(q.boardScheme) && !(opts && opts.reconcile === false)) {
+    const unsupported = unsupportedCredit(partial.lines, report?.lines, decided.lines);
+    const { report: bounded, clipped } = unsupported.length ? constrainToShown(decided, report?.lines, unsupported) : { report: decided, clipped: 0 };
+    if (clipped) { try { partial = partialOf(bounded); decided = bounded; } catch { /* the marks stand */ } }
+  }
   let markingReport = null;
   if (decided && decided !== report) {
     let reproduces = false;
     try { reproduces = JSON.stringify(partialOf(report)) === JSON.stringify(partial) && (!Array.isArray(q.boardScheme) || JSON.stringify(boardAward(q, meta, report, result.correct === true)) === JSON.stringify(board)); } catch { reproduces = false; }
     if (!reproduces) markingReport = markingReportOf(decided);
   }
-  return { stepReport: report, partial, ...(board ? { board } : {}), ...(markingReport ? { markingReport } : {}) };
+  // A scheme question (schemeAward.js) also learns which lines the topic check ITSELF verified: the page ticks more than that (a copied
+  // given, a rule statement, a true-as-written sum), and "writes a correct derivative" is earned only by a line the check found equal to it.
+  const topicTicks = q._methodScheme ? (decided ? decided.lines.flatMap((l, i) => (l?.status === 'ok' ? [i] : [])) : null) : undefined;
+  return { stepReport: report, partial, ...(board ? { board } : {}), ...(markingReport ? { markingReport } : {}), ...(topicTicks !== undefined ? { topicTicks } : {}) };
 }
 
 /** The Board-scheme award for a question carrying one, from the deterministic report. */
@@ -545,7 +561,7 @@ export const MARKER_OPS = Object.freeze({
     if (!wanted) return { result, evidence: null };
     const evidence = stepEvidence(q, answer, working, result, { slipWarnings: true, ...(Array.isArray(workingGaps) ? { gaps: workingGaps } : {}), ...(Array.isArray(workingLatex) ? { latex: workingLatex } : {}) });
     // Final answer only: the step report stays, the method mark does not.
-    return { result, evidence: policyOf({ policy }).methodMarks ? evidence : { stepReport: evidence.stepReport, partial: null, ...(evidence.board ? { board: evidence.board } : {}) } };
+    return { result, evidence: policyOf({ policy }).methodMarks ? evidence : { stepReport: evidence.stepReport, partial: null, ...(evidence.board ? { board: evidence.board } : {}), ...(evidence.topicTicks !== undefined ? { topicTicks: evidence.topicTicks } : {}) } };
   },
   /** One examination response: the answer stage, then (method marks on) the working stage. */
   exam({ q, given, working, grid, policy }, emit) {

@@ -11,22 +11,27 @@ Year 12 Advanced and Extension 1 first, then Year 11.
 | # | Type | Course | Criteria | Marks | File |
 |---:|---|---|---:|---:|---|
 | 1 | Differentiate using the chain, product or quotient rule | Year 12 Mathematics Advanced | 2 | 2 | [y12-diff-rules.md](y12-diff-rules.md) |
-| 2 | Differentiate, then find the gradient at a point | Year 12 Mathematics Advanced | 2 | 2 | [y12-diff-gradient.md](y12-diff-gradient.md) |
-| 3 | Find the x-coordinates of the stationary points | Year 12 Mathematics Advanced | 3 | 3 | [y12-stationary-x.md](y12-stationary-x.md) |
-| 4 | Find the equation of a tangent | Year 12 Mathematics Advanced | 3 | 3 | [y12-tangent.md](y12-tangent.md) |
-| 5 | Maximum or minimum of a sine or cosine model | Year 12 Mathematics Advanced | 3 | 3 | [y12-trig-extreme.md](y12-trig-extreme.md) |
-| 6 | Find the value of a sine or cosine model at a time | Year 12 Mathematics Advanced | 2 | 2 | [y12-trig-evaluate.md](y12-trig-evaluate.md) |
-| 7 | Differentiate an exponential or logarithmic function | Year 12 Mathematics Advanced | 2 | 2 | [y12-diff-explog.md](y12-diff-explog.md) |
-| 8 | Evaluate a polynomial or find a remainder by substitution | Year 11 Mathematics Advanced | 2 | 2 | [y11-poly-evaluate.md](y11-poly-evaluate.md) |
-| 9 | Gradient of a tangent: differentiate, then substitute | Year 11 Mathematics Advanced | 2 | 2 | [y11-diff-gradient-plan.md](y11-diff-gradient-plan.md) |
-| 10 | Differentiate a polynomial by the power rule | Year 11 Mathematics Advanced | 2 | 2 | [y11-diff-power-rule.md](y11-diff-power-rule.md) |
+| 2 | Maximum or minimum of a sine or cosine model | Year 12 Mathematics Advanced | 3 | 3 | [y12-trig-extreme.md](y12-trig-extreme.md) |
+| 3 | Find the value of a sine or cosine model at a time | Year 12 Mathematics Advanced | 2 | 2 | [y12-trig-evaluate.md](y12-trig-evaluate.md) |
+| 4 | Differentiate an exponential or logarithmic function | Year 12 Mathematics Advanced | 2 | 2 | [y12-diff-explog.md](y12-diff-explog.md) |
+| 5 | Evaluate a polynomial or find a remainder by substitution | Year 11 Mathematics Advanced | 2 | 2 | [y11-poly-evaluate.md](y11-poly-evaluate.md) |
+| 6 | Gradient of a tangent: differentiate, then substitute | Year 11 Mathematics Advanced | 2 | 2 | [y11-diff-gradient-plan.md](y11-diff-gradient-plan.md) |
+| 7 | Differentiate a polynomial by the power rule | Year 11 Mathematics Advanced | 2 | 2 | [y11-diff-power-rule.md](y11-diff-power-rule.md) |
 
 ## Counts
 
-- Types given a scheme: 10.
-- Types where the engine awards every criterion deterministically: 10 of 10. Each was run on 3 sample questions with a full, a partial, a zero and an earlier-slip transcript, and every run gave the expected award.
-- Criteria in all: 23. Decided by the line interpreter: 12. By the engine (plan stage or step check): 4. By the answer checker on the final line: 7.
-- Size of the review job: 10 types, about 40 worked awards to read (one full, one partial, one zero and one earlier-slip award for each type), and 23 criteria whose marks to set.
+- Types given a scheme: 7.
+- Types where the engine awards every criterion deterministically: 7 of 7. Each was run on 3 sample questions with a full, a partial, a zero and an earlier-slip transcript, and every run gave the expected award.
+- Criteria in all: 15. Earned by a ticked line of the marked page: 8. Earned by a correct final answer (the answer checker): 7.
+- Size of the review job: 7 types, about 28 worked awards to read (one full, one partial, one zero and one earlier-slip award for each type), and 15 criteria whose marks to set.
+
+## Not available yet
+
+These three question types had a draft in an earlier version of this packet. They are NOT available now: the marked page the student sees cannot verify one of their criteria line by line, and the server pays only from that page, so nothing about them can be approved or paid. Each reason was checked by running a plausible correct transcript.
+
+- Differentiate, then find the gradient at a point (Year 12 Mathematics Advanced; families `y12-diff`): The question has no step plan, so the page leaves the derivative line unchecked; only the final value is verified. "Differentiates correctly" cannot be decided from the lines the student sees.
+- Find the x-coordinates of the stationary points (Year 12 Mathematics Advanced; families `y12-appdiff`): The page leaves the derivative line and the "let the derivative equal zero" line unchecked (it checks the equation and the roots only), so two of the three criteria cannot be decided from the lines the student sees.
+- Find the equation of a tangent (Year 12 Mathematics Advanced; families `y12-appdiff`): The page ticks the line that finds the point of contact but leaves the derivative line unchecked, so "differentiates correctly" cannot be decided from the lines the student sees.
 
 ## Could not be given a provable scheme
 
@@ -37,7 +42,7 @@ These types were tried. A scheme is not offered because at least one criterion c
 - Integration by substitution (Extension 1) (Year 12 Mathematics Extension 1; families `me12-calc`, `mex-integration`): A substitution line "u = ..." is a choice of notation and the transformed integral is not read, so no stage can be decided.
 - Definite integrals and areas under a curve (Year 12 Mathematics Advanced; families `y12-integration`, `y12-integral-calc`): The engine cannot read an antiderivative or an integral line, so "integrates correctly" and "substitutes the limits" cannot be decided; only the final value is checked.
 - Indefinite integrals and the reverse chain rule (Year 12 Mathematics Advanced; families `y12-integration`, `y12-integral-calc`, `y12-trigcalc`): The engine cannot read an antiderivative line, so no stage of the method can be decided apart from the final expression.
-- Nature of a stationary point (Year 12 Mathematics Advanced; families `y12-appdiff`): The nature question is multiple choice, and the second derivative is not a line the interpreter can read, so "determines the nature" cannot be decided from the lines.
+- Nature of a stationary point (Year 12 Mathematics Advanced; families `y12-appdiff`): The nature question is multiple choice, and the second derivative is not a line the page can check, so "determines the nature" cannot be decided from the lines.
 - Applications of differentiation: greatest or least value (rates and optimisation) (Year 12 Mathematics Advanced; families `y12-appdiff`): The derivative of a function named P (or any capital-letter name) is not read, and the line that sets it to zero is not recognised, so the calculus steps cannot be decided.
 - Exponential growth and decay models, and logarithmic equations (Year 12 Mathematics Advanced; families `y12-explogcalc`, `y12-func-model`, `y11-explog`): The lines that set up and solve the model equation (taking logarithms, finding k) are not read, so no method criterion can be decided.
 - Arithmetic and geometric sequences and series (Year 12 Mathematics Advanced; families `y12-series`): The formula line and the substitution line are not read, and the question has no engine plan, so only the final value can be checked.

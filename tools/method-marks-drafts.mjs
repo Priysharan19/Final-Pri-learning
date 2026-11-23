@@ -7,33 +7,32 @@
 // Nothing here approves, signs or switches anything on. It reads the engine and the line
 // interpreter; it never edits them. Deterministic: fixed seeds, no clock, no model, no network.
 //
-// A type gets a scheme only when, on every sample question, the engine (or the line interpreter)
-// awards the full marks to a full transcript, nothing to a zero transcript, and strictly between
-// to a partial one. A type that fails that run is listed as "could not be given a provable scheme".
+// The criteria, and the award, are the server's own (server/platform/schemeAward.js): each worked award below is produced by the same
+// function that pays a student, from the same step report the marked page shows. A type gets a scheme only when, on every sample
+// question, that award is the full marks for a full transcript, nothing for a zero transcript, and strictly between for a partial
+// one. A type that fails that run, or that the page cannot verify line by line, is listed as "could not be given a provable scheme".
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import * as G from '../client/src/engine/generators/index.js';
-import { stepMetaFor } from '../server/platform/markerOps.js';
-import { stepCheck, checkAnswer } from '../client/src/engine/checker.js';
-import { interpretWorking } from '../server/platform/lineInterpreter/index.js';
+import { stepMetaFor, stepEvidence } from '../server/platform/markerOps.js';
+import { checkAnswer } from '../client/src/engine/checker.js';
 import { publicDescription } from '../server/platform/lineInterpreter/givens.js';
-import { makeFn, polynomial, polyRoots, extremes } from '../server/platform/lineInterpreter/truth.js';
+import { makeFn, polynomial, extremes } from '../server/platform/lineInterpreter/truth.js';
+import { SCHEMES, UNAVAILABLE, schemeDigest, awardScheme } from '../server/platform/schemeAward.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const OUT_DIR = path.join(ROOT, 'owner-review', 'method-marks');
+// The packets the owner reads (docs/marking/method-marks-signoff/READ-ME-method-marks-signoff.md links here; the owner copies the folder into his private owner-actions): the same files, without the machine-readable types.json.
+export const OWNER_DIR = path.join(ROOT, 'docs', 'marking', 'method-marks-signoff', 'method-marks');
+export const ownerFiles = files => new Map([...files].filter(([name]) => name.endsWith('.md')));
 export const BANNER = "DRAFT for the author's review: not approved. Nothing in this file is switched on.";
-const ENV = { PRI_FEATURE_LINE_INTERPRETER: '1' };
 const SAMPLES_PER_TYPE = 3;
 const SEED_LIMIT = 80;
 
 // ── small helpers ───────────────────────────────────────────────────────────
 const plain = s => String(s ?? '').replace(/—/g, ', ').replace(/–/g, '-');
 const num = v => { const r = Math.round(v * 1e6) / 1e6; return String(Object.is(r, -0) ? 0 : r); };
-const canon = v => Array.isArray(v) ? `[${v.map(canon).join(',')}]`
-  : v && typeof v === 'object' ? `{${Object.keys(v).sort().map(k => `${JSON.stringify(k)}:${canon(v[k])}`).join(',')}}` : JSON.stringify(v ?? null);
-const sha = s => crypto.createHash('sha256').update(s).digest('hex');
 const descOf = q => publicDescription(q);
 const fnOf = q => { const f = descOf(q).functions; return f.length === 1 ? makeFn(f[0]) : null; };
 
@@ -62,42 +61,31 @@ function humanKey(q) {
   return JSON.stringify(a);
 }
 
-// ── judging: the engine and the interpreter, exactly as the server reads them ─
+// ── judging: the step report the marked page shows, and the server's own award ─
 async function judge(q, lines) {
-  const meta = stepMetaFor(q);
-  let rep = null;
-  if (meta) { try { rep = stepCheck(meta, lines.join('\n'), { prompt: q.prompt }); } catch { rep = null; } }
-  const engineLines = Array.isArray(rep?.lines) && rep.lines.length === lines.length ? rep.lines : null;
-  const interp = await interpretWorking({ question: q, lines, env: ENV, useModel: false });
-  const rows = lines.map((text, i) => {
-    const r = interp.lines[i];
-    const e = engineLines?.[i] || null;
-    return {
-      index: i, text,
-      engine: e ? e.status : null, stage: e && Number.isInteger(e.stage) ? e.stage : null, engineNote: e?.note || null,
-      kind: r.kind, verdict: r.verdict, basis: r.basis, why: r.why || null
-    };
-  });
+  const working = lines.join('\n');
   const last = lines[lines.length - 1] || '';
   const given = last.includes('=') ? last.slice(last.lastIndexOf('=') + 1).trim() : last.trim();
   let finalOk = false;
-  try { finalOk = checkAnswer(q, given)?.correct === true; } catch { finalOk = false; }
-  return { rows, finalOk, meta };
-}
-const isBreak = r => r.verdict === 'first-break' || r.engine === 'break';
-const interpValid = r => r.verdict === 'valid' && r.engine !== 'break';
-
-/** A criterion is earned by the first suitable line before the first wrong line; the final-answer one by the final line. */
-function awardOf(type, rows, finalOk) {
-  const fb = rows.findIndex(isBreak);
-  const limit = fb < 0 ? rows.length : fb;
-  const earned = type.criteria.map(c => {
-    let line = -1;
-    if (c.by === 'final') line = finalOk ? rows.length - 1 : -1;
-    else line = rows.slice(0, limit).findIndex(r => c.test(r, rows));
-    return { key: c.key, marks: c.marks, earned: line >= 0, line };
+  let result = { correct: false };
+  try { result = checkAnswer(q, given); finalOk = result?.correct === true; } catch { finalOk = false; }
+  let report = null;
+  let evidence = {};
+  try { evidence = stepEvidence({ ...q, _methodScheme: q._methodScheme ?? 'draft' }, given, working, result || { correct: false }); report = evidence.stepReport; } catch { report = null; }
+  const shown = Array.isArray(report?.lines) && report.lines.length === lines.length ? report.lines : null;
+  const rows = lines.map((text, i) => {
+    const e = shown?.[i] || null;
+    return { index: i, text, engine: e ? e.status : null, state: e?.state ?? null, stage: e && Number.isInteger(e.stage) ? e.stage : null, engineNote: e?.note || null };
   });
-  return { earned, total: earned.reduce((s, e) => s + (e.earned ? e.marks : 0), 0), firstBreak: fb };
+  return { rows, finalOk, report, topic: evidence.topicTicks ?? null };
+}
+const isBreak = r => r.engine === 'break';
+
+/** The award, by the server's own function, on the report the page shows. */
+function awardOf(type, rows, finalOk, report, topic, q) {
+  const a = awardScheme(type, report, finalOk, topic, q);
+  const earned = a.items.map(i => ({ key: i.key, marks: i.marks, earned: i.awarded, line: i.lines.length ? i.lines[0] - 1 : -1, verified: i.verified, basis: i.basis }));
+  return { earned, total: a.total, firstBreak: rows.findIndex(isBreak) };
 }
 
 // ── wrong lines ──────────────────────────────────────────────────────────────
@@ -109,8 +97,8 @@ async function firstWrong(q, makeLine, candidates) {
     if (isBreak(rows[0])) return { text: c, line };
     tried.push({ c, line, row: rows[0] });
   }
-  // No candidate was named wrong: take the first one no tool ticks (it earns nothing).
-  const quiet = tried.find(t => t.row.engine !== 'ok' && t.row.verdict !== 'valid' && t.row.verdict !== 'given');
+  // No candidate was named wrong: take the first one the page does not tick (it earns nothing).
+  const quiet = tried.find(t => t.row.engine !== 'ok');
   return quiet ? { text: quiet.c, line: quiet.line } : null;
 }
 function bumpedExprs(expr) {
@@ -121,30 +109,13 @@ function bumpedExprs(expr) {
   out.push(`-(${expr})`);
   return out;
 }
-const quadrant = (s, t) => String(s).replace(/\s+/g, ' ') === String(t).replace(/\s+/g, ' ');
-void quadrant;
 
 // ── the question types ──────────────────────────────────────────────────────
-const KEY_FINAL = { by: 'final' };
-const PHRASE = {
-  derivative: 'a line labelled as the derivative (dy/dx or f\'(x)) that the interpreter finds true for the function the question gives',
-  zero: 'the line "Let dy/dx = 0", then a line setting the derivative expression equal to zero that the interpreter finds true',
-  roots: 'a line stating the solutions, which the interpreter substitutes back into the derivative set to zero',
-  evalLine: 'a line that starts with the function written at the given value (for example y(2) = ...) with a right side that is not just a number, which the interpreter finds true',
-  final: 'the last line, read as the final answer, is checked by the answer checker (the same check that marks a one-line answer)'
-};
-
-const TYPES = [
-  // ───────────── Year 12 Advanced ─────────────
-  {
-    id: 'y12-diff-rules', title: 'Differentiate using the chain, product or quotient rule', course: 'Year 12 Mathematics Advanced', year: 12, level: 1,
-    families: ['y12-diff'],
+// The sample builders and the plain-language limits of each type. Its criteria, picks and marks are NOT here: they are the server's own
+// (server/platform/schemeAward.js), so what a packet says is what is paid.
+const EXTRAS = {
+  'y12-diff-rules': {
     form: 'A function of x is given and the student is asked to differentiate it, using a named rule, and give the answer in a stated form.',
-    pick: q => q.answerType === 'expression' && !!fnOf(q) && fnOf(q).name === 'y' && /differentiate/i.test(q.prompt),
-    criteria: [
-      { key: 'derivative', marks: 1, text: 'Writes a correct derivative of the given function (any equivalent form).', decidedBy: 'interpreter', how: PHRASE.derivative, test: r => interpValid(r) && r.kind === 'quantity' && r.basis === 'derivative' },
-      { key: 'answer', marks: 1, text: 'Gives the final answer correctly, in the form the question asks.', decidedBy: 'answer checker', how: PHRASE.final, ...KEY_FINAL }
-    ],
     cannot: [
       'It cannot tell which rule the student used. A correct derivative earns the first criterion however it was found.',
       'It cannot tell an unsimplified rule line from the final line. One correct line can therefore earn both criteria.',
@@ -158,96 +129,8 @@ const TYPES = [
       return { full: [`${lab} = ${key}`], partial: [`${lab} = ${key}`, `${lab} = ${w.text}`], zero: [`${lab} = ${w.text}`], slip: [`${lab} = ${w.text}`, `= ${w.text}`] };
     }
   },
-  {
-    id: 'y12-diff-gradient', title: 'Differentiate, then find the gradient at a point', course: 'Year 12 Mathematics Advanced', year: 12, level: 1,
-    families: ['y12-diff'],
-    form: 'A curve y = f(x) is given. The student differentiates and substitutes an x-value to give the gradient there.',
-    pick: q => q.answerType === 'numeric' && !!fnOf(q) && fnOf(q).name === 'y' && polynomial(fnOf(q)) !== null && /find \$?\\dfrac\{dy\}\{dx\}\$? at|gradient/i.test(q.prompt) && /x = -?\d+/.test(q.prompt),
-    criteria: [
-      { key: 'derivative', marks: 1, text: 'Differentiates the given function correctly.', decidedBy: 'interpreter', how: PHRASE.derivative, test: r => interpValid(r) && r.kind === 'quantity' && r.basis === 'derivative' },
-      { key: 'answer', marks: 1, text: 'Substitutes the x-value and states the gradient correctly.', decidedBy: 'answer checker', how: PHRASE.final, ...KEY_FINAL }
-    ],
-    cannot: [
-      'It cannot check the substitution line itself. A line such as "dy/dx = 4(1)(3)" is read as a gradient at a point, which it does not verify. Only the final value is checked.',
-      'It reads only functions that expand to a polynomial. A quotient is not read.'
-    ],
-    async build(q) {
-      const co = polynomial(fnOf(q)); const d = derivCo(co);
-      const x0 = Number(/x = (-?\d+)/.exec(q.prompt)[1]);
-      const val = evalCo(d, x0); const bad = bumpTop(d);
-      return {
-        full: [`dy/dx = ${polyText(d)}`, `dy/dx = ${num(val)}`],
-        partial: [`dy/dx = ${polyText(d)}`, `dy/dx = ${num(val + 1)}`],
-        zero: [`dy/dx = ${polyText(bad)}`, `dy/dx = ${num(val + 1)}`],
-        slip: [`dy/dx = ${polyText(bad)}`, `dy/dx = ${num(evalCo(bad, x0))}`]
-      };
-    }
-  },
-  {
-    id: 'y12-stationary-x', title: 'Find the x-coordinates of the stationary points', course: 'Year 12 Mathematics Advanced', year: 12, level: 1,
-    families: ['y12-appdiff'],
-    form: 'A cubic curve y = f(x) is given. The student finds where the gradient is zero.',
-    pick: q => q.answerType === 'set' && /stationary points/i.test(q.prompt) && !!fnOf(q) && polynomial(fnOf(q)) !== null,
-    criteria: [
-      { key: 'derivative', marks: 1, text: 'Differentiates the function correctly.', decidedBy: 'interpreter', how: PHRASE.derivative, test: r => interpValid(r) && r.kind === 'quantity' && r.basis === 'derivative' },
-      { key: 'zero', marks: 1, text: 'Sets the derivative equal to zero.', decidedBy: 'interpreter', how: PHRASE.zero, test: r => interpValid(r) && r.basis === 'derivative-set-to-zero' },
-      { key: 'solve', marks: 1, text: 'Solves to find the x-coordinates.', decidedBy: 'interpreter', how: PHRASE.roots, test: r => interpValid(r) && r.kind === 'solution-set' }
-    ],
-    cannot: [
-      'It checks the "set equal to zero" line only after the student writes a line such as "Let dy/dx = 0". A bare equation with no such line before it is read as an ordinary equation and does not earn this criterion.',
-      'It cannot check the y-coordinates or the nature (maximum, minimum or inflexion) of the points. Those are not in this scheme.'
-    ],
-    async build(q) {
-      const co = polynomial(fnOf(q)); const d = derivCo(co); const roots = q.answer.values.map(Number);
-      const bad = bumpTop(d);
-      const badRoots = (polyRoots(bad) || []).map(r => Math.round(r * 100) / 100);
-      const setLine = rs => `x = ${rs.map(num).join(' or x = ')}`;
-      return {
-        full: [`dy/dx = ${polyText(d)}`, 'Let dy/dx = 0', `${polyText(d)} = 0`, setLine(roots)],
-        partial: [`dy/dx = ${polyText(d)}`, 'Let dy/dx = 0', `${polyText(d)} = 0`, setLine(roots.map(r => r + 1))],
-        zero: [`dy/dx = ${polyText(bad)}`, 'Let dy/dx = 0', `${polyText(bad)} = 0`, setLine(roots.map(r => r + 1))],
-        slip: [`dy/dx = ${polyText(bad)}`, 'Let dy/dx = 0', `${polyText(bad)} = 0`, setLine(badRoots.length ? badRoots : roots.map(r => r + 1))]
-      };
-    }
-  },
-  {
-    id: 'y12-tangent', title: 'Find the equation of a tangent', course: 'Year 12 Mathematics Advanced', year: 12, level: 1,
-    families: ['y12-appdiff'],
-    form: 'A curve y = f(x) and a value of x are given. The student finds the tangent there, in the form y = mx + c.',
-    pick: q => q.answerType === 'expression' && /tangent/i.test(q.prompt) && !!fnOf(q) && polynomial(fnOf(q)) !== null && /x = -?\d+/.test(q.prompt),
-    criteria: [
-      { key: 'derivative', marks: 1, text: 'Differentiates the function correctly.', decidedBy: 'interpreter', how: PHRASE.derivative, test: r => interpValid(r) && r.kind === 'quantity' && r.basis === 'derivative' },
-      { key: 'ypoint', marks: 1, text: 'Finds the y-value of the point of contact.', decidedBy: 'interpreter', how: PHRASE.evalLine, test: r => interpValid(r) && r.basis === 'arithmetic' && /^\s*y\s*\(/.test(r.text) },
-      { key: 'answer', marks: 1, text: 'Gives the correct equation of the tangent.', decidedBy: 'answer checker', how: PHRASE.final, ...KEY_FINAL }
-    ],
-    cannot: [
-      'It cannot check the gradient at the point on its own line, nor the point-gradient step. The gradient is only tested through the final equation.',
-      'The y-value line must be written as y(a) = ... to be read.'
-    ],
-    async build(q) {
-      const co = polynomial(fnOf(q)); const d = derivCo(co); const a = Number(/x = (-?\d+)/.exec(q.prompt)[1]);
-      const y0 = evalCo(co, a); const m = evalCo(d, a); const c = y0 - m * a;
-      const slope = mm => (mm === 1 ? 'x' : mm === -1 ? '-x' : `${num(mm)}x`);
-      const eq = (mm, cc) => (cc === 0 ? `y = ${slope(mm)}` : `y = ${slope(mm)} ${cc < 0 ? '-' : '+'} ${num(Math.abs(cc))}`);
-      const bad = bumpTop(d); const m2 = evalCo(bad, a); const c2 = y0 - m2 * a;
-      return {
-        full: [`dy/dx = ${polyText(d)}`, `y(${a}) = ${num(y0)}`, eq(m, c)],
-        partial: [`dy/dx = ${polyText(d)}`, `y(${a}) = ${num(y0)}`, eq(m + 1, c - a)],
-        zero: [`dy/dx = ${polyText(bad)}`, `y(${a}) = ${num(y0 + 1)}`, eq(m + 1, c)],
-        slip: [`dy/dx = ${polyText(bad)}`, `y(${a}) = ${num(y0)}`, eq(m2, c2)]
-      };
-    }
-  },
-  {
-    id: 'y12-trig-extreme', title: 'Maximum or minimum of a sine or cosine model', course: 'Year 12 Mathematics Advanced', year: 12, level: 1,
-    families: ['y12-trig-model'],
+  'y12-trig-extreme': {
     form: 'A model such as h(t) = 14 + 11 sin(pi t / 6) is given. The student finds its greatest or least value.',
-    pick: q => q.answerType === 'numeric' && !!fnOf(q) && /(maximum|minimum) value/i.test(q.prompt) && !!extremes(fnOf(q))?.period,
-    criteria: [
-      { key: 'amplitude', marks: 1, text: 'States the amplitude correctly.', decidedBy: 'interpreter', how: 'a line "amplitude = ..." that the interpreter finds equal to the amplitude of the given function', test: r => interpValid(r) && r.kind === 'quantity' && /^\s*amplitude\b/i.test(r.text) },
-      { key: 'midline', marks: 1, text: 'States the midline (centre value) correctly.', decidedBy: 'interpreter', how: 'a line "midline = ..." that the interpreter finds equal to the centre value of the given function', test: r => interpValid(r) && r.kind === 'quantity' && /^\s*midline\b/i.test(r.text) },
-      { key: 'extreme', marks: 1, text: 'States the maximum or minimum value asked for, correctly.', decidedBy: 'interpreter', how: 'a line "maximum = ..." or "minimum = ..." that the interpreter finds equal to that value of the given function', test: r => interpValid(r) && r.kind === 'quantity' && /^\s*(maximum|minimum)\b/i.test(r.text) }
-    ],
     cannot: [
       'It cannot check a long written reason ("the sine is at most 1, so...").',
       'It reads only the labels amplitude, midline, maximum and minimum, followed by a number.',
@@ -265,16 +148,10 @@ const TYPES = [
       };
     }
   },
-  {
-    id: 'y12-trig-evaluate', title: 'Find the value of a sine or cosine model at a time', course: 'Year 12 Mathematics Advanced', year: 12, level: 1,
-    families: ['y12-trig-model'],
+  'y12-trig-evaluate': {
     form: 'A model h(t) is given and the student finds h at a stated value of t.',
-    pick: q => q.answerType === 'numeric' && !!fnOf(q) && /find \$[a-z]\(\d+\)\$/i.test(q.prompt),
-    criteria: [
-      { key: 'substitute', marks: 1, text: 'Substitutes the value of t into the model correctly.', decidedBy: 'interpreter', how: PHRASE.evalLine, test: r => interpValid(r) && r.basis === 'arithmetic' && /^\s*[a-z]\(\d+\)\s*=\s*[^=]*[A-Za-zπ(*+\-/]/i.test(r.text) && !/=\s*-?\d+(\.\d+)?\s*$/.test(r.text) },
-      { key: 'answer', marks: 1, text: 'States the value correctly.', decidedBy: 'answer checker', how: PHRASE.final, ...KEY_FINAL }
-    ],
     cannot: [
+      'A substitution line earns only when it is the model with the asked value put in, term by term. A sum that merely comes to the same value (a different number, or an evaluated line) does not earn; that criterion is then "not verified".',
       'It cannot judge a trigonometric value of a plain number without pi, because the angle might be in degrees or radians. Such a line is left unverified.',
       'The question may supply the exact trig value to use. The engine does not check that the student used it.'
     ],
@@ -291,18 +168,11 @@ const TYPES = [
       };
     }
   },
-  {
-    id: 'y12-diff-explog', title: 'Differentiate an exponential or logarithmic function', course: 'Year 12 Mathematics Advanced', year: 12, level: 1,
-    families: ['y12-explogcalc'],
+  'y12-diff-explog': {
     form: 'A function such as 2 ln(6x + 5) or x squared times e to the 2x is given and the student differentiates it.',
-    pick: q => q.answerType === 'expression' && /differentiate/i.test(q.prompt) && !/integral|\\int/i.test(q.prompt),
-    criteria: [
-      { key: 'derivative', marks: 1, text: 'Writes a correct derivative (any equivalent form).', decidedBy: 'engine', how: 'the engine tags a line "ok" when it is equivalent to the question\'s derivative', test: r => r.engine === 'ok' },
-      { key: 'answer', marks: 1, text: 'Gives the final answer correctly, in the form the question asks.', decidedBy: 'answer checker', how: PHRASE.final, ...KEY_FINAL }
-    ],
     cannot: [
       'It cannot tell which rule the student used, or an unsimplified rule line from the final line. One correct line can earn both criteria.',
-      'The line interpreter does not read these derivatives; only the engine\'s own equivalence check decides.'
+      'Only the step check\'s own equivalence test decides whether a line is a correct derivative.'
     ],
     async build(q) {
       const key = String(q.answer.expr); const lab = 'dy/dx';
@@ -311,18 +181,10 @@ const TYPES = [
       return { full: [`${lab} = ${key}`], partial: [`${lab} = ${key}`, `${lab} = ${w.text}`], zero: [`${lab} = ${w.text}`], slip: [`${lab} = ${w.text}`, `= ${w.text}`] };
     }
   },
-  // ───────────── Year 11 Advanced ─────────────
-  {
-    id: 'y11-poly-evaluate', title: 'Evaluate a polynomial or find a remainder by substitution', course: 'Year 11 Mathematics Advanced', year: 11, level: 2,
-    families: ['y11-polynomials'],
+  'y11-poly-evaluate': {
     form: 'A polynomial P(x) is given. The student finds P(a), or the remainder when P(x) is divided by x - a.',
-    pick: q => q.answerType === 'numeric' && !!fnOf(q) && fnOf(q).name === 'P' && /evaluate \$P\(-?\d+\)\$|remainder when/i.test(q.prompt),
-    criteria: [
-      { key: 'substitute', marks: 1, text: 'Substitutes the correct value into P(x).', decidedBy: 'interpreter', how: PHRASE.evalLine, test: r => interpValid(r) && r.basis === 'arithmetic' && /^\s*P\s*\(/.test(r.text) && !/=\s*-?\d+(\.\d+)?\s*$/.test(r.text) },
-      { key: 'answer', marks: 1, text: 'Evaluates correctly to give the value or remainder.', decidedBy: 'answer checker', how: PHRASE.final, ...KEY_FINAL }
-    ],
     cannot: [
-      'It cannot tell whether the student chose the right value to substitute, except through the arithmetic of the line: a wrong value makes the line false.',
+      'A substitution line earns only when it is P(x) with the asked value put in, term by term. A sum that merely comes to the same value (a different number, or an evaluated line) does not earn; that criterion is then "not verified".',
       'Long division is not read at all.'
     ],
     async build(q) {
@@ -341,15 +203,8 @@ const TYPES = [
       };
     }
   },
-  {
-    id: 'y11-diff-gradient-plan', title: 'Gradient of a tangent: differentiate, then substitute', course: 'Year 11 Mathematics Advanced', year: 11, level: 2,
-    families: ['y11-diff'],
+  'y11-diff-gradient-plan': {
     form: 'A curve y = f(x) is given and the student finds the gradient of the tangent at a stated x. This question carries a two-stage plan the engine already knows.',
-    pick: q => q.stepcheck?.kind === 'plan' && q.answerType === 'numeric' && /gradient of the tangent/i.test(q.prompt) && !!fnOf(q) && polynomial(fnOf(q)) !== null,
-    criteria: [
-      { key: 'derivative', marks: 1, text: 'Differentiates the function correctly (stage 1 of the plan).', decidedBy: 'engine plan stage', how: 'the engine tags a line "ok" at stage 1 of the question\'s plan (the derivative stage)', test: r => r.engine === 'ok' && r.stage === 0 },
-      { key: 'gradient', marks: 1, text: 'Substitutes the x-value and finds the gradient (stage 2 of the plan).', decidedBy: 'engine plan stage', how: 'the engine tags a line "ok" at stage 2 of the plan (the substitution of the x-value into the verified derivative)', test: r => r.engine === 'ok' && r.stage === 1 }
-    ],
     cannot: [
       'It decides only the two stages the plan names. It cannot check any other kind of working.',
       'The plan is authored for this question form only.'
@@ -368,15 +223,8 @@ const TYPES = [
       };
     }
   },
-  {
-    id: 'y11-diff-power-rule', title: 'Differentiate a polynomial by the power rule', course: 'Year 11 Mathematics Advanced', year: 11, level: 2,
-    families: ['y11-diff'],
+  'y11-diff-power-rule': {
     form: 'A power or a polynomial is given and the student writes its derivative.',
-    pick: q => q.answerType === 'expression' && q.stepcheck?.kind === 'derivative',
-    criteria: [
-      { key: 'derivative', marks: 1, text: 'Writes a correct derivative.', decidedBy: 'engine', how: 'the engine tags a line "ok" against the question\'s derivative step', test: r => r.engine === 'ok' },
-      { key: 'answer', marks: 1, text: 'Gives the final answer correctly.', decidedBy: 'answer checker', how: PHRASE.final, ...KEY_FINAL }
-    ],
     cannot: [
       'It cannot tell a rule line from the final line, so one correct line can earn both criteria.',
       'It does not check each term separately.'
@@ -388,7 +236,16 @@ const TYPES = [
       return { full: [`${lab} = ${key}`], partial: [`${lab} = ${key}`, `${lab} = ${w.text}`], zero: [`${lab} = ${w.text}`], slip: [`${lab} = ${w.text}`, `= ${w.text}`] };
     }
   }
-];
+};
+export const TYPES = SCHEMES.map(s => ({ ...s, ...EXTRAS[s.id] }));
+
+// ── types the marked page cannot verify line by line (server/platform/schemeAward.js UNAVAILABLE) ─
+const UNAVAILABLE_PROBES = {
+  'y12-diff-gradient': { family: 'y12-diff', d: 1, seed: 29, lines: ['dy/dx = 24x^2 + 72x + 54', 'dy/dx = 150'], unverified: [1] },
+  'y12-stationary-x': { family: 'y12-appdiff', d: 1, seed: 7, lines: ['dy/dx = 6x^2 - 294', 'Let dy/dx = 0', '6x^2 - 294 = 0', 'x = -7 or x = 7'], unverified: [1, 2] },
+  'y12-tangent': { family: 'y12-appdiff', d: 3, seed: 7, lines: ['dy/dx = 2x - 5', 'y(1) = 2', 'y = -3x + 5'], unverified: [1] }
+};
+const UNAVAILABLE_PROBED = UNAVAILABLE.map(u => ({ ...u, probe: UNAVAILABLE_PROBES[u.id] }));
 
 // ── types that could not be given a provable scheme ─────────────────────────
 // Each carries a probe: a plausible correct transcript, and the line numbers (from 1) that carry the
@@ -400,9 +257,9 @@ const UNPROVABLE = [
     probe: { family: 'y12-integration', d: 2, seed: 11, lines: ['∫ = x^3 + x^2', '[2x^3/3 + x^2] from 0 to 2', '9.333'], unverified: [1, 2] } },
   { id: 'y12-integrals-indefinite', title: 'Indefinite integrals and the reverse chain rule', course: 'Year 12 Mathematics Advanced', level: 1, families: ['y12-integration', 'y12-integral-calc', 'y12-trigcalc'],
     reason: 'The engine cannot read an antiderivative line, so no stage of the method can be decided apart from the final expression.',
-    probe: { family: 'y12-integral-calc', d: 2, seed: 23, lines: ['∫(3x^2+6)dx = x^3+6x', '(2)^3 + 6(2) - 0', '20'], unverified: [1, 2] } },
+    probe: { family: 'y12-integral-calc', d: 2, seed: 23, lines: ['∫(3x^2+6)dx = x^3+6x', '(2)^3 + 6(2) - 0', '20'], unverified: [1] } },
   { id: 'y12-stationary-nature', title: 'Nature of a stationary point', course: 'Year 12 Mathematics Advanced', level: 1, families: ['y12-appdiff'],
-    reason: 'The nature question is multiple choice, and the second derivative is not a line the interpreter can read, so "determines the nature" cannot be decided from the lines.',
+    reason: 'The nature question is multiple choice, and the second derivative is not a line the page can check, so "determines the nature" cannot be decided from the lines.',
     probe: { family: 'y12-appdiff', d: 2, seed: 23, lines: ["y' = -2(x + 3)", "y'' = -2", 'maximum'], unverified: [2] } },
   { id: 'y12-optimisation', title: 'Applications of differentiation: greatest or least value (rates and optimisation)', course: 'Year 12 Mathematics Advanced', level: 1, families: ['y12-appdiff'],
     reason: 'The derivative of a function named P (or any capital-letter name) is not read, and the line that sets it to zero is not recognised, so the calculus steps cannot be decided.',
@@ -447,12 +304,11 @@ async function findSamples(type) {
 }
 
 const ENGINE_WORDS = { ok: 'true line', break: 'wrong here', note: 'no verdict' };
-const INTERP_WORDS = { valid: 'checked', given: 'from the question', 'first-break': 'wrong here', 'follows-from-error': 'follows from the earlier mistake', unverifiable: 'could not verify' };
 const cell = s => plain(String(s)).replace(/\bPri\b/g, 'the checker').replace(/\|/g, '\\|').replace(/\n/g, ' ');
 
-async function runCase(type, q, lines) {
-  const { rows, finalOk } = await judge(q, lines);
-  const award = awardOf(type, rows, finalOk);
+export async function runCase(type, q, lines) {
+  const { rows, finalOk, report, topic } = await judge(q, lines);
+  const award = awardOf(type, rows, finalOk, report, topic, q);
   const rowsOut = rows.map(r => ({ ...r, counts: award.earned.filter(e => e.earned && e.line === r.index).map(e => e.key) }));
   return { lines, rows: rowsOut, finalOk, award };
 }
@@ -480,20 +336,14 @@ async function buildType(type) {
 }
 
 function summariseKey(q) { return plain(humanKey(q)); }
-function digestOf(type, samples) {
-  return sha(canon({
-    title: type.title,
-    criteria: type.criteria.map(c => ({ key: c.key, text: c.text, marks: c.marks })),
-    samples: samples.map(s => ({ prompt: s.q.prompt, key: s.q.answer, stepcheck: stepMetaFor(s.q) ?? null }))
-  }));
-}
+const digestOf = type => schemeDigest(type);
 
 function awardTable(type, c) {
-  const head = '| # | What the student wrote | Engine says | Interpreter says | Counts toward |\n|---:|---|---|---|---|';
-  const body = c.rows.map(r => `| ${r.index + 1} | \`${cell(r.text)}\` | ${r.engine ? (ENGINE_WORDS[r.engine] || r.engine) + (r.engineNote ? ` (${cell(r.engineNote)})` : '') : 'not used'} | ${INTERP_WORDS[r.verdict]}${r.verdict === 'unverifiable' && r.why ? ` (${cell(r.why)})` : ''} | ${r.counts.length ? r.counts.join(', ') : 'nothing'} |`).join('\n');
+  const head = '| # | What the student wrote | What the marked page shows | Counts toward |\n|---:|---|---|---|';
+  const body = c.rows.map(r => `| ${r.index + 1} | \`${cell(r.text)}\` | ${r.engine ? (ENGINE_WORDS[r.engine] || r.engine) + (r.engineNote ? ` (${cell(r.engineNote)})` : '') : 'no line report'} | ${r.counts.length ? r.counts.join(', ') : 'nothing'} |`).join('\n');
   const total = type.criteria.reduce((s, x) => s + x.marks, 0);
   const earned = c.award.earned.filter(e => e.earned).map(e => `${e.key} (${e.marks})`).join(', ') || 'none';
-  const answerLine = type.criteria.some(x => x.by === 'final') ? `\nFinal answer check: ${c.finalOk ? 'correct' : 'not correct'}.` : '';
+  const answerLine = `\nFinal answer check: ${c.finalOk ? 'correct' : 'not correct'}.`;
   return `${head}\n${body}\n\nAward: **${c.award.total} of ${total}**. Criteria earned: ${earned}.${answerLine}`;
 }
 
@@ -506,14 +356,14 @@ function typeMarkdown(type, built, digest) {
   L.push('## Sample questions', '');
   built.samples.forEach((s, i) => L.push(`${i + 1}. ${cell(s.q.prompt)}`, `   Key: ${cell(summariseKey(s.q))}`, ''));
   L.push('## Criteria', '', '| Criterion | Marks | How the engine decides it |', '|---|---:|---|');
-  type.criteria.forEach(c => L.push(`| ${cell(c.text)} | ${c.marks} | ${cell(c.how)} (decided by: ${c.decidedBy}) |`));
+  type.criteria.forEach(c => L.push(`| ${cell(c.text)} | ${c.marks} | ${cell(c.how)} |`));
   L.push('', `Total: ${total} marks. The marks per criterion are a first guess for the author to correct.`, '');
-  L.push('## What the engine can and cannot verify for this type', '', 'The engine is the marking code. The interpreter is the part that reads one line of working and checks it against the question. The answer checker is the code that marks a final answer.', '');
+  L.push('## What the engine can and cannot verify for this type', '', 'The page is the marked page the student sees: each line of working is ticked, crossed or left unchecked by the checker. The answer checker is the code that marks a final answer. The server pays exactly the criteria below, from exactly that page.', '');
   L.push('It can verify:', '');
-  type.criteria.forEach(c => L.push(`- ${plain(c.text)} (${c.decidedBy}).`));
+  type.criteria.forEach(c => L.push(`- ${plain(c.text)}`));
   L.push('', 'It cannot verify:', '');
   type.cannot.forEach(t => L.push(`- ${plain(t)}`));
-  L.push('', 'Rule used in every award below: a line earns a criterion only if the engine or interpreter finds it true. The first wrong line stops all further credit. The final-answer criterion looks at the last line only.', '');
+  L.push('', 'Rule used in every award below: a line earns a criterion only if the marked page ticks it. A line the page crosses, and every line after it, earns nothing. A correct final answer is the full mark, as it always was. A wrong final answer can never reach full marks.', '');
   L.push('## Worked awards', '', `These come from running the engine on built transcripts for the first sample question: ${cell(s0.q.prompt)}`, '');
   for (const [k, title] of [['full', 'Full marks'], ['partial', 'Partial marks'], ['zero', 'Zero marks']]) {
     L.push(`### ${title}`, '', awardTable(type, s0.cases[k]), '');
@@ -522,9 +372,9 @@ function typeMarkdown(type, built, digest) {
   const slip = s0.cases.slip;
   L.push(`Transcript with an earlier slip, on the same question:`, '', awardTable(type, slip), '');
   const after = slip.rows.slice(slip.award.firstBreak + 1);
-  const words = after.map(r => `line ${r.index + 1}: engine ${r.engine ? ENGINE_WORDS[r.engine] || r.engine : 'not used'}, interpreter ${INTERP_WORDS[r.verdict]}`).join('; ');
-  const tickedAfter = after.filter(r => r.verdict === 'valid' || r.verdict === 'given' || r.engine === 'ok').map(r => r.index + 1);
-  const carried = after.filter(r => r.verdict === 'follows-from-error' || r.engine === 'ecf' || /follows from the earlier/i.test(r.engineNote || '')).map(r => r.index + 1);
+  const words = after.map(r => `line ${r.index + 1}: ${r.engine ? ENGINE_WORDS[r.engine] || r.engine : 'no line report'}`).join('; ');
+  const tickedAfter = after.filter(r => r.engine === 'ok').map(r => r.index + 1);
+  const carried = after.filter(r => r.engine === 'ecf' || /follows from the earlier/i.test(r.engineNote || '')).map(r => r.index + 1);
   const hasEcf = built.samples.some(x => JSON.stringify(stepMetaFor(x.q) ?? {}).includes('"ecf"'));
   if (slip.award.firstBreak >= 0) L.push(`What the engine actually did: the first wrong line was line ${slip.award.firstBreak + 1}. ${after.length ? `After it, ${words}.` : 'No line followed it.'}`);
   else L.push('What the engine actually did: it did not name any line as wrong, so the slip showed only as lines that earned no tick.');
@@ -537,10 +387,12 @@ function typeMarkdown(type, built, digest) {
 async function checkProbe(u) {
   const q = G.generateQuestion(u.probe.family, u.probe.d, u.probe.seed);
   const { rows } = await judge(q, u.probe.lines);
-  const ticked = r => r.verdict === 'valid' || r.verdict === 'given' || r.engine === 'ok';
+  // A true-as-written arithmetic tick says only that the numbers on the line are equal; it never decides a criterion of a method.
+  // Nor does a tick that only says a line has the value of a step of the worked solution: it names no criterion.
+  const ticked = r => r.engine === 'ok' && r.state !== 'arithmetic' && !/^(Matches step \d+ of the worked solution|This is the value at step)/.test(r.engineNote || '');
   const bad = u.probe.unverified.filter(n => ticked(rows[n - 1]));
   if (bad.length) throw new Error(`probe for ${u.id}: lines ${bad.join(', ')} are now verified, so its reason no longer holds`);
-  return rows.map(r => ({ text: r.text, verdict: r.verdict, engine: r.engine }));
+  return rows.map(r => ({ text: r.text, engine: r.engine }));
 }
 
 export async function build() {
@@ -549,18 +401,18 @@ export async function build() {
   for (const type of TYPES) {
     const built = await buildType(type);
     if (!built.ok) { notProvable.push({ id: type.id, title: type.title, course: type.course, level: type.level, families: type.families, reason: built.reason }); continue; }
-    const digest = digestOf(type, built.samples);
+    const digest = digestOf(type);
     files.set(`${type.id}.md`, typeMarkdown(type, built, digest));
     done.push({ type, built, digest });
   }
-  for (const u of UNPROVABLE) { await checkProbe(u); notProvable.push({ id: u.id, title: u.title, course: u.course, level: u.level, families: u.families, reason: u.reason }); }
+  for (const u of [...UNAVAILABLE_PROBED, ...UNPROVABLE]) { await checkProbe(u); notProvable.push({ id: u.id, title: u.title, course: u.course, level: u.level, families: u.families, reason: u.reason, ...(UNAVAILABLE_PROBES[u.id] ? { unavailable: true } : {}) }); }
   // index and machine-readable file
   const order = (a, b) => a.level - b.level;
   const sorted = done.map((d, i) => ({ ...d, i })).sort((a, b) => order(a.type, b.type) || a.i - b.i);
   const totalMarks = d => d.built.total;
   const awardsToRead = done.reduce((s, d) => s + 4, 0);
   const crit = done.reduce((s, d) => s + d.type.criteria.length, 0);
-  const by = k => done.reduce((s, d) => s + d.type.criteria.filter(c => c.decidedBy === k).length, 0);
+  const by = k => done.reduce((s, d) => s + d.type.criteria.filter(c => c.by === k).length, 0);
   const I = [BANNER, '', '# Draft method-mark schemes for NSW question types', '',
     'These are drafts for the author (the tutor who writes the papers) to read, correct and decide on. Nothing here is approved, signed or switched on. Prithagoras still marks the final answer only.', '',
     '## Types given a draft scheme, in review order', '', 'Year 12 Advanced and Extension 1 first, then Year 11.', '',
@@ -569,11 +421,14 @@ export async function build() {
   I.push('', '## Counts', '',
     `- Types given a scheme: ${done.length}.`,
     `- Types where the engine awards every criterion deterministically: ${done.length} of ${done.length}. Each was run on ${SAMPLES_PER_TYPE} sample questions with a full, a partial, a zero and an earlier-slip transcript, and every run gave the expected award.`,
-    `- Criteria in all: ${crit}. Decided by the line interpreter: ${by('interpreter')}. By the engine (plan stage or step check): ${by('engine plan stage') + by('engine')}. By the answer checker on the final line: ${by('answer checker')}.`,
+    `- Criteria in all: ${crit}. Earned by a ticked line of the marked page: ${by('line')}. Earned by a correct final answer (the answer checker): ${by('final')}.`,
     `- Size of the review job: ${done.length} types, about ${awardsToRead} worked awards to read (one full, one partial, one zero and one earlier-slip award for each type), and ${crit} criteria whose marks to set.`, '',
-    '## Could not be given a provable scheme', '',
+    '## Not available yet', '',
+    'These three question types had a draft in an earlier version of this packet. They are NOT available now: the marked page the student sees cannot verify one of their criteria line by line, and the server pays only from that page, so nothing about them can be approved or paid. Each reason was checked by running a plausible correct transcript.', '',
+    ...notProvable.filter(n => n.unavailable).map(n => `- ${plain(n.title)} (${n.course}; families ${n.families.map(f => `\`${f}\``).join(', ')}): ${plain(n.reason)}`),
+    '', '## Could not be given a provable scheme', '',
     'These types were tried. A scheme is not offered because at least one criterion cannot be decided by the engine from the student\'s lines. Each reason was checked by running a plausible correct transcript.', '');
-  notProvable.slice().sort((a, b) => a.level - b.level).forEach(n => I.push(`- ${plain(n.title)} (${n.course}; families ${n.families.map(f => `\`${f}\``).join(', ')}): ${plain(n.reason)}`));
+  notProvable.filter(n => !n.unavailable).sort((a, b) => a.level - b.level).forEach(n => I.push(`- ${plain(n.title)} (${n.course}; families ${n.families.map(f => `\`${f}\``).join(', ')}): ${plain(n.reason)}`));
   I.push('');
   files.set('INDEX.md', plain(I.join('\n')));
   const json = {
@@ -581,10 +436,10 @@ export async function build() {
     types: sorted.map(d => ({
       id: d.type.id, title: d.type.title, course: d.type.course, year: d.type.year, families: d.type.families, file: `${d.type.id}.md`,
       totalMarks: totalMarks(d),
-      criteria: d.type.criteria.map(c => ({ key: c.key, text: c.text, marks: c.marks, decidedBy: c.decidedBy })),
+      criteria: d.type.criteria.map(c => ({ key: c.key, text: c.text, marks: c.marks, by: c.by })),
       digest: d.digest
     })),
-    notProvable: notProvable.map(n => ({ id: n.id, title: n.title, course: n.course, families: n.families, reason: n.reason }))
+    notProvable: notProvable.map(n => ({ id: n.id, title: n.title, course: n.course, families: n.families, reason: n.reason, ...(n.unavailable ? { unavailable: true } : {}) }))
   };
   files.set('types.json', plain(JSON.stringify(json, null, 2)) + '\n');
   for (const [k, v] of files) if (!v.endsWith('\n')) files.set(k, v + '\n');
@@ -611,11 +466,12 @@ export function diffFiles(files, dir = OUT_DIR) {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const { files, summary } = await build();
   if (process.argv.includes('--check')) {
-    const bad = diffFiles(files);
-    if (bad.length) { console.error(`owner-review/method-marks is out of date: ${bad.join(', ')}. Run: node tools/method-marks-drafts.mjs`); process.exit(1); }
+    const bad = [...diffFiles(files), ...diffFiles(ownerFiles(files), OWNER_DIR).map(f => `docs/marking/method-marks-signoff/method-marks/${f}`)];
+    if (bad.length) { console.error(`owner-review/method-marks or docs/marking/method-marks-signoff/method-marks is out of date: ${bad.join(', ')}. Run: node tools/method-marks-drafts.mjs`); process.exit(1); }
     console.log(`method-marks drafts match (${summary.schemes} types).`);
   } else {
     writeFiles(files);
+    writeFiles(ownerFiles(files), OWNER_DIR);
     console.log(`wrote ${files.size} files: ${summary.schemes} types with a scheme, ${summary.notProvable} not provable, ${summary.awardsToRead} awards to read.`);
   }
 }

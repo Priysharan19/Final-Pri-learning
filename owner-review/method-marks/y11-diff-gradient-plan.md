@@ -25,26 +25,26 @@ Generator families: `y11-diff`.
 
 | Criterion | Marks | How the engine decides it |
 |---|---:|---|
-| Differentiates the function correctly (stage 1 of the plan). | 1 | the engine tags a line "ok" at stage 1 of the question's plan (the derivative stage) (decided by: engine plan stage) |
-| Substitutes the x-value and finds the gradient (stage 2 of the plan). | 1 | the engine tags a line "ok" at stage 2 of the plan (the substitution of the x-value into the verified derivative) (decided by: engine plan stage) |
+| Differentiates the function correctly (stage 1 of the plan). | 1 | a line the step check ticks at stage 1 of the question's plan (the derivative stage) |
+| Substitutes the x-value and finds the gradient correctly (the final answer). | 1 | the answer checker marks the final answer, the same check that marks a one-line answer |
 
 Total: 2 marks. The marks per criterion are a first guess for the author to correct.
 
 ## What the engine can and cannot verify for this type
 
-The engine is the marking code. The interpreter is the part that reads one line of working and checks it against the question. The answer checker is the code that marks a final answer.
+The page is the marked page the student sees: each line of working is ticked, crossed or left unchecked by the checker. The answer checker is the code that marks a final answer. The server pays exactly the criteria below, from exactly that page.
 
 It can verify:
 
-- Differentiates the function correctly (stage 1 of the plan). (engine plan stage).
-- Substitutes the x-value and finds the gradient (stage 2 of the plan). (engine plan stage).
+- Differentiates the function correctly (stage 1 of the plan).
+- Substitutes the x-value and finds the gradient correctly (the final answer).
 
 It cannot verify:
 
 - It decides only the two stages the plan names. It cannot check any other kind of working.
 - The plan is authored for this question form only.
 
-Rule used in every award below: a line earns a criterion only if the engine or interpreter finds it true. The first wrong line stops all further credit. The final-answer criterion looks at the last line only.
+Rule used in every award below: a line earns a criterion only if the marked page ticks it. A line the page crosses, and every line after it, earns nothing. A correct final answer is the full mark, as it always was. A wrong final answer can never reach full marks.
 
 ## Worked awards
 
@@ -52,46 +52,50 @@ These come from running the engine on built transcripts for the first sample que
 
 ### Full marks
 
-| # | What the student wrote | Engine says | Interpreter says | Counts toward |
-|---:|---|---|---|---|
-| 1 | `dy/dx = 2x + 6` | true line | checked | derivative |
-| 2 | `dy/dx = 2*(-1) + 6` | true line | could not verify (a number here is the gradient at a point, which this line does not say) | gradient |
-| 3 | `gradient = 4` | true line | could not verify (gradient of a curve needs a point) | nothing |
+| # | What the student wrote | What the marked page shows | Counts toward |
+|---:|---|---|---|
+| 1 | `dy/dx = 2x + 6` | true line | derivative |
+| 2 | `dy/dx = 2*(-1) + 6` | true line | nothing |
+| 3 | `gradient = 4` | true line | nothing |
 
 Award: **2 of 2**. Criteria earned: derivative (1), gradient (1).
+Final answer check: correct.
 
 ### Partial marks
 
-| # | What the student wrote | Engine says | Interpreter says | Counts toward |
-|---:|---|---|---|---|
-| 1 | `dy/dx = 2x + 6` | true line | checked | derivative |
-| 2 | `gradient = 5` | wrong here (This substituted value is 5, but the verified expression evaluates to 4.) | could not verify (gradient of a curve needs a point) | nothing |
+| # | What the student wrote | What the marked page shows | Counts toward |
+|---:|---|---|---|
+| 1 | `dy/dx = 2x + 6` | true line | derivative |
+| 2 | `gradient = 5` | wrong here (This substituted value is 5, but the verified expression evaluates to 4.) | nothing |
 
 Award: **1 of 2**. Criteria earned: derivative (1).
+Final answer check: not correct.
 
 ### Zero marks
 
-| # | What the student wrote | Engine says | Interpreter says | Counts toward |
-|---:|---|---|---|---|
-| 1 | `dy/dx = 3x + 6` | wrong here (At x = -5, this line gives -9, but differentiating the original function gives -4.) | wrong here | nothing |
-| 2 | `dy/dx = 3*(-1) + 6` | no verdict (Follows from the earlier slip.) | could not verify (a number here is the gradient at a point, which this line does not say) | nothing |
-| 3 | `gradient = 3` | no verdict (Follows from the earlier slip.) | could not verify (gradient of a curve needs a point) | nothing |
+| # | What the student wrote | What the marked page shows | Counts toward |
+|---:|---|---|---|
+| 1 | `dy/dx = 3x + 6` | wrong here (At x = -5, this line gives -9, but differentiating the original function gives -4.) | nothing |
+| 2 | `dy/dx = 3*(-1) + 6` | no verdict (Follows from the earlier slip.) | nothing |
+| 3 | `gradient = 3` | no verdict (Follows from the earlier slip.) | nothing |
 
 Award: **0 of 2**. Criteria earned: none.
+Final answer check: not correct.
 
 ## Error carried forward
 
 Transcript with an earlier slip, on the same question:
 
-| # | What the student wrote | Engine says | Interpreter says | Counts toward |
-|---:|---|---|---|---|
-| 1 | `dy/dx = 3x + 6` | wrong here (At x = -5, this line gives -9, but differentiating the original function gives -4.) | wrong here | nothing |
-| 2 | `dy/dx = 3*(-1) + 6` | no verdict (Follows from the earlier slip.) | could not verify (a number here is the gradient at a point, which this line does not say) | nothing |
-| 3 | `gradient = 3` | no verdict (Follows from the earlier slip.) | could not verify (gradient of a curve needs a point) | nothing |
+| # | What the student wrote | What the marked page shows | Counts toward |
+|---:|---|---|---|
+| 1 | `dy/dx = 3x + 6` | wrong here (At x = -5, this line gives -9, but differentiating the original function gives -4.) | nothing |
+| 2 | `dy/dx = 3*(-1) + 6` | no verdict (Follows from the earlier slip.) | nothing |
+| 3 | `gradient = 3` | no verdict (Follows from the earlier slip.) | nothing |
 
 Award: **0 of 2**. Criteria earned: none.
+Final answer check: not correct.
 
-What the engine actually did: the first wrong line was line 1. After it, line 2: engine no verdict, interpreter could not verify; line 3: engine no verdict, interpreter could not verify.
+What the engine actually did: the first wrong line was line 1. After it, line 2: no verdict; line 3: no verdict.
 
 The engine named line(s) 2, 3 as following from the earlier mistake, and gave them no tick. No later line was found true. The engine pays nothing for a line that follows correctly from an earlier error here: the only rule that does so is a question plan marked for error carried forward, and this type has none. Whether a later criterion should earn after an earlier error is the author's decision, not the engine's.
 
@@ -103,4 +107,4 @@ To be filled in by the author (the tutor). Leave blank until reviewed.
 - Note: 
 - Name: 
 - Date: 
-- Scheme digest: `8c8eba64e50f941ad2501bbc99131020303fd6bf1180dae9fe36088ffbd6fb70`
+- Scheme digest: `c9d8465b12841281dec30c8bb4b9bdebef94bb375c47c06e7e4f32838d86865b`
