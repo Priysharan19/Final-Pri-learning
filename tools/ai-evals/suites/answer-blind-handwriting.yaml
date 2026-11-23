@@ -13,7 +13,7 @@
         const p = o.request.parts;
         return p.length === 3
           && p[0].role === 'system' && p[0].type === 'input_text'
-          && p[1].role === 'user' && p[1].type === 'input_text' && p[1].text === 'Transcribe every line of handwriting in this image. Do not solve it.'
+          && p[1].role === 'user' && p[1].type === 'input_text' && p[1].text === 'Transcribe every line of working in this image, whether handwritten, typed or printed. Do not solve it.'
           && p[2].role === 'user' && p[2].type === 'input_image';
     - type: javascript
       value: |

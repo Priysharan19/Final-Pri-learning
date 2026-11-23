@@ -87,6 +87,20 @@ for (const raw of ['\\therefore -6', 'therefore -6', 'Therefore -6', '∴-6', '�
 }
 eq(normalizeLeadConnective('\\because x+7 = 0'), '∵ x+7 = 0', '"\\because" normalises to ∵');
 eq(normalizeLeadConnective('because x+7 = 0'), '∵ x+7 = 0', '"because" normalises to ∵');
+// Typed, typeset or printed working is read line by line like handwriting (live bug: a rendered
+// compound-interest page came back with no lines because the reader was told it only reads handwriting).
+ok(/typed, typeset or printed/.test(SYSTEM_INSTRUCTIONS) && /exactly the same way as handwriting/.test(SYSTEM_INSTRUCTIONS) && /never skipped because it is not handwritten/.test(SYSTEM_INSTRUCTIONS),
+  'the reader is told typed, typeset or printed working is transcribed like handwriting');
+ok(/never solved, corrected or completed/.test(SYSTEM_INSTRUCTIONS), 'and typed working is still never solved, corrected or completed');
+{
+  const prose = ['We use the compound interest formula:', 'A = P(1 + r)^n', 'Where:', 'Step 1: Substitute the values', 'A = $9261', 'Final answer: $1,261'];
+  const typed = normalizeResult({
+    lines: prose.map(text => ({ text, latex: '', confidence: 0.99, uncertain: false })),
+    confidence: 0.99, needs_confirmation: false
+  }, { model: 'm', confidenceFloor: 0.8 });
+  eq(typed.lines.map(l => l.text), prose, 'a typed page of headings, prose and formulas is accepted line for line');
+  ok(typed.needsConfirmation === false, 'and is not forced into confirmation');
+}
 eq(normalizeLeadConnective('thereforex'), 'thereforex', 'a word that merely starts with "therefore" is left alone');
 eq(normalizeLeadConnective('x = 2 therefore'), 'x = 2 therefore', 'only a leading mark is rewritten');
 {
@@ -983,7 +997,7 @@ try {
   eq([b.reasoning, b.input[1].content[1].detail], [{ effort: 'none' }, 'auto'], 'the configured effort and detail are what is sent');
   eq(Object.keys(b).sort(), ['input', 'model', 'reasoning', 'store', 'text'], 'the request has only the model, the instructions, the picture and the schema');
   eq(b.input[1].content.map(p => p.type), ['input_text', 'input_image'], 'the user turn is one fixed sentence and the picture');
-  eq(b.input[1].content[0].text, 'Transcribe every line of handwriting in this image. Do not solve it.', 'with no hint the sentence is constant: no question text or symbol list rides with it');
+  eq(b.input[1].content[0].text, 'Transcribe every line of working in this image, whether handwritten, typed or printed. Do not solve it.', 'with no hint the sentence is constant: no question text or symbol list rides with it');
 }
 
 console.log(failures.length
