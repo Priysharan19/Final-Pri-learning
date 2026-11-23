@@ -1081,6 +1081,10 @@ jobs:
             node client/test/tour-activation-gate.js --no-build 2>&1 | tee -a browser.log
             # The library and the Exam Desk (makes its own flagged builds).
             node client/test/tour-exam-desk.js 2>&1 | tee -a browser.log
+            # Signed out and offline with the real service worker installed, /welcome
+            # says the page could not load and offers Try again, never the crash
+            # screen (Chromium only: WebKit's setOffline blocks the worker).
+            node client/test/tour-offline-welcome.js 2>&1 | tee -a browser.log
             # The paywall (E5) and NSW exam (G4) tours stay in a11y-boot: they
             # build Prithagoras themselves whatever this group's edition is.
               ;;

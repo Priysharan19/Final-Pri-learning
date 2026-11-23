@@ -787,7 +787,8 @@
         {"has":"E2E SUITE PASSED — 36/36 checks across 1 flows","note":"Plan E6: OTP sign-up on a Prithagoras build and server (36: one more check, no phone channel, parent reached by email)."},
         {"has":"E2E SUITE PASSED — 72/72 checks across 1 flows","note":"The activation gate on a Prithagoras build."},
         {"has":"E2E SUITE PASSED — 5/5 checks across 1 flows","note":"The Exam Desk dark without its flag, Prithagoras."},
-        {"has":"E2E SUITE PASSED — 120/120 checks across 4 flows","note":"The Exam Desk sitting, import and desk journeys on Prithagoras."}
+        {"has":"E2E SUITE PASSED — 120/120 checks across 4 flows","note":"The Exam Desk sitting, import and desk journeys on Prithagoras."},
+        {"has":"OFFLINE WELCOME: PASS — 19/19 checks","note":"Signed out and offline with the real service worker (Chromium), /welcome and /welcome/marking say the page could not load and offer Try again; never the crash screen. 19 is the printed count of the new tour."}
       ]
     },
     "platform/classroom.log": {
