@@ -95,7 +95,7 @@ ok(one('(2,100)')[0] !== 'ok', 'a point (2,100) is not read as 2100');
 
 // the gloss is a CLOSED list of plain words: any other bracket stays maths, so the line is not checkable (a note, never carried on)
 for (const [a, b] of [['y = 2 (abc)', 'y = 2'], ['y = 3 (sin x)', 'y = 3'], ['y = 2 (cos x)', 'y = 2'], ['P = 100 (xyz)', 'P = 100'], ['x = 2 (pqr)', 'x = 2'],
-  ['x = 2 (xy)', 'x = 2'], ['x = 2 (ab)', 'x = 2'], ['x = 2 (new x)', 'x = 2'], ['x = 2 (sin)', 'x = 2'], ['x = 2 (2 years)', 'x = 2']]) {
+  ['x = 2 (xy)', 'x = 2'], ['x = 2 (ab)', 'x = 2'], ['x = 2 (new x)', 'x = 2'], ['x = 2 (sin)', 'x = 2'], ['x = 2 (2 years)', 'x = 2'], ['y = 5 (in)', 'y = 5'], ['y = 5 (an)', 'y = 5'], ['y = 5 (or)', 'y = 5'], ['y = 5 (to)', 'y = 5'], ['y = 5 (the)', 'y = 5'], ['y = 5 (at)', 'y = 5'], ['y = 5 (of)', 'y = 5'], ['y = 5 (per)', 'y = 5'], ['y = 5 (of the)', 'y = 5']]) {
   ok(one(`${a}\n${b}`)[1] === 'note', `a bracket that is not a gloss is not dropped: ${a} then ${b}`);
 }
 ok(one('P = 8000 (principal)\nP = 8000')[1] === 'ok', 'a gloss of listed words is dropped');
