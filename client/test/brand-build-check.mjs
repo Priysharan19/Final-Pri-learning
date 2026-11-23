@@ -155,7 +155,12 @@ if (BOTH) {
       PaperGenerator: 'edition values', PracticeBase: 'edition values', PractisePhoto: 'edition values', ReportHead: 'edition values',
       Settings: 'edition values', Tasks: 'edition values', TrialNotice: 'edition values', index: 'edition values',
       AccountDeleteRequest: 'edition values', GuardianConsent: 'edition values', OfferedCourse: 'edition values', SignUpFlow: 'edition values', Teach: 'edition values',
-      difficultyText: 'edition values', glossary: 'edition values', guest: 'edition values', offering: 'edition values'
+      difficultyText: 'edition values', glossary: 'edition values', guest: 'edition values', offering: 'edition values',
+      // Launch polish (EDITION_PAGE_CHUNK above): a Prithagoras build has no NCERT Class 8/9 section, so the Class 8 and 9
+      // production banks that only the sections imported no longer form chunks of their own there and the bundler places them
+      // in the one on-demand chunk that still imports them (india-junior-overlay, loaded for an India junior bank and
+      // in no precache list); and `generators` names its dependency files by position, so the chunks removed shift its preload indices.
+      'india-junior-overlay': 'edition pages', generators: 'edition pages'
     };
     //   core           i18n/core.js (split from i18n/index.js in train 23 so the server
     //                  can translate without React) picks the edition's en-AU overrides
