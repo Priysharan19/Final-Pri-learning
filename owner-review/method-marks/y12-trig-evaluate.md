@@ -25,7 +25,7 @@ Generator families: `y12-trig-model`.
 
 | Criterion | Marks | How the engine decides it |
 |---|---:|---|
-| Substitutes the value of t into the model correctly. | 1 | a line that starts with the model written at the given value, for example h(5) = ..., with a right side that is not just a number, which the step check ticks |
+| Substitutes the value of t into the model correctly. | 1 | a line that starts with the model written at the given value, for example h(5) = ..., written as the model with that value put in, term by term (not an expression that merely comes to the same value), which the step check ticks |
 | States the value correctly. | 1 | the answer checker marks the final answer, the same check that marks a one-line answer |
 
 Total: 2 marks. The marks per criterion are a first guess for the author to correct.
@@ -41,7 +41,7 @@ It can verify:
 
 It cannot verify:
 
-- A substitution line earns only when the asked value stands in the right side as often as the variable appears in the model; a line that puts in a different number and happens to come to the same value does not earn.
+- A substitution line earns only when it is the model with the asked value put in, term by term. A sum that merely comes to the same value (a different number, or an evaluated line) does not earn; that criterion is then "not verified".
 - It cannot judge a trigonometric value of a plain number without pi, because the angle might be in degrees or radians. Such a line is left unverified.
 - The question may supply the exact trig value to use. The engine does not check that the student used it.
 
@@ -105,4 +105,4 @@ To be filled in by the author (the tutor). Leave blank until reviewed.
 - Note: 
 - Name: 
 - Date: 
-- Scheme digest: `dfd011c6853f49fe9d7c646e058e4297c7f1707da2a32f0ee2ec19390bdf7dbf`
+- Scheme digest: `8575a4d493aa7c7367da17544e73cf82676b79029ce67e7f45a5185f0986e6a1`

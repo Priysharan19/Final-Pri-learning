@@ -25,7 +25,7 @@ Generator families: `y11-diff`.
 
 | Criterion | Marks | How the engine decides it |
 |---|---:|---|
-| Writes a correct derivative. | 1 | a line the step check ticks against the question's derivative step |
+| Writes a correct derivative. | 1 | a line the step check ticks against the question's derivative step (a line that only restates the function does not count) |
 | Gives the final answer correctly. | 1 | the answer checker marks the final answer, the same check that marks a one-line answer |
 
 Total: 2 marks. The marks per criterion are a first guess for the author to correct.
@@ -102,4 +102,4 @@ To be filled in by the author (the tutor). Leave blank until reviewed.
 - Note: 
 - Name: 
 - Date: 
-- Scheme digest: `e5a76c6648ec88c8fc35e8ff4ef8f1eec201fa8a9edfb94f64fd4f977af30689`
+- Scheme digest: `892c8bdbf9df8c287f9ed2ed4da9ad244170f0ed27085970c527ba4a6a491a94`

@@ -151,7 +151,7 @@ const EXTRAS = {
   'y12-trig-evaluate': {
     form: 'A model h(t) is given and the student finds h at a stated value of t.',
     cannot: [
-      'A substitution line earns only when the asked value stands in the right side as often as the variable appears in the model; a line that puts in a different number and happens to come to the same value does not earn.',
+      'A substitution line earns only when it is the model with the asked value put in, term by term. A sum that merely comes to the same value (a different number, or an evaluated line) does not earn; that criterion is then "not verified".',
       'It cannot judge a trigonometric value of a plain number without pi, because the angle might be in degrees or radians. Such a line is left unverified.',
       'The question may supply the exact trig value to use. The engine does not check that the student used it.'
     ],
@@ -184,7 +184,7 @@ const EXTRAS = {
   'y11-poly-evaluate': {
     form: 'A polynomial P(x) is given. The student finds P(a), or the remainder when P(x) is divided by x - a.',
     cannot: [
-      'A substitution line earns only when the asked value stands in the right side as often as x appears in P(x); a line that puts in a different number and happens to come to the same value does not earn.',
+      'A substitution line earns only when it is P(x) with the asked value put in, term by term. A sum that merely comes to the same value (a different number, or an evaluated line) does not earn; that criterion is then "not verified".',
       'Long division is not read at all.'
     ],
     async build(q) {

@@ -27,6 +27,7 @@ import { FINAL_ANSWER_ONLY } from '../platform/markingPolicy.js';
 import { UNCERTIFIED_EDITIONS } from '../platform/editionMarking.js';
 import { sealForEdition, bankPolicy, FINAL_ANSWER_MARKING } from '../platform/editionBanks.js';
 import { checkAnswer } from '../../client/src/engine/checker.js';
+import { publicDescription } from '../platform/lineInterpreter/givens.js';
 import { criteriaView } from '../../client/src/components/criteriaTableModel.js';
 import en from '../../client/src/i18n/strings.en.js';
 import hi from '../../client/src/i18n/strings.hi.js';
@@ -65,11 +66,11 @@ ok(typed.every(([s, q]) => schemePay({ q, report: { lines: [] }, correct: false,
 {
   const policy = { ...bankPolicy('prithagoras'), methodSchemeTypes: LIST.filter(a => a.typeId === 'y12-diff-rules') };
   const [s1, q1] = typed.find(([s]) => s.id === 'y12-diff-rules'); const [s2, q2] = typed.find(([s]) => s.id === 'y12-trig-extreme');
-  const a = JSON.parse(JSON.stringify({ ...q1, _generator: s1.families[0] })); const b = JSON.parse(JSON.stringify({ ...q2, _generator: s2.families[0] }));
+  const a = JSON.parse(JSON.stringify({ ...asMarks(q1, schemeMarks(s1)), _generator: s1.families[0] })); delete a._methodScheme; const b = JSON.parse(JSON.stringify({ ...asMarks(q2, schemeMarks(s2)), _generator: s2.families[0] })); delete b._methodScheme;
   ok(sealForEdition(a, policy, s1.families[0]) && a._methodScheme === 'y12-diff-rules' && !('_marking' in a), 'an approved type is stamped with its scheme and not sealed final-answer-only');
   ok(sealForEdition(b, policy, s2.families[0]) && b._marking === FINAL_ANSWER_MARKING && !('_methodScheme' in b), 'a type not on the list stays sealed final-answer-only');
   const stale = { ...bankPolicy('prithagoras'), methodSchemeTypes: [{ typeId: 'y12-diff-rules', digest: 'f'.repeat(64) }] };
-  const c = JSON.parse(JSON.stringify({ ...q1, _generator: s1.families[0] }));
+  const c = JSON.parse(JSON.stringify({ ...asMarks(q1, schemeMarks(s1)), _generator: s1.families[0] })); delete c._methodScheme;
   ok(sealForEdition(c, stale, s1.families[0]) && c._marking === FINAL_ANSWER_MARKING && !('_methodScheme' in c), 'an approval for a digest the scheme no longer has is not an approval');
   ok(isApproved('y12-diff-rules', LIST) && !isApproved('y12-diff-rules', stale.methodSchemeTypes) && !isApproved('y12-tangent', LIST), 'isApproved needs the type, its current digest');
   ok(bankPolicy('priyabhata').marking === null && !bankPolicy('priyabhata').methodSchemeTypes, 'India: no seal and no scheme, so the new branch of the seal is never entered');
@@ -150,6 +151,56 @@ for (const [k, v] of Object.entries(V)) ok(v === 0, `${k} = ${v} (must be 0)`);
 ok(N.tableShown === N.paid, 'the table is shown on every page, adds up to the mark, and rests on ticked lines');
 // every payable type shows up
 for (const s of SCHEMES) ok(R.questionsOfType(s, { limit: 3 }).length === 3, `${s.id}: questions exist`);
+
+
+// ── 2b. adversarial lines: value-equal but not the named step, true but irrelevant, the question restated ─────────────
+{
+  const gamed = { tried: 0, earned: 0, controlEarned: 0, controls: 0 };
+  const payOn = (s, q, lines, answer) => {
+    const q2 = asMarks(q, schemeMarks(s), s.id);
+    const result = checkAnswer(q2, answer);
+    const ev = stepEvidence(q2, answer, lines.join('\n'), result, { slipWarnings: true });
+    return schemePay({ q: q2, report: ev.stepReport, topic: ev.topicTicks ?? null, correct: result.correct === true, marksPossible: marksPossibleFor(q2), env: ON, list: LIST });
+  };
+  for (const s of SCHEMES) {
+    const type = TYPES.find(t => t.id === s.id);
+    for (const q of R.questionsOfType(s, { limit: 40 })) {
+      const built = await type.build(q);
+      if (!built) continue;
+      const first = built.full[0];
+      const adversarial = [['0 = 0'], ['x = x'], [first.replace(/=.*/, '= 0')]];
+      const sub = /^\s*([A-Za-z])\((-?\d+)\)\s*=/.exec(first);
+      if (sub && /^(y11-poly-evaluate|y12-trig-evaluate)$/.test(s.id)) {
+        const [, name, a] = sub; const A = Number(a);
+        const v = Number(built.full[built.full.length - 1].split('=').pop());
+        adversarial.push([`${name}(${a}) = ${a} + ${a} + ${a} + ${v - 3 * A}`], [`${name}(${a}) = ${v - 3} + 3 - 3 + 3`], [`${name}(${a}) = ${v}`], [`${name}(${a}) = ${v} + 0`], [`${name}(${a}) = ${v - A}${A < 0 ? ' - ' : ' + '}${Math.abs(A)}`]);
+        const real = payOn(s, q, built.full, '999');
+        gamed.controls++; if (real.items.find(i => i.key === 'substitute')?.awarded) gamed.controlEarned++;
+      } else {
+        const f = publicDescription(q).functions[0];
+        if (f) adversarial.push([`dy/dx = ${f.rhs}`], [`${f.name}'(x) = ${f.rhs}`], [`${f.name} = ${f.rhs}`]);
+      }
+      for (const lines of adversarial) {
+        gamed.tried++;
+        const p = payOn(s, q, lines, '999');
+        if (p.items.some(i => i.basis === 'lines' && i.awarded)) gamed.earned++;
+      }
+    }
+  }
+  console.log(`  adversarial: ${gamed.tried} lines tried over ${SCHEMES.length} types, gamed marks ${gamed.earned}; the real substitution earned its criterion on ${gamed.controlEarned} of ${gamed.controls}`);
+  ok(gamed.tried >= 400 && gamed.earned === 0, `no adversarial line earns a criterion (${gamed.earned} of ${gamed.tried})`);
+  ok(gamed.controls >= 40 && gamed.controlEarned === gamed.controls, 'the genuine term-by-term substitution still earns its criterion');
+  // the reviewer's two lines, on the question they named (y11-polynomials, difficulty 2, seed 1)
+  const polyType = SCHEMES.find(x => x.id === 'y11-poly-evaluate');
+  const rq = G.generateQuestion('y11-polynomials', 2, 1);
+  if (polyType.pick(rq)) {
+    const a = /P\((-?\d+)\)/.exec(rq.prompt)?.[1] ?? '3';
+    for (const rhs of [`${a} + ${a} + ${a} + 19`, `28 + ${a} - ${a} + ${a} - ${a} + ${a} - ${a}`]) {
+      const p = payOn(polyType, rq, [`P(${a}) = ${rhs}`], '29');
+      ok(!p.items.find(i => i.key === 'substitute').awarded, `P(${a}) = ${rhs} does not earn the substitution criterion`);
+    }
+  }
+}
 
 // ── 3. criteria not the question's marks ───────────────────────────────────────────────────────────────────────────
 {

@@ -218,8 +218,9 @@ const generatorOf = q => (typeof q?._generator === 'string' && q._generator ? q.
 
 // The aggregate mark rows of a question limited to its final answer carry no
 // method row: there is no method mark to report, awarded or not.
-function finalAnswerRows(q, rows) {
-  if (!rows || q._marking !== FINAL_ANSWER_MARKING || !rows.method) return rows;
+function finalAnswerRows(q, rows, schemePaid = false) {
+  // Sealed final-answer-only, or an approved-scheme question the scheme is not paying: no method row, awarded or not.
+  if (!rows || !rows.method || (q._marking !== FINAL_ANSWER_MARKING && !(typeof q._methodScheme === 'string' && !schemePaid))) return rows;
   const { method, ...rest } = rows;
   return rest;
 }
@@ -277,13 +278,15 @@ function answerTextFor(q) {
   }
 }
 
-function solutionFor(q, sketch = null) {
+function solutionFor(q, sketch = null, scheme = null) {
   const steps = q.steps || [];
   const marks = marksPossibleFor(q);
   const keySteps = steps.filter(s => !/^(check|note|bonus)/i.test(s.h)).slice(0, marks);
   // A question limited to its final answer (editionBanks.js) states one
   // criterion: no row may suggest a step of the working earned or lost a mark.
-  const criteria = q._marking === FINAL_ANSWER_MARKING
+  // The scheme's own criteria only while the scheme is actually paying this question; otherwise exactly what a sealed question says.
+  const criteria = scheme?.paid ? scheme.items.map(i => ({ mark: i.marks, text: i.text }))
+    : q._marking === FINAL_ANSWER_MARKING || typeof q._methodScheme === 'string'
     ? [{ mark: marks, text: 'Correct final answer' }]
     : keySteps.length
       ? keySteps.map((step, i) => ({ mark: 1, text: i === keySteps.length - 1
@@ -1593,7 +1596,10 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // from its working HERE, where the mark commits, whatever the process's
       // method-mark switch says: its lines are still reported, as feedback.
       const finalAnswerOnly = q._marking === FINAL_ANSWER_MARKING;
-      const counted = resolved && finalAnswerOnly ? { stepReport: evidence.stepReport || null, partial: null } : evidence;
+      // A scheme question never reaches the generic method rubric: the scheme pays it (below) or it stays on the final answer.
+      const schemeQuestion = typeof q._methodScheme === 'string';
+      const counted = resolved && (finalAnswerOnly || schemeQuestion)
+        ? { stepReport: evidence.stepReport || null, partial: null, ...(schemeQuestion && evidence.topicTicks !== undefined ? { topicTicks: evidence.topicTicks } : {}) } : evidence;
       const { stepReport, partial, markingReport } = resolved ? counted : { stepReport: null, partial: null };
       const notRead = resolved && workingNotRead && working.trim() !== '';
       // After the engine's step check, never before it, and rules only (the model arm is unreachable here).
@@ -1684,17 +1690,18 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         stepReport: shownReport, partial: invalid ? null : markedPartial,
         // The signed scheme's criteria, each tied to the lines of the report above that earned it; only when the scheme paid.
         ...(scheme?.paid ? { methodCriteria: { typeId: scheme.typeId, digest: scheme.digest, items: scheme.items } } : {}),
-        ...(scheme ? { methodScheme: scheme.paid ? { typeId: scheme.typeId, paid: true } : { typeId: scheme.typeId ?? null, paid: false, reason: scheme.reason } } : {}),
+        // Only a paying scheme says so; why one did not pay stays on the server (schemePay's `reason`).
+        ...(scheme?.paid ? { methodScheme: { typeId: scheme.typeId, paid: true } } : {}),
         // The report that decided `partial`, only when the displayed one differs (markerOps.stepEvidence): stored with the reply.
         ...(resolved && !invalid && markingReport ? { markingReport } : {}),
         ...(resolved && !invalid && lineInterpretation ? { lineInterpretation } : {}), ...(resolved ? {
-          solution: solutionFor(q, result.sketch),
+          solution: solutionFor(q, result.sketch, scheme),
           // Supplemental aggregate marking: no per-step allocations are invented.
           ...(!invalid ? { markRows: finalAnswerRows(q, markRowsFor(q, {
             marksEarned, marksPossible, creditedMarks, attemptId, submissionId,
             correct: result.correct === true,
             partial: markedPartial, workingNotRead: notRead, resolved
-          })) } : {}),
+          }), scheme?.paid === true) } : {}),
           // Only a committed resolution may disclose opportunity explanations.
           // Their ontology identity is derived by the client from these
           // server-attested authored distractor explanations, not from an answer key.

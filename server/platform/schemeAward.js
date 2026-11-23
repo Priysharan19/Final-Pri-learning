@@ -26,18 +26,43 @@
 // Pure and deterministic: no model, no network, no clock. India is unchanged (its bank has no allow-list and no seal).
 import crypto from 'node:crypto';
 import { publicDescription } from './lineInterpreter/givens.js';
+import { evalNumeric } from '../../client/src/engine/expr.js';
 import { makeFn, polynomial, extremes } from './lineInterpreter/truth.js';
 import { editionMarkingPolicy, editionMethodMarksRefusal } from './editionMarking.js';
 
 /** The question types whose scheme the author has approved for payment. EMPTY by default. Entries: { typeId, digest }. */
 export const APPROVED_SCHEME_TYPES = Object.freeze([]);
+let approved = APPROVED_SCHEME_TYPES;
+/** The list in force: the repository's (empty) one, unless a test process has replaced it. */
+export const approvedSchemeTypes = () => approved;
+/** TEST PROCESSES ONLY (refused under NODE_ENV=production): approve types in this process, to exercise the paid path end to end. */
+export function approveSchemeTypesForTests(list) {
+  if (process.env.NODE_ENV === 'production') throw new Error('approveSchemeTypesForTests is for test processes only');
+  approved = Object.freeze([...list]);
+}
 
 const fnOf = q => { const f = publicDescription(q).functions; return f.length === 1 ? makeFn(f[0]) : null; };
-const aLoneNumber = text => /=\s*-?\d+(?:\.\d+)?\s*$/.test(String(text ?? ''));
 const labelled = word => l => new RegExp(`^\\s*${word}\\b`, 'i').test(String(l.text ?? ''));
-// "Substitutes the value" is earned only when the line really puts the asked value in: the number after the function's name (P(2), h(5))
-// must stand in the right side as often as the function has its variable. A line that substitutes a different number and happens to come to
-// the same value (P(2) = P(3)) is true as written, so the tick alone cannot tell it apart; this can.
+// "Substitutes the value" is earned only by a line that really is the model with the asked value put in, term by term, and not by any
+// expression that merely comes to the same number (P(3) = 3 + 3 + 3 + 19). The test is structural: some of the written numbers equal to
+// the asked value are the slots, and with those slots replaced by u the line must equal the model at u for several different u. A line
+// with no slot (an evaluated sum), or whose constants are not the model's, fails: its criterion is then "not verified", never earned.
+const SLOT_TESTS = [0, 1.5, -2];
+const slotted = (rhs, a, f) => {
+  const lit = Number.isInteger(a) ? String(Math.abs(a)) : String(Math.abs(a)).replace('.', '\\.');
+  const re = a < 0 ? new RegExp(`\\(\\s*-\\s*${lit}\\s*\\)`, 'g') : new RegExp(`(?<![\\d.])${lit}(?![\\d.])`, 'g');
+  const at = [...rhs.matchAll(re)].map(m => [m.index, m[0].length]);
+  if (!at.length || at.length > 10) return false;
+  for (let mask = 1; mask < (1 << at.length); mask++) {
+    let out = ''; let from = 0;
+    at.forEach(([i, n], k) => { out += rhs.slice(from, i) + ((mask >> k) & 1 ? '(u)' : rhs.slice(i, i + n)); from = i + n; });
+    out += rhs.slice(from);
+    try {
+      if (SLOT_TESTS.every(d => { const u = a + d; const want = evalNumeric(f.rhs, { [f.variable]: u }); const got = evalNumeric(out, { u }); return Math.abs(got - want) <= 1e-9 * (1 + Math.abs(want)); })) return true;
+    } catch { /* this reading is not an expression */ }
+  }
+  return false;
+};
 const askedValue = q => {
   const p = String(q?.prompt ?? '');
   const ev = /evaluate \$P\((-?\d+)\)\$/i.exec(p) || /find \$[a-z]\((-?\d+)\)\$/i.exec(p);
@@ -46,12 +71,16 @@ const askedValue = q => {
   return rem ? (rem[1] === '+' ? -Number(rem[2]) : Number(rem[2])) : null;
 };
 const substitutes = (l, q) => {
-  const m = /^\s*[A-Za-z]\(\s*(-?\d+(?:\.\d+)?)\s*\)\s*=(.*)$/.exec(String(l.text ?? ''));
+  const m = /^\s*[A-Za-z]\(\s*(-?\d+(?:\.\d+)?)\s*\)\s*=([^=]*)$/.exec(String(l.text ?? ''));
   const f = publicDescription(q).functions[0];
-  if (!m || !f || aLoneNumber(l.text) || Number(m[1]) !== askedValue(q)) return false;
-  const uses = (f.rhs.match(new RegExp(`(?<![A-Za-z])${f.variable}(?![A-Za-z])`, 'g')) || []).length;
-  const at = m[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return uses > 0 && (m[2].match(new RegExp(`(?<![\\d.^])${at}(?![\\d.])`, 'g')) || []).length >= uses;
+  if (!m || !f || Number(m[1]) !== askedValue(q)) return false;
+  return slotted(m[2], Number(m[1]), f);
+};
+// A derivative criterion is not earned by a line that only restates the function of the question.
+const restates = (l, q) => {
+  const f = publicDescription(q).functions[0];
+  const side = String(l.text ?? '').split('=').pop().replace(/\s+/g, '');
+  return !!f && side === String(f.rhs).replace(/\s+/g, '');
 };
 const ANSWER = { key: 'answer', by: 'final', marks: 1, how: 'the answer checker marks the final answer, the same check that marks a one-line answer' };
 
@@ -62,7 +91,7 @@ export const SCHEMES = Object.freeze([
     families: ['y12-diff'],
     pick: q => q.answerType === 'expression' && !!fnOf(q) && fnOf(q).name === 'y' && /differentiate/i.test(q.prompt),
     criteria: [
-      { key: 'derivative', by: 'line', marks: 1, text: 'Writes a correct derivative of the given function (any equivalent form).', how: 'a line the step check ticks as equal to the derivative of the given function, in any form', line: () => true },
+      { key: 'derivative', by: 'line', marks: 1, text: 'Writes a correct derivative of the given function (any equivalent form).', how: 'a line the step check ticks as equal to the derivative of the given function, in any form (a line that only restates the function does not count)', line: (l, k, lines, q) => !restates(l, q) },
       { ...ANSWER, marks: 1, text: 'Gives the final answer correctly, in the form the question asks.' }
     ]
   },
@@ -81,7 +110,7 @@ export const SCHEMES = Object.freeze([
     families: ['y12-trig-model'],
     pick: q => q.answerType === 'numeric' && !!fnOf(q) && /find \$[a-z]\(\d+\)\$/i.test(q.prompt),
     criteria: [
-      { key: 'substitute', by: 'line', marks: 1, text: 'Substitutes the value of t into the model correctly.', how: 'a line that starts with the model written at the given value, for example h(5) = ..., with a right side that is not just a number, which the step check ticks', line: (l, k, lines, q) => substitutes(l, q) },
+      { key: 'substitute', by: 'line', marks: 1, text: 'Substitutes the value of t into the model correctly.', how: 'a line that starts with the model written at the given value, for example h(5) = ..., written as the model with that value put in, term by term (not an expression that merely comes to the same value), which the step check ticks', line: (l, k, lines, q) => substitutes(l, q) },
       { ...ANSWER, marks: 1, text: 'States the value correctly.' }
     ]
   },
@@ -90,7 +119,7 @@ export const SCHEMES = Object.freeze([
     families: ['y12-explogcalc'],
     pick: q => q.answerType === 'expression' && /differentiate/i.test(q.prompt) && !/integral|\\int/i.test(q.prompt),
     criteria: [
-      { key: 'derivative', by: 'line', marks: 1, text: 'Writes a correct derivative (any equivalent form).', how: 'a line the step check ticks as equal to the derivative of the given function, in any form', line: () => true },
+      { key: 'derivative', by: 'line', marks: 1, text: 'Writes a correct derivative (any equivalent form).', how: 'a line the step check ticks as equal to the derivative of the given function, in any form (a line that only restates the function does not count)', line: (l, k, lines, q) => !restates(l, q) },
       { ...ANSWER, marks: 1, text: 'Gives the final answer correctly, in the form the question asks.' }
     ]
   },
@@ -99,7 +128,7 @@ export const SCHEMES = Object.freeze([
     families: ['y11-polynomials'],
     pick: q => q.answerType === 'numeric' && !!fnOf(q) && fnOf(q).name === 'P' && /evaluate \$P\(-?\d+\)\$|remainder when/i.test(q.prompt),
     criteria: [
-      { key: 'substitute', by: 'line', marks: 1, text: 'Substitutes the correct value into P(x).', how: 'a line that starts with P at the given value, with a right side that is not just a number, which the step check ticks as true for the question\'s polynomial', line: (l, k, lines, q) => /^\s*P\s*\(/.test(String(l.text ?? '')) && substitutes(l, q) },
+      { key: 'substitute', by: 'line', marks: 1, text: 'Substitutes the correct value into P(x).', how: 'a line that starts with P at the given value, written as the polynomial with that value put in, term by term (not an expression that merely comes to the same value), which the step check ticks', line: (l, k, lines, q) => /^\s*P\s*\(/.test(String(l.text ?? '')) && substitutes(l, q) },
       { ...ANSWER, marks: 1, text: 'Evaluates correctly to give the value or remainder.' }
     ]
   },
@@ -108,7 +137,7 @@ export const SCHEMES = Object.freeze([
     families: ['y11-diff'],
     pick: q => q.stepcheck?.kind === 'plan' && q.answerType === 'numeric' && /gradient of the tangent/i.test(q.prompt) && !!fnOf(q) && polynomial(fnOf(q)) !== null,
     criteria: [
-      { key: 'derivative', by: 'line', marks: 1, text: 'Differentiates the function correctly (stage 1 of the plan).', how: 'a line the step check ticks at stage 1 of the question\'s plan (the derivative stage)', line: l => l.stage === 0 },
+      { key: 'derivative', by: 'line', marks: 1, text: 'Differentiates the function correctly (stage 1 of the plan).', how: 'a line the step check ticks at stage 1 of the question\'s plan (the derivative stage)', line: (l, k, lines, q) => l.stage === 0 && !restates(l, q) },
       { ...ANSWER, key: 'gradient', marks: 1, text: 'Substitutes the x-value and finds the gradient correctly (the final answer).' }
     ]
   },
@@ -117,7 +146,7 @@ export const SCHEMES = Object.freeze([
     families: ['y11-diff'],
     pick: q => q.answerType === 'expression' && q.stepcheck?.kind === 'derivative',
     criteria: [
-      { key: 'derivative', by: 'line', marks: 1, text: 'Writes a correct derivative.', how: 'a line the step check ticks against the question\'s derivative step', line: () => true },
+      { key: 'derivative', by: 'line', marks: 1, text: 'Writes a correct derivative.', how: 'a line the step check ticks against the question\'s derivative step (a line that only restates the function does not count)', line: (l, k, lines, q) => !restates(l, q) },
       { ...ANSWER, marks: 1, text: 'Gives the final answer correctly.' }
     ]
   }
@@ -153,7 +182,7 @@ export function schemeTypeOf(q, generator = q?._generator ?? q?.subtopic) {
 }
 
 /** Is this type approved, for the digest it has now? `list` defaults to the repository's (empty) allow-list. */
-export const isApproved = (typeId, list = APPROVED_SCHEME_TYPES) => {
+export const isApproved = (typeId, list = approved) => {
   const s = byId.get(typeId);
   return !!s && list.some(a => a?.typeId === typeId && a.digest === schemeDigest(s));
 };
@@ -198,7 +227,7 @@ export function awardScheme(scheme, report, correct, topic = null, q = null) {
  * What a scheme pays one resolved practice question. `{ paid: false, reason }` when it must not pay it; otherwise
  * `{ paid: true, typeId, digest, items, awarded, partial }` where `partial` has the shape the rest of the reply already reads.
  */
-export function schemePay({ q, report, topic = null, correct, marksPossible, env = process.env, list = APPROVED_SCHEME_TYPES }) {
+export function schemePay({ q, report, topic = null, correct, marksPossible, env = process.env, list = approved }) {
   const typeId = typeof q?._methodScheme === 'string' ? q._methodScheme : null;
   const scheme = typeId ? byId.get(typeId) : null;
   if (!scheme) return { paid: false, reason: 'not-a-scheme-question' };

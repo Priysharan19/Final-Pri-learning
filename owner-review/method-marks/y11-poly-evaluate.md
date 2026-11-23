@@ -25,7 +25,7 @@ Generator families: `y11-polynomials`.
 
 | Criterion | Marks | How the engine decides it |
 |---|---:|---|
-| Substitutes the correct value into P(x). | 1 | a line that starts with P at the given value, with a right side that is not just a number, which the step check ticks as true for the question's polynomial |
+| Substitutes the correct value into P(x). | 1 | a line that starts with P at the given value, written as the polynomial with that value put in, term by term (not an expression that merely comes to the same value), which the step check ticks |
 | Evaluates correctly to give the value or remainder. | 1 | the answer checker marks the final answer, the same check that marks a one-line answer |
 
 Total: 2 marks. The marks per criterion are a first guess for the author to correct.
@@ -41,7 +41,7 @@ It can verify:
 
 It cannot verify:
 
-- A substitution line earns only when the asked value stands in the right side as often as x appears in P(x); a line that puts in a different number and happens to come to the same value does not earn.
+- A substitution line earns only when it is P(x) with the asked value put in, term by term. A sum that merely comes to the same value (a different number, or an evaluated line) does not earn; that criterion is then "not verified".
 - Long division is not read at all.
 
 Rule used in every award below: a line earns a criterion only if the marked page ticks it. A line the page crosses, and every line after it, earns nothing. A correct final answer is the full mark, as it always was. A wrong final answer can never reach full marks.
@@ -104,4 +104,4 @@ To be filled in by the author (the tutor). Leave blank until reviewed.
 - Note: 
 - Name: 
 - Date: 
-- Scheme digest: `5be5abaa89ec8e7a4c799a40b8e24914134ebd28b8f11ab219aec2557b2113b5`
+- Scheme digest: `752b0bb78307bec0f5a234efc8c69a8713a464081f5b38b1a87ebfe3eec50503`

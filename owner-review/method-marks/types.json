@@ -25,7 +25,7 @@
           "by": "final"
         }
       ],
-      "digest": "f58d2e8cff6862a00a638a38a2e0356697c642d9be08d2594681b11549ecd701"
+      "digest": "1ad1b2e438c55f503fd39357e4d7f17981edee6820dbdfbadc7638caf33cfeca"
     },
     {
       "id": "y12-trig-extreme",
@@ -83,7 +83,7 @@
           "by": "final"
         }
       ],
-      "digest": "dfd011c6853f49fe9d7c646e058e4297c7f1707da2a32f0ee2ec19390bdf7dbf"
+      "digest": "8575a4d493aa7c7367da17544e73cf82676b79029ce67e7f45a5185f0986e6a1"
     },
     {
       "id": "y12-diff-explog",
@@ -109,7 +109,7 @@
           "by": "final"
         }
       ],
-      "digest": "58f14f247f31579ba253f04c6697e6dbd71d541be8519c88e3bd58f4ed09753f"
+      "digest": "3d22a090d1a9e2bbbcdf4af4e742d5c7e6600812c0e048222be50f2e9e39be85"
     },
     {
       "id": "y11-poly-evaluate",
@@ -135,7 +135,7 @@
           "by": "final"
         }
       ],
-      "digest": "5be5abaa89ec8e7a4c799a40b8e24914134ebd28b8f11ab219aec2557b2113b5"
+      "digest": "752b0bb78307bec0f5a234efc8c69a8713a464081f5b38b1a87ebfe3eec50503"
     },
     {
       "id": "y11-diff-gradient-plan",
@@ -187,7 +187,7 @@
           "by": "final"
         }
       ],
-      "digest": "e5a76c6648ec88c8fc35e8ff4ef8f1eec201fa8a9edfb94f64fd4f977af30689"
+      "digest": "892c8bdbf9df8c287f9ed2ed4da9ad244170f0ed27085970c527ba4a6a491a94"
     }
   ],
   "notProvable": [

@@ -25,7 +25,7 @@ Generator families: `y12-diff`.
 
 | Criterion | Marks | How the engine decides it |
 |---|---:|---|
-| Writes a correct derivative of the given function (any equivalent form). | 1 | a line the step check ticks as equal to the derivative of the given function, in any form |
+| Writes a correct derivative of the given function (any equivalent form). | 1 | a line the step check ticks as equal to the derivative of the given function, in any form (a line that only restates the function does not count) |
 | Gives the final answer correctly, in the form the question asks. | 1 | the answer checker marks the final answer, the same check that marks a one-line answer |
 
 Total: 2 marks. The marks per criterion are a first guess for the author to correct.
@@ -103,4 +103,4 @@ To be filled in by the author (the tutor). Leave blank until reviewed.
 - Note: 
 - Name: 
 - Date: 
-- Scheme digest: `f58d2e8cff6862a00a638a38a2e0356697c642d9be08d2594681b11549ecd701`
+- Scheme digest: `1ad1b2e438c55f503fd39357e4d7f17981edee6820dbdfbadc7638caf33cfeca`

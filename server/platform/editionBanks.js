@@ -20,7 +20,8 @@
 import { serverEdition } from './edition.js';
 import { indiaBank, BANK_OUTSIDE_INDIA } from './indiaBanks.js';
 import { indiaQuestionIdentity } from './indiaIdentity.js';
-import { APPROVED_SCHEME_TYPES, schemeTypeOf, isApproved } from './schemeAward.js';
+import { approvedSchemeTypes, schemeTypeOf, schemeById, schemeMarks, isApproved } from './schemeAward.js';
+import { marksPossibleFor } from './markerOps.js';
 import { nswBank, nswIssuable, nswQuestionIdentity, BANK_OUTSIDE_NSW, NSW_COURSE } from './nswBanks.js';
 
 /** Sealed on a question whose mark is its final answer's alone, whatever the working shows. */
@@ -35,7 +36,7 @@ const POLICIES = Object.freeze({
     edition: 'prithagoras', curriculum: NSW_COURSE, issues: nswBank, outside: BANK_OUTSIDE_NSW,
     admits: nswIssuable, identityOf: nswQuestionIdentity, marking: FINAL_ANSWER_MARKING,
     // The question types the author has approved for payment by a scheme (schemeAward.js). EMPTY: every question is sealed.
-    methodSchemeTypes: APPROVED_SCHEME_TYPES
+    get methodSchemeTypes() { return approvedSchemeTypes(); }
   })
 });
 
@@ -63,7 +64,9 @@ export function sealForEdition(q, banks, generator = q?._generator ?? q?.subtopi
     // An allow-listed type, at the digest the author read, is stamped with its scheme instead of the final-answer seal.
     // With the list empty (the repository default) this never looks at the question: every question is sealed as before.
     const typeId = banks.methodSchemeTypes?.length ? schemeTypeOf(q, generator) : null;
-    if (typeId && isApproved(typeId, banks.methodSchemeTypes)) q._methodScheme = typeId;
+    // A listed type is paid by its scheme only when the scheme's marks are the question's marks; otherwise it is sealed final-answer-only,
+    // so the generic method rubric can never run on an NSW question.
+    if (typeId && isApproved(typeId, banks.methodSchemeTypes) && marksPossibleFor(q) === schemeMarks(schemeById(typeId))) q._methodScheme = typeId;
     else q._marking = banks.marking;
   }
   return true;

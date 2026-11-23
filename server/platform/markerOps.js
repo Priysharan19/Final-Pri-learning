@@ -276,11 +276,13 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
   try { if (report && result.correct !== true && typeof steps === 'string') { const gap = missingSteps(q, steps); if (gap) report = { ...report, missing: gap.missing, stepsFound: gap.found, stepsReadable: gap.total }; } } catch { /* the report stands */ }
   // The displayed report is kept as it was. Where running the marks again on it would NOT give the stored `partial` (or the
   // Board's ticks), the report that decided them is kept beside it, reduced to what reproduces the decision.
-  // One page, one story (engine/markExplanation.js). The marks rest only on lines the page shows as ticks, and not after a cross
-  // that only the page makes (the first wrong step). Measured over the ten question types with a draft scheme no page breaks
-  // that today, so there it clips nothing and changes no mark; it makes the rule structural, so a later display pass cannot pay a
-  // mark on a line it does not tick or after a line it alone crosses. A cross the deciding report also made stays the rubric's own.
-  // `opts.reconcile === false` is the measurement's "before" switch (tools/method-marks-ready.mjs).
+  // BEHAVIOUR CHANGE of the generic method-marks path (not of final-answer marking). The marks rest only on lines the page shows as ticks,
+  // and not after a cross that only the page makes (the first wrong step): a mark that main paid on a true line AFTER the page's own cross
+  // (owner's product-rule page, line 9 true again after a crossed line 8: 3 marks, now 2) is no longer paid. A cross the deciding report
+  // also made stays the rubric's own (an authored plan lets an independent stage earn). It can lower a method mark wherever method marks
+  // are computed, whatever the allow-list says. Where method marks are off (production today, and every Prithagoras request) `partial` is
+  // dropped by MARKER_OPS.practice, so this is a no-op for every reply: server/test/method-marks-ready-check.mjs proves the stripped
+  // evidence identical with and without it. `opts.reconcile === false` is the measurement's "before" switch.
   if (decided && partial && !Array.isArray(q.boardScheme) && !(opts && opts.reconcile === false)) {
     const unsupported = unsupportedCredit(partial.lines, report?.lines, decided.lines);
     const { report: bounded, clipped } = unsupported.length ? constrainToShown(decided, report?.lines, unsupported) : { report: decided, clipped: 0 };

@@ -27,7 +27,14 @@ import { markingPolicy, methodMarksRefusal, FINAL_ANSWER_ONLY, METHOD_MARKS_ENV 
 export const UNCERTIFIED_EDITIONS = Object.freeze(['prithagoras']);
 
 const editionOf = env => String(env?.PRI_EDITION ?? '').trim();
-const uncertified = env => UNCERTIFIED_EDITIONS.includes(editionOf(env));
+const blocked = new Set(UNCERTIFIED_EDITIONS);
+const uncertified = env => blocked.has(editionOf(env));
+
+/** TEST PROCESSES ONLY (refused under NODE_ENV=production): treat an edition as certified, to exercise the paid path end to end. */
+export function certifyEditionForTests(edition) {
+  if (process.env.NODE_ENV === 'production') throw new Error('certifyEditionForTests is for test processes only');
+  blocked.delete(String(edition));
+}
 const asked = env => String(env?.[METHOD_MARKS_ENV] ?? '').trim().toLowerCase() === 'on';
 
 /** The marking policy this process applies, for its edition. */

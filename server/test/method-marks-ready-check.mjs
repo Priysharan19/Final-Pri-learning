@@ -21,6 +21,7 @@ import * as R from '../../tools/method-marks-ready.mjs';
 import { constrainToShown, unsupportedCredit, reconcileLostRows } from '../../client/src/engine/markExplanation.js';
 import { lostMarksForPage } from '../../client/src/components/attemptEvidence.js';
 import { stepEvidence } from '../platform/markerOps.js';
+import { checkAnswer } from '../../client/src/engine/checker.js';
 import { markingPolicy, FINAL_ANSWER_ONLY } from '../platform/markingPolicy.js';
 import en from '../../client/src/i18n/strings.en.js';
 import hi from '../../client/src/i18n/strings.hi.js';
@@ -53,6 +54,24 @@ ok(B.stress.afterUnseen === A.stress.afterUnseen && A.stress.afterUnseen > 0, `a
 // Every page whose reasons contradict the page keeps the report that decided the marks beside the displayed one.
 ok(A.asWritten.markingReport >= A.asWritten.contradicts && A.stress.markingReport >= A.stress.contradicts, `markingReport kept on ${A.asWritten.markingReport} / ${A.stress.markingReport} pages`);
 for (const [id, row] of Object.entries(after.byType)) ok(row.questions > 0, `${id}: ${row.questions} questions`);
+
+// With method marks OFF (production today, every Prithagoras request) MARKER_OPS.practice keeps only stepReport and board (partial and
+// markingReport are dropped), so the guard of markerOps.stepEvidence must change neither: identical on every page of the sweep.
+{
+  let pages = 0, differ = 0, offDiffer = 0;
+  for (const type of (await import('../../tools/method-marks-drafts.mjs')).TYPES) for (const q of R.questionsOfType(type, { limit: 20 })) for (const page of await R.pagesFor(type, q)) for (const qq of [q, R.asFourMarks(q)]) {
+    const answer = page.answer ?? page.lines[page.lines.length - 1].split('=').pop().trim();
+    const res = checkAnswer(qq, answer);
+    const a = stepEvidence(qq, answer, page.lines.join('\n'), res, { slipWarnings: true, reconcile: false });
+    const b = stepEvidence(qq, answer, page.lines.join('\n'), res, { slipWarnings: true });
+    pages++;
+    if (JSON.stringify([a.stepReport, a.board ?? null]) !== JSON.stringify([b.stepReport, b.board ?? null])) offDiffer++;
+    if (JSON.stringify(a.partial) !== JSON.stringify(b.partial)) differ++;
+  }
+  ok(pages >= 1000 && offDiffer === 0, `method marks off: the page and the board are identical with and without the guard on ${pages} pages (${offDiffer} differ)`);
+  ok(differ <= 2, `with method marks on, the guard changed the generic method mark on ${differ} of ${pages} pages (the owner's first-wrong-step shape), and on none otherwise`);
+  console.log(`  guard: off-path identical on ${pages} pages; method mark lowered on ${differ}`);
+}
 
 // ── 2. the join ───────────────────────────────────────────────────────────────────────────────────────────────────
 {
