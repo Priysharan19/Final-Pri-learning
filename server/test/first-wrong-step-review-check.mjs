@@ -75,6 +75,22 @@ ok(isPartialWork('x(x-2) + 1(x-2)', 'x^2 - 2x') && isPartialWork('2(x+1)(x-2)', 
   ok(rn && !/product rule/.test(rn.kept || ''), `method praise only when the question names the method (${rn?.kept})`);
 }
 
+// 4b  a derived quantity of a defined symbol is never a premise: it ticks only when the engine verifies EVERY claim on the line
+{
+  const SIN = QUESTION('Differentiate $y = x^{2}\\sin x$ using the product rule.', '2x sin(x) + x^2 cos(x)');
+  const line2 = (def, claim) => mark(SIN, [def, claim]).report.lines[1];
+  const D = 'Let u = x^2 and v = sin x';
+  ok(line2(D, "u' = 3x and v' = cos x").status === 'note', "u' = 3x and v' = cos x is a note (u' is wrong)");
+  ok(line2(D, "u' = 2x and v' = -cos x").status === 'note', "v' = -cos x is a note");
+  ok(line2(D, "u' = 3x").status === 'note' && line2('Let u = x^2', "Then u' = 3x").status === 'note', "u' = 3x alone is a note (and not a cross)");
+  ok(mark(SIN, [D, "u' = 3x and v' = cos x"]).st.every(s => s !== 'break'), 'no cross from the false derivative line');
+  ok(line2(D, "u' = 2x and v' = cos x").status === 'ok', "u' = 2x and v' = cos x ticks: both verified");
+  ok(line2('Let u = x^2', "Then u' = 2x").status === 'ok', "u' = 2x ticks");
+  ok(mark(PRODUCT, PAGE.map(l => (l.startsWith('Then') ? "Then u' = 3x and v' = 1." : l))).st[2] === 'note', 'the polynomial false case is a note');
+  const good = mark(PRODUCT, PAGE, '3x^2-x');
+  ok(good.st[2] === 'ok' && good.report.lines[8].status === 'break', "the owner's page is unchanged: line 3 ticked, line 9 crossed");
+}
+
 // 5  a term is named only when it is on the line it is said to be on
 {
   const sg = mark(QUESTION('Simplify $x^2 - 2x + x - 2$.', 'x^2-x-2'), ['y = x^2 - 2x + x - 2', '= x^2 + x - 2']);

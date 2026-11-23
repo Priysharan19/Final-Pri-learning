@@ -962,7 +962,7 @@ function pageDefinitionsOnce(raw, out, firstBreak, prep, degreePrimed, tickOnly,
       const text = cleanStatement(stmt);
       const parts = text.split('=').map(x => x.trim());
       if (parts.length < 2 || parts.some(x => !x)) return;
-      const head = parts[0];
+      const head = parts[0].replace(/^(?:then\s+)?(?:(?:let|take|put|set)\s+)?/i, '');
       // The derivative the page set, put equal to zero (`0 = 6x^2 + 18x` after `y' = 6x^2 + 18x` and `y' = 0`): true as written, never crossed.
       if (zeroFor && parts.length === 2 && (parts[0] === '0' || parts[1] === '0')) {
         const side = parts[0] === '0' ? parts[1] : parts[0];
@@ -1088,6 +1088,10 @@ function pageDefinitionsOnce(raw, out, firstBreak, prep, degreePrimed, tickOnly,
       // A statement about the unknown of the equation before it that this pass could not tick (`x = 3`, `2x = 5` after
       // `2x = 4`) is not a premise: it may be false, so the line is not ticked (independent review, rounds 2 and 3).
       if (sides.length >= 2 && equationBefore && sides.some(x => lettersOf(x).includes(equationBefore.variable))) { verdicts.push('bad'); continue; }
+      // A claim about a DERIVED quantity of a symbol the page defined (`u' = 3x`, `v' = cos x`, `f'(x) = ...`, `y'' = ...`) that this pass did not tick is
+      // never a premise: it may be false (review of 23 November 2026), so the line is not ticked. It ticks only when verified above.
+      { const dc = /(?:^|\s)([A-Za-z])'{1,2}(?:\(\s*[a-z]\s*\))?$/.exec(sides[0]) || /(?:^|\s)d{1,2}([a-z])\s*\/\s*d[a-z]\^?2?$/.exec(sides[0]);
+        if (dc && sides.length >= 2 && (defs[dc[1]] || raw.slice(0, i).some(l0 => new RegExp(`(?<![A-Za-z'])${dc[1]}\\s*=`).test(l0)))) { verdicts.push('bad'); continue; } }
       const plain = sides.length >= 2 && sides.every(x => x && !lettersOf(x).length);
       const values = plain ? sides.map(numberOf) : [];
       verdicts.push(plain && !(values.every(v => v !== null) && values.every(v => close(v, values[0]))) ? 'bad' : 'premise');
