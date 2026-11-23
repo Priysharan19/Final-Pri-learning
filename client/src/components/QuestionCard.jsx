@@ -2301,6 +2301,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         engine: photoOCR.engine, confidence: photoOCR.confidence, attested: photoAttested }) } }));
     }
   };
+  // The selected-line panel on the marked page is the explanation of a cross: no second "What went wrong" panel repeats it.
+  const crossShown = markedOn && !!awInput?.stepReport?.lines?.some(l => l?.status === 'break' || l?.state === 'wrong');
   const instrumentScore = INSTRUMENT && !!shownGrade && Number.isFinite(Number(shownGrade.awarded))
     && Number(shownGrade.possible) > 0 && Number(shownGrade.awarded) >= 0 && Number(shownGrade.awarded) <= Number(shownGrade.possible);
 
@@ -2933,10 +2935,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                                 </div>
                               )}
                               {/* The one place the reading's provenance is said, quietly. */}
-                              <details className="pf-how" data-photo-how>
+                              {!photoPageOn && <details className="pf-how" data-photo-how>
                                 <summary>{t('photo.how.title')}</summary>
                                 <p>{String(photoOCR.engine || '').startsWith('cloud') ? t('photo.how.server') : t('verdict.decodedOnDevice')} {t('verdict.photoReadOnServerNotice')}</p>
-                              </details>
+                              </details>}
                             </>
                           )}
                            {(photoOCR.phase === 'failed' || photoOCR.phase === 'unavailable') && (
@@ -2993,7 +2995,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               )}
               {photoPageOn && (
                 <React.Suspense fallback={null}>
-                  <MarkedPage input={awInput} source={{ kind: 'photo', src: photo, lines: photoPageLines }} texOf={texOf} scoreShown={instrumentScore} criteria={res?.methodCriteria} reading={pageReading} onCorrect={onRedo ? correctReadLine : null} />
+                  <MarkedPage input={awInput} howRead={`${String(photoOCR.engine || '').startsWith('cloud') ? t('photo.how.server') : t('verdict.decodedOnDevice')} ${t('verdict.photoReadOnServerNotice')}`} source={{ kind: 'photo', src: photo, lines: photoPageLines }} texOf={texOf} scoreShown={instrumentScore} criteria={res?.methodCriteria} reading={pageReading} onCorrect={onRedo ? correctReadLine : null} />
                 </React.Suspense>
               )}
               {photoSignInOpen && photoOCR.blockedKey === 'verdict.photoReadingSignIn' && (
@@ -3186,7 +3188,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               {t('tutor.help')}
             </button>
             {/* Help and "What went wrong?" are one row of quiet actions. */}
-            {showDiagnoseButton({ tutorEnabled, diagnostic, resolved, res: state.res, gradedRetry }) && MistakeDiagnosis && (() => {
+            {showDiagnoseButton({ tutorEnabled, diagnostic, resolved, res: state.res, gradedRetry }) && !crossShown && MistakeDiagnosis && (() => {
               const key = String(attempt?.submissionId || judged?.revision || question.id);
               return (
                 <button type="button" className={`btn btn-ghost btn-sm tutor-launch ${diagnoseFor === key ? 'on' : ''}`}
@@ -3227,7 +3229,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         {/* "What went wrong?" — where a wrong line or answer is shown, and only
             with the tutor on. It explains the engine's verdict; the mark above
             is the engine's and does not move (src/tutor/diagnoseGate.js). */}
-        {showDiagnoseButton({ tutorEnabled, diagnostic, resolved, res: state.res, gradedRetry }) && MistakeDiagnosis && (() => {
+        {showDiagnoseButton({ tutorEnabled, diagnostic, resolved, res: state.res, gradedRetry }) && !crossShown && MistakeDiagnosis && (() => {
           const attemptKey = String(attempt?.submissionId || judged?.revision || question.id);
           const judgedLines = (attempt?.lines?.length ? attempt.lines : judged?.lines) || [];
           const lines = (judgedLines.length ? judgedLines : (working ? working.split('\n') : []))

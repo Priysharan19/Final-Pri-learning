@@ -123,6 +123,9 @@ export async function turnOnServerReading(page, base) {
  * are not shown). Needs a marked page.
  */
 export async function readLines(page) {
+  // The readings of the page are under "About this reading", a closed disclosure to begin with.
+  const about = page.locator('[data-mp-about]');
+  if (await about.count() && !(await about.evaluate(d => d.open))) await about.locator('summary').click();
   const link = page.locator('[data-mp-see-page]');
   if (await link.count() && (await link.getAttribute('aria-expanded')) !== 'true') await link.click();
   return page.locator('[data-mp-reading]').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-text') || ''));

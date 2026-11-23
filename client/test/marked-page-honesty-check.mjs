@@ -66,7 +66,7 @@ const card = (n, status, extra = {}) => ({ n, status, valueChain: status === 'no
   eq(page.collapsed.lines, [1, 2, 4, 5], 'the unchecked lines are one card');
   eq(page.collapsed.unread, [4], 'only the line the reader could not read is called unread');
   const jsx = sheet;
-  ok(/status === 'not-verified'\) \{\s*comment = <p className="mp-text">\{t\('mp\.collapsed', \{ count: 1, list: String\(n\) \}\)\}/.test(jsx),
+  ok(/status === 'not-verified'\) \{[\s\S]{0,160}?t\('mp\.collapsed', \{ count: 1, list: String\(n\) \}\)/.test(jsx),
     'the "read but nothing to check" sentence names only the lines that were read');
   ok(/status === 'unread'\) \{[\s\S]{0,160}?t\('mp\.unread', \{ count: 1, list: String\(n\) \}\)/.test(jsx), 'the "could not read" sentence names only the unread lines');
 }

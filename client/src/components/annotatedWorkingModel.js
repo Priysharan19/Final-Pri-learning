@@ -15,6 +15,10 @@
 import { annotateWorking } from '../engine/stepJustify.js';
 
 const MAX_LINES = 40;
+// Optional per-line fields the engine may add: a specific comment (any line) and, on a wrong line, what changed, why it is wrong,
+// the line it comes from (1-based), a quick check and a closing sentence about what was kept. Absent: null, nothing invented.
+const clip = (v, n = 400) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, n) : null);
+const factsOf = l => ({ whatChanged: clip(l?.whatChanged), whyWrong: clip(l?.whyWrong), fromLine: Number.isInteger(l?.fromLine) && l.fromLine >= 1 ? l.fromLine : null, check: clip(l?.check), kept: clip(l?.kept) });
 
 /** 6, 7, 8 → "6–8"; 2, 4 → "2, 4". */
 export function lineRange(ns) {
@@ -95,7 +99,8 @@ export function buildAnnotatedWorking({ lines, stepReport, receipt = null, solut
       note: status === 'first-error' ? (l.note || null) : null,
       previousText: status === 'first-error' && i > 0 && report[i - 1]?.status === 'ok' ? texts[i - 1] : null,
       text: texts[i],
-      corrected: status === 'first-error' && typeof l?.corrected === 'string' && l.corrected.trim() ? l.corrected.trim().slice(0, 200) : null
+      corrected: status === 'first-error' && typeof l?.corrected === 'string' && l.corrected.trim() ? l.corrected.trim().slice(0, 200) : null,
+      comment: clip(l?.comment, 300), facts: status === 'first-error' ? factsOf(l) : null
     };
   });
 
@@ -152,7 +157,8 @@ function buildValueChainModel({ report: reportIn, stepReport, receipt, source, a
     start: false, startSide: null, rules: [], more: false, same: false, unnamed: false, followsFrom: null,
     diagnosis: l?.state === 'wrong' ? (l.diagnosis || null) : null, note: l?.state === 'wrong' || l?.state === 'given' || l?.state === 'incomplete' || l?.state === 'arithmetic' || l?.state === 'verified' ? (l.note || null) : null,
     previousText: null, text: String(l?.text ?? ''), restated: l?.state === 'given' && l?.solutionMatch === true, fact: l?.fact || null,
-    corrected: l?.state === 'wrong' && typeof l?.corrected === 'string' && l.corrected.trim() ? l.corrected.trim().slice(0, 200) : null
+    corrected: l?.state === 'wrong' && typeof l?.corrected === 'string' && l.corrected.trim() ? l.corrected.trim().slice(0, 200) : null,
+    comment: clip(l?.comment, 300), facts: l?.state === 'wrong' ? factsOf(l) : null
   }));
   const summaryOf = stepReport.summary || {};
   const unverified = cards.filter(c => c.status === 'not-verified' || c.status === 'unread').map(c => c.n);

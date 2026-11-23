@@ -1,5 +1,6 @@
 // The marked page's pure model: where each judged line sits on the student's own page, where its
 // comment goes, the one collapsed "not checked" card, and the header sentence. No DOM.
+import { buildAnnotatedWorking } from '../src/components/annotatedWorkingModel.js';
 import { boxesFromInk, boxesFromPhoto, alignCards, buildMarkedPage, commentItems, defaultLine, stateOf } from '../src/components/markedPageModel.js';
 
 let pass = 0; const fail = [];
@@ -89,5 +90,18 @@ ok(ci.every(i => typeof i.y === 'number'), 'every comment has a level when the p
 ok(Math.abs(ci.find(i => i.kind === 'collapsed').y - (boxes[2].y + boxes[2].h / 2)) < 1e-9, 'the collapsed card is level with the first line it speaks about');
 ok(commentItems(p8).every(i => i.y === null || i.kind === 'collapsed' && i.y === null), 'without geometry no comment claims a level');
 
+// ── the engine's optional per-line fields reach the cards, and only when present ─────────────────────────────
+{
+  const rep = { source: 'value-chain', firstBreak: 2, lines: [
+    { text: 'y=2x', status: 'ok', state: 'given', comment: 'Restates the question.' },
+    { text: 'y=3x', status: 'ok', state: 'verified' },
+    { text: 'y=4x', status: 'break', state: 'wrong', note: 'Wrong.', comment: 'Not equal to line 2.', whatChanged: 'a', whyWrong: 'b', corrected: 'y=5x', fromLine: 2, check: 'c', kept: 'd' }] };
+  const m = buildAnnotatedWorking({ lines: rep.lines.map(l => l.text), stepReport: rep });
+  eq(m.cards.map(c => c.comment), ['Restates the question.', null, 'Not equal to line 2.'], 'a line comment from the engine reaches its card; none is invented');
+  eq(m.cards[2].facts, { whatChanged: 'a', whyWrong: 'b', fromLine: 2, check: 'c', kept: 'd' }, 'the wrong line carries the engine\'s what changed, why, from line, quick check and kept');
+  eq([m.cards[2].corrected, m.cards[0].facts, m.cards[1].corrected, m.firstBreakIndex], ['y=5x', null, null, 2], 'a corrected line only on the wrong line; the first-break index is carried');
+  const bare = buildAnnotatedWorking({ lines: ['a', 'b'], stepReport: { source: 'value-chain', lines: [{ text: 'a', status: 'ok', state: 'verified' }, { text: 'b', status: 'break', state: 'wrong' }] } });
+  eq([bare.cards[1].facts, bare.cards[1].corrected, bare.firstBreakIndex], [{ whatChanged: null, whyWrong: null, fromLine: null, check: null, kept: null }, null, null], 'without the optional fields every one is null');
+}
 if (fail.length) { console.error(fail.map(f => `  · ${f}`).join('\n')); console.error(`MARKED PAGE MODEL: FAIL (${fail.length} of ${pass + fail.length})`); process.exit(1); }
 console.log(`MARKED PAGE MODEL: PASS — ${pass}/${pass} checks — line geometry for ink and photo, level comments, the one collapsed card, an honest header, no mark unless the server gave one`);

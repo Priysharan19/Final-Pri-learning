@@ -34,6 +34,7 @@ const EXPECT = {
   stationary: { statuses: ['checked', 'checked', 'condition', 'checked', 'checked', 'checked', 'checked', 'first-error'], sentence: 'Correct up to line 7. The first error is on line 8. 6 lines checked and correct. 1 line wrong.', mark: '0/3', selected: 8, word: 'Wrong', cross: 8 },
   mixed: { statuses: ['checked', 'unread', 'checked', 'not-verified', 'checked', 'checked'], sentence: 'The lines Pri could check are correct. The final answer is not. 4 lines checked and correct. 2 lines not checked.', mark: '0/3', selected: 1, word: 'Correct', cross: null },
   crossed: { statuses: ['checked', 'checked', 'condition', 'checked', 'not-verified', 'unread', 'not-verified', 'checked', 'first-error'], sentence: 'The first error is on line 9. 4 lines checked and correct. 1 line wrong. 3 lines not checked.', mark: '0/3', selected: 9, word: 'Wrong', cross: 9 },
+  product: { statuses: ['checked', 'checked', 'checked', 'checked', 'checked', 'checked', 'checked', 'checked', 'first-error'], sentence: 'Correct up to line 8. The first error is on line 9. 8 lines checked and correct. 1 line wrong.', mark: '0/3', selected: 9, word: 'Wrong', cross: 9 },
   wrongfinal: { statuses: ['checked', 'checked', 'condition', 'checked', 'checked', 'checked', 'checked'], sentence: 'The lines Pri could check are correct. The final answer is not. 6 lines checked and correct.', mark: '0/3', selected: 1, word: 'Correct', cross: null }
 };
 const WORDS = { checked: 'Correct', 'first-error': 'Wrong', condition: 'Context', 'not-verified': 'Not checked', unread: 'Not checked', follows: 'Not checked', incomplete: 'Not checked' };
@@ -88,7 +89,7 @@ const browser0 = await chromium.launch();
   ok(await pg.locator('[data-marked-page]').getAttribute('data-mp-selected') === '9' && /Wrong/.test(await pg.locator('[data-mp-detail]').innerText()), 'End goes to the last line');
   await pg.keyboard.press('Home'); await pg.keyboard.press('ArrowUp');
   ok(await pg.locator('[data-marked-page]').getAttribute('data-mp-selected') === '1', 'Home goes to line 1, and ArrowUp stops there');
-  ok(await pg.locator('[data-mp-pick]').evaluateAll(bs => bs.filter(b => b.tabIndex === 0).length) === 1, 'the list is one tab stop (roving), not one per line');
+  ok(await pg.locator('[data-mp-pick]').evaluateAll(bs => bs.filter(b => b.tabIndex === 0).length) === 0, 'the screen-reader list adds no tab stops');
   // keyboard on the markers
   await pg.locator('[data-mp-box="1"]').focus();
   await pg.keyboard.press('ArrowDown'); await pg.keyboard.press('ArrowDown');
@@ -105,6 +106,48 @@ const browser0 = await chromium.launch();
   // the panel is announced politely
   ok(await pg.locator('.mp-live').getAttribute('aria-live') === 'polite', 'the panel is a polite live region');
   await ctx.close();
+}
+{
+  // Decluttered: the summary and marks above the photo, everything about the reading in one disclosure beneath it, one stepper, no list of rows.
+  const ctx = await browser0.newContext({ viewport: { width: 1440, height: 900 } }); const pg = await ctx.newPage();
+  await pg.goto(`${url('crossed', 'photo', 'prithagoras', 'light')}&reading=1`, { waitUntil: 'networkidle' }); await pg.waitForSelector('[data-marked-page]');
+  ok(await pg.locator('.mp-head [data-mp-see-page], .mp-head [data-mp-photo-toggle]').count() === 0 && await pg.locator('[data-mp-about] [data-mp-see-page]').count() === 1 && await pg.locator('[data-mp-about] [data-mp-photo-toggle]').count() === 1, 'above the photo: the summary and marks only; the readings, the photo toggle and the note are in "About this reading"');
+  ok(await pg.locator('[data-mp-about]').evaluate(d => d.open === false) && /About this reading/.test(await pg.locator('[data-mp-about] summary').innerText()), 'the disclosure is closed to begin with');
+  const list = await pg.locator('.mp-comments').evaluate(o => { const r = o.getBoundingClientRect(); return { w: r.width, h: r.height }; });
+  ok(list.w <= 2 && list.h <= 2, 'the nine-row status list is not drawn: the markers are the navigation');
+  ok(/Line 9 of 9/.test(await pg.locator('[data-mp-step-of]').innerText()) && await pg.locator('[data-mp-step="next"]').isDisabled() && await pg.locator('[data-mp-step="prev"]').isEnabled(), 'a compact stepper says Line 9 of 9, with Next off at the end');
+  await pg.locator('[data-mp-step="prev"]').click();
+  ok(await pg.locator('[data-marked-page]').getAttribute('data-mp-selected') === '8' && /Line 8 of 9/.test(await pg.locator('[data-mp-step-of]').innerText()), 'Previous moves to line 8');
+  const box = await pg.locator('.mp-detail').evaluate(d => { const s = getComputedStyle(d); return { b: s.borderTopWidth, bg: s.backgroundColor }; });
+  ok(box.b === '0px' && box.bg === 'rgba(0, 0, 0, 0)', 'the panel is a calm column, not a box');
+  const q = await pg.evaluate(() => { const g = id => getComputedStyle(document.querySelector(`[data-mp-box="${id}"]`)); return { tick: g(1).borderTopColor, quiet: g(5).borderTopColor, quietOpacity: g(5).opacity, tickOpacity: g(1).opacity }; });
+  ok(q.quiet === 'rgba(0, 0, 0, 0)' && parseFloat(q.quietOpacity) < 1 && q.tick !== 'rgba(0, 0, 0, 0)' && q.tickOpacity === '1', 'a not-checked marker is quieter than a tick');
+  await pg.locator('[data-mp-about] summary').click();
+  await pg.locator('[data-mp-see-page]').click();
+  ok(await pg.locator('[data-mp-all] [data-mp-reading]').count() === 8 && await pg.locator('[data-mp-reading]').count() === 8, 'the whole-page reading lists each line Pri read once');
+  await ctx.close();
+}
+{
+  // The product-rule page: a specific comment on every correct line and a detailed annotation on the wrong one (SYNTHETIC report).
+  for (const [w, h] of [[1440, 900], [390, 844]]) {
+    const ctx = await browser0.newContext({ viewport: { width: w, height: h } }); const pg = await ctx.newPage();
+    await pg.goto(`${url('product', 'photo', 'prithagoras', 'light')}`, { waitUntil: 'networkidle' }); await pg.waitForSelector('[data-marked-page]');
+    const parts = await pg.evaluate(() => [...document.querySelectorAll('[data-mp-detail] [data-mp-fact], [data-mp-detail] [data-mp-kept]')].map(e => [e.getAttribute('data-mp-fact') || 'kept', e.innerText.replace(/\s+/g, ' ').trim()]));
+    ok(JSON.stringify(parts.map(x => x[0])) === JSON.stringify(['from', 'read', 'whatChanged', 'whyWrong', 'corrected', 'check', 'kept']), `${w}: the wrong line reads in order: the line before, the line as read, what changed, why, corrected, quick check, kept (${parts.map(x => x[0])})`);
+    ok(/^From line 8/.test(parts[0][1]) && /How Pri read/.test(parts[1][1]) && /What changed/.test(parts[2][1]) && /Why it is wrong/.test(parts[3][1]) && /Corrected line/.test(parts[4][1]) && /Quick check/.test(parts[5][1]) && /only the last collecting step/.test(parts[6][1]), `${w}: each part carries its label and the engine's words`);
+    const order = await pg.evaluate(() => [...document.querySelectorAll('[data-mp-detail] > *')].map(e => e.getBoundingClientRect().top));
+    ok(order.every((t, i, a) => i === 0 || t >= a[i - 1]), `${w}: the parts run top to bottom in that order`);
+    const fix = await pg.evaluate(() => ({ fix: parseFloat(getComputedStyle(document.querySelector('[data-mp-corrected]')).fontSize), from: parseFloat(getComputedStyle(document.querySelector('[data-mp-from]')).fontSize), typeset: document.querySelectorAll('[data-mp-corrected] .katex, [data-mp-from] .katex').length }));
+    ok(fix.fix > fix.from && fix.typeset >= 2, `${w}: the corrected line is typeset and visually primary over the line it came from`);
+    ok(await pg.locator('[data-mp-detail] [data-mp-why-error]').count() === 1 && await pg.locator('[data-mp-box="9"]').getAttribute('aria-label') === 'Line 9, wrong', `${w}: the cross is line 9`);
+    await pg.locator('[data-mp-box="8"]').click();
+    const d8 = await pg.locator('[data-mp-detail]').innerText();
+    ok(/Correct/.test(d8) && /Correct expansion: 2x\s*\(x\s*-\s*1\)/.test(d8.replace(/\s+/g, ' ')) || /Correct expansion/.test(d8), `${w}: a correct line shows the engine's specific comment as its detail`);
+    ok(await pg.locator('[data-mp-detail] [data-mp-fact]').count() === 0, `${w}: a correct line has no wrong-line parts`);
+    for (let n = 1; n <= 8; n++) { await pg.locator(`[data-mp-box="${n}"]`).click(); if (!(await pg.locator('[data-mp-detail] [data-mp-why]').count())) { ok(false, `${w}: line ${n} has a specific comment`); break; } }
+    ok(true, `${w}: every correct line was walked`);
+    await ctx.close();
+  }
 }
 {
   // The engine's optional facts: a first-break index and a corrected line. Shown when present, absent without them.
@@ -141,6 +184,7 @@ try {
       await page.goto(url(c, source, edition, theme), { waitUntil: 'networkidle' });
       await page.waitForSelector('[data-marked-page]', { timeout: 30000 });
       await page.waitForTimeout(150);
+      if (source === 'photo') await page.locator('[data-mp-about] summary').click();
       const e = EXPECT[c];
       const got = await page.evaluate(() => {
         const sec = document.querySelector('[data-marked-page]');
@@ -181,7 +225,7 @@ try {
       } else ok(got.under.length === 0, `${where}: no cross, no underline`);
       if (c === 'buoy') ok(!got.rows.some(x => x.status === 'first-error') && !got.markers.some(b => b.status === 'first-error'), `${where}: no error shown on the buoy working`);
       // every row and marker is a word and an icon, never colour alone; one tab stop in the list; one named list
-      ok(got.rows.every(x => x.hasIcon && x.text.trim().length > 3) && got.rows.filter(x => x.tab === 0).length === 1, `${where}: every row has an icon and words; the list is one tab stop`);
+      ok(got.rows.every(x => x.hasIcon && x.text.trim().length > 3) && got.rows.every(x => x.tab === -1), `${where}: the screen-reader list has an icon and words on every row and adds no tab stops`);
       ok(got.list && got.headings.length === 1, `${where}: the lines are one named list under one heading`);
       ok(got.overflow <= 0, `${where}: no horizontal scroll (${got.overflow}px)`);
       // markers: one real button per judged line, an icon and the number, named with the state
@@ -247,7 +291,7 @@ try {
           const s = getComputedStyle(el);
           if (/gradient/.test(s.backgroundImage)) bad.push('gradient');
           if (s.backdropFilter && s.backdropFilter !== 'none') bad.push('blur');
-          if (el.matches('.mp-detail, .mp-comments') && (parseFloat(s.borderLeftWidth) !== parseFloat(s.borderTopWidth) || parseFloat(s.borderTopWidth) < 1)) bad.push('left-border card or no hairline');
+          if (el.matches('.mp-detail') && (parseFloat(s.borderTopWidth) > 0 || parseFloat(s.borderLeftWidth) > 0 || s.backgroundColor !== 'rgba(0, 0, 0, 0)')) bad.push('a box round the panel');
           if (/opacity|transform|all/.test(s.transitionProperty) && parseFloat(s.transitionDuration) > 0 && el.matches('.mp-marker, .mp-detail, .mp-pick')) bad.push('animated');
         }
         return [...new Set(bad)].concat(/—/.test(sec.innerText) ? ['em dash'] : []).concat(/\p{Extended_Pictographic}/u.test(sec.innerText) ? ['emoji'] : []);

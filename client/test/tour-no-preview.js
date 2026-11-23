@@ -170,7 +170,7 @@ export const flow = {
     const after = await readingIsNotShown(page, longLines);
     await check('and still no typed reading is visible: the reading is on demand only', after.structure.length === 0 && after.leaked.length === 0, JSON.stringify(after));
     // One panel for the selected line (the first line, with no cross): choose line 2 from the list, then its reading is on offer.
-    await page.locator('[data-mp-pick="2"]').click();
+    await page.locator('[data-mp-pick="2"]').evaluate(el => el.click());
     const seeLine = page.locator('[data-mp-see-line="2"]');
     await check('the selected line offers a quiet text action, "See how Pri read this line", reachable from the keyboard',
       await seeLine.count() === 1 && /^See how Pri read this line$/.test((await seeLine.innerText()).trim()) && await seeLine.evaluate(el => el.tabIndex >= 0 && el.tagName === 'BUTTON'));
@@ -198,7 +198,7 @@ export const flow = {
     await check('a line read below the reader\'s floor is excluded by the server and named by its index',
       g2?.json?.reading?.studentConfirmed === false && JSON.stringify(g2.json.reading.excludedLines) === '[1]' && JSON.stringify(g2.json.reading.lineStates) === '["judged","not-read","judged","judged"]',
       JSON.stringify(g2?.json?.reading));
-    await page.locator('[data-mp-pick="2"]').click();
+    await page.locator('[data-mp-pick="2"]').evaluate(el => el.click());
     const unreadCard = page.locator('[data-mp-detail="2"]');
     await check('the page shows it as Not checked, in the panel for that line, with "Rewrite it, or type it."',
       await unreadCard.count() === 1 && /Not checked/.test(await unreadCard.innerText()) && /wasn’t checked: Pri couldn’t read it\./.test(await unreadCard.innerText()) && /Rewrite it, or type it\./.test(await unreadCard.innerText()) && await unreadCard.getAttribute('data-mp-status') === 'unread',

@@ -128,7 +128,7 @@ function Sheet({ source, geometry, page, selected, pick, onKey, markersRef, t, c
  * source: { kind: 'ink', strokes } or { kind: 'photo', src, lines } where `lines` are the judged
  * lines in order (each may carry the reader's normalised `box`). The geometry is worked out here.
  */
-export default function MarkedPage({ input, source, texOf = s => s, markReady = true, scoreShown = false, criteria = null, approved, reading = null, onCorrect = null }) {
+export default function MarkedPage({ input, source, texOf = s => s, markReady = true, scoreShown = false, criteria = null, approved, reading = null, onCorrect = null, howRead = '' }) {
   const t = useT();
   const { language } = useLanguage();
   // The engine's own commentary from its structured facts (engine/lineCommentary.js): null keeps the engine's sentence as it was.
@@ -184,7 +184,9 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
   const textOf = n => { const l = reading?.lines?.[n - 1]; return typeof l === 'string' ? l : String(l?.text ?? ''); };
   // The reader's own TeX for line n, when it has one for the line as shown.
   const latexOf = n => { const l = reading?.lines?.[n - 1]; return l && typeof l === 'object' && typeof l.latex === 'string' && l.latex ? l.latex : null; };
-  const lineOpen = n => showAll || shown.has(n);
+  const lineOpen = n => shown.has(n);
+  // With the whole-page list open, that list carries the readings; the panel's own are not marked a second time.
+  const readAttr = n => (showAll ? {} : { 'data-mp-reading': n });
   const toggleLine = n => setShown(prev => { const next = new Set(prev); if (next.has(n)) next.delete(n); else next.add(n); return next; });
   // One line's reading, on demand, with Edit. A correction marks the page again (the caller's business).
   // `inline`: the reading is the panel's own "How Pri read this line" (a wrong line), so there is no second link to open it, only Edit.
@@ -201,8 +203,8 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
             <>
               {inline && <p className="mp-fact-l">{t('mp.readAs')}</p>}
               {text.trim()
-                ? <p className="mp-expr" data-mp-reading={n} data-text={text} aria-label={t('mp.readingOf', { n })}><Typeset text={text} texOf={lineOf} tex={latexOf(n)} /></p>
-                : <p className="mp-text" data-mp-reading={n}>{t('mp.readingBlank')}</p>}
+                ? <p className="mp-expr" {...readAttr(n)} data-text={text} aria-label={t('mp.readingOf', { n })}><Typeset text={text} texOf={lineOf} tex={latexOf(n)} /></p>
+                : <p className="mp-text" {...readAttr(n)}>{t('mp.readingBlank')}</p>}
               {onCorrect && !isEditing && (
                 <button type="button" className="mp-link" data-mp-edit-line={n} onClick={() => setEditing({ line: n, text })}>{t('mp.edit')}</button>
               )}
@@ -222,53 +224,67 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
     );
   };
 
-  // The one panel: the selected line, in words.
+  // The one panel: the selected line, in words. No box round it, no list of rows beside it: the markers on the page are the navigation.
+  const lines = page.lines;
+  const selIndex = lines.findIndex(l => l.n === selected);
+  const step = d => { const to = lines[selIndex + d]; if (to) pick(to.n); };
+  const textOfLine = n => String(lines.find(l => l.n === n)?.card?.text ?? '');
+  const field = (key, label, body, extra = '') => (
+    <div className={`mp-fact ${extra}`} data-mp-fact={key}><p className="mp-fact-l">{label}</p>{body}</div>
+  );
   const detail = () => {
-    const it = page.lines.find(l => l.n === selected);
+    const it = lines[selIndex];
     if (!it) return null;
     const { card, n, status } = it;
     const st = STATE[status] || STATE['not-verified'];
     const state = stateOf(status);
+    const facts = card.facts || {};
+    // The engine's own specific comment where it gave one; else the sentence built from its structured facts.
     let comment = null;
     if (status === 'checked' || status === 'condition') {
       const said = say(card);
-      const why = said ? said.text : whyOf(card, t);
-      if (why) comment = <p className="mp-text" data-mp-why data-mp-said={said ? said.kind : undefined}>{said ? <EngineComment text={why} lang={language} /> : whyIsEngine(card) ? <EngineComment text={why} /> : why}</p>;
+      const why = card.comment || (said ? said.text : whyOf(card, t));
+      if (why) comment = <p className="mp-text" data-mp-why data-mp-said={said && !card.comment ? said.kind : undefined}>{card.comment || said || whyIsEngine(card) ? <EngineComment text={why} lang={card.comment ? 'en' : language} /> : why}</p>;
     } else if (status === 'first-error') {
       const saidCross = say(card);
       const sentence = firstSentence(card.diagnosis?.message || card.diagnosis?.title || card.note || '');
-      comment = <p className="mp-text mp-sentence-1" data-mp-why-error>{saidCross ? <EngineComment text={saidCross.text} lang={language} /> : sentence ? (sentence.includes('$') && dollarsBalanced(sentence) ? <EngineComment text={sentence} /> : <Typeset text={sentence} texOf={texOf} />) : (n > 1 ? t('aw.body.firstError', { n: n - 1 }) : t('aw.body.firstErrorStart'))}</p>;
+      const text = card.comment || (saidCross ? saidCross.text : '');
+      comment = <p className="mp-text mp-sentence-1" data-mp-why-error>{text ? <EngineComment text={text} lang={language} /> : sentence ? (sentence.includes('$') && dollarsBalanced(sentence) ? <EngineComment text={sentence} /> : <Typeset text={sentence} texOf={texOf} />) : (n > 1 ? t('aw.body.firstError', { n: n - 1 }) : t('aw.body.firstErrorStart'))}</p>;
     } else if (status === 'unread') {
       comment = <><p className="mp-text" data-mp-unread={String(n)}>{t('mp.unread', { count: 1, list: String(n) })}</p><p className="mp-text mp-how" data-mp-unread-how>{t('mp.unreadHow')}</p></>;
     } else if (status === 'not-verified') {
-      comment = <p className="mp-text">{t('mp.collapsed', { count: 1, list: String(n) })}</p>;
+      comment = <p className="mp-text">{card.comment ? <EngineComment text={card.comment} /> : t('mp.collapsed', { count: 1, list: String(n) })}</p>;
     } else {
-      const body = <CardBody card={card} model={model} t={t} />;
-      comment = <div className="mp-text">{body}</div>;
+      comment = <div className="mp-text">{card.comment ? <p><EngineComment text={card.comment} /></p> : <CardBody card={card} model={model} t={t} />}</div>;
     }
-    const inlineRead = status === 'first-error' && !!reading;
-    const showRead = (status === 'first-error' && !reading) || status === 'follows';
+    const wrong = status === 'first-error';
+    const inlineRead = wrong && !!reading;
+    const showRead = (wrong && !reading) || status === 'follows';
+    const from = wrong ? (facts.fromLine && facts.fromLine < n ? facts.fromLine : n > 1 ? n - 1 : null) : null;
+    const fromText = from ? textOfLine(from) : '';
     return (
       <div className="mp-detail" data-mp-detail={n} data-mp-status={status} ref={detailRef}>
+        <div className="mp-stepper" data-mp-stepper>
+          <span className="mp-step-of" data-mp-step-of>{t('mp.stepOf', { n, total: lines.length })}</span>
+          <span className="mp-step-btns">
+            <button type="button" className="mp-link" data-mp-step="prev" disabled={selIndex <= 0} onClick={() => step(-1)}>{t('mp.prev')}</button>
+            <button type="button" className="mp-link" data-mp-step="next" disabled={selIndex >= lines.length - 1} onClick={() => step(1)}>{t('mp.next')}</button>
+          </span>
+        </div>
         <p className="mp-state" data-mp-state={state}>
-          <Icon name={st.icon} size={14} />
-          <span className="mp-state-n">{t('mp.line', { n })}</span>
+          <Icon name={st.icon} size={16} />
           <b>{t(STATE_WORD[state])}</b>
+          <span className="mp-state-n">{t('mp.line', { n })}</span>
         </p>
-        {comment}
-        {showRead && card.text && (
-          <div className="mp-fact" data-mp-fact="read">
-            <p className="mp-fact-l">{t('mp.readAs')}</p>
-            <p className="mp-expr" data-mp-expr><Typeset text={card.text} texOf={lineOf} tex={textOf(n).replace(/\s+/g, '') === String(card.text).replace(/\s+/g, '') ? latexOf(n) : null} /></p>
-          </div>
-        )}
+        {wrong && fromText && field('from', t('mp.from', { n: from }), <p className="mp-expr mp-prev" data-mp-from><Typeset text={fromText} texOf={lineOf} /></p>)}
         {inlineRead && readingOfLine(n, true)}
-        {status === 'first-error' && card.corrected && (
-          <div className="mp-fact" data-mp-fact="corrected">
-            <p className="mp-fact-l">{t('mp.corrected')}</p>
-            <p className="mp-expr" data-mp-corrected><Typeset text={card.corrected} texOf={lineOf} /></p>
-          </div>
-        )}
+        {showRead && card.text && field('read', t('mp.readAs'), <p className="mp-expr" data-mp-expr><Typeset text={card.text} texOf={lineOf} tex={textOf(n).replace(/\s+/g, '') === String(card.text).replace(/\s+/g, '') ? latexOf(n) : null} /></p>)}
+        {comment}
+        {wrong && facts.whatChanged && field('whatChanged', t('mp.whatChanged'), <p className="mp-text"><EngineComment text={facts.whatChanged} lang="en" /></p>)}
+        {wrong && facts.whyWrong && field('whyWrong', t('mp.whyWrong'), <p className="mp-text"><EngineComment text={facts.whyWrong} lang="en" /></p>)}
+        {wrong && card.corrected && field('corrected', t('mp.corrected'), <p className="mp-expr mp-fix" data-mp-corrected><Typeset text={card.corrected} texOf={lineOf} /></p>, 'is-fix')}
+        {wrong && facts.check && field('check', t('mp.quickCheck'), <p className="mp-text"><EngineComment text={facts.check} lang="en" /></p>)}
+        {wrong && facts.kept && <p className="mp-text mp-kept" data-mp-kept><EngineComment text={facts.kept} lang="en" /></p>}
         {reading && status !== 'unread' && !inlineRead && readingOfLine(n)}
       </div>
     );
@@ -278,39 +294,50 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
     <section className="mp" aria-labelledby={`${uid}-h`} data-marked-page data-mp-source={source.kind} data-mp-aligned={page.aligned ? 'true' : 'false'} data-mp-selected={selected}>
       <h3 className="sr-only" id={`${uid}-h`}>{t('mp.title')}</h3>
       <Header page={page} t={t} hasTable={!!table} scoreShown={scoreShown} />
-      {reading && (
-        <p className="mp-read-all">
-          <button type="button" className="mp-link" data-mp-see-page aria-expanded={showAll} onClick={() => setShowAll(v => !v)}>{t(showAll ? 'mp.hidePage' : 'mp.seePage')}</button>
-        </p>
-      )}
       <div className="mp-body">
         <figure className="mp-page">
           <Sheet source={source} geometry={geometry} page={page} selected={selected} pick={pick} onKey={onKey(markersRef)} markersRef={markersRef} t={t} cleaned={cleaned} />
-          {source.kind === 'photo' && (
-            <figcaption className="mp-photo-note">
-              <button type="button" className="mp-link" data-mp-photo-toggle aria-pressed={!cleaned} onClick={() => setCleaned(v => !v)}>{t(cleaned ? 'mp.showOriginal' : 'mp.showCleaned')}</button>
-              {cleaned && <span> {t('mp.cleanedNote')}</span>}
-              {page.aligned && <span data-mp-approx-note> {t('mp.photoNote')}</span>}
-            </figcaption>
-          )}
+          {/* Everything about how the page was read is one quiet disclosure under the photo. */}
+          <details className="mp-about" data-mp-about>
+            <summary>{t('mp.about')}</summary>
+            <div className="mp-about-in">
+              {source.kind === 'photo' && (
+                <p className="mp-photo-note">
+                  <button type="button" className="mp-link" data-mp-photo-toggle aria-pressed={!cleaned} onClick={() => setCleaned(v => !v)}>{t(cleaned ? 'mp.showOriginal' : 'mp.showCleaned')}</button>
+                  {cleaned && <span> {t('mp.cleanedNote')}</span>}
+                  {page.aligned && <span data-mp-approx-note> {t('mp.photoNote')}</span>}
+                </p>
+              )}
+              {howRead && <p className="mp-photo-note" data-mp-how>{howRead}</p>}
+              {reading && (
+                <p className="mp-read-all">
+                  <button type="button" className="mp-link" data-mp-see-page aria-expanded={showAll} onClick={() => setShowAll(v => !v)}>{t(showAll ? 'mp.hidePage' : 'mp.seePage')}</button>
+                </p>
+              )}
+              {reading && showAll && (
+                <ol className="mp-all" data-mp-all>
+                  {lines.filter(l => l.status !== 'unread').map(l => {
+                    const text = textOf(l.n);
+                    return <li key={l.n}><span className="mp-all-n">{t('mp.line', { n: l.n })}</span>{text.trim() ? <span className="mp-expr" data-mp-reading={l.n} data-text={text}><Typeset text={text} texOf={lineOf} tex={latexOf(l.n)} /></span> : <span data-mp-reading={l.n}>{t('mp.readingBlank')}</span>}</li>;
+                  })}
+                </ol>
+              )}
+            </div>
+          </details>
         </figure>
         <div className="mp-panel">
           <div className="mp-live" aria-live="polite" aria-atomic="false">{detail()}</div>
-          <ol className="mp-comments" ref={listRef} aria-label={t('mp.comments')} onKeyDown={onKey(listRef)}>
-            {page.lines.map(l => {
-              const st = STATE[l.status] || STATE['not-verified'];
-              const word = t(STATE_WORD[stateOf(l.status)]);
-              return (
-                <li key={l.n} className={`mp-card is-${l.status}${selected === l.n ? ' is-active' : ''}`} data-mp-card={l.n} data-mp-status={l.status}>
-                  <button type="button" className="mp-pick" data-mp-pick={l.n} aria-current={selected === l.n ? 'true' : undefined}
-                    tabIndex={selected === l.n ? 0 : -1} onClick={() => pick(l.n)}>
-                    <Icon name={st.icon} size={14} />
-                    <span className="mp-row-n">{t('mp.line', { n: l.n })}</span>
-                    <span className="mp-row-w">{word}</span>
-                  </button>
-                </li>
-              );
-            })}
+          {/* The screen-reader list of every line, in order; sighted navigation is the markers and the stepper. */}
+          <ol className="mp-comments sr-only" ref={listRef} aria-label={t('mp.comments')} onKeyDown={onKey(listRef)}>
+            {lines.map(l => (
+              <li key={l.n} className={`mp-card is-${l.status}${selected === l.n ? ' is-active' : ''}`} data-mp-card={l.n} data-mp-status={l.status}>
+                <button type="button" className="mp-pick" data-mp-pick={l.n} aria-current={selected === l.n ? 'true' : undefined} tabIndex={-1} onClick={() => pick(l.n)}>
+                  <Icon name={(STATE[l.status] || STATE['not-verified']).icon} size={14} />
+                  <span className="mp-row-n">{t('mp.line', { n: l.n })}</span>
+                  <span className="mp-row-w">{t(STATE_WORD[stateOf(l.status)])}</span>
+                </button>
+              </li>
+            ))}
           </ol>
         </div>
       </div>
