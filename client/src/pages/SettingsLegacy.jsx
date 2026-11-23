@@ -19,6 +19,10 @@ import { offersCourse, offeredLanguages, offeredYears, pathwayOffered } from '..
 import Glyph from '../instrument/Glyph.jsx';
 import { sellsPremium, useSaleAvailable } from '../paywall/useSaleAvailable.js';
 import { resetTour } from '../lib/firstRunTour.js';
+import { TEXT_SIZES, applyTextSize, readTextSize } from '../lib/textSize.js';
+import { MathText } from '../lib/latex.jsx';
+
+const TEXT_SIZE_LABELS = { standard: 'settings.textSize.standard', large: 'settings.textSize.large', larger: 'settings.textSize.larger', largest: 'settings.textSize.largest' };
 
 // The instrument build draws a glyph beside each section name (s9); the
 // flag-off build renders exactly what it did.
@@ -388,6 +392,7 @@ export default function Settings() {
   const t = useT();
   const goTo = useNavigate();
   const [storageInfo, setStorageInfo] = useState(null);
+  const [textSize, setTextSize] = useState(() => readTextSize());   // a device setting, never sent to the server
   // Where Premium is not on sale (the edition has no provider, or its server says it is not selling) there is no
   // plan to show: the Plan section, with its plan wording and the line about what Premium adds, is not drawn.
   const sells = sellsPremium(useSaleAvailable());
@@ -647,6 +652,18 @@ export default function Settings() {
               ))}
             </div>
             <p className="muted" style={{ marginTop: 10 }}>{t(user.theme === 'system' ? 'settings.themeSystemNote' : 'settings.themeNote')}</p>
+            <div role="radiogroup" aria-labelledby="text-size-label" style={{ marginTop: 18 }}>
+              <h3 id="text-size-label" style={{ marginBottom: 8 }}>{t('settings.textSize')}</h3>
+              <div className="seg text-size-seg">
+                {TEXT_SIZES.map(size => (
+                  <button key={size} type="button" role="radio" aria-checked={textSize === size} className={textSize === size ? 'on' : ''}
+                    data-text-size-option={size} onClick={() => setTextSize(applyTextSize(size))}>{t(TEXT_SIZE_LABELS[size])}</button>
+                ))}
+              </div>
+              <p className="muted" style={{ marginTop: 10 }}>{t('settings.textSizeNote')}</p>
+              <p className="textsize-preview" data-testid="text-size-preview">{t('settings.textSizePreview')} <MathText text={'$\\frac{x^2+3x}{2}=7$'} /></p>
+              <p className="sr-only" role="status" aria-live="polite">{t('settings.textSizeSet', { size: t(TEXT_SIZE_LABELS[textSize]) })}</p>
+            </div>
           </div>
 
           {/* ── Courses ── */}

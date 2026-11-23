@@ -56,3 +56,35 @@ export function tourNoteTop({ anchor, side, h, vh, minTop = 0, avoid = null }) {
   }
   return Math.min(hi, Math.max(lo, top));
 }
+
+/**
+ * Where a note sits when something must stay uncovered (the question, the dot-point picker). Rects are viewport pixels
+ * ({ left, top, right, bottom }). The note's usual place is tried first, so a screen where nothing is in the way is
+ * exactly as before; then below, above, right and left of the control, each shifted along its axis in steps. The first
+ * place that is wholly on screen (below `minTop`, inside `edge`) and overlaps none of `avoids` wins; when there is none,
+ * the on-screen place that covers the least of them, and then the nearest to the control.
+ */
+export function tourNotePlace({ anchor, w, h, vw, vh, minTop = 0, avoids = [], usual, edge = TOUR_EDGE, gap = TOUR_GAP }) {
+  const lo = Math.max(edge, minTop);
+  const fits = c => c.left >= edge && c.left + w <= vw - edge && c.top >= lo && c.top + h <= vh - edge;
+  const covered = c => avoids.reduce((sum, q) => {
+    const x = Math.min(c.left + w, q.right) - Math.max(c.left, q.left);
+    const y = Math.min(c.top + h, q.bottom) - Math.max(c.top, q.top);
+    return x > 1 && y > 1 ? sum + x * y : sum;
+  }, 0);
+  const apart = c => Math.max(0, anchor.left - (c.left + w), c.left - anchor.right) + Math.max(0, anchor.top - (c.top + h), c.top - anchor.bottom);
+  const out = [usual];
+  const steps = [0, 1, -1, 2, -2, 3, -3, 4, -4, 6, -6, 8, -8];
+  const clampL = l => Math.max(edge, Math.min(l, vw - w - edge));
+  const clampT = t => Math.max(lo, Math.min(t, vh - h - edge));
+  for (const k of steps) out.push({ left: clampL(anchor.left + k * 48), top: anchor.bottom + gap });
+  for (const k of steps) out.push({ left: clampL(anchor.left + k * 48), top: anchor.top - h - gap });
+  for (const k of steps) out.push({ left: anchor.right + gap, top: clampT(anchor.top + k * 40) });
+  for (const k of steps) out.push({ left: anchor.left - w - gap, top: clampT(anchor.top + k * 40) });
+  const ok = out.filter(fits);
+  const near = ok.filter(c => apart(c) <= 24);
+  const clear = near.find(c => covered(c) === 0) || ok.find(c => covered(c) === 0);
+  if (clear) return clear;
+  const pool = near.length ? near : (ok.length ? ok : [usual]);
+  return pool.reduce((best, c) => (covered(c) < covered(best) || (covered(c) === covered(best) && apart(c) < apart(best)) ? c : best), pool[0]);
+}

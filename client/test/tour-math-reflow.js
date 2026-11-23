@@ -25,7 +25,8 @@
 import { pathToFileURL } from 'node:url';
 
 export const SAMPLE_PER_WIDTH = 4;
-const WIDTHS = [['375 pt iPhone at 200%', 188, 334], ['430 pt iPhone at 200%', 215, 466]];
+// The last case is the Text size setting at Largest (1.4x zoom of the content, src/lib/textSize.js) on a 375 pt iPhone.
+const WIDTHS = [['375 pt iPhone at 200%', 188, 334], ['430 pt iPhone at 200%', 215, 466], ['375 pt iPhone, Text size Largest', 375, 812, 'largest']];
 const CHAPTERS = ['c8-exponents', 'c7-exponents-powers', 'c10-polynomials'];
 
 export const MATH_AUDIT = () => {
@@ -65,7 +66,8 @@ export const flow = {
     await settle();
     const typeTab = page.getByRole('button', { name: 'Answer by typing' });
     const writeTab = page.getByRole('button', { name: 'Answer by handwriting' });
-    for (const [label, w, h] of WIDTHS) {
+    for (const [label, w, h, textSize] of WIDTHS) {
+      if (textSize) await page.addInitScript(size => { try { localStorage.setItem('pri.textSize', size); } catch { /* */ } }, textSize);
       await page.setViewportSize({ width: w, height: h });
       let sampled = 0;
       for (const sub of CHAPTERS) {

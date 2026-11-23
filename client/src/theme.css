@@ -2556,3 +2556,40 @@ html[data-edition=prithagoras] .legal-body pre, html[data-edition=prithagoras] .
   .tap-row > a { display: inline-flex; align-items: center; min-height: var(--tap-min); }
   summary.tap-row { display: list-item; min-height: 0; padding-block: 12px; }
 }
+
+/* Text size (src/lib/textSize.js). Absent at Standard, so nothing changes for
+   a student who never opens the setting. The content area scales as one: text,
+   spacing and controls together, like the browser's own zoom. */
+html[data-text-size] .content { zoom: var(--pri-text-scale, 1); }
+/* Viewport units inside a zoomed box are zoomed too (100vh would be 1.4 screens
+   tall), so the few page-height rules in the content divide the scale back out. */
+html[data-text-size] .ws-page { min-height: calc(100dvh / var(--pri-text-scale)); }
+html[data-text-size] .exam-page { min-height: calc(100vh / var(--pri-text-scale)); }
+html[data-text-size] .ws-split .ws-context { min-height: calc((100vh - 52px) / var(--pri-text-scale)); }
+html[data-text-size] .ws-split .ws-context { max-height: calc((100vh - 52px) / var(--pri-text-scale)); }
+html[data-text-size] .kmap-wrap { height: calc((100vh - 210px) / var(--pri-text-scale)); }
+html[data-text-size] .in-index { min-height: calc((100vh - 55px) / var(--pri-text-scale)); }
+html[data-text-size] .ow-ink { max-height: calc(70vh / var(--pri-text-scale)); }
+@media (min-width: 800px) { html[data-text-size] .mp-sheet-in { max-width: calc(((100vh - 260px) / var(--pri-text-scale)) * var(--mp-ar, 100)); } }
+/* A long address or code must wrap inside the narrower column, not widen the page. */
+html[data-text-size] .content { overflow-wrap: break-word; }
+/* A formula glued to its punctuation may not wrap at Standard; in the narrower scaled column it must. */
+html[data-text-size] .content .mt-glue { white-space: normal; }
+/* A display formula wider than the narrower column scrolls in its own box (as in .q-prompt) rather than widening the page. */
+html[data-text-size] .content .katex-display { overflow-x: auto; overflow-y: hidden; padding: 2px 0; }
+html[data-text-size] .content .answer-input { min-width: 0; max-width: 100%; }
+/* A label and its value stack instead of squeezing the label into a letter a line. */
+html[data-text-size] .content .set-row { flex-wrap: wrap; row-gap: 4px; }
+html[data-text-size] .content .set-k { flex: 0 1 auto; max-width: 100%; flex-wrap: wrap; }
+html[data-text-size] .content .set-k > * { min-width: 0; }
+/* The action bar keeps its labels on one line; its buttons wrap as a group instead. */
+html[data-text-size] .ws-actions .btn { white-space: nowrap; }
+html[data-text-size] .ws-actions-btns { flex-wrap: wrap; justify-content: flex-end; }
+/* Full-screen layers that live inside the content (the explain launcher and its dialog, drawers, the paper overlay, the
+   scrims, the lightbox) are fixed to the screen and sized in viewport units: they would be offset, clamped and 1.4 screens
+   tall under the zoom. They are taken out of it (an inverse zoom), so they are exactly their Standard selves. */
+html[data-text-size] .content :is(.pri-explain-launch, .pri-explain-backdrop, .drawer, .paper-overlay, .nt-cards-scrim, .pf-lightbox, .modal-scrim, .toast-wrap) { zoom: calc(1 / var(--pri-text-scale)); }
+html[data-text-size] .content .seg { flex-wrap: wrap; max-width: 100%; }
+html[data-text-size] .content .seg > button { white-space: nowrap; }
+@media (max-width: 560px) { .text-size-seg { display: grid; grid-template-columns: 1fr 1fr; } }
+.textsize-preview { margin-top: 12px; padding: 12px 14px; border: 1px solid var(--hairline-strong); border-radius: 5px; }
