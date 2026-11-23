@@ -46,6 +46,7 @@ export const EDITION_SUITES = [
   'client/test/syllabus-board-check.mjs',
   'client/test/nsw-bank-quality-check.mjs',
   'client/test/nsw-offer-check.mjs',
+  'client/test/topic-entries-check.mjs',
   'client/test/nsw-exams-check.mjs',
   'client/test/library-ui-check.mjs',
   'client/test/desk-clock-check.mjs',

@@ -5,6 +5,8 @@
 // by the mark predictor and the priorities engine.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { nswIssuedLevels } from './nswOffer.js';
+
 export const STRANDS = [
   'Number',
   'Algebra',
@@ -709,22 +711,22 @@ export const STREAM_CURRICULUM = {
         'Differentiate an inverse tangent',
         'Integrate to inverse trigonometric functions'
       ]),
-      T('me12-induction-forms', 'Proof by Induction: Original Forms', 'Algebra', 8, 'ME-P1', [
+      T('me12-induction-forms', 'Proof by Mathematical Induction', 'Algebra', 8, 'ME-P1', [
         'Find the base case and the next term in a series proof',
         'Find the constant in a divisibility step',
         'Use a result proved by induction'
       ]),
-      T('me12-vectors-forms', 'Vectors in Two Dimensions: Original Forms', 'Algebra', 8, 'ME-V1', [
+      T('me12-vectors-forms', 'Vectors in Two Dimensions', 'Algebra', 8, 'ME-V1', [
         'Dot product, magnitude, perpendicular and parallel vectors',
         'Scalar projection and the angle between vectors',
         'Position vectors in a parallelogram and on a line segment'
       ]),
-      T('me12-projectile-forms', 'Projectile Motion: Original Forms', 'Calculus', 8, 'ME-V1', [
+      T('me12-projectile-forms', 'Projectile Motion', 'Calculus', 8, 'ME-V1', [
         'Time of flight, range and greatest height from launch components',
         'Horizontal launches from a cliff',
         'Height at a time and the times at a given height'
       ]),
-      T('me12-binomial-forms', 'The Binomial Distribution: Original Forms', 'Statistics & Probability', 8, 'ME-S1', [
+      T('me12-binomial-forms', 'The Binomial Distribution', 'Statistics & Probability', 8, 'ME-S1', [
         'Mean, variance and standard deviation of a binomial variable',
         'Exact binomial probabilities and the complement rule',
         'Find the number of trials or the probability of success'
@@ -1104,3 +1106,136 @@ export function formDotpoints(subtopicId, difficulty) {
 export function difficultiesForDotpoint(id) {
   return dotpointById(id)?.forms ?? [];
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// Pri Learning · one entry per syllabus topic (Prithagoras)
+//
+// A `<id>-forms` subtopic is a second generator holding extra question forms for
+// the same syllabus topic as `<id>` (me12-induction and me12-induction-forms).
+// They are two generators and stay two everywhere the engine, the server and the
+// stored rows are concerned: a question is always issued from ONE of them, and
+// every attempt, rating, review and dot point is recorded under the generator
+// that issued it. What a student sees is ONE topic. This module is that seam:
+//
+//   - the entry id is the base id; a companion id (a stored row, a link, a task)
+//     is read as its base, at read time, with no migration;
+//   - the entry's dot points are the base's followed by the companion's, each
+//     keeping its own id, so the picker's ordinal is a position in that list;
+//   - practising an entry draws one side per question from a seed, in proportion to how many
+//     authored forms each side has at the level asked;
+//   - lists a student reads group the pair into one row at render time (counts added); nothing a computation reads
+//     moves: the adaptive engine, the planner, the predictor and the exports keep reading each generator's own rows.
+//
+// Pure: no I/O. The server is untouched: a question is still requested by the
+// generator it comes from, and the server still refuses any generator the
+// account and edition may not have (server/platform/practice.js).
+// ─────────────────────────────────────────────────────────────────
+export const COMPANION_SUFFIX = '-forms';
+
+// Every (base, companion) pair, found once: a `<id>-forms` subtopic whose base `<id>` exists.
+const COMPANION_OF = new Map(Object.keys(SUBTOPIC_BY_ID).filter(id => id.endsWith(COMPANION_SUFFIX) && SUBTOPIC_BY_ID[id.slice(0, -COMPANION_SUFFIX.length)]).map(c => [c.slice(0, -COMPANION_SUFFIX.length), c]));
+const BASE_OF = new Map([...COMPANION_OF].map(([b, c]) => [c, b]));
+const blank = ref => ref === undefined || ref === null || ref === '';
+
+/** The base id a companion generator belongs to, or null (not a companion, or no base exists). */
+export const baseOfCompanion = id => BASE_OF.get(id) || null;
+
+/** The entry a stored or requested subtopic id belongs to: its base when it is a companion, else itself. */
+export const entryIdOf = id => BASE_OF.get(id) || id;
+
+/** The companion generator of an entry, or null. */
+export const companionOf = entryId => COMPANION_OF.get(entryId) || null;
+
+/** The generators behind an entry: the base, then its companion when there is one. */
+export const sidesOf = entryId => (COMPANION_OF.has(entryId) ? [entryId, COMPANION_OF.get(entryId)] : [entryId]);
+
+/** Every (base, companion) pair in the catalogue. */
+export const entryPairs = () => [...COMPANION_OF].map(([base, companion]) => ({ base, companion }));
+
+/** The levels the server issues for any generator behind the entry, ascending. */
+export const entryIssuedLevels = entryId => [...new Set(sidesOf(entryId).flatMap(id => nswIssuedLevels(id)))].sort((a, b) => a - b);
+
+// ── Dot points ───────────────────────────────────────────────────────────────
+
+/** The entry's dot points: the base's, then the companion's, in order. The index is the picker's ordinal. */
+export const entryDotpoints = entryId => sidesOf(entryId).flatMap(id => dotpointsFor(id));
+
+/** `{ subtopic: entry id, dotpoint: entry ordinal | undefined }`. A numeric ref on a COMPANION id is that companion's own ordinal (what a link written before the merge meant); an id or key is looked up. */
+export function requestOnEntry(subtopicId, ref) {
+  const entry = entryIdOf(subtopicId);
+  if (blank(ref)) return { subtopic: entry, dotpoint: undefined };
+  if (/^\d+$/.test(String(ref))) return { subtopic: entry, dotpoint: Number(ref) + (entry !== subtopicId ? dotpointsFor(entry).length : 0) };
+  const dp = dotpointById(String(ref));
+  return { subtopic: entry, dotpoint: dp && entryIdOf(dp.subtopic) === entry ? entryDotpoints(entry).indexOf(dp) : ref };
+}
+
+/** The real (per-generator) dot point a request names, or null. */
+export function dotpointOfEntry(subtopicId, ref) {
+  const { subtopic, dotpoint } = requestOnEntry(subtopicId, ref);
+  return entryDotpoints(subtopic)[dotpoint] || null;
+}
+
+// ── Which generator answers a request ────────────────────────────────────────
+
+/**
+ * The generator that answers a request on an entry: `{ subtopic: generator id, dotpoint: that generator's own ordinal }`.
+ * A named dot point fixes its generator. Otherwise one side is drawn from `seed`, weighted by each side's form count
+ * across the levels asked (all issued levels when none is named), among the sides the server issues at that level.
+ * `seed` is a number in [0, 1): the same seed draws the same side.
+ * When no side issues the level the entry itself is returned and the caller's refusal explains it.
+ */
+export function resolveSide(entryId, { dotpoint = null, difficulty = null, seed = 0 } = {}) {
+  const named = dotpointOfEntry(entryId, dotpoint);
+  if (named) return { subtopic: named.subtopic, dotpoint: named.ordinal };
+  const d = blank(difficulty) ? null : Number(difficulty);
+  const sides = sidesOf(entryId).map(id => ({ id, levels: nswIssuedLevels(id).filter(l => d === null || l === d) })).filter(s => s.levels.length);
+  if (sides.length < 2) return { subtopic: sides[0]?.id || entryId, dotpoint: undefined };
+  // Weighted by each side's authored forms (the registry's cells) across the levels in play.
+  const weights = sides.map(s => Math.max(1, s.levels.reduce((n, l) => n + formDotpointOrdinals(s.id, l).length, 0)));
+  let pick = seed * weights.reduce((a, b) => a + b, 0);
+  const at = weights.findIndex(w => (pick -= w) < 0);
+  return { subtopic: sides[at < 0 ? sides.length - 1 : at].id, dotpoint: undefined };
+}
+
+// ── Scope (what a chooser or picker lists) ───────────────────────────────────
+
+// ── Presentation of lists that would show one topic twice ─────────────────────
+// Everything below only changes what is DISPLAYED. The engine, the planner, the predictor and the exports keep
+// reading each generator's own rows, so no number they use moves.
+
+/** A name or a bare subtopic id as a student should read it (a `-forms` id reads as its base topic's name). */
+export const displayName = value => SUBTOPIC_BY_ID[entryIdOf(value)]?.name ?? value;
+
+/** The list with the entries that share a key made one: `merge(kept, next)` decides what the one carries (the first by default). */
+export function groupBy(list, keyOf, merge = kept => kept) {
+  const out = [];
+  for (const x of list) {
+    const at = out.findIndex(o => keyOf(o) === keyOf(x));
+    if (at < 0) out.push(x); else out[at] = merge(out[at], x);
+  }
+  return out;
+}
+
+/** A list of catalogue subtopics with each `-forms` companion dropped where its base is listed. */
+export const collapseList = list => groupBy(list, s => entryIdOf(s.id));
+
+/**
+ * Rows of one list that belong to one topic become one (a topic and its `-forms` companion): counts added, mastery
+ * attempt-weighted, dot points joined, levels united. A row with a unique name is returned as it is.
+ */
+export const mergeRows = (rows, band) => groupBy(rows, r => entryIdOf(r.id), (g, r) => {
+  const n = g.attempts + r.attempts, mastery = n ? Math.round((g.mastery * g.attempts + r.mastery * r.attempts) / n) : g.mastery;
+  return {
+    ...g, attempts: n, correct: g.correct + r.correct, mastery, band: n ? band(mastery / 100) : g.band,
+    ...(g.evidence && {
+      evidence: Object.fromEntries(Object.keys(g.evidence).map(k => [k, g.evidence[k] + r.evidence[k]])),
+      dotpoints: [...g.dotpoints, ...r.dotpoints], requestable: [...new Set([...g.requestable, ...r.requestable])].sort(), due: g.due || r.due
+    })
+  };
+});
+
+/** One plan session per topic, type and day: the first stands, its minutes are the sum. */
+export const oneSessionPerTopic = sessions => groupBy(sessions, s => (s.name ? `${s.name}|${s.type}` : {}), (g, s) => ({ ...g, minutes: g.minutes + s.minutes, done: g.done && s.done }));
+
+/** The paper generator's topic options with a pair as ONE option: `{ id, ids: [every generator behind it that is listed], name }`. */
+export const groupOptionTopics = topics => groupBy((topics || []).map(x => ({ ...x, ids: [x.id] })), x => entryIdOf(x.id), (g, x) => ({ ...g, ids: [...g.ids, x.id] }));

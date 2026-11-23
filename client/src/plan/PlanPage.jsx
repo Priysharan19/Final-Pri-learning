@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { displayName, oneSessionPerTopic } from '../engine/curriculum.js';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../App.jsx';
 import { useT } from '../i18n/index.js';
@@ -70,11 +71,11 @@ export default function PlanPage() {
                 {d.afterExam && <span className="muted">{t('plan.afterExam')}</span>}
                 {d.rest && <span className="muted">{t('plan.restDay')}</span>}
                 {!d.rest && !d.examDay && !d.afterExam && !d.sessions.length && <span className="muted">{t('plan.noSessions')}</span>}
-                {d.sessions.map(s => (
+                {oneSessionPerTopic(d.sessions).map(s => (
                   <div key={s.id} data-plan-session={s.type} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                     <span className="tag" style={{ flex: 'none' }}>{t(SESSION_TYPE_KEYS[s.type])}</span>
                     <span style={{ flex: '1 1 160px', minWidth: 0 }}>
-                      <span style={{ fontWeight: 600 }}>{s.name || t('plan.type.mock')}</span>
+                      <span style={{ fontWeight: 600 }}>{displayName(s.name) || t('plan.type.mock')}</span>
                       {done.has(s.id) && <> {<span className="plan-started" data-plan-started><Icon name="check" size={13} />{t('plan.started')}</span>}</>}
                       <span className="muted" style={{ display: 'block', fontSize: 12.5 }}>{reasonText(t, s, v => formatDate(Date.parse(`${v}T12:00:00Z`), user))}</span>
                     </span>
