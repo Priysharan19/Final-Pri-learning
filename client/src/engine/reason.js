@@ -12,7 +12,7 @@
 // is allowed to certify an equation transformation as correct.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { parse, evaluate, numsClose, variablesOf } from './expr.js';
+import { parse, evaluate, numsClose, variablesOf, equationHoldsNear, containsInverseTrig } from './expr.js';
 
 const SAMPLE = [0.73, 1.31, -0.64, 2.17, -1.72, 0.37, 3.08, -2.29, 4.61, -4.13];
 const EPS = 1e-7;
@@ -283,11 +283,15 @@ function definiteExtraRoot(eq, meta) {
   const degree = polynomialEquationDegree(eq, variable);
   if (!Number.isInteger(degree) || degree < 1 || degree > 8) return null;
 
+  // an inverse trig value is an angle in radians or in degrees: a line true of the answer in degrees has another root in radians, which is the same angle
+  if (containsInverseTrig(eq) && expected.some(sol => equationHoldsNear(eq, variable, sol, meta.tol > 0 ? meta.tol : 0))) return null;
   const roots = [
     ...scanRoots(eq, variable, -40, 40, 0.25),
     ...scanRoots(eq, variable, -2000, 2000, 2)
   ];
-  return roots.find(root => !expected.some(sol => numsClose(root, sol, 2e-5))) ?? null;
+  // a root the question states rounded is the same root as the exact one within that rounding
+  const slack = Math.max(2e-5, meta.tol > 0 ? meta.tol : 0);
+  return roots.find(root => !expected.some(sol => numsClose(root, sol, slack))) ?? null;
 }
 
 function lostSolutionDiagnosis(variable, solution) {
@@ -417,7 +421,8 @@ export function assessEquationLine({ ast, previousAst = null, previousTrusted = 
 
   if (variable && solutions.length) {
     for (const sol of solutions) {
-      if (!equationHoldsAt(ast, variable, sol)) {
+      // a root the question states rounded (meta.tol) is held to within that rounding
+      if (!equationHoldsAt(ast, variable, sol) && !equationHoldsNear(ast, variable, sol, meta.tol > 0 ? Math.min(meta.tol, 0.05 * Math.max(1, Math.abs(sol))) : 0)) {
         return {
           status: 'break', trusted: false,
           note: `This is the line where it goes wrong: ${variable} = ${sol} solves the original problem but no longer satisfies this equation.`,
