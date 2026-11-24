@@ -15,7 +15,7 @@
 // image ships — see Dockerfile and production-runtime-image-check.mjs). It
 // must never import a server module: the worker has no store and no secrets.
 import { derivedMetaOff } from '../../client/src/engine/derivedMetaOff.js';
-import { checkAnswer, stepCheck, methodMarks, claimFreeReport } from '../../client/src/engine/checker.js';
+import { checkAnswer, stepCheck, methodMarks, claimFreeReport, tickRejections } from '../../client/src/engine/checker.js';
 import { checkBankAnswer } from './qbankMarking.js';
 import { markObjective, markMultiCorrect } from '../../client/src/engine/indiaExams.js';
 import { markMatrixMatch } from '../../client/src/engine/matrixMatch.js';
@@ -45,6 +45,29 @@ import { answerForm, effectiveSymbols, firstFinalAttempt, planGivens, readClaimF
  * questions. Marking, the step report and `supportsSteps` therefore see the family; progress, identity and the device see the subtopic.
  */
 export const markerView = q => (q && typeof q._bank === 'string' && typeof q._family === 'string' && q.subtopic !== q._family ? { ...q, subtopic: q._family } : q);
+
+/**
+ * The Australian edition's questions (every one is sealed at issue: editionBanks.js stamps `_marking`, an approved step-mark type stamps
+ * `_methodScheme`, an author-bank question carries `_bank`). Only they read a candidate root as a candidate (checker.js withCandidates);
+ * India's questions carry none of the three and are read exactly as before.
+ */
+export const candidateRoots = q => !!q && (q._marking === 'final-answer-only' || typeof q._methodScheme === 'string' || typeof q._bank === 'string');
+/** The equations the question's own worked solution writes (plain text): what a derived line of the page may be a multiple of. */
+function authoredEquations(q) {
+  const out = [];
+  try {
+    for (const st of Array.isArray(q?.steps) ? q.steps.slice(0, 20) : []) {
+      for (const m of String(st?.d ?? '').replace(/\\\$/g, '\u0001').matchAll(/\$([^$]+)\$/g)) {
+        for (const part of m[1].split(/\\(?:Rightarrow|Longrightarrow|therefore|implies)/)) {
+          let plain = null; try { plain = SOLUTION_INTERNALS.spanToPlain(part); } catch { plain = null; }
+          if (plain && plain.includes('=') && plain.length < 140) out.push(plain.trim());
+        }
+      }
+    }
+  } catch { /* none */ }
+  return out;
+}
+const stepOptions = q => (candidateRoots(q) ? { prompt: q.prompt, candidates: true, authored: authoredEquations(q) } : { prompt: q.prompt });
 
 export function stepMetaFor(q) {
   q = markerView(q);
@@ -212,7 +235,7 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
   if (meta && steps && !report) {
     // The prompt lets a true line about another unknown of the question be
     // verified against the system it gives, instead of being left unjudged.
-    try { report = stepCheck(meta, steps, { prompt: q.prompt }); } catch { report = null; }
+    try { report = stepCheck(meta, steps, stepOptions(q)); } catch { report = null; }
   }
   // No Step Check for this question: the arithmetic on each line is still checked (engine/arithmeticLines.js).
   // That report proves only that stated numbers are equal; it reaches no mark below (meta is null there).
@@ -268,7 +291,7 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
   // board tick above was computed from the report the topic check made, unchanged. `opts.claims === false` is the test switch.
   if (meta && steps && typeof steps === 'string' && report && report.arithmetic !== true && !(opts && opts.claims === false)) {
     try {
-      const shown = claimFreeReport(meta, steps, { prompt: q.prompt }, report);
+      const shown = claimFreeReport(meta, steps, stepOptions(q), report);
       if (shown !== report) { report = shown; }
     } catch { /* the report stands */ }
   }
@@ -366,6 +389,24 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
     try { reproduces = JSON.stringify(partialOf(report)) === JSON.stringify(partial) && (!Array.isArray(q.boardScheme) || JSON.stringify(boardAward(q, meta, report, result.correct === true)) === JSON.stringify(board)); } catch { reproduces = false; }
     if (!reproduces) markingReport = markingReportOf(decided);
   }
+  // A candidate root (checker.js withCandidates: a value of the derived equation that is no root of the original) stays a note on the
+  // displayed page whatever the feedback layers above add: they tick a line that matches a step of the worked solution or that satisfies the line
+  // before it, and a candidate must be checked in the original equation before any line of the page can claim it. The topic check's own rows.
+  try {
+    if (decided && report && Array.isArray(decided.lines) && Array.isArray(report.lines) && decided.lines.length === report.lines.length && decided.lines.some(l => l?.candidate === true)) {
+      report = { ...report, lines: report.lines.map((l, i) => (decided.lines[i]?.candidate === true && String(decided.lines[i].text).trim() === String(l?.text ?? '').trim() ? decided.lines[i] : l)) };
+    }
+  } catch { /* the report stands */ }
+  // Feedback only, last: the line that rejects a candidate root is ticked (checker.js tickRejections). Nothing above reads it.
+  try {
+    if (report && typeof steps === 'string' && candidateRoots(q)) {
+      const lead = stepMetaFor(q);
+      const letter = /^([a-z])\s*=$/i.exec(String(q.answerPrefix || '').trim());
+      const keyed = q.answerType === 'numeric' && Number.isFinite(q.answer?.value) ? [q.answer.value] : q.answerType === 'set' && Array.isArray(q.answer?.values) && q.answer.values.every(Number.isFinite) ? q.answer.values : null;
+      const candMeta = lead?.kind === 'equation' ? lead : (keyed ? { kind: 'equation', ...(letter ? { variable: letter[1] } : {}), solutions: keyed, ...(q.answer?.tol > 0 ? { tol: q.answer.tol } : {}) } : null);
+      if (candMeta) report = tickRejections(candMeta, report, { authored: authoredEquations(q), prompt: q.prompt });
+    }
+  } catch { /* the report stands */ }
   // A scheme question (schemeAward.js) also learns which lines the topic check ITSELF verified: the page ticks more than that (a copied
   // given, a rule statement, a true-as-written sum), and "writes a correct derivative" is earned only by a line the check found equal to it.
   const topicTicks = q._methodScheme ? (decided ? decided.lines.flatMap((l, i) => (l?.status === 'ok' ? [i] : [])) : null) : undefined;
@@ -465,7 +506,7 @@ export function examAnswerStage(q, given, working, grid) {
     // answer point by checkAnswer, each working point only by its own line.
     const meta = stepMetaFor(q);
     let report = null;
-    if (meta && !blank(working)) { try { report = stepCheck(meta, String(working), { prompt: q.prompt }); } catch { report = null; } }
+    if (meta && !blank(working)) { try { report = stepCheck(meta, String(working), stepOptions(q)); } catch { report = null; } }
     const b = boardAward(q, meta, report, correct);
     const earned = Math.max(0, Math.min(marks, correct ? b.awarded : Math.min(marks - 1, b.method)));
     return { final: true, response: { unanswered: false, correct, awarded: earned, feedback: feedback.slice(0, 3000),
@@ -531,7 +572,7 @@ export function tutorEvidence(q, lines) {
   const meta = stepMetaFor(q);
   if (!meta || !Array.isArray(lines) || !lines.length) return evidence;
   try {
-    const report = stepCheck(meta, lines.join('\n'), { prompt: q.prompt });
+    const report = stepCheck(meta, lines.join('\n'), stepOptions(q));
     const judged = report?.lines || [];
     // The engine's own misconception id for the break (audit D1), as a stable
     // id only — never free text — exactly as the device reads it (tutorWork).
@@ -572,7 +613,7 @@ export function reviewEvidence(q, lines) {
   try {
     const meta = stepMetaFor(q);
     if (!meta) return silent;
-    const report = stepCheck(meta, list.join('\n'), { prompt: q.prompt });
+    const report = stepCheck(meta, list.join('\n'), stepOptions(q));
     const judged = Array.isArray(report?.lines) ? report.lines : [];
     let firstBreak = -1;
     const statuses = list.map((_, i) => {
@@ -710,7 +751,7 @@ export function stepCoachEvidence(q, lines, answerText) {
   const open = attemptAt >= 0 ? list.slice(0, attemptAt) : list;
   let judged = [];
   if (meta && open.length) {
-    try { judged = stepCheck(meta, open.join('\n'), { prompt: q.prompt })?.lines || []; } catch { return allFinal(); }
+    try { judged = stepCheck(meta, open.join('\n'), stepOptions(q))?.lines || []; } catch { return allFinal(); }
   }
   // "Doesn't follow from the line above" is said only where there IS a line
   // above that the engine verified: a first line, or one under a line the
