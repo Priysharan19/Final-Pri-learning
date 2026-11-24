@@ -16,7 +16,7 @@ import * as G from '../client/src/engine/generators/index.js';
 import { NSW_BANK_LEDGER, nswIssuable } from '../server/platform/nswBanks.js';
 import { inScope, courseOf } from './scheme-coverage-y1112.mjs';
 import { SUBTOPIC_BY_ID, entryIdOf } from '../client/src/engine/curriculum.js';
-import { GENERIC_ID, genericDigest, genericPlan, genericEligible, authoredLines } from '../server/platform/genericSteps.js';
+import { GENERIC_ID, genericDigest, genericPlan, genericEligible, authoredLines, stepFacts } from '../server/platform/genericSteps.js';
 import { schemePay } from '../server/platform/schemeAward.js';
 import { stepEvidence, marksPossibleFor, practiceMarksEarned } from '../server/platform/markerOps.js';
 import { checkAnswer } from '../client/src/engine/checker.js';
@@ -106,6 +106,9 @@ export async function runSweep({ seeds = 40 } = {}) {
     b: { pages: 0, full: 0, notFull: 0, skipped: 0, wrongTyped: 0, wrongTypedAtN: 0 },
     c: { pages: 0, crossedFalsified: 0, falsifiedEarned: 0, atOrAfterCross: 0, laterThanFalsified: 0, uncrossedFalsified: 0, fromPages: 0, fromEarnedAtOrAfter: 0, fromMarksOverBefore: 0, fromFalsifiedEarned: 0 },
     d: { classes: new Map() }, e: { pages: 0, wrongFull: 0, overN: 0, unticked: 0, afterCross: 0, tableNotMark: 0, correctNotFull: 0, notPaid: 0, finalByLines: 0 },
+    f: { pages: 0, marks: 0, ideal: 0, overPages: 0, afterWrong: 0 }, g: { pages: 0, earned: 0, overCredit: 0, singleResult: 0 },
+    i: { pages: 0, earned: 0, firstSolutionStep: 0, derived: 0, bareFirst: 0 },
+    h: { route: { pages: 0, marks: 0 }, swap: { pages: 0, marks: 0 }, onesided: { pages: 0, marks: 0 } },
     exceptions: [], coincidences: [], violations: []
   };
   const klass = name => { if (!R.d.classes.has(name)) R.d.classes.set(name, { pages: 0, earned: 0, exceptions: 0 }); return R.d.classes.get(name); };
@@ -226,6 +229,71 @@ export async function runSweep({ seeds = 40 } = {}) {
       if (earnedBefore > possibleBefore + stillTrueLines.size) { R.c.fromMarksOverBefore++; viol('more-marks-than-steps-before-the-wrong-step', q, { step: k.number, earnedBefore, possibleBefore }); }
     }
 
+    // (f) ONE WRONG MIDDLE LINE, then the authored lines. Every authored line before the answer step is falsified in turn. Nothing may be earned by the
+    // wrong line or by any line after it, whether the page crosses it or only notes it. Tolerance: 0 pages. `ideal` = key steps whose authored line stands before it.
+    {
+      const facts = stepFacts(q);
+      lines0.forEach((al, idx) => {
+        if (lastAns >= 0 && al.step === ansStep) return;
+        const bad = falsify(texts[idx]);
+        if (!bad || bad === texts[idx] || stillTrue(texts[idx], bad)) return;
+        const lines = texts.map((t, i) => (i === idx ? bad : t));
+        const f = markPage(q, lines, '99991');
+        if (f.correct || !f.pay.paid) return;
+        check(q, f, `f-wrong-middle-line-${idx + 1}`);
+        const ideal = plan.keySteps.filter(k => lines0.findIndex(l => l.step === k.step) < idx).length;
+        R.f.pages++; R.f.marks += f.marks; R.f.ideal += ideal;
+        const late = f.pay.items.filter(i => i.awarded && i.key !== 'answer' && i.lines.some(n => n - 1 >= idx));
+        if (f.marks > ideal) R.f.overPages++;
+        if (late.length) { R.f.afterWrong++; viol('earned-after-an-unverified-wrong-line', q, { idx: idx + 1, lines, earned: late.map(i => [i.key, i.lines]) }); }
+      });
+      // (g) A SINGLE BARE LINE alone: a letter equal to a number, or a bare number. It may earn only a step whose one result it is (nonzero, not a given).
+      const seenBare = new Set();
+      for (const al of lines0) {
+        const m = /^\s*(?:[A-Za-z][A-Za-z0-9_']*(?:\([^()]*\))?\s*=\s*)?(-?\d+(?:\.\d+)?)\s*$/.exec(al.text);
+        if (!m || seenBare.has(al.text)) continue;
+        seenBare.add(al.text);
+        const g = markPage(q, [al.text], '99991'); check(q, g, 'g-single-bare-line');
+        R.g.pages++;
+        if (g.pay.paid && g.marks > 0) {
+          R.g.earned++;
+          const earnedItem = g.pay.items.find(i => i.awarded && i.key !== 'answer');
+          const f = facts.get(Number(earnedItem.key.replace('step-', '')) - 1);
+          if (f && f.results === 1 && Number(m[1]) !== 0) R.g.singleResult++;
+          else { R.g.overCredit++; viol('bare-line-alone-earned', q, { line: al.text, key: earnedItem.key, results: f?.results }); R.exceptions.push({ class: 'single-bare-line', prompt: q.prompt, lines: [al.text], earned: [earnedItem.key], marks: g.marks }); }
+        }
+      }
+    }
+    // (i) A TRUE FIRST LINE, THEN WORDS. The first authored line alone followed by lines nothing can read. It may earn only a key step, and a key step is a
+    // result, not set-up: counted by whether the step is the first step of the solution and whether its result is an expression (derived) or a bare value.
+    {
+      const first = lines0[0];
+      if (first) {
+        const g = markPage(q, [first.text, ...WORDS], '99991'); check(q, g, 'i-first-line-then-words');
+        R.i.pages++;
+        const item = g.pay.paid ? g.pay.items.find(x => x.awarded && x.key !== 'answer') : null;
+        if (item) {
+          R.i.earned++;
+          const stepIdx = Number(item.key.replace('step-', '')) - 1;
+          const firstStepIdx = Math.min(...q.steps.map((st, i) => (/^(check|note|bonus)/i.test(st?.h) ? 1e9 : i)));
+          if (stepIdx === firstStepIdx) R.i.firstSolutionStep++;
+          if (/^\s*(?:[A-Za-z][A-Za-z0-9_']*(?:\([^()]*\))?\s*=\s*)?-?\d+(?:\.\d+)?\s*$/.test(first.text)) R.i.bareFirst++; else R.i.derived++;
+          if (R.i.bareFirst && /^\s*[A-Za-z][A-Za-z0-9_']*\s*=\s*-?\d+(?:\.\d+)?\s*$/.test(first.text) && stepFacts(q).get(stepIdx)?.results !== 1) viol('bare-first-line-earned-a-multi-result-step', q, { line: first.text });
+        }
+      }
+    }
+    // (h) THE SAME CORRECT ROUTE, written three ways, with a wrong last line: as authored, the sides of every equation swapped, and every equation of
+    // letters moved to one side (a = b becomes a - (b) = 0). Equivalent lines; the page can tick them less often. Informational: the mean marks of each.
+    {
+      const bad = lastAns >= 0 ? falsify(texts[lastAns]) : null;
+      if (bad && bad !== texts[lastAns]) {
+        const base = texts.map((t, i) => (i === lastAns ? bad : t));
+        const swap = base.map((t, i) => { const parts = t.split('='); return i === lastAns || parts.length !== 2 ? t : `${parts[1].trim()} = ${parts[0].trim()}`; });
+        const one = base.map((t, i) => { const parts = t.split('='); return i === lastAns || parts.length !== 2 || !/[a-z]/.test(parts[0]) || /^[A-Za-z][A-Za-z0-9_']*(\([^()]*\))?$/.test(parts[0].trim()) ? t : `${parts[0].trim()} - (${parts[1].trim()}) = 0`; });
+        for (const [k, lines] of [['route', base], ['swap', swap], ['onesided', one]]) { const h = markPage(q, lines, '99991'); if (h.pay.paid) { R.h[k].pages++; R.h[k].marks += h.marks; } }
+      }
+    }
+
     // (d) gaming. Every page has a wrong typed answer, so nothing may be earned for the final answer, and every mark is by lines.
     const gaming = (name, lines, { allowed = () => false, coincidence = false } = {}) => {
       const g = markPage(q, lines, '99991');
@@ -322,6 +390,11 @@ export function report(R) {
   L.push(`(c, from step k) every line from a key step on falsified: ${R.c.fromPages} pages; earned on or after the wrong step ${R.c.fromEarnedAtOrAfter}, more marks than steps before it ${R.c.fromMarksOverBefore}`);
   L.push(`(c, one line) wrong at a key step: ${R.c.pages} pages; falsified line crossed ${R.c.crossedFalsified}, not crossed ${R.c.uncrossedFalsified}; the falsified line earned ${R.c.falsifiedEarned}; earned at or after a cross ${R.c.atOrAfterCross}; a later line than the falsified one earned (uncrossed wrong line) ${R.c.laterThanFalsified}`);
   for (const [k, v] of R.d.classes) L.push(`(d) ${k}: ${v.pages} pages, earned a mark on ${v.earned}, exceptions ${v.exceptions}${v.crossedAtFirst !== undefined ? `, crossed at line 1 on ${v.crossedAtFirst}` : ''}${v.coincidences ? `, coincidences (the other question's line is also true here) ${v.coincidences}` : ''}${v.bareEarnedItsOwnStep !== undefined ? `, the bare value earned its own step on ${v.bareEarnedItsOwnStep}` : ''}`);
+  L.push(`(f) one wrong middle line then the authored lines: ${R.f.pages} pages, marks ${R.f.marks} against an ideal of ${R.f.ideal}; pages above the ideal ${R.f.overPages}; earned by a line at or after the wrong one ${R.f.afterWrong}`);
+  L.push(`(g) a single bare line alone: ${R.g.pages} pages, earned a mark on ${R.g.earned} (a step whose one result it is: ${R.g.singleResult}); over-credit ${R.g.overCredit}`);
+  L.push(`(i) a true first line then words: ${R.i.pages} pages, earned a mark on ${R.i.earned}; the step is the first step of the solution on ${R.i.firstSolutionStep}; its line is a derived expression on ${R.i.derived} and a bare value on ${R.i.bareFirst}`);
+  const mean = o => (o.pages ? (o.marks / o.pages).toFixed(2) : '-');
+  L.push(`(h) same route, wrong last line, mean marks: as authored ${mean(R.h.route)} (${R.h.route.pages} pages), sides swapped ${mean(R.h.swap)}, moved to one side ${mean(R.h.onesided)}`);
   L.push(`(e) ${R.e.pages} pages: wrong answer at full ${R.e.wrongFull}, over N ${R.e.overN}, correct not full ${R.e.correctNotFull}, earned on an unticked line ${R.e.unticked}, at or after a cross ${R.e.afterCross}, answer criterion earned by working ${R.e.finalByLines}, table not the mark ${R.e.tableNotMark}, not paid ${R.e.notPaid}`);
   return L.join('\n');
 }

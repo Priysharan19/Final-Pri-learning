@@ -40,7 +40,13 @@ A step is real progress only if its result is not the question's own statement o
 - true but irrelevant arithmetic (2 + 2 = 4), unless it uses the same operations on the question's own numbers as the authored step does;
 - a number from the solution written without the working, when the step's result is an expression (an equation, a derivative, an antiderivative);
 - a line the page only notes, or one that comes at or after the first crossed line;
-- a line carried forward from an earlier slip.
+- a line carried forward from an earlier slip;
+- a line that comes at or after a line the page could not verify (THE STOP RULE below);
+- a bare value or bare condition with nothing derived behind it (THE BARE-LINE TEST below).
+
+THE STOP RULE. The page leaves some lines as notes: it cannot tell whether they are true. A student whose middle line is wrong, and which the page can only note, can then write the right lines again and collect marks. So no line at or after the first note that makes a claim (it has a number or an equals sign in it, and it is not the question restated, and the page itself does not read it as a definition or label such as u = 2x + 1) may earn a key step. Ticked lines never stop the working; words with no number or equals sign do not either. Lines are not rescued by being true: the rule is "stop", with no exception for lines that happen to match the solution.
+
+THE BARE-LINE TEST. A bare line is a letter equal to a number (t = 1, x = -6) or a number alone. It can earn a key step only if ALL hold: the authored step is itself only values; the value is not zero (v = 0 and sin(5x) = 0 are the set-up of solving, never a result); the value is not a number the question gives; the step is not the first step of the solution (which is set-up); and EITHER the step has that one result alone, OR a line that is not bare and reached a key step stands before it. So x = -6 alone earns nothing on a step whose result is the equation x + 6 = 0, and v = 0 alone earns nothing.
 
 ## The choices you can see
 
@@ -57,40 +63,40 @@ Measured on the generated Year 11 and 12 Advanced and Extension 1 written questi
 
 | Topic | Multi-mark written | Your seven types today | Rule can pay | Share | Rule can pay all N-1 |
 |---|---:|---:|---:|---:|---:|
-| Advanced · Algebra | 191 | 40 | 103 | 53.9% | 29 |
-| Advanced · Calculus | 851 | 23 | 651 | 76.5% | 402 |
-| Advanced · Financial Maths | 219 | 0 | 101 | 46.1% | 59 |
-| Advanced · Functions | 780 | 0 | 467 | 59.9% | 331 |
-| Advanced · Statistics & Probability | 342 | 0 | 95 | 27.8% | 85 |
-| Advanced · Trigonometry | 362 | 2 | 90 | 24.9% | 59 |
-| Extension 1 · Algebra | 590 | 0 | 236 | 40.0% | 117 |
-| Extension 1 · Calculus | 518 | 0 | 264 | 51.0% | 193 |
-| Extension 1 · Functions | 109 | 0 | 81 | 74.3% | 35 |
-| Extension 1 · Statistics & Probability | 307 | 0 | 105 | 34.2% | 72 |
-| Extension 1 · Trigonometry | 330 | 0 | 221 | 67.0% | 106 |
-| ALL | 4599 | 65 | 2414 | 52.5% | 1488 |
+| Advanced · Algebra | 191 | 40 | 46 | 24.1% | 12 |
+| Advanced · Calculus | 851 | 23 | 584 | 68.6% | 355 |
+| Advanced · Financial Maths | 219 | 0 | 82 | 37.4% | 45 |
+| Advanced · Functions | 780 | 0 | 415 | 53.2% | 285 |
+| Advanced · Statistics & Probability | 342 | 0 | 87 | 25.4% | 77 |
+| Advanced · Trigonometry | 362 | 2 | 79 | 21.8% | 53 |
+| Extension 1 · Algebra | 590 | 0 | 223 | 37.8% | 112 |
+| Extension 1 · Calculus | 518 | 0 | 191 | 36.9% | 133 |
+| Extension 1 · Functions | 109 | 0 | 76 | 69.7% | 25 |
+| Extension 1 · Statistics & Probability | 307 | 0 | 96 | 31.3% | 72 |
+| Extension 1 · Trigonometry | 330 | 0 | 216 | 65.5% | 95 |
+| ALL | 4599 | 65 | 2095 | 45.6% | 1264 |
 
-Before this rule only 1.4% of these questions could earn a step mark. With it, 52.5% can. On the 2414 questions it can pay, it can pay 2864 of the 3893 marks below full (73.6%).
+Before this rule only 1.4% of these questions could earn a step mark. With it, 45.6% can. On the 2095 questions it can pay, it can pay 2462 of the 3361 marks below full (73.3%).
 
 ## The sweep: does it pay anything it should not
 
-Run with the rule approved in the test process only (nothing is approved in the repository), over every topic, seeds 1 to 6: 364 payable questions, 5972 marked pages.
+Run with the rule approved in the test process only (nothing is approved in the repository), over every topic, seeds 1 to 6: 309 payable questions, 6336 marked pages.
 
-- Authored working with only the final line wrong (350 pages): marks earned 1 mark(s) on 271, 2 mark(s) on 76, 3 mark(s) on 3.
-- Authored working in full with the right answer: N on 282 of 282. Full working with a wrong typed answer: N on 0 of 352.
-- Wrong from a key step onward (435 pages): marks earned on or after the wrong step: 0. One wrong line only (429 pages): the wrong line earned 0, anything at or after a crossed line earned 0.
-- Gaming, restate the question (352 pages): a mark was earned on 0, exceptions 0.
-- Gaming, another questions working (318 pages): a mark was earned on 0, exceptions 0.
-- Gaming, given numbers (352 pages): a mark was earned on 0, exceptions 0.
-- Gaming, irrelevant true arithmetic (352 pages): a mark was earned on 0, exceptions 0.
-- Gaming, irrelevant true arithmetic outside the question (352 pages): a mark was earned on 0, exceptions 0.
-- Gaming, lines no check can read (352 pages): a mark was earned on 0, exceptions 0.
-- Gaming, naming a formula (352 pages): a mark was earned on 0, exceptions 0.
-- Gaming, same value other operations (227 pages): a mark was earned on 0, exceptions 0.
-- Gaming, bare intermediate value alone (253 pages): a mark was earned on 0, exceptions 0.
-- Gaming, bare intermediate value after earlier lines (253 pages): a mark was earned on 55, exceptions 0.
-- Gaming, lines after the first crossed line (350 pages): a mark was earned on 198, exceptions 0.
-- Gaming, numbers of the solution without working (189 pages): a mark was earned on 0, exceptions 0.
+- Authored working with only the final line wrong (297 pages): marks earned 1 mark(s) on 224, 2 mark(s) on 70, 3 mark(s) on 3.
+- Authored working in full with the right answer: N on 234 of 234. Full working with a wrong typed answer: N on 0 of 299.
+- Wrong from a key step onward (375 pages): marks earned on or after the wrong step: 0. One wrong line only (371 pages): the wrong line earned 0, anything at or after a crossed line earned 0.
+- Gaming, restate the question (299 pages): a mark was earned on 0, exceptions 0.
+- Gaming, another questions working (274 pages): a mark was earned on 0, exceptions 0.
+- Gaming, given numbers (299 pages): a mark was earned on 0, exceptions 0.
+- Gaming, irrelevant true arithmetic (299 pages): a mark was earned on 0, exceptions 0.
+- Gaming, irrelevant true arithmetic outside the question (299 pages): a mark was earned on 0, exceptions 0.
+- Gaming, lines no check can read (299 pages): a mark was earned on 0, exceptions 0.
+- Gaming, naming a formula (299 pages): a mark was earned on 0, exceptions 0.
+- Gaming, same value other operations (182 pages): a mark was earned on 0, exceptions 0.
+- Gaming, bare intermediate value alone (205 pages): a mark was earned on 0, exceptions 0.
+- Gaming, bare intermediate value after earlier lines (205 pages): a mark was earned on 50, exceptions 0.
+- Gaming, lines after the first crossed line (297 pages): a mark was earned on 0, exceptions 0.
+- Gaming, numbers of the solution without working (172 pages): a mark was earned on 0, exceptions 0.
 - Every page: a wrong answer at full marks 0, above N 0, a mark on an unticked line 0, a mark at or after a crossed line 0, the answer mark earned by working 0.
 
 ## Twelve worked examples
@@ -156,54 +162,55 @@ Marks: **2 of 3**.
 
 ### Example 3: Series (Advanced, Functions)
 
-A student finds the common ratio and then miscalculates the term.
+A student sets up the arithmetic-sequence condition correctly, then slips while solving.
 
-Question (2 marks): A colony has 5 cells at the end of day 1. Its size triples every day. How many cells are there at the end of day 6?
+Question (2 marks): The expressions -2k, -4k-8 and -2k-12 are three consecutive terms of an arithmetic sequence. Find the value of k.
 
 The authored worked solution, step by step:
 
-1. Type of sequence: r=3
-2. Term: T_6 = 5(3)^(5) = 1215
+1. Equal differences: 2(-4k-8)=(-2k)+(-2k-12)
+2. Expand and collect: -8k-16=-4k-12
+3. Solve: k=-1
 
-Final answer typed: `8518`. The answer checker says it is not correct.
+Final answer typed: `-20`. The answer checker says it is not correct.
 
 | Line | What the student wrote | What the marked page shows | Earns |
 |---:|---|---|---|
-| 1 | `r=3` | ticked | step 1 |
-| 2 | `T_6 = 5(3)^(5) = 8518` | not checked | nothing |
+| 1 | `2(-4k-8)=(-2k)+(-2k-12)` | ticked | step 1 |
+| 2 | `-8k-16=-4k-12` | ticked | nothing |
+| 3 | `k=-20` | crossed (first wrong line) | nothing |
 
 | Criterion | Marks | Result | Lines |
 |---|---:|---|---|
-| Step 1 of the worked solution (Type of sequence): r=3 | 1 | earned | 1 |
+| Step 1 of the worked solution (Equal differences): 2(-4k-8)=(-2k)+(-2k-12) | 1 | earned | 1 |
 | Gives the final answer correctly, in the form the question asks. | 1 | not earned | - |
 
 Marks: **1 of 2**.
 
 ### Example 4: Financial mathematics (Advanced)
 
-A student finds the monthly rate and the number of periods correctly, but is wrong from the second key step onward (a slip carried down the page).
+A student works out the first plan's interest correctly, but is wrong from the second key step onward (a slip carried down the page).
 
-Question (3 marks): A savings plan pays 9% p.a. interest, compounded monthly. Equal deposits are made at the END of each month for 2 years. What deposit is needed each month so that the balance immediately after the last deposit is $40,000? Give your answer to the nearest cent.
+Question (3 marks): Two plans repay the same loan of $10,000. Plan 1 requires 48 monthly repayments of $240.39. Plan 2 requires 60 monthly repayments of $198.96. How much less total interest is paid on the cheaper plan? Give your answer to the nearest cent.
 
 The authored worked solution, step by step:
 
-1. Rate and periods: r=0.0075; n=24
-2. Rearrange: M = ((40000* 0.0075)/((1 + 0.0075)^(24) - 1))
-3. Evaluate: M=1527.39
+1. Plan 1: 48*240.39-10000=1538.72
+2. Plan 2: 60*198.96-10000=1937.6
+3. Difference: 398.88
 
 Final answer typed: `99991`. The answer checker says it is not correct.
 
 | Line | What the student wrote | What the marked page shows | Earns |
 |---:|---|---|---|
-| 1 | `r=0.0075` | ticked | step 1 |
-| 2 | `n=24` | ticked | nothing |
-| 3 | `M = ((40000* 0.0075)/((1 + 0.0075)^(24) - 20))` | not checked | nothing |
-| 4 | `M=1527.286` | not checked | nothing |
+| 1 | `48*240.39-10000=1538.72` | ticked | step 1 |
+| 2 | `60*198.96-10000=1937.55` | not checked | nothing |
+| 3 | `398.629` | not checked | nothing |
 
 | Criterion | Marks | Result | Lines |
 |---|---:|---|---|
-| Step 1 of the worked solution (Rate and periods): r=0.0075; n=24 | 1 | earned | 1 |
-| Step 2 of the worked solution (Rearrange): M = ((40000* 0.0075)/((1 + 0.0075)^(24) - 1)) | 1 | not verified | - |
+| Step 1 of the worked solution (Plan 1): 48*240.39-10000=1538.72 | 1 | earned | 1 |
+| Step 2 of the worked solution (Plan 2): 60*198.96-10000=1937.6 | 1 | not verified | - |
 | Gives the final answer correctly, in the form the question asks. | 1 | not earned | - |
 
 Marks: **1 of 3**.
@@ -350,17 +357,17 @@ Final answer typed: `99991`. The answer checker says it is not correct.
 
 Marks: **0 of 3**.
 
-### Example 10: Financial mathematics, a bare value and true but irrelevant sums
+### Example 10: Functions and modelling, a bare value and true but irrelevant sums
 
 A student writes one correct intermediate value and some true sums that have nothing to do with the question.
 
-Question (2 marks): $5,000 is deposited at the end of each year for 7 years into an account paying 3% p.a., compounded annually. How much of the balance immediately after the last deposit is interest? Give your answer to the nearest cent.
+Question (3 marks): A club sells n tickets with revenue R(n)=6n(38-n) dollars and costs C(n)=30+102n dollars. Find the profit, in dollars, when n=19.
 
 The authored worked solution, step by step:
 
-1. Future value: FV = 5000*(((1 + 0.03)^(7) - 1)/(0.03)) = 38312.31
-2. Paid in: 7*5000=35000
-3. Interest: 38312.31-35000=3312.31
+1. Revenue: R(19)=6(19)(19)=2166
+2. Cost: C(19)=30+102(19)=1968
+3. Profit: 2166-1968=198
 
 Final answer typed: `99991`. The answer checker says it is not correct.
 
@@ -370,14 +377,15 @@ Final answer typed: `99991`. The answer checker says it is not correct.
 | 2 | `3 * 5 = 15` | ticked | nothing |
 | 3 | `7 - 3 = 4` | ticked | nothing |
 | 4 | `12 - 5 = 7` | ticked | nothing |
-| 5 | `35000` | not checked | nothing |
+| 5 | `2166` | not checked | nothing |
 
 | Criterion | Marks | Result | Lines |
 |---|---:|---|---|
-| Step 2 of the worked solution (Paid in): 7*5000=35000 | 1 | not verified | - |
+| Step 1 of the worked solution (Revenue): R(19)=6(19)(19)=2166 | 1 | not verified | - |
+| Step 2 of the worked solution (Cost): C(19)=30+102(19)=1968 | 1 | not verified | - |
 | Gives the final answer correctly, in the form the question asks. | 1 | not earned | - |
 
-Marks: **0 of 2**.
+Marks: **0 of 3**.
 
 ### Example 11: Calculus, volume of revolution (Extension 1), no final answer
 
@@ -437,13 +445,17 @@ Marks: **2 of 2**.
 
 ## What the rule cannot see, and its known weaknesses
 
+These are measured, in the same sweep (seeds 1 to 6), and rewritten each time the packet is generated.
+
+- **A different valid method earns less.** The same correct route, with a wrong last line, earns on average 1.25 marks when it is written the way the author wrote it (268 pages). Written with the sides of each equation swapped it earns 0.57, and with every equation moved to one side it earns 1.18. The rule recognises the authored route best. A student who solves it another valid way, or writes an equivalent line in a different shape, is paid less than they deserve and sometimes nothing.
+- **Over-credit after a wrong line the page cannot see.** One middle line was made wrong in turn, and the authored lines left after it (706 pages, hard test, tolerance 0): 365 marks were earned against an ideal of 396 (the steps written before the wrong line); pages above the ideal: 0; marks earned by the wrong line or a line after it: 0. The cost of the stop rule is that true working is sometimes not paid: a true line the page can only note (an inequality such as x >= 4, a bare list of numbers, a definition it does not read) ends the paying. The stop rule and the bare-line test together reduced the questions the rule can pay from 52.5 percent to 45.6 percent of the multi-mark written questions (seeds 1 to 40), and the marks paid on the authored route with a wrong last line from 2702 over 2260 pages (1.20 a page) to 2321 over 1955 pages (1.19 a page): a loss of 14.1 percent of marks, almost all of it questions that no longer pay at all, not a lower mark on those that still do.
+- **A single bare line.** A letter equal to a number, or a number, alone (262 pages, hard test, tolerance 0): a mark was earned on 13, every one a step whose one result that is (13); over-credit 0. Examples that no longer earn: v = 0 alone, and x = -6 alone for the domain of a composite function.
+- **A true first line, then nothing readable.** 299 pages: a mark was earned on 226. In 216 of those the step is the first step of the solution, and the line is a derived expression on 226 and a bare value on 0. This is intended: a derived first line (a derivative, the equation set up from the question) is a true result a student had to find, and it earns one mark, the same as it does at the answer step of an examiner's scheme. A bare value as the first step does not pay (it is set-up).
 - It reads only what the page can tick. A question whose solution is in words, in a table, as an inequality, as a sketch or as a vector or matrix the page cannot read has no usable steps, and stays on the final answer.
-- A correct method that is not the authored one (a different but valid route) earns only where its lines match the authored results. A student who solves it another way may earn less than they deserve.
+- A value counts for a numeric step only if it is worked from the question's or the solution's own numbers with the same operations on the same numbers as the authored step (so 2 + 2 = 4 is not the step 2^2 = 4, and 9 / 3 = 3 is not 27 / 9 = 3).
 - Another question's correct working earns nothing, except where one of its lines is also a true statement of this question's own solution (the same root, an equivalent equation). That is rare in the sweep and each case is listed in the test output.
-- It trusts the page's ticks. If the page wrongly ticks a line, the rule can pay for it. The sweep above looked for this by writing wrong lines and found none that earned; it cannot prove none exists.
-- A value counts for a numeric step only if it is worked from the question's or the solution's own numbers with the same operations on the same numbers as the authored step (so 2 + 2 = 4 is not the step 2^2 = 4, and 9 / 3 = 3 is not 27 / 9 = 3). A student who reaches a step's value by a different valid computation (a different grouping, another route) may earn less than they deserve; a line that repeats the authored computation exactly cannot be told from honest work.
+- It trusts the page's ticks. If the page wrongly ticks a line, the rule can pay for it. The review of this rule found one such false tick (a derivative of the wrong function ticked when the question gave a value for x) and it is fixed in the page; the sweep cannot prove none remains.
 - Only the LAST N minus 1 usable steps pay. A student who does the early steps correctly and goes wrong in the middle may earn nothing for working although they did earn something in an examiner's eyes.
-- A wrong line the page cannot judge is a note, not a cross. Correct lines written after it can then earn. A page where later lines follow from a wrong line earned nothing in the sweep, but a slip the page cannot see is not stopped.
 - It never pays on a question worth one mark, and never for a model's reading: only the engine's own tick.
 - The mark split between steps is the same, one mark each. It does not weigh a hard step more than an easy one.
 
@@ -457,4 +469,4 @@ To be filled in by the author (the tutor). Leave blank until reviewed.
 - Note: 
 - Name: 
 - Date: 
-- Scheme digest: `ba5f417fdba7cb97362f0d233f082adbf6cd96f8b4a388641f3eb62daf5a457e`
+- Scheme digest: `68fbbe684f9d20c82c4a10d2fe616e7b8325e15cb1b7365a81593111c6792d28`

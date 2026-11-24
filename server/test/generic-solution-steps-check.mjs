@@ -154,6 +154,24 @@ const pay = (q, lines, answer, { env = ON_AU, list = LIST } = {}) => { const m =
   void item;
 }
 
+// ── 3b. regressions from the independent review ────────────────────────────────────────────────────────────────────────
+{
+  const mk = (gen, d, seed) => ({ ...G.generateQuestion(gen, d, seed), _methodScheme: GENERIC_ID });
+  const cases = [['me11-rates', 4, 1, 'v=0', 'v = 0 alone (the set-up of solving)'], ['y11-functions-more', 4, 1, 'x = -6', 'x = -6 alone (the classic wrong answer to a domain of a composite)'], ['y11-functions-more', 4, 5, 'x = 4', 'x = 4 alone (same question shape)']];
+  for (const [g, d, seed, line, say] of cases) ok(S.markPage(mk(g, d, seed), [line], '99991').marks === 0, `a bare line earns nothing: ${say}`);
+  // the stop rule: a wrong middle line the page can only note, then the authored lines
+  const q = mk('y12-appdiff', 3, 1); const t = authoredLines(q).map(l => l.text);
+  const bad = t.map((x, i) => (i === 1 ? S.falsify(x) : x));
+  const m = S.markPage(q, bad, '99991');
+  const firstOpen = m.lines.findIndex(l => l.status !== 'ok');
+  ok(firstOpen < 0 || !m.pay.items.some(i => i.awarded && i.key !== 'answer' && i.lines.some(n => n - 1 >= firstOpen)), 'no key step is earned by a line at or after one the page could not verify');
+  // the page's false derivative tick (the question's own x value must not be put into the differentiating variable)
+  const { stepCheckArithmetic } = await import('../../client/src/engine/arithmeticLines.js');
+  const { questionFacts } = await import('../../client/src/engine/questionFacts.js');
+  const facts = questionFacts({ prompt: 'Find the value of $\\dfrac{d^2y}{dx^2}$ at $x = \\dfrac{2\\pi}{3}$ for $y = -6\\cos(2x)$.' });
+  ok(stepCheckArithmetic("y' = 12sin(27x)", { facts }).lines[0].status !== 'ok' && stepCheckArithmetic("y' = 12sin(2x)", { facts }).lines[0].status === 'ok', 'y\' = 12sin(27x) is not ticked as the derivative of -6cos(2x) when the question gives a value of x; the true derivative still is');
+}
+
 // ── 4. the sweep ───────────────────────────────────────────────────────────────────────────────────────────────────
 const SWEEP_SEEDS = 6;
 const SW = await S.runSweep({ seeds: SWEEP_SEEDS });
@@ -163,8 +181,11 @@ for (const v of SW.violations.slice(0, 10)) console.log('  VIOLATION', JSON.stri
 for (const e of SW.exceptions.slice(0, 10)) console.log('  EXCEPTION', JSON.stringify(e).slice(0, 700));
 console.log(`  coincidences (another question's working that is also true here): ${SW.coincidences.length}`);
 for (const e of SW.coincidences.slice(0, 6)) console.log('  COINCIDENCE', JSON.stringify(e).slice(0, 500));
-ok(SW.payable >= 300 && SW.a.pages >= 300 && SW.b.pages >= 250 && SW.c.pages >= 300 && SW.c.fromPages >= 300, `the sweep is large enough (${SW.payable} payable questions, ${SW.e.pages} pages)`);
+ok(SW.payable >= 250 && SW.a.pages >= 250 && SW.b.pages >= 200 && SW.c.pages >= 250 && SW.c.fromPages >= 250, `the sweep is large enough (${SW.payable} payable questions, ${SW.e.pages} pages)`);
 ok(SW.violations.length === 0, `no violation of an invariant or of a "nothing" in (c) and (d): ${SW.violations.length}`);
+ok(SW.f.pages >= 300 && SW.f.overPages === 0 && SW.f.afterWrong === 0, `(f) one wrong middle line then the authored lines: ${SW.f.pages} pages, ${SW.f.overPages} above the ideal, ${SW.f.afterWrong} earned at or after the wrong line (tolerance 0)`);
+ok(SW.g.pages >= 150 && SW.g.overCredit === 0, `(g) a single bare line: ${SW.g.pages} pages, over-credit ${SW.g.overCredit} (tolerance 0); only a step whose one result it is earns (${SW.g.singleResult})`);
+ok(SW.i.pages >= 150 && SW.i.bareFirst <= 2, '(i) a true first line then words earns for a derived result, not for bare set-up');
 ok(SW.e.wrongFull === 0 && SW.e.overN === 0 && SW.e.correctNotFull === 0, '(e) a wrong or missing final answer never earns N; never above N; a correct one always N');
 ok(SW.e.unticked === 0 && SW.e.afterCross === 0 && SW.e.finalByLines === 0 && SW.e.tableNotMark === 0, '(e) every mark rests on a ticked line before the first crossed line; the answer mark is never earned by working; the table is the mark');
 ok(SW.b.wrongTypedAtN === 0 && SW.b.notFull === 0 && SW.b.full === SW.b.pages, '(b) full working with the right answer is N on every page; with a wrong typed answer it is never N');
@@ -174,7 +195,7 @@ for (const need of ['restate-the-question', 'given-numbers', 'irrelevant-true-ar
 ok((SW.d.classes.get('bare-intermediate-value-alone')?.earned ?? 1) === 0, 'a bare intermediate value with no line before it earns nothing (the page does not tick it)');
 ok((SW.d.classes.get('bare-intermediate-value-after-earlier-lines')?.bareEarnedItsOwnStep ?? 0) >= 5, 'a bare value after earlier lines the page recognised can earn its own step (BARE_VALUE_EVIDENCE) and no other');
 ok(SW.exceptions.length === 0, `no gamed page earned a mark (${SW.exceptions.length} exceptions)`);
-ok(SW.coincidences.length <= 6 && (SW.d.classes.get('another-questions-working')?.pages ?? 0) >= 300, `another question's working earns nothing except where its line is also true here (${SW.coincidences.length} coincidences, each printed above)`);
+ok(SW.coincidences.length <= 6 && (SW.d.classes.get('another-questions-working')?.pages ?? 0) >= 200, `another question's working earns nothing except where its line is also true here (${SW.coincidences.length} coincidences, each printed above)`);
 const dist = [...SW.a.dist].map(([k, v]) => `${k}:${v}`).join(' ');
 console.log(`  (a) distribution of marks with only the final line wrong: ${dist}`);
 

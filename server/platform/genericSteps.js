@@ -94,7 +94,8 @@ export function authoredLines(q) {
       for (const piece of tex.split(/\\Rightarrow|\\implies|\\therefore|\\text\{\s*(?:or|and)\s*\}/)) {
         let p = null;
         try { p = spanToPlain(piece); } catch { p = null; }
-        p = p && p.replace(/\s+/g, ' ').trim();
+        // how a student writes it: 4,000 is the number four thousand, and 3!=6 is three factorial equals six (not 3 not-equal 6)
+        p = p && p.replace(/(\d),(?=\d{3}(?!\d))/g, '$1').replace(/(\d|\))!=(?=[\d(])/g, '$1! = ').replace(/\s+/g, ' ').trim();
         if (p) out.push({ text: p, step: i });
       }
     }
@@ -179,11 +180,14 @@ function contextOf(q) {
   const values = sol.values.map(v => ({ step: v.step, v: v.v, progress: !givenNumber(v.v, nums) && (v.step === answerStep || !isAnswerValue(v.v)) }));
   const opsByStep = new Map();
   for (const n of sol.numeric) opsByStep.set(n.step, [...(opsByStep.get(n.step) || []), `${opsKey(n.parts[0])}|${numbersIn(n.parts[0]).sort((a, b) => a - b).join(',')}`]);
-  return { sol, nums, pc, keys, answerStep, entries, values, opsByStep, source: sourceNumbersOf(q) };
+  // A step is "only a value" when every one of its real-progress results is a label = number (t = 1, x = 33). Only then may a bare value reach it.
+  const bareOnly = new Map();
+  for (const e of entries) if (e.progress) bareOnly.set(e.step, (bareOnly.get(e.step) ?? true) && e.kind === 'label' && e.numeric);
+  return { sol, nums, pc, keys, answerStep, entries, values, opsByStep, bareOnly, source: sourceNumbersOf(q) };
 }
 
 /** The steps a ticked line reaches, as a Set of step indices of q.steps. Entry-level real-progress rules apply here. */
-function stepsReached(line, ctx) {
+function stepsReached(line, ctx, prior = false) {
   const reached = new Set();
   const text = String(line?.text ?? '');
   const fact = line?.fact;
@@ -203,6 +207,19 @@ function stepsReached(line, ctx) {
     if (!hit || !stepOk(hit.step)) continue;
     const entry = ctx.entries.find(e => e.st === hit);
     if (!entry || !entry.progress) continue;
+    // A BARE statement (a letter equal to a number: v = 0, x = -6, t = 1). It may reach a step only if that step is itself only values, the value is not
+    // zero (v = 0, f(x) = 0 is the set-up of solving) and is not given (above), AND either the step has that one result alone, or a line that is not bare
+    // and reached a key step stands before it (the first step of the solution is set-up and always needs one). A bare line with nothing derived before
+    // it, for a step with several results, never earns.
+    // "f(x) = 0" with one function or letter on the left (sin(5x) = 0, v = 0, dy/dx = 0) is the set-up of solving, not a result: it never earns.
+    if (parts.length === 2 && ((numericOf(parts[1]) === 0 && singleTerm(parts[0])) || (numericOf(parts[0]) === 0 && singleTerm(parts[1])))) continue;
+    const bareLine = parts.length === 2 && labelOf(parts[0]) && numericOf(parts[1]) !== null;
+    if (bareLine) {
+      reached.bare = true;
+      const alone = ctx.entries.filter(e => e.step === hit.step && e.progress).length === 1;
+      // the first step of the solution is the set-up (the rate, the ratio, the given read off): a bare value there needs a derived line before it
+      if (!ctx.bareOnly.get(hit.step) || numericOf(parts[1]) === 0 || !((alone && hit.step !== ctx.keys[0]) || prior)) continue;
+    }
     if (entry.kind === 'cond') { let own = null; try { own = conditionOf(parts); } catch { own = null; } if (!decisive(own)) continue; }
     if (!entry.numeric || (computedFromSource(parts, ctx) && sameComputation(parts, hit.step, ctx))) reached.add(hit.step);
   }
@@ -215,7 +232,9 @@ function stepsReached(line, ctx) {
       } else if (PARAMETERS.BARE_VALUE_EVIDENCE && s && !s.multi && !s.ctx) {
         const vals = s.parts.map(numericOf);
         const v = vals.every(x => x !== null) && vals.every(x => close(x, vals[0])) ? vals[0] : null;
-        if (v !== null && computedFromSource(s.parts, ctx) && sameComputation(s.parts, i, ctx) && ctx.values.some(e => e.step === i && e.progress && close(e.v, v))) reached.add(i);
+        reached.bare = true;
+        const aloneV = ctx.entries.filter(e => e.step === i && e.progress).length === 1;
+        if (v !== null && v !== 0 && ctx.bareOnly.get(i) === true && ((aloneV && i !== ctx.keys[0]) || prior) && computedFromSource(s.parts, ctx) && sameComputation(s.parts, i, ctx) && ctx.values.some(e => e.step === i && e.progress && close(e.v, v))) reached.add(i);
       }
     }
   }
@@ -261,16 +280,46 @@ function computedFromSource(parts, ctx) {
   return nums.every(n => [...ctx.source].some(a => close(a, n)));
 }
 
+/** One letter, one function call or one derivative symbol, with no sum, product or power outside brackets: sin(5x), v, f'(x), dy/dx. */
+function singleTerm(side) {
+  const t = String(side ?? '').replace(/\s+/g, '');
+  if (/^d\^?2?[a-z]\/d[a-z]\^?2?$/.test(t)) return true;
+  let depth = 0;
+  for (const c of t) { if (c === '(') depth++; else if (c === ')') depth--; else if (depth === 0 && '+-*/^'.includes(c)) return false; }
+  return /^[A-Za-z][A-Za-z0-9_']*(\(.*\))?$/.test(t);
+}
+
 const ticked = l => l?.status === 'ok' && l.ecf !== true && l.given !== true && l.state !== 'given' && l.restates !== true;
+
+/**
+ * THE STOP RULE. A line the deterministic report could not verify (a note that is neither a restatement of the question nor a plain label or
+ * words) leaves open whether the working has already gone wrong, and a true line written after it can be the student copying the right line
+ * back. So no line at or after the first such line may earn a key step. Ticked lines never stop the working; a note that restates the question
+ * or has no number, no sign and no relation in it (a label, a few words) does not either. Proved by the sweep, class "an unverified wrong line".
+ */
+function barrierOf(lines, limit, ctx) {
+  for (let j = 0; j < limit; j++) {
+    const l = lines[j];
+    if (!l || l.status === 'ok') continue;                   // a ticked line (or a ticked given) never stops the working
+    const text = String(l.text ?? '').trim();
+    const s = readStudent(text);
+    if (s && !s.multi && s.parts.every(p => ctx.pc.has(canon(p)))) continue;   // the question restated
+    if (!/[=\d]/.test(text)) continue;                      // words or a bare label: nothing is claimed
+    if (/defines or labels something/.test(String(l.note ?? ''))) continue;   // the page itself reads it as a definition (u = 2x + 1, du = ...), not a claim
+    return j;
+  }
+  return limit;
+}
 
 /** For each ticked line before the limit, the steps it reaches. Lines that reach nothing are absent. */
 function reachMap(lines, limit, ctx) {
   const map = new Map();
+  let prior = false;           // a line that is not bare and reached a key step stands before this one
   for (let j = 0; j < limit; j++) {
     const l = lines[j];
     if (!ticked(l)) continue;
-    const r = stepsReached(l, ctx);
-    if (r.size) map.set(j, r);
+    const r = stepsReached(l, ctx, prior);
+    if (r.size) { map.set(j, r); if (!r.bare) prior = true; }
   }
   return map;
 }
@@ -323,7 +372,8 @@ function buildPlan(q) {
       const rep = ev.stepReport;
       if (!rep || !Array.isArray(rep.lines) || rep.lines.length !== lines.length) return result('authored-working-not-read');
       const cross = rep.lines.findIndex(l => l?.status === 'break');
-      const limit = cross < 0 ? rep.lines.length : cross;
+      const limit0 = cross < 0 ? rep.lines.length : cross;
+      const limit = barrierOf(rep.lines, limit0, ctx);
       const map = reachMap(rep.lines, limit, ctx);
       // candidates: steps before the answer step with a progress entry, that an authored line of THAT step was ticked as
       const candidates = [];
@@ -368,7 +418,7 @@ export function awardGeneric(q, report, correct) {
   try {
     withEvaluationBudget(BUDGET, () => {
       const ctx = contextOf(q);
-      lineOf = assign(plan.keySteps.map(k => k.step), reachMap(lines, Math.min(limit, 40), ctx));
+      lineOf = assign(plan.keySteps.map(k => k.step), reachMap(lines, Math.min(barrierOf(lines, limit, ctx), 40), ctx));
     });
   } catch { lineOf = new Map(); }
   const fmt = (t, o) => t.replace(/\{(\w+)\}/g, (_, k) => String(o[k]));
@@ -385,4 +435,12 @@ export function awardGeneric(q, report, correct) {
   items.push({ key: 'answer', text: GENERIC_WORDING.answer, marks: answerMarks, awarded: correct === true, verified: true, lines: [], basis: 'answer', reason: correct === true ? GENERIC_WORDING.answerRight : GENERIC_WORDING.answerWrong });
   const total = items.reduce((n, i) => n + (i.awarded ? i.marks : 0), 0);
   return { items, total, possible: N, cross, plan };
+}
+
+/** For the sweep and the packet: how many real-progress results each step of the authored solution has, and whether the step is only values. */
+export function stepFacts(q) {
+  const ctx = withEvaluationBudget(BUDGET, () => contextOf(q));
+  const out = new Map();
+  for (const e of ctx.entries) if (e.progress) { const f = out.get(e.step) || { results: 0, onlyValues: true }; f.results++; f.onlyValues = f.onlyValues && e.kind === 'label' && e.numeric; out.set(e.step, f); }
+  return out;
 }
