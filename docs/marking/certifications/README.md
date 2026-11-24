@@ -17,3 +17,9 @@ reviewed or signed anything, so method marks are **off** in both editions.
 
 **Never create a record here except from a real, signed original.** Test fixtures live in `tools/test-fixtures/`.
 A CBSE record certifies CBSE only; it never enables Prithagoras (ADR-0002 §6).
+
+**Two tiers.** This folder is the examiner tier only. Since 24 November 2026 Australia (Prithagoras) also has a separate
+author-approved tier (`docs/marking/author-approvals/`): a question type the author approved is paid by its scheme alone,
+with no examiner record, and is never called examiner-certified. It does not use this folder, it does not remove
+Prithagoras from `UNCERTIFIED_EDITIONS`, and it never sets or reads `PRI_METHOD_MARKS_EXAMINER_RESULT`. The generic method
+rubric stays off in Australia. `--gate` keeps its meaning for the examiner tier: its checks are not weakened by the second tier.

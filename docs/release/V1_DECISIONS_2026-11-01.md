@@ -74,3 +74,7 @@ No code can close these, and nothing in this file implies they are done:
 - A real-writer study of the server reader.
 - Paid Apps Agreement, tax and bank details, and the final store submission.
 - Google Play's device check and closed test.
+
+## Owner decision, 24 November 2026: step marks in Australia on the author's approval (amends D12 for Prithagoras only)
+
+For the Australian edition (Prithagoras) only, step marks may be paid on the author's approval (Priysharan Tripathi, tutor), without waiting for two independent NSW examiners, for the question types whose scheme he has approved. D12 above is unchanged for India (Priyabhata): no step marks without the signed examiner result. In Australia the only step-mark path is the scheme path, for an approved type on a question stamped with that scheme at issue, while the server has `PRI_METHOD_MARKS=on`; the general method rubric still pays nothing and every other question stays on the final answer. Every shown criterion is labelled "Pri practice marking, approved by the author (Priysharan Tripathi, tutor). Not an official NESA guideline." It is never called examiner-certified. No author record is committed yet, so nothing is paid today. See `docs/marking/author-approvals/README.md`.

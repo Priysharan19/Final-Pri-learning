@@ -1,13 +1,13 @@
 // ───────────────────────────────────────────────────────────────────────────────
 // Pri Learning · method marks paid by a scheme, over the real submit path (R4)
 //
-// Boots the shipped /v1 app as Prithagoras with the method-mark switch ON, approves the seven types IN THIS TEST PROCESS ONLY, and
+// Boots the shipped /v1 app as Prithagoras (switch off in phase 1, on in phase 2), approves the seven types IN THIS TEST PROCESS ONLY, and
 // issues, submits and reads real replies:
 //
-//   PHASE 1  Prithagoras UNCERTIFIED (the repository state, editionMarking.js UNCERTIFIED_EDITIONS): a listed type's question is
-//            stamped with its scheme, and nothing is paid: the reply is main's reply (the final answer only), shows no scheme criteria,
+//   PHASE 1  the switch OFF (PRI_METHOD_MARKS unset; Prithagoras stays in editionMarking.js UNCERTIFIED_EDITIONS throughout): a listed
+//            type's question is stamped with its scheme, and nothing is paid: the reply is main's reply (the final answer only), shows no scheme criteria,
 //            no method row, no scheme field and no reason code.
-//   PHASE 2  edition certified (test hook, refused under production):
+//   PHASE 2  the switch ON, author-approved tier (owner decision 24 Nov 2026; no certifyEditionForTests, no examiner variable):
 //            · a listed question whose marks are the scheme's marks is paid by the scheme, from the lines the page ticks, and says so
 //            · a listed question whose marks are NOT the scheme's (y12-explogcalc: 3 marks) is sealed final-answer-only at issue, so
 //              the generic rubric never runs on it: 0 where the control (the generic rubric, run on the same question) would pay
@@ -29,7 +29,7 @@ process.env.NODE_ENV = 'test';
 process.env.PRI_PLATFORM_DB = join(scratch, 'platform.db');
 process.env.PRI_AUTH_DELIVERY_KEY = 'c3'.repeat(32);
 process.env.PRI_FREE_PRACTICE_PER_DAY = '100000';
-process.env.PRI_METHOD_MARKS = 'on';
+delete process.env.PRI_METHOD_MARKS;
 process.env.PRI_EDITION = 'prithagoras';
 process.env.PRI_OFFERING = 'catalogue';
 delete process.env.PRI_METHOD_MARKS_EXAMINER_RESULT;
@@ -40,7 +40,7 @@ const { requestedEngine } = await import('./support/engine.mjs');
 const G = await import('../../client/src/engine/generators/index.js');
 const { nswCell } = await import('../platform/nswBanks.js');
 const { SCHEMES, schemeDigest, schemeMarks, schemeTypeOf, approveSchemeTypesForTests } = await import('../platform/schemeAward.js');
-const { certifyEditionForTests, editionMarkingPolicy } = await import('../platform/editionMarking.js');
+const { editionMarkingPolicy } = await import('../platform/editionMarking.js');
 const { sealForEdition, bankPolicy, FINAL_ANSWER_MARKING } = await import('../platform/editionBanks.js');
 const { marksPossibleFor, MARKER_OPS } = await import('../platform/markerOps.js');
 const { TYPES } = await import('../../tools/method-marks-drafts.mjs');
@@ -113,7 +113,7 @@ try {
   const clean = reply => !reply.methodCriteria && !reply.methodScheme && !('reason' in (reply.methodScheme || {})) && !JSON.stringify(reply).includes('criteria-count') && !JSON.stringify(reply).includes('type-not-approved') && !JSON.stringify(reply).includes('MARKER_POLICY');
 
   // PHASE 1: uncertified
-  c.eq(editionMarkingPolicy(process.env).methodMarks, false, 'phase 1: Prithagoras is uncertified: the edition policy is final answer only, with the switch on');
+  c.eq(editionMarkingPolicy(process.env).methodMarks, false, 'phase 1: Prithagoras is uncertified: the edition policy is final answer only, with the switch off');
   const p1 = await run(paying, 'phase1-pay');
   c.eq(p1.sealed._methodScheme, paying.scheme.id, 'phase 1: the question is stamped with its scheme (listed, marks equal)');
   c.ok(p1.sealed._marking === undefined, 'phase 1: and not sealed final-answer-only');
@@ -121,8 +121,8 @@ try {
   c.ok(clean(p1.reply) && final(p1.reply) && !p1.reply.markRows?.method, 'phase 1: no scheme criteria, no method row, no scheme field, no reason code; the solution states one criterion');
 
   // PHASE 2: certified (test hook)
-  certifyEditionForTests('prithagoras');
-  c.eq(editionMarkingPolicy(process.env).methodMarks, true, 'phase 2: with the edition certified (test hook) the switch is honoured');
+  process.env.PRI_METHOD_MARKS = 'on';
+  c.eq(editionMarkingPolicy(process.env).methodMarks, false, 'phase 2: the generic method rubric stays off on Prithagoras even with the switch on (no certification)');
   const p2 = await run(paying, 'phase2-pay');
   const credited = p2.reply.methodCriteria;
   c.ok(credited && credited.typeId === paying.scheme.id && credited.digest === schemeDigest(paying.scheme) && credited.items.length === paying.scheme.criteria.length, 'phase 2: the reply carries the scheme\'s criteria');

@@ -6,17 +6,22 @@
 
 **Worked example (your product-rule question).** Differentiate y = x^2(x - 1), a 2-mark question, with the working on your page but the last line wrong (3x^2 - x instead of 3x^2 - 2x). The page ticks the working down to line 8 and crosses line 9. Step 1, "writes a correct derivative (any equivalent form)", is earned by the first ticked line that is the derivative, line 6. Step 2, "gives the final answer correctly", is not earned, because 3x^2 - x is wrong. Result: **1 of 2**. Line 9, the crossed line, earns nothing, and neither would any line after it.
 
-**What must exist before a type pays a real student (production).** All five, for that type, and nothing pays until every one is in place:
+**What must exist before a type pays a real student (production).** Two tiers exist, and they are kept apart.
 
-1. Your approval record for the type in `docs/marking/author-approvals/<type>.json`, for the digest printed in the packet (this also makes the marked page show the table).
-2. The type's entry `{ typeId, digest }` in `APPROVED_SCHEME_TYPES` in `server/platform/schemeAward.js`. It is empty today. A question is stamped with its scheme only at issue, so only questions issued after this change are paid by it.
-3. `PRI_METHOD_MARKS=on` in the server's environment.
-4. In production, `PRI_METHOD_MARKS_EXAMINER_RESULT` naming the signed examiner result (`markingPolicy.js`).
-5. The edition's certification: `'prithagoras'` is in `UNCERTIFIED_EDITIONS` (`server/platform/editionMarking.js:27`), which forces final-answer marking for the whole edition whatever else is set. It is lifted only by a change to that list made with the edition's own signed evidence. Until then the scheme pays nothing, even with 1 to 4 in place.
+Australia (Prithagoras), the author-approved tier (your decision of 24 Nov 2026). All four, for that type, and nothing pays until every one is in place:
 
-Approving in your own name (the reply line below) does steps 1 only; steps 2 to 5 are separate decisions.
+1. Your approval record for the type in `docs/marking/author-approvals/<type>.json`, for the digest printed in the packet. Running `node tools/author-approvals.mjs` then writes the type and digest into the server's list (`server/platform/authorApproved.generated.js`) and into the page's list. Nobody types that list by hand. It is empty today.
+2. `PRI_METHOD_MARKS=on` in the server's environment. Unset, off or misspelt means the final answer only. No examiner variable is needed or read.
+3. A question stamped with the scheme when it is issued, so only questions issued after the record is committed are paid by it.
+4. The scheme's marks equal the question's marks.
 
-**To approve.** Reply with exactly: `I approve the seven step-mark schemes in INDEX.md as drafted. Priysharan Tripathi`. Approving does not switch anything on: the approved list stays empty and the marking switch stays off until you decide, in separate steps. As before, the approval record for each type is written by you, in your own name (steps below).
+Only this scheme path pays step marks in Australia. The general method rubric still pays nothing there, and every other Australian question stays on the final answer. Where a criterion is shown, the page says it is Pri practice marking approved by you, and not an official NESA guideline.
+
+India (Priyabhata), the examiner tier, unchanged: `PRI_METHOD_MARKS=on` and, in production, `PRI_METHOD_MARKS_EXAMINER_RESULT` naming the signed examiner result (`markingPolicy.js`).
+
+Approving in your own name (the reply line below) writes nothing by itself: the record for each type is written by you.
+
+**To approve.** Reply with exactly: `I approve the seven step-mark schemes in INDEX.md as drafted. Priysharan Tripathi`. Approving does not switch anything on: the approved list stays empty until your records are committed, and the marking switch stays off until you decide. As before, the approval record for each type is written by you, in your own name (steps below).
 
 ---
 
@@ -96,4 +101,4 @@ Please write these records yourself. No one else, and no automatic run, may crea
 
 ## What approval does not do
 
-Approving a type does not by itself switch step marks on for students. Two separate steps are needed after your record: the type is added to the server's approved list (empty today), and the marking switch (PRI_METHOD_MARKS, and in production the examiner-result variable) is turned on. Both are your decision. The older route, with two independent examiners, is kept as it was, as a stronger second tier.
+Approving a type does not by itself switch step marks on for students. After your record, the type reaches the server's approved list when `node tools/author-approvals.mjs` is run and committed, and the server pays it only while `PRI_METHOD_MARKS=on` is set on the Australian server. This is the author-approved tier (24 Nov 2026): it does not wait for two independent NSW examiners, and it is never called examiner-certified. The older route, with two independent examiners, is kept as it was for India and as a stronger second tier.
