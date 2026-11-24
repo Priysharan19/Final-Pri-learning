@@ -267,7 +267,9 @@ try {
     assert.equal(sq.outcome, slots[i].outcome);
     assert.ok(nswCell(sq.generator, q.difficulty) && !indiaBank(sq.generator), `${sq.generator} is an issued NSW form`);
     assert.ok(q._curriculum.outcomes.some(o => o.code === slots[i].outcome), 'its sealed identity names the slot\'s outcome');
+    // Papers are sealed without the approved step-mark list (exams.js paperBanks): final-answer-only, never a scheme stamp.
     assert.equal(q._marking, 'final-answer-only');
+    assert.equal(q._methodScheme, undefined);
     assert.ok(['numeric', 'mcq', 'expression', 'point', 'set'].includes(q.answerType) && !q.boardScheme && !q.multipart, 'a final-answer type');
     assert.deepEqual(sq.marking, { correct: slots[i].marks, incorrect: 0, unanswered: 0, partialPerOption: null });
   });

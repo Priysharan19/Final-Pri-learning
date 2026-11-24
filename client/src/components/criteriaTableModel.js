@@ -44,3 +44,7 @@ export function criteriaView({ criteria, mark, cards, approved = AUTHOR_APPROVED
   if (earned !== Number(mark.awarded) || possible !== Number(mark.possible)) return null;
   return { typeId: criteria.typeId, rows, earned, possible };
 }
+
+// The cards a stepReport gives criteriaView: a ticked line is 'checked', the first crossed line 'first-error', anything else 'unchecked'. The same lines the
+// server paid from (its own report), whatever the working's shape: typed, ink or photo, an expression chain or not.
+export const cardsOfReport = report => (Array.isArray(report?.lines) ? report.lines.map((l, i) => ({ n: i + 1, status: l?.status === 'ok' ? 'checked' : l?.status === 'break' ? 'first-error' : 'unchecked' })) : []);

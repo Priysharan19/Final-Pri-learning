@@ -58,6 +58,9 @@ delete process.env.PRI_PUBLIC_ORIGIN;
 const { startApp, checks, registerAccount, verifyEmail } = await import('./support/app-harness.mjs');
 const { requestedEngine } = await import('./support/engine.mjs');
 const { bankPolicy, FINAL_ANSWER_MARKING } = await import('../platform/editionBanks.js');
+const { genericEligible, genericPlan, GENERIC_WORDING } = await import('../platform/genericSteps.js');
+const { schemeTypeOf, schemeMarks, schemeById } = await import('../platform/schemeAward.js');
+const { marksPossibleFor } = await import('../platform/markerOps.js');
 const { nswBank, nswCell, NSW_BANK_LEDGER, NSW_BANK_COUNT, NSW_CELL_COUNT, nswCurriculumResponse } = await import('../platform/nswBanks.js');
 const { FINAL_ANSWER_ONLY } = await import('../platform/markingPolicy.js');
 const { editionMarkingPolicy: markingPolicy, editionMethodMarksRefusal: methodMarksRefusal } = await import('../platform/editionMarking.js');
@@ -186,7 +189,11 @@ try {
     c.ok(validIdentity(sealed._curriculum, sample.generator), `${tag}: the sealed question carries a valid curriculum identity`);
     c.deq([sealed._curriculum.syllabus, sealed._curriculum.syllabusVersion], [sample.syllabus, sample.version], `${tag}: syllabus ${sample.syllabus} version ${sample.version}`);
     c.ok(sealed._curriculum.outcomes.some(o => o.code === sample.code), `${tag}: outcome ${sample.code}`);
-    c.eq(sealed._marking, FINAL_ANSWER_MARKING, `${tag}: sealed final-answer-only`);
+    // Since the author's record of 24 Nov 2026 an eligible written question worth 2+ marks is stamped with the generic rule (or its type's scheme) at issue
+    // instead of the final-answer seal. Every other question keeps exactly the seal it had. Never both, never neither.
+    const stamped = typeof sealed._methodScheme === 'string';
+    c.ok(stamped !== (sealed._marking === FINAL_ANSWER_MARKING), `${tag}: sealed final-answer-only, or stamped with the approved scheme, never both`);
+    c.eq(stamped, genericEligible(sealed) || schemeTypeOf(sealed, sample.generator) != null && marksPossibleFor(sealed) === schemeMarks(schemeById(schemeTypeOf(sealed, sample.generator))), `${tag}: it is stamped exactly when it is eligible for the approved rule or scheme`);
     // The right answer, as the server holds it, is credited in full.
     const key = sealed.answerType === 'mcq' ? String(sealed.answer.correctIndex)
       : sealed.answerType === 'numeric' ? (sealed.answer.canonicalInput || String(sealed.answer.value))
@@ -195,8 +202,26 @@ try {
             : sealed.answerType === 'set' ? sealed.answer.values.join(', ') : `${sealed.answer.a}:${sealed.answer.b}`;
     const g = await submit(r.data.question.id, `nsw-right-${sample.generator}`, key);
     c.deq([g.status, g.data?.correct, g.data?.resolved, g.data?.marksEarned], [200, true, true, g.data?.marksPossible], `${tag}: the stored answer is marked correct for full marks`);
-    c.deq(g.data.solution.criteria, [{ mark: g.data.marksPossible, text: 'Correct final answer' }], `${tag}: the solution states one criterion, the final answer`);
-    c.ok(!g.data.markRows?.method && g.data.partial == null, `${tag}: and no method evidence`);
+    if (!stamped) {
+      // exactly the old assertions
+      c.deq(g.data.solution.criteria, [{ mark: g.data.marksPossible, text: 'Correct final answer' }], `${tag}: the solution states one criterion, the final answer`);
+      c.ok(!g.data.markRows?.method && g.data.partial == null, `${tag}: and no method evidence`);
+    } else if (!schemeById(sealed._methodScheme) && !genericPlan(sealed).keySteps.length) {
+      // stamped by the generic rule, but the question's authored solution has no readable key step: the rule cannot pay it, so it is exactly the old reply
+      c.deq(g.data.solution.criteria, [{ mark: g.data.marksPossible, text: 'Correct final answer' }], `${tag}: stamped but with no key step to pay, the solution states one criterion, the final answer`);
+      c.ok(!g.data.markRows?.method && g.data.partial == null && !g.data.methodScheme, `${tag}: and nothing is paid by the rule`);
+    } else {
+      // The switch is on here: the right answer on a stamped question is paid by its approved scheme, and the solution's criteria are exactly that scheme's rows
+      // (marks, text, order), which add up to the question's marks; the reply's table has the scheme's ids in the same order, every criterion earned.
+      const scheme = schemeById(sealed._methodScheme);
+      const expected = scheme
+        ? scheme.criteria.map(x => ({ key: x.key, mark: x.marks, text: x.text }))
+        : [...genericPlan(sealed).keySteps.map(k => ({ key: `step-${k.number}`, mark: 1, text: k.text })), { key: 'answer', mark: genericPlan(sealed).marks - genericPlan(sealed).keySteps.length, text: GENERIC_WORDING.answer }];
+      c.deq(g.data.solution.criteria, expected.map(({ mark, text }) => ({ mark, text })), `${tag}: the solution's criteria are exactly the approved ${scheme ? 'scheme' : 'rule'}'s rows, in order`);
+      c.deq(g.data.methodCriteria?.items?.map(i => [i.key, i.marks, i.awarded]), expected.map(x => [x.key, x.mark, true]), `${tag}: the reply's table has those ids and marks in that order, every criterion earned by the right answer`);
+      c.eq(expected.reduce((n, x) => n + x.mark, 0), g.data.marksPossible, `${tag}: and the rows add up to the question's marks`);
+      c.deq(g.data.methodScheme, { typeId: sealed._methodScheme, paid: true }, `${tag}: the reply says the scheme paid`);
+    }
     const [event] = await eventsOf(r.data.question.id);
     c.deq(event.curriculum, sealed._curriculum, `${tag}: the graded attempt records the same identity`);
     c.eq(event.marksEarned, g.data.marksPossible, `${tag}: and the mark`);

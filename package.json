@@ -300,6 +300,7 @@
     "test:consent:signup": "node client/test/signup-consent-check.mjs",
     "test:practice:course": "node client/test/practice-course-request-check.mjs && node server/test/free-practice-uncapped-check.mjs",
     "test:nsw:practice:tour": "node client/test/tour-nsw-practice-marked.js",
+    "test:step-marks:tour": "node client/test/tour-step-marks.mjs",
     "test:nsw:practice:bank:tour": "node client/test/tour-nsw-practice-bank.js",
     "test:qbank:mix": "node server/test/qbank-mix-check.mjs",
     "test:qbank:sealed": "node server/test/qbank-sealed-check.mjs",

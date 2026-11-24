@@ -1,4 +1,4 @@
-DRAFT for the author's review: not approved. Nothing in this file is switched on.
+APPROVED by the author, Priysharan Tripathi (tutor), on 2026-11-24, at the digest named in this file. It pays on Prithagoras only while the server has PRI_METHOD_MARKS=on. Not an official NESA guideline.
 
 # Step marks drawn from the authored worked solution (generic rule)
 
@@ -6,7 +6,7 @@ Approval id: `generic-solution-steps`. This is ONE rule for every multi-mark wri
 
 ## What you are asked to decide
 
-Whether the rule below may pay step marks, in Australia only, for a student whose method is right and whose final answer is wrong or missing. It pays nothing until you approve it. It is a separate approval from your seven question types, which are unchanged: a question whose type you approved still uses that type's scheme.
+Whether the rule below may pay step marks, in Australia only, for a student whose method is right and whose final answer is wrong or missing. You approved it on 2026-11-24, at the digest at the foot of this packet; it pays only while the Australian server has the method-marks switch on. It is a separate approval from your question types, which are unchanged: a question whose type you approved still uses that type's scheme.
 
 If you approve it the server pays it only while all of these hold: the Australian server has the method-marks switch on, the question was marked as a rule question when it was issued, and your record names the digest at the foot of this packet. Change one word of the rule and the digest changes, and the approval no longer counts.
 
@@ -61,22 +61,22 @@ THE BARE-LINE TEST. A bare line is a letter equal to a number (t = 1, x = -6) or
 
 Measured on the generated Year 11 and 12 Advanced and Extension 1 written questions that the NSW bank issues, seeds 1 to 40 per issued cell. "Can pay" means the question is worth 2 or more marks and the rule has at least one key step to pay. "All N-1" means it has a key step for every mark below full.
 
-| Topic | Multi-mark written | Your seven types today | Rule can pay | Share | Rule can pay all N-1 |
+| Topic | Multi-mark written | Your approved types today | Rule can pay | Share | Rule can pay all N-1 |
 |---|---:|---:|---:|---:|---:|
 | Advanced · Algebra | 191 | 40 | 46 | 24.1% | 12 |
-| Advanced · Calculus | 851 | 23 | 559 | 65.7% | 342 |
+| Advanced · Calculus | 851 | 123 | 559 | 65.7% | 342 |
 | Advanced · Financial Maths | 219 | 0 | 82 | 37.4% | 45 |
 | Advanced · Functions | 780 | 0 | 415 | 53.2% | 283 |
 | Advanced · Statistics & Probability | 342 | 0 | 86 | 25.1% | 76 |
-| Advanced · Trigonometry | 362 | 2 | 77 | 21.3% | 53 |
+| Advanced · Trigonometry | 362 | 6 | 77 | 21.3% | 53 |
 | Extension 1 · Algebra | 590 | 0 | 204 | 34.6% | 112 |
 | Extension 1 · Calculus | 518 | 0 | 188 | 36.3% | 116 |
 | Extension 1 · Functions | 109 | 0 | 66 | 60.6% | 24 |
 | Extension 1 · Statistics & Probability | 307 | 0 | 96 | 31.3% | 72 |
 | Extension 1 · Trigonometry | 330 | 0 | 194 | 58.8% | 59 |
-| ALL | 4599 | 65 | 2013 | 43.8% | 1194 |
+| ALL | 4599 | 169 | 2013 | 43.8% | 1194 |
 
-Before this rule only 1.4% of these questions could earn a step mark. With it, 43.8% can. On the 2013 questions it can pay, it can pay 2332 of the 3220 marks below full (72.4%).
+Before this rule only 3.7% of these questions could earn a step mark. With it, 43.8% can. On the 2013 questions it can pay, it can pay 2332 of the 3220 marks below full (72.4%).
 
 ## The sweep: does it pay anything it should not
 
@@ -446,7 +446,7 @@ Marks: **2 of 2**.
 These are measured, in the same sweep (seeds 1 to 6), and rewritten each time the packet is generated.
 
 - **A different valid method earns less.** The same correct route, with a wrong last line, earns on average 1.24 marks when it is written the way the author wrote it (262 pages). Written with the sides of each equation swapped it earns 0.56, and with every equation moved to one side it earns 1.17. The rule recognises the authored route best. A student who solves it another valid way, or writes an equivalent line in a different shape, is paid less than they deserve and sometimes nothing.
-- **Over-credit after a wrong line the page cannot see.** One middle line was made wrong in turn, and the authored lines left after it (692 pages, hard test, tolerance 0): 333 marks were earned against an ideal of 369 (the steps written before the wrong line); pages above the ideal: 0; marks earned by the wrong line or a line after it: 0. The cost of the stop rule is that true working is sometimes not paid: a true line the page can only note (a bare list of numbers, an inequality, a definition it does not read) ends the paying. The stop rule and the bare-line test together reduced the questions the rule can pay from 52.5 percent to 44.8 percent of the multi-mark written questions (45.8 percent with your seven types), seeds 1 to 40, and the marks paid on the authored route with a wrong last line from 2702 over 2260 pages (1.20 a page) to 2257 over 1940 pages (1.16 a page): a loss of 16.5 percent of marks, almost all of it questions that no longer pay at all, not a lower mark on those that still do.
+- **Over-credit after a wrong line the page cannot see.** One middle line was made wrong in turn, and the authored lines left after it (692 pages, hard test, tolerance 0): 333 marks were earned against an ideal of 369 (the steps written before the wrong line); pages above the ideal: 0; marks earned by the wrong line or a line after it: 0. The cost of the stop rule is that true working is sometimes not paid: a true line the page can only note (a bare list of numbers, an inequality, a definition it does not read) ends the paying. The stop rule and the bare-line test together reduced the questions the rule can pay from 52.5 percent to 44.8 percent of the multi-mark written questions (45.8 percent with the seven types approved when this was measured), seeds 1 to 40, and the marks paid on the authored route with a wrong last line from 2702 over 2260 pages (1.20 a page) to 2257 over 1940 pages (1.16 a page): a loss of 16.5 percent of marks, almost all of it questions that no longer pay at all, not a lower mark on those that still do.
 - **A single bare line.** A letter equal to a number, or a number, alone (257 pages, hard test, tolerance 0): a mark was earned on 9, every one a step whose one result that is (9); over-credit 0. Examples that no longer earn: v = 0 alone, and x = -6 alone for the domain of a composite function.
 - **A true first line, then nothing readable.** 292 pages: a mark was earned on 219. In 209 of those the step is the first step of the solution, and the line is a derived expression on 219 and a bare value on 0. This is intended: a derived first line (a derivative, the equation set up from the question) is a true result a student had to find, and it earns one mark, the same as it does at the answer step of an examiner's scheme. A bare value as the first step does not pay (it is set-up).
 - It reads only what the page can tick. A question whose solution is in words, in a table, as an inequality, as a sketch or as a vector or matrix the page cannot read has no usable steps, and stays on the final answer.
