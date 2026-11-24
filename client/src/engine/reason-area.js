@@ -233,8 +233,25 @@ function assessSubstituted({ text, meta }) {
   // difference that is right and a claim that is not, and is a note.
   let shown = false;
   for (const piece of clause.split('=').map(part => part.trim()).filter(Boolean)) {
+    // An integral or a bracket on the line is judged by its limits, whatever it holds: this question's limits, or the line is not credited.
+    const brk = piece.match(BRACKET);
+    if (brk) { const b = boundsOf(brk[2], brk[3]); if (b && !b.unread && boundsAgree(b, meta)) continue; return abstain('Pri could not verify the limits written on this line.'); }
+    const itg = piece.match(INTEGRAL);
+    if (itg && /^(?:∫|int(?![a-z]))/i.test(piece)) { const b = boundsOf(itg[1] ?? itg[3] ?? itg[5], itg[2] ?? itg[4] ?? itg[6]); if (b && !b.unread && boundsAgree(b, meta)) continue; return abstain('Pri could not verify the limits written on this line.'); }
     const ast = astFor(piece);
-    if (!ast || variablesOf(ast).size) continue;
+    if (ast && variablesOf(ast).size) {
+      // A part with a letter is judged, never skipped: it may only name the function (`F(x)`, `A`), or be exactly F(upper) - F(lower) for this
+      // question's limits. `F(3) + F(1)` and `F(5) - F(1)` come to the same numbers as the right line and are not it.
+      if (isLabelPart(piece, variable) || LABEL.test(piece)) continue;
+      const fd = piece.replace(/\s+/g, '').match(/^([A-Za-z])\(([^()]+)\)-\(?([A-Za-z])\(([^()]+)\)\)?$/);
+      if (fd && fd[1] === fd[3]) {
+        const at = t => { const a = astFor(t); if (!a || variablesOf(a).size) return null; try { const v = evaluate(a, {}); return Number.isFinite(v) ? v : null; } catch { return null; } };
+        const hi = at(fd[2]), lo = at(fd[4]);
+        if (hi !== null && lo !== null && numsClose(hi, Number(meta.upper), 1e-9) && numsClose(lo, Number(meta.lower), 1e-9)) continue;
+      }
+      return abstain('Pri could not match this line to the limits substituted into an antiderivative.');
+    }
+    if (!ast) continue;
     let v = null; try { v = evaluate(ast, {}); } catch { v = null; }
     if (!Number.isFinite(v)) continue;
     if (!numsClose(v, expected, 1e-9) && Math.abs(v - expected) > 6e-4) return abstain('Pri could not match this line to the limits substituted into an antiderivative.');

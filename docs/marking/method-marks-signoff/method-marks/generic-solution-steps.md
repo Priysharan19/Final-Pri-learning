@@ -64,7 +64,7 @@ Measured on the generated Year 11 and 12 Advanced and Extension 1 written questi
 | Topic | Multi-mark written | Your seven types today | Rule can pay | Share | Rule can pay all N-1 |
 |---|---:|---:|---:|---:|---:|
 | Advanced · Algebra | 191 | 40 | 46 | 24.1% | 12 |
-| Advanced · Calculus | 851 | 23 | 584 | 68.6% | 354 |
+| Advanced · Calculus | 851 | 23 | 584 | 68.6% | 356 |
 | Advanced · Financial Maths | 219 | 0 | 82 | 37.4% | 45 |
 | Advanced · Functions | 780 | 0 | 415 | 53.2% | 285 |
 | Advanced · Statistics & Probability | 342 | 0 | 87 | 25.4% | 77 |
@@ -74,9 +74,9 @@ Measured on the generated Year 11 and 12 Advanced and Extension 1 written questi
 | Extension 1 · Functions | 109 | 0 | 75 | 68.8% | 24 |
 | Extension 1 · Statistics & Probability | 307 | 0 | 96 | 31.3% | 72 |
 | Extension 1 · Trigonometry | 330 | 0 | 194 | 58.8% | 59 |
-| ALL | 4599 | 65 | 2051 | 44.6% | 1212 |
+| ALL | 4599 | 65 | 2051 | 44.6% | 1214 |
 
-Before this rule only 1.4% of these questions could earn a step mark. With it, 44.6% can. On the 2051 questions it can pay, it can pay 2376 of the 3283 marks below full (72.4%).
+Before this rule only 1.4% of these questions could earn a step mark. With it, 44.6% can. On the 2051 questions it can pay, it can pay 2378 of the 3283 marks below full (72.4%).
 
 ## The sweep: does it pay anything it should not
 

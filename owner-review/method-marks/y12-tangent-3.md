@@ -70,7 +70,7 @@ Final answer check: correct.
 |---:|---|---|---|
 | 1 | `dy/dx = 2 * x - 5` | true line | derivative |
 | 2 | `m = 2 * (1) - 5 = -3` | true line | gradient |
-| 3 | `y = -4x + 5` | no verdict (This line belongs to a different mathematical operation, so the checker has not reclassified it as a substitution.) | nothing |
+| 3 | `y = -4x + 5` | no verdict (This line is not labelled as the value asked for (m, gradient or y′(x)), so it is not checked as that value.) | nothing |
 
 Award: **2 of 3**. Criteria earned: derivative (1), gradient (1).
 Final answer check: not correct.

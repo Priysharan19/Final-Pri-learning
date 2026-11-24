@@ -2017,9 +2017,16 @@ function assessEvaluationStage(stage, line, ctx) {
   const clause = chain?.reversed ? chain.clause : ctx ? cleanLine(raw, { letters: ctx.read.letters }) : raw;
   // A derived plan (engine/schemePlans.js) judges a chain of equals as the evaluation only when it is labelled (`y'(0) = ...`, `m = ...`): the
   // numerator `2 - 1 = 1` of an authored true page is a true line on the way, never the value of the gradient. A lone value is still judged.
-  { const eqParts = raw.split('='); if (stage.requireLabel === true && eqParts.length >= 2 && !/[a-z]/i.test(eqParts[0].replace(/\bpi\b|\be\b/gi, '')) && eqParts[0].trim() !== '') {
-    return { status: 'note', trusted: false, note: 'This line is not labelled as the value asked for (m, gradient or y′(x)), so it is not checked as that value.' };
-  } }
+  // A chain of equals is the value asked for only when it is labelled with one of the stage's labels (`y'(0) = ...`, `m = ...`); a lone value is
+  // judged as before. Any other chain (`(x + 4) = 5`, `= 3`, `2 - 1 = 1`) is a true or false line of its own, left to the general line checks
+  // (a note here, ticked or crossed by the arithmetic check on its own truth), never the gradient's value.
+  if (stage.requireLabel === true && raw.includes('=')) {
+    const key = t => String(t).toLowerCase().replace(/^(?:∴|so|hence|then|therefore)\s+/, '').replace(/\s+/g, '').replace(/\([^()]*\)$/, '').replace(/[′’‘]/g, "'");
+    const first = key(raw.split('=')[0]);
+    if (!(stage.labels || []).some(l => key(l) === first)) {
+      return { status: 'note', trusted: false, note: 'This line is not labelled as the value asked for (m, gradient or y′(x)), so it is not checked as that value.' };
+    }
+  }
   let verdict = null;
   for (const variant of evaluationVariants(stage, ctx)) {
     const v = assessEvaluationLine({ text: clause, meta: variant.stage });
