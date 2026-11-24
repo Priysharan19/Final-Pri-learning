@@ -130,6 +130,18 @@ ok(sidesOf('a = b = c').length === 3, 'oracle: splits a chain');
   }
 }
 
+// ── a lazy `=` that begins the next step ──────────────────────────────────────────────────────────────────────────────────────
+{
+  // `x = π/2` then `= 8` (the area): the value the worked solution reaches, begun under an unrelated value, is the start of the next step, never a false rewrite
+  for (const [d, sd] of [[3, 104], [3, 109], [4, 104], [4, 109]]) {
+    const q = gen('y12-trigcalc', d, sd);
+    const lines = authoredPage(q, (await import('../../client/src/engine/solutionMatch.js'))._internals.spanToPlain);
+    const at = lines.findIndex(l => /^=/.test(l));
+    ok(at < 0 || statusOf(q, lines, at) !== 'break', `y12-trigcalc ${d} ${sd}: the line "${lines[at]}" is not crossed`);
+    ok(at >= 0, `y12-trigcalc ${d} ${sd}: the authored page has a lazy "=" line`);
+  }
+}
+
 // ── a root the question states rounded (answer.tol) ──────────────────────────────────────────────────────────────────────────
 {
   // the diagnosis never says a line "lost a root" or "is false" for a root it holds to within the question's own rounding
