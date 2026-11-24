@@ -254,6 +254,13 @@ const wordsOf = prose => prose.split(/\s+/).filter(w => /[A-Za-z0-9]/.test(w));
 function answerNumbers(q) {
   const a = q?.answer || {};
   const out = [...keyNumbers(q)];
+  // One step from a numeric answer: its coefficient of pi (5/4 for 5pi/4), and what the logarithm of it is the logarithm of
+  // (10^3 for log 1000 = 3, 2^k, e^k for a small whole answer k).
+  if (q?.answerType === 'numeric' && Number.isFinite(a.value)) {
+    const c = a.value / Math.PI;
+    for (let d = 1; d <= 12; d++) { const n = Math.round(c * d); if (n !== 0 && Math.abs(c * d - n) < 1e-9 * Math.max(1, Math.abs(n))) { out.push(n / d); break; } }
+    if (Number.isInteger(a.value) && Math.abs(a.value) <= 12) out.push(10 ** a.value, 2 ** a.value, Math.E ** a.value);
+  }
   if (q?.answerType === 'interval' && typeof a.region === 'string') for (const m of a.region.matchAll(/\d+(?:\.\d+)?/g)) out.push(Number(m[0]));
   return out.filter(Number.isFinite);
 }
@@ -374,6 +381,10 @@ export function rungDropReason(q, text, ctx = {}) {
   const symbolOnly = spans.every(sp => /^\s*\\?[A-Za-z]{1,6}(?:_\{?\w+\}?)?\s*$/.test(sp));
   if (plainWords.length && symbolOnly && plainWords.some(w => BARE_VERBS.has(w)) && plainWords.every(w => BARE_VERBS.has(w) || FILLER.has(w) || ARTICLES.has(w) || GENERIC_NOUNS.has(w) || w.length === 1)) return 'a bare verb';
   if (words.length + spans.length === 1 && !spans.length && !/[0-9=+\-−×÷*/^²³]/.test(words[0])) return 'a single word';
+
+  // Only a number, a fraction or a power of numbers: it names no method and gives, or is one step from, a value.
+  { const bare = plainUnicode(texToPlain(spans.length ? spans.join(' ') + ' ' + prose : t).plain).replace(/[\s.,;:!?]+$/g, '').trim();
+    if (bare && !/[A-Za-z\u03b1-\u03c9\u0391-\u03a9\u221a]/.test(bare) && /\d/.test(bare) && !words.some(w => /[A-Za-z]/.test(w))) return 'only a number, fraction or power'; }
 
   const direct = leakReason(q, t);
   if (direct) return direct;
