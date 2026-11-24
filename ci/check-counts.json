@@ -223,7 +223,10 @@
         {"has":"STEP JUSTIFY: PASS — 777/777 checks","note":"773 → 777 (21 November: worked-solution line match): the two new aw.* strings (aw.body.restates, aw.summary.mixedAll) are walked by the two per-string checks, twice each. 755 → 773 (20 November: true-as-written fold, honest Evaluation copy, true-as-written headline): the nine new aw.* and mp.* strings are walked by the two per-string checks, twice each. 753 → 755 (#1072, printed by CI run 44481164559): the new card string aw.body.arithmetic is walked by the two per-string checks (has a Hindi string, has no praise word). Annotated working: named rules for valid steps (27 rules, negative and must-not-name cases), identity proofs straight, \"= RHS\" and meet-in-the-middle, receipt marks unchanged by the panel, no praise words."},
         {"has":"HSC PRIORITIES · 1437/1437 checks passed","note":"Prithagoras HSC 2027 priorities: NESA mapping-grid metadata (no text), the old → new map held to the NSW model, the pinned ranking, the backtest evidence doc, edition isolation, en-AU copy and a render."},
         {"has":"LANDING HOME: PASS — 97/97 checks","note":"The verified page: the landing demo's statuses come from the real Step Check and mistakeView, the social-proof slots stay hidden, Home shows only evidence that exists."},
-        {"has":"LINE SYSTEM REGRESSION: PASS — 8000 prompts over 4000 seeds","note":"Examiner pre-review regression: no simultaneous pair is a single line; no line prints without its x term."}
+        {"has":"LINE SYSTEM REGRESSION: PASS — 8000 prompts over 4000 seeds","note":"Examiner pre-review regression: no simultaneous pair is a single line; no line prints without its x term."},
+        {"has":"QBANK IMPORT: PASS 129/129 checks","note":"89 -> 129, as printed after the second review round: the rung rule (the seven reviewer cases, plain-prose arithmetic, sealed texts, 0 to 3 rungs, nothing derived from a step) on a fixture written in the test."},
+        {"has":"QBANK ISOLATION: PASS — 6/6 checks (1804 questions protected)","note":"1794 -> 1804 questions, as printed: the pack now keeps the questions whose leaking hint is dropped instead of rejecting them. Static isolation of the committed bank from the client (the built-client half runs after the build, with --require-dist, over every file of client/dist whatever its extension)."},
+        {"has":"QBANK ISOLATION TEST: PASS 23/23 checks","note":"15 -> 23, as printed: the pack in a non-text extension, gzipped, brotli-compressed, answers alone, and a script of short numeric answers (in order and shuffled) all fail the scan; a table of whole numbers does not."}
       ]
     },
     "platform/blind.log": {
@@ -768,6 +771,7 @@
         {"has":"PRACTICE INPUT TIMING: PASS — 4/4 cases (390×844 and 820×1180, light and dark), 12/12 answer-mode presses (the selected tab included) inside 100 ms"},
         {"has":"E2E SUITE PASSED — 129/129 checks across 1 flows"},
         {"has":"NSW PRACTICE MARKED TOUR: PASS — 12/12 checks","note":"9 → 12 (train banks-1, as printed by running the tour on the merged tree): the quality sweep (77b9474e3) added three render checks of the Exams page (the paper generator entry, the exam-style practice sets with a Sit button each, and no generic Start practice paper card). A Prithagoras NSW Year 10 student is issued a question by the server and the server marks it (the device names the profile own course)."},
+        {"has":"NSW PRACTICE BANK TOUR: PASS — 31/31 checks","note":"28 -> 31, as printed by running client/test/tour-nsw-practice-bank.js: his hints are the rungs (2 or 3 here), and a question with no rung offers no hint control and no empty panel (the 3 checks run when one is dealt within the bounded search, as it is in about one question in ten)."},
         {"has":"GUEST TRIAL TOUR: PASS - 180 checks (priyabhata, prithagoras)","note":"ADR-0003: both editions, a visitor with no account, five server-marked questions, the sign-up prompt, Hindi where offered, and the same picker as the signed-in Home quick start. 129 -> 180: a wrong answer shows the first worked step and keeps the answer closed, one retry (recorded as after a worked step), the next steps one at a time, \"Try one like it\" and the three-state tally (re-derived by running the tour)."}
       ]
     },
@@ -836,6 +840,41 @@
       "log": "reading-floor-http.log",
       "pins": [
         {"has":"READING FLOOR HTTP (sqlite): PASS: 71 checks"}
+      ]
+    },
+    "platform/qbank-pack.log": {
+      "job": "platform-contracts",
+      "log": "qbank-pack.log",
+      "pins": [
+        {"has":"QBANK PACK: PASS — 402/402 checks","note":"392 -> 402, as printed: the ladder is the hints, in order, and no step, heading, criterion line or trap text is on the wire."}
+      ]
+    },
+    "platform/qbank-real-pack.log": {
+      "job": "platform-contracts",
+      "log": "qbank-real-pack.log",
+      "pins": [
+        {"has":"QBANK REAL PACK: PASS — 620/620 checks over 1804 questions","note":"217 -> 620 over 1804, as printed: the rung rule re-run over every hint and rung of every packed question, and a sweep of 300 questions through the real routes (issue reply, hint route, no-rung refusal)."}
+      ]
+    },
+    "platform/qbank-mix.log": {
+      "job": "platform-contracts",
+      "log": "qbank-mix.log",
+      "pins": [
+        {"has":"QBANK MIX: PASS — 251/251 checks","note":"183 -> 251, as printed: a bank question dealt and then revealed (at once, through the ladder, afterwards) or abandoned is never dealt again in 90 issues of y12-integration level 3."}
+      ]
+    },
+    "platform/qbank-marking.log": {
+      "job": "platform-contracts",
+      "log": "qbank-marking.log",
+      "pins": [
+        {"has":"QBANK MARKING: PASS — 55/55 checks over 1804 questions","note":"30 -> 55 over 1804, as printed: the rounding reading applies to 0 of 1226 numeric questions and never where an exact form is asked, and yy' and dy/dx are one left side."}
+      ]
+    },
+    "platform/qbank-sealed.log": {
+      "job": "platform-contracts",
+      "log": "qbank-sealed.log",
+      "pins": [
+        {"has":"QBANK SEALED: PASS — 11/11 checks over 1804 questions","note":"1794 -> 1804 questions, as printed."}
       ]
     }
   },

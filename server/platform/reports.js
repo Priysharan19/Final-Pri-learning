@@ -39,6 +39,15 @@ export function createReportRouter(db) {
     const appVersion = String(req.body?.appVersion || '').slice(0, 80) || null;
     const curriculumVersion = String(req.body?.curriculumVersion || '').slice(0, 120) || null;
     const context = cleanContext(req.body?.context);
+    // A question from the author's bank carries its own id in the report, so the author can find it: read from the account's own escrowed
+    // question (never from the request), and only for a question this account was issued.
+    if (questionId) {
+      try {
+        const held = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=?", [req.platformSession.account_id, questionId]);
+        const bank = held ? JSON.parse(held.response_json)?._bank : null;
+        if (typeof bank === 'string' && /^[A-Za-z0-9._-]{1,60}$/.test(bank)) context.bankQuestion = bank;
+      } catch { /* a report is never refused for this */ }
+    }
     const encoded = JSON.stringify(context);
     if (Buffer.byteLength(encoded) > 32 * 1024) return res.status(413).json({ error: { code: 'REPORT_CONTEXT_TOO_LARGE', message: 'Report context is too large.' } });
     const reportId = id('rpt');

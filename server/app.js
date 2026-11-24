@@ -5,6 +5,7 @@
 // in-process against an in-memory database. In production the legacy /api
 // Express stack is never imported: the modules are loaded lazily and only for
 // local development, and the container image does not ship them at all.
+import { ensureQbank } from './platform/qbankPack.js';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import compression from 'compression';
@@ -106,6 +107,9 @@ export async function createServerApp(db, {
   // The built client this app will serve must have been made for this
   // server's edition (platform/edition.js). Throws before anything is mounted.
   assertEditionAgreement({ dist, production });
+  // The author question bank (platform/qbankPack.js): PRI_QBANK_DIR unset means no bank and nothing else changes; set and refused, the
+  // server does not start (a deployment pointed at a damaged pack must not quietly serve none).
+  await ensureQbank(process.env, { strict: true });
   // The database must belong to this edition too (plan H2): a service pointed
   // at the other region's database stops here, before any route is mounted.
   await bindDatabaseEdition(asStore(db), serverEdition());

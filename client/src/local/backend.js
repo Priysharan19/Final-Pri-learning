@@ -2000,7 +2000,8 @@ function sanitize(q, row) {
     hintsAvailable: (q.hints || []).length, hintsUsed: row.hintsUsed || 0,
     // The hint ladder (engine/hintLadder.js): four rungs the server serves and
     // charges. `hintLevel` is the level the server committed for this row.
-    hintLadder: !q.multipart && !q.custom && !['rush', 'match', 'placement', 'exam'].includes(row.mode) && !row.examId ? HINT_RUNGS.length : 0,
+    // An author-bank question the server says has no rung (`hintsOffered: false`, safeQuestion) offers no ladder at all.
+    hintLadder: !q.multipart && !q.custom && !['rush', 'match', 'placement', 'exam'].includes(row.mode) && !row.examId && q.hintsOffered !== false ? HINT_RUNGS.length : 0,
     hintLevel: rungLevelOf(row.hintLevel),
     tutorLevel: row.tutorLevel || 0,
     triesLeft: 2 - (row.tries || 0),

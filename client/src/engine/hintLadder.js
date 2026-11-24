@@ -214,7 +214,12 @@ export function buildHintLadder(q) {
   const nudge = pick([hints[0], text(steps[0]?.h)], []);
   const method = pick([hints[1], text(steps[1]?.h), hints[0] ? text(steps[0]?.h) : null], [text(steps[2]?.h)]);
   const worked = pick([stepText(steps[0]), hints[2]], [hints[2], ...middle, ...hints.slice(3)]);
-  const texts = { nudge, method, worked, solution: null };
+  // An author-bank question carries the rungs its importer chose (tools/qbank-leak.mjs bankLadder: none states the answer, the worked
+  // rung is never the last step). They are used as they are; a rung it has no text for is thin. Generators never set `ladder`.
+  const own = q?.ladder && typeof q.ladder === 'object' ? q.ladder : null;
+  const texts = own
+    ? { nudge: text(own.nudge), method: text(own.method), worked: text(own.worked), solution: null }
+    : { nudge, method, worked, solution: null };
   return HINT_RUNGS.map((rung, i) => ({
     rung, level: i + 1, text: texts[rung], thin: rung !== 'solution' && !texts[rung],
     cost: RUNG_COST[rung], weightAfter: markWeightAfter(i + 1), helpUnits: RUNG_HELP_UNITS[rung],
@@ -229,6 +234,9 @@ export function buildHintLadder(q) {
  */
 export function ladderAvailable(q) {
   if (!q || q.multipart || q.placement || q.custom) return false;
+  // An author-bank question carries the rungs its importer chose, and only those (tools/qbank-leak.mjs bankLadder): with none, no hint is offered
+  // (the solution is still there to be revealed). Its steps never stand in for a rung.
+  if (q.ladder && typeof q.ladder === 'object') return !!(text(q.ladder.nudge) || text(q.ladder.method) || text(q.ladder.worked));
   return (Array.isArray(q.hints) && q.hints.length > 0) || (Array.isArray(q.steps) && q.steps.length > 0);
 }
 
