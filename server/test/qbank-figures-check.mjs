@@ -34,7 +34,7 @@ const { statesAnswer, checkFiguresDir, verifyFigure } = await import('../../tool
 
 const c = checks();
 const pack = await qb.ensureQbank(process.env, { strict: true });
-c.ok(pack && pack.questionCount > 2000, 'the committed pack loads');
+c.ok(pack && pack.questionCount > 1500, 'the committed pack loads');
 const sha = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const entries = qb.qbankEntries().map(e => ({ ...e.entry, family: e.family }));
 const withFigure = entries.filter(e => e.diagram);

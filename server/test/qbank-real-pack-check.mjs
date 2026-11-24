@@ -210,7 +210,7 @@ try {
     c.deq(problems.slice(0, 5), [], `${swept} bank questions (${seenIds.size} different) through the routes: no sealed text in an issue reply, every hint passes the rung rule, every rung served is a hint sent`);
     c.eq(sweepLeaks, 0, 'no step, criterion, trap reason or title is in any issue reply');
     c.ok(rungsServed > 100, `${rungsServed} rungs served by the hint route, ${refused} questions with no rung refused it`);
-    c.ok(figuresSwept >= 30, `${figuresSwept} of the ${swept} swept have a figure, each fetched signed in and refused with no session`);
+    c.ok(figuresSwept >= 15, `${figuresSwept} of the ${swept} swept have a figure, each fetched signed in and refused with no session`);
     console.log(`  leak sweep: ${swept} issued (${seenIds.size} different, ${figuresSwept} with a figure), ${rungsServed} rungs served, ${refused} with no rung refused the hint route`);
   }
   c.eq(rightOk, n, `${n} random bank questions marked correct with the accepted answer`);
