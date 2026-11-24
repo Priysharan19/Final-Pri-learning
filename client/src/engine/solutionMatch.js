@@ -342,10 +342,6 @@ function matchEquation(parts, sol, ctx) {
     for (const st of sol.every) if (st.parts.length === parts.length && parts.every((p, k) => canon(p) === canon(st.parts[k]))) return st;
     return null;
   }
-  // The very same statement as one of the solution (canon: spaces, bracket style and `*` only), where a side cannot be evaluated.
-  if (!ctx && parts.some(p => readSide(p) === null)) {
-    for (const st of sol.verbatim) if (st.parts.length === parts.length && parts.every((p, k) => canon(p) === canon(st.parts[k]))) return st;
-  }
   const lab = labelOf(parts[0]);
   if (lab) {
     const rest = parts.slice(1).map(readSide);
@@ -380,6 +376,11 @@ function matchEquation(parts, sol, ctx) {
         if (proportional(cond, st.cond)) return st;
       }
     }
+  }
+  // The very same statement as one of the solution (canon: spaces, bracket style and `*` only), where a side cannot be evaluated: the last resort,
+  // so that a line another rule attributes to its own step is never taken by an earlier statement that merely reads alike.
+  if (!ctx && parts.some(p => readSide(p) === null)) {
+    for (const st of sol.verbatim) if (st.parts.length === parts.length && parts.every((p, k) => canon(p) === canon(st.parts[k]))) return st;
   }
   return null;
 }
