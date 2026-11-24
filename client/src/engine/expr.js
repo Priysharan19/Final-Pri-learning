@@ -397,13 +397,21 @@ class Parser {
         this.next();
         const power = this.parseAtom();
         if (this.peek() && this.peek().t === 'op' && this.peek().v === '*' && this.peek().implicit) this.next();
+        let bareArg = true;
         if (this.peek() && this.peek().t === 'lp') {
           this.next();
           arg = this.parseExpression(0);
           this.expect('rp');
+          bareArg = false;
         } else {
           arg = this.parseUnary();
         }
+        // sin^(-1) x, cos^-1 x, tan^{-1} x: in Australian courses the INVERSE function (arcsin), never the reciprocal (1/sin, written cosec)
+        { let pw = power; while (pw && pw.t === 'group') pw = pw.v;
+          const minusOne = pw && ((pw.t === 'num' && pw.v === -1) || (pw.t === 'neg' && pw.v && pw.v.t === 'num' && pw.v.v === 1));
+          // `sin^(-1)1/2` is arcsin(1/2) or arcsin(1)/2: the reading is not decided, so the line is not read
+          if (minusOne && bareArg && this.peek() && this.peek().t === 'op' && (this.peek().v === '/' || this.peek().v === '*')) throw new Error('Ambiguous inverse function: write its argument in brackets');
+          if (minusOne && (tok.v === 'sin' || tok.v === 'cos' || tok.v === 'tan')) return { t: 'call', fn: `arc${tok.v}`, arg }; }
         return { t: 'bin', op: '^', l: { t: 'call', fn: tok.v, arg }, r: power };
       }
       if (this.peek() && this.peek().t === 'lp') {
