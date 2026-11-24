@@ -20,6 +20,7 @@ import { checkAnswer } from '../client/src/engine/checker.js';
 import { publicDescription } from '../server/platform/lineInterpreter/givens.js';
 import { makeFn, polynomial, extremes } from '../server/platform/lineInterpreter/truth.js';
 import { SCHEMES, UNAVAILABLE, schemeDigest, awardScheme } from '../server/platform/schemeAward.js';
+import { transcriptsFor } from './understanding-audit/corpus.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const OUT_DIR = path.join(ROOT, 'owner-review', 'method-marks');
@@ -237,6 +238,43 @@ const EXTRAS = {
     }
   }
 };
+
+// A solved-equation question: transcripts are the audit corpus's own, so nothing here knows the key. A wrong line is the same line with its last number raised by one.
+const raiseLast = text => {
+  const m = [...String(text).matchAll(/\d+/g)].pop();
+  return m ? text.slice(0, m.index) + (Number(m[0]) + 1) + text.slice(m.index + m[0].length) : null;
+};
+async function equationBuild(q) {
+  const bare = transcriptsFor(q).find(t => t.style === 'bare');
+  if (!bare || bare.lines.length < 2) return null;
+  // A chained line (5x = -31 - 4 = -35) is not read as a step by the page, so the transcripts write each equation on its own line.
+  const good = bare.lines.map(l => l.text).map(t => { const p = t.split('='); return p.length > 2 ? `${p[0].trim()} = ${p.at(-1).trim()}` : t; });
+  const v = q.stepcheck?.variable || 'x';
+  const wrongFinal = q.answerType === 'set'
+    ? `${(q.answer.values || []).map((n, i, a) => num(i === a.length - 1 ? n + 1 : n)).join(' or ')}`
+    : `${v} = ${num(Number(q.answer.value) + 1)}`;
+  // The wrong first line must be one the page really crosses (a line merely left unchecked, or ticked by luck, is not a known-wrong line).
+  const cands = [raiseLast(good[0]), good[0].replace(/\d+(?!.*\d)/, m => String(Math.max(0, Number(m) - 1))), good[0].replace(/(\d+)\s*$/, m => String(Number(m) + 2)), good[0].replace(/=\s*(-?)(\d+)/, (m, sg, d) => `= ${sg ? '' : '-'}${d}`)].filter((c, i, a) => c && c !== good[0] && a.indexOf(c) === i);
+  let bad = null;
+  for (const c of cands) { const { rows } = await judge(q, [c, wrongFinal]); if (isBreak(rows[0])) { bad = c; break; } }
+  if (!bad) return null;
+  return {
+    full: good,
+    partial: [...good.slice(0, -1), wrongFinal],
+    zero: [bad, wrongFinal],
+    slip: [bad, ...good.slice(1, -1), wrongFinal]
+  };
+}
+const EQUATION_CANNOT = [
+  'It reads each line only as an equation with the same solutions as the question\'s. It cannot tell a worthwhile step from a trivial rewrite that gets nowhere (for example multiplying both sides by 1): both are a true equation with the same solutions, and both earn.',
+  'A line with no letter in it, a solved form such as x = 7, the question\'s own equation (either way round), and a line already written earn no step.',
+  'A chained line such as 5x = -31 - 4 = -35 is left unchecked by the page, so it earns no step: each equation has to be written on its own line. A line that only shows numbers being equal earns nothing either.',
+  'A step the page cannot place is "not verified", never "wrong". A word problem has no equation printed in the question: the student\'s own setup equation is a step like any other.'
+];
+
+EXTRAS['y12-trig-extreme-2'] = { ...EXTRAS['y12-trig-extreme'], form: 'A model such as h(t) = 14 + 11 sin(pi t / 6) is given. The student finds its greatest or least value. This version is for questions worth two marks.', cannot: [...EXTRAS['y12-trig-extreme'].cannot, 'It does not require both the amplitude and the midline: either one, correctly stated, earns the working mark.'] };
+for (const id of ['y7-equation-solve-2', 'y7-equation-solve-3', 'y10-quadratic-solve-2', 'y10-quadratic-solve-3']) EXTRAS[id] = { form: '' + (id.startsWith('y10') ? 'A quadratic equation is given and the student finds all its solutions.' : 'An equation in one letter is given, or arises from a short word problem, and the student finds the value of the letter.') + ' This version is for ' + (id.endsWith('2') ? 'two' : 'three') + '-mark questions.', cannot: EQUATION_CANNOT, build: equationBuild };
+
 export const TYPES = SCHEMES.map(s => ({ ...s, ...EXTRAS[s.id] }));
 
 // ── types the marked page cannot verify line by line (server/platform/schemeAward.js UNAVAILABLE) ─
@@ -416,8 +454,12 @@ export async function build() {
   const I = [BANNER, '', '# Draft method-mark schemes for NSW question types', '',
     'These are drafts for the author (the tutor who writes the papers) to read, correct and decide on. Nothing here is approved, signed or switched on. Prithagoras still marks the final answer only.', '',
     '## Types given a draft scheme, in review order', '', 'Year 12 Advanced and Extension 1 first, then Year 11.', '',
-    '| # | Type | Course | Criteria | Marks | File |', '|---:|---|---|---:|---:|---|'];
-  sorted.forEach((d, n) => I.push(`| ${n + 1} | ${cell(d.type.title)} | ${d.type.course} | ${d.type.criteria.length} | ${totalMarks(d)} | [${d.type.id}.md](${d.type.id}.md) |`));
+    'The Status column reads the author\'s own records (docs/marking/author-approvals) and only reports them: a type is "approved" only while its record names the digest in its packet. This tool never writes a record.', '',
+    '| # | Type | Course | Criteria | Marks | Status | File |', '|---:|---|---|---:|---:|---|---|'];
+  const recDir = path.join(ROOT, 'docs', 'marking', 'author-approvals');
+  const recs = fs.existsSync(recDir) ? fs.readdirSync(recDir).filter(f => f.endsWith('.json') && f !== 'schema.json').map(f => JSON.parse(fs.readFileSync(path.join(recDir, f), 'utf8'))) : [];
+  const status = d => (recs.some(r => r.typeId === d.type.id && r.digest === d.digest && r.verdict === 'approved') ? 'approved by the author' : 'new draft, not approved');
+  sorted.forEach((d, n) => I.push(`| ${n + 1} | ${cell(d.type.title)} | ${d.type.course} | ${d.type.criteria.length} | ${totalMarks(d)} | ${status(d)} | [${d.type.id}.md](${d.type.id}.md) |`));
   I.push('', '## Counts', '',
     `- Types given a scheme: ${done.length}.`,
     `- Types where the engine awards every criterion deterministically: ${done.length} of ${done.length}. Each was run on ${SAMPLES_PER_TYPE} sample questions with a full, a partial, a zero and an earlier-slip transcript, and every run gave the expected award.`,
