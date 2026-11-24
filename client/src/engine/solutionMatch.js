@@ -316,6 +316,23 @@ function sameAsPromptStatement(parts, prompt) {
 }
 
 /** A step of the worked solution an equation (or chain) of the student matches: { step, heading } or null. */
+/**
+ * `(1.06)^(20) = 3.2070`: a decimal literal beside an expression that is not itself a literal claims to be that expression's value to the places it
+ * shows. It is the line's claim only when it IS the correct rounding or the truncation of the exact value to those places; 3.2070 for 3.20713547 is
+ * not, whatever the worked solution's own (3-place) 3.207 says. Two plain numbers (`3.2070 = 3.207`) or an exact side keep the numeric match.
+ */
+function roundedAsWritten(parts, a, b) {
+  const literal = t => /^-?\d+\.\d+$/.test(tidy(t).replace(/\s+/g, '').replace(/^\((.*)\)$/, '$1'));
+  const lit = literal(parts[0]) ? 0 : literal(parts[1]) ? 1 : -1;
+  if (lit < 0 || literal(parts[1 - lit])) return true;
+  const written = tidy(parts[lit]).replace(/\s+/g, '').replace(/^\((.*)\)$/, '$1');
+  const places = written.split('.')[1].length;
+  const exact = lit === 0 ? b.value : a.value, shown = lit === 0 ? a.value : b.value;
+  if (!Number.isFinite(exact) || !Number.isFinite(shown)) return true;
+  const unit = 10 ** places, eps = 1e-9 / unit * Math.max(1, Math.abs(exact));
+  const rounded = Math.round(exact * unit) / unit, truncated = Math.trunc(exact * unit) / unit;
+  return Math.abs(shown - rounded) <= eps + 1e-12 || Math.abs(shown - truncated) <= eps + 1e-12 || Math.abs(shown - exact) <= 1e-9 * Math.max(1, Math.abs(exact));
+}
 function matchEquation(parts, sol, ctx) {
   // a limit pair the question and its solution never use: not a step of this working, whatever value it reaches
   if (!limitsKnown(parts, sol)) return null;
@@ -345,7 +362,7 @@ function matchEquation(parts, sol, ctx) {
   if (parts.length === 2) {
     // (1.09)^19 = 5.142: a statement about numbers only, both sides as the solution has them
     const a = readSide(parts[0]), b = readSide(parts[1]);
-    if (a && b && a.value !== undefined && b.value !== undefined) {
+    if (a && b && a.value !== undefined && b.value !== undefined && roundedAsWritten(parts, a, b)) {
       for (const st of sol.numeric) {
         const x = readSide(st.parts[0]), y = readSide(st.parts[1]);
         if (x && y && closeLoose(a.value, x.value) && closeLoose(b.value, y.value)) return st;

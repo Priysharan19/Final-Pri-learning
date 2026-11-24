@@ -341,6 +341,35 @@ export function mutationsOf(line) {
   return out.filter(m => (seen.has(m.text) ? false : (seen.add(m.text), true)));
 }
 
+/**
+ * `(1.06)^(20) = 3.207` (a value written to some places beside an expression that has none): the value to p places with its last digit one off, both
+ * ways, for the places written and one more. Wrong unless it is the correct rounding or the truncation of the exact value to those places (3.2070 for
+ * 3.20713547 is wrong at four places even though it equals the authored 3.207 as a number, which is why this class has its own oracle).
+ */
+export function roundingMutants(line) {
+  const sides = sidesOf(line);
+  if (sides.length !== 2) return [];
+  const lit = sides.findIndex(x => /^\(?-?\d+\.\d+\)?$/.test(x.replace(/\s+/g, '')));
+  if (lit < 0) return [];
+  const other = sides[1 - lit];
+  if (/^\(?-?\d+(?:\.\d+)?\)?$/.test(other.replace(/\s+/g, ''))) return [];
+  const ev = sideValues(other, []);
+  if (!ev || ev[0] === null || !Number.isFinite(ev[0])) return [];
+  const exact = ev[0], k = sides[lit].replace(/[()\s]/g, '').split('.')[1].length;
+  const out = [];
+  for (const p of [k, k + 1]) {
+    const unit = 10 ** p, r = Math.round(exact * unit) / unit, t = Math.trunc(exact * unit) / unit;
+    for (const d of [-1, 1]) {
+      const v = r + d / unit;
+      if (Math.abs(v - r) < 1e-12 || Math.abs(v - t) < 1e-12 / unit) continue;   // a correct truncation is a correct rounded value
+      const shown = (v < 0 ? '-' : '') + Math.abs(v).toFixed(p);
+      const text = lit === 0 ? `${shown} = ${other}` : `${other} = ${shown}`;
+      if (text.replace(/\s+/g, '') !== line.replace(/\s+/g, '')) out.push({ kind: 'rounding-off-by-one', text });
+    }
+  }
+  return out;
+}
+
 // ── the authored page of a question ───────────────────────────────────────────────────────────────────────────────────────
 const TEX_SPAN = /\$([^$]+)\$/g;
 /** The lines of the question's authored worked solution, as plain text, in order (what a student's true working looks like). */
@@ -583,8 +612,8 @@ export async function run({ root = path.resolve(path.dirname(fileURLToPath(impor
     }
     lines.forEach((line, i) => {
       const wrong = [];
-      for (const m of mutationsOf(line)) {
-        const verdict = judgeMutant(line, m.text);
+      for (const m of [...mutationsOf(line), ...roundingMutants(line)]) {
+        const verdict = m.kind === 'rounding-off-by-one' ? 'wrong' : judgeMutant(line, m.text);
         // A mutant that says what ANOTHER authored line of the page says (x = 2 in place of x = 0 when x = 2 is a root too) is a true
         // statement in the wrong place, not a false line: it is not held against the marker.
         const echo = verdict === 'wrong' ? echoClass(lines, i, line, m.text, given, solutionNumbers) : null;

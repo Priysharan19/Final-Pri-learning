@@ -13,7 +13,7 @@
 //
 // Deterministic: fixed seeds, no model, no network.
 import fs from 'node:fs';
-import { run, judgeMutant, mutationsOf, sidesOf, sideValues, loadEngine, markPage, lineAt, authoredPage, typedAnswer } from '../../tools/marking-mutation-harness.mjs';
+import { run, judgeMutant, mutationsOf, roundingMutants, sidesOf, sideValues, loadEngine, markPage, lineAt, authoredPage, typedAnswer } from '../../tools/marking-mutation-harness.mjs';
 
 const G = await import('../../client/src/engine/generators/index.js');
 const { stepEvidence, stepMetaFor } = await import('../platform/markerOps.js');
@@ -128,6 +128,18 @@ ok(sidesOf('a = b = c').length === 3, 'oracle: splits a chain');
     }
     ok(statusOf(q, ['2 + 3 = 6'], 0) !== 'ok', `2 + 3 = 6 is not ticked (${id} ${d} ${seed})`);
   }
+}
+
+// ── a rounded value is ticked only as the correct rounding or truncation to the places it shows ───────────────────────────────
+{
+  const q = gen('y12-financial', 3, 19);
+  const page = v => ['FV = a(((1+r)^n - 1)/(r)) = 2600(((1.06)^(20) - 1)/(0.06))', `(1.06)^(20) = ${v}`];
+  // (1.06)^20 = 3.20713547...
+  for (const bad of ['3.2070', '3.2072', '3.206', '3.208', '3.20712', '3.20714']) ok(statusOf(q, page(bad), 1) !== 'ok', `a value one digit off is not ticked: (1.06)^(20) = ${bad}`);
+  ok(statusOf(q, page('3.207'), 1) === 'ok', 'the authored 3.207 is ticked');
+  const m = mutationsOf('x = 1') ; ok(Array.isArray(m), 'mutationsOf still reads a plain line');
+  const kinds = roundingMutants('(1.06)^(20) = 3.207').map(x => x.text);
+  for (const t of ['(1.06)^(20) = 3.2070', '(1.06)^(20) = 3.2072', '(1.06)^(20) = 3.206', '(1.06)^(20) = 3.208']) ok(kinds.includes(t), `the harness generates the rounding mutant ${t}`);
 }
 
 // ── a lazy `=` that begins the next step ──────────────────────────────────────────────────────────────────────────────────────

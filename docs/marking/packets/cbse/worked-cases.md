@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `208c27b1817dd24a71bf360489c64350d89566b923a9d9f03224cc5b0724ff48` (`docs/marking/order14-examiner-certification-dossier.md`).
+Dossier digest: `910423df49f0dadacba2973f62df1e2677bd39bab2d8717e105cf7ddf1cf80fa` (`docs/marking/order14-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -1300,6 +1300,226 @@ partial:
 ```text
 (working with the right method, ending in a wrong value)
 Final answer: 8
+```
+</details>
+
+## `cbse-bank:y12-appdiff/D3` — seed 32685
+
+> Find the equation of the **tangent** to $y = x^2 + 4x - 5$ at the point where $x = 1$. Answer in the form $y = mx + c$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `6x + -6` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `(6x + -6)` | yes | 3/3 | 3/3 | The same expression written with brackets. |
+| common wrong | `(6x + -6) + 1` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(6x + -6) + 1` | no | 0/3 | 0/3 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: (6x + -6) + 1
+```
+</details>
+
+## `cbse-bank:y12-diff/D2` — seed 72280
+
+> Use the product rule to find the gradient of $y = (6x - 8)(4x - 5)$ at the point where $x = -4$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `-254` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `-254.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `-253` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `-253` | no | 0/2 | 0/2 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: -253
+```
+</details>
+
+## `cbse-bank:y12-diff/D3` — seed 32685
+
+> If $y = \\dfrac{3x - 3}{2x + 2}$, find the gradient $\\dfrac{dy}{dx}$ at $x = 0$, correct to 3 decimal places where needed.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `3` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `3.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `4` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `4` | no | 0/3 | 0/3 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: 4
+```
+</details>
+
+## `cbse-bank:y12-diff/D4` — seed 24766
+
+> Find the gradient of $y = x(x^2 - 3)^{2}$ at the point where $x = 3$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `252` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `252.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `253` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `253` | no | 0/3 | 0/3 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: 253
+```
+</details>
+
+## `cbse-bank:y12-integral-calc/D1` — seed 64361
+
+> Find the exact value of $\\displaystyle\\int_0^{\\pi/4} 20\\sin(4x)\\,dx$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `10` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `10.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `11` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `11` | no | 0/1 | 0/1 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: 11
+```
+</details>
+
+## `cbse-bank:y12-integral-calc/D2` — seed 32685
+
+> Evaluate $\\displaystyle\\int_0^{4} \\left(15x^2 + 2\\right)dx$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `328` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `328.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `329` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `329` | no | 0/2 | 0/2 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: 329
+```
+</details>
+
+## `cbse-bank:y12-integral-calc/D3` — seed 56442
+
+> Find the exact value of $\\displaystyle\\int_0^{\\pi/6} 30\\sin(6x)\\,dx$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `10` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `10.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `11` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `11` | no | 0/2 | 0/2 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: 11
+```
+</details>
+
+## `cbse-bank:y12-integral-calc/D4` — seed 56442
+
+> Find the exact value of $\\displaystyle\\int_0^{\\pi/6} 30\\sin(6x)\\,dx$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `10` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `10.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `11` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `11` | no | 0/2 | 0/2 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: 11
+```
+</details>
+
+## `cbse-bank:y12-integration/D1` — seed 222741
+
+> Evaluate $\\displaystyle\\int_{3}^{4} 16x^3\\,dx$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `700` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `700.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `701` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `701` | no | 0/1 | 0/1 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: 701
+```
+</details>
+
+## `cbse-bank:y12-integration/D2` — seed 1009
+
+> Evaluate $\\displaystyle\\int_{0}^{1} (2x^2 + 3x)\\,dx$, correct to 3 decimal places where needed.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `2167/1000` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `2167/1000` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `3167/1000` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `3167/1000` | no | 0/2 | 0/2 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: 3167/1000
+```
+</details>
+
+## `cbse-bank:y12-integration/D3` — seed 1009
+
+> Find the area under the curve $y = (5x + 2)^{3}$ from $x = 0$ to $x = 2$. Give the answer as a fraction in simplest form if needed.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `1036` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `1036.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `1037` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `1037` | no | 0/3 | 0/3 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: 1037
 ```
 </details>
 

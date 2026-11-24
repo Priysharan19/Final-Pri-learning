@@ -37,11 +37,13 @@
 // Pure and deterministic: no model, no network, no clock. India is unchanged (its bank has no allow-list and no seal).
 import crypto from 'node:crypto';
 import { publicDescription } from './lineInterpreter/givens.js';
-import { evalNumeric } from '../../client/src/engine/expr.js';
+import { evalNumeric, parse, normalize, evaluate, variablesOf } from '../../client/src/engine/expr.js';
+import { topLevelDifference } from '../../client/src/engine/reason-area.js';
 import { makeFn, polynomial, extremes } from './lineInterpreter/truth.js';
 import { editionMarkingPolicy, editionMethodMarksRefusal } from './editionMarking.js';
 import { AUTHOR_APPROVED_SERVER } from './authorApproved.generated.js';
 import { marksPossibleFor } from './markerOps.js';
+import { GENERIC_ID, genericDigest, awardGeneric, GENERIC_WORDING } from './genericSteps.js';
 
 /** Editions on the author-approved tier: schemes only, on the author's approval and PRI_METHOD_MARKS=on. */
 export const AUTHOR_APPROVED_EDITIONS = Object.freeze(['prithagoras']);
@@ -71,17 +73,29 @@ const labelled = word => l => new RegExp(`^\\s*${word}\\b`, 'i').test(String(l.t
 // the asked value are the slots, and with those slots replaced by u the line must equal the model at u for several different u. A line
 // with no slot (an evaluated sum), or whose constants are not the model's, fails: its criterion is then "not verified", never earned.
 const SLOT_TESTS = [0, 1.5, -2];
-const slotted = (rhs, a, f) => {
+const SLOT_TESTS_ROBUST = [0.37, 1.13, -0.71, 2.9, -1.9, 0.02];
+const slotted = (rhs, a, f, robust = false) => {
   const lit = Number.isInteger(a) ? String(Math.abs(a)) : String(Math.abs(a)).replace('.', '\\.');
   const re = a < 0 ? new RegExp(`\\(\\s*-\\s*${lit}\\s*\\)`, 'g') : new RegExp(`(?<![\\d.])${lit}(?![\\d.])`, 'g');
   const at = [...rhs.matchAll(re)].map(m => [m.index, m[0].length]);
-  if (!at.length || at.length > 10) return false;
+  if (!at.length || at.length > (robust ? 14 : 10)) return false;
   for (let mask = 1; mask < (1 << at.length); mask++) {
     let out = ''; let from = 0;
     at.forEach(([i, n], k) => { out += rhs.slice(from, i) + ((mask >> k) & 1 ? '(u)' : rhs.slice(i, i + n)); from = i + n; });
     out += rhs.slice(from);
     try {
-      if (SLOT_TESTS.every(d => { const u = a + d; const want = evalNumeric(f.rhs, { [f.variable]: u }); const got = evalNumeric(out, { u }); return Math.abs(got - want) <= 1e-9 * (1 + Math.abs(want)); })) return true;
+      if (!robust && SLOT_TESTS.every(d => { const u = a + d; const want = evalNumeric(f.rhs, { [f.variable]: u }); const got = evalNumeric(out, { u }); return Math.abs(got - want) <= 1e-9 * (1 + Math.abs(want)); })) return true;
+      // A derivative with a denominator has poles: probe where the model is defined, and need at least four such points, all in agreement.
+      if (robust) {
+        let seen = 0, bad = 0;
+        for (const d of SLOT_TESTS_ROBUST) {
+          const u = a + d; let want; try { want = evalNumeric(f.rhs, { [f.variable]: u }); } catch { continue; }
+          if (!Number.isFinite(want)) continue;
+          const got = evalNumeric(out, { u }); seen++;
+          if (!(Math.abs(got - want) <= 1e-9 * (1 + Math.abs(want)))) { bad++; break; }
+        }
+        if (seen >= 4 && !bad) return true;
+      }
     } catch { /* this reading is not an expression */ }
   }
   return false;
@@ -104,6 +118,72 @@ const restates = (l, q) => {
   const f = publicDescription(q).functions[0];
   const side = String(l.text ?? '').split('=').pop().replace(/\s+/g, '');
   return !!f && side === String(f.rhs).replace(/\s+/g, '');
+};
+
+// ── Lines of a derived step plan (client/src/engine/schemePlans.js) ────────────────────────────────────────────────────────
+// The plan ticks a line at a stage; these helpers add the one structural fact a tick cannot say: that a line really is the substitution of the
+// point into the derivative the student wrote above it (the same slot test as "substitutes the value", never an expression that merely comes
+// to the same number).
+const planOf = q => (q?.stepcheck?.kind === 'plan' ? q.stepcheck : null);
+const segmentsOf = text => String(text ?? '').replace(/[−–—]/g, '-').split('=').map(t => t.trim()).filter(Boolean);
+const labelOnly = t => /^(?:d\s*[a-z]\s*\/\s*d\s*[a-z]|[a-z]'?(?:\(\s*-?[\d.]+\s*\))?|gradient|m)$/i.test(t);
+const rhsOf = text => { const seg = segmentsOf(text); return seg.length > 1 ? seg[seg.length - 1] : seg[0] ?? ''; };
+const substitutesDerivative = (l, k, lines, q) => {
+  const plan = planOf(q);
+  const x0 = plan?.stages?.[1]?.substitutions?.x;
+  if (!Number.isFinite(x0) || l.stage !== 1) return false;
+  const written = segmentsOf(l.text).filter(t => !labelOnly(t));
+  for (let j = 0; j < k; j++) {
+    const e = lines[j];
+    if (!e || e.status !== 'ok' || e.stage !== 0 || e.ecf === true) continue;
+    const f = { rhs: rhsOf(e.text), variable: 'x' };
+    try { if (written.some(t => slotted(t, x0, f, true))) return true; } catch { /* this line is not an expression */ }
+  }
+  return false;
+};
+const gradientPick = q => q.answerType === 'numeric' && planOf(q)?.scheme === 'gradient-at-point';
+
+// ── Lines of a definite integral (the plan's two area stages) ─────────────────────────────────────────────────────────────
+// The first stage ticks a line that carries a function whose derivative is the integrand (any constant, any form). The second ticks a line that
+// has a difference of two numbers equal to the value of the integral, and says nothing about WHICH numbers. "Substitutes the limits" is therefore
+// decided here, against the student's own antiderivative: the two numbers must be that function at the upper and at the lower limit, so a
+// difference that merely comes to the answer (9 - 1 for 8) earns nothing unless it is what their own antiderivative gives.
+const exprOf = t => { try { const a = parse(normalize(String(t).replace(/\+\s*C\s*$/, ''))); return a.t === 'equation' ? null : a; } catch { return null; } };
+const antiderivativesIn = (text, variable = 'x') => {
+  const out = [];
+  for (const seg of String(text ?? '').replace(/[−–—]/g, '-').split('=')) {
+    let t = seg.trim();
+    const b = /^\[(.*)\]\s*(?:_\s*\S+\s*\^\s*\S+)?$/.exec(t);
+    if (b) t = b[1];
+    if (/∫|\\int|\bint\b/i.test(t)) continue;
+    const a = exprOf(t);
+    if (!a) continue;
+    const vars = [...variablesOf(a)];
+    if (vars.length && vars.every(v => v === variable)) out.push(a);
+  }
+  return out;
+};
+const closeNum = (a, b) => Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b));
+const integralPick = q => q.answerType === 'numeric' && planOf(q)?.scheme === 'definite-integral';
+const limitsShown = (l, k, lines, q) => {
+  const st = planOf(q)?.stages?.[1];
+  if (!st || l.stage !== 1) return false;
+  const lo = Number(st.lower), hi = Number(st.upper);
+  const found = [];
+  for (let j = 0; j < k; j++) { const e = lines[j]; if (e?.status === 'ok' && e.stage === 0 && e.ecf !== true) found.push(...antiderivativesIn(e.text)); }
+  if (!found.length) return false;
+  for (const seg of String(l.text ?? '').replace(/[−–—]/g, '-').split('=')) {
+    const a = exprOf(seg.trim());
+    if (!a || variablesOf(a).size) continue;
+    const d = topLevelDifference(a);
+    if (!d) continue;
+    let e1, e2; try { e1 = evaluate(d[0], {}); e2 = evaluate(d[1], {}); } catch { continue; }
+    for (const F of found) {
+      let Fb, Fa; try { Fb = evaluate(F, { x: hi }); Fa = evaluate(F, { x: lo }); } catch { continue; }
+      if (closeNum(e1, Fb) && closeNum(e2, Fa)) return true;
+    }
+  }
+  return false;
 };
 
 // ── draft schemes for solving an equation ─────────────────────────────────────────────────────────────────────────────────
@@ -245,17 +325,72 @@ export const SCHEMES = Object.freeze([
       { key: 'step2', by: 'line', marks: 1, text: 'Writes a second correct step, on a different line.', how: REWRITE_HOW + '; the first such line earns the first step and the next one earns this', line: rewrite },
       { ...ANSWER, key: 'solutions', marks: 1, text: 'Gives all the solutions correctly.' }
     ]
+  },
+  // ── DRAFTS added 24 Nov 2026 (Years 11-12 coverage pass). Not approved: nothing is paid until the author files a record for the digest. ──
+  {
+    id: 'y12-diff-rules-3', title: 'Differentiate using the product or quotient rule (3 marks)', course: 'Year 12 Mathematics Advanced', year: 12, level: 1,
+    families: ['y12-diff'],
+    pick: q => q.answerType === 'expression' && !!fnOf(q) && fnOf(q).name === 'y' && /differentiate/i.test(q.prompt),
+    criteria: [
+      { key: 'derivative', by: 'line', marks: 1, text: 'Writes a correct derivative of the given function (any equivalent form).', how: 'a line the step check ticks as equal to the derivative of the given function, in any form (a line that only restates the function does not count)', line: (l, k, lines, q) => !restates(l, q) },
+      { key: 'second', by: 'line', marks: 1, text: 'Writes a second correct derivative, on a different line (the rule applied, then simplified).', how: 'a second line the step check ticks as equal to the derivative, whose right-hand side is not the same as an earlier line\'s once spaces are ignored; the first such line earns the first criterion and the next one earns this', line: (l, k, lines, q) => !restates(l, q) && !lines.slice(0, k).some(e => e?.status === 'ok' && rhsOf(e.text).replace(/\s+/g, '') === rhsOf(l.text).replace(/\s+/g, '')) },
+      { ...ANSWER, marks: 1, text: 'Gives the final answer correctly, in the form the question asks.' }
+    ]
+  },
+  {
+    id: 'y12-diff-gradient-2', title: 'Differentiate, then find the gradient at a point (2 marks)', course: 'Year 12 Mathematics Advanced', year: 12, level: 1,
+    families: ['y12-diff'],
+    pick: gradientPick,
+    criteria: [
+      { key: 'derivative', by: 'line', marks: 1, text: 'Differentiates the function correctly.', how: 'a line the step check ticks as equal to the derivative of the given function (the plan\'s first stage), in any form; a line that only restates the function does not count', line: (l, k, lines, q) => l.stage === 0 && !restates(l, q) },
+      { ...ANSWER, key: 'gradient', marks: 1, text: 'Finds the gradient at the point correctly (the final answer).' }
+    ]
+  },
+  {
+    id: 'y12-diff-gradient-3', title: 'Differentiate, substitute, then find the gradient at a point (3 marks)', course: 'Year 12 Mathematics Advanced', year: 12, level: 1,
+    families: ['y12-diff'],
+    pick: gradientPick,
+    criteria: [
+      { key: 'derivative', by: 'line', marks: 1, text: 'Differentiates the function correctly.', how: 'a line the step check ticks as equal to the derivative of the given function (the plan\'s first stage), in any form; a line that only restates the function does not count', line: (l, k, lines, q) => l.stage === 0 && !restates(l, q) },
+      { key: 'substitute', by: 'line', marks: 1, text: 'Substitutes the value of x into the derivative correctly.', how: 'a line the step check ticks at the plan\'s second stage (its value is the derivative\'s value at the point) that is the derivative the student wrote above, with the value put in, term by term (not an expression that merely comes to the same value)', line: substitutesDerivative },
+      { ...ANSWER, key: 'gradient', marks: 1, text: 'Finds the gradient at the point correctly (the final answer).' }
+    ]
+  },
+  {
+    id: 'y12-integral-2', title: 'Evaluate a definite integral or an area (2 marks)', course: 'Year 12 Mathematics Advanced', year: 12, level: 1,
+    families: ['y12-integration', 'y12-integral-calc'],
+    pick: integralPick,
+    criteria: [
+      { key: 'antiderivative', by: 'line', marks: 1, text: 'Integrates correctly: writes an antiderivative of the function.', how: 'a line the step check ticks at the plan\'s first stage: a function on it (after F(x) =, the integral sign, or inside a bracket with limits; any constant) whose derivative equals the function being integrated at every sample point where both are defined, found by differentiating it', line: (l, k, lines, q) => l.stage === 0 },
+      { ...ANSWER, key: 'value', marks: 1, text: 'Finds the value correctly (the final answer).' }
+    ]
+  },
+  {
+    id: 'y12-integral-3', title: 'Evaluate a definite integral or an area (3 marks)', course: 'Year 12 Mathematics Advanced', year: 12, level: 1,
+    families: ['y12-integration', 'y12-integral-calc'],
+    pick: integralPick,
+    criteria: [
+      { key: 'antiderivative', by: 'line', marks: 1, text: 'Integrates correctly: writes an antiderivative of the function.', how: 'a line the step check ticks at the plan\'s first stage: a function on it (after F(x) =, the integral sign, or inside a bracket with limits; any constant) whose derivative equals the function being integrated at every sample point where both are defined, found by differentiating it', line: (l, k, lines, q) => l.stage === 0 },
+      { key: 'limits', by: 'line', marks: 1, text: 'Substitutes the limits into the antiderivative correctly.', how: 'a line the step check ticks at the plan\'s second stage (it has a difference of two numbers equal to the value of the integral) whose two numbers are the antiderivative the student wrote above, put at the upper and at the lower limit; a difference that merely comes to the value earns nothing', line: limitsShown },
+      { ...ANSWER, key: 'value', marks: 1, text: 'Finds the value correctly (the final answer).' }
+    ]
+  },
+  {
+    id: 'y12-tangent-3', title: 'Find the equation of a tangent or a normal', course: 'Year 12 Mathematics Advanced', year: 12, level: 1,
+    families: ['y12-appdiff'],
+    pick: q => q.answerType === 'expression' && planOf(q)?.scheme === 'tangent-normal',
+    criteria: [
+      { key: 'derivative', by: 'line', marks: 1, text: 'Differentiates the curve correctly.', how: 'a line the step check ticks as equal to the derivative of the curve (the plan\'s first stage), in any form; a line that only restates the curve does not count', line: (l, k, lines, q) => l.stage === 0 && !restates(l, q) },
+      { key: 'gradient', by: 'line', marks: 1, text: 'Finds the gradient of the tangent at the point correctly.', how: 'a line the step check ticks at the plan\'s second stage: its value is the derivative of the curve at the point (the substitution, or the value), with the label m, m_T, gradient or dy/dx', line: (l, k, lines, q) => l.stage === 1 && /^\s*(?:m|m_?t|mt|gradient|tangent gradient|dy\s*\/\s*dx|y['′])\b/i.test(String(l.text ?? '')) },
+      { ...ANSWER, key: 'equation', marks: 1, text: 'Gives the equation of the line correctly (the final answer).' }
+    ]
   }
 ]);
 
 /** Types the page cannot verify line by line today, each with the reason. They are never paid by a scheme. */
 export const UNAVAILABLE = Object.freeze([
-  { id: 'y12-diff-gradient', title: 'Differentiate, then find the gradient at a point', course: 'Year 12 Mathematics Advanced', level: 1, families: ['y12-diff'],
-    reason: 'The question has no step plan, so the page leaves the derivative line unchecked; only the final value is verified. "Differentiates correctly" cannot be decided from the lines the student sees.' },
   { id: 'y12-stationary-x', title: 'Find the x-coordinates of the stationary points', course: 'Year 12 Mathematics Advanced', level: 1, families: ['y12-appdiff'],
-    reason: 'The page leaves the derivative line and the "let the derivative equal zero" line unchecked (it checks the equation and the roots only), so two of the three criteria cannot be decided from the lines the student sees.' },
-  { id: 'y12-tangent', title: 'Find the equation of a tangent', course: 'Year 12 Mathematics Advanced', level: 1, families: ['y12-appdiff'],
-    reason: 'The page ticks the line that finds the point of contact but leaves the derivative line unchecked, so "differentiates correctly" cannot be decided from the lines the student sees.' }
+    reason: 'The page leaves the derivative line and the "let the derivative equal zero" line unchecked (it checks the equation and the roots only), so two of the three criteria cannot be decided from the lines the student sees.' }
 ]);
 
 const byId = new Map(SCHEMES.map(s => [s.id, s]));
@@ -289,6 +424,8 @@ export function schemeTypeOf(q, generator = q?._generator ?? q?.subtopic) {
 
 /** Is this type approved, for the digest it has now? `list` defaults to the repository's (empty) allow-list. */
 export const isApproved = (typeId, list = approved) => {
+  // The generic rule (genericSteps.js) is not one of SCHEMES: its own approval id, its own digest over the rule's code and wording.
+  if (typeId === GENERIC_ID) return Array.isArray(list) && list.some(a => a?.typeId === GENERIC_ID && a.digest === genericDigest());
   const s = byId.get(typeId);
   return !!s && list.some(a => a?.typeId === typeId && a.digest === schemeDigest(s));
 };
@@ -335,9 +472,12 @@ export function awardScheme(scheme, report, correct, topic = null, q = null) {
  */
 export function schemePay({ q, report, topic = null, correct, marksPossible, env = process.env, list = approved }) {
   const typeId = typeof q?._methodScheme === 'string' ? q._methodScheme : null;
+  const generic = typeId === GENERIC_ID;
   const scheme = typeId ? byId.get(typeId) : null;
-  if (!scheme) return { paid: false, reason: 'not-a-scheme-question' };
+  if (!scheme && !generic) return { paid: false, reason: 'not-a-scheme-question' };
   if (!isApproved(typeId, list)) return { paid: false, typeId, reason: 'type-not-approved' };
+  // The generic rule is the author-approved tier only: never under the examiner tier, whatever else is set.
+  if (generic && !authorTier(env)) return { paid: false, typeId, reason: 'generic-author-tier-only' };
   if (authorTier(env)) {
     // Author-approved tier: the listed type above plus the explicit switch. The examiner result is neither needed nor read.
     const why = authorTierRefusal(env);
@@ -345,6 +485,22 @@ export function schemePay({ q, report, topic = null, correct, marksPossible, env
   } else if (editionMarkingPolicy(env).methodMarks !== true) {
     // Examiner tier, every existing gate unchanged: the switch, the production examiner result, and the edition's certification.
     return { paid: false, typeId, reason: editionMethodMarksRefusal(env)?.code ?? 'method-marks-off' };
+  }
+  if (generic) {
+    // The generic rule: criteria are drawn from this question's own authored solution (genericSteps.js). Same gates as above, same reply shape.
+    const award = awardGeneric(q, report, correct === true);
+    if (!award) return { paid: false, typeId, reason: 'generic-no-usable-steps' };
+    if (award.possible !== marksPossible) return { paid: false, typeId, reason: `criteria-count: the rule has ${award.possible} marks and this question is worth ${marksPossible}, so it stays on the final answer` };
+    const awarded = correct === true ? award.possible : Math.min(award.total, award.possible - 1);
+    const earnedLines = award.items.filter(i => i.awarded && i.basis === 'lines').length;
+    return {
+      paid: true, typeId, digest: genericDigest(), items: award.items, awarded,
+      partial: {
+        okLines: earnedLines, awarded,
+        note: awarded > 0 ? GENERIC_WORDING.note.replace('{n}', String(awarded)).replace('{N}', String(award.possible)) : GENERIC_WORDING.none,
+        lines: [], lost: [], scheme: typeId
+      }
+    };
   }
   const possible = schemeMarks(scheme);
   if (possible !== marksPossible) return { paid: false, typeId, reason: `criteria-count: the scheme has ${possible} marks and this question is worth ${marksPossible}, so it stays on the final answer` };

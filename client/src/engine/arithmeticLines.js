@@ -1024,8 +1024,11 @@ function pageDefinitionsOnce(raw, out, firstBreak, prep, degreePrimed, tickOnly,
       if (m && defs[m[1]] && parts.length === 2) {
         const d = defs[m[1]];
         const variable = m[2] || d.variable || (lettersOf(d.expr).length === 1 ? lettersOf(d.expr)[0] : null);
-        const base = variable ? putIn(d.expr, defs, variable) : null;
-        const claim = variable ? putIn(parts[1], defs, variable) : null;
+        // The variable we differentiate by is FREE here, even where the question gave it a value (y'' at x = 2pi/3): were that value put in, both sides would be
+        // constants and any line, 12sin(27x) for 12sin(2x), would be ticked as the derivative.
+        const free = variable && defs[variable] && !defs[variable].variable ? Object.fromEntries(Object.entries(defs).filter(([k]) => k !== variable)) : defs;
+        const base = variable ? putIn(d.expr, free, variable) : null;
+        const claim = variable ? putIn(parts[1], free, variable) : null;
         const f = base && fnOf(base.text, variable), g = claim && fnOf(claim.text, variable);
         if (f && g) {
           let agree = 0, differ = 0, tried = 0;

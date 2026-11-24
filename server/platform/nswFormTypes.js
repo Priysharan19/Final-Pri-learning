@@ -246,7 +246,7 @@ export const NSW_FORM_ANSWER_TYPES = Object.freeze({
   'y11-probability|4': ["mcq","numeric"],
   'y12-diff|1': ["expression","mcq","numeric"],
   'y12-diff|2': ["expression","mcq","numeric"],
-  'y12-diff|3': ["mcq","numeric"],
+  'y12-diff|3': ["expression","mcq","numeric"],
   'y12-diff|4': ["mcq","numeric"],
   'y12-appdiff|1': ["mcq","numeric","set"],
   'y12-appdiff|2': ["graph-sketch","mcq","numeric"],

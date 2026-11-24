@@ -6,9 +6,9 @@ This file is written by an AI model. It is **not** an examiner's review, it sign
 
 Legend: **AI-A** nothing found wrong · **AI-C** a change is suggested (wording, mark weight, missing alternative form) · **AI-R** an apparent defect that should not be served until fixed. Each reason was reached by working the item independently of the key; a row with a defect names the fix. Defects judged genuine are fixed through the normal R4 path in the same change as this file, and their rows describe the state of the packet **before** that fix.
 
-Items: 415 of 415 · AI-A 368 · AI-C 45 · AI-R 2
+Items: 417 of 417 · AI-A 368 · AI-C 47 · AI-R 2
 
-> **Not pre-reviewed (141 items).** These cells joined the packet after this file was written (train 25, the walk-through maths fixes of content version 2026.11.41, and the 19 November 2026 content-gap work). The rows at the end of the table carry AI-C only because the table needs a verdict; none was formed. No pre-review has looked at them, and nothing here says they are right or wrong. A human examiner reviews them like every other item.
+> **Not pre-reviewed (143 items).** These cells joined the packet after this file was written (train 25, the walk-through maths fixes of content version 2026.11.41, the 19 November 2026 content-gap work, and, for the last two, the 24 November 2026 Years 11-12 step-mark pass: definite-integral questions of y12-integration now carry a derived step plan). The rows at the end of the table carry AI-C only because the table needs a verdict; none was formed. No pre-review has looked at them, and nothing here says they are right or wrong. A human examiner reviews them like every other item.
 
 | Item | AI verdict | Reason | Defect to fix |
 |---|---|---|---|
@@ -568,3 +568,5 @@ Items: 415 of 415 · AI-A 368 · AI-C 45 · AI-R 2
 | nsw-final:me12-calc/D4 | AI-C | Not pre-reviewed: this cell joined the packet after this file was written (content-gap work, 19 November 2026: key-format repairs and new forms for empty practice cells). No verdict was formed. | Run the pre-review over this cell before the packet is issued. |
 | nsw-method:me11-poly/D4 | AI-C | Not pre-reviewed: this cell joined the packet after this file was written (content-gap work, 19 November 2026: key-format repairs and new forms for empty practice cells). No verdict was formed. | Run the pre-review over this cell before the packet is issued. |
 | nsw-method:me11-functions/D2 | AI-C | Not pre-reviewed: this cell joined the packet after this file was written (content-gap work, 19 November 2026: key-format repairs and new forms for empty practice cells). No verdict was formed. | Run the pre-review over this cell before the packet is issued. |
+| nsw-method:y12-integration/D2 | AI-C | Not pre-reviewed: this cell joined the packet on 24 November 2026 (its definite-integral questions now carry a derived step plan: an antiderivative of the integrand, then the limits put in), after this file was written. No verdict was formed. | Run the pre-review over this cell before the packet is issued. |
+| nsw-method:y12-integration/D3 | AI-C | Not pre-reviewed: this cell joined the packet on 24 November 2026 (its definite-integral questions now carry a derived step plan: an antiderivative of the integrand, then the limits put in), after this file was written. No verdict was formed. | Run the pre-review over this cell before the packet is issued. |

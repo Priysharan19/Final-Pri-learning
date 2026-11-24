@@ -138,6 +138,188 @@
       "digest": "073ae29c731218a52d39a7ceabae69c62115c92a080c8107954e1c92a1907af4"
     },
     {
+      "id": "y12-diff-rules-3",
+      "title": "Differentiate using the product or quotient rule (3 marks)",
+      "course": "Year 12 Mathematics Advanced",
+      "year": 12,
+      "families": [
+        "y12-diff"
+      ],
+      "file": "y12-diff-rules-3.md",
+      "totalMarks": 3,
+      "criteria": [
+        {
+          "key": "derivative",
+          "text": "Writes a correct derivative of the given function (any equivalent form).",
+          "marks": 1,
+          "by": "line"
+        },
+        {
+          "key": "second",
+          "text": "Writes a second correct derivative, on a different line (the rule applied, then simplified).",
+          "marks": 1,
+          "by": "line"
+        },
+        {
+          "key": "answer",
+          "text": "Gives the final answer correctly, in the form the question asks.",
+          "marks": 1,
+          "by": "final"
+        }
+      ],
+      "digest": "045e2cfe6ac1a701d921b62097a289eede04181acf32f226034ec6b475ead35b"
+    },
+    {
+      "id": "y12-diff-gradient-2",
+      "title": "Differentiate, then find the gradient at a point (2 marks)",
+      "course": "Year 12 Mathematics Advanced",
+      "year": 12,
+      "families": [
+        "y12-diff"
+      ],
+      "file": "y12-diff-gradient-2.md",
+      "totalMarks": 2,
+      "criteria": [
+        {
+          "key": "derivative",
+          "text": "Differentiates the function correctly.",
+          "marks": 1,
+          "by": "line"
+        },
+        {
+          "key": "gradient",
+          "text": "Finds the gradient at the point correctly (the final answer).",
+          "marks": 1,
+          "by": "final"
+        }
+      ],
+      "digest": "321087896ff2c26b5cd961ccd9ff2b269c2374ecaadc8fca2df01d1d85c79647"
+    },
+    {
+      "id": "y12-diff-gradient-3",
+      "title": "Differentiate, substitute, then find the gradient at a point (3 marks)",
+      "course": "Year 12 Mathematics Advanced",
+      "year": 12,
+      "families": [
+        "y12-diff"
+      ],
+      "file": "y12-diff-gradient-3.md",
+      "totalMarks": 3,
+      "criteria": [
+        {
+          "key": "derivative",
+          "text": "Differentiates the function correctly.",
+          "marks": 1,
+          "by": "line"
+        },
+        {
+          "key": "substitute",
+          "text": "Substitutes the value of x into the derivative correctly.",
+          "marks": 1,
+          "by": "line"
+        },
+        {
+          "key": "gradient",
+          "text": "Finds the gradient at the point correctly (the final answer).",
+          "marks": 1,
+          "by": "final"
+        }
+      ],
+      "digest": "617054ccf2d5ea4c0bc74f4bf2c0c0657b871f8914a5ac414f93de9f24c57efe"
+    },
+    {
+      "id": "y12-integral-2",
+      "title": "Evaluate a definite integral or an area (2 marks)",
+      "course": "Year 12 Mathematics Advanced",
+      "year": 12,
+      "families": [
+        "y12-integration",
+        "y12-integral-calc"
+      ],
+      "file": "y12-integral-2.md",
+      "totalMarks": 2,
+      "criteria": [
+        {
+          "key": "antiderivative",
+          "text": "Integrates correctly: writes an antiderivative of the function.",
+          "marks": 1,
+          "by": "line"
+        },
+        {
+          "key": "value",
+          "text": "Finds the value correctly (the final answer).",
+          "marks": 1,
+          "by": "final"
+        }
+      ],
+      "digest": "906b842a32463f9b581bdb0260153f5e3c5d2b63fa5df630c0230c76400beda8"
+    },
+    {
+      "id": "y12-integral-3",
+      "title": "Evaluate a definite integral or an area (3 marks)",
+      "course": "Year 12 Mathematics Advanced",
+      "year": 12,
+      "families": [
+        "y12-integration",
+        "y12-integral-calc"
+      ],
+      "file": "y12-integral-3.md",
+      "totalMarks": 3,
+      "criteria": [
+        {
+          "key": "antiderivative",
+          "text": "Integrates correctly: writes an antiderivative of the function.",
+          "marks": 1,
+          "by": "line"
+        },
+        {
+          "key": "limits",
+          "text": "Substitutes the limits into the antiderivative correctly.",
+          "marks": 1,
+          "by": "line"
+        },
+        {
+          "key": "value",
+          "text": "Finds the value correctly (the final answer).",
+          "marks": 1,
+          "by": "final"
+        }
+      ],
+      "digest": "51055d287d31ce88cf90d971e2ee694faa3b213e639265636fad21d5660142e6"
+    },
+    {
+      "id": "y12-tangent-3",
+      "title": "Find the equation of a tangent or a normal",
+      "course": "Year 12 Mathematics Advanced",
+      "year": 12,
+      "families": [
+        "y12-appdiff"
+      ],
+      "file": "y12-tangent-3.md",
+      "totalMarks": 3,
+      "criteria": [
+        {
+          "key": "derivative",
+          "text": "Differentiates the curve correctly.",
+          "marks": 1,
+          "by": "line"
+        },
+        {
+          "key": "gradient",
+          "text": "Finds the gradient of the tangent at the point correctly.",
+          "marks": 1,
+          "by": "line"
+        },
+        {
+          "key": "equation",
+          "text": "Gives the equation of the line correctly (the final answer).",
+          "marks": 1,
+          "by": "final"
+        }
+      ],
+      "digest": "8e0013beecf267d0a84b39636c15d8d6255732d0f652e0d065684e82c0004269"
+    },
+    {
       "id": "y11-poly-evaluate",
       "title": "Evaluate a polynomial or find a remainder by substitution",
       "course": "Year 11 Mathematics Advanced",
@@ -338,16 +520,6 @@
   ],
   "notProvable": [
     {
-      "id": "y12-diff-gradient",
-      "title": "Differentiate, then find the gradient at a point",
-      "course": "Year 12 Mathematics Advanced",
-      "families": [
-        "y12-diff"
-      ],
-      "reason": "The question has no step plan, so the page leaves the derivative line unchecked; only the final value is verified. \"Differentiates correctly\" cannot be decided from the lines the student sees.",
-      "unavailable": true
-    },
-    {
       "id": "y12-stationary-x",
       "title": "Find the x-coordinates of the stationary points",
       "course": "Year 12 Mathematics Advanced",
@@ -358,35 +530,13 @@
       "unavailable": true
     },
     {
-      "id": "y12-tangent",
-      "title": "Find the equation of a tangent",
-      "course": "Year 12 Mathematics Advanced",
-      "families": [
-        "y12-appdiff"
-      ],
-      "reason": "The page ticks the line that finds the point of contact but leaves the derivative line unchecked, so \"differentiates correctly\" cannot be decided from the lines the student sees.",
-      "unavailable": true
-    },
-    {
-      "id": "y12-integrals",
-      "title": "Definite integrals and areas under a curve",
-      "course": "Year 12 Mathematics Advanced",
-      "families": [
-        "y12-integration",
-        "y12-integral-calc"
-      ],
-      "reason": "The engine cannot read an antiderivative or an integral line, so \"integrates correctly\" and \"substitutes the limits\" cannot be decided; only the final value is checked."
-    },
-    {
       "id": "y12-integrals-indefinite",
-      "title": "Indefinite integrals and the reverse chain rule",
+      "title": "The reverse chain rule: find the constant that makes an antiderivative true",
       "course": "Year 12 Mathematics Advanced",
       "families": [
-        "y12-integration",
-        "y12-integral-calc",
-        "y12-trigcalc"
+        "y12-integration"
       ],
-      "reason": "The engine cannot read an antiderivative line, so no stage of the method can be decided apart from the final expression."
+      "reason": "The question gives the form of the antiderivative and asks for one constant, and a line such as \"u = x^2 + 7\" is a choice of notation, so no stage of the method can be decided from the lines; only the final value is checked. (A definite integral, or the area under a curve, now has a scheme: its antiderivative line is checked by differentiating it. A question that asks for the antiderivative itself is answered in one line, so a second criterion would pay that line twice.)"
     },
     {
       "id": "y12-stationary-nature",

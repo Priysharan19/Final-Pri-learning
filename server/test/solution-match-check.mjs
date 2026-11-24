@@ -356,7 +356,8 @@ const MUTATIONS = {
   ok(warnings === 0, `slip warning: 0 warnings on correct continuation lines (${warnings}: ${bad.join(' | ')})`);
   console.log(`slip warning: ${batteryLines} battery lines and ${lines} correct continuation lines (${solutionChains} identities the solutions write) from ${gensSeen.size} generators, ${batteryWarnings + warnings} warnings`);
   // and it does fire on a real slip, and says what it should
-  const q = generate('y12-diff', 3, 7);
+  // carrier: a question with no Step Check (seed 7 drew a gradient-at-a-point question, which has a derived step plan since the Years 11-12 coverage pass)
+  const q = generate('y12-diff', 3, 6);
   const r = stepEvidence(q, '', ['A = (4t+2)(4t+1)', '= 16t^2 + 12t + 2', '= 16t^2 + 13t + 2'].join('\n'), { correct: false }, { slipWarnings: true }).stepReport;
   const L = r.lines;
   ok(L[2].status === 'note' && L[2].slipWarning === true && /^This is not equal to the line above for every value of t \(for example at t = [-\d.]+: [-\d.]+ against [-\d.]+\)\. Check this step\.$/.test(L[2].note), `a slip line warns, as a note (${L[2].status}: ${L[2].note})`);
@@ -408,7 +409,7 @@ const MUTATIONS = {
   const lg = stepEvidence(diff, '', [...base, 't = 4: 6(16) + 8(4) + 5', '= 96 + 32 + 5', '= 133'].join('\n'), { correct: false }, { slipWarnings: true }).stepReport.lines;
   ok(!lg.some(l => l.slipWarning), 'a true substitution is not warned');
   // a warning needs a continuation of a chain, never two full statements with one label; a restricted-domain rewrite is not a slip
-  const wq = generate('y12-diff', 3, 7);
+  const wq = generate('y12-diff', 3, 6);
   const warns = pg => (stepEvidence(wq, '', pg.join('\n'), { correct: false }, { slipWarnings: true }).stepReport?.lines || []).filter(l => l.slipWarning).length;
   const same = [['y = 2x + 1', 'y = 3x - 4'], ['x = 2y + 1', 'x = 3y - 1'], ['y = x^2', 'y = x^2 + 3'], ['f(x) = x^2', 'f(x) = x^3'], ['A = 3x^2', 'A = 5x'], ['d = 3t', 'd = 2t^2'], ['y = x^2', '= x^2 + 3'], ['y = x^2', '= x^2', 'y = x^2 + 3']];
   for (const pg of same) ok(warns(pg) === 0, `no warning on ${pg.join(' / ')}`);

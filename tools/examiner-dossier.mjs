@@ -78,7 +78,7 @@ const SOURCES = [...new Set([...importTree(['server/platform/markerOps.js', ...s
 const sourceRows = SOURCES.map(f => ({ file: f, sha256: sha(readFileSync(path.join(ROOT, f))) }));
 
 // Every rubric bank: a (generator, difficulty) that issues a chain plan on the fixed seeds.
-const SEEDS = Array.from({ length: 24 }, (_, i) => 1009 + i * 7919);   // 12 until train 25: the extra Priyabhata forms left c10-ap-inverse-competency/D1 with no step check on the first 12
+const SEEDS = Array.from({ length: 48 }, (_, i) => 1009 + i * 7919);   // 12 until train 25: the extra Priyabhata forms left c10-ap-inverse-competency/D1 with no step check on the first 12; 24 until the Years 11-12 step-mark pass (24 Nov 2026): the derived plans of definite-integral questions leave y12-integration/D1 with none on the first 24
 // A wider sweep finds banks; the digest samples SEEDS within each one.
 const DISCOVERY = Array.from({ length: 200 }, (_, i) => 1 + i * 37);
 const banks = [];

@@ -36,7 +36,8 @@ const TAN17 = ['Days remaining: 119days', '8 y = 2x(4-x)', 'Area = ∫_0^4 2x(4-
 const TAN8 = ['8 y = 3/tan x', 'y° = 3[tan x]^-1', 'y′ = -3[tan x]^-2 x sec^2 x', '= -3sin x/cos^2 x x 1/cos^2 x', '= -3sin x/cos^3 x', 'y′(π/6) = -3sin(π/6) x 1/[cos(π/6)]^3', '= -3 x 1/2 x 1/(√3)^3 x 2^3', '= -8 x 4/(3√3) = -4/√3 = -4√3/3'];
 
 const Q = {
-  areaExact: gen('y12-integration', 3, 337), areaNear: gen('y12-integration', 3, 437), integStep: gen('y12-integration', 1, 12), integPlain: gen('y12-integration', 1, 27),
+  areaExact: gen('y12-integration', 3, 337), areaNear: gen('y12-integration', 3, 437), integStep: gen('y12-integration', 1, 12), // seed 27 drew a plain definite integral, which has a derived step plan since the Years 11-12 coverage pass; seed 31 is a reverse-chain-rule integral, which has none
+  integPlain: gen('y12-integration', 1, 31),
   appdiff128: gen('y12-appdiff', 1, 128), appdiff387: gen('y12-appdiff', 1, 387), appdiff19: gen('y12-appdiff', 1, 19), appdiffPlain: gen('y12-appdiff', 2, 41),
   vec58: gen('me12-vectors', 1, 58), vec367: gen('me12-vectors', 1, 367), vecPlain: gen('me12-vectors', 1, 35),
   trig48: gen('y12-trigcalc', 3, 48), trig99: gen('y12-trigcalc', 1, 99)
@@ -213,7 +214,9 @@ ok(!acode(STAT).includes('X'), `the page itself, as written, is never crossed by
 
 // ── the slip warning on the tan page, and the slash column page (22 November 2026) ─────────────────────────────────────────────────
 {
-  const q = gen('y12-diff', 3, 7);
+  // The carrier is a question with no Step Check of its own (the pages below are another question's handwriting). Seed 7 drew a gradient-at-a-point
+  // question until the Years 11-12 coverage pass gave those a derived step plan; seed 6 is a question with none, as seed 7 was.
+  const q = gen('y12-diff', 3, 6);
   const W = page => (stepEvidence(q, '', page.join('\n'), { correct: false }, { slipWarnings: true }).stepReport?.lines || []);
   const L = W(TAN8);
   // line 3 is unchanged (a note: it may be a derivative of the definition or of the equation 8y = 3/tan x).

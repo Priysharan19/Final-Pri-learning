@@ -446,7 +446,7 @@ export function assessCalculusLine(line, ctx, meta, stage = { claimed: false }) 
     // The answer test judges the LAST '='-segment. A chain `dy/dx = 3(…)·4x = 8x(…)` that ends at the answer is still a chain: a middle
     // piece the question's own relation proves false (a wrong coefficient, power or inner function) is the slip, so the line is not ticked.
     // (the first piece of a chain may be the name of what is found, dA/dr or y', which is no claim)
-    const nameLike = t => /^\(*d[A-Za-z]?\)*\s*\/\s*\(*d[A-Za-z]\)*$|^[A-Za-z]\s*'{0,2}\s*(?:\(\s*[A-Za-z0-9]\s*\))?$/.test(String(t).replace(/\s+/g, ' ').trim());
+    const nameLike = t => /^\(*d[A-Za-z]?\)*\s*\/\s*\(*d[A-Za-z]\)*$|^(?:ans|answer|result)$|^[A-Za-z]\s*'{0,2}\s*(?:\(\s*[A-Za-z0-9]\s*\))?$/i.test(String(t).replace(/\s+/g, ' ').trim());
     const badMiddle = real.some((seg, idx) => verdicts[idx] === 'invalid' && !(idx === 0 && real.length > 1 && nameLike(seg.text)) && idx !== real.length - 1);
     if (isAnswer && !badMiddle) return { status: 'ok' };
     const firstInvalid = verdicts.findIndex((v, idx) => v === 'invalid' && !(isAnswer && idx === 0 && real.length > 1 && nameLike(real[idx].text)));
