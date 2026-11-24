@@ -188,6 +188,7 @@ try {
         const hint = await call(`/v1/practice/${d.question.id}/hint`, { rung: ['nudge', 'method', 'worked'][k] });
         if (hint.status !== 200 || hint.data.hint !== sent[k]) problems.push(`${e.id}: rung ${k + 1} served ${JSON.stringify(hint.data?.hint)}, not hint ${k + 1}`); else rungsServed++;
       }
+      if ((d.question.hintsOffered === false) !== (sent.length === 0)) problems.push(`${e.id}: the device is ${d.question.hintsOffered === false ? 'told no hint is offered' : 'not told'} with ${sent.length} rungs`);
       if (!sent.length) {
         const hint = await call(`/v1/practice/${d.question.id}/hint`, { rung: 'nudge' });
         if (hint.status === 409 && hint.data?.error?.code === 'HINT_NOT_AVAILABLE') refused++; else problems.push(`${e.id}: no rung, and the hint route did not refuse (${hint.status})`);

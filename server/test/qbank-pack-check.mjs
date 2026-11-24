@@ -218,7 +218,7 @@ try {
   const entries = [];
   for (const s of manifest.shards) for (const q of JSON.parse(fs.readFileSync(path.join(dir, s.name), 'utf8')).questions) entries.push({ ...q, family: s.name.replace(/^shards\/|\.json$/g, '') });
   c.eq(entries.length, 10, 'the ten pack questions are all drawn below');
-  const allowed = new Set([...PUBLIC_QUESTION_FIELDS, 'id', 'supportsSteps', 'criteriaCount']);
+  const allowed = new Set([...PUBLIC_QUESTION_FIELDS, 'id', 'supportsSteps', 'criteriaCount', 'hintsOffered']);
 
   for (const e of entries) {
     const { question, sealed, wire, place } = await issueExact(e);

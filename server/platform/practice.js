@@ -243,6 +243,8 @@ function safeQuestion(id, q) {
   const publicQ = { id, supportsSteps: !!stepMetaFor(q),
     criteriaCount: marksPossibleFor(q) };
   for (const k of PUBLIC_Q) if (Object.hasOwn(q, k)) publicQ[k] = q[k];
+  // An author-bank question carries the rungs its importer chose and none else: with none, the device is told no hint is offered (no control, no panel).
+  if (q.ladder && typeof q.ladder === 'object' && !ladderAvailable(q)) publicQ.hintsOffered = false;
   if ('contentId' in publicQ) publicQ.contentId = opaqueContentId(q.contentId);
   if ('contentHash' in publicQ) publicQ.contentHash = opaqueContentHash(q.contentHash);
   return publicQ;
