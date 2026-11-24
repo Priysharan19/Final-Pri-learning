@@ -160,7 +160,7 @@
         {"has":"RESIDENCY CLAIMS (H7): PASS — ","note":"Plan H7: nothing says work stays in, never leaves or is processed in India or Australia (the count follows the files read)."},
         {"has":"STUDY PLAN: PASS — 215/215 checks","note":"211 → 215 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree)."},
         {"has":"REMINDERS: PASS — 183/183 checks"},
-        {"has":"I18N COVERAGE: PASS — 94/94 checks — 121 files scanned, 0 hard-coded strings","note":"TRAIN 3: 120 -> 121 files scanned: the marked-page review adds client/src/components/typesetProse.js and lineReportText.js, as printed by running it; the 94 checks are unchanged. Earlier note: 119 → 120 files (dot point picker: + components/DotpointPicker.jsx, re-derived by running the check). 117 → 119 files (Practice UX: + components/RecentAttempts.jsx, + components/PracticeTour.jsx, re-derived by running the check). 114 → 117 files (train marking 5, re-derived by running the check on the merged tree): + components/EngineComment.jsx (typesets the engine's line comments), + components/QuestionReport.jsx (report a problem), + components/SketchAnswer.jsx (graph-sketch answer). 109 → 110 files (Ext1Papers.jsx, re-derived by running the check). 92 → 93 files (standard #08: + components/OriginalWork.jsx, re-derived by running the check). 91: two key-chord literals (⌘/Ctrl ↵ and the ARIA aria-keyshortcuts value) joined the allowlist, each checked for its stated reason. 74 (Train 4, re-derived by running): main 71 + src/parent (ParentReport.jsx, ParentReportEmailAction.jsx, #743) + ink/ReaderPermission.jsx (#737, the D17 prompt). 75 (Train 6, re-derived by running on the merged tree): 74 + tutor/MistakeDiagnosis.jsx (#770). 75 → 77 files (Train 10, re-derived by a full local run of the 4 suite shards on the merged tree). 77 → 78 files (Train 15: + tutor/StepCoachLive.jsx from #826, re-derived by running all 4 shards). 78 → 79 files (plan F1: + library/Library.jsx, re-derived by running the check). 91 → 94 (plan E4, re-derived by running): +1 the ambient placeholders are exactly {brand} and {company}; the allowlist JSON lost \"P\" and \"Pri Learning.\" and gained Priyabhata, Prithagoras, प्रियभट and \"by Pri Learning\". 80 → 89 files (plan F4b: + src/desk (DeskPage, DeskImport, DeskEntry) and src/examShell (six components), re-derived by running the check)."},
+        {"has":"I18N COVERAGE: PASS — 94/94 checks — 122 files scanned, 0 hard-coded strings","note":"TRAIN 3: 120 -> 121 files scanned: the marked-page review adds client/src/components/typesetProse.js and lineReportText.js, as printed by running it; the 94 checks are unchanged. Earlier note: 119 → 120 files (dot point picker: + components/DotpointPicker.jsx, re-derived by running the check). 117 → 119 files (Practice UX: + components/RecentAttempts.jsx, + components/PracticeTour.jsx, re-derived by running the check). 114 → 117 files (train marking 5, re-derived by running the check on the merged tree): + components/EngineComment.jsx (typesets the engine's line comments), + components/QuestionReport.jsx (report a problem), + components/SketchAnswer.jsx (graph-sketch answer). 109 → 110 files (Ext1Papers.jsx, re-derived by running the check). 92 → 93 files (standard #08: + components/OriginalWork.jsx, re-derived by running the check). 91: two key-chord literals (⌘/Ctrl ↵ and the ARIA aria-keyshortcuts value) joined the allowlist, each checked for its stated reason. 74 (Train 4, re-derived by running): main 71 + src/parent (ParentReport.jsx, ParentReportEmailAction.jsx, #743) + ink/ReaderPermission.jsx (#737, the D17 prompt). 75 (Train 6, re-derived by running on the merged tree): 74 + tutor/MistakeDiagnosis.jsx (#770). 75 → 77 files (Train 10, re-derived by a full local run of the 4 suite shards on the merged tree). 77 → 78 files (Train 15: + tutor/StepCoachLive.jsx from #826, re-derived by running all 4 shards). 78 → 79 files (plan F1: + library/Library.jsx, re-derived by running the check). 91 → 94 (plan E4, re-derived by running): +1 the ambient placeholders are exactly {brand} and {company}; the allowlist JSON lost \"P\" and \"Pri Learning.\" and gained Priyabhata, Prithagoras, प्रियभट and \"by Pri Learning\". 80 → 89 files (plan F4b: + src/desk (DeskPage, DeskImport, DeskEntry) and src/examShell (six components), re-derived by running the check)."},
         {"has":"I18N: PASS — 205/205 checks","note":"198 → 209 (Prithagoras Hindi trim, re-derived by running): six checks that an edition without Hindi ships no Hindi catalogue and Priyabhata is untouched, and five that run the languages.js a Prithagoras build really uses (an English-only list, a stored hi clamped to English, the table still knowing Hindi, and the build stopping if languages.js changes under the clamp). 200 → 198 (plan E4, re-derived by running): \"P\" and \"Pri Learning.\" (the brand tile) and \"Pri\" (the old bar label) left the literal allowlist; \"by Pri Learning\" joined it."},
         {"has":"READER PERMISSION (D17): PASS — 124/124 checks"},
         {"has":"PAGE LINK HISTORY: PASS — 39/39 checks"},
@@ -224,9 +224,9 @@
         {"has":"HSC PRIORITIES · 1437/1437 checks passed","note":"Prithagoras HSC 2027 priorities: NESA mapping-grid metadata (no text), the old → new map held to the NSW model, the pinned ranking, the backtest evidence doc, edition isolation, en-AU copy and a render."},
         {"has":"LANDING HOME: PASS — 97/97 checks","note":"The verified page: the landing demo's statuses come from the real Step Check and mistakeView, the social-proof slots stay hidden, Home shows only evidence that exists."},
         {"has":"LINE SYSTEM REGRESSION: PASS — 8000 prompts over 4000 seeds","note":"Examiner pre-review regression: no simultaneous pair is a single line; no line prints without its x term."},
-        {"has":"QBANK IMPORT: PASS 129/129 checks","note":"89 -> 129, as printed after the second review round: the rung rule (the seven reviewer cases, plain-prose arithmetic, sealed texts, 0 to 3 rungs, nothing derived from a step) on a fixture written in the test."},
+        {"has":"QBANK IMPORT: PASS 136/136 checks","note":"89 -> 129, as printed after the second review round: the rung rule (the seven reviewer cases, plain-prose arithmetic, sealed texts, 0 to 3 rungs, nothing derived from a step) on a fixture written in the test."},
         {"re":"QBANK DIAGRAMS: PASS (74/74|92/92) checks","note":"New pin: the TikZ-to-SVG renderer on three tiny figures (74 on CI, which has no TeX and skips the compile group by name; 92 where latex and dvisvgm are installed), the untrusted-input filter, the sanitiser, the alt text and answer-leak rules, and the committed figures against their manifest hashes."},
-        {"has":"QBANK ISOLATION: PASS — 6/6 checks (1804 questions protected)","note":"1794 -> 1804 questions, as printed: the pack now keeps the questions whose leaking hint is dropped instead of rejecting them. Static isolation of the committed bank from the client (the built-client half runs after the build, with --require-dist, over every file of client/dist whatever its extension)."},
+        {"has":"QBANK ISOLATION: PASS — 6/6 checks (2340 questions protected)","note":"1794 -> 1804 questions, as printed: the pack now keeps the questions whose leaking hint is dropped instead of rejecting them. Static isolation of the committed bank from the client (the built-client half runs after the build, with --require-dist, over every file of client/dist whatever its extension)."},
         {"has":"QBANK ISOLATION TEST: PASS 23/23 checks","note":"15 -> 23, as printed: the pack in a non-text extension, gzipped, brotli-compressed, answers alone, and a script of short numeric answers (in order and shuffled) all fail the scan; a table of whole numbers does not."}
       ]
     },
@@ -855,35 +855,35 @@
       "job": "platform-contracts",
       "log": "qbank-real-pack.log",
       "pins": [
-        {"has":"QBANK REAL PACK: PASS — 620/620 checks over 1804 questions","note":"217 -> 620 over 1804, as printed: the rung rule re-run over every hint and rung of every packed question, and a sweep of 300 questions through the real routes (issue reply, hint route, no-rung refusal)."}
+        {"has":"QBANK REAL PACK: PASS — 636/636 checks over 2340 questions","note":"217 -> 620 over 1804, as printed: the rung rule re-run over every hint and rung of every packed question, and a sweep of 300 questions through the real routes (issue reply, hint route, no-rung refusal)."}
       ]
     },
     "platform/qbank-mix.log": {
       "job": "platform-contracts",
       "log": "qbank-mix.log",
       "pins": [
-        {"has":"QBANK MIX: PASS — 251/251 checks","note":"183 -> 251, as printed: a bank question dealt and then revealed (at once, through the ladder, afterwards) or abandoned is never dealt again in 90 issues of y12-integration level 3."}
+        {"has":"QBANK MIX: PASS — 256/256 checks","note":"183 -> 251, as printed: a bank question dealt and then revealed (at once, through the ladder, afterwards) or abandoned is never dealt again in 90 issues of y12-integration level 3."}
       ]
     },
     "platform/qbank-marking.log": {
       "job": "platform-contracts",
       "log": "qbank-marking.log",
       "pins": [
-        {"has":"QBANK MARKING: PASS — 55/55 checks over 1804 questions","note":"30 -> 55 over 1804, as printed: the rounding reading applies to 0 of 1226 numeric questions and never where an exact form is asked, and yy' and dy/dx are one left side."}
+        {"has":"QBANK MARKING: PASS — 85/85 checks over 2340 questions","note":"30 -> 55 over 1804, as printed: the rounding reading applies to 0 of 1226 numeric questions and never where an exact form is asked, and yy' and dy/dx are one left side."}
       ]
     },
     "platform/qbank-sealed.log": {
       "job": "platform-contracts",
       "log": "qbank-sealed.log",
       "pins": [
-        {"has":"QBANK SEALED: PASS — 11/11 checks over 1804 questions","note":"1794 -> 1804 questions, as printed."}
+        {"has":"QBANK SEALED: PASS — 11/11 checks over 2340 questions","note":"1794 -> 1804 questions, as printed."}
       ]
     },
     "platform/qbank-figures.log": {
       "job": "platform-contracts",
       "log": "qbank-figures.log",
       "pins": [
-        {"has":"QBANK FIGURES: PASS — 41/41 checks over 519 parts with a figure","note":"New pin, as printed: the committed figures against the pack and the sanitiser, no text alternative that states an answer, the figure route (signed out refused; never issued, malformed and no-diagram all one 404; another account's question 404; bytes, headers, ETag, the JSON twin) and a figure file that is not the one the pack names is never sent."}
+        {"has":"QBANK FIGURES: PASS — 41/41 checks over 536 parts with a figure","note":"New pin, as printed: the committed figures against the pack and the sanitiser, no text alternative that states an answer, the figure route (signed out refused; never issued, malformed and no-diagram all one 404; another account's question 404; bytes, headers, ETag, the JSON twin) and a figure file that is not the one the pack names is never sent."}
       ]
     }
   },
