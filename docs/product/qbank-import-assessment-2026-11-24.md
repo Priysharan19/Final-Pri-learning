@@ -493,3 +493,26 @@ Risks:
 - `tools/qbank-import.test.mjs`: 55 checks on a fixture written in the test (no part of the bank is committed).
 - Not wired into `package.json` or CI in this change; wiring is a one-line script, left to the merger so the CI count pins are not
   touched here.
+
+## Review round, 25 November 2026
+
+An independent review of the first push found the following; each is fixed at its cause and held by a test.
+
+- Hints gave the answer. The ladder's third rung was the first solution step, which for one-step solutions is the whole solution, and the
+  import check could not read TeX such as a binomial or a fraction. `tools/qbank-leak.mjs` now reads the TeX and evaluates every side;
+  a rung or hint that states the answer in any form the engine accepts, or one trivial calculation from it, or that cannot be read, is
+  dropped. The pack carries the rungs the importer chose (`ladder`); the worked rung is never the last step. Of the 1,794 packed questions,
+  540 rungs of 530 questions gave the answer under the new test; 1,017 rungs of 998 questions are different now, 40 authored hints were
+  dropped, 6 rungs are thin and 4 questions have no worked rung.
+- The isolation scan looks for any pack text (answers, prompts, trap answers and reasons, hints, criteria, 20-character runs of steps) and
+  has a test that plants each kind.
+- Placement does not deal the bank (as Rush, Match and timed papers).
+- Answers: an interval that names a precision accepts the key rounded as asked; the answer box's own label is read with or without it and
+  another left side is refused; a non-whole numeric key that names no precision accepts a correct rounding to 3 or more figures (never
+  fewer). Applied to bank questions only (`server/platform/qbankMarking.js`).
+- Mix: a seek no longer draws an authored question it has found stale, and a generator wins a tie with one. Over the real routes with every
+  question answered, each authored question of a cell is dealt once and the generators take over; a question issued and left unanswered
+  is the device's `avoid` list's to hold back, as for a generator.
+- Held for the owner: X11-C1-041 (its trap does not match its reason) and A11-T2-092 (its trap reason is its third hint). Two questions
+  re-tagged (A11-T1-074, X12-V1-116); nine author dot points that were wider than the product dot point they sat under are topic-level.
+- Covered elsewhere: an unrelated true line crossed on a calculus bank question (A11-C1-089) is fixed on PR #1110.
