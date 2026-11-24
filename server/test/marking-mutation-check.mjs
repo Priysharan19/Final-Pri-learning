@@ -9,6 +9,12 @@
 // 3. The recorded corpus (server/test/fixtures/marking-mutation-corpus.json): every false tick and every crossed true line the harness found on
 //    origin/main over seeds 1-30 (not the owner's margin-number ticks). Each is re-marked here and must not be ticked / crossed. A change that
 //    brings any one of this PR's fixes back fails it (checked per file: README of the PR lists the result).
+// 5. The AUTHOR BANK (server/content/qbank, server/platform/qbankPack.js), all of it, marked the way the practice route marks it: the authored
+//    worked steps are never crossed; one-line provably false mutants are never ticked; and the natural pages of an equation solved by a step that
+//    is not reversible (squaring, clearing a fraction, taking logarithms): the candidate roots listed one per line or in one line, then rejected
+//    (`reject x = -1`, `x = -1 does not satisfy the equation`, `x ≠ -1`, `x = -1 is extraneous`, `x = -1 (rejected)`, `x = -1 fails`), the two
+//    branches of ±, the solutions listed before they are checked. Every line of them is true: none is crossed, and the rejection of a candidate is
+//    ticked. The false ones (a value that is a root of nothing, written as a root or as a rejection; the rejection of a real solution) are never ticked.
 // 4. A self-contained TRUE arithmetic line (`2 + 3 = 5`) inserted into every authored page is never crossed.
 //
 // Deterministic: fixed seeds, no model, no network.
@@ -325,6 +331,73 @@ let corpusFalse = 0, corpusCross = 0, corpusFalseTicked = 0, corpusCrossed = 0, 
   ok(res.probe.falseTicks === 0, `no probe mutant is ticked (${res.probe.falseTicks})`);
   for (const k of ['solution-list', 'plus-minus', 'rounded', 'rounded-operand', 'substitution']) ok(res.probe.byClass[k] && res.probe.byClass[k].falseTicks === 0 && res.probe.byClass[k].mutants > 0, `probe class ${k}: mutants ran and none was ticked`);
   ok(res.probe.trueTicked >= 0.9 * (res.probe.trueLines - (res.probe.trueCrossed || 0)), `probe true lines are ticked (${res.probe.trueTicked} of ${res.probe.trueLines}, ${res.probe.trueCrossed || 0} crossed by the topic check before this pass)`);
+}
+
+// ── the author bank ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+{
+  const B = await run({ bank: true, maxPerLine: 6 });
+  const t = B.totals;
+  console.log(`MARKING MUTATION BANK COUNTS: ${t.pages} authored pages, ${t.lines} authored lines, ${t.mutants} mutants, false ticks ${t.falseTicks}, true crosses ${t.trueCrosses}, authored ticks ${t.trueTicks}, extraneous-root pages ${t.variantPages} (${t.variantLines} lines, crossed ${t.variantCrosses}), rejections ${t.rejectLines} (ticked ${t.rejectTicked}), false variants ${t.variantMutants} (ticked ${t.variantFalseTicks}), far-out roots of nothing ${t.largeRoots || 0} (crossed ${t.largeRootsCrossed || 0}, as on origin/main), inserted true lines ${t.insertedTrue || 0}`);
+  ok(t.pages >= 700 && t.mutants >= 9000, `the bank sample is not trivial (${t.pages} pages, ${t.mutants} mutants)`);
+  ok(t.trueCrosses === 0, `no authored bank line and no line of an extraneous-root page is crossed (${t.trueCrosses}: ${JSON.stringify(B.failures.trueCrosses.slice(0, 3))})`);
+  ok(t.falseTicks === 0, `no provably wrong bank mutant is ticked (${t.falseTicks}: ${JSON.stringify(B.failures.falseTicks.slice(0, 3))})`);
+  ok(t.variantPages >= 500 && t.variantMutants >= 900, `the extraneous-root sample is not trivial (${t.variantPages} pages, ${t.variantMutants} false variants)`);
+  ok(t.rejectLines >= 150 && t.rejectTicked === t.rejectLines, `every rejection of a candidate root is ticked (${t.rejectTicked} of ${t.rejectLines})`);
+  ok(t.trueTicks >= 1600, `authored bank lines are still ticked (${t.trueTicks})`);
+}
+
+// ── the live defect: Solve √(x+5) = x − 1 (A11-F1-172, answer 4) ─────────────────────────────────────────────────────────────────────────
+{
+  const pack = await import('../platform/qbankPack.js');
+  const { MARKER_OPS, markerView } = await import('../platform/markerOps.js');
+  await pack.ensureQbank({ ...process.env, PRI_EDITION: 'prithagoras' }, { strict: true });
+  const q = markerView(pack.qbankEntryQuestion('A11-F1-172', 17));
+  const mark = (working, answer = '4') => MARKER_OPS.practice({ q, answer, working, evidenceIfWrong: true, policy: { methodMarks: true } }, () => {});
+  // the page the student sees (the rejection ticks are DISPLAY ONLY, markerOps `shownReport`); `deterministic` is the report the marks read
+  const rows = (working, answer) => { const e = mark(working, answer).evidence; return (e.shownReport || e.stepReport).lines; };
+  const deterministic = (working, answer) => mark(working, answer).evidence.stepReport.lines;
+  const live = rows('x^2-3x-4=0\nx=-1\nx=4');
+  ok(live.map(l => l.status).join() === 'ok,note,ok', `the live page: the squared equation ticked, x = -1 a note, x = 4 ticked (${live.map(l => l.status)})`);
+  ok(/candidate/.test(live[1].note) && !/false/.test(live[1].note) && live[2].note == null, `x = -1 is called a candidate; the stray note on x = 4 is gone (${live[1].note} | ${live[2].note})`);
+  ok(rows('x^2-3x-4=0\nx=-1 or x=4')[1].status !== 'break' && rows('x^2-3x-4=0\nx=4 or x=-1')[1].status !== 'break', 'x = -1 or x = 4 in one line is not crossed');
+  ok(rows('x^2-3x-4=0\nx=±1')[1].status === 'break', 'x = ±1 names 1, a root of nothing: it is crossed');
+  for (const reject of ['reject x=-1', 'x=-1 does not satisfy', 'x ≠ -1', 'x = -1 is extraneous', 'x = -1 (rejected)', 'x=-1 fails', 'x = -1 is not a solution', '-1 is rejected', 'x = -1 is rejected']) {
+    const r = rows(`x^2-3x-4=0\nx=-1\n${reject}\nx=4`);
+    ok(r[2].status === 'ok' && r[1].status === 'note' && r[3].status === 'ok', `"${reject}" is ticked after the candidate, the candidate stays a note, x = 4 is ticked (${r.map(l => l.status)})`);
+    ok(deterministic(`x^2-3x-4=0\nx=-1\n${reject}\nx=4`)[2].status !== 'ok', `"${reject}" is NOT ticked in the deterministic report that pays`);
+    if (!reject.includes('≠')) ok(rows(`x^2-3x-4=0\n${reject}\nx=4`)[1].status === 'ok', `"${reject}" is ticked straight after the squared equation`);
+  }
+  // a value that is a root of neither is never a candidate and never ticked, as a root or as a rejection; a real solution is never rejected
+  ok(rows('x^2-3x-4=0\nx=7')[1].status === 'break', 'x = 7 (a root of nothing) is crossed');
+  for (const w of ['reject x=7', 'x ≠ 7', 'x=7 does not satisfy', 'reject x=4', 'x ≠ 4', 'x = 4 is extraneous']) ok(rows(`x^2-3x-4=0\n${w}`)[1].status !== 'ok', `"${w}" is not ticked`);
+  ok(rows('x^2-3x-4=0\nx=-1\nx=7')[2].status !== 'ok', 'x = 7 after the candidate is not ticked');
+  // (review of 25 Nov) a value far out on the number line is a root of nothing on an exponential equation: crossed, never a candidate, never rejected as one
+  {
+    const qe = markerView(pack.qbankEntryQuestion('A11-E1-140', 17));
+    const re = w => MARKER_OPS.practice({ q: qe, answer: '99991', working: w, evidenceIfWrong: true, policy: { methodMarks: true } }, () => {}).evidence.stepReport.lines;
+    ok(re('5^(2x-1)=5^(3x-6)\nx=-12')[1].status === 'break', 'A11-E1-140: x = -12 is crossed, as on main');
+    for (const w of ['reject x=-12', 'x ≠ -30', 'x = -12 is extraneous', 'x=-30 does not satisfy']) ok(re(`5^(2x-1)=5^(3x-6)\n${w}`)[1].status !== 'ok', `A11-E1-140: "${w}" is not ticked`);
+    ok(re('5^(2x-1)=5^(3x-6)\nx=-30\nx ≠ -30')[2].status !== 'ok', 'A11-E1-140: x ≠ -30 after x = -30 is not ticked');
+    for (const id of ['A11-E1-028', 'A11-E1-073']) {
+      const qx = markerView(pack.qbankEntryQuestion(id, 17));
+      let crossed = 0, n = 0;
+      for (let x = -40; x <= -13; x++) { n++; const r = MARKER_OPS.practice({ q: qx, answer: '99991', working: `9^x=27^(x-1)\nx=${x}`, evidenceIfWrong: true, policy: { methodMarks: true } }, () => {}).evidence.stepReport.lines; if (r[1].status === 'break') crossed++; }
+      ok(crossed === n, `${id}: x = -40 ... -13 are each crossed (${crossed} of ${n})`);
+    }
+  }
+  // a rejection that says the opposite is never ticked
+  for (const neg of ['x=-1 rejected or is it', 'x=-1 rejected and accepted', 'x=-1 rejected?', 'x=-1 rejected maybe', 'x=-1 is not rejected', 'x=-1 is not extraneous', 'x=-1 does not fail', 'x=-1 is not wrong', 'x=-1 is not false', 'x=-1 is NOT rejected', 'x=-1 does not satisfy but works', 'x=-1 is rejected but it works', 'x=-1 is valid']) {
+    ok(rows(`x^2-3x-4=0\nx=-1\n${neg}\nx=4`)[2].status !== 'ok', `"${neg}" is not ticked`);
+  }
+  ok(rows('x^2-3x-4=0\nx ≠ -1')[1].status !== 'ok', 'the symbol alone is not read as a rejection unless it directly follows the candidate');
+  // a root of a line the page could not judge is no candidate: crossed as on main
+  ok(rows('(x-4)(x+7)=0\nx=-7\nx=4')[1].status === 'break', '(x-4)(x+7) = 0 does not make x = -7 a candidate: it is crossed, as on main');
+  // the final answer is the answer check's alone: both roots as the answer is still wrong; the candidate alone is wrong; 4 is right
+  ok(mark('x^2-3x-4=0\nx=-1\nx=4', '-1, 4').result.correct === false && mark('x^2-3x-4=0\nx=-1', '-1').result.correct === false && mark('x^2-3x-4=0\nx=4', '4').result.correct === true, 'the answer mark is unchanged: -1, 4 and -1 are wrong, 4 is right');
+  // India reads a page as it did: a question not sealed by the Australian edition has no candidate reading
+  const { stepEvidence } = await import('../platform/markerOps.js');
+  const india = stepEvidence({ prompt: q.prompt, answerType: 'numeric', answer: { value: 4 }, answerPrefix: 'x =', steps: q.steps, difficulty: 2 }, '4', 'x^2-3x-4=0\nx=-1\nx=4', { correct: true }, { slipWarnings: true }).stepReport.lines;
+  ok(india[1].status === 'break', `a question the Australian edition has not sealed reads the page as it always did (${india.map(l => l.status)})`);
 }
 
 console.log(failed ? `MARKING MUTATION: FAIL: ${failed} of ${checks} checks` : `MARKING MUTATION: PASS: ${checks} checks`);
