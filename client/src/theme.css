@@ -61,6 +61,8 @@
   --paper: #fdfcf9;
   --paper-rule: rgba(30, 74, 110, 0.085);
   --paper-margin: rgba(160, 79, 36, 0.16);
+  --figure-sheet: #fff;   /* a bank figure is drawn black on white, like a paper's diagram, in either theme */
+  --figure-note: #555;
   --hairline: rgba(28, 27, 24, 0.10);
   --hairline-strong: rgba(28, 27, 24, 0.18);
   --hairline-faint: rgba(28, 27, 24, 0.055);
@@ -1680,9 +1682,9 @@ html[data-edition=prithagoras] .hero-kicker { text-wrap: balance; }
 .q-prompt .katex-display > .katex { text-align: left; padding-left: 0.6em; }
 .q-figure { margin: 16px 0 0; max-width: 100%; overflow-x: auto; }
 .q-figure svg { max-width: 100%; height: auto; }
-.q-figure--sheet { background: #fff; overflow: hidden; }
+.q-figure--sheet { background: var(--figure-sheet); overflow: hidden; }
 .q-figure--sheet img { display: block; max-width: 100%; height: auto; }
-.q-figure-note { margin: 0; font-size: 14px; color: #555; }
+.q-figure-note { margin: 0; font-size: 14px; color: var(--figure-note); }
 
 .ws-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .ws-tools-end { margin-left: auto; display: flex; gap: 2px; align-items: center; }
