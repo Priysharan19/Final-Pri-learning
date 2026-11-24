@@ -870,7 +870,7 @@
       "job": "platform-contracts",
       "log": "qbank-marking.log",
       "pins": [
-        {"has":"QBANK MARKING: PASS — 90/90 checks over 1972 questions","note":"30 -> 55 over 1804, as printed: the rounding reading applies to 0 of 1226 numeric questions and never where an exact form is asked, and yy' and dy/dx are one left side."}
+        {"has":"QBANK MARKING: PASS — 98/98 checks over 1972 questions","note":"30 -> 55 over 1804, as printed: the rounding reading applies to 0 of 1226 numeric questions and never where an exact form is asked, and yy' and dy/dx are one left side."}
       ]
     },
     "platform/qbank-sealed.log": {
