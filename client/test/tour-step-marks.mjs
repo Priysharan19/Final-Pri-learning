@@ -68,6 +68,13 @@ try {
   const ctx = await browser.newContext({ viewport: { width: 1180, height: 820 } });
   const page = await ctx.newPage();
   const online = platform.session(ctx, page);
+  // The scripted student asks for the harder form (difficulty 3, a multi-mark question): the card's own adaptive pick would start on one-mark questions, which no scheme pays.
+  await page.route('**/v1/practice/issue', route => {
+    const request = route.request(); let body = null;
+    try { body = JSON.parse(request.postData() || 'null'); } catch { body = null; }
+    if (body && typeof body === 'object' && !body.prepared && !body.mode) return route.continue({ postData: JSON.stringify({ ...body, difficulty: 3 }) });
+    return route.continue();
+  });
   stage = 'open the app';
   await page.goto(platform.origin, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.auth-wrap, .shell', { timeout: 30000 });
