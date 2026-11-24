@@ -36,6 +36,7 @@ const { productPlaceOf } = await import('../platform/qbankDotpoints.js');
 const { dotpointById } = await import('../../client/src/engine/curriculum.js');
 const { safeQuestion } = await import('../platform/practice.js');
 const { acceptedInput, trapInput, hintLeaks, authoredPage } = await import('../../tools/qbank-import.mjs');
+const { plausibleWrongs } = await import('../../tools/qbank-manual.mjs');
 
 const c = checks();
 const pack = await qb.ensureQbank(process.env, { strict: true });
@@ -47,6 +48,27 @@ const entries = [];
 for (const s of manifest.shards) for (const e of JSON.parse(fs.readFileSync(path.join(qb.DEFAULT_PACK_DIR, s.name), 'utf8')).questions) entries.push({ ...e, family: s.name.replace(/^shards\/|\.json$/g, '') });
 c.eq(entries.length, pack.questionCount, 'every packed question is visited');
 const policy = bankPolicy('prithagoras');
+// A key DERIVED from his own printed answer (a "find" part with no structured key) is held to more than an authored one: his own form is marked
+// correct in every natural way of typing it (the importer's `derivedForms`: as read, brackets taken out, π, a rearrangement, a plain decimal where it
+// is one), and at least three plausible wrong values are refused, by the real marker with the question's own answer type.
+{
+  const derivedQs = entries.filter(e => e.derived === true);
+  c.ok(derivedQs.length > 50, `the pack holds derived keys (${derivedQs.length})`);
+  const noForms = [], formRefused = [], fewWrongs = [], wrongAccepted = [];
+  let forms = 0, wrongs = 0;
+  for (const e of derivedQs) {
+    const q = markerView(qb.qbankEntryQuestion(e.id, 17));
+    if (!Array.isArray(e.derivedForms) || !e.derivedForms.length) { noForms.push(e.id); continue; }
+    for (const f of e.derivedForms) { forms++; if (checkBankAnswer(q, f)?.correct !== true) formRefused.push(`${e.id}: ${f}`); }
+    const w = plausibleWrongs({ answerType: e.answerType, answer: e.answer }).slice(0, 6);
+    if (w.length < 3) fewWrongs.push(e.id);
+    for (const t of w) { wrongs++; if (checkBankAnswer(q, t)?.correct === true) wrongAccepted.push(`${e.id}: ${t}`); }
+  }
+  c.deq(noForms, [], 'every derived key records the typed forms of his answer that were proved');
+  c.deq(formRefused, [], `his own answer, as ${forms} natural typed forms, is marked correct on every derived question`);
+  c.deq(fewWrongs, [], 'every derived key has at least three plausible wrong values to refuse');
+  c.deq(wrongAccepted, [], `and the real marker refuses all ${wrongs} of them`);
+}
 let rungsShown = 0, rungsTested = 0, authoredHints = 0, withRungs = { 0: 0, 1: 0, 2: 0, 3: 0 }, noLadderNoHints = 0, noNudge = 0, displayed = 0, badDisplay = 0, hinted = 0, hintIsAnswer = 0, crossed = 0, ticked = 0, traps = 0, rungs = 0, accepted = 0, sealed = 0, marksOk = 0, leaks = 0, openers = 0;
 const bad = { accepted: [], trap: [], marks: [], seal: [], wire: [], hint: [] };
 for (const e of entries) {

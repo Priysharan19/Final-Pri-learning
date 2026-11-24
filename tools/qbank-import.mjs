@@ -613,7 +613,7 @@ export function derivedKeyRefusals(dpart, q, key = {}) {
   const tested = plausibleWrongs({ answerType: dpart.answerType, answer: dpart.answer }).slice(0, 6);
   if (tested.length < 3) return { ok: false, why: 'fewer-than-three-wrong-values' };
   const accepted = tested.filter(w => safe(() => checkBankAnswer(q, w), { correct: true }).correct === true);
-  return accepted.length ? { ok: false, why: 'a-wrong-value-is-accepted' } : { ok: true, forms: forms.length, wrongs: tested.length };
+  return accepted.length ? { ok: false, why: 'a-wrong-value-is-accepted' } : { ok: true, forms: forms.length, formList: forms, wrongs: tested.length };
 }
 
 /**
@@ -687,8 +687,8 @@ export function compilePack(archive, opts = {}) {
             const dev = evaluateAuto(dpart, question, archive, opts);
             const refusals = dev.reasons.length ? { ok: false, why: `pack-check:${dev.reasons[0]}` } : derivedKeyRefusals(dpart, dev.q, cfg);
             if (refusals.ok && archive.tags?.[dpart.question]) {
-              part = dpart; ev = dev; converted = true;
-              derived.converted.push({ id: dev.rec.id, answerType: dpart.answerType, shown: cfg.shown, prompt: String(original.prompt).replace(/\s+/g, ' ').slice(0, 140), key: dpart.answer, forms: refusals.forms, wrongs: refusals.wrongs, exactForm: cfg !== key });
+              part = { ...dpart, derivedForms: refusals.formList }; ev = dev; converted = true;
+              derived.converted.push({ id: dev.rec.id, answerType: dpart.answerType, shown: cfg.shown, prompt: String(original.prompt).replace(/\s+/g, ' ').slice(0, 140), key: dpart.answer, forms: refusals.forms, formList: refusals.formList, wrongs: refusals.wrongs, exactForm: cfg !== key });
               derived.byType[dpart.answerType] = (derived.byType[dpart.answerType] || 0) + 1;
               break;
             }
@@ -730,9 +730,9 @@ export function compilePack(archive, opts = {}) {
       id: rec.id, group: part.question, label: part.label ?? undefined, dp: TAG_CORRECTIONS[rec.id] ?? archive.tags[part.question], authored: part.difficulty, level: LEVEL_OF(part.difficulty),
       marks: part.marks, title: question.title, prompt: part.prompt, answerType: part.answerType, answer: part.answer,
       answerPrefix: part.answerPrefix, inputHint: part.inputHint, hints: lad.hints, ladder: lad.ladder, steps: part.steps, traps: q.traps, criteria: part.criteria, stepcheck: part.stepcheck,
-      derived: part.derivedKey ? true : undefined,
+      derived: part.derivedKey ? true : undefined, derivedForms: part.derivedKey ? part.derivedForms : undefined,
       diagram: rec.diagram ? figureRef(packableFigure(opts.figures, part.question)) : undefined
-    }, ['id', 'group', 'label', 'dp', 'authored', 'level', 'marks', 'title', 'prompt', 'answerType', 'answer', 'answerPrefix', 'inputHint', 'hints', 'ladder', 'steps', 'traps', 'criteria', 'stepcheck', 'derived', 'diagram']);
+    }, ['id', 'group', 'label', 'dp', 'authored', 'level', 'marks', 'title', 'prompt', 'answerType', 'answer', 'answerPrefix', 'inputHint', 'hints', 'ladder', 'steps', 'traps', 'criteria', 'stepcheck', 'derived', 'derivedForms', 'diagram']);
     shardOf(part).questions.push(entry);
   }
   const files = new Map();
@@ -775,7 +775,8 @@ export function compilePack(archive, opts = {}) {
 export function derivedSample(converted, n = 40) {
   const pick = [...converted].sort((a, b) => (sha256(Buffer.from(a.id)) < sha256(Buffer.from(b.id)) ? -1 : 1)).slice(0, n).sort((a, b) => (a.id < b.id ? -1 : 1));
   const cell = t => String(t).replace(/\|/g, '\\|').replace(/\n/g, ' ');
-  return ['| Question | Prompt (start) | Kind | Derived key |', '|---|---|---|---|', ...pick.map(c => `| ${c.id} | ${cell(c.prompt)} | ${c.answerType} | \`${cell(JSON.stringify(c.key))}\` (his printed answer, read as \`${cell(c.shown)}\`) |`)].join('\n') + '\n';
+  return ['| Question | Prompt (start) | Box | Derived key (his printed answer, read as) | His form typed in (accepted) | Wrong values refused |', '|---|---|---|---|---|---|',
+    ...pick.map(c => `| ${c.id} | ${cell(c.prompt)} | ${c.answerType}${c.exactForm ? ' (exact form)' : ''} | \`${cell(JSON.stringify(c.key))}\` (\`${cell(c.shown)}\`) | ${c.forms}: ${(c.formList || []).slice(0, 4).map(f => `\`${cell(f)}\``).join(' ')} | ${c.wrongs} |`)].join('\n') + '\n';
 }
 
 export const NOTICE = 'Question bank content \u00a9 Priysharan Tripathi trading as Pri Learning. All rights reserved.\n';

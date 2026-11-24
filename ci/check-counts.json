@@ -863,7 +863,7 @@
       "job": "platform-contracts",
       "log": "qbank-real-pack.log",
       "pins": [
-        {"has":"QBANK REAL PACK: PASS — 665/665 checks over 2035 questions","note":"648 -> 665 over 2035, as printed: 91 find parts whose own printed answer and last worked step agree are now marked questions (derived keys), through the same checks. Earlier: 217 -> 620 over 1804, as printed: the rung rule re-run over every hint and rung of every packed question, and a sweep of 300 questions through the real routes (issue reply, hint route, no-rung refusal)."}
+        {"has":"QBANK REAL PACK: PASS — 630/630 checks over 2031 questions","note":"2035 -> 2031 questions and 665 -> 630 checks, as printed: the derived-key rule now proves the key against his own TeX and his typed forms, so 87 (not 91) find parts are marked questions; each of them is re-marked in every typed form it was proved on, and its wrong values re-refused. 648 -> 665 over 2035, as printed: 91 find parts whose own printed answer and last worked step agree are now marked questions (derived keys), through the same checks. Earlier: 217 -> 620 over 1804, as printed: the rung rule re-run over every hint and rung of every packed question, and a sweep of 300 questions through the real routes (issue reply, hint route, no-rung refusal)."}
       ]
     },
     "platform/qbank-mix.log": {
@@ -877,28 +877,28 @@
       "job": "platform-contracts",
       "log": "qbank-marking.log",
       "pins": [
-        {"has":"QBANK MARKING: PASS — 105/105 checks over 2035 questions","note":"1944 -> 2035 questions, as printed (the 91 derived-key questions); the 105 checks are unchanged. Earlier: 30 -> 55 over 1804, as printed: the rounding reading applies to 0 of 1226 numeric questions and never where an exact form is asked, and yy' and dy/dx are one left side."}
+        {"has":"QBANK MARKING: PASS — 105/105 checks over 2031 questions","note":"2035 -> 2031 questions, as printed (87 derived keys, not 91). 1944 -> 2035 questions, as printed (the 91 derived-key questions); the 105 checks are unchanged. Earlier: 30 -> 55 over 1804, as printed: the rounding reading applies to 0 of 1226 numeric questions and never where an exact form is asked, and yy' and dy/dx are one left side."}
       ]
     },
     "platform/qbank-sealed.log": {
       "job": "platform-contracts",
       "log": "qbank-sealed.log",
       "pins": [
-        {"has":"QBANK SEALED: PASS — 11/11 checks over 2035 questions","note":"1944 -> 2035 questions, as printed. Earlier: 1794 -> 1804 questions, as printed."}
+        {"has":"QBANK SEALED: PASS — 11/11 checks over 2031 questions","note":"2035 -> 2031 questions, as printed (87 derived keys, not 91). 1944 -> 2035 questions, as printed. Earlier: 1794 -> 1804 questions, as printed."}
       ]
     },
     "platform/qbank-worked.log": {
       "job": "platform-contracts",
       "log": "qbank-worked.log",
       "pins": [
-        {"has":"QBANK WORKED: PASS — 59/59 checks over 2238 worked-solution questions","note":"New pin, as printed by running server/test/qbank-worked-check.mjs: no answer or trap on a worked-solution question, none of his steps or criteria before the solution, submit, reveal and the solution rung refuse it, the solution route records it completed and seen and nothing else (no attempt, no event, no mark), 1 draw in 6, never two in a row, never in Rush, Match, placement, a timed paper or a prepared question."}
+        {"has":"QBANK WORKED: PASS — 88/88 checks over 2241 worked-solution questions","note":"59 -> 88 checks over 2238 -> 2241, as printed: a worked-solution question uses none of the free allowance on a repeat, review and task mode never deal one, a twin is never one, and hints stating a worked-step value are dropped. New pin, as printed by running server/test/qbank-worked-check.mjs: no answer or trap on a worked-solution question, none of his steps or criteria before the solution, submit, reveal and the solution rung refuse it, the solution route records it completed and seen and nothing else (no attempt, no event, no mark), 1 draw in 6, never two in a row, never in Rush, Match, placement, a timed paper or a prepared question."}
       ]
     },
     "platform/qbank-figures.log": {
       "job": "platform-contracts",
       "log": "qbank-figures.log",
       "pins": [
-        {"has":"QBANK FIGURES: PASS — 42/42 checks over 164 parts with a figure","note":"136 -> 164 parts, as printed: the derived-key questions that have a figure (a worked-solution question's figure is counted with the directory, not here). Earlier: 142 -> 136 parts as printed after six more figures were held for the owner (the floor follows the smaller pack). New pin, as printed: the committed figures against the pack and the sanitiser, no text alternative that states an answer, the figure route (signed out refused; never issued, malformed and no-diagram all one 404; another account's question 404; bytes, headers, ETag, the JSON twin) and a figure file that is not the one the pack names is never sent."}
+        {"has":"QBANK FIGURES: PASS — 42/42 checks over 163 parts with a figure","note":"164 -> 163 parts, as printed (X12-V1-004 is no longer a derived-key question). 136 -> 164 parts, as printed: the derived-key questions that have a figure (a worked-solution question's figure is counted with the directory, not here). Earlier: 142 -> 136 parts as printed after six more figures were held for the owner (the floor follows the smaller pack). New pin, as printed: the committed figures against the pack and the sanitiser, no text alternative that states an answer, the figure route (signed out refused; never issued, malformed and no-diagram all one 404; another account's question 404; bytes, headers, ETag, the JSON twin) and a figure file that is not the one the pack names is never sent."}
       ]
     }
   },

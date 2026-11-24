@@ -3,7 +3,7 @@
 //
 //   node tools/qbank-manual.test.mjs
 import crypto from 'node:crypto';
-import { classifyManual, readPrintedAnswer, deriveKey, asDerivedPart, plausibleWrongs, stepResults, stepResultLeak } from './qbank-manual.mjs';
+import { classifyManual, readPrintedAnswer, deriveKey, asDerivedPart, plausibleWrongs, stepResults, stepResultLeak, bracketFunctions, plainOf, evalTeX, keyAgreesWithTeX, naturalForms } from './qbank-manual.mjs';
 import { compilePack, derivedSample, derivedKeyRefusals, engineQuestion, printedAnswers, evaluateManual } from './qbank-import.mjs';
 import { loadPack } from '../server/platform/qbankPack.js';
 import { checkBankAnswer } from '../server/platform/qbankMarking.js';
@@ -152,10 +152,25 @@ const archive = () => {
   // The derived key must pass the same checks an authored part does: a question whose derived key is accepted but whose wrong values are not refused is not converted.
   const p = base('FD-009', { prompt: 'Find the gradient of $y=x^{2}$ at $x=3$.' });
   const d = asDerivedPart(p, { answerType: 'numeric', answer: { value: 6 } });
-  const r = derivedKeyRefusals(d, engineQuestion(d));
-  ok(r.ok === true && r.tested >= 2, 'a numeric key that refuses its wrong values is accepted');
+  const r = derivedKeyRefusals(d, engineQuestion(d), { shown: '6' });
+  ok(r.ok === true && r.wrongs >= 3 && r.forms >= 1, 'a numeric key that refuses its wrong values is accepted');
   const wide = asDerivedPart(p, { answerType: 'expression', answer: { expr: 'x' } });
-  ok(derivedKeyRefusals({ ...wide, answer: { expr: 'x' } }, engineQuestion(wide)).ok === true, 'an expression key refuses -x, 2x, x+1');
+  ok(derivedKeyRefusals({ ...wide, answer: { expr: 'x' } }, engineQuestion(wide), { shown: 'x' }).ok === true, 'an expression key refuses -x, 2x, x+1');
+  // His own form must be marked correct by the real marker, in the ways a student types it. A numeric box refuses `e^2+5` ("work it out first").
+  const e = base('FD-011', { prompt: 'Find the exact value of $\\displaystyle\\int_{1}^{e^{2}}\\left(1+\\frac3x\\right)dx$.', steps: [{ h: 'Integrate', d: '$[x+3\\ln x]_{1}^{e^{2}}=(e^{2}+6)-1$' }, { h: 'Result', d: '$=e^{2}+5$' }] });
+  const ek = deriveKey(e, '$e^{2}+5$');
+  ok(ek.answerType === 'numeric' && ek.alt?.answerType === 'expression', 'his e^2+5 is read as a number and carries an exact-form expression alternative');
+  const asNumber = asDerivedPart(e, ek);
+  eq(derivedKeyRefusals(asNumber, engineQuestion(asNumber), ek).why, 'his-form-is-not-accepted', 'the numeric box that says "work it out first" to his own e^2+5 is not used');
+  const asExpr = asDerivedPart(e, ek.alt);
+  const er = derivedKeyRefusals(asExpr, engineQuestion(asExpr), ek.alt);
+  ok(er.ok === true && er.forms >= 3, 'the exact-form expression accepts e^2+5, 5+e^2, e^(2)+5 and refuses three wrong values');
+  const eq3 = engineQuestion(asExpr);
+  ok(['e^2+5', '5+e^2', 'e^(2)+5', 'e**2 + 5'].every(t => checkBankAnswer(eq3, t).correct === true) && ['e^2', '12.4', '2e^2+5'].every(t => checkBankAnswer(eq3, t).correct !== true), 'typed as a student would, and not otherwise');
+  const pk = deriveKey(base('FD-012', { prompt: 'The region under $y=1+\\cos x$ for $0\\le x\\le\\pi$ is rotated about the $x$-axis. Find the exact volume.', steps: [{ h: 'V', d: '$V=\\tfrac{3\\pi^{2}}2$' }] }), '$\\tfrac{3\\pi^{2}}2$');
+  const pd = asDerivedPart(base('FD-012', { prompt: 'Find the exact volume.' }), pk.alt ?? pk);
+  const pq = engineQuestion(pd);
+  ok(['3pi^2/2', '1.5pi^2', '(3/2)pi^2', '3π²/2', '(3*pi^2)/2'].every(t => checkBankAnswer(pq, t).correct === true), 'his 3π²/2 is accepted as 3pi^2/2, 1.5pi^2, (3/2)pi^2 and 3π²/2');
 }
 {
   // The leak rule for a question that stays a worked solution: a hint may not state a result of his steps.
@@ -188,6 +203,43 @@ const archive = () => {
   const arch = { questions: [{ id: 'M-1', ans: undefined, parts: [{ ans: '$1$' }, { ans: '$2$' }] }, { id: 'M-2', ans: '$9$' }], parts: [{ question: 'M-1', label: '(i)' }, { question: 'M-1', label: '(ii)' }, { question: 'M-2', label: null }] };
   const got = [...printedAnswers(arch).values()];
   eq(got, ['$1$', '$2$', '$9$'], 'printed answers are read by part');
+}
+
+// ── a function application keeps its argument; the key is proved against his own TeX ─────────────────
+eq(bracketFunctions('\\frac12(\\cos 2x-\\cos 4x)'), '\\frac12(\\cos(2x)-\\cos(4x))', 'cos 2x is cos(2x)');
+eq(bracketFunctions('\\sin x\\cos x'), '\\sin(x)\\cos(x)', 'sin x cos x is two applications');
+eq(bracketFunctions('\\ln \\cos 2x'), '\\ln(\\cos(2x))', 'a function of a function nests');
+eq(bracketFunctions('\\sin^2 x+\\sin(x)'), '\\sin^2(x)+\\sin(x)', 'a power stays, a bracket given is the argument');
+eq(plainOf('\\cos 2x-\\cos 4x').plain, 'cos(2x)-cos(4x)', 'read as plain text the argument keeps its brackets');
+eq(evalTeX('\\tfrac12(\\cos2x-\\cos4x)', { x: 0.7 }), 0.5 * (Math.cos(1.4) - Math.cos(2.8)), 'his TeX is evaluated on its own (cos 2x is cos(2x))');
+{
+  const bad = { answerType: 'expression', answer: { expr: '((1)/(2))(cos2x-cos4x)' } };
+  eq(keyAgreesWithTeX(bad, '$\\tfrac12(\\cos2x-\\cos4x)$'), 'key-disagrees-with-his-tex', 'the old key (cos2x is cos(2)·x) is refused by the round trip');
+  const good = { answerType: 'expression', answer: { expr: '((1)/(2))(cos(2x)-cos(4x))' } };
+  eq(keyAgreesWithTeX(good, '$\\tfrac12(\\cos2x-\\cos4x)$'), null, 'the bracketed key agrees with his TeX at every sample point');
+  eq(keyAgreesWithTeX({ answerType: 'numeric', answer: { value: 5 } }, '$e^{2}+5$'), 'key-disagrees-with-his-tex', 'a numeric key that is not his value is refused');
+  eq(keyAgreesWithTeX({ answerType: 'set', answer: { values: [1, 2] } }, '$x=1$ or $x=2$'), null, 'a set agrees item by item');
+  const k = deriveKey(base('FD-013', { prompt: 'Express $\\sin x\\sin3x$ as a difference of cosines.', steps: [{ h: 'Product to sum', d: '$\\sin x\\sin3x=\\tfrac12(\\cos2x-\\cos4x)$' }] }), '$\\tfrac12(\\cos2x-\\cos4x)$');
+  eq(k.answer?.expr, '((1)/(2))(cos(2x)-cos(4x))', 'the derived key has explicit function arguments');
+  const dp = asDerivedPart(base('FD-013', { prompt: 'Express $\\sin x\\sin3x$ as a difference of cosines.' }), k);
+  const q = engineQuestion(dp);
+  ok(checkBankAnswer(q, '(1/2)(cos(2x)-cos(4x))').correct === true && checkBankAnswer(q, '1/2*(cos(2x)-cos(4x))').correct === true, 'and the correct answer is marked right');
+  ok(checkBankAnswer(q, '(1/2)(cos2x-cos4x)').correct !== true && checkBankAnswer(q, '(cos(2x)-cos(4x))').correct !== true && checkBankAnswer(q, '(1/2)(cos(2x)+cos(4x))').correct !== true, 'and wrong ones, including the old misreading, are not');
+}
+// A prompt that asks for more than a value is never converted.
+for (const prompt of ['Every point of a data set lies on the line $y=2x+1$. State the value of Pearson\'s correlation coefficient, with a reason.', 'State the value of $r$ and interpret it.', 'Find $x$ and justify your answer.', 'State the gradient and the intercept of $y=2x+1$.']) eq(deriveKey(base('FD-014', { prompt, steps: [{ h: 'r', d: '$r=1$' }] }), '$r=1$').no !== undefined, true, `not converted: ${prompt.slice(0, 40)}`);
+// The natural typed forms of his answer.
+eq(naturalForms({ answerType: 'expression', answer: { expr: '' }, shown: '((3pi^(2))/(2))' }).slice(0, 3), ['((3pi^(2))/(2))', '(3pi^2)/2', '(3π^2)/2'], 'his form as read, tidied, with pi as π');
+eq(naturalForms({ answerType: 'expression', answer: { expr: '' }, shown: 'e^(2)+5' }).includes('5+e^2'), true, 'and a rearrangement of a sum');
+// A hint may not state a number the worked steps reach that the question does not give.
+{
+  const p = base('PR-015', { prompt: 'A loan of $\\$300000$ is repaid monthly at $0.4\\%$ a month. Find the number of repayments $n$.', steps: [{ h: 'Equation', d: '$300=n$' }, { h: 'Result', d: '$n=360$' }] });
+  eq(stepResultLeak(p, 'Balance zero after 360.', stepResults(p)) !== null, true, 'a hint stating 360 is dropped');
+  eq(stepResultLeak(p, 'Monthly rate 0.4%.', stepResults(p)), null, 'a number the question gives is not a result');
+  const q = base('PR-016', { prompt: 'Solve $e^{-0.2t}=0.4$.', steps: [{ h: 'Take logs', d: '$-0.2t=\\ln0.4$' }, { h: 'Time', d: '$t=4.58$' }] });
+  const lq = base('PR-017', { prompt: 'The mass is $M=50e^{-0.2t}$. Find the time when $M=20$.', steps: [{ h: 'Equation', d: '$e^{-0.2t}=0.4$' }, { h: 'Time', d: '$t=4.58$' }] });
+  eq(stepResultLeak(lq, 'ln 0.4.', stepResults(lq)) !== null, true, 'a hint stating ln 0.4 (the set-up value 0.4 the steps reach) is dropped');
+  void q;
 }
 
 console.log(failures.length ? `QBANK MANUAL: FAIL ${failures.length}\n  ${failures.join('\n  ')}` : `QBANK MANUAL: PASS ${pass}/${pass} checks`);

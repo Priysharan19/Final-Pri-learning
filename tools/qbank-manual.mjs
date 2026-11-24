@@ -73,7 +73,7 @@ function applyAt(s, i) {
   while (s[j] === ' ') j++;
   if (s[j] === '^') { const a = texArgEnd(s, j + 1); if (a > 0) { head += s.slice(j, a); j = a; } }
   while (s[j] === ' ') j++;
-  if (s[j] === '(' || s.startsWith('\\left(', j)) return { text: `${head} `, end: j };       // brackets given: they are the argument
+  if (s[j] === '(' || s.startsWith('\\left(', j)) return { text: head, end: j };       // brackets given: they are the argument
   let end = j, first = true;
   for (;;) { const e = factorEnd(s, end, first); if (e < 0) break; end = e; first = false; }
   if (end === j) return { text: `${head} `, end: j };
@@ -590,7 +590,7 @@ function numberValuesIn(text) {
   for (const part of parts) {
     let rest = String(part);
     for (const m of rest.matchAll(/(?<![A-Za-z])(?:ln|log|sqrt|sin|cos|tan|exp)\s*\(?\s*-?\d+(?:\.\d+)?\s*\)?/g)) { const v = numberOf(m[0].replace(/^([a-z]+)\s*\(?\s*(-?[\d.]+)\s*\)?$/, '$1($2)')); if (v !== null) out.push({ text: m[0].trim(), value: v }); }
-    rest = rest.replace(/(?<![A-Za-z])(?:ln|log|sqrt|sin|cos|tan|exp)\s*\(?\s*-?\d+(?:\.\d+)?\s*\)?/g, ' ');
+    rest = rest.replace(/(?<![A-Za-z])(?:ln|log|sqrt|sin|cos|tan|exp)(?=\s*\(?\s*-?\d)/g, ' ');   // the number inside a function of a number is read on its own as well
     for (const m of rest.matchAll(/\d+(?:\.\d+)?\s*\/\s*\d+(?:\.\d+)?|\d+(?:\.\d+)?/g)) { const v = numberOf(m[0]); if (v !== null) out.push({ text: m[0].trim(), value: v }); }
   }
   return out;
