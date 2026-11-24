@@ -15,8 +15,18 @@
 //
 // Deterministic: fixed seeds, no model, no network. A measurement; it sets and changes nothing.
 //
-//   node tools/marking-mutation-harness.mjs [--root <repo>] [--seeds 1] [--max-per-line 12] [--generators y12-diff,me11-poly]
+//   node tools/marking-mutation-harness.mjs [--root <repo>] [--seeds 1] [--seed-from 0] [--max-per-line 12] [--generators y12-diff,me11-poly]
 //        [--typed wrong|right] [--dump out.json] [--compare base.json] [--limit-pages N] [--verbose]
+//   --root points the engine at another checkout (the same harness measured against an older tree gives the "before" rate);
+//   --dump writes every authored line's verdict, --compare lists the ticks a tree lost or gained against such a dump.
+//
+// What is NOT held against the marker (counted in the totals, never silently dropped):
+//   echoes             a mutant that says something TRUE the page, the question or its solution says elsewhere (another authored line, a root of an
+//                      authored equation, a value the solution reaches, a true identity, a statement true at the question's given point);
+//   nameDefinitions   `b = 3 - (-1) = 4` where the page never said what b is: no line can be shown false;
+//   marginNumberTicks the owner's rule of 19 November 2026 (a number from the margin read into the front of a true line is not the line's claim; pinned
+//                      by client/test/arithmetic-lines-check.mjs): such a tick says in words what it left out;
+//   undecided         a mutant the harness's own evaluator cannot read: never asserted either way.
 // ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 import fs from 'node:fs';
 import path from 'node:path';
