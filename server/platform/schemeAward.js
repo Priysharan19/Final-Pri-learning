@@ -41,6 +41,7 @@ import { evalNumeric } from '../../client/src/engine/expr.js';
 import { makeFn, polynomial, extremes } from './lineInterpreter/truth.js';
 import { editionMarkingPolicy, editionMethodMarksRefusal } from './editionMarking.js';
 import { AUTHOR_APPROVED_SERVER } from './authorApproved.generated.js';
+import { marksPossibleFor } from './markerOps.js';
 
 /** Editions on the author-approved tier: schemes only, on the author's approval and PRI_METHOD_MARKS=on. */
 export const AUTHOR_APPROVED_EDITIONS = Object.freeze(['prithagoras']);
@@ -104,6 +105,31 @@ const restates = (l, q) => {
   const side = String(l.text ?? '').split('=').pop().replace(/\s+/g, '');
   return !!f && side === String(f.rhs).replace(/\s+/g, '');
 };
+
+// ── draft schemes for solving an equation ─────────────────────────────────────────────────────────────────────────────────
+// The step check ticks a line of a solved equation when it is an equation with the same solutions as the question's. That alone is not a
+// method step, so a line earns a criterion here only when it is a real rewrite: an equation with a letter in it, which is not the
+// question's own equation (either way round), not a solved form such as "x = 7", and not a line already written.
+const EQ_NORM = s => String(s ?? '').replace(/\$|\s+/g, '').toLowerCase();
+const SOLVED_FORM = /^[a-z]=-?[\d.]+((or|,|and)[a-z]=-?[\d.]+)*$/;
+const sidesKey = s => { const p = EQ_NORM(s).split('='); return p.length === 2 ? p.slice().sort().join('=') : EQ_NORM(s); };
+const givenEquation = q => /^\s*Solve\s+\$([^$]+)\$/i.exec(String(q?.prompt ?? ''))?.[1] ?? null;
+const rewrite = (l, k, lines, q) => {
+  // A tick that says only that the numbers on the line are equal (state "arithmetic") decides no step of a method.
+  if (l.state === 'arithmetic') return false;
+  const t = EQ_NORM(l.text);
+  if (!t.includes('=') || !/[a-z]/.test(t.replace(/or|and/g, ''))) return false;
+  if (SOLVED_FORM.test(t)) return false;
+  // A line the step check ticks as "incomplete" keeps only some of the solutions (a factor set to zero). It is a step only in that form: any
+  // equation that happens to have one of the solutions (x - 5 = 1 when 6 is a solution) is ticked the same way and must not earn.
+  if (l.state === 'incomplete' && !/=0$/.test(t)) return false;
+  const g = givenEquation(q);
+  if (g && sidesKey(l.text) === sidesKey(g)) return false;
+  return !lines.slice(0, k).some(e => sidesKey(e?.text) === sidesKey(l.text));
+};
+const solvable = q => q.answerType === 'numeric' && q.stepcheck?.kind === 'equation';
+const REWRITE_HOW = 'a line that the step check ticks as an equation with the same solutions as the question\'s, and that is a real rewrite: it has a letter in it, it is not the question\'s own equation (either way round), it is not a solved form such as x = 7, and it is not a line already written';
+
 const ANSWER = { key: 'answer', by: 'final', marks: 1, how: 'the answer checker marks the final answer, the same check that marks a one-line answer' };
 
 // A criterion's `line` predicate sees one TICKED line of the displayed report (and its place); it never sees the key or a mark.
@@ -171,6 +197,54 @@ export const SCHEMES = Object.freeze([
       { key: 'derivative', by: 'line', marks: 1, text: 'Writes a correct derivative.', how: 'a line the step check ticks against the question\'s derivative step (a line that only restates the function does not count)', line: (l, k, lines, q) => !restates(l, q) },
       { ...ANSWER, marks: 1, text: 'Gives the final answer correctly.' }
     ]
+  },
+  // ── DRAFTS added 24 Nov 2026 (coverage pass). Not approved: nothing is paid until the author files a record for the digest. ──
+  {
+    id: 'y12-trig-extreme-2', title: 'Maximum or minimum of a sine or cosine model (2 marks)', course: 'Year 12 Mathematics Advanced', year: 12, level: 1,
+    families: ['y12-trig-model'],
+    pick: q => q.answerType === 'numeric' && !!fnOf(q) && /(maximum|minimum) value/i.test(q.prompt) && !!extremes(fnOf(q))?.period,
+    criteria: [
+      { key: 'working', by: 'line', marks: 1, text: 'States the amplitude or the midline correctly.', how: 'a line "amplitude = ..." or "midline = ..." that the step check ticks as the amplitude or the centre value of the given function', line: (l, k, lines, q) => labelled('amplitude')(l) || labelled('midline')(l) },
+      { ...ANSWER, key: 'extreme', marks: 1, text: 'States the maximum or minimum value asked for, correctly (the final answer).' }
+    ]
+  },
+  {
+    id: 'y7-equation-solve-2', title: 'Solve an equation, two marks', course: 'Mathematics Stage 4 (Years 7 and 8)', year: 8, level: 3,
+    families: ['y7-equations', 'y8-equations', 'y7-angles'],
+    pick: solvable,
+    criteria: [
+      { key: 'step', by: 'line', marks: 1, text: 'Writes a correct step towards the solution.', how: REWRITE_HOW, line: rewrite },
+      { ...ANSWER, key: 'solution', marks: 1, text: 'Gives the solution correctly.' }
+    ]
+  },
+  {
+    id: 'y7-equation-solve-3', title: 'Solve an equation, three marks', course: 'Mathematics Stage 4 (Years 7 and 8)', year: 8, level: 3,
+    families: ['y7-equations', 'y8-equations', 'y7-angles'],
+    pick: solvable,
+    criteria: [
+      { key: 'step1', by: 'line', marks: 1, text: 'Writes a correct first step towards the solution.', how: REWRITE_HOW, line: rewrite },
+      { key: 'step2', by: 'line', marks: 1, text: 'Writes a second correct step, on a different line.', how: REWRITE_HOW + '; the first such line earns the first step and the next one earns this', line: rewrite },
+      { ...ANSWER, key: 'solution', marks: 1, text: 'Gives the solution correctly.' }
+    ]
+  },
+  {
+    id: 'y10-quadratic-solve-2', title: 'Solve a quadratic equation, two marks', course: 'Mathematics Stage 5 (Year 10)', year: 10, level: 4,
+    families: ['y10-quadratics'],
+    pick: q => q.answerType === 'set' && q.stepcheck?.kind === 'equation' && /^\s*Solve\s+\$/i.test(q.prompt) && !/formula/i.test(q.prompt),
+    criteria: [
+      { key: 'step', by: 'line', marks: 1, text: 'Writes a correct step towards the solutions.', how: REWRITE_HOW, line: rewrite },
+      { ...ANSWER, key: 'solutions', marks: 1, text: 'Gives all the solutions correctly.' }
+    ]
+  },
+  {
+    id: 'y10-quadratic-solve-3', title: 'Solve a quadratic equation, three marks', course: 'Mathematics Stage 5 (Year 10)', year: 10, level: 4,
+    families: ['y10-quadratics'],
+    pick: q => q.answerType === 'set' && q.stepcheck?.kind === 'equation' && /^\s*Solve\s+\$/i.test(q.prompt) && !/formula/i.test(q.prompt),
+    criteria: [
+      { key: 'step1', by: 'line', marks: 1, text: 'Writes a correct first step towards the solutions.', how: REWRITE_HOW, line: rewrite },
+      { key: 'step2', by: 'line', marks: 1, text: 'Writes a second correct step, on a different line.', how: REWRITE_HOW + '; the first such line earns the first step and the next one earns this', line: rewrite },
+      { ...ANSWER, key: 'solutions', marks: 1, text: 'Gives all the solutions correctly.' }
+    ]
   }
 ]);
 
@@ -194,13 +268,23 @@ export const schemeDigest = scheme => crypto.createHash('sha256').update(canon({
   id: scheme.id, title: scheme.title, criteria: scheme.criteria.map(c => ({ key: c.key, by: c.by, marks: c.marks, text: c.text, how: c.how }))
 })).digest('hex');
 
-/** The scheme of an issued question's type, or null. `generator` is the family that drew it. */
+/**
+ * The scheme of an issued question's type, or null. `generator` is the family that drew it. Several schemes may share one question
+ * form and differ only in marks (a mark-variant): the one whose marks are the question's marks wins; otherwise the first that matches
+ * (it will then not pay, and the question stays on the final answer).
+ */
 export function schemeTypeOf(q, generator = q?._generator ?? q?.subtopic) {
+  const matches = [];
   for (const s of SCHEMES) {
     if (!s.families.includes(generator)) continue;
-    try { if (s.pick(q)) return s.id; } catch { /* not this type */ }
+    try { if (s.pick(q)) matches.push(s); } catch { /* not this type */ }
   }
-  return null;
+  if (matches.length > 1) {
+    let marks = null; try { marks = marksPossibleFor(q); } catch { marks = null; }
+    const fit = matches.find(s => schemeMarks(s) === marks);
+    if (fit) return fit.id;
+  }
+  return matches[0]?.id ?? null;
 }
 
 /** Is this type approved, for the digest it has now? `list` defaults to the repository's (empty) allow-list. */

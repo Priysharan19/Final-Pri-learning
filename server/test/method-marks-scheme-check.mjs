@@ -40,6 +40,8 @@ await G.loadAllBanks();
 
 const LIST = SCHEMES.map(s => ({ typeId: s.id, digest: schemeDigest(s) }));
 const ON = { PRI_METHOD_MARKS: 'on' };
+const EQ_SKIP = t => !/[a-z]/i.test(t) || /^\s*[a-z]\s*=\s*-?[\d.]+\s*$/i.test(t);
+const num = v => { const r = Math.round(v * 1e6) / 1e6; return String(Object.is(r, -0) ? 0 : r); };
 const asMarks = (q, n, typeId) => ({ ...q, difficulty: n, steps: Array.from({ length: n }, (_, i) => ({ h: `Step ${i + 1}`, d: '' })), _methodScheme: typeId });
 const finalOf = lines => { const l = lines[lines.length - 1] || ''; return l.includes('=') ? l.slice(l.lastIndexOf('=') + 1).trim() : l.trim(); };
 
@@ -207,7 +209,9 @@ for (const s of SCHEMES) ok(R.questionsOfType(s, { limit: 3 }).length === 3, `${
       const built = await type.build(q);
       if (!built) continue;
       const first = built.full[0];
-      const adversarial = [['0 = 0'], ['x = x'], [first.replace(/=.*/, '= 0')]];
+      const zeroed = first.replace(/=.*/, '= 0');
+      // (a first line that already is "... = 0" is the genuine step, not a gamed one)
+      const adversarial = [['0 = 0'], ['x = x'], ...(zeroed.replace(/\s+/g, '') === first.replace(/\s+/g, '') ? [] : [[zeroed]])];
       const sub = /^\s*([A-Za-z])\((-?\d+)\)\s*=/.exec(first);
       if (sub && /^(y11-poly-evaluate|y12-trig-evaluate)$/.test(s.id)) {
         const [, name, a] = sub; const A = Number(a);
@@ -227,7 +231,7 @@ for (const s of SCHEMES) ok(R.questionsOfType(s, { limit: 3 }).length === 3, `${
     }
   }
   console.log(`  adversarial: ${gamed.tried} lines tried over ${SCHEMES.length} types, gamed marks ${gamed.earned}; the real substitution earned its criterion on ${gamed.controlEarned} of ${gamed.controls}`);
-  ok(gamed.tried >= 400 && gamed.earned === 0, `no adversarial line earns a criterion (${gamed.earned} of ${gamed.tried})`);
+  ok(gamed.tried >= 800 && gamed.earned === 0, `no adversarial line earns a criterion (${gamed.earned} of ${gamed.tried})`);
   ok(gamed.controls >= 40 && gamed.controlEarned === gamed.controls, 'the genuine term-by-term substitution still earns its criterion');
   // the reviewer's two lines, on the question they named (y11-polynomials, difficulty 2, seed 1)
   const polyType = SCHEMES.find(x => x.id === 'y11-poly-evaluate');
@@ -239,6 +243,71 @@ for (const s of SCHEMES) ok(R.questionsOfType(s, { limit: 3 }).length === 3, `${
       ok(!p.items.find(i => i.key === 'substitute').awarded, `P(${a}) = ${rhs} does not earn the substitution criterion`);
     }
   }
+}
+
+// ── 2b2. the draft schemes of the coverage pass (24 Nov 2026): unapproved in the repository, gamed lines earn nothing ──────────────
+{
+  const DRAFT_IDS = ['y12-trig-extreme-2', 'y7-equation-solve-2', 'y7-equation-solve-3'];
+  ok(DRAFT_IDS.every(id => SCHEMES.some(s => s.id === id) && !APPROVED_SCHEME_TYPES.some(a => a.typeId === id) && !isApproved(id)), 'the draft schemes exist and none is on the repository\'s approved list');
+  // with the repository's own list, a draft type is never stamped and never pays
+  {
+    let stamped = 0, tried = 0;
+    for (const id of DRAFT_IDS) { const s = SCHEMES.find(x => x.id === id); for (const q of R.questionsOfType(s, { limit: 15 })) {
+      const copy = JSON.parse(JSON.stringify({ ...q, _generator: s.families[0] })); tried++;
+      if (sealForEdition(copy, bankPolicy('prithagoras'), s.families[0]) && copy._methodScheme === id) stamped++;
+      const p = schemePay({ q: asMarks(q, schemeMarks(s), id), report: { lines: [{ status: 'ok', text: 'x' }] }, correct: false, marksPossible: schemeMarks(s), env: { ...ON, PRI_EDITION: 'prithagoras' } });
+      if (p.paid) stamped++;
+    } }
+    ok(tried >= 30 && stamped === 0, `an unapproved draft is never stamped and never pays (${tried} questions)`);
+  }
+  // the mark-variants: a question is stamped with the variant whose marks are its marks, and the other variant never pays it
+  {
+    const two = SCHEMES.find(x => x.id === 'y7-equation-solve-2'), three = SCHEMES.find(x => x.id === 'y7-equation-solve-3');
+    let n2 = 0, n3 = 0, bad = 0;
+    for (const q of R.questionsOfType(two)) { const m = marksPossibleFor(q); const id = schemeTypeOf(q); if (m === 2) { n2++; if (id !== two.id) bad++; } if (m === 3) { n3++; if (id !== three.id) bad++; } }
+    ok(n2 >= 20 && n3 >= 20 && bad === 0, `equation questions: ${n2} two-mark ones typed to the two-mark scheme, ${n3} three-mark ones to the three-mark scheme, ${bad} wrongly typed`);
+  }
+  // gaming lines on an equation question earn no step: its own equation (either way round), a line with no letter, an identity, a solved form, a repeat
+  const gamed = { tried: 0, earned: 0, controls: 0, controlEarned: 0, repeatEarned: 0 };
+  for (const id of ['y7-equation-solve-2', 'y7-equation-solve-3', 'y10-quadratic-solve-2', 'y10-quadratic-solve-3']) {
+    const s = SCHEMES.find(x => x.id === id); const type = TYPES.find(t => t.id === id);
+    for (const q of R.questionsOfType(s, { limit: 60 })) {
+      const built = await type.build(q); if (!built) continue;
+      const q2 = asMarks(q, schemeMarks(s), id);
+      const payLines = lines => { const result = checkAnswer(q2, '999'); const ev = stepEvidence(q2, '999', lines.join('\n'), result, { slipWarnings: true }); return schemePay({ q: q2, report: ev.stepReport, topic: ev.topicTicks ?? null, correct: false, marksPossible: schemeMarks(s), env: ON, list: LIST }); };
+      const given = /^\s*Solve\s+\$([^$]+)\$/i.exec(q.prompt)?.[1];
+      const v = q.stepcheck?.variable || 'x';
+      const roots = q.answerType === 'set' ? q.answer.values.map(Number) : [Number(q.answer.value)];
+      const lists = [['2 + 2 = 4'], ['9 = 9'], [`${v} = ${v}`], ['0 = 0'], [`${v} = ${num(roots[0])}`], [`${v} = ${num(roots[0])}`, `${v} = ${num(roots[0])}`]];
+      // an equation that merely happens to have one of the several solutions (x - 5 = 1 when 6 is a solution) is ticked as incomplete: it is no step
+      if (q.answerType === 'set') for (const r of roots) lists.push([`${v} - ${num(r - 1)} = 1`], [`2${v} = ${num(2 * r)}`.replace(/^2/, '2')]);
+      if (given) { const [l, r] = given.split('='); lists.push([given], [`${r.trim()} = ${l.trim()}`], [given, given]); }
+      for (const lines of lists) { gamed.tried++; if (payLines(lines).items.some(i => i.basis === 'lines' && i.awarded)) gamed.earned++; }
+      // a real first step is earned, and the same line written twice earns once only
+      // (the page ticks a line only when the lines after it lead somewhere: a first step on its own, with nothing after it, is "not verified")
+      // (a one-step equation has no step but the answer itself, and the answer written early is not a step)
+      if (!EQ_SKIP(built.full[0])) { gamed.controls++; if (payLines(built.partial).items.find(i => i.key === 'step' || i.key === 'step1')?.awarded) gamed.controlEarned++; }
+      if (id.endsWith('3') && payLines([built.partial[0], built.partial[0], ...built.partial.slice(1)]).items.find(i => i.key === 'step2')?.awarded && built.partial.slice(1).every(t => EQ_SKIP(t))) gamed.repeatEarned++;
+    }
+  }
+  console.log(`  equation drafts, adversarial: ${gamed.tried} gamed lines, ${gamed.earned} earned a step; real first step earned ${gamed.controlEarned} of ${gamed.controls}; repeated line earned a second step ${gamed.repeatEarned} times`);
+  ok(gamed.tried >= 400 && gamed.earned === 0, `no gamed line earns a step on an equation draft (${gamed.earned} of ${gamed.tried})`);
+  ok(gamed.controls >= 40 && gamed.controlEarned === gamed.controls, `a genuine first step earns the step (${gamed.controlEarned} of ${gamed.controls})`);
+  ok(gamed.repeatEarned === 0, 'the same line written twice never earns the second step');
+}
+
+// ── 2b3. regression (24 Nov 2026): a braced exponent, e^{3x - 3}, was never read, so a correct derivative line earned nothing ──────
+{
+  const q = { ...G.generateQuestion('y12-explogcalc', 2, 29), _methodScheme: 'y12-diff-explog' };
+  const lines = ['y = -4e^{3x - 3}', "y' = -4 × 3e^{3x - 3}", '= -4e^{3x - 3}'];
+  const result = checkAnswer(q, '-4e^(3x-3)');
+  const ev = stepEvidence(q, '-4e^(3x-3)', lines.join('\n'), result, { slipWarnings: true });
+  const p = schemePay({ q, report: ev.stepReport, topic: ev.topicTicks ?? null, correct: result.correct === true, marksPossible: marksPossibleFor(q), env: ON, list: LIST });
+  ok(marksPossibleFor(q) === 2 && p.paid && p.awarded === 1 && p.items[0].awarded && p.items[0].lines.join() === '2', `braced exponent: correct derivative line earned, wrong last line, 1 of 2 (got ${p.awarded})`);
+  const wrong = ev2 => ev2.stepReport.lines[1].status;
+  const bad = stepEvidence(q, '-4e^(3x-3)', ['y = -4e^{3x - 3}', "y' = -4 × 2e^{3x - 3}", '= -4e^{3x - 3}'].join('\n'), result, { slipWarnings: true });
+  ok(wrong(bad) !== 'ok', 'a wrong derivative line with a braced exponent is not ticked');
+  ok(checkAnswer(q, '-12e^{3x-3}').correct === true && checkAnswer(q, '-12e^{3x-2}').correct === false, 'the answer checker reads a braced exponent, and still refuses a wrong one');
 }
 
 // ── 2c. a lying interpreter cannot pay a mark ────────────────────────────────────────────────────────────────────

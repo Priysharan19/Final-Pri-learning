@@ -112,6 +112,32 @@
       "digest": "3d22a090d1a9e2bbbcdf4af4e742d5c7e6600812c0e048222be50f2e9e39be85"
     },
     {
+      "id": "y12-trig-extreme-2",
+      "title": "Maximum or minimum of a sine or cosine model (2 marks)",
+      "course": "Year 12 Mathematics Advanced",
+      "year": 12,
+      "families": [
+        "y12-trig-model"
+      ],
+      "file": "y12-trig-extreme-2.md",
+      "totalMarks": 2,
+      "criteria": [
+        {
+          "key": "working",
+          "text": "States the amplitude or the midline correctly.",
+          "marks": 1,
+          "by": "line"
+        },
+        {
+          "key": "extreme",
+          "text": "States the maximum or minimum value asked for, correctly (the final answer).",
+          "marks": 1,
+          "by": "final"
+        }
+      ],
+      "digest": "073ae29c731218a52d39a7ceabae69c62115c92a080c8107954e1c92a1907af4"
+    },
+    {
       "id": "y11-poly-evaluate",
       "title": "Evaluate a polynomial or find a remainder by substitution",
       "course": "Year 11 Mathematics Advanced",
@@ -188,6 +214,126 @@
         }
       ],
       "digest": "892c8bdbf9df8c287f9ed2ed4da9ad244170f0ed27085970c527ba4a6a491a94"
+    },
+    {
+      "id": "y7-equation-solve-2",
+      "title": "Solve an equation, two marks",
+      "course": "Mathematics Stage 4 (Years 7 and 8)",
+      "year": 8,
+      "families": [
+        "y7-equations",
+        "y8-equations",
+        "y7-angles"
+      ],
+      "file": "y7-equation-solve-2.md",
+      "totalMarks": 2,
+      "criteria": [
+        {
+          "key": "step",
+          "text": "Writes a correct step towards the solution.",
+          "marks": 1,
+          "by": "line"
+        },
+        {
+          "key": "solution",
+          "text": "Gives the solution correctly.",
+          "marks": 1,
+          "by": "final"
+        }
+      ],
+      "digest": "2db74e25a9c0a60828800d8f3370fcf2e9287b718dfb852551b812bf37698ed2"
+    },
+    {
+      "id": "y7-equation-solve-3",
+      "title": "Solve an equation, three marks",
+      "course": "Mathematics Stage 4 (Years 7 and 8)",
+      "year": 8,
+      "families": [
+        "y7-equations",
+        "y8-equations",
+        "y7-angles"
+      ],
+      "file": "y7-equation-solve-3.md",
+      "totalMarks": 3,
+      "criteria": [
+        {
+          "key": "step1",
+          "text": "Writes a correct first step towards the solution.",
+          "marks": 1,
+          "by": "line"
+        },
+        {
+          "key": "step2",
+          "text": "Writes a second correct step, on a different line.",
+          "marks": 1,
+          "by": "line"
+        },
+        {
+          "key": "solution",
+          "text": "Gives the solution correctly.",
+          "marks": 1,
+          "by": "final"
+        }
+      ],
+      "digest": "e16086f8c8099cfa56c3349e10cd35eefe7da3f95092363658c7b5f5a5e4e65f"
+    },
+    {
+      "id": "y10-quadratic-solve-2",
+      "title": "Solve a quadratic equation, two marks",
+      "course": "Mathematics Stage 5 (Year 10)",
+      "year": 10,
+      "families": [
+        "y10-quadratics"
+      ],
+      "file": "y10-quadratic-solve-2.md",
+      "totalMarks": 2,
+      "criteria": [
+        {
+          "key": "step",
+          "text": "Writes a correct step towards the solutions.",
+          "marks": 1,
+          "by": "line"
+        },
+        {
+          "key": "solutions",
+          "text": "Gives all the solutions correctly.",
+          "marks": 1,
+          "by": "final"
+        }
+      ],
+      "digest": "854cb52a476964ef767eefbc0d5349da19d42a3e42dc64d92a77c64fc747ea5c"
+    },
+    {
+      "id": "y10-quadratic-solve-3",
+      "title": "Solve a quadratic equation, three marks",
+      "course": "Mathematics Stage 5 (Year 10)",
+      "year": 10,
+      "families": [
+        "y10-quadratics"
+      ],
+      "file": "y10-quadratic-solve-3.md",
+      "totalMarks": 3,
+      "criteria": [
+        {
+          "key": "step1",
+          "text": "Writes a correct first step towards the solutions.",
+          "marks": 1,
+          "by": "line"
+        },
+        {
+          "key": "step2",
+          "text": "Writes a second correct step, on a different line.",
+          "marks": 1,
+          "by": "line"
+        },
+        {
+          "key": "solutions",
+          "text": "Gives all the solutions correctly.",
+          "marks": 1,
+          "by": "final"
+        }
+      ],
+      "digest": "396531471dd01c7d4e289ac14ac9f279782b1e82d33e7103ff6aca40180d1e51"
     }
   ],
   "notProvable": [

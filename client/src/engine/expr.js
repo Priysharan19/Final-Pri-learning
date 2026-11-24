@@ -229,6 +229,9 @@ export function normalize(raw) {
     .replace(/θ/g, 'theta')
     .replace(/√/g, 'sqrt');
   s = rewriteCounting(s);
+  // A braced exponent, e^{3x - 3} or x^{2}, as it is printed in a question and copied into working: the same power as e^(3x - 3).
+  // The tokeniser refused "{" outright, so this only turns a line that was never read into one that is; nothing already read changes.
+  for (let i = 0; i < 4 && /\^\s*\{[^{}]*\}/.test(s); i++) s = s.replace(/\^\s*\{([^{}]*)\}/g, '^($1)');
   // Superscript digits are a power: a⁷, x¹², 10⁻³. The counting notations
   // (⁵C₂) were rewritten above, so what is left is an exponent.
   s = s.replace(/⁻([⁰¹²³⁴⁵⁶⁷⁸⁹]+)/g, (_, d) => `^(-${[...d].map(ch => SUPER[ch]).join('')})`)
