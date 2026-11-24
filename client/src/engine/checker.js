@@ -1410,7 +1410,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
             out.push({ text: line, status, note, otherUnknown: true, ...(lineDiagnosis ? { diagnosis: lineDiagnosis } : {}) });
             return;
           }
-          if (ast.t === 'equation' && changesOneSideOfTheQuestion(ast, meta, prompt)) {
+          if (ast.t === 'equation' && changesOneSideOfTheQuestion(ast, meta, prompt) && solutionsSatisfying(ast, meta).length === uniqueNumeric(meta.solutions).length) {   // (a line that fails at a root is crossed below, as it always was)
             out.push({ text: line, status: 'note', note: 'Not checked: this keeps one side of the question\u2019s equation and changes the other, so it is not the same equation and Pri does not mark it as a step.' });
             return;
           }

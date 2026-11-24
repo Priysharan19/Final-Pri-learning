@@ -32,7 +32,9 @@ const WEIGHTS = {
   'test:content:cert': 71, 'test:lines': 69, 'test:engine': 35, 'test:release:prep': 25,
   'test:backend': 17, 'test:engine:regex': 17, 'test:calculus': 15, 'test:jee': 14,
   'test:misconceptions': 13, 'test:india:adaptive': 11, 'test:exam:session': 10,
-  'test:india:hardest': 9, 'test:marker:progress': 8
+  'test:india:hardest': 9, 'test:marker:progress': 8,
+  // measured locally, not from run 39186561084: the mutation check inside it (seeds 1-6 of the harness plus the recorded corpus) is ~80 s
+  'test:first:wrong:step': 120
 };
 const DEFAULT_WEIGHT = 3;
 
