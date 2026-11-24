@@ -493,3 +493,26 @@ Risks:
 - `tools/qbank-import.test.mjs`: 55 checks on a fixture written in the test (no part of the bank is committed).
 - Not wired into `package.json` or CI in this change; wiring is a one-line script, left to the merger so the CI count pins are not
   touched here.
+
+## Diagrams, built 25 November (phase B1)
+
+`tools/qbank-diagrams.mjs` compiles each question's TikZ to a plain SVG at authoring time, outside the repository. The app never runs TeX.
+
+- **Input is untrusted.** The TikZ is refused before any compile if it reads or writes a file, runs a program, loads a package, redefines the document,
+  hides any of that behind `^^` escapes, or plots from a file. TeX runs with `-no-shell-escape` and in paranoid file mode, in a fresh temp directory,
+  with a minimal environment. The preamble is the bank's own (read from `source/build.py`), with `pgfsys-dvisvgm.def` declared first.
+- **Output is inert and repeatable.** `dvisvgm --no-fonts` turns every glyph into a path; the file is normalised (no comment or version stamp, sizes in px)
+  so a rerun is byte-identical, then held to an allow-list of elements and attributes (no script, event attribute, style, image, `foreignObject` or
+  external reference), a size cap and a nonzero drawing.
+- **Text alternative.** Built only from what the source states: the axes, how many plots or closed shapes it draws (no count where the source loops), the
+  labels it prints and the values at its ticks. A version that states an answer the question does not state is dropped for a shorter one; with nothing left,
+  the neutral sentence "Diagram for this question; the measurements are given in the question text."
+- **Answer in the figure.** A figure whose printed labels or tick values state a key the question does not state is not packed (reason
+  `diagram:answer-in-figure`) and is left for the owner to review. Automatic ticks, which the source does not state, are not tested.
+- **Packing and serving.** A diagram question is packed only with a verified figure. The pack entry carries `diagram: { alt, w, h, sha256, bytes }`; the file is
+  `server/content/qbank/figures/<question id>.svg` with a manifest of hashes. `GET /v1/practice/:id/figure` (and `/figure/data`, JSON, for the native
+  bridge) sends it to the account the question was issued to only, after checking length and sha256 against the pack. The page draws it in an `<img>` on a
+  white sheet (as a paper's diagrams are), which reads the same in the light and dark themes.
+- **Rebuild.** `node tools/qbank-diagrams.mjs render <archive> --work <dir>` then
+  `node tools/qbank-import.mjs --pack <archive> --out server/content/qbank --overwrite --figures <dir>`. CI has no TeX: it checks the committed figures
+  against their manifest hashes and the sanitiser (`node tools/qbank-diagrams.mjs check`), never re-renders.

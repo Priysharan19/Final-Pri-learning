@@ -393,6 +393,11 @@ jobs:
           # packed questions is stamped with either, and a wrong answer with the author's own worked lines earns 0.
           node server/test/qbank-sealed-check.mjs 2>&1 | tee qbank-sealed.log
           node tools/ci-check-counts.mjs verify platform/qbank-sealed.log
+          # The bank's diagrams (the owner's TikZ compiled to SVG at authoring time, committed; CI has no TeX and verifies the files against their
+          # manifest hashes and the sanitiser, never re-renders): the route that serves a figure to the account it was issued to, and no alt text or
+          # figure that states an answer.
+          node server/test/qbank-figures-check.mjs 2>&1 | tee qbank-figures.log
+          node tools/ci-check-counts.mjs verify platform/qbank-figures.log
           # The Exam Desk (ADR-0002 §8 plan F4a): the unmarked mode — server-stamped
           # clock, one open attempt per paper, the import, never a mark — and the
           # static proof that it reaches nothing of the marking path.
@@ -1073,6 +1078,9 @@ jobs:
             # The author's questions inside a dot point's ordinary practice: dealt, marked for his marks, his hints, his trap reason and
             # worked solution, no source shown, nothing sideways at 360 px.
             node client/test/tour-nsw-practice-bank.js 2>&1 | tee -a browser.log
+            # A bank question with a diagram: the figure is fetched with the session, named for a screen reader, fits at 360 px and stays
+            # legible in the dark theme.
+            node client/test/tour-nsw-practice-bank-figure.js 2>&1 | tee -a browser.log
             # ADR-0003: a visitor with no account meets the question picker first, in both
             # editions, has up to five typed or multiple-choice questions marked by the
             # server, and then a calm sign-up prompt; nothing of an account is touched.
