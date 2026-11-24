@@ -174,6 +174,9 @@ import {
 import { loadBanksFor } from '../../client/src/engine/generators/index.js';
 import { practicePapersAllowed } from './indiaBanks.js';
 import { bankPolicy, sealForEdition } from './editionBanks.js';
+// A timed paper marks the final answer only. The author-approved step-mark schemes (schemeAward.js) are for practice questions, so a paper's questions are
+// sealed without the approved list: exactly the seal they had before any scheme was approved (final-answer-only), whatever the repository's list holds.
+const paperBanks = banks => ({ ...banks, methodSchemeTypes: [] });
 import { editionOffering } from './edition.js';
 import { courseOfferedIn } from '../../client/src/engine/offeringRules.js';
 import { nswExamsOn, nswRelease, nswExamPool, nswExamCatalogue, outcomeNamed } from './nswExamPool.js';
@@ -653,7 +656,7 @@ function generatedAdmit(style, { print = false } = {}) {
       if (!NSW_GENERATED_TYPES.has(q.answerType)) return false;
       if (slot.objective !== (q.answerType === 'mcq')) return false;
     } else if (style === 'jee' && slot.objective !== (q.answerType === 'mcq')) return false;
-    return sealForEdition(q, banks, gen);
+    return sealForEdition(q, paperBanks(banks), gen);
   };
 }
 
@@ -1001,7 +1004,7 @@ async function issueNswQuestions(read, { seal, draw, fresh, onPaper, unitHashes,
         // A multi-mark slot is never a multiple-choice question (engine/nswExams.js formsForSlot).
         if (slot.marks > 1 && OBJECTIVE.has(drawn.answerType)) continue;
         drawn._generator = candidate.generator;
-        if (!sealForEdition(drawn, banks, candidate.generator)) continue;
+        if (!sealForEdition(drawn, paperBanks(banks), candidate.generator)) continue;
         if (!drawn._curriculum?.outcomes?.some(o => o.code === slot.outcome)) continue;
         q = drawn;
       }
