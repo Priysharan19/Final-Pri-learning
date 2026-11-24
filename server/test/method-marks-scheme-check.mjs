@@ -119,6 +119,13 @@ ok(typed.every(([s, q]) => schemePay({ q, report: { lines: [] }, correct: false,
   ok(got.length === 1 && got[0].typeId === 'y12-diff-rules' && got[0].digest === typesJson.find(t => t.id === 'y12-diff-rules').digest, 'only a valid, approved record at the type\'s current digest is listed');
   const text = AA.renderServer(got);
   ok(/typeId": "y12-diff-rules"/.test(text) && !/approvedBy|date/.test(text), 'the server list carries the type and the digest only');
+  // only the author's own name: another name (even a plausible one) is refused and appears in neither generated list
+  const dir2 = fs.mkdtempSync(path.join(os.tmpdir(), 'pri-approvals-'));
+  fs.writeFileSync(path.join(dir2, 'y12-diff-rules.json'), JSON.stringify(rec('y12-diff-rules', { approvedBy: 'Priya Sharma' })));
+  const other = AA.readRecords(dir2);
+  ok(AA.recordProblems(other[0], typesJson).some(m => /approvedBy/.test(m)) && AA.approvedTypes(other, typesJson).length === 0 && !AA.renderServer(AA.approvedTypes(other, typesJson)).includes('y12-diff-rules') && !AA.render(AA.approvedTypes(other, typesJson)).includes('y12-diff-rules'), 'a record by any other name is refused and listed in neither generated list');
+  ok(AA.approvedTypes(AA.readRecords(dir), typesJson).length === 1, 'the author\'s own name (trimmed) still lists');
+  fs.rmSync(dir2, { recursive: true, force: true });
   fs.rmSync(dir, { recursive: true, force: true });
 }
 

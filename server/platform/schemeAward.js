@@ -29,7 +29,7 @@
 //      records in docs/marking/author-approvals, one per type, each valid only for the digest he read. EMPTY while no record is
 //      committed: then nothing is paid by a scheme.
 //   2. The switch. Examiner tier: editionMarkingPolicy(env) (PRI_METHOD_MARKS=on, in production the examiner result, edition
-//      certified). Author-approved tier: PRI_METHOD_MARKS exactly 'on' on the server; unset, off or misspelt is final answer only.
+//      certified). Author-approved tier: PRI_METHOD_MARKS 'on' on the server (trimmed and case-insensitive, parsed as markingPolicy.js parses it for India); unset, off or misspelt is final answer only.
 //      No client field can set either.
 //   3. A question is stamped `_methodScheme` at issue only for a listed type at its current digest (editionBanks.sealForEdition);
 //      every other question stays sealed final-answer-only.
@@ -45,7 +45,7 @@ import { AUTHOR_APPROVED_SERVER } from './authorApproved.generated.js';
 /** Editions on the author-approved tier: schemes only, on the author's approval and PRI_METHOD_MARKS=on. */
 export const AUTHOR_APPROVED_EDITIONS = Object.freeze(['prithagoras']);
 const authorTier = env => AUTHOR_APPROVED_EDITIONS.includes(String(env?.PRI_EDITION ?? '').trim());
-/** Why the switch does not let the author-approved tier pay, or null. Exactly 'on' pays; anything else fails closed. */
+/** Why the switch does not let the author-approved tier pay, or null. 'on' (trimmed, any case, as in markingPolicy.js) pays; anything else fails closed. */
 const authorTierRefusal = env => {
   const raw = String(env?.PRI_METHOD_MARKS ?? '').trim().toLowerCase();
   if (raw === 'on') return null;

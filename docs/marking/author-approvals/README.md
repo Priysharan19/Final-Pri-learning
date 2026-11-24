@@ -17,7 +17,7 @@ holds none: nothing has been reviewed, so no per-criterion mark is shown to any 
   Never create a record for him, from a fixture, or from an automated run. `node tools/author-approvals.mjs --gate`
   (part of `npm run test:author:approvals`) fails on a fixture, a sample name or an automation name.
 - A record names the type, the scheme digest it applies to, his verdict (`approved` or `changes-needed`), a note,
-  his name, the date. It counts only while the type's digest in `owner-review/method-marks/types.json` is still
+  his name (exactly "Priysharan Tripathi"; any other name is refused), the date. It counts only while the type's digest in `owner-review/method-marks/types.json` is still
   the digest in the record. Any change to the scheme or its sample questions changes the digest, and the type is
   then **not approved** again until he re-reviews it.
 - `node tools/author-approvals.mjs` writes `client/src/engine/authorApprovals.js` (the page reads it at build time)

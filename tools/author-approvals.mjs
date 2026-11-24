@@ -17,6 +17,7 @@ export const RECORDS_DIR = path.join(ROOT, 'docs/marking/author-approvals');
 const TYPES = path.join(ROOT, 'owner-review/method-marks/types.json');
 const OUT = path.join(ROOT, 'client/src/engine/authorApprovals.js');
 const SERVER_OUT = path.join(ROOT, 'server/platform/authorApproved.generated.js');
+const AUTHOR = 'Priysharan Tripathi';
 const AUTOMATION = /\b(bot|automation|claude|agent|ci|github-actions|sample|fixture|test)\b/i;
 
 export function readRecords(dir = RECORDS_DIR) {
@@ -37,7 +38,7 @@ export function recordProblems({ file, record }, types) {
   if (!/^[0-9a-f]{64}$/.test(String(r.digest))) out.push(`${file}: digest must be a sha256`);
   if (!['approved', 'changes-needed'].includes(r.verdict)) out.push(`${file}: verdict must be approved or changes-needed`);
   if (r.role !== 'author (tutor)') out.push(`${file}: role must be "author (tutor)" (never examiner or NESA)`);
-  if (typeof r.approvedBy !== 'string' || r.approvedBy.trim().length < 2 || AUTOMATION.test(r.approvedBy)) out.push(`${file}: approvedBy must be the author's own name, not an automation identity`);
+  if (typeof r.approvedBy !== 'string' || r.approvedBy.trim() !== AUTHOR || AUTOMATION.test(r.approvedBy)) out.push(`${file}: approvedBy must be exactly "${AUTHOR}" (the author's own name); any other name or an automation identity is refused`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(r.date))) out.push(`${file}: date must be YYYY-MM-DD`);
   if (typeof r.note !== 'string') out.push(`${file}: note must be text`);
   if (/examiner[- ]certified|nesa/i.test(`${r.note} ${r.role}`)) out.push(`${file}: records say author approval only, never examiner-certified or NESA`);
