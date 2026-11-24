@@ -628,10 +628,6 @@ the question id and the text), with the accepted answer, so that a reader can se
 | A11-E1-035 | I₀ cancels. | 3.01 |
 | X12-C3-048 | Square the factor. | 35 |
 
-**Numeric answers with no stated precision.** `server/platform/qbankMarking.js` `acceptsRoundedFigures`: when the prompt states no precision and asks for
-no exact form, and the key is a non-terminating decimal (7 or more significant figures as written; not an integer, not a short terminating decimal, no
-own tolerance, not a fraction or surd key type), an answer that is the key correctly rounded to 3 or more significant figures is accepted. Never 2
-figures, never a truncation that is not also a correct rounding, never a value merely within a band. The form the author wrote the key in no longer
-decides (24√3, 6π and 33/95 asked for with no precision are decimals); the prompt does. A prompt that asks for an exact form keeps refusing decimals
-(A12-M1-021, A12-M1-033, A11-F1-164) and a prompt that states a precision keeps the engine's reading. The rule applies to 247 of 1,604 numeric questions
-in the pack (the list is printed by `server/test/qbank-marking-check.mjs`). Terminating keys of 4 to 6 figures (35 questions) are left to the engine alone.
+**Numeric answers with no stated precision.** The rule of #1114 stands unchanged: a key written as a long decimal that the author did not write as an exact form, on a prompt that states no precision and asks for no exact form, accepts the key correctly rounded to 3 or more significant figures. An independent review required that it never apply where the prompt, any criterion or any step heading asks for an exact value, or where the key is authored as an exact form (24 root 3, 6 pi, 33/95); those guards are in place and the original assertions restored. In the 1,604 numeric questions of the pack the rule applies to none today (printed by `server/test/qbank-marking-check.mjs`), and A11-E1-011, A11-T1-059, A12-C4-094, A12-C4-106, X12-C2-101 and X12-C2-105 refuse a 3 significant figure decimal.
+
+**Figures (review round).** The answer-in-figure test is now structural (`tools/qbank-figure-risk.mjs`): a coordinate, plotted point or vector endpoint equal to the answer, a plotted curve or line equal to the answer or its tangent or normal (by sampling), a label or tick equal to the answer, its reciprocal or negative or an interval boundary, a marked point at an answer value, or a worked result drawn; a coordinate it cannot read holds the figure. 17 more were held after looking at the rasterised figure beside the question and answer. 212 of 1,565 figures are held (250 parts); 392 packed questions have a figure.
