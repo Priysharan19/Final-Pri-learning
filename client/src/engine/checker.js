@@ -1107,6 +1107,30 @@ function restatesQuestionSide(ast, meta, prompt) {
   } catch { /* nothing restated */ }
   return false;
 }
+/**
+ * One side of the line IS a side of the question's own equation (as a function) and the other side is NOT the question's other side, and the two
+ * sides are not equal: `3x^3 - 24x^2 + 27x + 54 = 2(x-6)(x-3)(x+1)` under `... = 0`. It is an equation with the same roots only by accident of
+ * the constant, and as a statement (a factorisation) it is false: sharing roots makes it neither true nor a step. Never a tick; a note.
+ */
+function changesOneSideOfTheQuestion(ast, meta, prompt) {
+  try {
+    if (!ast || ast.t !== 'equation') return false;
+    if (exprEquivalent(ast.l, ast.r) === true) return false;   // a true identity is decided elsewhere
+    let changes = false;
+    for (const claim of questionClaims(meta, prompt)) {
+      if (claim.kind !== 'equation') continue;
+      for (const [gl, gr] of [[claim.ast.l, claim.ast.r], [claim.ast.r, claim.ast.l]]) {
+        for (const [ml, mr] of [[ast.l, ast.r], [ast.r, ast.l]]) {
+          if (!variablesOf(gl).size || exprEquivalent(ml, gl) !== true) continue;
+          if (exprEquivalent(mr, gr) === true) return false;     // the question's equation, restated
+          changes = true;
+        }
+      }
+    }
+    return changes;
+  } catch { /* undecided: leave it to the checks below */ }
+  return false;
+}
 const SIDE_DEFINITION = /^(?:d?[uvw]'?|d\/d[uvw].*)=|^d[uvw]\/d[xyt]=|^[uvw]'\(?[xyt]?\)?=/i;
 // A line about a method step (an integral of another integrand, an arrow, a differentiation check, an
 // intermediate with another letter) is not the answer's own chain, so it is never crossed.
@@ -1296,7 +1320,18 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
       // Authored derivative metadata lets Pri verify the mathematical operation,
       // not merely whether the student's final expression happens to match.
       if (meta?.kind === 'derivative') {
-        const assessed = namesAValue(proseClean, meta)
+        // A self-contained numeric statement that is TRUE (`2 + 3 = 5`) says nothing about the derivative: never crossed for not being one.
+        const arithmeticOnly = (() => {
+          try {
+            const sides = normalize(proseClean).split('=').map(x => x.trim());
+            if (sides.length < 2 || sides.some(x => !x)) return false;
+            const vals = sides.map(x => { const a = parse(x); return variablesOf(a).size ? NaN : evaluate(a, {}); });
+            return vals.every(v => Number.isFinite(v) && Math.abs(v - vals[0]) <= 1e-9 * Math.max(1, Math.abs(v)));
+          } catch { return false; }
+        })();
+        const assessed = arithmeticOnly
+          ? { status: 'note', note: 'This is a true statement of arithmetic, not a claim about the derivative, so it is not checked as one.' }
+          : namesAValue(proseClean, meta)
           ? { status: 'note', note: 'This gives a value, not a derivative, so it is not checked as one.' }
           : (named
             // Named slips only for a whole question's own working. A stage of a proof plan keeps
@@ -1373,6 +1408,10 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
             lineDiagnosis = assessed.diagnosis || null;
             if (status === 'break' && firstBreak === -1) firstBreak = i;
             out.push({ text: line, status, note, otherUnknown: true, ...(lineDiagnosis ? { diagnosis: lineDiagnosis } : {}) });
+            return;
+          }
+          if (ast.t === 'equation' && changesOneSideOfTheQuestion(ast, meta, prompt)) {
+            out.push({ text: line, status: 'note', note: 'Not checked: this keeps one side of the question\u2019s equation and changes the other, so it is not the same equation and Pri does not mark it as a step.' });
             return;
           }
           if (ast.t === 'equation') {

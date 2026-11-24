@@ -1050,7 +1050,7 @@ function pageDefinitionsOnce(raw, out, firstBreak, prep, degreePrimed, tickOnly,
       if (m && !m[2] && sides.length === 1 && equation && equation.variable === m[1]) {
         const value = putIn(sides[0], defs, null), v = value && numberOf(value.text);
         const L = v !== null && v !== undefined ? fnOf(equation.left, m[1]) : null, R = L ? fnOf(equation.right, m[1]) : null;
-        if (L && R) { const a = L(v), b = R(v); if (a !== null && b !== null && close(a, b)) ticks.push(`${assignSpan(m[1], sides[0])} satisfies the equation before it.`); }
+        if (L && R) { const a = L(v), b = R(v); /* relative, not close(): 16^(-10) and 8^(-10) are both below 1e-9 and are not equal */ if (a !== null && b !== null && Math.abs(a - b) <= 1e-9 * Math.max(Math.abs(a), Math.abs(b))) ticks.push(`${assignSpan(m[1], sides[0])} satisfies the equation before it.`); }
       }
       // C. sides that become plain numbers, or one function of one letter, once the definitions are in
       if (sides.length >= 2) {

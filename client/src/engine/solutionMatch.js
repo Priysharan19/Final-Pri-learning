@@ -304,7 +304,9 @@ function readStudent(text) {
 
 // Restating the question is STRUCTURAL: the same tokens, differing only in spaces, bracket style, `*` and a unicode minus. Two
 // things that merely evaluate alike (f^(-2)(0) and f^(-1)(0) when f is read as a product) are never the same statement.
-const canon = s => tidy(s).replace(/\s+/g, '').replace(/[{}]/g, '').replace(/\[/g, '(').replace(/\]/g, ')').replace(/\^\(([^()]*)\)/g, '^$1').replace(/\*/g, '');
+// A limit is its VALUE, not its spelling: `]_0^(3.0)` and `]_0^(2+1)` are `]_0^(3)` (limitKeys compares values the same way).
+const limitsByValue = s => braces(tidy(s)).replace(LIMIT_PAIR, (m, a, b) => { const x = numericOf(a), y = numericOf(b); return x !== null && y !== null ? `_${x}^${y}` : m; });
+const canon = s => limitsByValue(s).replace(/\s+/g, '').replace(/[{}]/g, '').replace(/\[/g, '(').replace(/\]/g, ')').replace(/\^\(([^()]*)\)/g, '^$1').replace(/\*/g, '');
 function sameAsPromptStatement(parts, prompt) {
   for (const s of prompt) {
     if (s.parts.length !== parts.length) continue;

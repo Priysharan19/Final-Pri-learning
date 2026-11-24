@@ -435,39 +435,46 @@ function trueAtGivenPoint(mutant, env) {
     return vals.every(v => Number.isFinite(v) && Math.abs(v - vals[0]) <= 1e-7 * Math.max(1, Math.abs(v)));
   } catch { return false; }
 }
-function echoesPage(lines, i, original, mutant, given = [], solutionNumbers = []) {
+/** True when some side of the line has no letter in it: an `expression = 0` (or `= 7`) equation, whose meaning IS its root set. */
+function hasConstantSide(line) { return sidesOf(line).some(x => x && lettersIn(x).length === 0); }
+/**
+ * The class under which a mutant says something TRUE the page, the question or its solution says elsewhere, or null. An equation between two
+ * expressions that both carry the letter is never an echo because it merely shares roots with another equation: it is a claim that the two sides are
+ * EQUAL, and the harness proved they are not (`P = 2(x-6)(x-3)(x+1)` when P = 3(x-6)(x-3)(x+1)).
+ */
+function echoClass(lines, i, original, mutant, given = [], solutionNumbers = []) {
   const others = [...lines.filter((_, j) => j !== i), ...given];
   // a true statement whatever the page says: an identity (`5·1^x - 3 = 2`, `0 = 0`), a root of an equation the page states, or the original equation under another constant factor
-  if (isIdentity(mutant) && !isIdentity(original)) return true;
-  if (satisfiesAPageEquation(mutant, others)) return true;
-  if (trueAtGivenPoint(mutant, givenPoint(given))) return true;
-  { const a = rootsOf(original), b = rootsOf(mutant); if (a && b && a.v === b.v && a.roots.length && a.roots.length === b.roots.length && b.roots.every(r => a.roots.some(q => Math.abs(q - r) < 1e-4))) return true; }
+  if (isIdentity(mutant) && !isIdentity(original)) return 'true-identity';
+  if (satisfiesAPageEquation(mutant, others)) return 'root-of-a-page-equation';
+  if (trueAtGivenPoint(mutant, givenPoint(given))) return 'true-at-the-given-point';
+  if (hasConstantSide(mutant)) { const a = rootsOf(original), b = rootsOf(mutant); if (a && b && a.v === b.v && a.roots.length && a.roots.length === b.roots.length && b.roots.every(r => a.roots.some(q => Math.abs(q - r) < 1e-4))) return 'same-roots-as-the-authored-equation'; }
   const squash = t => String(t).replace(/\s+/g, '');
-  if (others.some(o => squash(o) === squash(mutant) || judgeMutant(o, mutant) === 'same')) return true;
+  if (others.some(o => squash(o) === squash(mutant) || judgeMutant(o, mutant) === 'same')) return 'another-authored-line';
   const sides = sidesOf(mutant);
   // a bare value (one side, no letters) that another line has as a side
   if (sides.length === 1) {
     const vars = lettersIn(sides[0]), mine = sideValues(sides[0], vars);
-    if (mine && others.some(o => sidesOf(o).some(side => { const v = sideValues(side, vars); return v && lettersIn(side).join() === vars.join() && v.every((x, k) => (x === null) === (mine[k] === null) && (x === null || Math.abs(x - mine[k]) <= 1e-9 * Math.max(1, Math.abs(x)))); }))) return true;
+    if (mine && others.some(o => sidesOf(o).some(side => { const v = sideValues(side, vars); return v && lettersIn(side).join() === vars.join() && v.every((x, k) => (x === null) === (mine[k] === null) && (x === null || Math.abs(x - mine[k]) <= 1e-9 * Math.max(1, Math.abs(x)))); }))) return 'a-value-another-line-has';
   }
   // a bare value the page or the solution's own text states (a rounded value counts: 1.571 is π/2 to 3 places)
   if (sides.length === 1) {
     const mv = valuesOf(mutant);
     const near = v => Math.abs(v - mv[0]) <= 5e-4 * Math.max(1, Math.abs(v));
-    if (mv.length === 1 && (others.some(o => valuesOf(o).some(near)) || solutionNumbers.some(near))) return true;
+    if (mv.length === 1 && (others.some(o => valuesOf(o).some(near)) || solutionNumbers.some(near))) return 'a-value-the-page-or-solution-states';
   }
   // a list that keeps only values the original list had
   if (/,/.test(original) && /,/.test(mutant)) {
     const nums = t => [...String(t).matchAll(/-?\d+(?:\.\d+)?/g)].map(x => Number(x[0]));
     const had = nums(original), has = nums(mutant);
-    if (has.length && has.every(v => had.includes(v))) return true;
+    if (has.length && has.every(v => had.includes(v))) return 'a-sub-list-of-the-original';
   }
-  // an equation in one letter whose roots are all roots of another authored equation in that letter
-  const mr = rootsOf(mutant);
+  // an equation in one letter whose roots are all roots of another authored equation in that letter (only where it has a constant side: `expr = 0`)
+  const mr = hasConstantSide(mutant) ? rootsOf(mutant) : null;
   if (mr && mr.roots.length) {
-    for (const o of others) { const orr = rootsOf(o); if (orr && orr.v === mr.v && mr.roots.every(r => orr.roots.some(q => Math.abs(q - r) < 1e-4))) return true; }
+    for (const o of others) { const orr = rootsOf(o); if (orr && orr.v === mr.v && mr.roots.every(r => orr.roots.some(q => Math.abs(q - r) < 1e-4))) return 'roots-of-another-authored-equation'; }
   }
-  return false;
+  return null;
 }
 // A line that gives a bare name (`b = …`) a value the original line's first side did not: the page never says what the name is, so no line can be shown false.
 function definesAName(original, mutant) {
@@ -507,6 +514,7 @@ export async function run({ root = path.resolve(path.dirname(fileURLToPath(impor
   }
   const totals = { pages: 0, lines: 0, trueTicks: 0, trueCrosses: 0, mutants: 0, falseTicks: 0, falseCrosses: 0, notes: 0, undecided: 0, coincidentallyTrue: 0 };
   const byKind = {};
+  const setAside = {};
   const failures = { falseTicks: [], trueCrosses: [] };
   const trueStatus = {};   // `${generator}|${difficulty}|${seed}` → [status per line]
   for (const cell of cells) {
@@ -546,8 +554,8 @@ export async function run({ root = path.resolve(path.dirname(fileURLToPath(impor
         const verdict = judgeMutant(line, m.text);
         // A mutant that says what ANOTHER authored line of the page says (x = 2 in place of x = 0 when x = 2 is a root too) is a true
         // statement in the wrong place, not a false line: it is not held against the marker.
-        const echoes = verdict === 'wrong' && echoesPage(lines, i, line, m.text, given, solutionNumbers);
-        if (echoes) totals.echoes = (totals.echoes || 0) + 1;
+        const echo = verdict === 'wrong' ? echoClass(lines, i, line, m.text, given, solutionNumbers) : null;
+        if (echo) { totals.echoes = (totals.echoes || 0) + 1; setAside[echo] = (setAside[echo] || 0) + 1; }
         else if (verdict === 'wrong' && definesAName(line, m.text)) totals.nameDefinitions = (totals.nameDefinitions || 0) + 1;
         else if (verdict === 'wrong') wrong.push(m); else if (verdict === 'same') totals.undecided += 0; else totals.undecided++;
       }
@@ -566,7 +574,7 @@ export async function run({ root = path.resolve(path.dirname(fileURLToPath(impor
       }
     });
   }
-  return { totals, byKind, failures, trueStatus };
+  return { totals, byKind, setAside, failures, trueStatus };
 }
 
 // ── true ticks lost between two runs of the same cells ──────────────────────────────────────────────────────────────────
