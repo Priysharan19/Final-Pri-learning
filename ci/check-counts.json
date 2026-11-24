@@ -440,7 +440,7 @@
       "job": "platform-contracts",
       "log": "practice-http.log",
       "pins": [
-        {"has":"NSW PRACTICE (G3): PASS — 159/159 checks"}
+        {"has":"NSW PRACTICE (G3): PASS — 164/164 checks","note":"159 -> 164, as printed by running server/test/nsw-practice-check.mjs on task/step-mark-approvals-2: after the author approved the generic rule and seven schemes (24 Nov 2026) an eligible question is stamped with the approved scheme instead of the final-answer seal, so the one seal assertion per sampled form became two (stamped XOR final-answer-only; stamped exactly when eligible), the bound-question reveal gained one, and a stamped form asserts its criteria sum to the marks instead of the two final-answer assertions. The number is the one the run printed."}
       ]
     },
     "platform/practice-http.log#6": {
