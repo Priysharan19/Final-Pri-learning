@@ -215,8 +215,15 @@ fs.rmSync(t2, { recursive: true, force: true });
     [num(7), 'Simplify.', true, 'a single word'],
     [num(7), 'Solve', true, 'a single word with no full stop'],
     [num(7), '', true, 'empty'],
-    [num(7), 'Product law.', true, 'under four words with no maths'],
-    [num(7), 'Check the domain.', true, 'under four words with no maths'],
+    [num(7), 'Product law.', false, 'two words with no maths are kept'],
+    [num(7), 'Check the domain.', false, 'three words are kept'],
+    [num(7), 'Simplify it.', true, 'a bare verb with it'],
+    [num(7), 'Hint', true, 'a lone ordinary word'],
+    [num(7), '$x^2+1$', false, 'a lone formula that is not the answer'],
+    [num(8), '$2^3$', true, 'a lone formula that is the answer'],
+    [{ answerType: 'expression', answer: { expr: 'ln(8)' }, prompt: 'Simplify.', steps: [], hints: [] }, '$3 \\ln 2 = \\ln 2^3$', true, 'a chain with a side that is the answer'],
+    [num(8), '56/7', true, 'a lone division that gives the answer'],
+    [num(8), 'The answer is eight.', true, 'a number spelled out as the result'],
     // kept: real help that is not the answer
     [num(7), 'Write the bracket as a power first.', false, 'a method in words'],
     [num(7), 'Use $y-y_1=m(x-x_1)$ with the midpoint.', false, 'a formula that is not the answer'],
@@ -251,7 +258,7 @@ fs.rmSync(t2, { recursive: true, force: true });
   ok(proseRuns('Compute 56/8 and then 100 − 50, so 2 ln 3 = ln 9.').join(' | ') === '56/8 | 100 \u2212 50 | 2 ln 3 = ln 9', 'plain maths in prose is read as runs: 56/8, 100 − 50, 2 ln 3 = ln 9');
   // the ladder: only his hints, in his order; none derived from a step or a heading
   const base = { answerType: 'numeric', answer: { value: 252 }, prompt: 'Find $\\binom{10}{5}$.', steps: [{ h: 'Evaluate', d: '$\\binom{10}{5}=252$' }] };
-  const none = bankLadder({ ...base, hints: ['Use it.', 'Write it out.', 'Evaluate it.'] });
+  const none = bankLadder({ ...base, hints: ['Use it.', 'Solve.', 'Evaluate it.'] });
   ok(none.hints.length === 0 && Object.keys(none.ladder).length === 0 && none.dropped.length === 3, 'a question whose hints are all too thin has no rung and nothing takes their place (not its step, not its heading)');
   const two = bankLadder({ ...base, hints: ['Think about the factorial formula.', 'It is $252$.', 'Write the numerator out in full.'] });
   ok(two.hints.length === 2 && two.ladder.nudge === 'Think about the factorial formula.' && two.ladder.method === 'Write the numerator out in full.' && !two.ladder.worked && two.dropped[0].index === 1, 'a hint that states the answer is dropped and the next one moves up: two rungs, in his order');

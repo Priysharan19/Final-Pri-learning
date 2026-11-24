@@ -224,7 +224,8 @@ export function leaksOf(q, texts) {
 // from a worked step or a step heading. A hint becomes a rung only when every test below passes; a hint that fails any is dropped,
 // and a question may end with 0 to 3 rungs (with none the hint control is not offered for it).
 //
-//   · empty, a single word, or under 4 words with no mathematical content: nothing to learn from it;
+//   · empty, a lone ordinary word, or only a bare verb from a stoplist (alone or with "it"/"this"): nothing to learn from it. Two or more
+//     words are otherwise kept, and so is one maths span that passes every test below;
 //   · every TeX span is read; one the reader cannot read is dropped; so is any side of it the engine's parser cannot parse;
 //   · every maths run written in plain prose ("56/8", "100 − 50", "2 ln 3 = ln 9") is read the same way;
 //   · ANY side, run, list or number in it that is the accepted answer, any accepted form of it, or an arithmetic expression that
@@ -233,6 +234,11 @@ export function leaksOf(q, texts) {
 //     a hint that contains one of those long texts whole is dropped (those are sealed until the question resolves, and the hints are
 //     sent when it is issued).
 // ─────────────────────────────────────────────────────────────────────────────
+
+/** Verbs that, alone or with "it" or "this", say nothing the question did not (the stoplist of the thin-hint rule). */
+const BARE_VERBS = new Set(['evaluate', 'simplify', 'multiply', 'substitute', 'solve', 'calculate', 'compute', 'expand', 'factorise', 'factorize', 'factor', 'differentiate', 'integrate', 'rearrange', 'divide', 'add', 'subtract', 'cancel', 'rewrite', 'find', 'use', 'apply', 'try', 'do', 'square', 'equate', 'collect', 'combine', 'reduce', 'complete', 'expand']);
+const FILLER = new Set(['it', 'this', 'that', 'them', 'these', 'those', 'first', 'now', 'then', 'again', 'please']);
+const NUMBER_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen', 'twenty'];
 
 const RELATION = /\s*(?:<=|>=|!=|=|<|>|≤|≥|≈)\s*/;
 /** A text folded to what it says: no TeX markup, spacing, case or punctuation. */
@@ -356,8 +362,11 @@ export function rungDropReason(q, text, ctx = {}) {
   const spans = [...t.matchAll(MATH)].map(m => m[1]);
   const prose = t.replace(MATH, ' ');
   const words = wordsOf(prose);
-  if (words.length + spans.length <= 1) return 'a single word';
-  if (words.length + spans.length < 4 && !spans.length && !/[0-9=+\-−×÷*/^]/.test(t)) return 'under 4 words with no mathematical content';
+  // Thin hints. Two or more words are kept, whatever they say, unless they are only a bare verb (alone, or with "it"/"this"); one maths span
+  // or one run of plain maths is kept when it passes every test below; a lone ordinary word is nothing to learn from.
+  if (words.length + spans.length === 0) return 'empty';
+  if (!spans.length && words.length && words.every(w => BARE_VERBS.has(w.toLowerCase().replace(/[^a-z]/g, '')) || FILLER.has(w.toLowerCase().replace(/[^a-z]/g, ''))) && words.some(w => BARE_VERBS.has(w.toLowerCase().replace(/[^a-z]/g, '')))) return 'a bare verb';
+  if (words.length + spans.length === 1 && !spans.length && !/[0-9=+\-−×÷*/^²³]/.test(words[0])) return 'a single word';
 
   const direct = leakReason(q, t);
   if (direct) return direct;
@@ -384,6 +393,9 @@ export function rungDropReason(q, text, ctx = {}) {
     }
     const hit = numberHit(standaloneNumbers(cleanMath(run)), 'the prose'); if (hit) return hit;
   }
+
+  // A number spelled out as the result ("the answer is seven").
+  for (const k of keys) if (Number.isInteger(k) && k >= 0 && k <= 20 && new RegExp(`(?:answer|result|equals?|gives?|get|so|therefore|hence|thus|is|are|=)\\s*(?:then\\s*)?(?:about\\s*)?${NUMBER_WORDS[k]}\\b`, 'i').test(prose)) return `the prose spells out ${NUMBER_WORDS[k]} as the result`;
 
   // The same words as another thing a student is sent or that is sealed until the question resolves.
   const f = fold(t);

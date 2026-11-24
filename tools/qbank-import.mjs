@@ -671,6 +671,7 @@ export async function main(argv) {
     if (!argv.includes('--quiet')) {
       const s = compiled.summary;
       console.log(`pack ${s.packVersion}: ${s.questions} questions in ${s.shards} shards, ${s.bytes} bytes; rejected parts ${s.rejectedParts}`);
+      { const l = s.ladder; console.log(`hints: ${l.authoredHints} authored (at most three a question) over ${l.questions} auto-markable parts; kept ${l.rungsKept}, dropped ${l.rungsDropped}; questions with 3/2/1/0 rungs: ${l.withRungs[3]}/${l.withRungs[2]}/${l.withRungs[1]}/${l.withRungs[0]}`); console.log(`drop reasons ${JSON.stringify(Object.fromEntries(Object.entries(l.dropReasons).sort((x, y) => y[1] - x[1]).slice(0, 12)))}`); }
       console.log(`by course ${JSON.stringify(s.byCourse)}`);
       console.log(`reject reasons ${JSON.stringify(s.reasons)}`);
       console.log(`written to ${outDir}`);
