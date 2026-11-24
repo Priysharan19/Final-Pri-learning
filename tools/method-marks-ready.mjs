@@ -33,10 +33,15 @@ import { checkAnswer } from '../client/src/engine/checker.js';
 import { transcriptsFor } from './understanding-audit/corpus.mjs';
 import { TYPES as ALL_TYPES } from './method-marks-drafts.mjs';
 
-// This measurement is of the GENERIC method rubric (the examiner tier), for the seven types the author approved on 24 Nov 2026. The draft
-// types added later (mark-variants and equation solving) are paid only by the scheme path, never by the generic rubric, which is sealed
-// off every NSW question; their invariants are held by server/test/method-marks-scheme-check.mjs. Measured on the generic rubric they
-// would fail (equation lines are ticked as equivalent equations), which says nothing about what Prithagoras pays.
+// What this measures, and what it does not. It is a measurement of the GENERIC method rubric (the examiner tier: the rubric that pays method marks on
+// India and that is sealed off every NSW question), for the seven types the author approved on 24 Nov 2026. It does not measure the five draft types
+// added later (y12-trig-extreme-2, y7-equation-solve-2/-3, y10-quadratic-solve-2/-3). Those are paid only by the scheme path, whose invariants
+// server/test/method-marks-scheme-check.mjs holds over 11,000+ pages (wrong final never full, nothing at or after a crossed line, gamed lines earn nothing).
+// Why they are left out here, measured on 24 Nov 2026 after the subset-equation fix (server/test/subset-equation-ticks-check.mjs): on the two
+// quadratic drafts the generic rubric still reports falseTick 6 each, every one a falsified line that is in fact a true rearrangement of the line above
+// it (x - 1 = 1 written after x - 2 = 0) or a repeated root, so the sweep's own "known wrong" label is wrong, not the page; on the two equation drafts the
+// generic rubric's "where the marks went" card contradicts the page on 516 pages (unflagged). An equation that is true of only some roots (x - 5 = 1)
+// is NOT among the causes any more: it is a note, never a tick. Neither effect reaches a Prithagoras student, but neither is measured as fixed here.
 const GENERIC_RUBRIC_TYPES = new Set(['y12-diff-rules', 'y12-trig-extreme', 'y12-trig-evaluate', 'y12-diff-explog', 'y11-poly-evaluate', 'y11-diff-gradient-plan', 'y11-diff-power-rule']);
 const TYPES = ALL_TYPES.filter(t => GENERIC_RUBRIC_TYPES.has(t.id));
 import { reconcileLostRows, displayOnlyCross } from '../client/src/engine/markExplanation.js';

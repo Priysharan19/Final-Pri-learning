@@ -215,7 +215,9 @@ function readSolution(q) {
       else if (cond && lab && cond.vars.length >= 1 && (cond.l.vars || []).length === 0) { /* x = 25 is a label statement, not a condition */ }
     }
   });
-  return { steps, labelled, conditions, numeric, values, final: values.length ? values[values.length - 1] : null };
+  // A question with several solutions: a line true of only some of them is a step only when it is plainly a branch (see matchEquation).
+  const multiRoot = (Array.isArray(q?.stepcheck?.solutions) && q.stepcheck.solutions.length > 1) || (Array.isArray(q?.answer?.values) && q.answer.values.length > 1);
+  return { steps, labelled, conditions, numeric, values, multiRoot, final: values.length ? values[values.length - 1] : null };
 }
 
 function readPrompt(q) {
@@ -302,7 +304,11 @@ function matchEquation(parts, sol, ctx) {
   }
   if (!ctx && parts.length === 2) {
     const cond = conditionOf(parts);
-    if (cond) {
+    // Where the question has several solutions, an equation that is only "the same condition" as one factor (x - 5 = 1 beside x - 6 = 0)
+    // is true of one root and says nothing about the working: it is a branch only as a factor set equal to zero, either way round, or
+    // a value (x = 6). Such a line stays a note.
+    const plainBranch = !sol.multiRoot || parts.some(p => numericOf(p) === 0) || (/^[A-Za-z]$/.test(tidy(parts[0])) && numericOf(parts[1]) !== null) || (/^[A-Za-z]$/.test(tidy(parts[1])) && numericOf(parts[0]) !== null);
+    if (cond && plainBranch) {
       for (const st of sol.conditions) {
         if (proportional(cond, st.cond)) return st;
       }

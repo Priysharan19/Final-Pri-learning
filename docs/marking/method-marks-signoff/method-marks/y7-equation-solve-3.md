@@ -43,7 +43,7 @@ It can verify:
 
 It cannot verify:
 
-- It reads each line only as an equation with the same solutions as the question's. It cannot tell a worthwhile step from a harmless rewrite (for example multiplying both sides by 1).
+- It reads each line only as an equation with the same solutions as the question's. It cannot tell a worthwhile step from a trivial rewrite that gets nowhere (for example multiplying both sides by 1): both are a true equation with the same solutions, and both earn.
 - A line with no letter in it, a solved form such as x = 7, the question's own equation (either way round), and a line already written earn no step.
 - A chained line such as 5x = -31 - 4 = -35 is left unchecked by the page, so it earns no step: each equation has to be written on its own line. A line that only shows numbers being equal earns nothing either.
 - A step the page cannot place is "not verified", never "wrong". A word problem has no equation printed in the question: the student's own setup equation is a step like any other.

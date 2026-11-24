@@ -581,7 +581,7 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
     // On a quadratic a disguised root earns nothing until something is solved,
     // so it takes nothing from the working written after it, slip or no slip.
     ok(pos('x+1=4\nx+1=6\n(x-3)(x-5)=0\nx=3\nx=5\nx+1=8') === 3 && pos('x+1=4\nx+1=6\n(x-3)(x-5)=0\nx=3\nx=5') === 3, 'quadratic: roots disguised before the factorisation leave its three marks alone, with or without a slip in the disguise');
-    ok(why(...POS, 'x+1=4\nx+1=6\n(x-3)(x-5)=0\nx=3\nx=5\nx+1=8') === 'final-answer,final-answer,progress,progress,progress,break', '…they are answers stated before any working');
+    ok(why(...POS, 'x+1=4\nx+1=6\n(x-3)(x-5)=0\nx=3\nx=5\nx+1=8') === 'note,note,progress,progress,progress,break', '…they are notes, not steps: an equation that merely has one root (x + 1 = 4) is neither a factor set to zero nor a value (24 Nov 2026 rule: it was read as an answer stated early)');
     ok(pos('(x-3)(x-5)=0\nx+1=4\nx+1=6\nx=3\nx=5\nx+1=8') === 3 && pos('(x-3)(x-5)=0\nx+1=4\nx+1=6\nx=3\nx=5\nx+1=8\nx+1=9') === 1, 'quadratic: each root is read off once however it is spelt, and a second wrong value is still a list of candidates');
     // A factorisation that shares one root with the question is not refuted by
     // the line check, but it is not true either: it is not what sets a false
@@ -898,7 +898,10 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
   ok(marks(...Q, [...four, ...eight].join('\n')) === 0, 'every spelling of both roots, with nothing solved, earns nothing');
   // After the equation has been solved, each root is read off once, in any spelling.
   for (let i = 0; i < four.length; i++) {
-    ok(marks(...Q, `(x-4)(x+8)=0\n${four[i]}\n${eight[i]}`) === 3, `after the factorisation, "${four[i]}" and "${eight[i]}" each read off a root`);
+    // 24 Nov 2026: "x + 1 = 5" is true of one root but is neither a factor set to zero, a value, nor a multiple of the unknown, so it is a note
+    // and reads off nothing; every other spelling (x = 4, x - 4 = 0, 2x = 8, 8 = 2x, x/2 = 2, -x = -4, 0 = x - 4) still does.
+    const plainly = !/^x \+ 1 = /.test(four[i]);
+    ok(marks(...Q, `(x-4)(x+8)=0\n${four[i]}\n${eight[i]}`) === (plainly ? 3 : 1), `after the factorisation, "${four[i]}" and "${eight[i]}" ${plainly ? 'each read off a root' : 'are notes and add nothing to the factorisation'}`);
     ok(marks(...Q, `(x-4)(x+8)=0\n${four[i]}`) === 1, `…and "${four[i]}" alone, the other branch of the product dropped, is still the mistake it was`);
   }
   ok(marks(...Q, `(x-4)(x+8)=0\n${four.join('\n')}\nx + 8 = 0`) === 3, 'one root in eight spellings is read off once');

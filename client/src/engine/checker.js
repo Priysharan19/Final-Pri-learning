@@ -514,6 +514,49 @@ function foreignLetters(ast, meta, system = null) {
   return [...variablesOf(ast)].filter(name => !own.has(name));
 }
 
+
+/**
+ * A line true of only SOME of the question's roots is a step a marker accepts only when it is plainly a branch: a value
+ * (`x = 6`), a factor set equal to zero (`x - 6 = 0`, `2x - 12 = 0`, `0 = x - 6`), or one branch of a square the line above
+ * trusted (`x - 3 = 4` under `(x - 3)^2 = 16`). Any other equation that merely has one of the roots (`x - 5 = 1` when 6 is a root)
+ * is true of that root and proves nothing about the working: it is a note, never a tick and never a cross.
+ */
+function isPlainBranch(ast, variable, prev, prevTrusted) {
+  if (!ast || ast.t !== 'equation') return false;
+  if (namesValue(ast, variable)) return true;
+  const zero = side => { const n = unwrapGroup(side); return !!n && n.t === 'num' && Math.abs(n.v) < 1e-12; };
+  if (zero(ast.l) !== zero(ast.r)) return true;
+  // A multiple of the unknown alone beside a constant (x ln 2 = ln 1, 3x = 12): the value, one step from `x = ...`. An added constant (x - 5 = 1) is not.
+  try {
+    const constant = n => !variablesOf(n).size || [...variablesOf(n)].every(v => v === 'e');
+    const multiple = (side, other) => {
+      if (!constant(other) || constant(side)) return false;
+      const g = x => evaluate(side, { [variable]: x });
+      const g0 = g(0), g1 = g(1), g2 = g(2), g3 = g(-3);
+      return [g0, g1, g2, g3].every(Number.isFinite) && Math.abs(g0) < 1e-12 && Math.abs(g1) > 1e-12 && Math.abs(g2 - 2 * g1) < 1e-9 * (1 + Math.abs(g1)) && Math.abs(g3 + 3 * g1) < 1e-9 * (1 + Math.abs(g1));
+    };
+    if (multiple(ast.l, ast.r) || multiple(ast.r, ast.l)) return true;
+  } catch { /* not a multiple */ }
+  if (prev && prevTrusted && prev.t === 'equation') {
+    try {
+      const diff = e => x => evaluate(e.l, { [variable]: x }) - evaluate(e.r, { [variable]: x });
+      const sum = x => evaluate(ast.l, { [variable]: x }) + evaluate(ast.r, { [variable]: x });
+      const dl = diff(ast), dp = diff(prev);
+      let ratio = null;
+      let used = 0;
+      for (const x of [0.37, 1.61, -2.43, 3.29, 5.13, 8.77, -6.91]) {
+        const a = dl(x) * sum(x), b = dp(x);
+        if (!Number.isFinite(a) || !Number.isFinite(b)) return false;
+        if (Math.abs(b) < 1e-9) { if (Math.abs(a) > 1e-9) return false; continue; }
+        if (ratio === null) ratio = a / b; else if (Math.abs(a / b - ratio) > 1e-7 * (1 + Math.abs(ratio))) return false;
+        used++;
+      }
+      return used >= 4 && Math.abs(ratio) > 1e-9;
+    } catch { return false; }
+  }
+  return false;
+}
+
 /** `x = value`: the unknown alone on one side, nothing but constants (e included) on the other. */
 function namesValue(ast, variable) {
   if (!ast || ast.t !== 'equation') return false;
@@ -1469,6 +1512,12 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
               note = lineDiagnosis.message;
               if (firstBreak === -1) firstBreak = i;
               out.push({ text: line, status, note, diagnosis: lineDiagnosis });
+              return;
+            }
+            if (partial && !expLogNames && !isPlainBranch(ast, meta.variable, previousEquation, previousEquationTrusted)) {
+              status = 'note';
+              note = `True for ${meta.variable} = ${held.map(shownRoot).join(' or ')}, but it is not a factor set equal to zero or a value, so it is not marked as a step.`;
+              out.push({ text: line, status, note });
               return;
             }
             if (partial) {
