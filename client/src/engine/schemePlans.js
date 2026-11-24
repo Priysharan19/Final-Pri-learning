@@ -100,6 +100,8 @@ function gradientPlan(payload) {
   if (!m) return null;
   const source = texExpr(m[1]); const x0 = num(m[2]);
   if (!source || x0 === null) return null;
+  // "correct to 3 decimal places": the page may state the value rounded as asked
+  const dp = /correct to (\d) decimal place/i.exec(prompt); const places = dp ? Number(dp[1]) : null;
   const deriv = derivativeText(source);
   const ast = deriv && parsed(deriv);
   if (!ast || [...variablesOf(ast)].some(v => v !== 'x')) return null;
@@ -111,7 +113,46 @@ function gradientPlan(payload) {
     kind: 'plan', scheme: 'gradient-at-point', creditPerStage: true,
     stages: [
       { kind: 'derivative', variable: 'x', source },
-      { kind: 'evaluation', source: deriv, substitutions: { x: x0 }, expected: value, labels: ['m', 'gradient', 'dy/dx', 'y\''] }
+      { kind: 'evaluation', source: deriv, substitutions: { x: x0 }, expected: value, labels: ['m', 'gradient', 'dy/dx', 'y\''], ...(places === null ? {} : { roundTo: places }) }
+    ]
+  };
+}
+
+
+// ── definite integral and area under a curve ─────────────────────────────────────────────────────────────────────────────
+// The limit text is read as a constant (pi, e and fractions allowed); the integrand as a function of x. The plan is returned only when the
+// integral the engine computes (Simpson, many panels) is the keyed answer, and for an area question only when the curve is not below the axis
+// between the limits, so "the area" and "the integral" are the same number.
+const constantOf = tex => { const t = texExpr(tex); const a = t && parsed(t); if (!a || variablesOf(a).size) return null; return at(a, 'x', 0); };
+function integralPlan(payload) {
+  const key = keyValue(payload);
+  if (key === null) return null;
+  const prompt = oneLine(payload.prompt);
+  if (/substitution|\bUsing\b|\\int[^$]*\\int/i.test(prompt)) return null;
+  let source = null, lo = null, hi = null, area = false;
+  const span = /\$([^$]*\\int[^$]*)\$/.exec(prompt);
+  if (span) {
+    const inner = span[1].replace(/\\displaystyle|\\left|\\right/g, '').replace(/\s+/g, ' ');
+    const m = /\\int_(\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}|\S)\^(\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}|\S)\s*(.+?)\s*(?:\\,\s*)?d\s*x\s*$/.exec(inner);
+    if (!m) return null;
+    lo = constantOf(m[1].replace(/^\{|\}$/g, '')); hi = constantOf(m[2].replace(/^\{|\}$/g, '')); source = texExpr(m[3]);
+    if (!/^(?:Evaluate|Find the exact value of|Calculate)\s/i.test(prompt)) return null;
+  } else {
+    const a = /^Find the area under the curve \$y\s*=\s*([^$]+)\$ from \$x\s*=\s*(-?[\d.]+)\$ to \$x\s*=\s*(-?[\d.]+)\$/i.exec(prompt);
+    if (!a) return null;
+    source = texExpr(a[1]); lo = num(a[2]); hi = num(a[3]); area = true;
+  }
+  const f = source && parsed(source);
+  if (!f || lo === null || hi === null || !(hi > lo) || [...variablesOf(f)].some(v => v !== 'x')) return null;
+  const value = integrate(f, 'x', lo, hi);
+  if (value === null || Math.abs(value - key) > tolOf(payload)) return null;
+  if (area) for (let i = 0; i <= 40; i++) { const y = at(f, 'x', lo + (hi - lo) * i / 40); if (y === null || y < -1e-9) return null; }
+  // a non-constant integrand with a primitive that is not a line: a constant integrand has nothing to integrate
+  return {
+    kind: 'plan', scheme: 'definite-integral', creditPerStage: true,
+    stages: [
+      { kind: 'area-antiderivative-of', variable: 'x', integrand: source, lower: lo, upper: hi, independent: true },
+      { kind: 'area-substituted', variable: 'x', lower: lo, upper: hi, expected: value, independent: true }
     ]
   };
 }
@@ -121,6 +162,7 @@ export function schemePlanFor(payload, subtopicId) {
   if (!payload || payload.stepcheck) return null;
   try {
     if (subtopicId === 'y12-diff') return gradientPlan(payload);
+    if (subtopicId === 'y12-integration' || subtopicId === 'y12-integral-calc') return integralPlan(payload);
   } catch { /* an unreadable prompt has no plan */ }
   return null;
 }

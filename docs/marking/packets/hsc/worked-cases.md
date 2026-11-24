@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `1b20ca208c0382adc594c77dd1ac2fbc7e80a43bdba18841530d07c6c09572e7` (`docs/marking/hsc-examiner-certification-dossier.md`).
+Dossier digest: `f38dfbc7e3dd54918cd09cbf4bc65afff04167888cbeb25dcdd2444b93098443` (`docs/marking/hsc-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -2884,7 +2884,16 @@ Final answer: -6, 7
 | correct | `2167/1000` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
 | alternative | `2167/1000` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
 | common wrong | `3167/1000` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `3167/1000` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| partial | `3167/1000` | no | 0/2 | 0/2 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: 3167/1000
+```
+</details>
 
 ## `nsw-final:y12-integration/D3` — seed 1009
 
@@ -2895,7 +2904,16 @@ Final answer: -6, 7
 | correct | `1036` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
 | alternative | `1036.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
 | common wrong | `1037` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `1037` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| partial | `1037` | no | 0/3 | 0/3 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: 1037
+```
+</details>
 
 ## `nsw-final:y12-integration/D4` — seed 1009
 

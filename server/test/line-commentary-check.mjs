@@ -185,8 +185,8 @@ ok(commentFor({ n: 3, status: 'first-error', text: 'x', diagnosis: { expected: 5
 }
 // the engine's own diagnoses for the three shapes, and the old sentences they replace
 {
-  const run = lines => { const r = stepEvidence(G.generateQuestion('y12-integration', 1, 27), '14', lines.join('\n'), { correct: false }).stepReport; return r.lines.find(l => l.status === 'break'); };
-  const cardOf = (l, lines) => { const m = buildAnnotatedWorking({ lines, stepReport: stepEvidence(G.generateQuestion('y12-integration', 1, 27), '14', lines.join('\n'), { correct: false }).stepReport }); return m.cards.find(c => c.status === 'first-error'); };
+  const run = lines => { const r = stepEvidence(G.generateQuestion('y12-integration', 1, 31), '14', lines.join('\n'), { correct: false }).stepReport; return r.lines.find(l => l.status === 'break'); };
+  const cardOf = (l, lines) => { const m = buildAnnotatedWorking({ lines, stepReport: stepEvidence(G.generateQuestion('y12-integration', 1, 31), '14', lines.join('\n'), { correct: false }).stepReport }); return m.cards.find(c => c.status === 'first-error'); };
   for (const [lines, kind, must] of [
     [['3 + 4 = 7', '10 - 6 = 14'], 'crossComputed', ['comes to']],
     [['3 + 4 = 7', '3 * 4 = 5 * 2'], 'crossSidesDiffer', ['do not match']],
@@ -206,7 +206,7 @@ ok(commentFor({ n: 3, status: 'first-error', text: 'x', diagnosis: { expected: 5
 // the tick for `1/2 = 2/4` keeps the engine's note, which carries the advice to give the answer simplified
 {
   const lines = ['3 + 4 = 7', '1/2 = 2/4'];
-  const r = stepEvidence(G.generateQuestion('y12-integration', 1, 27), '1/2', lines.join('\n'), { correct: false }).stepReport;
+  const r = stepEvidence(G.generateQuestion('y12-integration', 1, 31), '1/2', lines.join('\n'), { correct: false }).stepReport;
   const m = r?.lines?.length >= 2 ? buildAnnotatedWorking({ lines, stepReport: r }) : null;
   const card = m?.cards?.[1];
   ok(card && /simplified form|simplifies to/.test(r.lines[1].note || '') && r.lines[1].fact?.simplifyNote === true && commentFor(card, ctx) === null, `a tick whose note carries simplify advice keeps the engine sentence: ${JSON.stringify(r?.lines?.[1]?.note)} ${JSON.stringify(r?.lines?.[1]?.fact)}`);
@@ -295,7 +295,7 @@ for (const [title, qq, page, answer] of [
   ['IMG_0501, the area page (y = 2x(4 - x), area 64/3)', G.generateQuestion('y12-integration', 3, 4), AREA, '64/3'],
   ['IMG_0496, the stationary points page', G.generateQuestion('y12-appdiff', 2, 41), STAT, '0'],
   ['IMG_1233, the vectors page', G.generateQuestion('me12-vectors', 1, 58), VEC, '260'],
-  ['A slip written as arithmetic (10 - 6 = 14)', G.generateQuestion('y12-integration', 1, 27), SLIP, '14']
+  ['A slip written as arithmetic (10 - 6 = 14)', G.generateQuestion('y12-integration', 1, 31), SLIP, '14']
 ]) {
   const r = stepEvidence(qq, answer, page.join('\n'), { correct: false }).stepReport;
   if (!r?.lines || r.lines.length < 2) { pagesOut.push({ title, rows: [] }); continue; }

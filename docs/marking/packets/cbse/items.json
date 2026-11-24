@@ -5,7 +5,7 @@
     "cbse-mathematics-2026-27"
   ],
   "dossier": "docs/marking/order14-examiner-certification-dossier.md",
-  "dossierDigest": "91d423c10bf3fd5546c1583e1f2fd127acd8ff5978243b40ca899778dba78c91",
+  "dossierDigest": "a16dbf615e48f0c42de9104a24321a23e625caeee1f129bd76cc554bdacdef12",
   "minExaminers": 1,
   "items": [
     "cbse-policy:ap-ecf",
@@ -63,6 +63,13 @@
     "cbse-bank:y12-diff/D2",
     "cbse-bank:y12-diff/D3",
     "cbse-bank:y12-diff/D4",
+    "cbse-bank:y12-integral-calc/D1",
+    "cbse-bank:y12-integral-calc/D2",
+    "cbse-bank:y12-integral-calc/D3",
+    "cbse-bank:y12-integral-calc/D4",
+    "cbse-bank:y12-integration/D1",
+    "cbse-bank:y12-integration/D2",
+    "cbse-bank:y12-integration/D3",
     "cbse-bank:y7-angles/D1",
     "cbse-bank:y7-angles/D2",
     "cbse-bank:y7-angles/D3",

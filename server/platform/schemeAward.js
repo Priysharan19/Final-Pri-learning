@@ -37,7 +37,8 @@
 // Pure and deterministic: no model, no network, no clock. India is unchanged (its bank has no allow-list and no seal).
 import crypto from 'node:crypto';
 import { publicDescription } from './lineInterpreter/givens.js';
-import { evalNumeric } from '../../client/src/engine/expr.js';
+import { evalNumeric, parse, normalize, evaluate, variablesOf } from '../../client/src/engine/expr.js';
+import { topLevelDifference } from '../../client/src/engine/reason-area.js';
 import { makeFn, polynomial, extremes } from './lineInterpreter/truth.js';
 import { editionMarkingPolicy, editionMethodMarksRefusal } from './editionMarking.js';
 import { AUTHOR_APPROVED_SERVER } from './authorApproved.generated.js';
@@ -140,6 +141,49 @@ const substitutesDerivative = (l, k, lines, q) => {
   return false;
 };
 const gradientPick = q => q.answerType === 'numeric' && planOf(q)?.scheme === 'gradient-at-point';
+
+// ── Lines of a definite integral (the plan's two area stages) ─────────────────────────────────────────────────────────────
+// The first stage ticks a line that carries a function whose derivative is the integrand (any constant, any form). The second ticks a line that
+// has a difference of two numbers equal to the value of the integral, and says nothing about WHICH numbers. "Substitutes the limits" is therefore
+// decided here, against the student's own antiderivative: the two numbers must be that function at the upper and at the lower limit, so a
+// difference that merely comes to the answer (9 - 1 for 8) earns nothing unless it is what their own antiderivative gives.
+const exprOf = t => { try { const a = parse(normalize(String(t).replace(/\+\s*C\s*$/, ''))); return a.t === 'equation' ? null : a; } catch { return null; } };
+const antiderivativesIn = (text, variable = 'x') => {
+  const out = [];
+  for (const seg of String(text ?? '').replace(/[−–—]/g, '-').split('=')) {
+    let t = seg.trim();
+    const b = /^\[(.*)\]\s*(?:_\s*\S+\s*\^\s*\S+)?$/.exec(t);
+    if (b) t = b[1];
+    if (/∫|\\int|\bint\b/i.test(t)) continue;
+    const a = exprOf(t);
+    if (!a) continue;
+    const vars = [...variablesOf(a)];
+    if (vars.length && vars.every(v => v === variable)) out.push(a);
+  }
+  return out;
+};
+const closeNum = (a, b) => Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b));
+const integralPick = q => q.answerType === 'numeric' && planOf(q)?.scheme === 'definite-integral';
+const limitsShown = (l, k, lines, q) => {
+  const st = planOf(q)?.stages?.[1];
+  if (!st || l.stage !== 1) return false;
+  const lo = Number(st.lower), hi = Number(st.upper);
+  const found = [];
+  for (let j = 0; j < k; j++) { const e = lines[j]; if (e?.status === 'ok' && e.stage === 0 && e.ecf !== true) found.push(...antiderivativesIn(e.text)); }
+  if (!found.length) return false;
+  for (const seg of String(l.text ?? '').replace(/[−–—]/g, '-').split('=')) {
+    const a = exprOf(seg.trim());
+    if (!a || variablesOf(a).size) continue;
+    const d = topLevelDifference(a);
+    if (!d) continue;
+    let e1, e2; try { e1 = evaluate(d[0], {}); e2 = evaluate(d[1], {}); } catch { continue; }
+    for (const F of found) {
+      let Fb, Fa; try { Fb = evaluate(F, { x: hi }); Fa = evaluate(F, { x: lo }); } catch { continue; }
+      if (closeNum(e1, Fb) && closeNum(e2, Fa)) return true;
+    }
+  }
+  return false;
+};
 
 // ── draft schemes for solving an equation ─────────────────────────────────────────────────────────────────────────────────
 // The step check ticks a line of a solved equation when it is an equation with the same solutions as the question's. That alone is not a
@@ -309,6 +353,25 @@ export const SCHEMES = Object.freeze([
       { key: 'derivative', by: 'line', marks: 1, text: 'Differentiates the function correctly.', how: 'a line the step check ticks as equal to the derivative of the given function (the plan\'s first stage), in any form; a line that only restates the function does not count', line: (l, k, lines, q) => l.stage === 0 && !restates(l, q) },
       { key: 'substitute', by: 'line', marks: 1, text: 'Substitutes the value of x into the derivative correctly.', how: 'a line the step check ticks at the plan\'s second stage (its value is the derivative\'s value at the point) that is the derivative the student wrote above, with the value put in, term by term (not an expression that merely comes to the same value)', line: substitutesDerivative },
       { ...ANSWER, key: 'gradient', marks: 1, text: 'Finds the gradient at the point correctly (the final answer).' }
+    ]
+  },
+  {
+    id: 'y12-integral-2', title: 'Evaluate a definite integral or an area (2 marks)', course: 'Year 12 Mathematics Advanced', year: 12, level: 1,
+    families: ['y12-integration', 'y12-integral-calc'],
+    pick: integralPick,
+    criteria: [
+      { key: 'antiderivative', by: 'line', marks: 1, text: 'Integrates correctly: writes an antiderivative of the function.', how: 'a line the step check ticks at the plan\'s first stage: a function on it (after F(x) =, the integral sign, or inside a bracket with limits; any constant) whose derivative equals the function being integrated at every sample point where both are defined, found by differentiating it', line: (l, k, lines, q) => l.stage === 0 },
+      { ...ANSWER, key: 'value', marks: 1, text: 'Finds the value correctly (the final answer).' }
+    ]
+  },
+  {
+    id: 'y12-integral-3', title: 'Evaluate a definite integral or an area (3 marks)', course: 'Year 12 Mathematics Advanced', year: 12, level: 1,
+    families: ['y12-integration', 'y12-integral-calc'],
+    pick: integralPick,
+    criteria: [
+      { key: 'antiderivative', by: 'line', marks: 1, text: 'Integrates correctly: writes an antiderivative of the function.', how: 'a line the step check ticks at the plan\'s first stage: a function on it (after F(x) =, the integral sign, or inside a bracket with limits; any constant) whose derivative equals the function being integrated at every sample point where both are defined, found by differentiating it', line: (l, k, lines, q) => l.stage === 0 },
+      { key: 'limits', by: 'line', marks: 1, text: 'Substitutes the limits into the antiderivative correctly.', how: 'a line the step check ticks at the plan\'s second stage (it has a difference of two numbers equal to the value of the integral) whose two numbers are the antiderivative the student wrote above, put at the upper and at the lower limit; a difference that merely comes to the value earns nothing', line: limitsShown },
+      { ...ANSWER, key: 'value', marks: 1, text: 'Finds the value correctly (the final answer).' }
     ]
   }
 ]);

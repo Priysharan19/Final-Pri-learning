@@ -20,7 +20,7 @@
 
 import { normalize, parse, evaluate, numsClose, variablesOf } from './expr.js';
 
-export const AREA_STAGE_KINDS = new Set(['area-limits', 'area-integrand', 'area-antiderivative', 'area-value']);
+export const AREA_STAGE_KINDS = new Set(['area-limits', 'area-integrand', 'area-antiderivative', 'area-value', 'area-antiderivative-of', 'area-substituted']);
 
 const SAMPLES = [-2.3, -0.9, 0.37, 1.3, 2.1, 3.7, 5.2];
 const TOL = 1e-7;
@@ -145,6 +145,109 @@ function authoredAst(text, variable) {
   return ast && onlyVariable(ast, variable) ? ast : null;
 }
 
+
+// ── Step-mark stages (24 Nov 2026): an antiderivative of the integrand, and the limits substituted ─────────────────────────────────────
+// `area-antiderivative-of` carries only the INTEGRAND (read from the question): a line is credited when a function on it differentiates, at
+// every sample point where both are defined, to the integrand. It does not need the question's own antiderivative, so any correct
+// antiderivative (any constant, any equivalent form, `F(x) = ...`, `∫ f dx = ...`, `[F]_a^b`) is accepted, and a function that is not one is a note.
+// `area-substituted` is credited when a line has a number-only part that is a difference E1 - E2 of two number-only expressions equal to
+// the expected value (the F(b) - F(a) the question comes to). It does not know F: the scheme layer holds the student's own antiderivative
+// line against E1 and E2, so a bare difference of numbers that merely comes to the answer earns nothing there. Both stages only ever TICK
+// or abstain: a wrong line is a note, never a cross, and nothing here reads the key.
+const H = 1e-5;
+const isLabelPart = (text, variable) => {
+  const t = String(text).trim();
+  if (!t) return true;
+  const ast = astFor(t);
+  if (!ast) return false;
+  const free = [...variablesOf(ast)];
+  // a name that is not the variable of integration is a label (F(x), y, A, I): the part names the function, it is not one
+  return free.length > 0 && free.some(v => v !== variable) && !/[+\-*/^]/.test(t.replace(/^\s*-/, '').replace(/\(\s*[a-z]\s*\)/i, ''));
+};
+function derivativeMatches(F, f, variable) {
+  let seen = 0;
+  for (const x of [0.37, 0.9, 1.3, 2.1, 3.7, 5.2, -0.9, -2.3]) {
+    const hi = valueAt(F, variable, x + H), lo = valueAt(F, variable, x - H), want = valueAt(f, variable, x);
+    if (hi === null || lo === null || want === null) continue;
+    seen++;
+    if (!numsClose((hi - lo) / (2 * H), want, 1e-5)) return false;
+  }
+  return seen >= 4;
+}
+function assessAntiderivativeOf({ text, meta }) {
+  const variable = meta.variable || 'x';
+  const f = authoredAst(meta.integrand, variable);
+  if (!f) return abstain('This integration stage is not configured safely.');
+  const clause = cleanText(text);
+  if (!clause || clause.length > 300) return abstain(UNREAD);
+  const pieces = clause.split('=').map(part => part.trim()).filter(Boolean);
+  const candidates = [];
+  for (const piece of pieces) {
+    const integral = piece.match(INTEGRAL);
+    if (integral && /^(?:∫|int(?![a-z]))/i.test(piece)) {
+      // `∫ f dx` on the line is the integral being integrated: it must be this question's integrand, with these limits if it has any
+      const bounds = boundsOf(integral[1] ?? integral[3] ?? integral[5], integral[2] ?? integral[4] ?? integral[6]);
+      const body = String(integral[7] || '').replace(new RegExp('\\s*d\\s*' + variable + '\\s*$'), '').trim();
+      const ast = astFor(body);
+      if (!ast || bounds?.unread || !sameFunction(ast, f, variable)) return abstain(UNREAD);
+      if (bounds && !boundsAgree(bounds, meta)) return abstain('Pri could not verify the limits written on this integral.');
+      continue;
+    }
+    const bracket = piece.match(BRACKET);
+    if (bracket) {
+      const bounds = boundsOf(bracket[2], bracket[3]);
+      const ast = astFor(bracket[1].replace(/\+\s*C\s*$/, ''));
+      if (!ast || bounds?.unread) return abstain(UNREAD);
+      if (bounds && !boundsAgree(bounds, meta)) return abstain('Pri could not verify the limits written on this bracket.');
+      candidates.push(ast);
+      continue;
+    }
+    if (isLabelPart(piece, variable) || LABEL.test(piece)) continue;
+    const ast = astFor(piece.replace(/\+\s*C\s*$/, ''));
+    if (!ast) return abstain(UNREAD);
+    if (!variablesOf(ast).size) continue;   // a number: a value, not an antiderivative
+    if (!onlyVariable(ast, variable)) return abstain(UNREAD);
+    candidates.push(ast);
+  }
+  if (!candidates.length) return abstain(UNREAD);
+  if (!candidates.every(F => derivativeMatches(F, f, variable))) return abstain('Pri could not verify this as an antiderivative of the integrand.');
+  return { status: 'ok', trusted: true };
+}
+
+const unwrap = ast => (ast && ast.t === 'group' ? unwrap(ast.v) : ast);
+/** E1 - E2 as two trees when the expression is a subtraction at its top level, else null. */
+export function topLevelDifference(ast) {
+  const a = unwrap(ast);
+  if (!a || a.t !== 'bin') return null;
+  if (a.op === '-') return [a.l, a.r];
+  if (a.op === '+' && unwrap(a.r)?.t === 'neg') return [a.l, unwrap(a.r).v];
+  return null;
+}
+function assessSubstituted({ text, meta }) {
+  const variable = meta.variable || 'x';
+  const expected = Number(meta.expected);
+  if (!Number.isFinite(expected)) return abstain('This substitution stage is not configured safely.');
+  const clause = cleanText(text);
+  if (!clause || clause.length > 300) return abstain(UNREAD);
+  // A line is credited only when EVERY number-only part of it is the value (to the rounding a question may ask for): `243 - (-32) = 550` has a
+  // difference that is right and a claim that is not, and is a note.
+  let shown = false;
+  for (const piece of clause.split('=').map(part => part.trim()).filter(Boolean)) {
+    const ast = astFor(piece);
+    if (!ast || variablesOf(ast).size) continue;
+    let v = null; try { v = evaluate(ast, {}); } catch { v = null; }
+    if (!Number.isFinite(v)) continue;
+    if (!numsClose(v, expected, 1e-9) && Math.abs(v - expected) > 6e-4) return abstain('Pri could not match this line to the limits substituted into an antiderivative.');
+    const parts = topLevelDifference(ast);
+    if (!parts) continue;
+    let e1 = null, e2 = null;
+    try { e1 = evaluate(parts[0], {}); e2 = evaluate(parts[1], {}); } catch { continue; }
+    if (Number.isFinite(e1) && Number.isFinite(e2) && numsClose(e1 - e2, expected, 1e-9)) shown = true;
+  }
+  if (shown) return { status: 'ok', trusted: true };
+  return abstain('Pri could not match this line to the limits substituted into an antiderivative.');
+}
+
 function assessLimits({ text, meta, checkEquation }) {
   const variable = meta.variable || 'x';
   const values = (meta.values || []).map(Number);
@@ -236,6 +339,8 @@ export function assessAreaLine({ text, meta = null, checkEquation = null } = {})
     if (meta.kind === 'area-limits') return assessLimits({ text, meta, checkEquation });
     if (meta.kind === 'area-integrand') return assessIntegrand({ text, meta });
     if (meta.kind === 'area-antiderivative') return assessAntiderivative({ text, meta });
+    if (meta.kind === 'area-antiderivative-of') return assessAntiderivativeOf({ text, meta });
+    if (meta.kind === 'area-substituted') return assessSubstituted({ text, meta });
     return assessValue({ text, meta });
   } catch { return abstain(UNREAD); }
 }

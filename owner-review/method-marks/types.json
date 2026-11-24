@@ -228,6 +228,66 @@
       "digest": "617054ccf2d5ea4c0bc74f4bf2c0c0657b871f8914a5ac414f93de9f24c57efe"
     },
     {
+      "id": "y12-integral-2",
+      "title": "Evaluate a definite integral or an area (2 marks)",
+      "course": "Year 12 Mathematics Advanced",
+      "year": 12,
+      "families": [
+        "y12-integration",
+        "y12-integral-calc"
+      ],
+      "file": "y12-integral-2.md",
+      "totalMarks": 2,
+      "criteria": [
+        {
+          "key": "antiderivative",
+          "text": "Integrates correctly: writes an antiderivative of the function.",
+          "marks": 1,
+          "by": "line"
+        },
+        {
+          "key": "value",
+          "text": "Finds the value correctly (the final answer).",
+          "marks": 1,
+          "by": "final"
+        }
+      ],
+      "digest": "906b842a32463f9b581bdb0260153f5e3c5d2b63fa5df630c0230c76400beda8"
+    },
+    {
+      "id": "y12-integral-3",
+      "title": "Evaluate a definite integral or an area (3 marks)",
+      "course": "Year 12 Mathematics Advanced",
+      "year": 12,
+      "families": [
+        "y12-integration",
+        "y12-integral-calc"
+      ],
+      "file": "y12-integral-3.md",
+      "totalMarks": 3,
+      "criteria": [
+        {
+          "key": "antiderivative",
+          "text": "Integrates correctly: writes an antiderivative of the function.",
+          "marks": 1,
+          "by": "line"
+        },
+        {
+          "key": "limits",
+          "text": "Substitutes the limits into the antiderivative correctly.",
+          "marks": 1,
+          "by": "line"
+        },
+        {
+          "key": "value",
+          "text": "Finds the value correctly (the final answer).",
+          "marks": 1,
+          "by": "final"
+        }
+      ],
+      "digest": "51055d287d31ce88cf90d971e2ee694faa3b213e639265636fad21d5660142e6"
+    },
+    {
       "id": "y11-poly-evaluate",
       "title": "Evaluate a polynomial or find a remainder by substitution",
       "course": "Year 11 Mathematics Advanced",
@@ -458,25 +518,13 @@
       "unavailable": true
     },
     {
-      "id": "y12-integrals",
-      "title": "Definite integrals and areas under a curve",
-      "course": "Year 12 Mathematics Advanced",
-      "families": [
-        "y12-integration",
-        "y12-integral-calc"
-      ],
-      "reason": "The engine cannot read an antiderivative or an integral line, so \"integrates correctly\" and \"substitutes the limits\" cannot be decided; only the final value is checked."
-    },
-    {
       "id": "y12-integrals-indefinite",
-      "title": "Indefinite integrals and the reverse chain rule",
+      "title": "The reverse chain rule: find the constant that makes an antiderivative true",
       "course": "Year 12 Mathematics Advanced",
       "families": [
-        "y12-integration",
-        "y12-integral-calc",
-        "y12-trigcalc"
+        "y12-integration"
       ],
-      "reason": "The engine cannot read an antiderivative line, so no stage of the method can be decided apart from the final expression."
+      "reason": "The question gives the form of the antiderivative and asks for one constant, and a line such as \"u = x^2 + 7\" is a choice of notation, so no stage of the method can be decided from the lines; only the final value is checked. (A definite integral, or the area under a curve, now has a scheme: its antiderivative line is checked by differentiating it. A question that asks for the antiderivative itself is answered in one line, so a second criterion would pay that line twice.)"
     },
     {
       "id": "y12-stationary-nature",

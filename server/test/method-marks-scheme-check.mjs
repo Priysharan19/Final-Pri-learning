@@ -329,7 +329,7 @@ for (const s of SCHEMES) ok(R.questionsOfType(s, { limit: 3 }).length === 3, `${
 
 // ── 2b4. the Years 11-12 draft schemes (24 Nov 2026): unapproved in the repository; approved here in the TEST PROCESS only; gamed lines earn nothing ──
 {
-  const NEW = ['y12-diff-rules-3', 'y12-diff-gradient-2', 'y12-diff-gradient-3'];
+  const NEW = ['y12-diff-rules-3', 'y12-diff-gradient-2', 'y12-diff-gradient-3', 'y12-integral-2', 'y12-integral-3'];
   ok(NEW.every(id => SCHEMES.some(s => s.id === id) && !APPROVED_SCHEME_TYPES.some(a => a.typeId === id) && !isApproved(id)), 'the Years 11-12 draft schemes exist and none is on the repository\'s approved list');
   {
     let stamped = 0, tried = 0;
@@ -353,17 +353,30 @@ for (const s of SCHEMES) ok(R.questionsOfType(s, { limit: 3 }).length === 3, `${
     for (const q of R.questionsOfType(s, { limit: 60 })) {
       const built = await type.build(q); if (!built) continue;
       const f = publicDescription(q).functions[0];
-      const lists = [['0 = 0'], ['x = x'], ['999'], [`dy/dx = ${f.rhs}`], [`y' = ${f.rhs}`], [`f'(x) = ${f.rhs}`]];
+      const lists = [['0 = 0'], ['x = x'], ['999'], ...(f ? [[`dy/dx = ${f.rhs}`], [`y' = ${f.rhs}`], [`f'(x) = ${f.rhs}`]] : [])];
+      const base = lists.length;
       if (id === 'y12-diff-rules-3') {
         const key = String(q.answer.expr);
         lists.push([`dy/dx = ${key}`, `dy/dx = ${key}`], [`dy/dx = ${key}`, `= ${key}`], [`dy/dx = ${key}`, `dy/dx = ${key.replace(/\s+/g, '')}`], [`dy/dx = ${key}`, `dy/dx = ${key.replace(/\s+/g, '')} `]);
         // a first correct line earns the first criterion; the same derivative written again earns no second one
-        for (const ls of lists.slice(6)) { g.tried++; const k = earnedKeys(run(s, q, ls)); if (k.includes('second')) g.earned++; }
-        lists.length = 6;
+        for (const ls of lists.slice(base)) { g.tried++; const k = earnedKeys(run(s, q, ls)); if (k.includes('second')) g.earned++; }
+        lists.length = base;
         // a crossed line, then right lines: nothing after the cross
         const wrong = built.zero[0];
         g.tried++; if (earnedKeys(run(s, q, [wrong, built.full[0], built.full[1]])).length) g.earned++;
         g.controls++; if (earnedKeys(run(s, q, built.full.slice(0, 2))).join() === 'derivative,second') g.controlEarned++; else if (process.env.DEBUG_CONTROL) console.log('control', id, q.prompt.slice(0, 90), JSON.stringify(built.full), earnedKeys(run(s, q, built.full.slice(0, 2))));
+      } else if (id.startsWith('y12-integral')) {
+        const st = q.stepcheck.stages; const val = st[1].expected; const F = built.full[0];
+        const integrand = st[0].integrand;
+        // a difference of numbers that merely comes to the value, the value alone, the integrand restated, a function that is not an antiderivative, a wrong antiderivative then a right substitution
+        lists.push([`F(x) = ${integrand}`], [`${num(val)}`], [`= ${num(val + 7.31)} - 7.31`], [F, `= ${num(val + 7.31)} - 7.31`], [F, `= ${num(val)} + 0`], [F, F], [`F(x) = ${integrand}`, `= ${num(val + 7.31)} - 7.31`]);
+        if (id.endsWith('3')) lists.push([built.zero[0], built.full[1]], [built.zero[0], built.full[1], built.full[2]]);
+        for (const ls of lists) { g.tried++; const k = earnedKeys(run(s, q, ls)); const real = ls.includes(F); if (k.includes('limits')) g.earned++; if (k.includes('antiderivative') && !real) g.earned++; }
+        g.tried++; if (earnedKeys(run(s, q, [F, F])).filter(x => x === 'limits').length) g.earned++;
+        // the real lines earn their criteria, even with a wrong final answer
+        const want = id.endsWith('3') ? 'antiderivative,limits' : 'antiderivative';
+        g.controls++; if (earnedKeys(run(s, q, built.partial)).join() === want) g.controlEarned++; else if (process.env.DEBUG_CONTROL) console.log('control', id, q.prompt.slice(0, 90), JSON.stringify(built.partial), earnedKeys(run(s, q, built.partial)));
+        continue;
       } else {
         const st = q.stepcheck.stages; const val = st[1].expected; const D = built.full[0]; const S = built.full[1];
         const wrongD = built.zero[0];

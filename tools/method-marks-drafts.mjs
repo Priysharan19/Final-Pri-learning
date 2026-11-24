@@ -23,6 +23,7 @@ import { SCHEMES, UNAVAILABLE, schemeDigest, awardScheme } from '../server/platf
 import { transcriptsFor } from './understanding-audit/corpus.mjs';
 import { parse, normalize } from '../client/src/engine/expr.js';
 import { differentiateAst } from '../client/src/engine/reason-v2.js';
+import { evaluate } from '../client/src/engine/expr.js';
 import { prettyText } from '../client/src/engine/schemePlans.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -316,6 +317,49 @@ const gradientBuild = three => async function build(q) {
 EXTRAS['y12-diff-gradient-2'] = { marksMatch: true, form: 'A function of x is given and the student finds its gradient at a stated value of x (two marks).', cannot: GRADIENT_CANNOT, build: gradientBuild(false) };
 EXTRAS['y12-diff-gradient-3'] = { marksMatch: true, form: 'A function of x is given and the student finds its gradient at a stated value of x (three marks): differentiate, put the value in, evaluate.', cannot: GRADIENT_CANNOT, build: gradientBuild(true) };
 
+// ── definite integrals (24 Nov 2026) ─────────────────────────────────────────────────────────────────────────────────────────
+const gcd = (a, b) => (b ? gcd(b, a % b) : Math.abs(a));
+const fracText = (n, d) => { const g = gcd(n, d) || 1; const [a, b] = [n / g, d / g]; return b === 1 ? (a < 0 ? `(${a})` : String(a)) : `(${a}/${b})`; };
+// An antiderivative of the integrand as text, only for a polynomial with whole-number coefficients over small denominators (anything else: null).
+function primitiveText(f) {
+  const ast = parse(normalize(f));
+  const ys = Array.from({ length: 8 }, (_, i) => evaluate(ast, { x: i }));
+  // finite differences give the polynomial's coefficients in the Newton basis; solve for the monomial coefficients by Vandermonde elimination
+  const n = 7; const A = ys.slice(0, n).map((_, r) => Array.from({ length: n }, (_, c) => r ** c)); const b = ys.slice(0, n).slice();
+  for (let c = 0; c < n; c++) { let p = c; for (let r = c + 1; r < n; r++) if (Math.abs(A[r][c]) > Math.abs(A[p][c])) p = r; [A[c], A[p]] = [A[p], A[c]]; [b[c], b[p]] = [b[p], b[c]];
+    for (let r = 0; r < n; r++) if (r !== c) { const m = A[r][c] / A[c][c]; for (let k = c; k < n; k++) A[r][k] -= m * A[c][k]; b[r] -= m * b[c]; } }
+  const co = b.map((v, i) => v / A[i][i]);
+  if (!co.every(c => Math.abs(c * 12 - Math.round(c * 12)) < 1e-6)) return null;
+  const x7 = evaluate(ast, { x: 7.5 }); if (Math.abs(co.reduce((s, c, i) => s + c * 7.5 ** i, 0) - x7) > 1e-6 * Math.max(1, Math.abs(x7))) return null;
+  const terms = co.map((c, i) => [Math.round(c * 12), i]).filter(([c]) => c !== 0).map(([c12, i]) => `${i === 0 ? 'x' : `x^${i + 1}`}*${fracText(c12, 12 * (i + 1))}`);
+  return terms.length ? terms.join(' + ') : null;
+}
+const integralBuild = three => async function build(q) {
+  const st = q.stepcheck.stages; const lo = st[0].lower, hi = st[0].upper;
+  if (!Number.isInteger(lo) || !Number.isInteger(hi)) return null;
+  const F = primitiveText(st[0].integrand);
+  if (!F) return null;
+  const atX = (t, v) => t.replace(/(?<![A-Za-z])x(?![A-Za-z])/g, `(${v})`);
+  const finalText = num(q.answer.value); const wrongFinal = num(q.answer.value + 1);
+  const wrongF = await firstWrong(q, c => `F(x) = ${c}`, bumpedExprs(F));
+  if (!wrongF) return null;
+  // A zero limit is written 0: a bumped number inside a term whose base is 0 would leave the line true.
+  const sideOf = (t, v) => (v === 0 ? '0' : `(${atX(t, v)})`);
+  const sub = `= ${sideOf(F, hi)} - ${sideOf(F, lo)}`;
+  const wrongSub = `= ${sideOf(wrongF.text, hi)} - ${sideOf(wrongF.text, lo)}`;
+  return three
+    ? { full: [`F(x) = ${F}`, sub, `= ${finalText}`], partial: [`F(x) = ${F}`, sub, `= ${wrongFinal}`], zero: [`F(x) = ${wrongF.text}`, `= ${wrongFinal}`], slip: [`F(x) = ${wrongF.text}`, wrongSub, `= ${wrongFinal}`] }
+    : { full: [`F(x) = ${F}`, `= ${finalText}`], partial: [`F(x) = ${F}`, `= ${wrongFinal}`], zero: [`F(x) = ${wrongF.text}`, `= ${wrongFinal}`], slip: [`F(x) = ${wrongF.text}`, `= ${wrongF.text}`] };
+};
+const INTEGRAL_CANNOT = [
+  'It cannot tell which method the student used. Any function on a line whose derivative is the integrand earns the first criterion, however it was found, and in any form or constant.',
+  'It reads an antiderivative written as F(x) = ..., after the integral sign, or inside a bracket with its limits. A line that is not an antiderivative of this integrand is left without a verdict, never marked wrong.',
+  'The limits criterion needs the antiderivative to be written on its own earlier line, and the substitution to be a difference of two numbers, each exact (a fraction, a surd or a whole-number sum), that are that antiderivative at the upper and at the lower limit. A rounded decimal, or a difference that merely comes to the value, earns nothing.',
+  'Integration by substitution, an area between two curves, an area that crosses the axis and a question about an unknown limit are not read: those questions stay on the final answer.'
+];
+EXTRAS['y12-integral-2'] = { marksMatch: true, form: 'A definite integral is given, or the area under a curve between two values of x, and the student finds its value (two marks).', cannot: INTEGRAL_CANNOT, build: integralBuild(false) };
+EXTRAS['y12-integral-3'] = { marksMatch: true, form: 'A definite integral is given, or the area under a curve between two values of x, and the student finds its value (three marks): integrate, put the limits in, subtract.', cannot: INTEGRAL_CANNOT, build: integralBuild(true) };
+
 export const TYPES = SCHEMES.map(s => ({ ...s, ...EXTRAS[s.id] }));
 
 // ── types the marked page cannot verify line by line (server/platform/schemeAward.js UNAVAILABLE) ─
@@ -331,12 +375,9 @@ const UNAVAILABLE_PROBED = UNAVAILABLE.map(u => ({ ...u, probe: UNAVAILABLE_PROB
 // criterion in question. The tool runs it and fails loudly if any of those lines turns out to be
 // verified, so a reason on this list can never go out of date unnoticed.
 const UNPROVABLE = [
-  { id: 'y12-integrals', title: 'Definite integrals and areas under a curve', course: 'Year 12 Mathematics Advanced', level: 1, families: ['y12-integration', 'y12-integral-calc'],
-    reason: 'The engine cannot read an antiderivative or an integral line, so "integrates correctly" and "substitutes the limits" cannot be decided; only the final value is checked.',
-    probe: { family: 'y12-integration', d: 2, seed: 11, lines: ['∫ = x^3 + x^2', '[2x^3/3 + x^2] from 0 to 2', '9.333'], unverified: [1, 2] } },
-  { id: 'y12-integrals-indefinite', title: 'Indefinite integrals and the reverse chain rule', course: 'Year 12 Mathematics Advanced', level: 1, families: ['y12-integration', 'y12-integral-calc', 'y12-trigcalc'],
-    reason: 'The engine cannot read an antiderivative line, so no stage of the method can be decided apart from the final expression.',
-    probe: { family: 'y12-integral-calc', d: 2, seed: 23, lines: ['∫(3x^2+6)dx = x^3+6x', '(2)^3 + 6(2) - 0', '20'], unverified: [1] } },
+  { id: 'y12-integrals-indefinite', title: 'The reverse chain rule: find the constant that makes an antiderivative true', course: 'Year 12 Mathematics Advanced', level: 1, families: ['y12-integration'],
+    reason: 'The question gives the form of the antiderivative and asks for one constant, and a line such as "u = x^2 + 7" is a choice of notation, so no stage of the method can be decided from the lines; only the final value is checked. (A definite integral, or the area under a curve, now has a scheme: its antiderivative line is checked by differentiating it. A question that asks for the antiderivative itself is answered in one line, so a second criterion would pay that line twice.)',
+    probe: { family: 'y12-integration', d: 1, seed: 1, lines: ['u = x^2 + 7', 'du = 2x dx'], unverified: [1, 2] } },
   { id: 'y12-stationary-nature', title: 'Nature of a stationary point', course: 'Year 12 Mathematics Advanced', level: 1, families: ['y12-appdiff'],
     reason: 'The nature question is multiple choice, and the second derivative is not a line the page can check, so "determines the nature" cannot be decided from the lines.',
     probe: { family: 'y12-appdiff', d: 2, seed: 23, lines: ["y' = -2(x + 3)", "y'' = -2", 'maximum'], unverified: [2] } },
