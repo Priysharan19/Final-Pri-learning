@@ -32,7 +32,7 @@ const ok = (cond, label) => { checks++; if (!cond) { failed++; console.log(`FAIL
 
 const statusOf = (q, lines, index, typed = '99991') => {
   const ev = stepEvidence({ ...q }, typed, lines.join('\n'), checkAnswer(q, typed), { slipWarnings: true });
-  const l = ev.stepReport && ev.stepReport.lines && ev.stepReport.lines[index];
+  const rep = ev.shownReport || ev.stepReport, l = rep && rep.lines && rep.lines[index];
   return l ? l.status : 'none';
 };
 const gen = (id, d, s) => { const q = G.generateQuestion(id, d, s); if (q.stepcheck && q.stepcheck.scheme) delete q.stepcheck; return q; };
@@ -98,6 +98,72 @@ ok(sidesOf('a = b = c').length === 3, 'oracle: splits a chain');
   t(gen('me12-further-calc', 3, 5), ['3[sin^(-1)((x)/(4))]', '((x)/4)', '((sqrt(2))/2)', '((sqrt(3))/2)'], 2, 'a limit value (5)');
 }
 
+
+// ── the rounded-value tick reads what the question ASKS (independent review of PR #1116) ───────────────────────────────────────
+{
+  const q = gen('me12-binomial', 3, 23);   // "find the standard deviation, correct to 2 decimal places"
+  const at = line => statusOf(q, ['9*0.15*0.85=1.1475', line], 1);
+  // the correct rounding at the asked places, or to more places, is ticked
+  for (const good of ['√(1.1475) ≈ 1.07', '√(1.1475) ≈ 1.071', '√(1.1475) = 1.07']) ok(at(good) === 'ok', `rounded at or beyond the asked 2 places is ticked: ${good}`);
+  // a truncation that is not the rounding, too few places, one out in the last place, and finite decimals written with an equals sign are not
+  for (const bad of ['√(1.1475) ≈ 1.06', '√(1.1475) ≈ 1.08', '√(1.1475) ≈ 1.1', '√(1.1475) ≈ 1.0', '(54/100)=0.5', '(30/99)=0.3', '17845.61-14000=3845.6', '1+0.08=1.0', '(54/100) ≈ 0.5']) ok(at(bad) !== 'ok', `not ticked: ${bad}`);
+  // an operand the question never gave and no earlier ticked line reached: the rounding does not hide it
+  for (const bad of ['√(1.16) ≈ 1.08', '√(1.1476) ≈ 1.07']) ok(at(bad) !== 'ok', `an operand nobody reached is not ticked: ${bad}`);
+  ok(statusOf(q, ['√(1.1475) ≈ 1.07'], 0) !== 'ok', 'with no earlier ticked line that reached 1.1475, the calculation is not ticked');
+  {
+    // the review's repro: a slipped operand hidden by a rounded result (y11-data-sets d1 seed 185)
+    const d = gen('y11-data-sets', 1, 185);
+    const page = last => ['16*90=1440', '29*81=2349', last];
+    ok(statusOf(d, page('((2349+1440)/45)=84.2'), 2) === 'ok', 'the true calculation is ticked: every operand is given or reached');
+    for (const bad of ['((2349+1439)/45)=84.2', '((2349+1441)/45)=84.2', '((2348+1440)/45)=84.2', '((2350+1440)/45)=84.2', '((2349+1440)/46)=84.2', '((2349+1440)/44)=86.1']) ok(statusOf(d, page(bad), 2) !== 'ok', `one operand changed by 1, the result still a correct rounding of the changed expression: not ticked: ${bad}`);
+  }
+  const e = gen('me12-calc', 4, 23);        // "Find the exact area"
+  for (const bad of ['x = 128/3 ≈ 42.666', '128/3 = 42.666', '128/3 ≈ 42.667', '128/3 ≈ 42.67']) ok(statusOf(e, ['A = \\int_0^{16} \\sqrt{y}\\,dy', bad], 1) !== 'ok', `an exact question never takes a decimal as correct: ${bad}`);
+  // no precision asked: a correct rounding to at least 3 significant figures is ticked, fewer is not
+  const f = gen('y12-financial', 2, 5);
+  ok(statusOf(f, ['(1.06)^5 = 1.3382'], 0) === 'ok', 'no precision asked: 5 significant figures, a correct rounding, is ticked');
+  ok(statusOf(f, ['(1.06)^5 = 1.3'], 0) !== 'ok', 'no precision asked: 2 significant figures is not ticked');
+  ok(statusOf(f, ['(1.06)^5 = 1.3383'], 0) !== 'ok', 'no precision asked: one out in the last place is not ticked');
+}
+// ── the tick classes of engine/provedLines.js (24 November 2026): each true line is ticked, each one-edit mutant is not ──────────
+{
+  // a solution list: a set, in any order, with ± and degrees; a wrong element, a wrong sign in a ± pair, an extra or a foreign unit is not ticked
+  const q = gen('y11-trig-ident', 2, 11);
+  for (const good of ['θ = 45°, -45°', '∴ θ = -45°, 45°', 'θ = 45° or θ = -45°', 'θ = ±45°']) ok(statusOf(q, ['cosθ = √2/2', good], 1) === 'ok', `solution list: ${good} is ticked`);
+  for (const bad of ['θ = 45°, -35°', 'θ = 45°, 45°', 'θ = 45°, -135°', 'θ = 45°, 315°', 'θ = ±135°', 'θ = 45°', 'θ = 45, -45 rad', 'θ = ±45° (cos is positive)']) ok(statusOf(q, ['cosθ = √2/2', bad], 1) !== 'ok', `solution list: ${bad} is not ticked`);
+  ok(statusOf(q, ['cosθ = √2/2', 'θ = 45°, -45°'], 0) === 'ok', 'restated equation: the question\'s own equation is ticked');
+  ok(statusOf(q, ['cosθ = √2/3', 'θ = 45°, -45°'], 0) !== 'ok', 'restated equation: a changed equation is not ticked');
+  ok(statusOf(q, ['cosθ = -√2/2', 'θ = 45°, -45°'], 0) !== 'ok', 'restated equation: a changed sign is not ticked');
+}
+{
+  // a rounded value: to the places shown, rounded or truncated; one digit out is not ticked
+  const q = gen('y12-financial', 2, 5);
+  for (const good of ['(1.06)^5 = 1.338226', '(1.06)^5 = 1.33823', '(1.06)^5 = 1.3382']) ok(statusOf(q, [good], 0) === 'ok', `rounded value: ${good} is ticked`);
+  for (const bad of ['(1.06)^5 = 1.338227', '(1.06)^5 = 1.338216', '(1.06)^5 = 1.33824', '(1.06)^5 = 1.3383', '(1.06)^5 = 1.338326', '(1.06)^6 = 1.338226', '(1.07)^5 = 1.338226']) ok(statusOf(q, [bad], 0) !== 'ok', `rounded value: ${bad} is not ticked`);
+}
+{
+  // a labelled substitution, true as an identity in the unknown coefficients and giving a value the question gives
+  const q = gen('me11-poly', 2, 5);
+  const page = l => ['P(x) = x^3 + ax^2 + bx - 1', l];
+  for (const good of ['P(1) = 0: 1 + a + b - 1 = 0', 'P(-3) = 20: -27 + 9a - 3b - 1 = 20']) ok(statusOf(q, page(good), 1) === 'ok', `substitution: ${good} is ticked`);
+  for (const bad of ['P(1) = 0: 1 + a + b + 1 = 0', 'P(1) = 0: 1 + 2a + b - 1 = 0', 'P(1) = 0: 1 + a - b - 1 = 0', 'P(1) = 1: 1 + a + b - 1 = 1', 'P(-3) = 20: -27 + 9a + 3b - 1 = 20', 'P(-3) = 20: -27 + 9a - 3b - 2 = 20', 'P(-3) = 21: -27 + 9a - 3b - 1 = 21', 'P(2) = 0: 8 + 4a + 2b - 1 = 0']) ok(statusOf(q, page(bad), 1) !== 'ok', `substitution: ${bad} is not ticked`);
+}
+{
+  // a derivative statement: the operator reaches one unit, so `d/dx (ax^n) + 1 = …` is not the derivative
+  const q = gen('y12-diff', 1, 7);
+  for (const good of ['((d)/(du))*sin u=cos u', '((d)/(dx))(ax^n) = anx^(n-1)']) ok(statusOf(q, [good], 0) === 'ok', `derivative statement: ${good} is ticked`);
+  for (const bad of ['((d)/(du))*sin u=-cos u', '((d)/(du))*sin u=cos u+1', '((d)/(dx))(ax^n) + 1 = anx^(n-1)', '((d)/(dx))(ax^n) = anx^(n-2)', '((d)/(dx))(ax^n) = ax^(n-1)']) ok(statusOf(q, [bad], 0) !== 'ok', `derivative statement: ${bad} is not ticked`);
+  ok(statusOf(q, ['((d)/(dx))cos(u) = -sin(u) * u\''], 0) === 'ok', 'chain rule statement is ticked');
+  ok(statusOf(q, ['((d)/(dx))cos(u) = sin(u) * u\''], 0) !== 'ok', 'chain rule statement with the wrong sign is not ticked');
+}
+{
+  // an identity, and an equation with exactly the question's solutions; one letter changed is neither
+  const q = gen('y12-diff', 1, 7);
+  ok(statusOf(q, ['cos(A - B) = cos(A)cos(B) + sin(A)sin(B)'], 0) === 'ok', 'identity: a true compound-angle line is ticked');
+  ok(statusOf(q, ['cos(A - B) = cos(A)cos(B) - sin(A)sin(B)'], 0) !== 'ok', 'identity: a wrong sign is not ticked');
+  ok(statusOf(q, ['f(0) = 1(1)^2 + 3(1) - 4'], 0) !== 'ok', 'identity: a function value written f(0) is never read as a product');
+}
+
 // ── the second review round: four classes ────────────────────────────────────────────────────────────────────────────────────
 {
   // an equation between two expressions is ticked only when its sides are EQUAL, not when they merely share roots
@@ -151,8 +217,10 @@ ok(sidesOf('a = b = c').length === 3, 'oracle: splits a chain');
   const q = gen('y12-financial', 3, 19);
   const page = v => ['FV = a(((1+r)^n - 1)/(r)) = 2600(((1.06)^(20) - 1)/(0.06))', `(1.06)^(20) = ${v}`];
   // (1.06)^20 = 3.20713547...
-  for (const bad of ['3.2070', '3.2072', '3.206', '3.208', '3.20712', '3.20714']) ok(statusOf(q, page(bad), 1) !== 'ok', `a value one digit off is not ticked: (1.06)^(20) = ${bad}`);
+  for (const bad of ['3.2070', '3.2072', '3.206', '3.208', '3.20712', '3.20715']) ok(statusOf(q, page(bad), 1) !== 'ok', `a value one digit off is not ticked: (1.06)^(20) = ${bad}`);
   ok(statusOf(q, page('3.207'), 1) === 'ok', 'the authored 3.207 is ticked');
+  // 3.20714 is NOT one digit off: 3.20713547... correct to 5 places IS 3.20714, so the page shows it ticked (the pass of engine/provedLines.js, feedback only); 3.20715 above is the wrong one
+  ok(statusOf(q, page('3.20714'), 1) === 'ok', '3.20714 is the correct rounding to 5 places and is ticked');
   const m = mutationsOf('x = 1') ; ok(Array.isArray(m), 'mutationsOf still reads a plain line');
   const kinds = roundingMutants('(1.06)^(20) = 3.207').map(x => x.text);
   for (const t of ['(1.06)^(20) = 3.2070', '(1.06)^(20) = 3.2072', '(1.06)^(20) = 3.206', '(1.06)^(20) = 3.208']) ok(kinds.includes(t), `the harness generates the rounding mutant ${t}`);
@@ -234,6 +302,20 @@ let corpusFalse = 0, corpusCross = 0, corpusFalseTicked = 0, corpusCrossed = 0, 
   ok(corpusFalse >= 300 && corpusCross >= 20, `the corpus is not trivial (${corpusFalse} false ticks, ${corpusCross} crossed true lines)`);
 }
 
+// ── the precision a question asks, read from its words (independent review of PR #1116) ─────────────────────────────────────────
+{
+  const { precisionOf } = await import('../../client/src/engine/provedLines.js');
+  const P = prompt => JSON.stringify(precisionOf({ prompt }));
+  const cases = [
+    ['Find x, correct to two decimal places.', { dp: 2 }], ['Find x to 2 decimal places.', { dp: 2 }], ['Give the answer to three decimal places.', { dp: 3 }], ['Find x, 2 d.p.', { dp: 2 }], ['Find x (2 dp).', { dp: 2 }],
+    ['Find x, one decimal place.', { dp: 1 }], ['Find $x$ to $2$ decimal places.', { dp: 2 }], ['Find x to four significant figures.', { sf: 4 }], ['Find x to 3 significant figures.', { sf: 3 }],
+    ['Find x, 3 s.f.', { sf: 3 }], ['Find x (3 sf).', { sf: 3 }], ['Give the answer to the nearest cent.', { dp: 2 }], ['to the nearest dollar', { dp: 0 }], ['to the nearest whole number', { dp: 0 }],
+    ['to the nearest integer', { dp: 0 }], ['to the nearest degree', { dp: 0 }], ['to the nearest minute', { dp: 0 }], ['to the nearest tenth', { dp: 1 }], ['to the nearest hundredth', { dp: 2 }], ['to the nearest thousandth', { dp: 3 }],
+    ['Find the exact value.', { exact: true }], ['Find x.', {}]
+  ];
+  for (const [prompt, want] of cases) ok(P(prompt) === JSON.stringify(want), `precision read from "${prompt}": ${P(prompt)}`);
+}
+
 // ── the harness over the authored pages ──────────────────────────────────────────────────────────────────────────────────────
 {
   const res = await run({ seeds: SEEDS, maxPerLine: 8 });
@@ -244,6 +326,11 @@ let corpusFalse = 0, corpusCross = 0, corpusFalseTicked = 0, corpusCrossed = 0, 
   ok(t.trueCrosses === 0, `no authored true line is crossed (${t.trueCrosses}: ${JSON.stringify(res.failures.trueCrosses.slice(0, 3))})`);
   ok(t.falseTicks === 0, `no provably wrong mutant is ticked (${t.falseTicks}: ${JSON.stringify(res.failures.falseTicks.slice(0, 3))})`);
   ok(t.trueTicks >= 600 * SEEDS.length / 2, `authored true lines are still ticked (${t.trueTicks})`);
+  // the probes of the new tick classes (solution lists, ± pairs, rounded values, labelled substitutions): built here, mutated one edit at a time
+  ok(res.probe.mutants >= 500 && res.probe.trueLines >= 150, `the probes are not trivial (${res.probe.trueLines} true lines, ${res.probe.mutants} mutants)`);
+  ok(res.probe.falseTicks === 0, `no probe mutant is ticked (${res.probe.falseTicks})`);
+  for (const k of ['solution-list', 'plus-minus', 'rounded', 'rounded-operand', 'substitution']) ok(res.probe.byClass[k] && res.probe.byClass[k].falseTicks === 0 && res.probe.byClass[k].mutants > 0, `probe class ${k}: mutants ran and none was ticked`);
+  ok(res.probe.trueTicked >= 0.9 * (res.probe.trueLines - (res.probe.trueCrossed || 0)), `probe true lines are ticked (${res.probe.trueTicked} of ${res.probe.trueLines}, ${res.probe.trueCrossed || 0} crossed by the topic check before this pass)`);
 }
 
 // ── the author bank ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -266,7 +353,9 @@ let corpusFalse = 0, corpusCross = 0, corpusFalseTicked = 0, corpusCrossed = 0, 
   await pack.ensureQbank({ ...process.env, PRI_EDITION: 'prithagoras' }, { strict: true });
   const q = markerView(pack.qbankEntryQuestion('A11-F1-172', 17));
   const mark = (working, answer = '4') => MARKER_OPS.practice({ q, answer, working, evidenceIfWrong: true, policy: { methodMarks: true } }, () => {});
-  const rows = (working, answer) => mark(working, answer).evidence.stepReport.lines;
+  // the page the student sees (the rejection ticks are DISPLAY ONLY, markerOps `shownReport`); `deterministic` is the report the marks read
+  const rows = (working, answer) => { const e = mark(working, answer).evidence; return (e.shownReport || e.stepReport).lines; };
+  const deterministic = (working, answer) => mark(working, answer).evidence.stepReport.lines;
   const live = rows('x^2-3x-4=0\nx=-1\nx=4');
   ok(live.map(l => l.status).join() === 'ok,note,ok', `the live page: the squared equation ticked, x = -1 a note, x = 4 ticked (${live.map(l => l.status)})`);
   ok(/candidate/.test(live[1].note) && !/false/.test(live[1].note) && live[2].note == null, `x = -1 is called a candidate; the stray note on x = 4 is gone (${live[1].note} | ${live[2].note})`);
@@ -275,6 +364,7 @@ let corpusFalse = 0, corpusCross = 0, corpusFalseTicked = 0, corpusCrossed = 0, 
   for (const reject of ['reject x=-1', 'x=-1 does not satisfy', 'x ≠ -1', 'x = -1 is extraneous', 'x = -1 (rejected)', 'x=-1 fails', 'x = -1 is not a solution', '-1 is rejected', 'x = -1 is rejected']) {
     const r = rows(`x^2-3x-4=0\nx=-1\n${reject}\nx=4`);
     ok(r[2].status === 'ok' && r[1].status === 'note' && r[3].status === 'ok', `"${reject}" is ticked after the candidate, the candidate stays a note, x = 4 is ticked (${r.map(l => l.status)})`);
+    ok(deterministic(`x^2-3x-4=0\nx=-1\n${reject}\nx=4`)[2].status !== 'ok', `"${reject}" is NOT ticked in the deterministic report that pays`);
     if (!reject.includes('≠')) ok(rows(`x^2-3x-4=0\n${reject}\nx=4`)[1].status === 'ok', `"${reject}" is ticked straight after the squared equation`);
   }
   // a value that is a root of neither is never a candidate and never ticked, as a root or as a rejection; a real solution is never rejected
