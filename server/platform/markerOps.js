@@ -52,7 +52,22 @@ export const markerView = q => (q && typeof q._bank === 'string' && typeof q._fa
  * India's questions carry none of the three and are read exactly as before.
  */
 export const candidateRoots = q => !!q && (q._marking === 'final-answer-only' || typeof q._methodScheme === 'string' || typeof q._bank === 'string');
-const stepOptions = q => (candidateRoots(q) ? { prompt: q.prompt, candidates: true } : { prompt: q.prompt });
+/** The equations the question's own worked solution writes (plain text): what a derived line of the page may be a multiple of. */
+function authoredEquations(q) {
+  const out = [];
+  try {
+    for (const st of Array.isArray(q?.steps) ? q.steps.slice(0, 20) : []) {
+      for (const m of String(st?.d ?? '').replace(/\\\$/g, '\u0001').matchAll(/\$([^$]+)\$/g)) {
+        for (const part of m[1].split(/\\(?:Rightarrow|Longrightarrow|therefore|implies)/)) {
+          let plain = null; try { plain = SOLUTION_INTERNALS.spanToPlain(part); } catch { plain = null; }
+          if (plain && plain.includes('=') && plain.length < 140) out.push(plain.trim());
+        }
+      }
+    }
+  } catch { /* none */ }
+  return out;
+}
+const stepOptions = q => (candidateRoots(q) ? { prompt: q.prompt, candidates: true, authored: authoredEquations(q) } : { prompt: q.prompt });
 
 export function stepMetaFor(q) {
   q = markerView(q);
@@ -389,7 +404,7 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
       const letter = /^([a-z])\s*=$/i.exec(String(q.answerPrefix || '').trim());
       const keyed = q.answerType === 'numeric' && Number.isFinite(q.answer?.value) ? [q.answer.value] : q.answerType === 'set' && Array.isArray(q.answer?.values) && q.answer.values.every(Number.isFinite) ? q.answer.values : null;
       const candMeta = lead?.kind === 'equation' ? lead : (keyed ? { kind: 'equation', ...(letter ? { variable: letter[1] } : {}), solutions: keyed, ...(q.answer?.tol > 0 ? { tol: q.answer.tol } : {}) } : null);
-      if (candMeta) report = tickRejections(candMeta, report);
+      if (candMeta) report = tickRejections(candMeta, report, { authored: authoredEquations(q), prompt: q.prompt });
     }
   } catch { /* the report stands */ }
   // A scheme question (schemeAward.js) also learns which lines the topic check ITSELF verified: the page ticks more than that (a copied

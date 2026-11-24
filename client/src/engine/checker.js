@@ -2824,7 +2824,18 @@ function notClaims(meta, workingText, options, report, run) {
 // alone (giving both roots as the answer is still wrong): this pass only reads the lines. Only when `options.candidates` is set
 // (the Prithagoras marker); every other caller reads the page exactly as before.
 const CANDIDATE_NOTE = (text, several) => `${several ? 'A value on this line' : text} solves the line above without solving the original equation: squaring, clearing a fraction or taking a logarithm can add a value the original does not have. It is only a candidate: put it in the original equation, and reject it if it fails.`;
-const REJECT_WORDS = /\b(?:rejected?|rejecting|discard(?:ed)?|ignored?|extraneous|invalid|inadmissible|excluded?|not\s+(?:a\s+)?(?:valid\s+)?(?:solution|root|allowed)|no\s+good|(?:does(?:\s*n[o']t|\s+not)|do(?:\s*n[o']t|\s+not)|is(?:\s*n[o']t|\s+not))\s+(?:satisfy|work|solve|hold|fit)|fails?|failed|false|wrong|✗|×)/i;
+// A rejection is read only in a CLOSED list of plain forms. Any negation or contrast word left in the line (`is not rejected`, `does not fail`,
+// `but it works`, `valid`) makes it a note: a line that may say the opposite is never ticked.
+const REJECT_PHRASES = /does\s*n[o'’]t\s+satisfy|do\s*n[o'’]t\s+satisfy|not\s+a\s+(?:valid\s+)?(?:solution|root)|not\s+valid/gi;
+const REJECT_WORDS = /\b(?:rejected?|rejecting|extraneous|invalid|fails?)\b/i;
+const REJECT_BLOCK = /\b(?:not|no|never|neither|nor|but|however|although|though|yet|still|works?|valid|correct|true|right|satisf\w*|solutions?|roots?|actually|unless|if)\b|n[’']t/i;
+function plainRejection(tail) {
+  const t = String(tail).toLowerCase();
+  const phrases = t.match(REJECT_PHRASES);
+  const rest = t.replace(REJECT_PHRASES, ' ');
+  if (!phrases && !REJECT_WORDS.test(rest)) return false;
+  return !REJECT_BLOCK.test(rest);
+}
 function candidateValue(text) {
   try { const v = parseNumericInput(String(text).trim().replace(/^[(\[]|[)\]]$/g, '').trim()).value; return Number.isFinite(v) ? v : null; } catch { return null; }
 }
@@ -2850,14 +2861,63 @@ function namedRoots(line, meta) {
   }
   return values.length ? { values, parts: parts.length } : null;
 }
+/** The unknown stands in an exponent or an exponential/logarithmic function: both sides can underflow to nothing far out on the number line. */
+function growsOrDecays(node) {
+  if (!node || typeof node !== 'object') return false;
+  if (node.t === 'bin' && node.op === '^' && variablesOf(node.r).size > 0) return true;
+  if (node.t === 'call' && /^(?:exp|ln|log)/i.test(String(node.fn ?? node.name ?? ''))) return true;
+  return ['l', 'r', 'v', 'arg'].some(k => growsOrDecays(node[k])) || (Array.isArray(node.args) && node.args.some(growsOrDecays));
+}
+/**
+ * Do the two sides of a line agree at r? A RELATIVE test with no absolute floor: at a large negative x both sides of `5^(2x-1) = 5^(3x-6)`
+ * are about 0 and an absolute tolerance calls every such x a root. Two exact zeros agree; a side that is zero beside float noise agrees only
+ * where no side grows or decays with the unknown.
+ */
 function holdsAtRoot(ast, variable, r) {
   try {
     const L = evaluate(ast.l, { [variable]: r }), R = evaluate(ast.r, { [variable]: r });
-    return Number.isFinite(L) && Number.isFinite(R) && Math.abs(L - R) <= Math.max(1e-6, Math.abs(L), Math.abs(R)) * 1e-6;
+    if (!Number.isFinite(L) || !Number.isFinite(R)) return false;
+    const m = Math.max(Math.abs(L), Math.abs(R));
+    if (m === 0) return !growsOrDecays(ast.l) && !growsOrDecays(ast.r);
+    if (Math.abs(L - R) <= 1e-9 * m) return !(m < 1e-300);
+    if (Math.abs(L - R) <= 1e-6 * m && m >= 1e-3) return true;
+    if (m < 1e-12 && (L === 0 || R === 0) && !growsOrDecays(ast.l) && !growsOrDecays(ast.r)) return true;
+    return false;
   } catch { return false; }
 }
 /** Is r a root of an earlier, uncrossed line of the page that also holds at every solution of the question (a line derived from it)? */
-function derivedRootSupport(meta, rows, before, r) {
+const PROBES = [0.37, 1.3, 2.9, 5.1, 3.3, 7.7, -0.6, -2.3];
+function proportional(f, g) {
+  let ratio = null, n = 0;
+  for (const p of PROBES) {
+    let a, b; try { a = f(p); b = g(p); } catch { continue; }
+    if (!Number.isFinite(a) || !Number.isFinite(b) || Math.abs(b) < 1e-9) continue;
+    const q = a / b;
+    if (ratio === null) ratio = q; else if (Math.abs(q - ratio) > 1e-6 * Math.max(1, Math.abs(ratio))) return false;
+    n++;
+  }
+  return n >= 3 && Math.abs(ratio) > 1e-12;
+}
+/** Is this equation line the authored derived equation (a multiple of it), or the question's own equation squared (or the question's, multiplied through)? */
+function reachedByDerivedStep(meta, ast, ctx) {
+  if (!ctx) return false;
+  const v = meta.variable;
+  const diff = a => x => evaluate(a.l, { [v]: x }) - evaluate(a.r, { [v]: x });
+  const f = diff(ast);
+  try {
+    for (const text of Array.isArray(ctx.authored) ? ctx.authored.slice(0, 30) : []) {
+      let a; try { a = parse(normalize(text)); } catch { continue; }
+      if (a && a.t === 'equation' && proportional(f, diff(a))) return true;
+    }
+    for (const claim of questionClaims(meta, ctx.prompt || '')) {
+      if (claim.kind !== 'equation') continue;
+      const A = claim.ast.l, B = claim.ast.r;
+      if (proportional(f, x => evaluate(A, { [v]: x }) ** 2 - evaluate(B, { [v]: x }) ** 2)) return true;
+    }
+  } catch { /* not derived */ }
+  return false;
+}
+function derivedRootSupport(meta, rows, before, r, ctx = null) {
   const wanted = uniqueNumeric(meta.solutions);
   for (let k = 0; k < before; k++) {
     const row = rows[k];
@@ -2866,6 +2926,8 @@ function derivedRootSupport(meta, rows, before, r) {
     try { ast = parse(normalize(String(row.text).replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore)\s+/i, ''))); } catch { continue; }
     if (!ast || ast.t !== 'equation' || ![...variablesOf(ast)].includes(meta.variable)) continue;
     if (!wanted.every(w => holdsAtRoot(ast, meta.variable, w))) continue;
+    // a line the page could not judge is no evidence of a non-reversible step: it must be ticked, or be the authored derived equation or the question squared
+    if (row.status !== 'ok' && !reachedByDerivedStep(meta, ast, ctx)) continue;
     // an identity (`3x³ + … = 3(x+6)²(x−6)`, true for every value) has every number as a root and supports none
     try { if (exprEquivalent(ast.l, ast.r) === true) continue; } catch { /* not decided: the probes below */ }
     if ([0.37, -1.3, 2.9, 5.1, -4.7].filter(p => holdsAtRoot(ast, meta.variable, p)).length >= 3) continue;
@@ -2875,27 +2937,32 @@ function derivedRootSupport(meta, rows, before, r) {
 }
 const isSolution = (meta, r) => uniqueNumeric(meta.solutions).some(w => numsClose(r, w, Math.max(1e-7, Number(meta.tol) > 0 ? Number(meta.tol) : 0)));
 /** The candidate this crossed line is, or null: every value it names is a solution or a root of a derived line above, and one is not a solution. */
-function candidateLine(meta, rows, at) {
+function candidateLine(meta, rows, at, ctx = null) {
   const named = namedRoots(rows[at].text, meta);
   if (!named) return null;
   let candidate = false;
   for (const r of named.values) {
     if (isSolution(meta, r)) continue;
-    if (!derivedRootSupport(meta, rows, at, r)) return null;
+    if (!derivedRootSupport(meta, rows, at, r, ctx)) return null;
     candidate = true;
   }
   return candidate ? named : null;
 }
-/** The value a line REJECTS (`reject x = -1`, `x = -1 does not satisfy`, `x ≠ -1`, `-1 is extraneous`), or null. */
-function rejectedValue(line, meta) {
-  const src = String(line || '').trim().replace(/[−–—]/g, '-').replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore)\s+/i, '').replace(/[.;]$/, '').trim();
+/** The value a line REJECTS (`reject x = -1`, `x = -1 does not satisfy`, `x ≠ -1` directly after the candidate, `-1 is extraneous`), or null. */
+function rejectedValue(line, meta, previous = null) {
+  const src = String(line || '').trim().replace(/[−–—]/g, '-').replace(/^∴\s*/, '').replace(/^(so|hence)\s+/i, '').replace(/[.;]$/, '').trim();
   if (!src || src.length > 90) return null;
   const variable = String(meta.variable).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const num = '(-?\\s*[0-9][0-9./]*|-?\\s*\\(\\s*-?[0-9./]+\\s*\\)|-?\\s*\\(\\s*-?[0-9]+\\s*/\\s*[0-9]+\\s*\\))';
   let m;
-  if ((m = new RegExp(`^${variable}\\s*(?:≠|!=|=/=|\\\\ne)\\s*${num}$`, 'i').exec(src))) return candidateValue(m[1].replace(/\s+/g, ''));
-  if ((m = new RegExp(`^(?:reject(?:ing)?|discard|ignore|exclude|cross\\s+out|not)\\s+(?:${variable}\\s*=\\s*)?${num}$`, 'i').exec(src))) return candidateValue(m[1].replace(/\s+/g, ''));
-  if ((m = new RegExp(`^(?:${variable}\\s*=\\s*)?${num}\\s*(?:\\(|,|:|-)?\\s*(?:is\\s+|are\\s+)?([a-z'’ ✗×]+)\\)?$`, 'i').exec(src)) && REJECT_WORDS.test(m[2]) && !/\b(?:true|correct|valid\s+solution|satisf(?:ies|y))\b/i.test(m[2].replace(/does\s*n[o']t\s+satisfy|do\s*n[o']t\s+satisfy|not\s+satisfy/gi, ''))) return candidateValue(m[1].replace(/\s+/g, ''));
+  if ((m = new RegExp(`^${variable}\\s*(?:≠|\\\\ne)\\s*${num}$`, 'i').exec(src))) {
+    // the symbol alone is read only directly after a line that names the same value as a candidate
+    const v = candidateValue(m[1].replace(/\s+/g, ''));
+    const before = previous ? namedRoots(previous.text, meta) : null;
+    return v !== null && before && before.values.some(x => numsClose(x, v, 1e-9)) ? v : null;
+  }
+  if ((m = new RegExp(`^reject(?:ing)?\\s+(?:${variable}\\s*=\\s*)?${num}$`, 'i').exec(src))) return candidateValue(m[1].replace(/\s+/g, ''));
+  if ((m = new RegExp(`^(?:${variable}\\s*=\\s*)?${num}\\s*(?:\\(|,|:|-)?\\s*(?:is\\s+|are\\s+)?([a-z'’ ]+)\\)?$`, 'i').exec(src)) && plainRejection(m[2])) return candidateValue(m[1].replace(/\s+/g, ''));
   return null;
 }
 /**
@@ -2903,7 +2970,7 @@ function rejectedValue(line, meta) {
  * feedback only: it is added to the page after every mark is computed, so no mark or step of a scheme reads it. A rejection of a value that is a
  * solution, or that no line above has as a root, is left exactly as it was.
  */
-export function tickRejections(meta, report) {
+export function tickRejections(meta, report, ctx = null) {
   try {
     if (meta?.kind !== 'equation' || !Array.isArray(meta.solutions) || !meta.solutions.length || !report || !Array.isArray(report.lines)) return report;
     let changed = false;
@@ -2912,8 +2979,8 @@ export function tickRejections(meta, report) {
       // a question with no unknown named by its step check: the letter the rejecting line names
       const named = meta.variable ? meta : (() => { const m = /^(?:so\s+|hence\s+)?(?:reject(?:ing)?\s+|discard\s+|not\s+)?([a-z])\s*(?:=|≠)/i.exec(String(row.text || '').trim()); return m ? { ...meta, variable: m[1] } : null; })();
       if (!named) return row;
-      const r = rejectedValue(row.text, named);
-      if (r === null || isSolution(named, r) || !derivedRootSupport(named, report.lines, i, r)) return row;
+      const r = rejectedValue(row.text, named, report.lines[i - 1] || null);
+      if (r === null || isSolution(named, r) || !derivedRootSupport(named, report.lines, i, r, ctx)) return row;
       changed = true;
       const { unverified: _u, unread: _r, incomplete: _i, ...rest } = row;
       return { ...rest, status: 'ok', state: 'verified', note: `Correct: ${named.variable} = ${fmtRootText(r)} solves the line above but not the original equation, so it is rejected.`, rejection: true };
@@ -2934,7 +3001,7 @@ function withCandidates(meta, workingText, options, run) {
     for (let round = 0; round < 6; round++) {
       const at = current.lines.findIndex(l => l?.status === 'break');
       if (at < 0) break;
-      const named = candidateLine(meta, current.lines, at);
+      const named = candidateLine(meta, current.lines, at, { authored: options.authored, prompt: options.prompt });
       if (!named) break;
       removed.set(keep[at], named);
       keep = keep.filter((_, k) => k !== at);

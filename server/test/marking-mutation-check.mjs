@@ -250,11 +250,11 @@ let corpusFalse = 0, corpusCross = 0, corpusFalseTicked = 0, corpusCrossed = 0, 
 {
   const B = await run({ bank: true, maxPerLine: 6 });
   const t = B.totals;
-  console.log(`MARKING MUTATION BANK COUNTS: ${t.pages} authored pages, ${t.lines} authored lines, ${t.mutants} mutants, false ticks ${t.falseTicks}, true crosses ${t.trueCrosses}, authored ticks ${t.trueTicks}, extraneous-root pages ${t.variantPages} (${t.variantLines} lines, crossed ${t.variantCrosses}), rejections ${t.rejectLines} (ticked ${t.rejectTicked}), false variants ${t.variantMutants} (ticked ${t.variantFalseTicks}), inserted true lines ${t.insertedTrue || 0}`);
+  console.log(`MARKING MUTATION BANK COUNTS: ${t.pages} authored pages, ${t.lines} authored lines, ${t.mutants} mutants, false ticks ${t.falseTicks}, true crosses ${t.trueCrosses}, authored ticks ${t.trueTicks}, extraneous-root pages ${t.variantPages} (${t.variantLines} lines, crossed ${t.variantCrosses}), rejections ${t.rejectLines} (ticked ${t.rejectTicked}), false variants ${t.variantMutants} (ticked ${t.variantFalseTicks}), far-out roots of nothing ${t.largeRoots || 0} (crossed ${t.largeRootsCrossed || 0}, as on origin/main), inserted true lines ${t.insertedTrue || 0}`);
   ok(t.pages >= 700 && t.mutants >= 9000, `the bank sample is not trivial (${t.pages} pages, ${t.mutants} mutants)`);
   ok(t.trueCrosses === 0, `no authored bank line and no line of an extraneous-root page is crossed (${t.trueCrosses}: ${JSON.stringify(B.failures.trueCrosses.slice(0, 3))})`);
   ok(t.falseTicks === 0, `no provably wrong bank mutant is ticked (${t.falseTicks}: ${JSON.stringify(B.failures.falseTicks.slice(0, 3))})`);
-  ok(t.variantPages >= 500 && t.variantMutants >= 60, `the extraneous-root sample is not trivial (${t.variantPages} pages, ${t.variantMutants} false variants)`);
+  ok(t.variantPages >= 500 && t.variantMutants >= 900, `the extraneous-root sample is not trivial (${t.variantPages} pages, ${t.variantMutants} false variants)`);
   ok(t.rejectLines >= 150 && t.rejectTicked === t.rejectLines, `every rejection of a candidate root is ticked (${t.rejectTicked} of ${t.rejectLines})`);
   ok(t.trueTicks >= 1600, `authored bank lines are still ticked (${t.trueTicks})`);
 }
@@ -275,12 +275,33 @@ let corpusFalse = 0, corpusCross = 0, corpusFalseTicked = 0, corpusCrossed = 0, 
   for (const reject of ['reject x=-1', 'x=-1 does not satisfy', 'x ≠ -1', 'x = -1 is extraneous', 'x = -1 (rejected)', 'x=-1 fails', 'x = -1 is not a solution', '-1 is rejected', 'x = -1 is rejected']) {
     const r = rows(`x^2-3x-4=0\nx=-1\n${reject}\nx=4`);
     ok(r[2].status === 'ok' && r[1].status === 'note' && r[3].status === 'ok', `"${reject}" is ticked after the candidate, the candidate stays a note, x = 4 is ticked (${r.map(l => l.status)})`);
-    ok(rows(`x^2-3x-4=0\n${reject}\nx=4`)[1].status === 'ok', `"${reject}" is ticked straight after the squared equation`);
+    if (!reject.includes('≠')) ok(rows(`x^2-3x-4=0\n${reject}\nx=4`)[1].status === 'ok', `"${reject}" is ticked straight after the squared equation`);
   }
   // a value that is a root of neither is never a candidate and never ticked, as a root or as a rejection; a real solution is never rejected
   ok(rows('x^2-3x-4=0\nx=7')[1].status === 'break', 'x = 7 (a root of nothing) is crossed');
   for (const w of ['reject x=7', 'x ≠ 7', 'x=7 does not satisfy', 'reject x=4', 'x ≠ 4', 'x = 4 is extraneous']) ok(rows(`x^2-3x-4=0\n${w}`)[1].status !== 'ok', `"${w}" is not ticked`);
   ok(rows('x^2-3x-4=0\nx=-1\nx=7')[2].status !== 'ok', 'x = 7 after the candidate is not ticked');
+  // (review of 25 Nov) a value far out on the number line is a root of nothing on an exponential equation: crossed, never a candidate, never rejected as one
+  {
+    const qe = markerView(pack.qbankEntryQuestion('A11-E1-140', 17));
+    const re = w => MARKER_OPS.practice({ q: qe, answer: '99991', working: w, evidenceIfWrong: true, policy: { methodMarks: true } }, () => {}).evidence.stepReport.lines;
+    ok(re('5^(2x-1)=5^(3x-6)\nx=-12')[1].status === 'break', 'A11-E1-140: x = -12 is crossed, as on main');
+    for (const w of ['reject x=-12', 'x ≠ -30', 'x = -12 is extraneous', 'x=-30 does not satisfy']) ok(re(`5^(2x-1)=5^(3x-6)\n${w}`)[1].status !== 'ok', `A11-E1-140: "${w}" is not ticked`);
+    ok(re('5^(2x-1)=5^(3x-6)\nx=-30\nx ≠ -30')[2].status !== 'ok', 'A11-E1-140: x ≠ -30 after x = -30 is not ticked');
+    for (const id of ['A11-E1-028', 'A11-E1-073']) {
+      const qx = markerView(pack.qbankEntryQuestion(id, 17));
+      let crossed = 0, n = 0;
+      for (let x = -40; x <= -13; x++) { n++; const r = MARKER_OPS.practice({ q: qx, answer: '99991', working: `9^x=27^(x-1)\nx=${x}`, evidenceIfWrong: true, policy: { methodMarks: true } }, () => {}).evidence.stepReport.lines; if (r[1].status === 'break') crossed++; }
+      ok(crossed === n, `${id}: x = -40 ... -13 are each crossed (${crossed} of ${n})`);
+    }
+  }
+  // a rejection that says the opposite is never ticked
+  for (const neg of ['x=-1 is not rejected', 'x=-1 is not extraneous', 'x=-1 does not fail', 'x=-1 is not wrong', 'x=-1 is not false', 'x=-1 is NOT rejected', 'x=-1 does not satisfy but works', 'x=-1 is rejected but it works', 'x=-1 is valid']) {
+    ok(rows(`x^2-3x-4=0\nx=-1\n${neg}\nx=4`)[2].status !== 'ok', `"${neg}" is not ticked`);
+  }
+  ok(rows('x^2-3x-4=0\nx ≠ -1')[1].status !== 'ok', 'the symbol alone is not read as a rejection unless it directly follows the candidate');
+  // a root of a line the page could not judge is no candidate: crossed as on main
+  ok(rows('(x-4)(x+7)=0\nx=-7\nx=4')[1].status === 'break', '(x-4)(x+7) = 0 does not make x = -7 a candidate: it is crossed, as on main');
   // the final answer is the answer check's alone: both roots as the answer is still wrong; the candidate alone is wrong; 4 is right
   ok(mark('x^2-3x-4=0\nx=-1\nx=4', '-1, 4').result.correct === false && mark('x^2-3x-4=0\nx=-1', '-1').result.correct === false && mark('x^2-3x-4=0\nx=4', '4').result.correct === true, 'the answer mark is unchanged: -1, 4 and -1 are wrong, 4 is right');
   // India reads a page as it did: a question not sealed by the Australian edition has no candidate reading

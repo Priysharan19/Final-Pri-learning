@@ -613,6 +613,25 @@ export async function run({ root = path.resolve(path.dirname(fileURLToPath(impor
           if (pg.kinds[i] === 'reject') { totals.rejectLines++; if (l.status === 'ok') totals.rejectTicked++; else if (failures.rejectUnticked.length < 60) failures.rejectUnticked.push({ ...cell, text, page: pg.name, status: l.status, note: l.note }); }
         });
       }
+      // A value far out on the number line is a root of nothing, on an exponential or logarithmic equation too (both sides of `5^(2x-1) = 5^(3x-6)`
+      // are about 0 there and an absolute tolerance would call every such x a root): crossed as it always was, never a candidate, never rejected as one.
+      if (facts) {
+        const head = facts.prefix.slice(0, 8);
+        const known0 = [...facts.S, ...facts.E];
+        for (const w of [-12, -25, -40]) {
+          if (known0.some(k => Math.abs(k - w) < 0.01)) continue;
+          const pages = [['root-of-nothing-large', `${facts.v} = ${w}`], ['reject-of-nothing-large', `reject ${facts.v} = ${w}`], ['not-a-solution-of-nothing-large', `${facts.v} = ${w} is not a solution`]];
+          for (const [kind, text] of pages) {
+            const lines2 = [...head, text];
+            const rep = markPage(E, q, typedAnswer(q, 'right', lines2), lines2);
+            if (!rep) continue;
+            totals.variantMutants++;
+            const l = lineAt(rep, lines2, head.length);
+            if (l && l.status === 'ok') { totals.variantFalseTicks++; totals.falseTicks++; failures.falseTicks.push({ ...cell, line: head.length, kind, authored: '(variant)', mutant: text, note: l.note }); }
+            if (kind === 'root-of-nothing-large') { totals.largeRoots = (totals.largeRoots || 0) + 1; if (l && l.status === 'break') totals.largeRootsCrossed = (totals.largeRootsCrossed || 0) + 1; }
+          }
+        }
+      }
       if (facts && facts.E.length) {
         const known = [...facts.S, ...facts.E];
         const wrongValue = e => [e + 7, e - 7, e * 3 + 11, e + 0.5 * 9].find(v => known.every(k => Math.abs(k - v) > 0.01) && Number.isInteger(v)) ?? null;
@@ -624,6 +643,14 @@ export async function run({ root = path.resolve(path.dirname(fileURLToPath(impor
           mutantPages.push({ kind: 'reject-of-nothing', at: head.length, lines: [...head, `reject ${facts.v} = ${w}`] });
           mutantPages.push({ kind: 'neq-of-nothing', at: head.length, lines: [...head, `${facts.v} ≠ ${w}`] });
           mutantPages.push({ kind: 'root-of-nothing-after-candidate', at: head.length + 1, lines: [...head, `${facts.v} = ${VARIANTS.asText(VARIANTS.cleanOf(e))}`, `${facts.v} = ${w}`] });
+        }
+        // a rejection that says the opposite is never ticked
+        for (const e of facts.E) {
+          const head = facts.prefix.slice(0, 8), t = `${facts.v} = ${VARIANTS.asText(VARIANTS.cleanOf(e))}`;
+          for (const neg of ['is not rejected', 'is not extraneous', 'does not fail', 'is not wrong', 'is not false', 'is NOT rejected', 'does not satisfy but works', 'is not invalid', 'is valid', 'works', 'is rejected but it works']) {
+            mutantPages.push({ kind: 'negated-rejection', at: head.length + 1, lines: [...head, t, `${t} ${neg}`] });
+          }
+          mutantPages.push({ kind: 'negated-rejection', at: head.length + 1, lines: [...head, t, `not rejecting ${t}`] });
         }
         for (const sv of facts.S) {
           const head = facts.prefix.slice(0, 8);

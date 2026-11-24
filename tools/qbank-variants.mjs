@@ -78,6 +78,12 @@ export function variantPages(facts) {
     pages.push(P('candidates-or', [[all.map(([r]) => `${v} = ${shown(r)}`).join(' or '), 'candidates']]));
     for (const style of ['reject', 'does-not-satisfy', 'neq', 'not-a-solution', 'extraneous', 'bracket', 'fails']) {
       const rej = e => ({ reject: `reject ${v} = ${shown(e)}`, 'does-not-satisfy': `${v} = ${shown(e)} does not satisfy the equation`, neq: `${v} ≠ ${shown(e)}`, bracket: `${v} = ${shown(e)} (rejected)`, fails: `${v} = ${shown(e)} fails`, 'not-a-solution': `${v} = ${shown(e)} is not a solution`, extraneous: `${v} = ${shown(e)} is extraneous` })[style];
+      if (style === 'neq') {
+        // the symbol is read only directly after the candidate it names
+        pages.push(P(`candidates-then-${style}`, [...all.flatMap(([r, k]) => (k === 'candidate' ? [eq(r, k), [rej(r), 'reject']] : [eq(r, k)]))]));
+        pages.push(P(`candidate-reject-${style}`, [...E.flatMap(e => [eq(e, 'candidate'), [rej(e), 'reject']]), ...S.map(s => eq(s, 'solution'))]));
+        continue;
+      }
       pages.push(P(`candidates-then-${style}`, [...all.map(([r, k]) => eq(r, k)), ...E.map(e => [rej(e), 'reject']), ...S.map(s => eq(s, 'solution'))]));
       pages.push(P(`candidate-reject-${style}`, [...E.map(e => eq(e, 'candidate')), ...E.map(e => [rej(e), 'reject']), ...S.map(s => eq(s, 'solution'))]));
     }
