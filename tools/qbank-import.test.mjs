@@ -229,6 +229,8 @@ fs.rmSync(t2, { recursive: true, force: true });
     [num(10), '2b = 20.', true, 'a one-line linear equation whose solution is the answer'],
     [num(0.3183098861837907), 'Divide 100 by 100\u03c0.', true, 'a division that gives the answer'],
     [num(21), 'Choose 2 from the other 7.', false, 'a method with small counts is kept'],
+    [num(15660.19), 'Multiply by 0.85 each year.', false, 'a factor named in words is a method'],
+    [num(14023.73), '78 periods.', false, 'a count named in words is a method'],
     [num(7), 'Complement.', false, 'a one word method name'],
     [num(7), 'Use the complement.', false, 'a method name'],
     [num(7), 'Cosine rule.', false, 'a method name'],

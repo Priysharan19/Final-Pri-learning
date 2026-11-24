@@ -423,22 +423,31 @@ function lastStepLeak(q, ctx, t, spans, prose) {
   const stated = new Set([...String(q.prompt ?? '').matchAll(/(?<![\w.^_])(\d+(?:\.\d+)?)(?![\w.^_])/g)].map(m => Number(m[1])));
   const lastAll = [...lastPlain.matchAll(/(?<![\w.^_])(\d+(?:\.\d+)?)(?![\w^_]|\.\d)/g)].map(m => Number(m[1])).filter(v => v !== 0);
   const lastNums = lastAll.filter(v => !stated.has(v));
-  const lastSides = lastPlain.split(/=|\u21d2|\u2248/).map(fold).filter(x => x.length >= 2);
+  // The result of the last worked step is its final side. A rung that STATES it (an equation or a percentage with that value on its right) is a leak;
+  // one that only mentions a factor or a count in words ("multiply by 0.85 each year", "78 periods") or sets a substitution up ("let u = sin x") is a method.
+  const lastFinal = fold(lastPlain.split(/=|\u21d2|\u2248/).pop());
+  const setsUp = /^\s*(?:let|set|write|rewrite|use|substitute|define|put|take)\b/i.test(prose.trim()) || /^\s*(?:let|set|write|rewrite|use)\b/i.test(t);
   const rungSides = [];
   for (const sp of spans) rungSides.push(...texToPlain(sp).plain.split(/=/));
-  rungSides.push(...(prose.includes('=') ? prose.split(/=/) : []));
-  for (const side of rungSides) {
-    const f = fold(side);
-    if (f.length >= 2 && lastSides.includes(f) && !(/^\d+(?:\.\d+)?$/.test(f) && stated.has(Number(f)))) return `a side of it ("${side.trim().slice(0, 30)}") is a result of the last worked step`;
+  const eqSides = prose.includes('=') ? prose.split(/=/) : [];
+  rungSides.push(...eqSides);
+  const hasEq = rungSides.length > spans.length || spans.some(sp => sp.includes('=')) || eqSides.length > 0;
+  if (hasEq && !setsUp) {
+    const finals = [];
+    for (const sp of spans) if (sp.includes('=')) finals.push(texToPlain(sp).plain.split(/=/).pop());
+    if (eqSides.length) finals.push(eqSides[eqSides.length - 1]);
+    for (const side of finals) {
+      const f = fold(side);
+      if (f.length >= 2 && f === lastFinal && !(/^\d+(?:\.\d+)?$/.test(f) && stated.has(Number(f)))) return `its right side ("${side.trim().slice(0, 30)}") is the result of the last worked step`;
+    }
   }
   const closed = [];
   for (const side of rungSides.concat(proseRuns(prose))) { const v = numberOf(String(side).replace(/%/g, '').replace(/[.,;:\s]+$/, '')); if (typeof v === 'number' && v !== 0) closed.push(v); }
-  for (const m of prose.matchAll(/(\d+(?:\.\d+)?)\s*%/g)) closed.push(Number(m[1]), Number(m[1]) / 100);
+  const pct = [...prose.matchAll(/(\d+(?:\.\d+)?)\s*%/g)].map(m => Number(m[1]));
   const smallWhole = v => Number.isInteger(v) && Math.abs(v) < 10;       // a stated small count is a method ("choose 2 from the other 7"), not a result
-  for (const v of closed) {
-    if (!smallWhole(v)) for (const n of lastNums) if (near(v, n)) return `it states ${+v.toFixed(6)}, a number of the last worked step`;
-    for (const n of lastAll) if (n > 0 && n < 1 && near(v, 1 - n)) return `it states ${+v.toFixed(6)}, the complement of a number of the last worked step`;
-  }
+  if (hasEq && !setsUp) for (const v of closed) if (!smallWhole(v)) for (const n of lastNums) if (near(v, n)) return `it states ${+v.toFixed(6)}, a number of the last worked step`;
+  for (const v of pct) for (const n of lastNums) if (near(v, n) || near(v, 100 - n)) return `it states ${v}%, a number of the last worked step`;
+  for (const v of closed) for (const n of lastAll) if (n > 0 && n < 1 && near(v, 1 - n)) return `it states ${+v.toFixed(6)}, the complement of a number of the last worked step`;
   return null;
 }
 
