@@ -183,7 +183,11 @@ function contextOf(q) {
   // A step is "only a value" when every one of its real-progress results is a label = number (t = 1, x = 33). Only then may a bare value reach it.
   const bareOnly = new Map();
   for (const e of entries) if (e.progress) bareOnly.set(e.step, (bareOnly.get(e.step) ?? true) && e.kind === 'label' && e.numeric);
-  return { sol, nums, pc, keys, answerStep, entries, values, opsByStep, bareOnly, source: sourceNumbersOf(q) };
+  // how many values of ONE letter a step lists (t = 9 or t = 10): a bare line for such a letter is a guess at one candidate, and never earns
+  const labelCount = new Map();
+  for (const l of sol.labelled) if (l.info && (l.info.vars || []).length === 0 && Number.isFinite(l.info.value)) { const k = `${l.step}|${l.label.name}`; labelCount.set(k, (labelCount.get(k) || 0) + 1); }
+  const authored = new Set(authoredLines(q).map(l => canon(l.text)));
+  return { sol, nums, pc, keys, answerStep, entries, values, opsByStep, bareOnly, labelCount, authored, source: sourceNumbersOf(q) };
 }
 
 /** The steps a ticked line reaches, as a Set of step indices of q.steps. Entry-level real-progress rules apply here. */
@@ -218,6 +222,7 @@ function stepsReached(line, ctx, prior = false) {
       reached.bare = true;
       const alone = ctx.entries.filter(e => e.step === hit.step && e.progress).length === 1;
       // the first step of the solution is the set-up (the rate, the ratio, the given read off): a bare value there needs a derived line before it
+      if ((ctx.labelCount.get(`${hit.step}|${labelOf(parts[0]).name}`) || 0) > 1) continue;
       if (!ctx.bareOnly.get(hit.step) || numericOf(parts[1]) === 0 || !((alone && hit.step !== ctx.keys[0]) || prior)) continue;
     }
     if (entry.kind === 'cond') { let own = null; try { own = conditionOf(parts); } catch { own = null; } if (!decisive(own)) continue; }
@@ -286,7 +291,7 @@ function singleTerm(side) {
   if (/^d\^?2?[a-z]\/d[a-z]\^?2?$/.test(t)) return true;
   let depth = 0;
   for (const c of t) { if (c === '(') depth++; else if (c === ')') depth--; else if (depth === 0 && '+-*/^'.includes(c)) return false; }
-  return /^[A-Za-z][A-Za-z0-9_']*(\(.*\))?$/.test(t);
+  return /^\p{L}[\p{L}0-9_']*(\(.*\))?$/u.test(t);
 }
 
 const ticked = l => l?.status === 'ok' && l.ecf !== true && l.given !== true && l.state !== 'given' && l.restates !== true;
@@ -297,6 +302,17 @@ const ticked = l => l?.status === 'ok' && l.ecf !== true && l.given !== true && 
  * back. So no line at or after the first such line may earn a key step. Ticked lines never stop the working; a note that restates the question
  * or has no number, no sign and no relation in it (a label, a few words) does not either. Proved by the sweep, class "an unverified wrong line".
  */
+const RELATION = /[=<>\u2264\u2265\u2260\u2248\u221d\u2208]|\b(?:equals?|is equal to|is greater than|is less than|greater than|less than|is more than|more than)\b/i;
+/**
+ * Does a line claim anything mathematical? Yes if it has a relation (= < > <= >= != ~ in, or the words equals / is equal to / is greater than / is less
+ * than), a digit, an operator between tokens (+ * / ^), or a function or letter applied to an argument (g(3), sin(2x)). `x equals seven` and `x > y` do.
+ * Pure prose ("so the answer is clear", "by the formula") and a lone symbol (y', theta) claim nothing.
+ */
+function claimsMaths(text) {
+  const t = String(text ?? '');
+  return RELATION.test(t) || /\d/.test(t) || /[+*/^]/.test(t) || /\b(?:[A-Za-z]|sin|cos|tan|ln|log|sqrt)\s*\(/.test(t);
+}
+
 function barrierOf(lines, limit, ctx) {
   for (let j = 0; j < limit; j++) {
     const l = lines[j];
@@ -304,8 +320,9 @@ function barrierOf(lines, limit, ctx) {
     const text = String(l.text ?? '').trim();
     const s = readStudent(text);
     if (s && !s.multi && s.parts.every(p => ctx.pc.has(canon(p)))) continue;   // the question restated
-    if (!/[=\d]/.test(text)) continue;                      // words or a bare label: nothing is claimed
-    if (/defines or labels something/.test(String(l.note ?? ''))) continue;   // the page itself reads it as a definition (u = 2x + 1, du = ...), not a claim
+    if (!claimsMaths(text)) continue;                       // pure prose, or a lone label: nothing is claimed
+    // a definition the page itself reads (u = 2x + 1, du = ...) stops nothing only if it IS the authored definition; a different one (u = 3x + 1) stops
+    if (/defines or labels something/.test(String(l.note ?? '')) && ctx.authored.has(canon(text))) continue;
     return j;
   }
   return limit;

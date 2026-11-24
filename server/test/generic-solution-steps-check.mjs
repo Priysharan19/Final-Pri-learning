@@ -159,6 +159,18 @@ const pay = (q, lines, answer, { env = ON_AU, list = LIST } = {}) => { const m =
   const mk = (gen, d, seed) => ({ ...G.generateQuestion(gen, d, seed), _methodScheme: GENERIC_ID });
   const cases = [['me11-rates', 4, 1, 'v=0', 'v = 0 alone (the set-up of solving)'], ['y11-functions-more', 4, 1, 'x = -6', 'x = -6 alone (the classic wrong answer to a domain of a composite)'], ['y11-functions-more', 4, 5, 'x = 4', 'x = 4 alone (same question shape)']];
   for (const [g, d, seed, line, say] of cases) ok(S.markPage(mk(g, d, seed), [line], '99991').marks === 0, `a bare line earns nothing: ${say}`);
+  // second review: digit-free claims, the zero set-up for any unknown, several candidate values
+  { const q = mk('y11-functions', 4, 1); const t = authoredLines(q).map(l => l.text);
+    for (const claim of ['x > y', 'x equals seven', 'a is greater than b']) ok(S.markPage(q, [claim, ...t], '99991').marks === 0, `a digit-free claim ("${claim}") stops the paying: the authored lines after it earn nothing`);
+    ok(S.markPage(q, ['x > y', 'g(3)=2(3)+4=10'], '99991').marks === 0, 'x > y then g(3) = 2(3) + 4 = 10 earns nothing');
+    ok(S.markPage(q, ['so the answer is clear', ...t], '99991').marks >= 1, 'pure prose does not stop it: the authored lines after "so the answer is clear" still earn'); }
+  { const q = mk('me12-trigeq', 2, 5); for (const l of ['tanθ=0', 'sinθ=0', 'cosθ=0']) ok(S.markPage(q, [l], '99991').marks === 0, `${l} alone earns nothing (the set-up of solving, for any unknown, Greek included)`); }
+  { const q = mk('me12-projectile-forms', 3, 1); ok(S.markPage(q, ['t=9'], '99991').marks === 0 && S.markPage(q, ['t=10'], '99991').marks === 0, 't = 9 (the wrong root for "second time") and t = 10 alone earn nothing: a step listing several values of one letter is not reached by a bare one'); }
+  { const its = await S.payableQuestions({ seeds: 12 });
+    const it = its.find(i => genericPlan(i.q).keySteps.length && authoredLines(i.q).some((l, k, all) => /^u=/.test(l.text.replace(/\s/g, '')) && k < all.length - 2 && genericPlan(i.q).keySteps.some(ks => all.findIndex(x => x.step === ks.step) > k)));
+    if (it) { const t = authoredLines(it.q).map(l => l.text); const iu = t.findIndex(x => /^u=/.test(x.replace(/\s/g, '')));
+      const wrong = t.map((x, i) => (i === iu ? S.falsify(x) : x)); const m = S.markPage(it.q, wrong, '99991'); const stop = m.lines.findIndex(l => l.status !== 'ok');
+      ok(stop < 0 || !(m.pay.items ?? []).some(i => i.awarded && i.key !== 'answer' && i.lines.some(n => n - 1 >= stop)), 'a wrong definition (the authored u = ... changed) stops the paying like any claim the page could not verify'); } else ok(false, 'a question with a substitution definition and a later key step is in the sample'); }
   // the stop rule: a wrong middle line the page can only note, then the authored lines
   const q = mk('y12-appdiff', 3, 1); const t = authoredLines(q).map(l => l.text);
   const bad = t.map((x, i) => (i === 1 ? S.falsify(x) : x));
@@ -185,6 +197,7 @@ ok(SW.payable >= 250 && SW.a.pages >= 250 && SW.b.pages >= 200 && SW.c.pages >= 
 ok(SW.violations.length === 0, `no violation of an invariant or of a "nothing" in (c) and (d): ${SW.violations.length}`);
 ok(SW.f.pages >= 300 && SW.f.overPages === 0 && SW.f.afterWrong === 0, `(f) one wrong middle line then the authored lines: ${SW.f.pages} pages, ${SW.f.overPages} above the ideal, ${SW.f.afterWrong} earned at or after the wrong line (tolerance 0)`);
 ok(SW.g.pages >= 150 && SW.g.overCredit === 0, `(g) a single bare line: ${SW.g.pages} pages, over-credit ${SW.g.overCredit} (tolerance 0); only a step whose one result it is earns (${SW.g.singleResult})`);
+ok(SW.j.pages >= 500 && SW.j.overCredit === 0, `(j) a digit-free claim first, then the authored lines: ${SW.j.pages} pages, over-credit ${SW.j.overCredit} (tolerance 0)`);
 ok(SW.i.pages >= 150 && SW.i.bareFirst <= 2, '(i) a true first line then words earns for a derived result, not for bare set-up');
 ok(SW.e.wrongFull === 0 && SW.e.overN === 0 && SW.e.correctNotFull === 0, '(e) a wrong or missing final answer never earns N; never above N; a correct one always N');
 ok(SW.e.unticked === 0 && SW.e.afterCross === 0 && SW.e.finalByLines === 0 && SW.e.tableNotMark === 0, '(e) every mark rests on a ticked line before the first crossed line; the answer mark is never earned by working; the table is the mark');

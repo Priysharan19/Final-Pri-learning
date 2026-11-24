@@ -90,6 +90,7 @@ export function stillTrue(a, b) {
     return true;
   } catch { return false; }
 }
+const DIGIT_FREE_CLAIMS = ['x > y', 'x equals seven', 'a is greater than b', 'x ≈ y'];
 const WORDS = ['so the answer is clear', 'by the formula', 'using the method above', 'we continue as before'];
 const NAMING = ['A = integral of f(x) dx', 'y = mx + c', 'dy/dx = gradient', 'a^2 + b^2 = c^2', 'the area is found by integrating'];
 const OUTSIDE = ['211 + 307 = 518', '401 * 3 = 1203', '997 - 13 = 984', '631 + 2 = 633', '17 * 19 = 323'];
@@ -106,7 +107,7 @@ export async function runSweep({ seeds = 40 } = {}) {
     b: { pages: 0, full: 0, notFull: 0, skipped: 0, wrongTyped: 0, wrongTypedAtN: 0 },
     c: { pages: 0, crossedFalsified: 0, falsifiedEarned: 0, atOrAfterCross: 0, laterThanFalsified: 0, uncrossedFalsified: 0, fromPages: 0, fromEarnedAtOrAfter: 0, fromMarksOverBefore: 0, fromFalsifiedEarned: 0 },
     d: { classes: new Map() }, e: { pages: 0, wrongFull: 0, overN: 0, unticked: 0, afterCross: 0, tableNotMark: 0, correctNotFull: 0, notPaid: 0, finalByLines: 0 },
-    f: { pages: 0, marks: 0, ideal: 0, overPages: 0, afterWrong: 0 }, g: { pages: 0, earned: 0, overCredit: 0, singleResult: 0 },
+    f: { pages: 0, marks: 0, ideal: 0, overPages: 0, afterWrong: 0 }, g: { pages: 0, earned: 0, overCredit: 0, singleResult: 0 }, j: { pages: 0, overCredit: 0 },
     i: { pages: 0, earned: 0, firstSolutionStep: 0, derived: 0, bareFirst: 0 },
     h: { route: { pages: 0, marks: 0 }, swap: { pages: 0, marks: 0 }, onesided: { pages: 0, marks: 0 } },
     exceptions: [], coincidences: [], violations: []
@@ -247,6 +248,13 @@ export async function runSweep({ seeds = 40 } = {}) {
         if (f.marks > ideal) R.f.overPages++;
         if (late.length) { R.f.afterWrong++; viol('earned-after-an-unverified-wrong-line', q, { idx: idx + 1, lines, earned: late.map(i => [i.key, i.lines]) }); }
       });
+      // (j) A DIGIT-FREE CLAIM first, then the authored lines. `x > y`, `x equals seven`, `a is greater than b` claim something the page cannot verify and
+      // contain no digit; nothing may be earned after one. Tolerance 0.
+      for (const claim of DIGIT_FREE_CLAIMS) {
+        const j = markPage(q, [claim, ...texts], '99991'); check(q, j, 'j-digit-free-claim');
+        R.j.pages++;
+        if (j.pay.paid && j.marks > 0) { R.j.overCredit++; viol('earned-after-a-digit-free-claim', q, { claim, earned: j.pay.items.filter(i => i.awarded).map(i => [i.key, i.lines]) }); }
+      }
       // (g) A SINGLE BARE LINE alone: a letter equal to a number, or a bare number. It may earn only a step whose one result it is (nonzero, not a given).
       const seenBare = new Set();
       for (const al of lines0) {
@@ -391,6 +399,7 @@ export function report(R) {
   L.push(`(c, one line) wrong at a key step: ${R.c.pages} pages; falsified line crossed ${R.c.crossedFalsified}, not crossed ${R.c.uncrossedFalsified}; the falsified line earned ${R.c.falsifiedEarned}; earned at or after a cross ${R.c.atOrAfterCross}; a later line than the falsified one earned (uncrossed wrong line) ${R.c.laterThanFalsified}`);
   for (const [k, v] of R.d.classes) L.push(`(d) ${k}: ${v.pages} pages, earned a mark on ${v.earned}, exceptions ${v.exceptions}${v.crossedAtFirst !== undefined ? `, crossed at line 1 on ${v.crossedAtFirst}` : ''}${v.coincidences ? `, coincidences (the other question's line is also true here) ${v.coincidences}` : ''}${v.bareEarnedItsOwnStep !== undefined ? `, the bare value earned its own step on ${v.bareEarnedItsOwnStep}` : ''}`);
   L.push(`(f) one wrong middle line then the authored lines: ${R.f.pages} pages, marks ${R.f.marks} against an ideal of ${R.f.ideal}; pages above the ideal ${R.f.overPages}; earned by a line at or after the wrong one ${R.f.afterWrong}`);
+  L.push(`(j) a digit-free claim first, then the authored lines: ${R.j.pages} pages, over-credit ${R.j.overCredit}`);
   L.push(`(g) a single bare line alone: ${R.g.pages} pages, earned a mark on ${R.g.earned} (a step whose one result it is: ${R.g.singleResult}); over-credit ${R.g.overCredit}`);
   L.push(`(i) a true first line then words: ${R.i.pages} pages, earned a mark on ${R.i.earned}; the step is the first step of the solution on ${R.i.firstSolutionStep}; its line is a derived expression on ${R.i.derived} and a bare value on ${R.i.bareFirst}`);
   const mean = o => (o.pages ? (o.marks / o.pages).toFixed(2) : '-');
