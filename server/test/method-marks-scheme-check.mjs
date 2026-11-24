@@ -18,13 +18,15 @@
 // ───────────────────────────────────────────────────────────────────────────────
 import './support/hermetic.mjs';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import * as G from '../../client/src/engine/generators/index.js';
 import * as R from '../../tools/method-marks-ready.mjs';
 import { TYPES } from '../../tools/method-marks-drafts.mjs';
 import { SCHEMES, UNAVAILABLE, APPROVED_SCHEME_TYPES, schemeDigest, schemeMarks, schemePay, schemeTypeOf, isApproved, awardScheme } from '../platform/schemeAward.js';
 import { stepEvidence, marksPossibleFor, practiceMarksEarned, MARKER_OPS } from '../platform/markerOps.js';
 import { FINAL_ANSWER_ONLY } from '../platform/markingPolicy.js';
-import { UNCERTIFIED_EDITIONS } from '../platform/editionMarking.js';
+import { UNCERTIFIED_EDITIONS, editionMarkingPolicy } from '../platform/editionMarking.js';
 import { sealForEdition, bankPolicy, FINAL_ANSWER_MARKING } from '../platform/editionBanks.js';
 import { checkAnswer } from '../../client/src/engine/checker.js';
 import { publicDescription } from '../platform/lineInterpreter/givens.js';
@@ -42,8 +44,8 @@ const asMarks = (q, n, typeId) => ({ ...q, difficulty: n, steps: Array.from({ le
 const finalOf = lines => { const l = lines[lines.length - 1] || ''; return l.includes('=') ? l.slice(l.lastIndexOf('=') + 1).trim() : l.trim(); };
 
 // ── 1. the gates ───────────────────────────────────────────────────────────────────────────────────────────────────
-ok(Array.isArray(APPROVED_SCHEME_TYPES) && APPROVED_SCHEME_TYPES.length === 0 && Object.isFrozen(APPROVED_SCHEME_TYPES), 'the allow-list in the repository is empty and frozen');
-ok(bankPolicy('prithagoras').methodSchemeTypes === APPROVED_SCHEME_TYPES, 'the NSW bank carries the (empty) allow-list');
+ok(Array.isArray(APPROVED_SCHEME_TYPES) && Object.isFrozen(APPROVED_SCHEME_TYPES) && APPROVED_SCHEME_TYPES.every(a => isApproved(a.typeId, APPROVED_SCHEME_TYPES)), 'the allow-list in the repository is frozen and every entry is at its scheme\'s current digest');
+ok(bankPolicy('prithagoras').methodSchemeTypes === APPROVED_SCHEME_TYPES, 'the NSW bank carries the generated allow-list');
 ok(!('methodSchemeTypes' in bankPolicy('priyabhata')) && bankPolicy('priyabhata').marking === null, 'India has no allow-list and no seal');
 let sealedCount = 0, byTypeSealed = 0;
 const typed = [];
@@ -51,7 +53,7 @@ for (const s of SCHEMES) for (const q of R.questionsOfType(s, { limit: 12 })) ty
 for (const [s, q] of typed) {
   const generator = s.families[0];
   const a = JSON.parse(JSON.stringify({ ...q, _generator: generator })); const b = JSON.parse(JSON.stringify({ ...q, _generator: generator }));
-  const sealed = sealForEdition(a, bankPolicy('prithagoras'), generator);
+  const sealed = sealForEdition(a, { ...bankPolicy('prithagoras'), methodSchemeTypes: [] }, generator);
   // the seal of main, written out: identity and the final-answer seal, nothing else
   const main = sealed ? (() => { b._curriculum = a._curriculum; b._marking = FINAL_ANSWER_MARKING; return b; })() : null;
   if (!sealed) continue;
@@ -60,7 +62,7 @@ for (const [s, q] of typed) {
 }
 ok(sealedCount >= 20 && byTypeSealed === sealedCount, `empty list: ${byTypeSealed} of ${sealedCount} sealed questions are byte-identical to main's seal`);
 // the same, with the list given but empty explicitly, and for the pay function
-ok(typed.every(([s, q]) => { const p = schemePay({ q: asMarks(q, schemeMarks(s), s.id), report: { lines: [] }, correct: false, marksPossible: schemeMarks(s), env: ON }); return p.paid === false && p.reason === 'type-not-approved'; }), 'empty list: nothing is paid by a scheme even with the switch on');
+ok(typed.every(([s, q]) => { const p = schemePay({ q: asMarks(q, schemeMarks(s), s.id), report: { lines: [] }, correct: false, marksPossible: schemeMarks(s), env: ON, list: [] }); return p.paid === false && p.reason === 'type-not-approved'; }), 'empty list: nothing is paid by a scheme even with the switch on');
 ok(typed.every(([s, q]) => schemePay({ q, report: { lines: [] }, correct: false, marksPossible: 1, env: ON, list: LIST }).reason === 'not-a-scheme-question'), 'a question not stamped with a scheme is never paid by one');
 // approved in this process: stamped, others sealed
 {
@@ -81,14 +83,51 @@ ok(typed.every(([s, q]) => schemePay({ q, report: { lines: [] }, correct: false,
   const run = env => schemePay({ q: q2, report: { lines: [] }, correct: false, marksPossible: schemeMarks(s), env, list: LIST });
   ok(run({}).reason === 'method-marks-off' && run({ PRI_METHOD_MARKS: 'off' }).reason === 'method-marks-off' && run({ PRI_METHOD_MARKS: 'yes' }).paid === false && run({ PRI_METHOD_MARKS: 'yes' }).reason === 'MARKER_POLICY_INVALID', 'the switch off, empty or misspelt pays nothing');
   ok(run({ NODE_ENV: 'production', PRI_METHOD_MARKS: 'on' }).reason === 'MARKER_POLICY_UNSIGNED', 'in production the switch alone pays nothing');
-  // The edition certification (editionMarking.js UNCERTIFIED_EDITIONS): Prithagoras pays nothing while it is uncertified, whatever the
-  // allow-list and the switch say, in every environment.
-  ok(UNCERTIFIED_EDITIONS.includes('prithagoras'), 'Prithagoras is uncertified in this repository');
-  ok(run({ ...ON, PRI_EDITION: 'prithagoras' }).reason === 'MARKER_POLICY_EDITION_UNCERTIFIED' && !run({ ...ON, PRI_EDITION: 'prithagoras' }).paid, 'uncertified Prithagoras: on the list and switched on, the scheme pays nothing');
-  ok(run({ NODE_ENV: 'production', PRI_METHOD_MARKS: 'on', PRI_METHOD_MARKS_EXAMINER_RESULT: 'signed-1', PRI_EDITION: 'prithagoras' }).paid === false, 'uncertified Prithagoras: even with the production examiner result the scheme pays nothing');
+  // The edition certification (editionMarking.js UNCERTIFIED_EDITIONS) is unchanged: Prithagoras is still uncertified, so the GENERIC
+  // method rubric pays nothing there. Owner decision 24 Nov 2026 (author-approved tier): a scheme of a type the author approved IS paid
+  // there when PRI_METHOD_MARKS=on, without the examiner variable. (This replaces the two assertions that said the scheme paid nothing
+  // on Prithagoras in every environment; the generic rubric assertions below keep the old meaning.)
+  const PRI = { PRI_EDITION: 'prithagoras' };
+  ok(UNCERTIFIED_EDITIONS.includes('prithagoras'), 'Prithagoras is still uncertified in this repository (no examiner certification)');
+  ok(editionMarkingPolicy({ ...ON, ...PRI }).methodMarks === false && editionMarkingPolicy({ NODE_ENV: 'production', ...ON, ...PRI, PRI_METHOD_MARKS_EXAMINER_RESULT: 'signed-1' }).methodMarks === false, 'Prithagoras: the generic method rubric pays nothing, switch on or not, examiner variable or not');
+  ok(run({ ...ON, ...PRI }).paid === true && run({ ...ON, ...PRI }).typeId === s.id, 'author-approved tier: on the list, switched on, Prithagoras pays the scheme');
+  ok(run({ NODE_ENV: 'production', ...ON, ...PRI }).paid === true, 'author-approved tier: in production the switch alone pays, with no examiner variable');
+  ok(run({ NODE_ENV: 'production', ...ON, ...PRI, PRI_METHOD_MARKS_EXAMINER_RESULT: 'signed-1' }).paid === true, 'author-approved tier: the examiner variable is neither needed nor read');
+  ok(!run({ ...PRI }).paid && run({ ...PRI }).reason === 'method-marks-off' && !run({ ...PRI, PRI_METHOD_MARKS: 'off' }).paid && !run({ ...PRI, PRI_METHOD_MARKS: ' ' }).paid, 'author-approved tier: unset, empty or off pays nothing');
+  ok(['yes', 'true', '1', 'onn', 'enabled'].every(v => run({ ...PRI, PRI_METHOD_MARKS: v }).paid === false && run({ ...PRI, PRI_METHOD_MARKS: v }).reason === 'MARKER_POLICY_INVALID'), 'author-approved tier: a misspelt switch fails closed');
+  ok(schemePay({ q: q2, report: { lines: [] }, correct: false, marksPossible: schemeMarks(s), env: { ...ON, ...PRI }, list: [{ typeId: s.id, digest: 'f'.repeat(64) }] }).reason === 'type-not-approved', 'author-approved tier: a digest the scheme no longer has pays nothing');
+  ok(schemePay({ q: q2, report: { lines: [] }, correct: false, marksPossible: schemeMarks(s), env: { ...ON, ...PRI }, list: LIST.filter(a => a.typeId !== s.id) }).reason === 'type-not-approved', 'author-approved tier: an unlisted type pays nothing');
   ok(run({ ...ON, PRI_EDITION: 'priyabhata' }).paid === true, 'another edition is not affected by the Prithagoras refusal');
+  ok(run({ NODE_ENV: 'production', PRI_METHOD_MARKS: 'on', PRI_EDITION: 'priyabhata' }).reason === 'MARKER_POLICY_UNSIGNED' && !run({ NODE_ENV: 'production', PRI_METHOD_MARKS: 'on', PRI_EDITION: 'priyabhata' }).paid, 'India is unchanged: in production the switch alone pays nothing');
   ok(run({ NODE_ENV: 'production', PRI_METHOD_MARKS: 'on', PRI_METHOD_MARKS_EXAMINER_RESULT: 'signed-1' }).paid === true, 'in production it needs the signed result too');
   ok(run(ON).paid === true, 'outside production the switch pays an approved type');
+}
+
+// (f) the repository's generated lists equal what the tool derives from the committed records, and the tool generates them from records only
+{
+  const AA = await import('../../tools/author-approvals.mjs');
+  const { AUTHOR_APPROVED_SERVER } = await import('../platform/authorApproved.generated.js');
+  const typesJson = JSON.parse(fs.readFileSync(new URL('../../owner-review/method-marks/types.json', import.meta.url), 'utf8')).types;
+  const derived = AA.approvedTypes(AA.readRecords(), typesJson).map(a => ({ typeId: a.typeId, digest: a.digest }));
+  ok(Object.isFrozen(AUTHOR_APPROVED_SERVER) && APPROVED_SCHEME_TYPES === AUTHOR_APPROVED_SERVER && JSON.stringify(AUTHOR_APPROVED_SERVER) === JSON.stringify(derived), 'the generated server list equals exactly what the tool derives from the committed records and types.json');
+  ok(AA.readRecords().flatMap(r => AA.recordProblems(r, typesJson)).length === 0 && derived.every(d => typesJson.find(t => t.id === d.typeId)?.digest === d.digest && SCHEMES.some(x => x.id === d.typeId && schemeDigest(x) === d.digest)), 'every committed record is valid and its digest is the type\'s current digest');
+  // fixtures in a temporary directory: valid + approved + current digest is listed; stale digest, changes-needed, automation names are not
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pri-approvals-'));
+  const rec = (typeId, o = {}) => ({ schemaVersion: 1, typeId, digest: typesJson.find(t => t.id === typeId).digest, verdict: 'approved', role: 'author (tutor)', approvedBy: 'Priysharan Tripathi', date: '2026-11-24', note: 'ok', ...o });
+  const put = r => fs.writeFileSync(path.join(dir, `${r.typeId}.json`), JSON.stringify(r));
+  put(rec('y12-diff-rules')); put(rec('y11-poly-evaluate', { digest: 'a'.repeat(64) })); put(rec('y12-trig-extreme', { verdict: 'changes-needed' })); put(rec('y12-diff-explog', { approvedBy: 'claude bot' }));
+  const got = AA.approvedTypes(AA.readRecords(dir), typesJson);
+  ok(got.length === 1 && got[0].typeId === 'y12-diff-rules' && got[0].digest === typesJson.find(t => t.id === 'y12-diff-rules').digest, 'only a valid, approved record at the type\'s current digest is listed');
+  const text = AA.renderServer(got);
+  ok(/typeId": "y12-diff-rules"/.test(text) && !/approvedBy|date/.test(text), 'the server list carries the type and the digest only');
+  // only the author's own name: another name (even a plausible one) is refused and appears in neither generated list
+  const dir2 = fs.mkdtempSync(path.join(os.tmpdir(), 'pri-approvals-'));
+  fs.writeFileSync(path.join(dir2, 'y12-diff-rules.json'), JSON.stringify(rec('y12-diff-rules', { approvedBy: 'Priya Sharma' })));
+  const other = AA.readRecords(dir2);
+  ok(AA.recordProblems(other[0], typesJson).some(m => /approvedBy/.test(m)) && AA.approvedTypes(other, typesJson).length === 0 && !AA.renderServer(AA.approvedTypes(other, typesJson)).includes('y12-diff-rules') && !AA.render(AA.approvedTypes(other, typesJson)).includes('y12-diff-rules'), 'a record by any other name is refused and listed in neither generated list');
+  ok(AA.approvedTypes(AA.readRecords(dir), typesJson).length === 1, 'the author\'s own name (trimmed) still lists');
+  fs.rmSync(dir2, { recursive: true, force: true });
+  fs.rmSync(dir, { recursive: true, force: true });
 }
 
 // ── 2. the sweep ───────────────────────────────────────────────────────────────────────────────────────────────────
@@ -239,6 +278,20 @@ for (const s of SCHEMES) ok(R.questionsOfType(s, { limit: 3 }).length === 3, `${
   const p = schemePay({ q, report: ev.stepReport, topic: ev.topicTicks, correct: false, marksPossible: poss, env: ON, list: LIST });
   const st = ev.stepReport.lines.map(l => l.status);
   ok(poss === 2 && p.paid && p.awarded === 1, `the owner's question: ${p.awarded} of ${poss}`);
+  {
+    // (a) Prithagoras, switch on, approved type, matching digest: correct method, wrong last line = 1 of 2. (b) switch off: final answer only.
+    const PRI = { PRI_EDITION: 'prithagoras' };
+    const pay = env => schemePay({ q, report: ev.stepReport, topic: ev.topicTicks, correct: false, marksPossible: poss, env, list: LIST });
+    ok(pay({ ...ON, ...PRI }).paid && pay({ ...ON, ...PRI }).awarded === 1 && pay({ NODE_ENV: 'production', ...ON, ...PRI }).awarded === 1, 'Prithagoras, switch on, approved type, matching digest: 1 of 2 (also in production, no examiner variable)');
+    ok(!pay({ ...PRI }).paid && !pay({ ...PRI, PRI_METHOD_MARKS: 'off' }).paid && !pay({ ...PRI, PRI_METHOD_MARKS: 'onn' }).paid, 'Prithagoras, switch off, unset or misspelt: final answer only, nothing paid');
+    // (d) the generic rubric pays nothing on Prithagoras even with the switch on: the real marker operation under the edition's policy
+    const gen = { ...R.OWNER_QUESTION, difficulty: 2, steps: q.steps };
+    const withPolicy = MARKER_OPS.practice({ q: gen, answer: '3x^2-x', working: lines.join('\n'), evidenceIfWrong: true, policy: editionMarkingPolicy({ ...ON, ...PRI }) }, () => {});
+    const control = MARKER_OPS.practice({ q: gen, answer: '3x^2-x', working: lines.join('\n'), evidenceIfWrong: true, policy: { methodMarks: true, scheme: 'method-marks' } }, () => {});
+    ok(withPolicy.evidence.partial === null && (control.evidence.partial?.awarded ?? 0) >= 1, `Prithagoras with the switch on: the generic rubric pays nothing (the control rubric would pay ${control.evidence.partial?.awarded ?? 0})`);
+    // (e) India behaves as before: the examiner result is still required in production, a scheme is never stamped
+    ok(editionMarkingPolicy({ NODE_ENV: 'production', ...ON, PRI_EDITION: 'priyabhata' }).methodMarks === false && editionMarkingPolicy({ NODE_ENV: 'production', ...ON, PRI_EDITION: 'priyabhata', PRI_METHOD_MARKS_EXAMINER_RESULT: 'x' }).methodMarks === true && editionMarkingPolicy({ NODE_ENV: 'production', ...ON }).methodMarks === false, 'India (and no edition): in production the examiner result is still required');
+  }
   ok(p.items[0].awarded && p.items[0].lines.join() === '6' && !p.items[1].awarded && p.items[1].verified && st[8] === 'break', `derivative earned on line 6 (the first ticked line), answer not earned, line 9 crossed: ${JSON.stringify(p.items.map(i => [i.key, i.awarded, i.lines]))}`);
   const right = schemePay({ q, report: stepEvidence(q, '3x^2-2x', [...R.OWNER_HEAD, '= 3x^2 - 2x'].join('\n'), checkAnswer(q, '3x^2-2x')).stepReport, correct: true, marksPossible: poss, env: ON, list: LIST });
   ok(right.paid && right.items.every(i => i.awarded) && right.awarded === 2, 'the right answer is 2 of 2');
