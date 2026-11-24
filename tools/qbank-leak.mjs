@@ -118,7 +118,7 @@ const hasFreeLetters = plain => /[A-Za-zΑ-Ωα-ω]/.test(plain.replace(NAMES, '
 const SEPARATORS = /\s*(?:<=|>=|!=|=|<|>)\s*/;
 
 const numberOf = text => {
-  const t = String(text).replace(/[−–]/g, '-').replace(/°/g, '*pi/180').replace(/(\d)\s*%/g, '($1/100)').trim();
+  const t = String(text).replace(/π/g, 'pi').replace(/[−–]/g, '-').replace(/°/g, '*pi/180').replace(/(\d)\s*%/g, '($1/100)').trim();
   if (!t || !/\d/.test(t)) return null;
   try { const v = evalNumeric(normalize(t)); return Number.isFinite(v) ? v : null; } catch { return undefined; }   // undefined: could not be read
 };
@@ -236,7 +236,10 @@ export function leaksOf(q, texts) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Verbs that, alone or with "it" or "this", say nothing the question did not (the stoplist of the thin-hint rule). */
-const BARE_VERBS = new Set(['evaluate', 'simplify', 'multiply', 'substitute', 'solve', 'calculate', 'compute', 'expand', 'factorise', 'factorize', 'factor', 'differentiate', 'integrate', 'rearrange', 'divide', 'add', 'subtract', 'cancel', 'rewrite', 'find', 'use', 'apply', 'try', 'do', 'square', 'equate', 'collect', 'combine', 'reduce', 'complete', 'expand']);
+const BARE_VERBS = new Set(['evaluate', 'simplify', 'multiply', 'substitute', 'solve', 'calculate', 'compute', 'expand', 'factorise', 'factorize', 'factor', 'differentiate', 'integrate', 'rearrange', 'divide', 'add', 'subtract', 'cancel', 'rewrite', 'find', 'use', 'apply', 'try', 'do', 'square', 'equate', 'collect', 'combine', 'reduce', 'complete', 'read', 'look', 'see', 'check', 'draw', 'plot']);
+const ARTICLES = new Set(['the', 'a', 'an', 'each', 'both', 'all', 'of', 'to']);
+/** Nouns that make a bare verb no more than the question again ("Read the graph."). */
+const GENERIC_NOUNS = new Set(['graph', 'diagram', 'figure', 'picture', 'sketch', 'table', 'axes']);
 const FILLER = new Set(['it', 'this', 'that', 'them', 'these', 'those', 'first', 'now', 'then', 'again', 'please']);
 const NUMBER_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen', 'twenty'];
 
@@ -310,7 +313,7 @@ export function proseRuns(proseRaw) {
 }
 
 /** Inverse trigonometric notation, minus signs and the multiplication sign, as the engine writes them. */
-const cleanMath = s => s.replace(/\b(sin|cos|tan)\s*\^\s*\(?-1\)?/g, 'arc$1').replace(/[−–]/g, '-').replace(/[×]/g, '*').replace(/÷/g, '/').replace(/[:;]/g, ',');
+const cleanMath = s => s.replace(/π/g, 'pi').replace(/\b(sin|cos|tan)\s*\^\s*\(?-1\)?/g, 'arc$1').replace(/[−–]/g, '-').replace(/[×]/g, '*').replace(/÷/g, '/').replace(/[:;]/g, ',');
 /** What the engine's parser needs to be asked "is this readable": subscripts, primes and Greek letters it has no spelling for are made plain. */
 const forParse = s => s.replace(/\^\(°\)/g, '°').replace(/_\(?([A-Za-z0-9]+)\)?/g, '$1').replace(/[′″'‴]+/g, '').replace(/[α-ωΑ-Ω]/g, m => (m === 'θ' || m === 'π' ? m : 'q')).replace(/°/g, '*pi/180').replace(/%/g, '/100');
 const bareFns = s => s.replace(/\b(arcsin|arccos|arctan|cosec|sqrt|sin|cos|tan|sec|cot|log|exp|ln)\b(?!\s*[0-9(A-Za-zπθ√])/g, '$1(1)');
@@ -350,6 +353,8 @@ function sideReason(q, side, accepted, keys, strict, whole = false) {
     const v = numberOf(s);
     if (v === undefined) return `a closed value "${s.slice(0, 40)}" cannot be read (fail closed)`;
     if (v !== null && keys.some(k => near(v, k))) return `"${s.slice(0, 40)}" evaluates to the answer`;
+    // one step from the answer: its logarithm (3 ln 2 = ln 8 when the answer is 8)
+    if (v !== null && keys.some(k => k > 0 && (near(v, Math.log(k)) || near(v, Math.log10(k))) && !(Number.isInteger(v) && Math.abs(v) <= 3))) return `"${s.slice(0, 40)}" is the logarithm of the answer`;
   }
   if ((strict || (!letters && /\d/.test(s))) && /[A-Za-z0-9α-ωΑ-Ω]/.test(s) && !SYMBOL.test(s) && !readable(s)) return `"${s.slice(0, 40)}" cannot be parsed (fail closed)`;
   return null;
@@ -365,7 +370,9 @@ export function rungDropReason(q, text, ctx = {}) {
   // Thin hints. Two or more words are kept, whatever they say, unless they are only a bare verb (alone, or with "it"/"this"); one maths span
   // or one run of plain maths is kept when it passes every test below; a lone ordinary word is nothing to learn from.
   if (words.length + spans.length === 0) return 'empty';
-  if (!spans.length && words.length && words.every(w => BARE_VERBS.has(w.toLowerCase().replace(/[^a-z]/g, '')) || FILLER.has(w.toLowerCase().replace(/[^a-z]/g, ''))) && words.some(w => BARE_VERBS.has(w.toLowerCase().replace(/[^a-z]/g, '')))) return 'a bare verb';
+  const plainWords = words.map(w => w.toLowerCase().replace(/[^a-z]/g, '')).filter(Boolean);
+  const symbolOnly = spans.every(sp => /^\s*\\?[A-Za-z]{1,6}(?:_\{?\w+\}?)?\s*$/.test(sp));
+  if (plainWords.length && symbolOnly && plainWords.some(w => BARE_VERBS.has(w)) && plainWords.every(w => BARE_VERBS.has(w) || FILLER.has(w) || ARTICLES.has(w) || GENERIC_NOUNS.has(w) || w.length === 1)) return 'a bare verb';
   if (words.length + spans.length === 1 && !spans.length && !/[0-9=+\-−×÷*/^²³]/.test(words[0])) return 'a single word';
 
   const direct = leakReason(q, t);

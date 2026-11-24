@@ -27,6 +27,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { checkAnswer, plainTex } from '../client/src/engine/checker.js';
+import { structuralLeaks } from './qbank-figure-risk.mjs';
 
 const run = promisify(execFile);
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -400,6 +401,8 @@ export function statesAnswer(part, text) {
  */
 export function figureLeaks(tikz, part) {
   const out = figureTexts(tikz).filter(t => statesAnswer(part, t));
+  // The drawing itself (qbank-figure-risk.mjs): coordinates, plotted curves and lines, one-step forms of the answer, worked results. Fail closed.
+  out.push(...structuralLeaks(tikz, part, { texts: figureTexts(tikz), ticks: figureTicks(tikz) }).map(r => `drawing: ${r}`));
   const nums = answerNumbers(part);
   for (const tk of figureTicks(tikz)) for (const x of tk.values) if (nums.some(v => Math.abs(x - v) <= NEAR(v) && !statesNumber(part.prompt, v))) out.push(`${tk.axis}tick ${x}`);
   return [...new Set(out)];

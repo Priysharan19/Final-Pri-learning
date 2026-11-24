@@ -76,6 +76,20 @@ ok(scanDist(plantFile('shuffled', 'a.js', `${stock}var n=[${shuffled.map(v => JS
 // false positives: ordinary code that holds numbers is not the pack
 ok(scanDist(plantFile('tables', 'tables.js', `${stock}var w=[${Array.from({ length: 400 }, (_, i) => (i * 37) % 1000).join(',')}];var f=[${Array.from({ length: 300 }, (_, i) => i).join(',')}];\n`), questions, manifest.packVersion).length === 0, 'tables of whole numbers in a script are not reported');
 
+// The scan is bounded: a cap that has passed is a FAILURE (never a pass), and adversarial input (the pack's answers as one long unshuffled list,
+// repeated to tens of megabytes) ends within the cap, found or timed out, never an unbounded run.
+{
+  const t0 = Date.now();
+  const tiny = scanDist(clean, questions, manifest.packVersion, { capMs: -1 });
+  ok(tiny.some(h => /did not finish within its .* cap \(fail closed\)/.test(h)), 'a scan whose cap has passed fails closed');
+  const answers = questions.flatMap(q => [q.answer?.value, q.answer?.expr, ...(q.answer?.values ?? [])]).filter(v => v !== undefined && v !== null);
+  const blob = `${stock}var a=[${answers.map(v => JSON.stringify(v)).join(',')}];\n`.repeat(40);
+  const adv = plantFile('adversarial', 'adv.js', blob);
+  const t1 = Date.now();
+  const found = scanDist(adv, questions, manifest.packVersion, { capMs: 20000 });
+  ok(found.length > 0 && Date.now() - t1 < 40000, `adversarial input (${(blob.length / 1e6).toFixed(1)} MB of the pack's answers in order) is found or timed out within the cap (${Date.now() - t1} ms)`);
+  ok(Date.now() - t0 < 60000, 'and the whole of it takes under a minute');
+}
 const { needles, runs } = needlesOf(questions);
 ok(needles.length > 5000 && runs.size > 20000, `the scan has needles for every kind (${needles.length}, ${runs.size} step runs)`);
 fs.rmSync(scratch, { recursive: true, force: true });

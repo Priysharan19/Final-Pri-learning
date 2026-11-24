@@ -8,13 +8,12 @@
 //      (f'(x) too, when the question defines y = f(x)). A different left side is left alone and the engine refuses it as it always did.
 //   2. A NAMED PRECISION ON AN INTERVAL. "Solve 3^x > 20, to two decimal places": the key is x > 2.7268, and x > 2.73 is the same answer
 //      rounded as asked. Every number of the key is rounded to the named place; the student's region is also tried against that.
-//   3. NO PRECISION NAMED. A numeric key that is a non-terminating decimal (written with 7 or more significant figures: a recurring or irrational
-//      value), on a prompt that names no decimal places, significant figures or "nearest" and asks for no exact form (exact, fraction, surd,
-//      simplest form, rational denominator, "in terms of"), is accepted when the student's value is the key correctly ROUNDED to at least 3
-//      significant figures, counting the digits as typed (so 135 and 135.0 for 134.9537, never 130 and never a truncation that is not also a
-//      correct rounding). The prompt decides, not the form the author wrote the key in: 24√3, 6π and 33/95 asked for with no precision are
-//      decimals. Where the prompt does ask for an exact form, or names a precision, or the key carries its own tolerance, the engine's reading
-//      stands alone: 0.3636 is not 4/11.
+//   3. NO PRECISION NAMED. A numeric key that the author wrote as a long decimal (7 or more significant figures: a recurring or irrational
+//      value), on a prompt that names no decimal places, significant figures or "nearest" and asks for no exact form, is accepted when the
+//      student's value is the key correctly rounded to at least 3 significant figures, counting the digits as typed (so 135 and 135.0 for
+//      134.9537, never 130). It is NEVER accepted where the prompt asks for an exact form (a fraction, a surd, a rational denominator, "exact",
+//      "in terms of", "simplest form") or where the author wrote the key as one (its criterion or last worked line is a fraction, a surd,
+//      a multiple of π, a logarithm, or its value reads as one): 0.3636 is not 4/11. A key that carries its own tolerance (`tol`) keeps the engine's reading alone.
 //
 // Pure and deterministic.
 import { checkAnswer } from '../../client/src/engine/checker.js';
@@ -98,7 +97,7 @@ export function typedDecimal(text) {
 // approximation; it is never accepted where the question asks for an exact form (a fraction, a surd, a rational denominator, "in terms of
 // π", "exact", "simplest form") or where the author wrote the key as one (a fraction, a surd, a multiple of π, a logarithm).
 const ASKS_FOR_PRECISION = /significant|sig\.?\s*fig|decimal|d\.\s?p\.?|nearest|round|approximat|\bto\s+(?:one|two|three|four|five|\d)\b/i;
-const ASKS_FOR_EXACT_FORM = /exact|fraction|simplest|simplif|surd|rational|rationalis|denominator|numerator|in terms of|closed form|mixed number|recurring|\\dot|\\overline|\bratio\b|\bsurd\b/i;
+const ASKS_FOR_EXACT_FORM = /exact|fraction|simplest|simplif|surd|rational|rationalis|denominator|numerator|in terms of|closed form|mixed number|recurring|\\dot|\\overline|\bratio\b|\\pi|\\sqrt|\\ln|\\log|\bsurd\b/i;
 const EXACT_MARKERS = /\\[dt]?frac|\\sqrt|\\pi|\\ln|\\log|\\binom|√|π|[½⅓⅔¼¾⅕⅛]|\bln\b|\blog\b|\bsqrt\b|\bpi\b|\be\s*\^|\^\s*\{?\s*\\?[a-z]|\d\s*\/\s*\d|\d\s*\\?\s*(?:ln|log)/i;
 const stripTeX = t => String(t ?? '').replace(/\$/g, '').trim();
 /** The last side of the author's final worked line, with the TeX kept: "\dfrac{0.36}{0.99}=\dfrac4{11}" gives "\dfrac4{11}". */
@@ -112,6 +111,8 @@ export function authoredAsExact(q) {
   const criteria = Array.isArray(q?.criteria) ? q.criteria : null;
   const steps = Array.isArray(q?.steps) ? q.steps : null;
   if (!criteria && !steps) return true;
+  // Any criterion or step heading that says "exact" asks for the exact value, whatever the key looks like.
+  if ((criteria || []).some(c => /exact/i.test(stripTeX(c?.point))) || (steps || []).some(st => /exact/i.test(stripTeX(st?.h)))) return true;
   const point = stripTeX((criteria || []).find(c => c?.answer)?.point);
   if (point && (EXACT_MARKERS.test(point) || /exact/i.test(point))) return true;
   const side = steps?.length ? lastSide(steps[steps.length - 1]) : '';
@@ -145,6 +146,7 @@ export function acceptsRoundedFigures(q) {
   const prompt = `${q.prompt ?? ''} ${q.answerSuffix ?? ''}`;
   if (ASKS_FOR_PRECISION.test(prompt) || ASKS_FOR_EXACT_FORM.test(prompt)) return false;
   if (namedDecimalPlaces(q) !== null || asksForExactValue(q)) return false;
+  if (authoredAsExact(q) || looksExact(a.value)) return false;
   return true;
 }
 /** The prompt asks for an exact form in so many words: a fraction, simplest form, a surd, a rational denominator, "exact", "in terms of". */
