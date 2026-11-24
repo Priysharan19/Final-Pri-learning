@@ -4,7 +4,7 @@
 // Against a committed snapshot of origin/main (server/test/fixtures/true-pages-main-2026-11-24.json, written by tools/true-pages-sweep.mjs from a
 // checkout of main), every page that exists on both sides:
 //   · a line crossed on this head was crossed on main (0 new crosses; main's own crosses are not this branch's);
-//   · a line main TICKED is still ticked, except the one class listed and justified below;
+//   · a line main TICKED is still ticked (no exception: a last line restating the final answer is carried over, server/platform/markerOps.js);
 // every page only this head has (a new bank form) has 0 crossed lines. Then the reviewer's repros and area mutants, never ticked.
 //
 //   node server/test/true-pages-vs-main-check.mjs
@@ -22,7 +22,7 @@ const ok = (c, l) => { if (c) pass++; else failures.push(l); };
 const base = JSON.parse(readFileSync(new URL('./fixtures/true-pages-main-2026-11-24.json', import.meta.url), 'utf8'));
 const head = await sweep({ withTexts: true });
 
-let both = 0, headOnly = 0, newCross = 0, lostTick = 0, allowedLost = 0, gainedTick = 0, headOnlyCrossed = 0, mainCrossed = 0, headCrossed = 0;
+let both = 0, headOnly = 0, newCross = 0, lostTick = 0, gainedTick = 0, headOnlyCrossed = 0, mainCrossed = 0, headCrossed = 0;
 const bad = [];
 for (const [key, h] of Object.entries(head)) {
   const b = base[key];
@@ -35,12 +35,7 @@ for (const [key, h] of Object.entries(head)) {
   for (let i = 0; i < bs.length; i++) {
     if (h.statuses[i] === 'b' && bs[i] !== 'b') { newCross++; if (bad.length < 6) bad.push(`new cross: ${h.prompt.slice(0, 70)} line ${i + 1} ${JSON.stringify(h.texts[i])}`); }
     if (bs[i] === 'o' && h.statuses[i] !== 'o') {
-      // The one listed class: the LAST line of a tangent / normal page or an exact-integral page, which restates the final answer (`2x + -5`,
-      // `ans = 12`). On main those questions had no step plan, so the whole page was judged by the answer's expression-equivalence; the derived plan
-      // is now the page's topic check and does not carry that equivalence over, so the restatement stays a note (never a cross, and no mark reads it:
-      // every scheme these plans serve is a draft that pays nothing).
-      const listed = (h.family === 'y12-appdiff' || h.family === 'y12-integral-calc') && i === bs.length - 1 && h.statuses[i] === 'n';
-      if (listed) allowedLost++; else { lostTick++; if (bad.length < 8) bad.push(`lost tick: ${h.prompt.slice(0, 70)} line ${i + 1} ${JSON.stringify(h.texts[i])} ${bs[i]}->${h.statuses[i]}`); }
+      lostTick++; if (bad.length < 8) bad.push(`lost tick: ${h.prompt.slice(0, 70)} line ${i + 1} ${JSON.stringify(h.texts[i])} ${bs[i]}->${h.statuses[i]}`);
     }
     if (bs[i] !== 'o' && h.statuses[i] === 'o') gainedTick++;
   }
@@ -48,9 +43,32 @@ for (const [key, h] of Object.entries(head)) {
 ok(both >= 2600, `the sweep covers the pages main also has: ${both}`);
 ok(newCross === 0, `0 lines crossed on this head that main did not cross: ${newCross} ${bad.join(' | ')}`);
 ok(headOnlyCrossed === 0, `pages only this head has (new bank forms) are never crossed: ${headOnlyCrossed} of ${headOnly}`);
-ok(lostTick === 0, `no tick main gave is lost outside the listed class: ${lostTick} ${bad.join(' | ')}`);
+ok(lostTick === 0, `no tick main gave is lost (no exception): ${lostTick} ${bad.join(' | ')}`);
 ok(headCrossed <= mainCrossed, `crossed lines on this head (${headCrossed}) are no more than on main (${mainCrossed})`);
-ok(allowedLost <= 40, `the listed class (a restated final answer on a tangent / normal / exact-integral page) stays small: ${allowedLost}`);
+
+// ── the carried-over final-answer tick is display only: no mark, partial or scheme tick reads it ──────────────────────────────────────────
+{
+  await C.loadFamilies();
+  let n = 0, differ = 0, carried = 0;
+  for (const fid of ['y12-appdiff', 'y12-integral-calc', 'y12-diff']) for (const q of C.questionsFor(fid, Array.from({ length: 25 }, (_, i) => i + 1))) {
+    if (!q.stepcheck || q.stepcheck.kind !== 'plan') continue;
+    let ts; try { ts = C.transcriptsFor(q); } catch { continue; }
+    for (const t of ts) {
+      const text = t.lines.map(l => l.text).join('\n');
+      let a, b; try { a = stepEvidence(q, '', text, { correct: false }, { slipWarnings: true }); b = stepEvidence(q, '', text, { correct: false }, { slipWarnings: true, planFinal: false }); } catch { continue; }
+      n++;
+      if (JSON.stringify([a.partial, a.topicTicks, a.markingReport]) !== JSON.stringify([b.partial, b.topicTicks, b.markingReport])) differ++;
+      if (a.stepReport?.lines && b.stepReport?.lines && a.stepReport.lines.some((l, i) => l.status !== b.stepReport.lines[i].status)) {
+        carried++;
+        // only the last line, only note -> ok, never a cross
+        const bad = a.stepReport.lines.some((l, i) => l.status !== b.stepReport.lines[i].status && (i !== a.stepReport.lines.length - 1 || b.stepReport.lines[i].status !== 'note' || l.status !== 'ok'));
+        ok(!bad, 'the carried tick is on the last line only, from a note, never a cross');
+      }
+    }
+  }
+  ok(n >= 200 && differ === 0, `partial, scheme ticks and the marking report are identical with and without the carried-over tick: ${differ} of ${n} pages differ`);
+  ok(carried >= 10, `the carried-over tick is used on real pages: ${carried}`);
+}
 
 // ── the reviewer's repros on the gradient plan ─────────────────────────────────────────────────────────────────────────
 const statusesOf = (pred) => {
@@ -106,5 +124,5 @@ for (const h of bareEq) ok(!h.statuses.includes('b'), `a bare "= n" page has no 
 }
 
 if (failures.length) { console.error(`TRUE PAGES VS MAIN: FAIL (${failures.length})`); for (const f of failures) console.error('  ' + String(f).slice(0, 700)); process.exit(1); }
-console.log(`true pages: ${both} pages on both sides, ${headOnly} only on this head; crossed lines ${headCrossed} (main ${mainCrossed}), new crosses ${newCross}, ticks lost ${lostTick} + ${allowedLost} listed, ticks gained ${gainedTick}`);
+console.log(`true pages: ${both} pages on both sides, ${headOnly} only on this head; crossed lines ${headCrossed} (main ${mainCrossed}), new crosses ${newCross}, ticks lost ${lostTick}, ticks gained ${gainedTick}`);
 console.log(`TRUE PAGES VS MAIN: PASS: ${pass} checks`);

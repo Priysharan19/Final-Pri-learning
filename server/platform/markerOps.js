@@ -262,6 +262,27 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
       if (more && (more.matched > 0 || more.warned > 0)) report = more.report;
     } catch { /* the report stands */ }
   }
+  // Feedback only, after every mark (topicTicks and `partial` above read `decided`, never this): a question that carries a DERIVED step plan
+  // (engine/schemePlans.js) had, before the plan, the whole page judged against the answer (an expression question: equivalence to the keyed
+  // answer). The plan replaced that check as the page's topic check, so a LAST line restating the final answer (`2x + -5`, `ans = 12`) was left
+  // "not checked". The tick the question had without the plan is carried over for that one line, exactly as it was (never a cross, never a new
+  // tick on a line that was not ticked there, never a mark: it is not in `decided`).
+  try {
+    if (q.stepcheck && q.stepcheck.kind === 'plan' && typeof q.stepcheck.scheme === 'string' && typeof steps === 'string' && steps.trim() && report && Array.isArray(report.lines) && report.lines.length && !(opts && opts.planFinal === false)) {
+      const k = report.lines.length - 1, mine = report.lines[k];
+      const unjudged = mine?.status === 'note' && (mine.state === undefined || mine.state === 'unverified') && mine.note !== 'Follows from the earlier slip.' && mine.unreadable !== true;
+      if (unjudged && !report.lines.some(l => l?.status === 'break')) {
+        const { stepcheck: _plan, ...bare } = q;
+        const before = stepEvidence(bare, answer, steps, result, { ...(opts || {}), planFinal: false }).stepReport;
+        const theirs = before?.lines?.[k];
+        if (theirs && theirs.status === 'ok' && before.lines.length === report.lines.length && String(theirs.text).trim() === String(mine.text).trim()) {
+          const { stage: _s, credit: _c, ...tick } = theirs;
+          const lines = report.lines.map((l, i) => (i === k ? { ...tick, state: tick.state || 'verified' } : l));
+          report = { ...report, lines };
+        }
+      }
+    }
+  } catch { /* the report stands */ }
   // A true-as-written tick on a line that ends at the student's own WRONG answer (`so 10^1 = 10` when the answer is 30)
   // reads as "this is right". The arithmetic is; the value was not accepted (it may be wrong, or right in a form or unit
   // the question did not accept: the note claims only what is true in both cases). Such a tick becomes that note.
