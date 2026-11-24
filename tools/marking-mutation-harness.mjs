@@ -668,6 +668,7 @@ export async function run({ root = path.resolve(path.dirname(fileURLToPath(impor
   //                    substituted expression changed, kept only when this file's evaluator finds it differs from the true substitution
   const probe = { trueLines: 0, trueTicked: 0, mutants: 0, falseTicks: 0, cells: 0, roundingTrue: 0, byClass: {} };
   const { stepMetaFor } = await import(path.join(root, 'server/platform/markerOps.js'));
+  const { precisionOf } = await import(path.join(root, 'client/src/engine/provedLines.js')).catch(() => ({ precisionOf: () => ({}) }));   // the question's own words only, never an answer
   const probeMark = (q, page, extra = {}) => {
     let ev; try { ev = stepEvidence({ ...q }, '99991', page.join('\n'), checkAnswer({ ...q }, '99991'), { slipWarnings: true, ...extra }); } catch { return []; }
     return ev && (ev.shownReport || ev.stepReport) && Array.isArray((ev.shownReport || ev.stepReport).lines) ? (ev.shownReport || ev.stepReport).lines : [];
@@ -729,13 +730,16 @@ export async function run({ root = path.resolve(path.dirname(fileURLToPath(impor
           if (Math.abs(fr - 0.5) < 1e-6 || fr < 1e-6 || fr > 1 - 1e-6) continue;
           const dec = n => `${v < 0 ? '-' : ''}${(n / sc).toFixed(pl)}`;
           const k0 = `${side}|${pl}`; if (seen.has(k0)) continue; seen.add(k0);
-          tryTrue(q, 'rounded', [`${side} = ${dec(rnd)}`], 0);
-          if (tr !== rnd) tryTrue(q, 'rounded', [`${side} = ${dec(tr)}`], 0);
+          // what the question asks of a decimal (read from its prompt only): a rounded line is TRUE (ticked) only at or beyond the asked precision (3 s.f. when none is asked),
+          // never on a question asking for an exact value, never as an equation with a finite decimal; a truncation that is not the rounding, fewer places and one out are not
+          const want = precisionOf(q), sfOf = x => x.replace(/^-/, '').replace('.', '').replace(/^0+/, '').length;
+          const finite = [0, 1, 2, 3, 4, 5, 6, 7, 8].some(k => { const x = Math.abs(v) * 10 ** k; return Math.abs(x - Math.round(x)) < 1e-7; });
+          const allowed = !want.exact && !finite && (want.dp !== undefined ? pl >= want.dp : want.sf !== undefined ? sfOf(dec(rnd)) >= want.sf : sfOf(dec(rnd)) >= 3);
+          if (allowed) tryTrue(q, 'rounded', [`${side} = ${dec(rnd)}`], 0); else tryFalse(q, 'rounded', [`${side} = ${dec(rnd)}`], 0, cell, `${side} = ${dec(rnd)} (not asked, or an exact question)`);
+          if (tr !== rnd) tryFalse(q, 'rounded', [`${side} = ${dec(tr)}`], 0, cell, `${side} = ${dec(rnd)} (truncation)`);
           for (const dd of [-2, -1, 1, 2]) {
-            const n = rnd + dd; if (n === rnd || n === tr || n < 0) continue;   // a neighbour that is still the truncation is a true line
-            const t = `${side} = ${dec(n)}`;
-            if (roundedTrue(t)) { probe.roundingTrue++; continue; }
-            tryFalse(q, 'rounded', [t], 0, cell, `${side} = ${dec(rnd)}`);
+            const n = rnd + dd; if (n === rnd || n < 0 || n === tr) continue;
+            tryFalse(q, 'rounded', [`${side} = ${dec(n)}`], 0, cell, `${side} = ${dec(rnd)}`);
           }
         }
         if (seen.size > 40) break;

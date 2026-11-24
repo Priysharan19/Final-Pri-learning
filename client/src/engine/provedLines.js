@@ -116,7 +116,31 @@ export function roundedTo(v, shown) {
   if (target === truncated) return { places: p, how: 'truncated' };
   return null;
 }
-function proveRounded(text, previous) {
+const NUMWORD = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6 };
+const numOf = w => (/^\d+$/.test(w) ? Number(w) : NUMWORD[String(w).toLowerCase()] ?? null);
+/**
+ * What the question's own words ask of a decimal answer: { dp } or { sf } (a stated precision), { exact: true } (an exact value is asked for), or
+ * {} (nothing stated). Read from the prompt's words only, never from the answer or the solution.
+ */
+export function precisionOf(q) {
+  const prompt = q && typeof q.prompt === 'string' ? q.prompt : '';
+  const words = prompt.replace(/\\\$/g, '\u0001').replace(/\$\$?[^$]*\$\$?/g, ' § ').replace(/\u0001/g, '$');
+  const tex = prompt;
+  let m;
+  if ((m = /\b(?:correct )?to (\d+|one|two|three|four|five|six) (?:decimal place|decimal point|d\.p)/i.exec(words))) { const n = numOf(m[1]); if (n !== null) return { dp: n }; }
+  if ((m = /\b(\d+|one|two|three|four|five|six) significant (?:figure|digit)/i.exec(words)) || (m = /\b(\d+|one|two|three|four|five|six) s\.?f\b/i.exec(words))) { const n = numOf(m[1]); if (n !== null) return { sf: n }; }
+  if (/\bnearest (?:cent|hundredth)\b/i.test(words)) return { dp: 2 };
+  if (/\bnearest tenth\b/i.test(words)) return { dp: 1 };
+  if (/\bnearest (?:whole number|integer|dollar|degree|minute|second|metre|meter|centimetre|centimeter|kilometre|kilometer|unit|year|month|day|hour|person|student)s?\b/i.test(words)) return { dp: 0 };
+  if (/\bexact(?:ly)?\b|\bsurds?\b|\bfractions?\b|\bsimplest form\b|\bin terms of\b|\bleave (?:your )?answer\b/i.test(words) || /\bin terms of\b/i.test(tex)) return { exact: true };
+  if (/\\\$|\bdollars?\b|\bcents?\b/i.test(prompt)) return { dp: 2, money: true };
+  return {};
+}
+const sigFigs = shown => { const d = shown.replace(/^-/, '').replace('.', '').replace(/^0+/, ''); return d.length; };
+/** Does v have a terminating decimal expansion that a float can show (so an equals sign with a different decimal is a false equality)? */
+const terminating = v => { for (let k = 0; k <= 8; k++) { const x = Math.abs(v) * 10 ** k; if (Math.abs(x - Math.round(x)) < 1e-7) return true; } return false; };
+function proveRounded(q, text, previous) {
+  const approx = /[≈≃]/.test(text);
   let src = lead(text).replace(/[≈≃]/g, '=');
   const cont = /^=/.test(src);
   const sides = src.split('=').map(s => s.trim());
@@ -133,7 +157,15 @@ function proveRounded(text, previous) {
   const values = before.map(numericSide);
   if (!values.length || values.some(v => v === null) || !values.every(v => close(v, values[0]))) return null;
   const hit = roundedTo(values[0], shown);
-  if (!hit) return null;
+  // fail closed: only a correct ROUNDING, never a truncation that differs from it, and only at the precision the question asks
+  if (!hit || hit.how === 'truncated') return null;
+  const want = precisionOf(q);
+  if (want.exact) return null;                                   // an exact value is asked for: no decimal is the answer
+  if (!approx && terminating(values[0])) return null;            // a finite decimal must be written exactly with an equals sign
+  const sf = sigFigs(shown);
+  if (want.dp !== undefined) { if (hit.places < want.dp) return null; }
+  else if (want.sf !== undefined) { if (sf < want.sf) return null; }
+  else if (sf < 3) return null;                                  // nothing stated: at least 3 significant figures
   const exactSide = before[before.length - 1];
   const places = `${hit.places} decimal place${hit.places === 1 ? '' : 's'}`;
   return { kind: 'rounded', note: `Correct to ${places}: the value on the left comes to ${Number(values[0].toPrecision(10))}, and ${shown} is that ${hit.how === 'truncated' ? 'cut off' : 'rounded'} to ${places}.`, how: { kind: 'rounded', places: hit.places, shown, exact: exactSide } };
@@ -224,7 +256,12 @@ function proveRestated(text, spans, state) {
         if (!close(a[0], b[0]) || !close(a[1], b[1])) ok = false; else seen++;
       } catch { /* a sample the line is not defined at */ }
     }
-    if (ok && seen >= 8) { state.restated = true; return { kind: 'restated', note: 'Correct. This copies the equation the question asks you to solve, side for side.', how: null }; }
+    if (ok && seen >= 8) {
+      state.restated = true;
+      const same = x => String(x).replace(/\s+/g, '').replace(/[{}]/g, '');
+      const copy = same(line) === same(clean(s.plain));
+      return { kind: 'restated', note: copy ? 'Correct. This copies the equation the question asks you to solve, side for side.' : 'Correct. This is the question\'s equation written another way: both sides have the same values as the question\'s for every x.', how: null };
+    }
   }
   return null;
 }
@@ -374,7 +411,7 @@ export function provedLines(q, meta, report) {
     let proof = null;
     const state = {};
     try {
-      proof = proveList(q, meta, text, spans) || proveSubstitution(q, text, spans) || proveRounded(text, i > 0 ? report.lines[i - 1]?.text : null) || proveRestated(text, spans, state) || proveIdentity(text) || proveDerivative(text) || proveChainRule(text);
+      proof = proveList(q, meta, text, spans) || proveSubstitution(q, text, spans) || proveRounded(q, text, i > 0 ? report.lines[i - 1]?.text : null) || proveRestated(text, spans, state) || proveIdentity(text) || proveDerivative(text) || proveChainRule(text);
     } catch { proof = null; }
     if (!proof || /[$—–]/.test(proof.note)) return l;
     n++;

@@ -93,6 +93,22 @@ ok(sidesOf('a = b = c').length === 3, 'oracle: splits a chain');
 }
 
 
+// ── the rounded-value tick reads what the question ASKS (independent review of PR #1116) ───────────────────────────────────────
+{
+  const q = gen('me12-binomial', 3, 23);   // "find the standard deviation, correct to 2 decimal places"
+  const at = line => statusOf(q, ['σ = √(npq)', line], 1);
+  // the correct rounding at the asked places, or to more places, is ticked
+  for (const good of ['√(1.16) ≈ 1.08', '√(25.7145) ≈ 5.07', '√(25.7145) ≈ 5.071', '√(25.7145) = 5.07']) ok(at(good) === 'ok', `rounded at or beyond the asked 2 places is ticked: ${good}`);
+  // a truncation that is not the rounding, too few places, one out in the last place, and finite decimals written with an equals sign are not
+  for (const bad of ['√(1.16) ≈ 1.07', '√(1.16) ≈ 1.09', '√(25.7145) ≈ 5.0', '√(25.7145) ≈ 5.1', '√(25.7145) ≈ 5.06', '√(25.7145) ≈ 5.08', '(54/100)=0.5', '(30/99)=0.3', '17845.61-14000=3845.6', '1+0.08=1.0', '(54/100) ≈ 0.5']) ok(at(bad) !== 'ok', `not ticked: ${bad}`);
+  const e = gen('me12-calc', 4, 23);        // "Find the exact area"
+  for (const bad of ['x = 128/3 ≈ 42.666', '128/3 = 42.666', '128/3 ≈ 42.667', '128/3 ≈ 42.67']) ok(statusOf(e, ['A = \\int_0^{16} \\sqrt{y}\\,dy', bad], 1) !== 'ok', `an exact question never takes a decimal as correct: ${bad}`);
+  // no precision asked: a correct rounding to at least 3 significant figures is ticked, fewer is not
+  const f = gen('y12-financial', 2, 5);
+  ok(statusOf(f, ['(1.06)^5 = 1.3382'], 0) === 'ok', 'no precision asked: 5 significant figures, a correct rounding, is ticked');
+  ok(statusOf(f, ['(1.06)^5 = 1.3'], 0) !== 'ok', 'no precision asked: 2 significant figures is not ticked');
+  ok(statusOf(f, ['(1.06)^5 = 1.3383'], 0) !== 'ok', 'no precision asked: one out in the last place is not ticked');
+}
 // ── the tick classes of engine/provedLines.js (24 November 2026): each true line is ticked, each one-edit mutant is not ──────────
 {
   // a solution list: a set, in any order, with ± and degrees; a wrong element, a wrong sign in a ± pair, an extra or a foreign unit is not ticked
