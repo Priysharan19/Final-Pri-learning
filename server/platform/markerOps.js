@@ -32,6 +32,7 @@ import { infoOf as arithmeticInfo, cleanStatement } from '../../client/src/engin
 import { annotateMilestones } from '../../client/src/engine/milestones.js';
 import { solutionMatch, _internals as SOLUTION_INTERNALS } from '../../client/src/engine/solutionMatch.js';
 import { lineChains } from '../../client/src/engine/lineChains.js';
+import { provedLines } from '../../client/src/engine/provedLines.js';
 import { awardBoardScheme, matchBoardPoints } from '../../client/src/engine/boardScheme.js';
 import { constrainToShown, unsupportedCredit } from '../../client/src/engine/markExplanation.js';
 import { answerForm, effectiveSymbols, firstFinalAttempt, planGivens, readClaimForm } from './finalAttempt.js';
@@ -383,6 +384,19 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
     const { report: bounded, clipped } = unsupported.length ? constrainToShown(decided, report?.lines, unsupported) : { report: decided, clipped: 0 };
     if (clipped) { try { partial = partialOf(bounded); decided = bounded; } catch { /* the marks stand */ } }
   }
+  // Feedback only, and DISPLAY ONLY: a note line that Pri can prove true (a solution list, a rounded value, a labelled substitution, a restated
+  // equation: engine/provedLines.js) is ticked, with the proof in its sentence, in `shownReport`. `stepReport` is NOT changed: it stays the
+  // deterministic report the marks, the scheme pay (schemeAward.schemePay), the generic solution-step rule and the stored record all read, so no
+  // proved tick can open a step mark. Never a cross, never a changed verdict, never a mark. `opts.proved === false` is the measurement's "before"
+  // switch, and `solutionMatch: false` (the switch that turns the display ticks off) turns it off too. Prithagoras (NSW Years 11-12) content only.
+  let shownReport = null;
+  if (typeof steps === 'string' && steps.trim() && !OBJECTIVE.has(q.answerType) && q.answerType !== 'graph-sketch' && !Array.isArray(q.boardScheme) && !(opts && (opts.proved === false || opts.solutionMatch === false)) && /^gen:(?:y11|y12|me11|me12)-/.test(String(q.contentId ?? ''))) {
+    try {
+      const base = report || trueAsWritten(q, steps, opts);
+      const more = base ? provedLines(q, meta, base) : null;
+      if (more && more !== base) shownReport = more;
+    } catch { /* the report stands */ }
+  }
   let markingReport = null;
   if (decided && decided !== report) {
     let reproduces = false;
@@ -394,7 +408,10 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
   // before it, and a candidate must be checked in the original equation before any line of the page can claim it. The topic check's own rows.
   try {
     if (decided && report && Array.isArray(decided.lines) && Array.isArray(report.lines) && decided.lines.length === report.lines.length && decided.lines.some(l => l?.candidate === true)) {
-      report = { ...report, lines: report.lines.map((l, i) => (decided.lines[i]?.candidate === true && String(decided.lines[i].text).trim() === String(l?.text ?? '').trim() ? decided.lines[i] : l)) };
+      const keepCandidates = rep => ({ ...rep, lines: rep.lines.map((l, i) => (decided.lines[i]?.candidate === true && String(decided.lines[i].text).trim() === String(l?.text ?? '').trim() ? decided.lines[i] : l)) });
+      report = keepCandidates(report);
+      // the displayed report (the proved-line ticks) keeps a candidate a note too
+      if (shownReport && Array.isArray(shownReport.lines) && shownReport.lines.length === decided.lines.length) shownReport = keepCandidates(shownReport);
     }
   } catch { /* the report stands */ }
   // Feedback only, last: the line that rejects a candidate root is ticked (checker.js tickRejections). Nothing above reads it.
@@ -404,13 +421,18 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
       const letter = /^([a-z])\s*=$/i.exec(String(q.answerPrefix || '').trim());
       const keyed = q.answerType === 'numeric' && Number.isFinite(q.answer?.value) ? [q.answer.value] : q.answerType === 'set' && Array.isArray(q.answer?.values) && q.answer.values.every(Number.isFinite) ? q.answer.values : null;
       const candMeta = lead?.kind === 'equation' ? lead : (keyed ? { kind: 'equation', ...(letter ? { variable: letter[1] } : {}), solutions: keyed, ...(q.answer?.tol > 0 ? { tol: q.answer.tol } : {}) } : null);
-      if (candMeta) report = tickRejections(candMeta, report, { authored: authoredEquations(q), prompt: q.prompt });
+      // DISPLAY ONLY: the rejection tick goes on the displayed report (`shownReport`), never on `report`, which the marks and the scheme pay read.
+      if (candMeta) {
+        const base = shownReport || report;
+        const rejected = tickRejections(candMeta, base, { authored: authoredEquations(q), prompt: q.prompt });
+        if (rejected !== base) shownReport = rejected;
+      }
     }
   } catch { /* the report stands */ }
   // A scheme question (schemeAward.js) also learns which lines the topic check ITSELF verified: the page ticks more than that (a copied
   // given, a rule statement, a true-as-written sum), and "writes a correct derivative" is earned only by a line the check found equal to it.
   const topicTicks = q._methodScheme ? (decided ? decided.lines.flatMap((l, i) => (l?.status === 'ok' ? [i] : [])) : null) : undefined;
-  return { stepReport: report, partial, ...(board ? { board } : {}), ...(markingReport ? { markingReport } : {}), ...(topicTicks !== undefined ? { topicTicks } : {}) };
+  return { stepReport: report, ...(shownReport ? { shownReport } : {}), partial, ...(board ? { board } : {}), ...(markingReport ? { markingReport } : {}), ...(topicTicks !== undefined ? { topicTicks } : {}) };
 }
 
 /** The Board-scheme award for a question carrying one, from the deterministic report. */
@@ -674,7 +696,7 @@ const RAW_MARKER_OPS = Object.freeze({
     if (!wanted) return { result, evidence: null };
     const evidence = stepEvidence(q, answer, working, result, { slipWarnings: true, ...(Array.isArray(workingGaps) ? { gaps: workingGaps } : {}), ...(Array.isArray(workingLatex) ? { latex: workingLatex } : {}) });
     // Final answer only: the step report stays, the method mark does not.
-    return { result, evidence: policyOf({ policy }).methodMarks ? evidence : { stepReport: evidence.stepReport, partial: null, ...(evidence.board ? { board: evidence.board } : {}), ...(evidence.topicTicks !== undefined ? { topicTicks: evidence.topicTicks } : {}) } };
+    return { result, evidence: policyOf({ policy }).methodMarks ? evidence : { stepReport: evidence.stepReport, ...(evidence.shownReport ? { shownReport: evidence.shownReport } : {}), partial: null, ...(evidence.board ? { board: evidence.board } : {}), ...(evidence.topicTicks !== undefined ? { topicTicks: evidence.topicTicks } : {}) } };
   },
   /** One examination response: the answer stage, then (method marks on) the working stage. */
   exam({ q, given, working, grid, policy }, emit) {

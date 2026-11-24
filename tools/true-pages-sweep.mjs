@@ -21,7 +21,7 @@ export async function sweep({ withTexts = false } = {}) {
     for (const t of ts) {
       if (t.style === 'slip') continue;
       const text = t.lines.map(l => l.text).join('\n');
-      let r; try { r = stepEvidence(q, '', text, { correct: false }, { slipWarnings: true }).stepReport; } catch { continue; }
+      let r; try { r = stepEvidence(q, '', text, { correct: false }, { slipWarnings: true }); r = r.shownReport || r.stepReport; } catch { continue; }
       if (!r?.lines || r.lines.length !== t.lines.length) continue;
       const key = createHash('sha1').update(`${q.subtopic}|${q.prompt}|${t.style}|${text}`).digest('hex').slice(0, 12);
       out[key] = { family: q.subtopic, statuses: r.lines.map(l => CODE[l.status] || '?').join(''), ...(withTexts ? { texts: t.lines.map(l => l.text), prompt: q.prompt, style: t.style } : {}) };

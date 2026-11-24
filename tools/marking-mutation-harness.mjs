@@ -342,6 +342,23 @@ export function mutationsOf(line) {
   return out.filter(m => (seen.has(m.text) ? false : (seen.add(m.text), true)));
 }
 
+
+// A line `E = d` (or `E ≈ d`) where d is a decimal with p places and E (no letters) comes to a value that rounds, or truncates, to d at p places:
+// true as an approximation to the places shown, whatever small change was made to E. Decided by THIS FILE's evaluator, never the engine's.
+export function roundedTrue(line) {
+  const sides = sidesOf(String(line).replace(/≈/g, '='));
+  if (sides.length < 2) return false;
+  const last = sides[sides.length - 1].trim();
+  const m = /^-?\d+\.(\d+)$/.exec(last);
+  if (!m) return false;
+  const vals = sides.slice(0, -1).map(x => (lettersIn(x).length ? null : sideValues(x, [])));
+  if (vals.some(v => !v || v[0] === null)) return false;
+  const v = vals[0][0];
+  if (!vals.every(w => Math.abs(w[0] - v) <= 1e-9 * Math.max(1, Math.abs(v)))) return false;
+  const scale = 10 ** m[1].length, d = Math.abs(Number(last.replace('.', ''))) , sc = Math.abs(v) * scale;
+  return Math.round(sc) === d || Math.floor(sc) === d;
+}
+
 /**
  * `(1.06)^(20) = 3.207` (a value written to some places beside an expression that has none): the value to p places with its last digit one off, both
  * ways, for the places written and one more. Wrong unless it is the correct rounding or the truncation of the exact value to those places (3.2070 for
@@ -362,7 +379,7 @@ export function roundingMutants(line) {
     const unit = 10 ** p, r = Math.round(exact * unit) / unit, t = Math.trunc(exact * unit) / unit;
     for (const d of [-1, 1]) {
       const v = r + d / unit;
-      if (Math.abs(v - r) < 1e-12 || Math.abs(v - t) < 1e-12 / unit) continue;   // a correct truncation is a correct rounded value
+      if (Math.abs((v - r) * unit) < 1e-6 || Math.abs((v - t) * unit) < 1e-6) continue;   // compared in units of the last place: a float difference of 1e-16 is not a different value   // a correct truncation is a correct rounded value
       const shown = (v < 0 ? '-' : '') + Math.abs(v).toFixed(p);
       const text = lit === 0 ? `${shown} = ${other}` : `${other} = ${shown}`;
       if (text.replace(/\s+/g, '') !== line.replace(/\s+/g, '')) out.push({ kind: 'rounding-off-by-one', text });
@@ -570,14 +587,14 @@ export async function loadBankEngine(root) {
 export function markPage(E, q, answer, page) {
   const qq = E.bank ? { ...q } : { ...q, _marking: 'final-answer-only' };
   let ev; try { ev = E.stepEvidence(qq, answer, page.join('\n'), E.checkAnswer(qq, answer), { slipWarnings: true }); } catch { return null; }
-  return ev && ev.stepReport && Array.isArray(ev.stepReport.lines) ? ev.stepReport.lines : null;
+  return ev && (ev.shownReport || ev.stepReport) && Array.isArray((ev.shownReport || ev.stepReport).lines) ? (ev.shownReport || ev.stepReport).lines : null;
 }
 /** The report's line for page line i: by position when it judged every line, otherwise by the line's text (a proof is judged line by line from its own plan). */
 export const lineAt = (rep, page, i) => (rep && rep.length === page.length ? rep[i] : rep ? rep.find(l => String(l.text ?? '').trim() === page[i].trim()) : undefined);
 
 export async function run({ root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), seeds = [1], maxPerLine = 12, generators = null, typed = 'wrong', limitPages = Infinity, verbose = false, bank = false, ids = null } = {}) {
   const E = bank ? await loadBankEngine(root) : await loadEngine(root);
-  const { G, NSW_BANK_LEDGER, spanToPlain } = E;
+  const { G, NSW_BANK_LEDGER, spanToPlain, stepEvidence, checkAnswer } = E;
   const cells = [];
   if (bank) for (const id of E.ids) { if (!ids || ids.includes(id)) cells.push({ generator: id, difficulty: 0, seed: 17 }); }
   else for (const e of NSW_BANK_LEDGER) {
@@ -588,6 +605,7 @@ export async function run({ root = path.resolve(path.dirname(fileURLToPath(impor
   const byKind = {};
   const setAside = {};
   const failures = { falseTicks: [], trueCrosses: [], rejectUnticked: [] };
+  const trueDetail = {};   // `${key}` → [{text,status,note}] per authored line (for the note-class table)
   const trueStatus = {};   // `${generator}|${difficulty}|${seed}` → [status per line]
   for (const cell of cells) {
     if (totals.pages >= limitPages) break;
@@ -679,6 +697,7 @@ export async function run({ root = path.resolve(path.dirname(fileURLToPath(impor
     const base = mark(lines);
     const key = `${cell.generator}|${cell.difficulty}|${cell.seed}`;
     trueStatus[key] = base ? lines.map((_, i) => { const l = at(base, lines, i); return l ? l.status : 'none'; }) : null;
+    trueDetail[key] = lines.map((t, i) => { const l = base ? at(base, lines, i) : null; return { type: q.answerType, text: t, status: l ? l.status : 'none', note: l ? (l.note || '') : (base ? '(no report line for this line)' : '(no line report for the page)') }; });
     if (base) {
       lines.forEach((_, i) => {
         const l = at(base, lines, i);
@@ -704,8 +723,11 @@ export async function run({ root = path.resolve(path.dirname(fileURLToPath(impor
         const verdict = m.kind === 'rounding-off-by-one' ? 'wrong' : judgeMutant(line, m.text);
         // A mutant that says what ANOTHER authored line of the page says (x = 2 in place of x = 0 when x = 2 is a root too) is a true
         // statement in the wrong place, not a false line: it is not held against the marker.
-        const echo = verdict === 'wrong' ? echoClass(lines, i, line, m.text, given, solutionNumbers) : null;
-        if (echo) { totals.echoes = (totals.echoes || 0) + 1; setAside[echo] = (setAside[echo] || 0) + 1; }
+        // a mutant that is still correct to the places it shows (a rounding or a truncation of the exact value) is a true approximation, counted apart
+        const rounded = verdict === 'wrong' && m.kind !== 'rounding-off-by-one' && roundedTrue(m.text);
+        const echo = verdict === 'wrong' && !rounded ? echoClass(lines, i, line, m.text, given, solutionNumbers) : null;
+        if (rounded) totals.roundingEchoes = (totals.roundingEchoes || 0) + 1;
+        else if (echo) { totals.echoes = (totals.echoes || 0) + 1; setAside[echo] = (setAside[echo] || 0) + 1; }
         else if (verdict === 'wrong' && definesAName(line, m.text)) totals.nameDefinitions = (totals.nameDefinitions || 0) + 1;
         else if (verdict === 'wrong') wrong.push(m); else if (verdict === 'same') totals.undecided += 0; else totals.undecided++;
       }
@@ -724,7 +746,148 @@ export async function run({ root = path.resolve(path.dirname(fileURLToPath(impor
       }
     });
   }
-  return { totals, byKind, setAside, failures, trueStatus };
+
+  // ── the tick classes of engine/provedLines.js, probed with true lines BUILT here and mutated one edit at a time ────────────────
+  //   solution lists   true: the question's solutions as a list (in the answer's order, reversed, with `or`, and as a ± pair where symmetric);
+  //                    mutants: a wrong element, a wrong sign in a ± pair, a ± pair cut to one side, a wrong ±n, an extra element, a dropped element
+  //   rounded values   true: an authored closed numeric side written to 1-4 places (rounded; truncated);  mutants: the last digit ±1 and ±2
+  //                    (a mutant this file's own evaluator finds still correct to the places shown is a true approximation, counted apart)
+  //   substitutions    true: `P(c) = r: <P with x replaced by (c)> = r` where the prompt gives P(c) = r;  mutants: one number or sign of the
+  //                    substituted expression changed, kept only when this file's evaluator finds it differs from the true substitution
+  const probe = { trueLines: 0, trueTicked: 0, mutants: 0, falseTicks: 0, cells: 0, roundingTrue: 0, byClass: {} };
+  const { stepMetaFor } = await import(path.join(root, 'server/platform/markerOps.js'));
+  const { precisionOf } = await import(path.join(root, 'client/src/engine/provedLines.js')).catch(() => ({ precisionOf: () => ({}) }));   // the question's own words only, never an answer
+  const probeMark = (q, page, extra = {}) => {
+    let ev; try { ev = stepEvidence({ ...q }, '99991', page.join('\n'), checkAnswer({ ...q }, '99991'), { slipWarnings: true, ...extra }); } catch { return []; }
+    return ev && (ev.shownReport || ev.stepReport) && Array.isArray((ev.shownReport || ev.stepReport).lines) ? (ev.shownReport || ev.stepReport).lines : [];
+  };
+  const asStatus = (q, page, k) => { const r = probeMark(q, page); const l = r.length === page.length ? r[k] : r.find(x => String(x.text ?? '').trim() === page[k].trim()); return l ? l.status : 'none'; };
+  const asTick = (q, page, k) => asStatus(q, page, k) === 'ok';
+  const cls = name => (probe.byClass[name] = probe.byClass[name] || { trueLines: 0, trueTicked: 0, mutants: 0, falseTicks: 0 });
+  const tryTrue = (q, name, page, k) => { const c = cls(name); probe.trueLines++; c.trueLines++; const st = asStatus(q, page, k); if (st === 'ok') { probe.trueTicked++; c.trueTicked++; } else if (st === 'break') { probe.trueCrossed = (probe.trueCrossed || 0) + 1; c.trueCrossed = (c.trueCrossed || 0) + 1; } else if (verbose) console.log('PROBE UNTICKED TRUE', name, JSON.stringify(page[k])); };
+  const tryFalse = (q, name, page, k, cell, authored) => {
+    const c = cls(name); probe.mutants++; c.mutants++;
+    if (asTick(q, page, k)) {
+      // a tick the engine gave BEFORE the provedLines pass (the same probe with it switched off) is the older passes' leniency, counted apart and named
+      const r0 = probeMark(q, page, { proved: false }); const l0 = r0.length === page.length ? r0[k] : r0.find(x => String(x.text ?? '').trim() === page[k].trim());
+      if (l0 && l0.status === 'ok') { probe.preexisting = (probe.preexisting || 0) + 1; (probe.preexistingList = probe.preexistingList || []).push({ ...cell, kind: name, authored, mutant: page[k], note: l0.note }); return; }
+      probe.falseTicks++; c.falseTicks++; failures.falseTicks.push({ ...cell, line: k, kind: name, authored, mutant: page[k], note: 'probe tick' }); }
+  };
+  const fmt = (v) => String(Object.is(v, -0) ? 0 : v);
+  for (const cell of cells) {
+    let q; try { q = G.generateQuestion(cell.generator, cell.difficulty, cell.seed); } catch { continue; }
+    if (!q || typeof q.prompt !== 'string' || ['mcq', 'multi-mcq', 'matrix-match', 'graph-sketch'].includes(q.answerType) || Array.isArray(q.boardScheme)) continue;
+    probe.cells++;
+    // solution lists
+    let meta = null; try { meta = stepMetaFor(q); } catch { meta = null; }
+    const sols = meta && meta.kind === 'equation' && Array.isArray(meta.solutions) ? meta.solutions.filter(Number.isFinite) : [];
+    const degrees = /\\circ|°|\bdegrees?\b/i.test(q.prompt);
+    const radians = /\bradians?\b|\\pi|π/i.test(q.prompt) && !degrees;
+    if (sols.length >= 1 && sols.length <= 4 && sols.every(Number.isInteger) && !radians) {
+      const L = meta.variable && meta.variable !== 'x' ? meta.variable : /\\theta/.test(q.prompt) ? 'θ' : /\\alpha/.test(q.prompt) ? 'α' : 'x', u = degrees ? '°' : '';
+      const ent = v => `${fmt(v)}${u}`;
+      const same = sols.length > 1 || sols.length === 1;
+      const lines = [`${L} = ${sols.map(ent).join(', ')}`, `${L} = ${sols.slice().reverse().map(ent).join(', ')}`, sols.map(v => `${L} = ${ent(v)}`).join(' or ')];
+      const sym = sols.length === 2 && sols[0] === -sols[1] && sols[0] !== 0;
+      if (sym) lines.push(`${L} = ±${fmt(Math.abs(sols[0]))}${u}`);
+      if (sols.length >= 2 || sym) for (const t of lines) if (same && (sols.length >= 2 || sym)) tryTrue(q, 'solution-list', [t], 0);
+      const wrongSets = [];
+      sols.forEach((v, i) => { const withEl = n => sols.map((x, j) => (j === i ? n : x)); wrongSets.push(withEl(v + 1), withEl(-v === v ? v + 2 : -v), withEl(v + 360 === v ? v : v + 90)); });
+      wrongSets.push([...sols, (Math.max(...sols) || 0) + 7]);
+      const key = x => x.slice().sort((a, b) => a - b).join();
+      const trueKey = key([...new Set(sols)]);
+      // a mutant that names ONLY roots of the question is true (incomplete, not false): the probes hold against it only a list with a value that is not a solution
+      const hasWrong = w => w.some(x => !sols.includes(x));
+      for (const w of wrongSets) { if (key([...new Set(w)]) === trueKey || !hasWrong(w)) continue; for (const t of [`${L} = ${w.map(ent).join(', ')}`, w.map(v => `${L} = ${ent(v)}`).join(' or ')]) tryFalse(q, 'solution-list', [t], 0, cell, lines[0]); }
+      if (sym) {
+        const n = Math.abs(sols[0]);
+        for (const t of [`${L} = ±${fmt(n + 1)}${u}`, `${L} = ±${fmt(n * 2)}${u}`, `${L} = ${fmt(n + 1)}${u}`]) tryFalse(q, 'plus-minus', [t], 0, cell, lines[3]);
+      }
+    }
+    // rounded values and labelled substitutions come from the question's authored page and prompt
+    const page = authoredPage(q, spanToPlain);
+    const seen = new Set();
+    const want = precisionOf(q), sfOf = x => x.replace(/^-/, '').replace('.', '').replace(/^0+/, '').length;
+    // the numbers a free-standing calculation may use (this file's own reading): the question's, what a percentage gives, 0 1 2 100, and the sides of earlier authored lines the engine ticks
+    const knownBase = [0, 1, 2, 100];
+    for (const m of String(q.prompt).replace(/\\\$/g, ' ').matchAll(/(?<![\w.])(\d+(?:\.\d+)?)\s*(\\?%|per\s?cent)?/g)) { const x = Number(m[1]); knownBase.push(x); if (m[2]) knownBase.push(x / 100, 1 + x / 100, 1 - x / 100); if (x > 0 && x < 1) knownBase.push(1 - x); }
+    const near = (a, b) => Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b));
+    const tickedLine = page.map((e, ei) => asStatus(q, page.slice(0, ei + 1), ei) === 'ok');
+    for (let li = 0; li < page.length; li++) {
+      const line = page[li];
+      const earlier = page.slice(0, li);
+      const known = knownBase.slice();
+      // an earlier line counts only when the engine ticks it on the page as it stands
+      earlier.forEach((e, ei) => { if (tickedLine[ei]) for (const sd of sidesOf(e)) { if (lettersIn(sd).length) continue; const vv = sideValues(sd, []); if (vv && vv[0] !== null) known.push(vv[0]); } });
+      const sides = sidesOf(line);
+      for (const side of sides) {
+        if (sides.length > 3 || lettersIn(side).length || !/[-+*\/^()]/.test(side.replace(/^-/, '')) || /[%π]|pi|sqrt|ln|log|sin|cos|tan|e\^|!/.test(side) || side.length > 50) continue;
+        const vv = sideValues(side, []); if (!vv || vv[0] === null) continue;
+        const v = vv[0]; if (!Number.isFinite(v) || Number.isInteger(v) || Math.abs(v) > 1e7) continue;
+        const tokens = [...side.matchAll(/\d+(?:\.\d+)?/g)];
+        const operandsKnown = tokens.length > 0 && tokens.every(t => known.some(k => near(k, Number(t[0]))));
+        for (const pl of [1, 2, 3, 4]) {
+          const sc = 10 ** pl, rnd = Math.round(Math.abs(v) * sc), tr = Math.floor(Math.abs(v) * sc), fr = Math.abs(v) * sc - tr;
+          if (Math.abs(fr - 0.5) < 1e-6 || fr < 1e-6 || fr > 1 - 1e-6) continue;
+          const dec = n => `${v < 0 ? '-' : ''}${(n / sc).toFixed(pl)}`;
+          const k0 = `${li}|${side}|${pl}`; if (seen.has(k0)) continue; seen.add(k0);
+          // a rounded line is TRUE (ticked) only when every operand is the question's or an earlier ticked line's, at or beyond the asked precision (3 s.f. when none is asked),
+          // never on a question asking for an exact value, never as an equation with a finite decimal; a truncation that is not the rounding, fewer places and one out are not
+          const finite = [0, 1, 2, 3, 4, 5, 6, 7, 8].some(k => { const x = Math.abs(v) * 10 ** k; return Math.abs(x - Math.round(x)) < 1e-7; });
+          const allowed = operandsKnown && !want.exact && !finite && (want.dp !== undefined ? pl >= want.dp : want.sf !== undefined ? sfOf(dec(rnd)) >= want.sf : sfOf(dec(rnd)) >= 3);
+          const pg = l => [...earlier, l];
+          if (allowed) tryTrue(q, 'rounded', pg(`${side} = ${dec(rnd)}`), li); else tryFalse(q, 'rounded', pg(`${side} = ${dec(rnd)}`), li, cell, `${side} = ${dec(rnd)} (not asked, an operand nobody reached, or an exact question)`);
+          if (tr !== rnd) tryFalse(q, 'rounded', pg(`${side} = ${dec(tr)}`), li, cell, `${side} = ${dec(rnd)} (truncation)`);
+          for (const dd of [-2, -1, 1, 2]) {
+            const n = rnd + dd; if (n === rnd || n < 0 || n === tr) continue;
+            tryFalse(q, 'rounded', pg(`${side} = ${dec(n)}`), li, cell, `${side} = ${dec(rnd)}`);
+          }
+          // one operand changed by 1 (the last place for a decimal), the result written as the correct rounding of the CHANGED expression: a slip the rounding must not hide
+          if (pl === 1 || pl === 2) tokens.forEach(t => {
+            const unit = t[0].includes('.') ? 10 ** -t[0].split('.')[1].length : 1;
+            for (const d of [-1, 1]) {
+              const nv = Number(t[0]) + d * unit; if (nv < 0) continue;
+              const nt = nv.toFixed(t[0].includes('.') ? t[0].split('.')[1].length : 0);
+              if (known.some(k => near(k, nv))) continue;                   // the changed operand is itself one the page has: a different true statement, not a slip
+              const ms = side.slice(0, t.index) + nt + side.slice(t.index + t[0].length);
+              const mv = sideValues(ms, []); if (!mv || mv[0] === null || !Number.isFinite(mv[0]) || Number.isInteger(mv[0])) continue;
+              const msc = 10 ** pl, f2 = Math.abs(mv[0]) * msc - Math.floor(Math.abs(mv[0]) * msc); if (Math.abs(f2 - 0.5) < 1e-6 || f2 < 1e-6 || f2 > 1 - 1e-6) continue;
+              tryFalse(q, 'rounded-operand', pg(`${ms} = ${(mv[0] < 0 ? '-' : '') + (Math.round(Math.abs(mv[0]) * msc) / msc).toFixed(pl)}`), li, cell, `${side} (one operand changed by ${d * unit})`);
+            }
+          });
+        }
+        if (seen.size > 60) break;
+      }
+      if (seen.size > 60) break;
+    }
+    const givens = [];
+    for (const m of String(q.prompt).replace(/\\\$/g, '\u0001').matchAll(TEX_SPAN)) { try { const pl = spanToPlain(m[1]); if (pl) givens.push(pl.trim()); } catch { /* unreadable */ } }
+    const def = givens.map(g => /^([A-Z])\(x\)\s*=\s*(.+)$/.exec(g)).find(Boolean);
+    if (def) {
+      const prompt = String(q.prompt);
+      const lin = /\(\s*x\s*([+-])\s*(\d+)\s*\)/.exec(prompt.replace(/\\\$/g, ''));
+      const rem = /remainder[^$]*\$[^$]*\$[^$]*\$\s*\(\s*x\s*([+-])\s*(\d+)\s*\)\s*\$[^$]*\$\s*([-\d.]+)\s*\$/.exec(prompt);
+      const factor = /\$\s*\(\s*x\s*([+-])\s*(\d+)\s*\)\s*\$\s*is a factor/.exec(prompt);
+      const gv = rem ? { c: (rem[1] === '+' ? -1 : 1) * Number(rem[2]), r: Number(rem[3]) } : factor ? { c: (factor[1] === '+' ? -1 : 1) * Number(factor[2]), r: 0 } : null;
+      void lin;
+      if (gv) {
+        const body = def[2], sub = body.replace(/x/g, `(${gv.c})`);
+        const truth = `${sub}`;
+        const trueLine = `${def[1]}(${gv.c}) = ${gv.r}: ${sub} = ${gv.r}`;
+        tryTrue(q, 'substitution', [trueLine], 0);
+        const letters = lettersIn(sub);
+        for (const mu of mutationsOf(sub)) {
+          const verdict = judgeMutant(truth, mu.text);
+          if (verdict !== 'wrong' || !letters.length) continue;
+          tryFalse(q, 'substitution', [`${def[1]}(${gv.c}) = ${gv.r}: ${mu.text} = ${gv.r}`], 0, cell, trueLine);
+        }
+        for (const bad of [gv.r + 1, gv.r - 3]) tryFalse(q, 'substitution', [`${def[1]}(${gv.c}) = ${bad}: ${sub} = ${bad}`], 0, cell, trueLine);
+      }
+    }
+  }
+  totals.probeTrueLines = probe.trueLines; totals.probeTrueTicked = probe.trueTicked; totals.probeMutants = probe.mutants; totals.probeFalseTicks = probe.falseTicks; totals.probeRoundingTrue = probe.roundingTrue; totals.probeTrueCrossedByTopicCheck = probe.trueCrossed || 0; totals.probePreexistingTicks = probe.preexisting || 0;
+  totals.falseTicks += probe.falseTicks;
+  return { totals, byKind, setAside, failures, trueStatus, trueDetail, probe };
 }
 
 // ── true ticks lost between two runs of the same cells ──────────────────────────────────────────────────────────────────
@@ -755,13 +918,13 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
     ids: arg('ids', null) ? arg('ids').split(',') : null,
     verbose: process.argv.includes('--verbose')
   });
-  console.log(JSON.stringify({ totals: res.totals, byKind: res.byKind }, null, 1));
+  console.log(JSON.stringify({ totals: res.totals, byKind: res.byKind, probe: res.probe }, null, 1));
   console.log('false ticks:', res.failures.falseTicks.length, 'true crosses:', res.failures.trueCrosses.length);
   for (const f of res.failures.falseTicks.slice(0, 40)) console.log('  FALSE TICK', f.generator, f.difficulty, f.seed, 'L' + f.line, f.kind, '|', f.authored, '->', f.mutant, '|', (f.note || '').slice(0, 70));
   for (const f of res.failures.rejectUnticked.slice(0, 12)) console.log('  REJECT NOT TICKED', f.generator, f.difficulty, f.seed, f.page, '|', f.text, '|', f.status, (f.note || '').slice(0, 60));
   for (const f of res.failures.trueCrosses.slice(0, 40)) console.log('  TRUE CROSS', f.generator, f.difficulty, f.seed, 'L' + f.line, '|', f.text, '|', (f.note || '').slice(0, 70));
   const dump = arg('dump', null);
-  if (dump) fs.writeFileSync(dump, JSON.stringify({ trueStatus: res.trueStatus, failures: res.failures, totals: res.totals, byKind: res.byKind }));
+  if (dump) fs.writeFileSync(dump, JSON.stringify({ trueStatus: res.trueStatus, trueDetail: res.trueDetail, failures: res.failures, totals: res.totals, byKind: res.byKind }));
   const cmp = arg('compare', null);
   if (cmp) {
     const before = JSON.parse(fs.readFileSync(cmp, 'utf8')).trueStatus;
