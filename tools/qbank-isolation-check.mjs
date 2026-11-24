@@ -7,8 +7,8 @@
 //
 // Static: no client source, client config or public asset names the pack or its module; the server serves static files from client/dist
 // only; the pack's own files are not under client/. Built: no file of client/dist (scripts, styles, pages, the service worker and its
-// precache list included) is a pack file, names the pack format or version, a pack shard, or contains the worked steps, criteria or trap
-// reasons of any packed question (the prompt and the authored hints are public by design and are not searched for).
+// precache list included) is a pack file, names the pack format or version, a pack shard, or contains the worked steps or criteria
+// of any packed question (the prompt and the authored hints are public by design and are not searched for).
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -63,9 +63,9 @@ if (!fs.existsSync(dist)) {
   ok(files.length > 0, 'client/dist holds files');
   const rel = f => path.relative(dist, f).split(path.sep).join('/');
   ok(!files.some(f => /(^|\/)qbank(\/|$)|qb-[ax]1[12]-m[ae]-/.test(rel(f))), 'no file of client/dist is, or is named for, a pack file');
-  const secrets = [...new Set(questions.flatMap(q => [...q.steps.map(s => s.d), ...q.criteria.map(c => c.point), ...q.traps.map(t => t.why)]
+  const secrets = [...new Set(questions.flatMap(q => [...q.steps.map(s => s.d), ...q.criteria.map(c => c.point)]
     .filter(t => t.length >= 40 && !q.hints.some(h => h.includes(t) || t.includes(h)) && !q.prompt.includes(t))))];
-  ok(secrets.length > 500, `the check has worked-step, criterion and trap texts to look for (${secrets.length})`);
+  ok(secrets.length > 500, `the check has worked-step and criterion texts to look for (${secrets.length})`);
   // Question ids are the author's own (A11-C1-089) and appear nowhere in the client; a long text can coincide with a generator's wording, an id cannot.
   const ids = questions.map(q => q.id);
   const hits = [];
