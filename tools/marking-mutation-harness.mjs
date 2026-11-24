@@ -719,32 +719,58 @@ export async function run({ root = path.resolve(path.dirname(fileURLToPath(impor
     // rounded values and labelled substitutions come from the question's authored page and prompt
     const page = authoredPage(q, spanToPlain);
     const seen = new Set();
-    for (const line of page) {
+    const want = precisionOf(q), sfOf = x => x.replace(/^-/, '').replace('.', '').replace(/^0+/, '').length;
+    // the numbers a free-standing calculation may use (this file's own reading): the question's, what a percentage gives, 0 1 2 100, and the sides of earlier authored lines the engine ticks
+    const knownBase = [0, 1, 2, 100];
+    for (const m of String(q.prompt).replace(/\\\$/g, ' ').matchAll(/(?<![\w.])(\d+(?:\.\d+)?)\s*(\\?%|per\s?cent)?/g)) { const x = Number(m[1]); knownBase.push(x); if (m[2]) knownBase.push(x / 100, 1 + x / 100, 1 - x / 100); if (x > 0 && x < 1) knownBase.push(1 - x); }
+    const near = (a, b) => Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b));
+    const tickedLine = page.map((e, ei) => asStatus(q, page.slice(0, ei + 1), ei) === 'ok');
+    for (let li = 0; li < page.length; li++) {
+      const line = page[li];
+      const earlier = page.slice(0, li);
+      const known = knownBase.slice();
+      // an earlier line counts only when the engine ticks it on the page as it stands
+      earlier.forEach((e, ei) => { if (tickedLine[ei]) for (const sd of sidesOf(e)) { if (lettersIn(sd).length) continue; const vv = sideValues(sd, []); if (vv && vv[0] !== null) known.push(vv[0]); } });
       const sides = sidesOf(line);
       for (const side of sides) {
         if (sides.length > 3 || lettersIn(side).length || !/[-+*\/^()]/.test(side.replace(/^-/, '')) || /[%π]|pi|sqrt|ln|log|sin|cos|tan|e\^|!/.test(side) || side.length > 50) continue;
         const vv = sideValues(side, []); if (!vv || vv[0] === null) continue;
         const v = vv[0]; if (!Number.isFinite(v) || Number.isInteger(v) || Math.abs(v) > 1e7) continue;
+        const tokens = [...side.matchAll(/\d+(?:\.\d+)?/g)];
+        const operandsKnown = tokens.length > 0 && tokens.every(t => known.some(k => near(k, Number(t[0]))));
         for (const pl of [1, 2, 3, 4]) {
           const sc = 10 ** pl, rnd = Math.round(Math.abs(v) * sc), tr = Math.floor(Math.abs(v) * sc), fr = Math.abs(v) * sc - tr;
           if (Math.abs(fr - 0.5) < 1e-6 || fr < 1e-6 || fr > 1 - 1e-6) continue;
           const dec = n => `${v < 0 ? '-' : ''}${(n / sc).toFixed(pl)}`;
-          const k0 = `${side}|${pl}`; if (seen.has(k0)) continue; seen.add(k0);
-          // what the question asks of a decimal (read from its prompt only): a rounded line is TRUE (ticked) only at or beyond the asked precision (3 s.f. when none is asked),
+          const k0 = `${li}|${side}|${pl}`; if (seen.has(k0)) continue; seen.add(k0);
+          // a rounded line is TRUE (ticked) only when every operand is the question's or an earlier ticked line's, at or beyond the asked precision (3 s.f. when none is asked),
           // never on a question asking for an exact value, never as an equation with a finite decimal; a truncation that is not the rounding, fewer places and one out are not
-          const want = precisionOf(q), sfOf = x => x.replace(/^-/, '').replace('.', '').replace(/^0+/, '').length;
           const finite = [0, 1, 2, 3, 4, 5, 6, 7, 8].some(k => { const x = Math.abs(v) * 10 ** k; return Math.abs(x - Math.round(x)) < 1e-7; });
-          const allowed = !want.exact && !finite && (want.dp !== undefined ? pl >= want.dp : want.sf !== undefined ? sfOf(dec(rnd)) >= want.sf : sfOf(dec(rnd)) >= 3);
-          if (allowed) tryTrue(q, 'rounded', [`${side} = ${dec(rnd)}`], 0); else tryFalse(q, 'rounded', [`${side} = ${dec(rnd)}`], 0, cell, `${side} = ${dec(rnd)} (not asked, or an exact question)`);
-          if (tr !== rnd) tryFalse(q, 'rounded', [`${side} = ${dec(tr)}`], 0, cell, `${side} = ${dec(rnd)} (truncation)`);
+          const allowed = operandsKnown && !want.exact && !finite && (want.dp !== undefined ? pl >= want.dp : want.sf !== undefined ? sfOf(dec(rnd)) >= want.sf : sfOf(dec(rnd)) >= 3);
+          const pg = l => [...earlier, l];
+          if (allowed) tryTrue(q, 'rounded', pg(`${side} = ${dec(rnd)}`), li); else tryFalse(q, 'rounded', pg(`${side} = ${dec(rnd)}`), li, cell, `${side} = ${dec(rnd)} (not asked, an operand nobody reached, or an exact question)`);
+          if (tr !== rnd) tryFalse(q, 'rounded', pg(`${side} = ${dec(tr)}`), li, cell, `${side} = ${dec(rnd)} (truncation)`);
           for (const dd of [-2, -1, 1, 2]) {
             const n = rnd + dd; if (n === rnd || n < 0 || n === tr) continue;
-            tryFalse(q, 'rounded', [`${side} = ${dec(n)}`], 0, cell, `${side} = ${dec(rnd)}`);
+            tryFalse(q, 'rounded', pg(`${side} = ${dec(n)}`), li, cell, `${side} = ${dec(rnd)}`);
           }
+          // one operand changed by 1 (the last place for a decimal), the result written as the correct rounding of the CHANGED expression: a slip the rounding must not hide
+          if (pl === 1 || pl === 2) tokens.forEach(t => {
+            const unit = t[0].includes('.') ? 10 ** -t[0].split('.')[1].length : 1;
+            for (const d of [-1, 1]) {
+              const nv = Number(t[0]) + d * unit; if (nv < 0) continue;
+              const nt = nv.toFixed(t[0].includes('.') ? t[0].split('.')[1].length : 0);
+              if (known.some(k => near(k, nv))) continue;                   // the changed operand is itself one the page has: a different true statement, not a slip
+              const ms = side.slice(0, t.index) + nt + side.slice(t.index + t[0].length);
+              const mv = sideValues(ms, []); if (!mv || mv[0] === null || !Number.isFinite(mv[0]) || Number.isInteger(mv[0])) continue;
+              const msc = 10 ** pl, f2 = Math.abs(mv[0]) * msc - Math.floor(Math.abs(mv[0]) * msc); if (Math.abs(f2 - 0.5) < 1e-6 || f2 < 1e-6 || f2 > 1 - 1e-6) continue;
+              tryFalse(q, 'rounded-operand', pg(`${ms} = ${(mv[0] < 0 ? '-' : '') + (Math.round(Math.abs(mv[0]) * msc) / msc).toFixed(pl)}`), li, cell, `${side} (one operand changed by ${d * unit})`);
+            }
+          });
         }
-        if (seen.size > 40) break;
+        if (seen.size > 60) break;
       }
-      if (seen.size > 40) break;
+      if (seen.size > 60) break;
     }
     const givens = [];
     for (const m of String(q.prompt).replace(/\\\$/g, '\u0001').matchAll(TEX_SPAN)) { try { const pl = spanToPlain(m[1]); if (pl) givens.push(pl.trim()); } catch { /* unreadable */ } }

@@ -116,6 +116,18 @@ export function roundedTo(v, shown) {
   if (target === truncated) return { places: p, how: 'truncated' };
   return null;
 }
+/** The numbers a calculation on the page may use without an earlier ticked line: the question's own numbers, what a percentage gives (1 + r/100, 1 - r/100, r/100), 1 - x for a proportion, and 0, 1, 2, 100. */
+export function knownNumbers(q) {
+  const out = [0, 1, 2, 100];
+  const prompt = q && typeof q.prompt === 'string' ? q.prompt : '';
+  for (const m of prompt.replace(/\\\$/g, ' ').matchAll(/(?<![\w.])(\d+(?:\.\d+)?)\s*(\\?%|per\s?cent)?/g)) {
+    const v = Number(m[1]);
+    out.push(v);
+    if (m[2]) out.push(v / 100, 1 + v / 100, 1 - v / 100);
+    if (v > 0 && v < 1) out.push(1 - v);
+  }
+  return out;
+}
 const NUMWORD = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6 };
 const numOf = w => (/^\d+$/.test(w) ? Number(w) : NUMWORD[String(w).toLowerCase()] ?? null);
 /**
@@ -124,13 +136,15 @@ const numOf = w => (/^\d+$/.test(w) ? Number(w) : NUMWORD[String(w).toLowerCase(
  */
 export function precisionOf(q) {
   const prompt = q && typeof q.prompt === 'string' ? q.prompt : '';
-  const words = prompt.replace(/\\\$/g, '\u0001').replace(/\$\$?[^$]*\$\$?/g, ' § ').replace(/\u0001/g, '$');
+  const words = prompt.replace(/\\\$/g, '\u0001').replace(/\$\s*(\d+)\s*\$/g, ' $1 ').replace(/\$\$?[^$]*\$\$?/g, ' § ').replace(/\u0001/g, '$');
   const tex = prompt;
+  const N = '(\\d+|one|two|three|four|five|six)';
   let m;
-  if ((m = /\b(?:correct )?to (\d+|one|two|three|four|five|six) (?:decimal place|decimal point|d\.p)/i.exec(words))) { const n = numOf(m[1]); if (n !== null) return { dp: n }; }
-  if ((m = /\b(\d+|one|two|three|four|five|six) significant (?:figure|digit)/i.exec(words)) || (m = /\b(\d+|one|two|three|four|five|six) s\.?f\b/i.exec(words))) { const n = numOf(m[1]); if (n !== null) return { sf: n }; }
-  if (/\bnearest (?:cent|hundredth)\b/i.test(words)) return { dp: 2 };
-  if (/\bnearest tenth\b/i.test(words)) return { dp: 1 };
+  if ((m = new RegExp(`\\b${N}\\s*(?:decimal\\s+(?:place|point)s?|d\\.\\s?p(?![A-Za-z])|dp(?![A-Za-z]))`, 'i').exec(words))) { const n = numOf(m[1]); if (n !== null) return { dp: n }; }
+  if ((m = new RegExp(`\\b${N}\\s*(?:significant\\s+(?:figure|digit)s?|s\\.\\s?f(?![A-Za-z])|sf(?![A-Za-z]))`, 'i').exec(words))) { const n = numOf(m[1]); if (n !== null) return { sf: n }; }
+  if (/\bnearest (?:cent|hundredth)s?\b/i.test(words)) return { dp: 2 };
+  if (/\bnearest thousandths?\b/i.test(words)) return { dp: 3 };
+  if (/\bnearest tenths?\b/i.test(words)) return { dp: 1 };
   if (/\bnearest (?:whole number|integer|dollar|degree|minute|second|metre|meter|centimetre|centimeter|kilometre|kilometer|unit|year|month|day|hour|person|student)s?\b/i.test(words)) return { dp: 0 };
   if (/\bexact(?:ly)?\b|\bsurds?\b|\bfractions?\b|\bsimplest form\b|\bin terms of\b|\bleave (?:your )?answer\b/i.test(words) || /\bin terms of\b/i.test(tex)) return { exact: true };
   if (/\\\$|\bdollars?\b|\bcents?\b/i.test(prompt)) return { dp: 2, money: true };
@@ -139,7 +153,7 @@ export function precisionOf(q) {
 const sigFigs = shown => { const d = shown.replace(/^-/, '').replace('.', '').replace(/^0+/, ''); return d.length; };
 /** Does v have a terminating decimal expansion that a float can show (so an equals sign with a different decimal is a false equality)? */
 const terminating = v => { for (let k = 0; k <= 8; k++) { const x = Math.abs(v) * 10 ** k; if (Math.abs(x - Math.round(x)) < 1e-7) return true; } return false; };
-function proveRounded(q, text, previous) {
+function proveRounded(q, text, previous, known) {
   const approx = /[≈≃]/.test(text);
   let src = lead(text).replace(/[≈≃]/g, '=');
   const cont = /^=/.test(src);
@@ -156,6 +170,9 @@ function proveRounded(q, text, previous) {
   }
   const values = before.map(numericSide);
   if (!values.length || values.some(v => v === null) || !values.every(v => close(v, values[0]))) return null;
+  // every number of the calculation must be one the question gives or an earlier ticked line reached: otherwise a slipped operand hides behind the rounding
+  const nums = [...clean(before[0]).matchAll(/\d+(?:\.\d+)?/g)].map(m => Number(m[0]));
+  if (!nums.length || !Array.isArray(known) || nums.some(x => !known.some(k => close(k, x)))) return null;
   const hit = roundedTo(values[0], shown);
   // fail closed: only a correct ROUNDING, never a truncation that differs from it, and only at the precision the question asks
   if (!hit || hit.how === 'truncated') return null;
@@ -405,16 +422,22 @@ export function provedLines(q, meta, report) {
   const limit = brk >= 0 ? brk : report.lines.length;
   const spans = promptSpans(q?.prompt);
   let n = 0;
+  // the numbers a free-standing calculation may use: the question's own (and what they give as a rate), plain constants of the method, and the sides
+  // of EARLIER lines that are themselves ticked (so an operand that slipped is never hidden by a rounded result)
+  const known = knownNumbers(q);
+  const learn = text => { for (const side of lead(text).replace(/[≈≃]/g, '=').split('=')) { const v = numericSide(side); if (v !== null) known.push(v); } };
   const lines = report.lines.map((l, i) => {
-    if (i >= limit || !unjudged(l)) return l;
+    if (i >= limit) return l;
+    if (!unjudged(l)) { if (l && l.status === 'ok') learn(String(l.text ?? '')); return l; }
     const text = String(l.text ?? '');
     let proof = null;
     const state = {};
     try {
-      proof = proveList(q, meta, text, spans) || proveSubstitution(q, text, spans) || proveRounded(q, text, i > 0 ? report.lines[i - 1]?.text : null) || proveRestated(text, spans, state) || proveIdentity(text) || proveDerivative(text) || proveChainRule(text);
+      proof = proveList(q, meta, text, spans) || proveSubstitution(q, text, spans) || proveRounded(q, text, i > 0 ? report.lines[i - 1]?.text : null, known) || proveRestated(text, spans, state) || proveIdentity(text) || proveDerivative(text) || proveChainRule(text);
     } catch { proof = null; }
     if (!proof || /[$—–]/.test(proof.note)) return l;
     n++;
+    learn(text);
     if (proof.kind === 'restated') return { text: l.text, status: 'ok', state: 'given', solutionMatch: true, note: proof.note };
     // state 'arithmetic' = true as written: the page says once that such a line is true, not that it is the right step; the note is shown as it is
     return { text: l.text, status: 'ok', state: 'arithmetic', note: proof.note, valueChain: { rule: 'proved' }, fact: { kind: 'proved', proof: proof.kind, ...(proof.how || {}) } };

@@ -96,11 +96,21 @@ ok(sidesOf('a = b = c').length === 3, 'oracle: splits a chain');
 // ── the rounded-value tick reads what the question ASKS (independent review of PR #1116) ───────────────────────────────────────
 {
   const q = gen('me12-binomial', 3, 23);   // "find the standard deviation, correct to 2 decimal places"
-  const at = line => statusOf(q, ['σ = √(npq)', line], 1);
+  const at = line => statusOf(q, ['9*0.15*0.85=1.1475', line], 1);
   // the correct rounding at the asked places, or to more places, is ticked
-  for (const good of ['√(1.16) ≈ 1.08', '√(25.7145) ≈ 5.07', '√(25.7145) ≈ 5.071', '√(25.7145) = 5.07']) ok(at(good) === 'ok', `rounded at or beyond the asked 2 places is ticked: ${good}`);
+  for (const good of ['√(1.1475) ≈ 1.07', '√(1.1475) ≈ 1.071', '√(1.1475) = 1.07']) ok(at(good) === 'ok', `rounded at or beyond the asked 2 places is ticked: ${good}`);
   // a truncation that is not the rounding, too few places, one out in the last place, and finite decimals written with an equals sign are not
-  for (const bad of ['√(1.16) ≈ 1.07', '√(1.16) ≈ 1.09', '√(25.7145) ≈ 5.0', '√(25.7145) ≈ 5.1', '√(25.7145) ≈ 5.06', '√(25.7145) ≈ 5.08', '(54/100)=0.5', '(30/99)=0.3', '17845.61-14000=3845.6', '1+0.08=1.0', '(54/100) ≈ 0.5']) ok(at(bad) !== 'ok', `not ticked: ${bad}`);
+  for (const bad of ['√(1.1475) ≈ 1.06', '√(1.1475) ≈ 1.08', '√(1.1475) ≈ 1.1', '√(1.1475) ≈ 1.0', '(54/100)=0.5', '(30/99)=0.3', '17845.61-14000=3845.6', '1+0.08=1.0', '(54/100) ≈ 0.5']) ok(at(bad) !== 'ok', `not ticked: ${bad}`);
+  // an operand the question never gave and no earlier ticked line reached: the rounding does not hide it
+  for (const bad of ['√(1.16) ≈ 1.08', '√(1.1476) ≈ 1.07']) ok(at(bad) !== 'ok', `an operand nobody reached is not ticked: ${bad}`);
+  ok(statusOf(q, ['√(1.1475) ≈ 1.07'], 0) !== 'ok', 'with no earlier ticked line that reached 1.1475, the calculation is not ticked');
+  {
+    // the review's repro: a slipped operand hidden by a rounded result (y11-data-sets d1 seed 185)
+    const d = gen('y11-data-sets', 1, 185);
+    const page = last => ['16*90=1440', '29*81=2349', last];
+    ok(statusOf(d, page('((2349+1440)/45)=84.2'), 2) === 'ok', 'the true calculation is ticked: every operand is given or reached');
+    for (const bad of ['((2349+1439)/45)=84.2', '((2349+1441)/45)=84.2', '((2348+1440)/45)=84.2', '((2350+1440)/45)=84.2', '((2349+1440)/46)=84.2', '((2349+1440)/44)=86.1']) ok(statusOf(d, page(bad), 2) !== 'ok', `one operand changed by 1, the result still a correct rounding of the changed expression: not ticked: ${bad}`);
+  }
   const e = gen('me12-calc', 4, 23);        // "Find the exact area"
   for (const bad of ['x = 128/3 ≈ 42.666', '128/3 = 42.666', '128/3 ≈ 42.667', '128/3 ≈ 42.67']) ok(statusOf(e, ['A = \\int_0^{16} \\sqrt{y}\\,dy', bad], 1) !== 'ok', `an exact question never takes a decimal as correct: ${bad}`);
   // no precision asked: a correct rounding to at least 3 significant figures is ticked, fewer is not
@@ -286,6 +296,20 @@ let corpusFalse = 0, corpusCross = 0, corpusFalseTicked = 0, corpusCrossed = 0, 
   ok(corpusFalse >= 300 && corpusCross >= 20, `the corpus is not trivial (${corpusFalse} false ticks, ${corpusCross} crossed true lines)`);
 }
 
+// ── the precision a question asks, read from its words (independent review of PR #1116) ─────────────────────────────────────────
+{
+  const { precisionOf } = await import('../../client/src/engine/provedLines.js');
+  const P = prompt => JSON.stringify(precisionOf({ prompt }));
+  const cases = [
+    ['Find x, correct to two decimal places.', { dp: 2 }], ['Find x to 2 decimal places.', { dp: 2 }], ['Give the answer to three decimal places.', { dp: 3 }], ['Find x, 2 d.p.', { dp: 2 }], ['Find x (2 dp).', { dp: 2 }],
+    ['Find x, one decimal place.', { dp: 1 }], ['Find $x$ to $2$ decimal places.', { dp: 2 }], ['Find x to four significant figures.', { sf: 4 }], ['Find x to 3 significant figures.', { sf: 3 }],
+    ['Find x, 3 s.f.', { sf: 3 }], ['Find x (3 sf).', { sf: 3 }], ['Give the answer to the nearest cent.', { dp: 2 }], ['to the nearest dollar', { dp: 0 }], ['to the nearest whole number', { dp: 0 }],
+    ['to the nearest integer', { dp: 0 }], ['to the nearest degree', { dp: 0 }], ['to the nearest minute', { dp: 0 }], ['to the nearest tenth', { dp: 1 }], ['to the nearest hundredth', { dp: 2 }], ['to the nearest thousandth', { dp: 3 }],
+    ['Find the exact value.', { exact: true }], ['Find x.', {}]
+  ];
+  for (const [prompt, want] of cases) ok(P(prompt) === JSON.stringify(want), `precision read from "${prompt}": ${P(prompt)}`);
+}
+
 // ── the harness over the authored pages ──────────────────────────────────────────────────────────────────────────────────────
 {
   const res = await run({ seeds: SEEDS, maxPerLine: 8 });
@@ -299,7 +323,7 @@ let corpusFalse = 0, corpusCross = 0, corpusFalseTicked = 0, corpusCrossed = 0, 
   // the probes of the new tick classes (solution lists, ± pairs, rounded values, labelled substitutions): built here, mutated one edit at a time
   ok(res.probe.mutants >= 500 && res.probe.trueLines >= 150, `the probes are not trivial (${res.probe.trueLines} true lines, ${res.probe.mutants} mutants)`);
   ok(res.probe.falseTicks === 0, `no probe mutant is ticked (${res.probe.falseTicks})`);
-  for (const k of ['solution-list', 'plus-minus', 'rounded', 'substitution']) ok(res.probe.byClass[k] && res.probe.byClass[k].falseTicks === 0 && res.probe.byClass[k].mutants > 0, `probe class ${k}: mutants ran and none was ticked`);
+  for (const k of ['solution-list', 'plus-minus', 'rounded', 'rounded-operand', 'substitution']) ok(res.probe.byClass[k] && res.probe.byClass[k].falseTicks === 0 && res.probe.byClass[k].mutants > 0, `probe class ${k}: mutants ran and none was ticked`);
   ok(res.probe.trueTicked >= 0.9 * (res.probe.trueLines - (res.probe.trueCrossed || 0)), `probe true lines are ticked (${res.probe.trueTicked} of ${res.probe.trueLines}, ${res.probe.trueCrossed || 0} crossed by the topic check before this pass)`);
 }
 
