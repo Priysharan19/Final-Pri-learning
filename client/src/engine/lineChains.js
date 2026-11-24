@@ -558,7 +558,7 @@ function run(q, report, warn, opts = null) {
       }
     }
     // c · a bracket worked out at its limits, then matched like any equation of the solution
-    if (!s.ctx && !s.continuation && parts.length === 2 && parts.some(x => /\]_/.test(x))) {
+    if (!s.ctx && !s.continuation && parts.length === 2 && parts.some(x => /\]_/.test(x)) && SM.limitsKnown(parts, sol)) {
       const ex = parts.map(x => (/\]_/.test(x) ? expandBrackets(x) : x));
       if (ex.every(Boolean)) { const h = SM.matchEquation(ex, sol, null); if (h) return verified(noteStep(h), h.step); }
     }

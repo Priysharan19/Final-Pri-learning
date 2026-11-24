@@ -23,6 +23,7 @@ import { texToPlain } from './texToPlain.js';
 import { plainTex } from './checker.js';
 import { evaluate, exprEquivalent, withEvaluationBudget } from './expr.js';
 import { infoOf, cleanStatement, exactForm } from './arithmeticLines.js';
+import { isWorkedSum } from './milestones.js';
 
 const PAGE_BUDGET = 120000;
 const MAX_LINES = 20;
@@ -87,6 +88,17 @@ function topLevelPieces(plain) {
   out.push(cur);
   return out.map(x => x.trim()).filter(Boolean);
 }
+// The limits of an evaluated bracket or an integral (`]_0^(2)`, `∫_0^2`) as number pairs: a line that evaluates a bracket between
+// limits the question and its solution never use may happen to reach the same value (F(3) = F(0) = 0), but it is not that step.
+const LIMIT_PAIR = /_\s*(\([^()]*\)|-?[A-Za-z0-9.π]+)\s*\^\s*(\([^()]*\)|-?[A-Za-z0-9.π]+)/g;
+function limitKeys(text) {
+  const out = [];
+  for (const m of String(text ?? '').matchAll(LIMIT_PAIR)) {
+    const key = x => { const v = numericOf(x); return v !== null ? String(Math.round(v * 1e9)) : canon(x); };
+    out.push(`${key(m[1])}|${key(m[2])}`);
+  }
+  return out;
+}
 const sidesOf = piece => piece.split(SPLIT_EQ).map(x => x.trim());
 
 /** Every statement of a text: [{ parts:[plain side, …] }] (one part = a bare expression). */
@@ -115,7 +127,8 @@ const readSide = side => {
     const t = braces(tidy(side));
     // a comma or semicolon list (a point, a vector, an interval) is never one number: it is compared component by component or not at all
     if (/[,;]/.test(t)) return null;
-    for (const f of FUNCS) if (new RegExp(`(?<![A-Za-z])${f}'*\\s*\\(`).test(t)) return null;
+    // `f^(-1)(-2)` is the inverse applied to -2, not the product f^(-1)·(-2): a power sits between the name and its argument.
+    for (const f of FUNCS) if (new RegExp(`(?<![A-Za-z])${f}(?:\\s*\\^\\s*(?:\\([^()]*\\)|-?\\d+))?'*\\s*\\(`).test(t)) return null;
     return infoOf(cleanStatement(t));
   } catch { return null; }
 };
@@ -195,13 +208,16 @@ function proportional(f, g) {
 // ── the worked solution, read once ───────────────────────────────────────────
 function readSolution(q) {
   const steps = Array.isArray(q?.steps) ? q.steps : [];
-  const labelled = [], conditions = [], values = [], numeric = [];
+  const labelled = [], conditions = [], values = [], numeric = [], verbatim = [], limits = new Set();
+  for (const t of [String(q?.prompt ?? ''), ...steps.map(x => String(x?.d ?? ''))]) for (const m of t.replace(/\\\$/g, '\u0001').matchAll(TEX_SPAN)) { const pl = spanToPlain(m[1]); if (pl) for (const k of limitKeys(braces(pl))) limits.add(k); }
   steps.forEach((st, i) => {
     const heading = String(st?.h ?? '').trim();
     for (const m of String(st?.d ?? '').matchAll(TEX_SPAN)) { const r = roundedTail(m[1]); if (r !== null) values.push({ step: i, heading, v: Number(r), rounded: true }); }
     for (const s of statementsOfSpans(st?.d)) {
       s.parts.forEach(p => { const v = numericOf(p); if (v !== null) values.push({ step: i, heading, v }); });
       if (s.parts.length < 2) continue;
+      // a statement with a side the engine cannot evaluate (`f^(-1)(-1)`) is recognised only as the very same text
+      if (s.parts.some(p => readSide(p) === null)) verbatim.push({ step: i, heading, parts: s.parts });
       if (s.parts.length === 2 && s.parts.every(p => numericOf(p) !== null)) numeric.push({ step: i, heading, parts: s.parts });
       const lab = labelOf(s.parts[0]);
       const last = s.parts[s.parts.length - 1];
@@ -226,7 +242,7 @@ function readSolution(q) {
     stated.set(l.label.name, set);
   }
   const multiRoot = [...stated.values()].some(set => set.size > 1);
-  return { steps, labelled, conditions, numeric, values, multiRoot, final: values.length ? values[values.length - 1] : null };
+  return { steps, labelled, conditions, numeric, verbatim, limits, values, multiRoot, final: values.length ? values[values.length - 1] : null };
 }
 
 function readPrompt(q) {
@@ -289,6 +305,12 @@ function sameAsPromptStatement(parts, prompt) {
 
 /** A step of the worked solution an equation (or chain) of the student matches: { step, heading } or null. */
 function matchEquation(parts, sol, ctx) {
+  // a limit pair the question and its solution never use: not a step of this working, whatever value it reaches
+  if (!limitsKnown(parts, sol)) return null;
+  // The very same statement as one of the solution (canon: spaces, bracket style and `*` only), where a side cannot be evaluated.
+  if (!ctx && parts.some(p => readSide(p) === null)) {
+    for (const st of sol.verbatim) if (st.parts.length === parts.length && parts.every((p, k) => canon(p) === canon(st.parts[k]))) return st;
+  }
   const lab = labelOf(parts[0]);
   if (lab) {
     const rest = parts.slice(1).map(readSide);
@@ -297,7 +319,8 @@ function matchEquation(parts, sol, ctx) {
         // a substitution fixes the argument: `x = 4: y' = …` is the statement about y'(4)
         const label = ctx && (lab.arg === null || lab.arg === ctx.name) ? { name: lab.name, arg: ctx.raw } : lab;
         if (!sameLabel(label, st.label)) continue;
-        if (rest.every((info, k) => sameSide(info, st.info, parts[k + 1], st.last))) return st;
+        // worked-out working (`-((-4)^3 + …)`) is matched as the same working, never by the number it reaches
+        if (rest.every((info, k) => sameSide(info, st.info, parts[k + 1], st.last) && (!isWorkedSum(parts[k + 1]) || canon(parts[k + 1]) === canon(st.last)))) return st;
       }
     }
   }
@@ -465,6 +488,8 @@ function run(q, report) {
   };
 }
 export const _setFunctionsUnused = q => { FUNCS = functionNames(q); };
-export const _internals = { readSolution, readStudent, matchEquation, spanToPlain, conditionOf, readSide, sameSidePublic: sameSide };
+/** True when every limit pair written in `parts` is one the question or its solution uses (a line with no limits is true of this). */
+const limitsKnown = (parts, sol) => !parts.some(p => limitKeys(braces(tidy(p))).some(k => !sol.limits.has(k)));
+export const _internals = { limitsKnown, readSolution, readStudent, matchEquation, spanToPlain, conditionOf, readSide, sameSidePublic: sameSide };
 // For engine/lineChains.js (the pass that runs after this one).
 export const _forChains = { knownSubstitutions, statementsOfSpans, numericOf, canon, labelOf, topLevelPieces, sameLabel, setFunctions: q => { FUNCS = functionNames(q); } };

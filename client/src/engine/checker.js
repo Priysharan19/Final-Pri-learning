@@ -375,6 +375,13 @@ function productEqualsZero(ast) {
 }
 
 /** Which of the authored solutions satisfy this line. */
+/** How many number literals an expression contains. */
+function numericLeaves(n) {
+  if (!n || typeof n !== 'object') return 0;
+  if (n.t === 'num') return 1;
+  return ['l', 'r', 'v', 'arg'].reduce((a, k) => a + numericLeaves(n[k]), 0);
+}
+
 function solutionsSatisfying(ast, meta) {
   const wanted = uniqueNumeric(meta?.solutions);
   if (!ast || ast.t !== 'equation' || !meta?.variable || !wanted.length) return [];
@@ -941,6 +948,19 @@ function isPartialProduct(text, whole) {
  * 4(4x + 2) → 16x + 8 on the way to 4(4x + 2) + 2). Only that shape is a partial; a line that merely equals
  * some part of a quotient or a power is not, so a slip is not excused by coincidence.
  */
+/** True when `text` is a + b·t in a single letter t (x, x/2, 2x + 3, 5 - t): degree 1 or 0, so a bare argument or shift. */
+function isAffineInOneLetter(text) {
+  const ast = parseExpr(text);
+  if (!ast) return false;
+  const letters = [...variablesOf(ast)].filter(v => v !== 'e');
+  if (letters.length !== 1) return false;
+  try {
+    const at = x => evaluate(ast, { [letters[0]]: x });
+    const [a, b, c] = [at(0.7), at(1.9), at(3.1)];
+    return [a, b, c].every(Number.isFinite) && Math.abs(c - 2 * b + a) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b), Math.abs(c));
+  } catch { return false; }
+}
+
 function isPartOf(text, whole) {
   const target = parseExpr(text), tree = parseExpr(whole);
   if (!target || !tree) return false;
@@ -1053,6 +1073,9 @@ function judgeExpressionLine(cleaned, meta, { reference = null, promptSpans = []
       // A TRUE PARTIAL result is not a slip: a line equal to a proper part of the expression above (or of
       // the question's own) is that part worked out, so it is "couldn't verify", never a cross.
       if (reference && (isPartOf(tail, reference) || isPartialProduct(tail, reference))) return unread;
+      // A bare `x` or `x/2` under a line that is not linear (`y = (x - 1)^2`) is the argument being replaced, a substitution piece (replace x by x/2),
+      // not a claim that the whole expression equals it: the page says nothing the engine can prove false.
+      if (isAffineInOneLetter(tail) && !isAffineInOneLetter(reference || meta.canonical)) return unread;
       if (promptSpans.some(span => isPartialProduct(tail, span) || isPartOf(tail, span))) return unread;
       // A line that only restates something the question writes is not a claim about the answer.
       if (promptSpans.some(span => { try { return same(tail, span); } catch { return false; } })) return unread;
@@ -1565,6 +1588,14 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
               // a true line is a false rejection. A value that is no root of the question breaks above;
               // completeness is the lost-root rule's job, not this line's.
               status = 'ok';
+              // A value line whose right side is a worked-out sum of several numbers (`k = -((-4)^3 + 9(-4)^2 + 24(-4))`) is ticked
+              // here on its VALUE alone, so a wrong number inside it that still reaches a root passes. This check holds only the
+              // question's prompt, not its solution, so it cannot say the sum follows: it is a note, and the question's own worked
+              // solution (engine/solutionMatch.js) ticks it where it states that very line.
+              if (valued && numericLeaves(names(ast.l) ? ast.r : ast.l) >= 4) {
+                status = 'note';
+                note = `True: ${meta.variable} = ${held.map(shownRoot).join(' or ')} is a root. Pri cannot check the working that reaches it from this question alone, so it is not marked as a step.`;
+              }
               if (valued) expLogStated.push(...held);
               if (expLogLine && expLog) {
                 if (!expLogJustBranched) { expLogOpen = []; expLogSteps = []; expLogUncertain = false; }
@@ -1610,7 +1641,9 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
               // equation forward, so it is not credited, but it is never crossed.
               if (status === 'break' && lineDiagnosis?.code === 'constraint-dropped' && variablesOf(ast.l).size && variablesOf(ast.r).size
                   && String(line).replace(/\s+/g, '') !== String(line).replace(/\s+/g, '').split('=').reverse().join('=')
-                  && (restatesQuestionSide(ast, meta, prompt) || /^[A-Za-z]\s*\(\s*-?[\d.]+\s*\)\s*=/.test(String(line).trim()))) {
+                  && (restatesQuestionSide(ast, meta, prompt) || /^[A-Za-z]\s*\(\s*-?[\d.]+\s*\)\s*=/.test(String(line).trim())
+                    // no equation above it for it to replace: a true statement that works a number out (`k(sin⁻¹(1/2) - 0) = kπ/6`) drops nothing
+                    || (!previousEquation && !out.some(l => l && l.status === 'ok')))) {
                 status = 'note';
                 note = 'True for every value (an identity), so it does not carry the equation forward: Pri neither marks it right nor wrong.';
                 lineDiagnosis = null;
@@ -1727,6 +1760,12 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
       note = 'Not checked: this question’s check covers the lines that lead to the answer.';
     }
 
+    // `a!=b` is `a ≠ b` or `(a!) = b`: the engine reads a factorial, so a verdict on it says nothing about the inequality the student wrote.
+    if ((status === 'break' || status === 'ok') && /!\s*=(?!=)/.test(String(line).replace(/!\s+=/g, ''))) {
+      status = 'note';
+      note = 'This can be read two ways (a!=b is a ≠ b, or a factorial equal to b), so it is not marked right or wrong. Put a space or use ≠.';
+      lineDiagnosis = null;
+    }
     // `e^2x` is e^(2x) or (e^2)x: a mismatch under one reading is not a mistake under the other.
     if (status === 'break' && /\^\s*\d+\s*[a-zA-Z]/.test(line)) {
       status = 'note';
@@ -2581,6 +2620,10 @@ function namesOfQuestion(meta, prompt) {
 function notAClaim(text, names, words) {
   const t = String(text).trim().replace(/[−–—]/g, '-').replace(/\s*\.\s*$/, '');
   if (BARE_NUMBER.test(t)) return B_NOTE;
+  // …and a bare number however it is written: ((sqrt(2))/2), (1/2), 3π/4. No relation sign, no letter but a constant, and it comes to one value.
+  if (!/[=<>≤≥≈⇒]/.test(t) && t.length <= 60 && /[\d√]|sqrt|pi|π/i.test(t)) {
+    try { const a = parse(normalize(t)); if (a.t !== 'equation' && ![...variablesOf(a)].some(v => v !== 'e') && Number.isFinite(evaluate(a, {}))) return B_NOTE; } catch { /* not a number */ }
+  }
   // C: no relation sign of any kind, numbers and arithmetic signs only, at least one digit and one operator.
   if (!/[=<>≤≥≈⇒]/.test(t) && SIDE_SUM.test(t) && /\d/.test(t) && /[+*\/×÷^-]/.test(t.replace(/^-/, ''))) return C_NOTE;
   const m = /^([A-Za-z][A-Za-z ]{0,24}?)(?:\(\s*[a-z]\s*\))?('{0,2})\s*=\s*([^=]+)$/.exec(t);

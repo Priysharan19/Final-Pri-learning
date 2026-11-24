@@ -84,6 +84,17 @@ export function milestonesOf(q) {
 /** The tick's comment: which step of the method the line matches. */
 export const milestoneNote = m => `Matches step ${m.step + 1} of the method${m.heading ? ` (${m.heading.replace(/\.$/, '')})` : ''}.`;
 
+/**
+ * A side that is a sum or product of several numbers worked out in place (`-((-4)^3 + 9(-4)^2 + 24(-4))`). Such a side is a piece of
+ * working, not a value: it ties to a step of the solution only as the same working, never by the number it happens to reach.
+ */
+export function isWorkedSum(plain) {
+  try {
+    const count = n => (!n || typeof n !== 'object' ? 0 : n.t === 'num' ? 1 : ['l', 'r', 'v', 'arg'].reduce((a, k) => a + count(n[k]), 0));
+    return count(parse(normalize(String(plain)))) >= 4;
+  } catch { return false; }
+}
+
 const SAME_SIDE = /(?<![<>!])=(?!=)/;
 
 /** The milestone a student line matches, or null. Same label, an equivalent value. */
@@ -98,6 +109,8 @@ export function matchMilestone(milestones, line) {
   if (!LABEL.test(label)) return null;
   let rhs;
   try { rhs = normalize(parts[1].trim()); parse(rhs); } catch { return null; }
+  // worked-out working is not matched by the number it reaches (the working may be wrong and still land on the value)
+  if (isWorkedSum(parts[1])) return null;
   for (const m of milestones) {
     if (m.label !== label) continue;
     // The student's value must agree with the step's RESULT (its last form),

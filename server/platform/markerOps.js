@@ -46,7 +46,7 @@ export function stepMetaFor(q) {
   if (q.answerType === 'numeric' && a.value !== undefined) {
     const m = (q.answerPrefix || '').match(/^([a-z])\s*=$/i);
     // The letter as the question writes it: an angle $A$ is not the side $a$.
-    if (m) return { kind: 'equation', variable: m[1], solutions: [a.value] };
+    if (m) return { kind: 'equation', variable: m[1], solutions: [a.value], ...(a.tol > 0 ? { tol: a.tol } : {}) };
     // Some authored Class 8 algebra forms print only `$6m+15=7m+29$`
     // and omit answerPrefix. Derive the variable ONLY from that entire,
     // single-variable, plain algebraic equation. Other numeric prompts
@@ -58,7 +58,7 @@ export function stepMetaFor(q) {
         equation.split('=').length === 2 && Number.isFinite(Number(a.value))) {
       const symbols = [...new Set((equation.match(/[a-z]/gi) || []).map(v => v.toLowerCase()))];
       if (symbols.length === 1) return {
-        kind: 'equation', variable: symbols[0], solutions: [a.value], source: equation
+        kind: 'equation', variable: symbols[0], solutions: [a.value], ...(a.tol > 0 ? { tol: a.tol } : {}), source: equation
       };
     }
   }

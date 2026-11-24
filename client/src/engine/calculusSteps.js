@@ -412,7 +412,9 @@ export function assessCalculusLine(line, ctx, meta, stage = { claimed: false }) 
     });
     if (verdicts.includes('unread')) return null;
 
-    if (isAnswer) return { status: 'ok' };
+    // The answer test judges the LAST '='-segment. A chain `dy/dx = 3(…)·4x = 8x(…)` that ends at the answer is still a chain: a middle
+    // piece the question's own relation proves false (a wrong coefficient, power or inner function) is the slip, so the line is not ticked.
+    if (isAnswer && !verdicts.includes('invalid')) return { status: 'ok' };
     const firstInvalid = verdicts.indexOf('invalid');
     if (firstInvalid === -1) {
       const onlyStart = verdicts.every(x => x === 'start');

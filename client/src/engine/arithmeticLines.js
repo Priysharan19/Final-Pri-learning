@@ -830,6 +830,20 @@ function putGivenInIntegrals(raw, prep) {
 // `8 y = 3/tan x` is ambiguous: a definition y = 3/tan x with a question number in front, or the equation 8y = 3/tan x (y = 3/(8 tan x)).
 // The page is read three ways: without either (exactly as it always was), as the definition ('D') and as the equation ('E'). A line is ticked when
 // the plain reading ticks it, or when BOTH readings tick it; no reading ever crosses.
+/** True when the expression has a product in which one factor is exactly 0 and another is not: whatever that other factor is, the product is 0. */
+function hasVanishingFactor(ast) {
+  const val = n => { try { const y = evaluate(n, {}); return typeof y === 'number' && Number.isFinite(y) ? y : null; } catch { return null; } };
+  const walk = n => {
+    if (!n || typeof n !== 'object') return false;
+    if (n.t === 'bin' && n.op === '*') {
+      const a = val(n.l), b = val(n.r);
+      if (a !== null && b !== null && ((a === 0) !== (b === 0))) return true;
+    }
+    return ['l', 'r', 'v', 'arg'].some(k => n[k] && typeof n[k] === 'object' && walk(n[k]));
+  };
+  return walk(ast);
+}
+
 function pageDefinitions(raw, out, firstBreak, prep = null, degreePrimed = null, tickOnly = false) {
   if (!raw.some(l => /^\s*\d{1,2}\s+[A-Za-z]\s*=/.test(l))) return pageDefinitionsOnce(raw, out, firstBreak, prep, degreePrimed, tickOnly, null);
   const runs = [null, 'D', 'E'].map(mode => { const o = out.slice(); const broke = pageDefinitionsOnce(raw, o, firstBreak, prep, degreePrimed, tickOnly, mode); return { o, broke }; });
@@ -1040,7 +1054,11 @@ function pageDefinitionsOnce(raw, out, firstBreak, prep, degreePrimed, tickOnly,
             const same = infos.every(x => sameAsWritten(x, infos[0]));
             const from = used.map(k => assignSpan(k, defs[k].shown)).join(', ');
             const where = used.length && used.every(k => defs[k].given) ? 'from the question' : 'from above';
-            if (same && used.length) ticks.push(numbers ? `With ${from} ${where}, each side comes to ${shown(infos[0].value)}.` : `With ${from} ${where}, the sides are the same expression.`);
+            // Both sides reaching one value is a check only where every part of the line was tested. A product with a factor that comes to
+            // exactly 0 (`(4/2)(x - 1/3)` with x = 1/3, the point-slope line through the point) is 0 for any other factor: the gradient was
+            // never tested, so the line stays a note.
+            if (same && used.length && put.some(x => { try { return hasVanishingFactor(parse(normalize(x.text))); } catch { return false; } })) { /* vacuous: not ticked */ }
+            else if (same && used.length) ticks.push(numbers ? `With ${from} ${where}, each side comes to ${shown(infos[0].value)}.` : `With ${from} ${where}, the sides are the same expression.`);
             // Crossed only in a worked chain under a name (A = 12e^(4k) = 12e^(ln(3)/4)): there the two sides are stated
             // equal. Two sides on their own (x^2 = 9 after x = 2) may be a new equation to solve, so that is a note.
             // …and only against a value set on this line or the line straight above it: an older value may belong to

@@ -1,0 +1,14 @@
+import fs from 'node:fs';
+const S='/private/tmp/claude-501/-Users-priysharantripathi-Developer-Final-Pri-learning/14293b2c-d711-45bd-a880-c6ba83c2bfdd/scratchpad/';
+const G = await import('./client/src/engine/generators/index.js');
+const { stepEvidence, stepMetaFor } = await import('./server/platform/markerOps.js');
+const { checkAnswer, stepCheck } = await import('./client/src/engine/checker.js');
+await G.loadAllBanks();
+const cases=JSON.parse(fs.readFileSync(S+'main-marking-defects.json','utf8')).filter(c=>c.kind==='true-cross');
+const i=+process.argv[2]; const c=cases[i];
+const q=G.generateQuestion(c.generator,c.difficulty,c.seed); if(q.stepcheck?.scheme) delete q.stepcheck;
+console.log(q.prompt.slice(0,120), q.prompt===c.questionPrompt, 'meta', JSON.stringify(stepMetaFor(q)).slice(0,300));
+const raw=stepCheck(stepMetaFor(q),c.lines.join('\n'),{prompt:q.prompt});
+console.log('RAW', raw?.lines.map(l=>[l.status,l.state,(l.note||'').slice(0,70)].join('|')));
+const ev=stepEvidence(q,'99991',c.lines.join('\n'),checkAnswer(q,'99991'),{slipWarnings:true});
+console.log('FINAL', ev.stepReport.lines.map(l=>[l.status,l.state,(l.note||'').slice(0,70)].join('|')));
