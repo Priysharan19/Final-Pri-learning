@@ -11,6 +11,7 @@
 // their offline grades as server grades. The client transport integration is
 // a separate mandatory release gate.
 import { interpretAfterStepCheck, reportWithInterpretation } from './lineInterpreter/overlay.js';
+import { adoptProved } from '../../client/src/engine/provedLines.js';
 import { createHash, randomInt, randomUUID } from 'node:crypto';
 import { asyncRouter, asyncHandler } from './asyncRouter.js';
 import { asStore } from './store.js';
@@ -1604,10 +1605,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         ? schemePay({ q, report: evidence.stepReport || null, topic: evidence.topicTicks ?? null, correct: result.correct === true, marksPossible, env }) : null;
       const counted = resolved && (finalAnswerOnly || schemeQuestion)
         ? { stepReport: evidence.stepReport || null, partial: scheme?.paid && !result.correct ? scheme.partial : null, ...(schemeQuestion && evidence.topicTicks !== undefined ? { topicTicks: evidence.topicTicks } : {}) } : evidence;
-      const { stepReport: engineReport, partial, markingReport } = resolved ? counted : { stepReport: null, partial: null };
-      // What the page draws is the engine's report with the lines Pri can prove true ticked (markerOps `shownReport`, engine/provedLines.js): feedback only.
-      // Every mark, the scheme pay (above, from evidence.stepReport) and the generic rule read the engine's report, which has none of those ticks.
-      const stepReport = resolved && !workingNotRead && evidence && evidence.shownReport && engineReport === (evidence.stepReport || null) ? evidence.shownReport : engineReport;
+      const { stepReport, partial, markingReport } = resolved ? counted : { stepReport: null, partial: null };
       const notRead = resolved && workingNotRead && working.trim() !== '';
       // After the engine's step check, never before it, and rules only (the model arm is unreachable here).
       const lineInterpretation = resolved && !invalid && !notRead
@@ -1713,6 +1711,9 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
           // server-attested authored distractor explanations, not from an answer key.
           repairOpportunities: [...new Set(trapProbes.map(t => t?.why).filter(Boolean))].slice(0, 40)
         } : {}) };
+      // The page also shows the lines Pri can prove true as ticked (markerOps `shownReport`, engine/provedLines.js): feedback only, set on the reply AFTER
+      // every mark and the scheme pay above, which read the engine's report (evidence.stepReport) and never this one.
+      if (resolved && !invalid && !notRead && evidence && evidence.shownReport) response.stepReport = response.stepReport ? adoptProved(response.stepReport, evidence.shownReport) : evidence.shownReport;
       // Everything this reply adds to the account's records goes in ONE
       // statement: the immutable reply, the completion when it resolves, and —
       // for a submission that carried its picture — the receipts /recognize

@@ -383,6 +383,11 @@ export function provedLines(q, meta, report) {
     return { text: l.text, status: 'ok', state: 'arithmetic', note: proof.note, valueChain: { rule: 'proved' }, fact: { kind: 'proved', proof: proof.kind, ...(proof.how || {}) } };
   });
   if (!n) return report;
+  return withLines(report, lines);
+}
+
+// The report with these lines in place of its own, the summary counted again from them.
+function withLines(report, lines) {
   const stated = lines.map(l => ({ ...l, state: l.state || (l.status === 'ok' ? 'verified' : l.status === 'break' ? 'wrong' : l.unreadable ? 'unread' : 'unverified') }));
   const at = st => stated.flatMap((l, k) => (l.state === st ? [k + 1] : []));
   const unverified = at('unverified'), unread = at('unread');
@@ -394,4 +399,22 @@ export function provedLines(q, meta, report) {
       reason: unverified.length ? (report.summary?.reason || 'Pri could not tie these lines to anything it can prove about this question, so it did not mark them.') : null
     }
   };
+}
+
+/**
+ * What the page draws when the lines were also folded by another reading (the interpreter's rules): `shown` is the engine's report with the proved
+ * lines ticked, `displayed` is the report the page would draw without them. Only a line that is still an unjudged note there takes the proved tick;
+ * every other line (ticked, crossed, folded) stays exactly as it is, so this can only turn a note into a tick.
+ */
+export function adoptProved(displayed, shown) {
+  if (!displayed || !shown || !Array.isArray(displayed.lines) || !Array.isArray(shown.lines) || displayed.lines.length !== shown.lines.length) return displayed;
+  const brk = displayed.lines.findIndex(l => l?.status === 'break');
+  let n = 0;
+  const lines = displayed.lines.map((l, i) => {
+    const w = shown.lines[i];
+    if ((brk >= 0 && i >= brk) || !unjudged(l) || !w || w.status !== 'ok' || String(w.text ?? '') !== String(l.text ?? '')) return l;
+    n++;
+    return w;
+  });
+  return n ? withLines(displayed, lines) : displayed;
 }
