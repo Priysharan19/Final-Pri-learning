@@ -91,7 +91,7 @@ try {
     if (await typeTab.count()) await typeTab.click();
     await online.settled();
     sealed = await sealedNow();
-    if (sealed && sealed._methodScheme === GENERIC_ID && await answerBox.count() === 1 && sealed.answerType !== 'mcq') {
+    if (sealed && sealed._methodScheme === GENERIC_ID && await answerBox.count() === 1 && sealed.answerType !== 'mcq' && await page.locator('[data-working-area="open"]').count() === 1) {
       const plan = genericPlan(sealed);
       if (plan.keySteps.length >= 1 && authoredLines(sealed).length >= 2) break;
     }
@@ -103,7 +103,6 @@ try {
   check('a typed question stamped with the generic rule was reached', !!sealed, 'none within the bounded search');
   if (sealed) {
     stage = 'before the answer';
-    console.log('  areas:', await page.locator('[data-working-area]').evaluateAll(es => es.map(e => e.getAttribute('data-working-area'))), 'marks', sealed.difficulty, JSON.stringify(sealed.steps?.length));
     const hint = await page.locator('[data-working-area="open"] .muted').first().innerText();
     check('before answering, the working hint says checked steps may earn marks', /may still earn marks/.test(hint) && !/not given yet/.test(hint), hint);
     const lines = authoredLines(sealed).map(l => l.text);
