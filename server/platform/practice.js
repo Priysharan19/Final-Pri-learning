@@ -17,7 +17,7 @@ import { asStore } from './store.js';
 import { nextSyncCursor, syncLockKey } from './db.js';
 import { requireSession, requireVerifiedEmail, requireRole, rateLimit, consumeRateLimit, sessionFromRequest, sha256 } from './security.js';
 import { encryptDeliveryToken, decryptDeliveryToken } from './deliveryCrypto.js';
-import { opaqueContentId, opaqueContentHash, contentSeenEvidence, markContentSeen, contentTried, markContentTried, seenAmong, seenKeysOf, triedKeysOf, repeatEvidenceOf } from './contentSeen.js';
+import { opaqueContentId, opaqueContentHash, contentSeenEvidence, markContentSeen, contentTried, markContentTried, markContentIssued, issuedKeyOf, seenAmong, seenKeysOf, triedKeysOf, repeatEvidenceOf } from './contentSeen.js';
 import { misconceptionIdForTrap, misconceptionIdForDiagnosis, misconceptionById } from '../../client/src/engine/misconceptions.js';
 import { slipHint } from '../../client/src/engine/slipHint.js';
 import { cleanLatex, safeLatexLines } from '../../client/src/engine/texSafe.js';
@@ -162,12 +162,15 @@ const ensureBanks = () => { if (!banksReady) banksReady = loadAllBanks().catch(e
 // (qbankDotpoints.js): a seed is either an authored question's turn or a generator's, by the pack's mix rule. With no pack loaded (and
 // on every edition but Prithagoras) qbankDraw is null and this is generateQuestion unchanged. A picked item (a past-paper cell) and a
 // request that names `bank: false` (a timed paper) never draw from the bank.
+// `bank` is true, false, or the Set of authored question ids this seek has already found stale (resolved, or just served): those are not
+// drawn again, so once the pool is used the seek is answered by the generators.
 const generateQuestion = (generator, difficulty, seed, dotpoint, pick, bank = true) => (bank && !pick && qbankServes(generator)
-  ? qbankDraw(generator, difficulty, seed, dotpoint ?? null) ?? generateGeneratorQuestion(generator, difficulty, seed, dotpoint, pick)
+  ? qbankDraw(generator, difficulty, seed, dotpoint ?? null, bank instanceof Set ? bank : null) ?? generateGeneratorQuestion(generator, difficulty, seed, dotpoint, pick)
   : generateGeneratorQuestion(generator, difficulty, seed, dotpoint, pick));
 const ensureQbankFromEnv = () => ensureQbank();
 // Rush and Match are one-line, timed rounds: an authored question (up to six marks, a working to show) is not dealt in them, nor in a timed paper.
-const bankAllowed = request => request.bank !== false && request.mode !== 'rush' && request.mode !== 'match';
+// The placement check is a diagnostic of what the student knows: it is composed from the generators alone, as a timed paper is.
+const bankAllowed = request => request.bank !== false && request.mode !== 'rush' && request.mode !== 'match' && request.mode !== 'placement';
 
 // ── What an open question may be told about its working ─────────────────────
 // A practice question allows two tries. Until it resolves, the reply to a
@@ -241,6 +244,8 @@ function safeQuestion(id, q) {
   const publicQ = { id, supportsSteps: !!stepMetaFor(q),
     criteriaCount: marksPossibleFor(q) };
   for (const k of PUBLIC_Q) if (Object.hasOwn(q, k)) publicQ[k] = q[k];
+  // An author-bank question carries the rungs its importer chose and none else: with none, the device is told no hint is offered (no control, no panel).
+  if (q.ladder && typeof q.ladder === 'object' && !ladderAvailable(q)) publicQ.hintsOffered = false;
   if ('contentId' in publicQ) publicQ.contentId = opaqueContentId(q.contentId);
   if ('contentHash' in publicQ) publicQ.contentHash = opaqueContentHash(q.contentHash);
   return publicQ;
@@ -508,13 +513,14 @@ function* seekQuestion(request, { draw, tries, batches, admits = null }) {
   // item can be guessed, which a diagnostic must avoid where it can.
   const springs = q => (!trap || carriesTrap(trap.owner, q, trap.key)) && (!written || (q.answerType !== 'mcq' && !q.multipart));
   const resolvedElsewhere = new Set();
+  const staleBank = new Set();   // authored questions this seek has found avoided or resolved: never drawn again in it
   const budget = () => tries ?? (dotpoint == null ? seekBudget(avoid.size + resolvedElsewhere.size)
     : Math.max(DOTPOINT_SEEK_TRIES, seekBudget(avoid.size + resolvedElsewhere.size)));
   let fallback = null, drawn = 0;
   for (let round = 0; drawn < budget(); round++) {
     const size = Math.min(batches[Math.min(round, batches.length - 1)], budget() - drawn);
     const batch = [];
-    for (let i = 0; i < size; i++, drawn++) batch.push(generateQuestion(generator, difficulty, draw(), dotpoint, pick, bankAllowed(request)));
+    for (let i = 0; i < size; i++, drawn++) batch.push(generateQuestion(generator, difficulty, draw(), dotpoint, pick, bankAllowed(request) && staleBank));
     const resolved = yield batch;
     for (const [i, q] of batch.entries()) {
       // A form this edition does not issue (editionBanks.js `admits`) is never
@@ -531,8 +537,10 @@ function* seekQuestion(request, { draw, tries, batches, admits = null }) {
       const done = resolved?.[i] === true;
       if (done && !avoided) resolvedElsewhere.add(hash);
       if (!avoided && !done && springs(q)) return { q, repeat: false, trapDelivered: !!trap };
+      if (typeof q._bank === 'string' && (done || avoided)) staleBank.add(q._bank);
       const rank = (done ? 0 : 2) + (avoided ? 0 : 1);
-      if (!fallback || rank > fallback.rank) fallback = { q, rank };
+      // Among equals a generator's question is preferred to an authored one: the mix rule says a generator takes over once the pool is used.
+      if (!fallback || rank > fallback.rank || (rank === fallback.rank && typeof fallback.q._bank === 'string' && typeof q._bank !== 'string')) fallback = { q, rank };
     }
   }
   if (!fallback) throw Object.assign(new Error('No form of this question may be issued.'), { code: 'PRACTICE_CONTENT_UNSUPPORTED' });
@@ -589,7 +597,8 @@ async function chooseQuestionFor(db, accountId, request, now, { draw = () => ran
   const seek = seekQuestion(request, { draw, tries, batches: ACCOUNT_SEEK_BATCHES, admits: banks.admits });
   let step = seek.next();
   while (!step.done) {
-    const keys = step.value.map(q => seenKeysOf(q));
+    // An author-bank question this account was already dealt (resolved or not: revealed, abandoned) is as stale as one it answered.
+    const keys = step.value.map(q => [...seenKeysOf(q), ...(typeof q._bank === 'string' ? [issuedKeyOf(q)] : [])]);
     // A failed read is the store's failure, not an unsupported question: it is
     // tagged so the routes rethrow it rather than answer 422.
     const known = await seenAmong(db, accountId, keys.flat(), now).catch(error => { throw Object.assign(error, { pickerStore: true }); });
@@ -848,6 +857,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       }
       await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-question',?,?,?,?,?)",
         [accountId, id, payload, digest(payload), now, now + MAX_AGE]);
+      // Dealt is dealt: an author-bank question steers the seek from here on, whatever becomes of it (contentSeen.js issuedKeyOf).
+      if (typeof q._bank === 'string') await markContentIssued(db, accountId, q, now);
       if (idem) await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-issue',?,?,?,?,?)",
         [accountId, idem, JSON.stringify(publicResponse), requestDigest, now, now + MAX_AGE]);
       if (preparedNonce) await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-prepared',?,?,?,?,?)",

@@ -16,6 +16,7 @@
 // must never import a server module: the worker has no store and no secrets.
 import { derivedMetaOff } from '../../client/src/engine/derivedMetaOff.js';
 import { checkAnswer, stepCheck, methodMarks, claimFreeReport } from '../../client/src/engine/checker.js';
+import { checkBankAnswer } from './qbankMarking.js';
 import { markObjective, markMultiCorrect } from '../../client/src/engine/indiaExams.js';
 import { markMatrixMatch } from '../../client/src/engine/matrixMatch.js';
 import { markGraphSketch, readFeatureSet, sketchMethodCredit, sketchVerdicts } from '../../client/src/engine/graphFeatures.js';
@@ -55,7 +56,7 @@ export function stepMetaFor(q) {
   if (q.answerType === 'numeric' && a.value !== undefined) {
     const m = (q.answerPrefix || '').match(/^([a-z])\s*=$/i);
     // The letter as the question writes it: an angle $A$ is not the side $a$.
-    if (m) return { kind: 'equation', variable: m[1], solutions: [a.value] };
+    if (m) return { kind: 'equation', variable: m[1], solutions: [a.value], ...(a.tol > 0 ? { tol: a.tol } : {}) };
     // Some authored Class 8 algebra forms print only `$6m+15=7m+29$`
     // and omit answerPrefix. Derive the variable ONLY from that entire,
     // single-variable, plain algebraic equation. Other numeric prompts
@@ -67,7 +68,7 @@ export function stepMetaFor(q) {
         equation.split('=').length === 2 && Number.isFinite(Number(a.value))) {
       const symbols = [...new Set((equation.match(/[a-z]/gi) || []).map(v => v.toLowerCase()))];
       if (symbols.length === 1) return {
-        kind: 'equation', variable: symbols[0], solutions: [a.value], source: equation
+        kind: 'equation', variable: symbols[0], solutions: [a.value], ...(a.tol > 0 ? { tol: a.tol } : {}), source: equation
       };
     }
   }
@@ -112,11 +113,37 @@ function solutionNumbers(q) {
   return [...out].slice(0, 400);
 }
 
+/**
+ * Every `f(3) = … = v` the question or its authored worked solution states, as `f|3|v` (v the value the statement reaches, `*` when it is not a
+ * number): what a line of working that names f(3) may reach. A function value the solution never states is not one a line can be said to be.
+ */
+function functionLabels(q) {
+  const out = new Set();
+  const spans = [];
+  for (const t of [String(q?.prompt ?? ''), ...(Array.isArray(q?.steps) ? q.steps.slice(0, 40).map(st => String(st?.d ?? '').slice(0, 2000)) : [])]) {
+    for (const m of t.replace(/\\\$/g, '\u0001').matchAll(/\$([^$]+)\$/g)) spans.push(m[1]);
+  }
+  for (const tex of spans) {
+    for (const part of tex.split(/\\(?:Rightarrow|Longrightarrow|therefore|quad|qquad|text\{[^}]*\})|[,;]/)) {
+      let plain = null;
+      try { plain = SOLUTION_INTERNALS.spanToPlain(part); } catch { plain = null; }
+      if (!plain) continue;
+      const sides = plain.split(/(?<![<>!])=(?!=)/).map(x => x.trim());
+      const head = /^([A-Za-z])\(\s*(-?\d+(?:\.\d+)?)\s*\)$/.exec(sides[0] || '');
+      if (!head || sides.length < 2) continue;
+      let v = null;
+      try { const i = arithmeticInfo(cleanStatement(sides[sides.length - 1])); v = i && i.value !== undefined ? i.value : null; } catch { v = null; }
+      out.add(`${head[1]}|${Number(head[2])}|${v === null ? '*' : Number(v.toPrecision(9))}`);
+    }
+  }
+  return [...out];
+}
+
 function trueAsWritten(q, steps, opts) {
   try {
     const facts = opts && Object.hasOwn(opts, 'facts') ? opts.facts : questionFacts(q);
     const solutionValues = solutionNumbers(q);
-    return stepCheckArithmetic(steps, { latex: opts && Array.isArray(opts.latex) ? opts.latex : null, facts, solutionValues, answerValue: typeof q?.answer?.value === 'number' ? q.answer.value : null });
+    return stepCheckArithmetic(steps, { latex: opts && Array.isArray(opts.latex) ? opts.latex : null, facts, solutionValues, knownLabels: functionLabels(q), answerValue: typeof q?.answer?.value === 'number' ? q.answer.value : null });
   } catch { return null; }
 }
 
@@ -600,7 +627,7 @@ const RAW_MARKER_OPS = Object.freeze({
    * was not computed. Blank working costs nothing, so it is always "computed".
    */
   practice({ q, answer, working, workingLatex, workingGaps, evidenceIfWrong, policy }, emit) {
-    const result = sketchReport(q, answer, checkAnswer(q, answer));
+    const result = sketchReport(q, answer, checkBankAnswer(q, answer));   // an author-bank question is read as qbankMarking.js says; every other question is checkAnswer
     emit({ result });
     const wanted = result.correct || evidenceIfWrong || !String(working || '').trim();
     if (!wanted) return { result, evidence: null };

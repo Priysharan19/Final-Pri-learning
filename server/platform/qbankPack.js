@@ -80,6 +80,9 @@ export function questionProblem(q, family) {
   if (!PACK_AUTO_TYPES.includes(q.answerType) || !keyShapeOk(q.answerType, q.answer)) return `${q.id}: answer`;
   if (!Array.isArray(q.steps) || !q.steps.every(s => isStr(s?.h) && isStr(s?.d))) return `${q.id}: steps`;
   if (!Array.isArray(q.hints) || !q.hints.every(isStr)) return `${q.id}: hints`;
+  if (q.ladder !== undefined && (!q.ladder || typeof q.ladder !== 'object' || Array.isArray(q.ladder) || !Object.entries(q.ladder).every(([k, v]) => ['nudge', 'method', 'worked'].includes(k) && isStr(v)))) return `${q.id}: ladder`;
+  // The hint ladder is the author's hints and nothing else: 0 to 3 of them, each one rung, in his order (tools/qbank-leak.mjs bankLadder).
+  if (q.hints.length > 3 || !q.ladder || JSON.stringify(['nudge', 'method', 'worked'].slice(0, q.hints.length).map(k => q.ladder[k])) !== JSON.stringify(q.hints) || Object.keys(q.ladder).length !== q.hints.length) return `${q.id}: ladder is not the hints`;
   if (!Array.isArray(q.traps) || !q.traps.every(t => t && typeof t === 'object' && isStr(t.why))) return `${q.id}: traps`;
   if (!Array.isArray(q.criteria) || !q.criteria.every(c => Number.isInteger(c?.marks) && isStr(c?.point))) return `${q.id}: criteria`;
   if (q.criteria.reduce((s, c) => s + c.marks, 0) !== q.marks) return `${q.id}: criteria do not add up to the marks`;
@@ -254,7 +257,7 @@ export const bankTurn = (poolSize, seed, key) => poolSize > 0 && mix((seed ^ 0x5
  * generator (practice.js calls this first): the product subtopic, the level asked for, the seed, and a product dot point id or null.
  * A dot point asked for is answered by a question numbered to it, at the level asked for, and never by another (the seek checks too).
  */
-export function qbankDraw(generator, level, seed, dotpointId = null) {
+export function qbankDraw(generator, level, seed, dotpointId = null, exclude = null) {
   const sub = installed?.product.get(generator);
   if (!sub) return null;
   let pool;
@@ -266,7 +269,11 @@ export function qbankDraw(generator, level, seed, dotpointId = null) {
   if (!pool || !pool.length) return null;
   const key = `${generator}|${dotpointId ?? ''}|${level}`;
   if (!bankTurn(pool.length, seed >>> 0, key)) return null;
-  return productQuestion(pool[mix((seed ^ 0x2545f491) >>> 0, `pick|${key}`) % pool.length], generator, seed, dotpointId);
+  // `exclude`: the authored questions a seek has already found stale. The turn is the pool's (so the rule's share is unchanged); the
+  // question is one of the rest, and when none is left the turn is the generators'.
+  const rest = exclude && exclude.size ? pool.filter(e => !exclude.has(e.id)) : pool;
+  if (!rest.length) return null;
+  return productQuestion(rest[mix((seed ^ 0x2545f491) >>> 0, `pick|${key}`) % rest.length], generator, seed, dotpointId);
 }
 
 /** One pack entry as the practice path issues it, whatever seed (tests, the isolation check). Throws when the table places it nowhere. */
@@ -304,6 +311,8 @@ function productQuestion(entry, generator, seed, requestedId) {
     hints: entry.hints, steps: entry.steps,
     // Public: the text alternative and the size. The figure itself is fetched by the account it was issued to (practice.js GET /:id/figure).
     ...(entry.diagram ? { diagram: { alt: entry.diagram.alt, w: entry.diagram.w, h: entry.diagram.h } } : {}),
+    // The rungs the importer chose (tools/qbank-leak.mjs): none states the answer, and the worked rung is never the last step.
+    ...(entry.ladder ? { ladder: entry.ladder } : {}),
     ...(entry.stepcheck ? { stepcheck: entry.stepcheck } : {}),
     dotpoints: ids, dotpoint: ids.length === 1 ? ids[0] : null, dotpointSource: 'qbank',
     contentId: `qbank:${entry.id}`, contentVersion: `qb.${installed.version}`, contentHash,

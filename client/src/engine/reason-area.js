@@ -162,7 +162,8 @@ const isLabelPart = (text, variable) => {
   if (!ast) return false;
   const free = [...variablesOf(ast)];
   // a name that is not the variable of integration is a label (F(x), y, A, I): the part names the function, it is not one
-  return free.length > 0 && free.some(v => v !== variable) && !/[+\-*/^]/.test(t.replace(/^\s*-/, '').replace(/\(\s*[a-z]\s*\)/i, ''));
+  // (a letter applied to a NUMBER, F(3), is a value claimed, not a name: `F(3) = 1728 - 108` is false, and `F(3)F(1)` is a product)
+  return free.length > 0 && free.some(v => v !== variable) && !/[A-Za-z]\s*\(\s*-?[0-9.]+\s*\)/.test(t) && !/[+\-*/^]/.test(t.replace(/^\s*-/, '').replace(/\(\s*[a-z]\s*\)/i, ''));
 };
 function derivativeMatches(F, f, variable) {
   let seen = 0;

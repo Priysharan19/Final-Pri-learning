@@ -309,6 +309,8 @@ function curveLine(fn, text, original) {
     const asts = rhs.map(parseSafe);
     if (asts.some(a => !a || freeVars(a).some(v => v !== variable))) return null;
     if (asts.every(a => exprEquivalent(a, curve.dast) === true)) return { status: 'ok', state: 'verified', valueChain: { rule: 'derivative' } };
+    // `y' = 6x^2 - 6x - 12 = 0`: the derivative, set to 0 to find the stationary points. The chain ends at the condition; what comes before it is the derivative.
+    if (asts.length >= 2 && constantValue(rhs[rhs.length - 1]) === 0 && asts.slice(0, -1).every(a => exprEquivalent(a, curve.dast) === true)) return { status: 'ok', state: 'verified', valueChain: { rule: 'derivative' } };
     return { status: 'break', code: 'derivative-not-true', note: `This is not the derivative of the curve ${assignSpan(name, fn.expr.replace(/\*/g, ''))}.` };
   }
   // A choice between the stationary points: "smaller: (0,0)", "smaller x = -3"

@@ -341,6 +341,8 @@ function run(q, report, warn, opts = null) {
     if (/^\s*-?\d+(?:\.\d+)?(?:\s*\/\s*\d+)?\s*$/.test(String(aboveSide)) || !/[-+*/^(]|sqrt|√/.test(String(aboveSide).replace(/^\s*-/, ''))) return null;   // a bare value above: a new calculation may start here with a lazy `=`
     if (!d || Math.abs(d.written + d.above) <= 1e-9 * Math.max(1, Math.abs(d.above))) return null;   // a value and its negative: the other root of a pair
     if (isPartialWide(aboveSide, writtenSide, '', earlierSides(i))) return null;
+    // a value the worked solution reaches, begun with a lazy `=` under an unrelated value (`x = π/2` then `= 10`, the area): the start of the next step, not a false rewrite
+    if (sol.values.some(v => Number.isFinite(v.v) && close(v.v, d.written)) || (typeof q?.answer?.value === 'number' && close(q.answer.value, d.written))) return null;
     return crossDiagnosis(null, null, { aboveSide, writtenSide, lineNo: i + 1, checkedBefore: 0 });
   };
 
@@ -558,7 +560,7 @@ function run(q, report, warn, opts = null) {
       }
     }
     // c · a bracket worked out at its limits, then matched like any equation of the solution
-    if (!s.ctx && !s.continuation && parts.length === 2 && parts.some(x => /\]_/.test(x))) {
+    if (!s.ctx && !s.continuation && parts.length === 2 && parts.some(x => /\]_/.test(x)) && SM.limitsKnown(parts, sol)) {
       const ex = parts.map(x => (/\]_/.test(x) ? expandBrackets(x) : x));
       if (ex.every(Boolean)) { const h = SM.matchEquation(ex, sol, null); if (h) return verified(noteStep(h), h.step); }
     }

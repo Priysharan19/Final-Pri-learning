@@ -1,6 +1,6 @@
 // A tiny author question bank, written for the tests. It is invented here: no question, answer, step or hint of the owner's bank is in
 // this repository (the repository is public; the bank is not). Same shape as the owner's archive (tools/qbank-import.mjs).
-const HINTS = ['Read the question carefully.', 'Choose the method.', 'Work it through.'];
+const HINTS = ['Read the question carefully before you start.', 'Choose the method that suits this kind of question.', 'Work through it one line at a time.'];
 const crit = (marks, answer = true, point = 'Correct final answer') => ({ marks, point, ...(answer ? { answer: true } : {}) });
 
 const part = (question, over) => ({

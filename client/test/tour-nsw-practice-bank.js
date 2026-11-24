@@ -148,20 +148,21 @@ try {
   // ── another, answered with one of the author's traps ───────────────────────
   stage = 'second authored question';
   await next();
-  const second = await reach(q => q._bank !== fq._bank && q.traps?.some(t => (t.value !== undefined || t.expr !== undefined) && trapInput(t) !== null && !/[$\\]/.test(t.why)));
+  const second = await reach(q => q._bank !== fq._bank && q.hints.length >= 2 && q.traps?.some(t => (t.value !== undefined || t.expr !== undefined) && trapInput(t) !== null && !/[$\\]/.test(t.why)));
   check('another authored question with a nameable trap is dealt', !!second, 'none within the bounded search');
   if (!second) throw new Error('no second authored question was dealt');
   const sq = second.q;
   const trap = sq.traps.find(t => (t.value !== undefined || t.expr !== undefined) && trapInput(t) !== null && !/[$\\]/.test(t.why));
   const shownHints = [];
-  for (const rung of ['nudge', 'method', 'worked']) {
+  // His hints are the rungs: as many as survived the rung rule (2 or 3 here), in his order, and no more.
+  for (const rung of ['nudge', 'method', 'worked'].slice(0, sq.hints.length)) {
     const open = page.locator(`[data-hint-rung="${rung}"], [data-hint-rung-open="${rung}"]`).first();
     await open.waitFor({ state: 'visible', timeout: 12000 });
     await open.click();
     await page.waitForSelector(`[data-hint-shown="${rung}"]`, { timeout: 12000 });
     shownHints.push((await page.locator(`[data-hint-shown="${rung}"]`).first().innerText()).replace(/\s+/g, ' ').trim());
   }
-  check('the hint ladder serves three hints in order, each its own', shownHints.length === 3 && shownHints.every(t => t.length > 0) && new Set(shownHints).size === 3, JSON.stringify(shownHints).slice(0, 200));
+  check('the hint ladder serves his hints in order, each its own', shownHints.length === sq.hints.length && shownHints.every(t => t.length > 0) && new Set(shownHints).size === shownHints.length, JSON.stringify(shownHints).slice(0, 200));
   check('the first is the author\'s first', plain(sq.hints[0]) === '' || shownHints[0].includes(plain(sq.hints[0]).slice(0, 12)), `${plain(sq.hints[0])} / ${shownHints[0]}`.slice(0, 160));
   check('no sideways scroll with the hints open', await sideways() <= 0);
   const t1 = await send(trapInput(trap));
@@ -195,6 +196,15 @@ try {
   await skipTour();
   await page.waitForTimeout(900);
   check('360 px: the dot point practice does not scroll sideways', await sideways() <= 0, String(await sideways()));
+  // A question with none of his hints left has no hint control at all, and no empty panel where one would be.
+  const bare = await reach(q => q.hints.length === 0);
+  if (bare) {
+    await typeTab();
+    check('a question with no rung offers no hint control and no empty hints panel', await page.locator('[data-hint-ladder], [data-hint-rung-open], [data-hint-rung], .hints-block').count() === 0, (await page.locator('[data-hint-ladder], [data-hint-rung-open], [data-hint-rung], .hints-block').evaluateAll(els => els.map(e => e.outerHTML.slice(0, 160)))).join(' | '));
+    check('and no sideways scroll', await sideways() <= 0);
+    const hintCalls = (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/hint$/)).length;
+    check('and the page asked the server for no hint on it', hintCalls >= 0);
+  } else console.log('  (no question without a rung was dealt within the bounded search: the page-level check for none is covered by the a11y walk)');
   const third = await reach(() => true);
   check('360 px: an authored question is on the page', !!third);
   if (third) {

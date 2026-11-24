@@ -59,10 +59,11 @@ const writePack = (dir, files) => { for (const [name, text] of files) { const f 
 const compiled = compilePack(fixtureArchive());
 const again = compilePack(fixtureArchive());
 c.ok([...compiled.files].every(([name, text]) => again.files.get(name) === text) && compiled.files.size === again.files.size, 'the importer compiles the same bytes twice');
-c.eq(compiled.summary.questions, 9, 'nine fixture parts pass every check');
-c.deq(compiled.summary.reasons, { diagram: 1, 'hint:leak': 1, 'latex:command-outside-math:\\leavevmode': 1, manual: 1 }, 'four are rejected, each with its reason');
-c.deq(compiled.rejects.map(r => r.id), ['TQ-009', 'TQ-010', 'TQ-011', 'TQ-012'], 'the rejected ids are the manual, leaking-hint, diagram and layout-TeX parts');
-c.deq(compiled.summary.byCourse, { A11: 8, X11: 1 }, 'the questions are counted by course');
+c.eq(compiled.summary.questions, 10, 'ten fixture parts pass every check (the one whose second hint states the answer is packed without that hint)');
+c.deq(compiled.summary.reasons, { diagram: 1, 'latex:command-outside-math:\\leavevmode': 1, manual: 1 }, 'three are rejected, each with its reason');
+c.deq(compiled.rejects.map(r => r.id), ['TQ-009', 'TQ-011', 'TQ-012'], 'the rejected ids are the manual, diagram and layout-TeX parts');
+c.ok(!JSON.stringify(compiled.files.get('shards/qb-a11-ma-c1.json')).includes('The product is'), 'a hint that states the answer is not in the pack at all');
+c.deq(compiled.summary.byCourse, { A11: 9, X11: 1 }, 'the questions are counted by course');
 const manifest = JSON.parse(compiled.files.get('manifest.json'));
 c.deq(manifest.shards.map(s => s.name), ['shards/qb-a11-ma-c1.json', 'shards/qb-x11-me-a1.json'], 'one shard per course and topic');
 c.ok(manifest.shards.every(s => s.sha256 === sha(compiled.files.get(s.name)) && s.bytes === Buffer.byteLength(compiled.files.get(s.name))), 'the manifest holds each shard\'s sha256 and size');
@@ -75,7 +76,7 @@ c.ok(!compiled.files.get('rejects.json').includes('Prove that') && JSON.parse(co
 const dir = path.join(scratch, 'pack');
 writePack(dir, compiled.files);
 const pack = await qb.loadPack(qb.directorySource(dir));
-c.deq([pack.questionCount, pack.families.size, pack.version], [9, 2, manifest.packVersion], 'the pack loads whole');
+c.deq([pack.questionCount, pack.families.size, pack.version], [10, 2, manifest.packVersion], 'the pack loads whole');
 c.deq(qb.indexOf(pack.families).map(f => [f.family, f.requestable]), [['qb-a11-ma-c1', [1, 2, 3, 4]], ['qb-x11-me-a1', [2]]], 'the picker view is what the shards hold');
 
 const tampered = async (mutate, expect, message) => {
@@ -104,7 +105,7 @@ await tampered(d => fs.writeFileSync(path.join(d, 'manifest.json'), '{"format":"
   bad.set('manifest.json', JSON.stringify(m) + '\n');
   await c.rejects(() => qb.loadPack(memorySource(bad)), /marks/, 'a consistent pack holding a malformed question is refused');
 }
-c.eq((await qb.loadPack(memorySource(compiled.files))).questionCount, 9, 'a pack loads from any source with the same read function (memory here, a directory above)');
+c.eq((await qb.loadPack(memorySource(compiled.files))).questionCount, 10, 'a pack loads from any source with the same read function (memory here, a directory above)');
 
 // ── no pack: nothing exists, nothing changes ─────────────────────────────────
 qb.resetQbank();
@@ -142,7 +143,7 @@ c.ok(!bankPolicy('prithagoras').issues('qb-a11-ma-c1') && !bankPolicy('priyabhat
 const draws = [];
 for (let seed = 1; seed <= 400; seed++) draws.push([seed, qb.qbankDraw('y11-diff', 2, seed)]);
 const authored = draws.filter(([, d]) => d);
-c.ok(authored.length > 100 && authored.length < 300, 'with a pool, some seeds are an authored question\'s turn and some are a generator\'s');
+c.ok(authored.length > 100 && authored.length < 360, 'with a pool, some seeds are an authored question\'s turn and some are a generator\'s');
 c.ok(draws.every(([seed, d]) => JSON.stringify(d) === JSON.stringify(qb.qbankDraw('y11-diff', 2, seed))), 'the same subtopic, level and seed is always the same draw');
 c.ok(authored.every(([, d]) => d.subtopic === 'y11-diff' && d.difficulty === 2 && d.dotpoints.every(id => /^y11-diff\.[123]$/.test(id)) && d._bank && d._family === 'qb-a11-ma-c1'), 'an authored draw is in the product subtopic, at the level asked for, with a product dot point');
 c.eq(qb.qbankDraw('y11-diff', 2, 1, 'y11-diff.3'), null, 'a dot point with no authored question at that level is a generator\'s draw');
@@ -216,8 +217,8 @@ try {
   };
   const entries = [];
   for (const s of manifest.shards) for (const q of JSON.parse(fs.readFileSync(path.join(dir, s.name), 'utf8')).questions) entries.push({ ...q, family: s.name.replace(/^shards\/|\.json$/g, '') });
-  c.eq(entries.length, 9, 'the nine pack questions are all drawn below');
-  const allowed = new Set([...PUBLIC_QUESTION_FIELDS, 'id', 'supportsSteps', 'criteriaCount']);
+  c.eq(entries.length, 10, 'the ten pack questions are all drawn below');
+  const allowed = new Set([...PUBLIC_QUESTION_FIELDS, 'id', 'supportsSteps', 'criteriaCount', 'hintsOffered']);
 
   for (const e of entries) {
     const { question, sealed, wire, place } = await issueExact(e);
@@ -225,14 +226,15 @@ try {
     drawn.set(e.id, question.id);
     c.deq(Object.keys(question).filter(k => !allowed.has(k)), [], `${tag}: the issued question holds public fields only`);
     c.ok(!PRIVATE_KEYS.test(wire), `${tag}: no private field name is on the wire`);
-    const secrets = [e.steps.map(s => s.d), e.criteria.map(x => x.point), e.traps.map(t => t.why), e.title].flat();
+    const secrets = [e.steps.flatMap(s => [s.d, s.h]), e.criteria.flatMap(x => [x.point, x.line]), e.traps.map(t => t.why), e.title].flat().filter(t => typeof t === 'string' && t.length >= 12);
     c.ok(secrets.every(t => !wire.includes(t)), `${tag}: no step, criterion, trap reason or title is on the wire`);
     const keyText = acceptedInput(e);
     c.ok(!wire.includes(JSON.stringify(e.answer)) && !(e.answerType === 'expression' && wire.includes(e.answer.expr)), `${tag}: the key is not on the wire`);
     c.deq([question.criteriaCount, question.supportsSteps === true || question.supportsSteps === false], [e.marks, true], `${tag}: the device is told the authored marks and nothing more`);
-    c.ok(question.hints.length === 3 && question.hints.every(t => !keyText || t !== keyText), `${tag}: the three authored hints are served`);
+    c.ok(JSON.stringify(question.hints) === JSON.stringify(e.hints) && e.hints.length <= 3 && question.hints.every(t => !keyText || t !== keyText), `${tag}: the authored hints that pass the rung rule are served, and only those (${e.hints.length})`);
+    c.ok(Object.values(e.ladder).join('|') === e.hints.join('|'), `${tag}: the ladder is the hints, in his order`);
     c.ok(question.difficulty === e.level && question.subtopic === place.subtopic && question.dotpoints.length > 0 && question.dotpoints.every(id => id.startsWith(`${place.subtopic}.`)), `${tag}: it is practised in its product subtopic, at its level, under product dot points`);
-    c.eq(question.dotpoint, place.ordinal === null ? null : `${place.subtopic}.${place.ordinal + 1}`, `${tag}: a numbered dot point is its one dot point and a topic-level one names none`);
+    c.eq(question.dotpoint, place.ordinal === null ? (question.dotpoints.length === 1 ? question.dotpoints[0] : null) : `${place.subtopic}.${place.ordinal + 1}`, `${tag}: a numbered dot point is its one dot point and a topic-level one names the cell's dot point only when the cell has one`);
     c.deq([sealed._marking, sealed._methodScheme, sealed.authoredMarks, sealed.criteria.length > 0], [FINAL_ANSWER_MARKING, undefined, e.marks, true], `${tag}: sealed final-answer-only, with its authored marks and criteria held server-side`);
     c.ok(sealed._curriculum.outcomes.length > 0 && sealed._curriculum.jurisdiction === 'NSW' && sealed._curriculum.dotpoints.every(id => id.startsWith(`${place.subtopic}.`)), `${tag}: sealed with a curriculum identity`);
   }
@@ -259,7 +261,7 @@ try {
       if (t.value !== undefined || t.expr !== undefined || t.region !== undefined) { c.eq(t2.data.trapWhy, t.why, `${e.id}: his reason for trap ${i} is shown`); trapsNamed++; }
     }
   }
-  c.ok(rights === 9 && trapsNamed >= 4, 'every question was marked, and four traps are named by the engine (set, equation and point traps are refused unnamed)');
+  c.ok(rights === 10 && trapsNamed >= 4, 'every question was marked, and four traps are named by the engine (set, equation and point traps are refused unnamed)');
 
   // the hint ladder serves a rung, and it is not the answer
   const hq = await issueExact(entries.find(e => e.id === 'TQ-001'));
