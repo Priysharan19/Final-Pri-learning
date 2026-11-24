@@ -327,6 +327,87 @@ for (const s of SCHEMES) ok(R.questionsOfType(s, { limit: 3 }).length === 3, `${
   ok(fromShown.awarded === 1, 'control: paid from the folded report it WOULD pay, which is why practice.js never reads it');
 }
 
+// ── 2b4. the Years 11-12 draft schemes (24 Nov 2026): unapproved in the repository; approved here in the TEST PROCESS only; gamed lines earn nothing ──
+{
+  const NEW = ['y12-diff-rules-3', 'y12-diff-gradient-2', 'y12-diff-gradient-3', 'y12-integral-2', 'y12-integral-3', 'y12-tangent-3'];
+  ok(NEW.every(id => SCHEMES.some(s => s.id === id) && !APPROVED_SCHEME_TYPES.some(a => a.typeId === id) && !isApproved(id)), 'the Years 11-12 draft schemes exist and none is on the repository\'s approved list');
+  {
+    let stamped = 0, tried = 0;
+    for (const id of NEW) { const s = SCHEMES.find(x => x.id === id); for (const q of R.questionsOfType(s, { limit: 15 })) {
+      const copy = JSON.parse(JSON.stringify({ ...q, _generator: s.families[0] })); tried++;
+      if (sealForEdition(copy, bankPolicy('prithagoras'), s.families[0]) && copy._methodScheme === id) stamped++;
+    } }
+    ok(tried >= 30 && stamped === 0, `an unapproved Years 11-12 draft is never stamped (${tried} questions)`);
+  }
+  // a question is typed to the variant whose marks are its marks
+  {
+    let n2 = 0, n3 = 0, bad = 0;
+    for (const s of SCHEMES.filter(x => x.id === 'y12-diff-gradient-2')) for (const q of R.questionsOfType(s)) { const m = marksPossibleFor(q); const id = schemeTypeOf(q); if (m === 2) { n2++; if (id !== 'y12-diff-gradient-2') bad++; } if (m === 3) { n3++; if (id !== 'y12-diff-gradient-3') bad++; } }
+    ok(n2 >= 10 && n3 >= 20 && bad === 0, `gradient questions: ${n2} two-mark ones typed to the two-mark scheme, ${n3} three-mark ones to the three-mark scheme, ${bad} wrongly typed`);
+  }
+  const g = { tried: 0, earned: 0, controls: 0, controlEarned: 0 };
+  const run = (s, q, lines) => { const q2 = asMarks(q, schemeMarks(s), s.id); const result = checkAnswer(q2, '999'); const ev = stepEvidence(q2, '999', lines.join('\n'), result, { slipWarnings: true }); return schemePay({ q: q2, report: ev.stepReport, topic: ev.topicTicks ?? null, correct: false, marksPossible: marksPossibleFor(q2), env: ON, list: LIST }); };
+  const earnedKeys = p => p.items.filter(i => i.basis === 'lines' && i.awarded).map(i => i.key);
+  for (const id of NEW) {
+    const s = SCHEMES.find(x => x.id === id); const type = TYPES.find(t => t.id === id);
+    for (const q of R.questionsOfType(s, { limit: 60 })) {
+      const built = await type.build(q); if (!built) continue;
+      const f = publicDescription(q).functions[0];
+      const lists = [['0 = 0'], ['x = x'], ['999'], ...(f ? [[`dy/dx = ${f.rhs}`], [`y' = ${f.rhs}`], [`f'(x) = ${f.rhs}`]] : [])];
+      const base = lists.length;
+      if (id === 'y12-diff-rules-3') {
+        const key = String(q.answer.expr);
+        lists.push([`dy/dx = ${key}`, `dy/dx = ${key}`], [`dy/dx = ${key}`, `= ${key}`], [`dy/dx = ${key}`, `dy/dx = ${key.replace(/\s+/g, '')}`], [`dy/dx = ${key}`, `dy/dx = ${key.replace(/\s+/g, '')} `]);
+        // a first correct line earns the first criterion; the same derivative written again earns no second one
+        for (const ls of lists.slice(base)) { g.tried++; const k = earnedKeys(run(s, q, ls)); if (k.includes('second')) g.earned++; }
+        lists.length = base;
+        // a crossed line, then right lines: nothing after the cross
+        const wrong = built.zero[0];
+        g.tried++; if (earnedKeys(run(s, q, [wrong, built.full[0], built.full[1]])).length) g.earned++;
+        g.controls++; if (earnedKeys(run(s, q, built.full.slice(0, 2))).join() === 'derivative,second') g.controlEarned++; else if (process.env.DEBUG_CONTROL) console.log('control', id, q.prompt.slice(0, 90), JSON.stringify(built.full), earnedKeys(run(s, q, built.full.slice(0, 2))));
+      } else if (id === 'y12-tangent-3') {
+        const st = q.stepcheck.stages; const slope = st[1].expected; const D = built.full[0];
+        // the value alone is a true line at the second stage and earns the gradient only under a gradient label; the final line restated; the curve restated
+        lists.push([`y = ${String(q.answer.expr)}`], [`m = ${num(slope)}`, `y = ${String(q.answer.expr)}`], [`${num(slope)}`], [`dy/dx = ${num(slope)}`], [`2 + 2 = ${num(slope)}`], [`m = ${num(slope + 1)}`], [`m = ${num(slope - 3)} + 1 + 1 + 1`, D]);
+        for (const ls of lists) { g.tried++; const k = earnedKeys(run(s, q, ls)); if (k.includes('derivative') && !ls.includes(D)) g.earned++; if (k.includes('gradient') && !(ls.length && /^m\b/.test(ls[0]) && ls[0] === `m = ${num(slope)}`) && !/^m = .*=/.test(ls.join('|'))) { if (!(ls.some(x => /^dy\/dx = /.test(x) && x.endsWith(`= ${num(slope)}`)))) g.earned++; } }
+        g.tried++; if (earnedKeys(run(s, q, [built.zero[0], built.full[1]])).length) g.earned++;
+        g.controls++; if (earnedKeys(run(s, q, built.partial)).join() === 'derivative,gradient') g.controlEarned++; else if (process.env.DEBUG_CONTROL) console.log('control', id, q.prompt.slice(0, 90), JSON.stringify(built.partial), earnedKeys(run(s, q, built.partial)));
+        continue;
+      } else if (id.startsWith('y12-integral')) {
+        const st = q.stepcheck.stages; const val = st[1].expected; const F = built.full[0];
+        const integrand = st[0].integrand;
+        // a difference of numbers that merely comes to the value, the value alone, the integrand restated, a function that is not an antiderivative, a wrong antiderivative then a right substitution
+        lists.push([`F(x) = ${integrand}`], [`${num(val)}`], [`= ${num(val + 7.31)} - 7.31`], [F, `= ${num(val + 7.31)} - 7.31`], [F, `= ${num(val)} + 0`], [F, F], [`F(x) = ${integrand}`, `= ${num(val + 7.31)} - 7.31`]);
+        if (id.endsWith('3')) lists.push([built.zero[0], built.full[1]], [built.zero[0], built.full[1], built.full[2]]);
+        for (const ls of lists) { g.tried++; const k = earnedKeys(run(s, q, ls)); const real = ls.includes(F); if (k.includes('limits')) g.earned++; if (k.includes('antiderivative') && !real) g.earned++; }
+        g.tried++; if (earnedKeys(run(s, q, [F, F])).filter(x => x === 'limits').length) g.earned++;
+        // the real lines earn their criteria, even with a wrong final answer
+        const want = id.endsWith('3') ? 'antiderivative,limits' : 'antiderivative';
+        g.controls++; if (earnedKeys(run(s, q, built.partial)).join() === want) g.controlEarned++; else if (process.env.DEBUG_CONTROL) console.log('control', id, q.prompt.slice(0, 90), JSON.stringify(built.partial), earnedKeys(run(s, q, built.partial)));
+        continue;
+      } else {
+        const st = q.stepcheck.stages; const val = st[1].expected; const D = built.full[0]; const S = built.full[1];
+        const wrongD = built.zero[0];
+        // the value alone is a true line at the second stage, and shows no substitution; a sum that merely comes to the value shows none either
+        lists.push([`dy/dx = ${num(val)}`], [D, `dy/dx = ${num(val - 3)} + 1 + 1 + 1`], [D, `dy/dx = ${num(val)}`], [D, `dy/dx = ${num(val)} + 0`], [`dy/dx = ${num(val - 3)} + 1 + 1 + 1`, D]);
+        for (const ls of lists) { g.tried++; const k = earnedKeys(run(s, q, ls)); if (k.includes('substitute') && !ls.includes(S)) g.earned++; if (!ls.includes(D) && k.includes('derivative')) g.earned++; }
+        // nothing is earned by a crossed line, nor by the lines after it
+        g.tried++; if (earnedKeys(run(s, q, [wrongD, D, ...(id.endsWith('3') ? [S] : [])])).length) g.earned++;
+        // the real lines earn their criteria, even with a wrong final answer
+        const want = id.endsWith('3') ? 'derivative,substitute' : 'derivative';
+        g.controls++; if (earnedKeys(run(s, q, built.partial)).join() === want) g.controlEarned++; else if (process.env.DEBUG_CONTROL) console.log('control', id, q.prompt.slice(0, 90), JSON.stringify(built.partial), earnedKeys(run(s, q, built.partial)));
+        // a line that restates the function is never the derivative
+        g.tried++; if (earnedKeys(run(s, q, [`dy/dx = ${f.rhs}`])).includes('derivative')) g.earned++;
+        continue;
+      }
+      for (const ls of lists) { g.tried++; if (earnedKeys(run(s, q, ls)).length) g.earned++; }
+    }
+  }
+  console.log(`  Years 11-12 drafts, adversarial: ${g.tried} gamed pages, ${g.earned} earned a criterion they should not; the real lines earned their criteria on ${g.controlEarned} of ${g.controls}`);
+  ok(g.tried >= 600 && g.earned === 0, `no gamed page earns a criterion on a Years 11-12 draft (${g.earned} of ${g.tried})`);
+  ok(g.controls >= 100 && g.controlEarned === g.controls, `the genuine lines earn their criteria (${g.controlEarned} of ${g.controls})`);
+}
+
 // ── 3. criteria not the question's marks ───────────────────────────────────────────────────────────────────────────
 {
   const [s, q] = typed.find(([x]) => x.id === 'y12-diff-rules');
@@ -395,7 +476,8 @@ for (const s of SCHEMES) ok(R.questionsOfType(s, { limit: 3 }).length === 3, `${
   ok(types.types.every(t => { const s = SCHEMES.find(x => x.id === t.id); return t.totalMarks === schemeMarks(s) && t.criteria.length === s.criteria.length && t.criteria.every((c, i) => c.key === s.criteria[i].key && c.marks === s.criteria[i].marks && c.text === s.criteria[i].text); }), 'every packet criterion, mark and text is the server\'s');
   const owner = id => fs.readFileSync(new URL(`../../docs/marking/method-marks-signoff/method-marks/${id}.md`, import.meta.url), 'utf8');
   ok(SCHEMES.every(s => owner(s.id).includes(schemeDigest(s)) && s.criteria.every(c => owner(s.id).includes(c.text))), 'the owner packets carry the digest and every criterion');
-  ok(UNAVAILABLE.length === 3 && UNAVAILABLE.every(u => !SCHEMES.some(s => s.id === u.id) && !fs.existsSync(new URL(`../../docs/marking/method-marks-signoff/method-marks/${u.id}.md`, import.meta.url))), 'the three unavailable types have no scheme and no packet');
+  // Three until the Years 11-12 pass (24 Nov 2026): the gradient at a point and the tangent now have a derived step plan and a scheme each (y12-diff-gradient-2/-3, y12-tangent-3), so they left this list; the stationary points stay.
+  ok(UNAVAILABLE.length === 1 && UNAVAILABLE[0].id === 'y12-stationary-x' && UNAVAILABLE.every(u => !SCHEMES.some(s => s.id === u.id) && !fs.existsSync(new URL(`../../docs/marking/method-marks-signoff/method-marks/${u.id}.md`, import.meta.url))), 'the unavailable type has no scheme and no packet');
   const index = fs.readFileSync(new URL('../../docs/marking/method-marks-signoff/method-marks/INDEX.md', import.meta.url), 'utf8');
   ok(/## Not available yet/.test(index) && UNAVAILABLE.every(u => index.includes(u.reason.slice(0, 40))), 'INDEX.md says "not available yet", with the reason for each');
   const readme = fs.readFileSync(new URL('../../docs/marking/method-marks-signoff/READ-ME-method-marks-signoff.md', import.meta.url), 'utf8');

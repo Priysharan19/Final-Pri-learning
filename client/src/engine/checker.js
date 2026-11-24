@@ -2015,6 +2015,18 @@ function assessEvaluationStage(stage, line, ctx) {
   // The line as the assessor reads it: label first, even when the student
   // wrote it last (`9 + 8 × 3 = T_9`).
   const clause = chain?.reversed ? chain.clause : ctx ? cleanLine(raw, { letters: ctx.read.letters }) : raw;
+  // A derived plan (engine/schemePlans.js) judges a chain of equals as the evaluation only when it is labelled (`y'(0) = ...`, `m = ...`): the
+  // numerator `2 - 1 = 1` of an authored true page is a true line on the way, never the value of the gradient. A lone value is still judged.
+  // A chain of equals is the value asked for only when it is labelled with one of the stage's labels (`y'(0) = ...`, `m = ...`); a lone value is
+  // judged as before. Any other chain (`(x + 4) = 5`, `= 3`, `2 - 1 = 1`) is a true or false line of its own, left to the general line checks
+  // (a note here, ticked or crossed by the arithmetic check on its own truth), never the gradient's value.
+  if (stage.requireLabel === true && raw.includes('=')) {
+    const key = t => String(t).toLowerCase().replace(/^(?:∴|so|hence|then|therefore)\s+/, '').replace(/\s+/g, '').replace(/\([^()]*\)$/, '').replace(/[′’‘]/g, "'");
+    const first = key(raw.split('=')[0]);
+    if (!(stage.labels || []).some(l => key(l) === first)) {
+      return { status: 'note', trusted: false, note: 'This line is not labelled as the value asked for (m, gradient or y′(x)), so it is not checked as that value.' };
+    }
+  }
   let verdict = null;
   for (const variant of evaluationVariants(stage, ctx)) {
     const v = assessEvaluationLine({ text: clause, meta: variant.stage });
@@ -2041,6 +2053,7 @@ function assessEvaluationStage(stage, line, ctx) {
   return chained !== verdict ? chained : refineWithTraps(verdict, chain, stage, ctx);
 }
 
+const DERIVATIVE_LABEL = /^(?:d\s*[a-z]\s*\/\s*d\s*[a-z]|dydx|d\s*\/\s*d\s*[a-z]\s*\(.*\)|[a-z]\s*['′’‘°]\s*(?:\(\s*[a-z]\s*\))?|[a-z]\s*\(\s*[a-z]\s*\)\s*['′’‘°])$/i;
 function assessPlanStage(stage, line, ctx = null) {
   if (!stage || typeof stage !== 'object') {
     return { status: 'note', note: 'This proof stage is not configured safely.', trusted: false };
@@ -2064,6 +2077,11 @@ function assessPlanStage(stage, line, ctx = null) {
   }
   if (derivativeSourceLine(stage, line)) {
     return { status: 'note', trusted: false, note: 'Starting function recognised: differentiate it on the next line.' };
+  }
+  // A derived plan (engine/schemePlans.js) judges a line as a derivative only when it says it is one: `y - 2 = -3(x - 1)` is a true line of a tangent
+  // question, not a wrong derivative. An unlabelled line is a note.
+  if (stage.kind === 'derivative' && stage.requireLabel === true && !DERIVATIVE_LABEL.test(String(planClause(line)).split('=')[0].replace(/\s+/g, ' ').trim())) {
+    return { status: 'note', trusted: false, note: 'This line is not labelled as a derivative (dy/dx, y′ or f′(x)), so it is not checked as one.' };
   }
   // `0, 0` lists values; a derivative is one expression. Not judged, never a
   // mistake — as the evaluation stage abstains on a list (reason-v3.js).

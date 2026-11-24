@@ -617,6 +617,77 @@ diffForms.push({ diffs: [4], make: (rng) => {
   });
 } });
 
+// ── Step-mark forms (24 Nov 2026): the rules asked for as an expression, at the mark each is worth ───────────────────────────
+// D2 chain rule (two marks), D3 quotient rule and D3 product rule (three marks). Each declares its own dot point (the cell's registry
+// entry names the product rule at D2 and the quotient rule at D3), is keyed in code from the numbers shown, and agrees with a central
+// difference of the function before it can be issued.
+diffForms.push({ diffs: [2], make: (rng) => {
+  const a = ri(rng, 1, 4), b = nz(rng, -7, 7), n = ri(rng, 2, 4);
+  const inner = poly([a, 0, b]);
+  const co = 2 * n * a;
+  const e1 = n - 1 === 1 ? '' : `^${n - 1}`;
+  const key = `${co}x(${inner})${e1}`;
+  const f = x => (a * x * x + b) ** n;
+  for (const x0 of [0.7, 1.9, -1.4]) agree(co * x0 * (a * x0 * x0 + b) ** (n - 1), dnum(f, x0), 'chain expr');
+  return {
+    dotpoints: [2],
+    prompt: `Use the chain rule to differentiate $y = ${pw(inner, n)}$.`,
+    answerType: 'expression', answer: { expr: key }, answerPrefix: 'dy/dx =', inputHint: `e.g. ${co}x(${inner})${e1}`,
+    traps: [
+      { expr: `${n}(${inner})${e1}`, why: `Chain rule: also multiply by the derivative of the inside, $${2 * a}x$.` },
+      { expr: `${co}x(${inner})^${n}`, why: 'Reduce the power by 1 as well as multiplying down.' }
+    ],
+    hints: ['Chain rule: outer derivative times inner derivative.', `Outer: $${n}u^{${n - 1}}$ with $u = ${inner}$. Inner: $\\dfrac{du}{dx} = ${2 * a}x$.`, `Multiply: $${n}\\times ${2 * a}x = ${co}x$.`],
+    steps: [
+      { h: 'Outer and inner', d: `$u = ${inner},\\; \\dfrac{du}{dx} = ${2 * a}x$, so $\\dfrac{dy}{du} = ${n}u^{${n - 1}}$` },
+      { h: 'Chain rule', d: `$\\dfrac{dy}{dx} = ${n}(${inner})^{${n - 1}}\\times ${2 * a}x = ${co}x(${inner})^{${n - 1}}$` }
+    ]
+  };
+} });
+diffForms.push({ diffs: [3], make: (rng) => {
+  let a, b;
+  do { a = nz(rng, -9, 9); b = nz(rng, -6, 6); } while (a === -b * b);   // (x^2 - b^2)/(x + b) is the line x - b: no quotient rule to apply
+  const num = poly([1, 2 * b, -a]);
+  const key = `(${num})/(x ${sgn(b)})^2`;
+  for (const x0 of [0.7, 1.9, -0.4]) agree((x0 * x0 + 2 * b * x0 - a) / (x0 + b) ** 2, dnum(x => (x * x + a) / (x + b), x0), 'quotient expr');
+  return {
+    dotpoints: [1],
+    prompt: `Use the quotient rule to differentiate $y = \\dfrac{x^2 ${sgn(a)}}{x ${sgn(b)}}$.`,
+    answerType: 'expression', answer: { expr: key }, answerPrefix: 'dy/dx =', inputHint: 'e.g. (x^2 + 4x - 3)/(x + 2)^2',
+    traps: [
+      { expr: `(${poly([1, 2 * b, a])})/(x ${sgn(b)})^2`, why: 'Quotient rule: $\\dfrac{u\'v - uv\'}{v^2}$. Keep the order: $u\'v$ first, then subtract $uv\'$.' },
+      { expr: '2x', why: 'Do not divide the derivatives: the quotient rule is $\\dfrac{u\'v - uv\'}{v^2}$.' }
+    ],
+    hints: ['Quotient rule: $\\left(\\dfrac{u}{v}\\right)\' = \\dfrac{u\'v - uv\'}{v^2}$.', `$u = x^2 ${sgn(a)},\\; u' = 2x$ and $v = x ${sgn(b)},\\; v' = 1$.`, 'Expand the numerator and collect like terms.'],
+    steps: [
+      { h: 'Identify', d: `$u = x^2 ${sgn(a)},\\; v = x ${sgn(b)}$, so $u' = 2x,\\; v' = 1$` },
+      { h: 'Quotient rule', d: `$y' = \\dfrac{2x(x ${sgn(b)}) - (x^2 ${sgn(a)})}{(x ${sgn(b)})^2}$` },
+      { h: 'Simplify', d: `$y' = \\dfrac{${num}}{(x ${sgn(b)})^2}$` }
+    ]
+  };
+} });
+diffForms.push({ diffs: [3], make: (rng) => {
+  const n = ri(rng, 2, 4), k = rc(rng, [-3, -2, 2, 3]);
+  const lower = n - 1 === 1 ? 'x' : `x^${n - 1}`;
+  const key = `(${k}x^${n} + ${n}${lower})e^(${k}x)`;
+  for (const x0 of [0.4, 1.1, -0.8]) agree((k * x0 ** n + n * x0 ** (n - 1)) * Math.exp(k * x0), dnum(x => x ** n * Math.exp(k * x), x0), 'product exp');
+  return {
+    dotpoints: [0],
+    prompt: `Use the product rule to differentiate $y = x^{${n}}e^{${k}x}$.`,
+    answerType: 'expression', answer: { expr: key }, answerPrefix: 'dy/dx =', inputHint: `e.g. (${k}x^${n} + ${n}${lower})e^(${k}x)`,
+    traps: [
+      { expr: `${n}${lower}*${k}e^(${k}x)`, why: 'Product rule: $u\'v + uv\'$, two terms, not the product of the derivatives.' },
+      { expr: `${n}${lower}e^(${k}x)`, why: `The derivative of $e^{${k}x}$ is $${k}e^{${k}x}$, so the second term is needed.` }
+    ],
+    hints: ['$(uv)\' = u\'v + uv\'$.', `$u = x^{${n}},\\; u' = ${n}x^{${n - 1}}$ and $v = e^{${k}x},\\; v' = ${k}e^{${k}x}$.`, `Take out the common factor $e^{${k}x}$ if you like.`],
+    steps: [
+      { h: 'Identify', d: `$u = x^{${n}},\\; v = e^{${k}x}$, so $u' = ${n}x^{${n - 1}},\\; v' = ${k}e^{${k}x}$` },
+      { h: 'Product rule', d: `$y' = ${n}x^{${n - 1}}e^{${k}x} + x^{${n}}\\cdot (${k})e^{${k}x}$` },
+      { h: 'Collect', d: `$y' = (${k}x^{${n}} + ${n}x^{${n - 1}})e^{${k}x}$` }
+    ]
+  };
+} });
+
 // ═════════════════════════════════════════════════════════════════════════════
 // y12-appdiff
 // ═════════════════════════════════════════════════════════════════════════════

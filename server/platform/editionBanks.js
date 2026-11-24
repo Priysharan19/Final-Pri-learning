@@ -21,6 +21,7 @@ import { serverEdition } from './edition.js';
 import { indiaBank, BANK_OUTSIDE_INDIA } from './indiaBanks.js';
 import { indiaQuestionIdentity } from './indiaIdentity.js';
 import { approvedSchemeTypes, schemeTypeOf, schemeById, schemeMarks, isApproved } from './schemeAward.js';
+import { GENERIC_ID, genericEligible } from './genericSteps.js';
 import { marksPossibleFor } from './markerOps.js';
 import { nswBank, nswIssuable, nswQuestionIdentity, BANK_OUTSIDE_NSW, NSW_COURSE } from './nswBanks.js';
 
@@ -67,6 +68,9 @@ export function sealForEdition(q, banks, generator = q?._generator ?? q?.subtopi
     // A listed type is paid by its scheme only when the scheme's marks are the question's marks; otherwise it is sealed final-answer-only,
     // so the generic method rubric can never run on an NSW question.
     if (typeId && isApproved(typeId, banks.methodSchemeTypes) && marksPossibleFor(q) === schemeMarks(schemeById(typeId))) q._methodScheme = typeId;
+    // No approved per-type scheme is in force for this question (none for its type, or the type's scheme is for other marks): the generic
+    // rule (genericSteps.js), only while the author's record for it is at its current digest. A per-type approved scheme is never replaced.
+    else if (banks.methodSchemeTypes?.length && isApproved(GENERIC_ID, banks.methodSchemeTypes) && genericEligible(q)) q._methodScheme = GENERIC_ID;
     else q._marking = banks.marking;
   }
   return true;

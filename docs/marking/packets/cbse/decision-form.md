@@ -7,7 +7,7 @@ Complete one form per examiner. Return the signed original as the README says; t
 ```text
 Jurisdiction:                    cbse
 Syllabus version(s):             cbse-mathematics-2026-27
-Dossier digest reviewed:         47a2399a4d54cd965fd3fffa1ab278f6cbd1b6824eedba88d71dd1978ae7b6b6
+Dossier digest reviewed:         9b7b6a3599e19cfc44f25c18cb2f032f481d2897eb39305a66e2f088f297946b
 Repository commit reviewed:      ________________________________________
 Examiner full name:              ________________________________________
 Qualification:                   ________________________________________
@@ -73,16 +73,27 @@ Verdict per item: **A** approved as the engine behaves · **C** approved with ch
 | 50 | `cbse-bank:y11-diff/D3` | 2 marks · plan: derivative → evaluation · ECF n/a |  |  |
 | 51 | `cbse-bank:y11-diff/D4` | 3 marks · plan: derivative → equation → evaluation → point · ECF n/a |  |  |
 | 52 | `cbse-bank:y11-explog/D3` | 3 marks · equation step check · ECF n/a |  |  |
-| 53 | `cbse-bank:y7-angles/D1` | 1 marks · equation step check · ECF n/a |  |  |
-| 54 | `cbse-bank:y7-angles/D2` | 2 marks · equation step check · ECF n/a |  |  |
-| 55 | `cbse-bank:y7-angles/D3` | 2 marks · equation step check · ECF n/a |  |  |
-| 56 | `cbse-bank:y7-angles/D4` | 2 marks · equation step check · ECF n/a |  |  |
-| 57 | `cbse-bank:y7-equations/D1` | 1 marks · equation step check · ECF n/a |  |  |
-| 58 | `cbse-bank:y7-equations/D2` | 2 marks · equation step check · ECF n/a |  |  |
-| 59 | `cbse-bank:y7-equations/D3` | 2 marks · equation step check · ECF n/a |  |  |
-| 60 | `cbse-bank:y7-equations/D4` | 2 marks · equation step check · ECF n/a |  |  |
-| 61 | `cbse-bank:y8-equations/D1` | 1 marks · equation step check · ECF n/a |  |  |
-| 62 | `cbse-bank:y8-equations/D2` | 2 marks · equation step check · ECF n/a |  |  |
-| 63 | `cbse-bank:y8-equations/D3` | 3 marks · equation step check · ECF n/a |  |  |
+| 53 | `cbse-bank:y12-appdiff/D3` | 3 marks · plan: derivative → evaluation · ECF n/a |  |  |
+| 54 | `cbse-bank:y12-diff/D2` | 2 marks · plan: derivative → evaluation · ECF n/a |  |  |
+| 55 | `cbse-bank:y12-diff/D3` | 3 marks · plan: derivative → evaluation · ECF n/a |  |  |
+| 56 | `cbse-bank:y12-diff/D4` | 3 marks · plan: derivative → evaluation · ECF n/a |  |  |
+| 57 | `cbse-bank:y12-integral-calc/D1` | 1 marks · plan: area-antiderivative-of → area-substituted · ECF n/a |  |  |
+| 58 | `cbse-bank:y12-integral-calc/D2` | 2 marks · plan: area-antiderivative-of → area-substituted · ECF n/a |  |  |
+| 59 | `cbse-bank:y12-integral-calc/D3` | 2 marks · plan: area-antiderivative-of → area-substituted · ECF n/a |  |  |
+| 60 | `cbse-bank:y12-integral-calc/D4` | 2 marks · plan: area-antiderivative-of → area-substituted · ECF n/a |  |  |
+| 61 | `cbse-bank:y12-integration/D1` | 1 marks · plan: area-antiderivative-of → area-substituted · ECF n/a |  |  |
+| 62 | `cbse-bank:y12-integration/D2` | 2 marks · plan: area-antiderivative-of → area-substituted · ECF n/a |  |  |
+| 63 | `cbse-bank:y12-integration/D3` | 3 marks · plan: area-antiderivative-of → area-substituted · ECF n/a |  |  |
+| 64 | `cbse-bank:y7-angles/D1` | 1 marks · equation step check · ECF n/a |  |  |
+| 65 | `cbse-bank:y7-angles/D2` | 2 marks · equation step check · ECF n/a |  |  |
+| 66 | `cbse-bank:y7-angles/D3` | 2 marks · equation step check · ECF n/a |  |  |
+| 67 | `cbse-bank:y7-angles/D4` | 2 marks · equation step check · ECF n/a |  |  |
+| 68 | `cbse-bank:y7-equations/D1` | 1 marks · equation step check · ECF n/a |  |  |
+| 69 | `cbse-bank:y7-equations/D2` | 2 marks · equation step check · ECF n/a |  |  |
+| 70 | `cbse-bank:y7-equations/D3` | 3 marks · equation step check · ECF n/a |  |  |
+| 71 | `cbse-bank:y7-equations/D4` | 3 marks · equation step check · ECF n/a |  |  |
+| 72 | `cbse-bank:y8-equations/D1` | 1 marks · equation step check · ECF n/a |  |  |
+| 73 | `cbse-bank:y8-equations/D2` | 2 marks · equation step check · ECF n/a |  |  |
+| 74 | `cbse-bank:y8-equations/D3` | 3 marks · equation step check · ECF n/a |  |  |
 
-Items: 63.
+Items: 74.

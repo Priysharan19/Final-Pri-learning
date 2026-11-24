@@ -82,8 +82,14 @@ const draw = (sub, d, arg) => Array.from({ length: DRAWS }, (_, i) => generateQu
 const credited = q => (Array.isArray(q.dotpoints) && q.dotpoints.length ? q.dotpoints : q.dotpoint ? [q.dotpoint] : []);
 const KNOWN_LEAKS = {
   'y12-financial.1@D1': 28, 'y12-financial.2@D1': 12, 'me11-poly.3@D4': 21, 'me11-functions.2@D2': 35,
-  'me11-comb.3@D4': 5, 'me12-induction.1@D4': 23, 'me12-induction.3@D4': 26
+  'me11-comb.3@D4': 5, 'me12-induction.1@D4': 23, 'me12-induction.3@D4': 26,
+  'y12-diff.1@D2': 36, 'y12-diff.2@D3': 36
 };
+// y12-diff D2 and D3 (Years 11-12 step-mark pass, 24 Nov 2026): three forms were added so the approved scheme can pay two-mark chain rule questions and a
+// draft can pay three-mark product and quotient rule ones. Each declares its own dot point on the question (chain rule at D2, product rule at D3), and the
+// picker still draws a cell's forms at random, so asked for the product rule at D2 it now returns a chain rule question 4 times in 40 (36 belong), and asked
+// for the quotient rule at D3 a product rule question 4 times in 40 (36 belong). Two recorded leak cells, each a sibling dot point of the same topic;
+// the question says which dot point it is on, so nothing wears a wrong label.
 // me12-induction D4: 11 -> 23 and 25 -> 26 of 40 draws belong to the asked dot point (the leak SHRINKS: 29 -> 17 and 15 -> 14 draws
 // on a sibling's dot point). Cause: the Extension 1 bank-variety forms (CONTENT_VERSION 2026.11.46) joined that cell declaring no
 // dot point, so they are credited to the cell's own dot points (series and structure) and the divisibility-only forms of
