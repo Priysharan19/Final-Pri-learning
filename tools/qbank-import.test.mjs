@@ -218,6 +218,23 @@ fs.rmSync(t2, { recursive: true, force: true });
     [num(7), 'Product law.', false, 'two words with no maths are kept'],
     [num(7), 'Check the domain.', false, 'three words are kept'],
     [num(7), 'Simplify it.', true, 'a bare verb with it'],
+    [num(1 / 6), 'Total 6 of 36.', true, 'a of b gives the answer'],
+    [num(0.5), '2 of 4.', true, 'a of b gives the answer'],
+    [num(5), 'Remaining 5%.', true, 'a percentage that is the answer'],
+    [num(5), '95% between.', true, 'the complement of a percentage that is the answer'],
+    [num(21), 'C(7, 2).', true, 'C(n, r) that is the answer'],
+    [num(56), '= C(8, 3).', true, 'C(n, r) that is the answer'],
+    [num(120), '5 choices, then 4, 3, 2.', true, 'a product of listed numbers that is the answer'],
+    [num(22.5), '45 = 2v.', true, 'a one-line linear equation whose solution is the answer'],
+    [num(10), '2b = 20.', true, 'a one-line linear equation whose solution is the answer'],
+    [num(0.3183098861837907), 'Divide 100 by 100\u03c0.', true, 'a division that gives the answer'],
+    [num(21), 'Choose 2 from the other 7.', false, 'a method with small counts is kept'],
+    [num(7), 'Complement.', false, 'a one word method name'],
+    [num(7), 'Use the complement.', false, 'a method name'],
+    [num(7), 'Cosine rule.', false, 'a method name'],
+    [num(7), 'Pythagoras.', false, 'a method name'],
+    [num(7), 'Product law.', false, 'a method name'],
+    [num(7), 'Check the domain.', false, 'a method name'],
     [num(5 * Math.PI / 4), '5/4.', true, 'only a fraction (the coefficient of pi of the answer)'],
     [num(3), '10\u00b3.', true, 'only a power (the argument of the logarithm that is the answer)'],
     [num(7), '$10^{3}$', true, 'only a power in maths'],
@@ -257,6 +274,13 @@ fs.rmSync(t2, { recursive: true, force: true });
     [num(3), 'Write $[1, 2 \\cup 5$ down first.', true, 'a span that cannot be read']
   ];
   for (const [q, text, dropped, what] of rungCases) ok(!!drop(q, text, {}) === dropped, `a hint is ${dropped ? 'dropped' : 'kept'}: ${what}`);
+  { const lq = { answerType: 'numeric', answer: { value: 0.3413 }, prompt: 'Using $P(Z<1)=0.8413$, find $P(0<Z<1)$.', steps: [{ h: 'Subtract', d: '$0.8413-0.5$' }] };
+    ok(!!drop(lq, 'P(Z < 0) = 0.5.', { steps: lq.steps }), 'a number of the last worked step (0.5) is a leak');
+    const lq2 = { answerType: 'numeric', answer: { value: 0.8384 }, prompt: 'Using $P(Z<1.4)=0.9192$, find $P(|Z|<1.4)$.', steps: [{ h: 'Symmetry', d: '$2(0.9192)-1$' }] };
+    ok(!!drop(lq2, 'Lower tail 0.0808.', { steps: lq2.steps }), 'the complement of a number of the last worked step is a leak');
+    const lq3 = { answerType: 'expression', answer: { expr: 'ln(2)' }, prompt: 'Evaluate the integral.', steps: [{ h: 'Antiderivative', d: '$\\ln(1+\\sin x)$' }, { h: 'Limits', d: '$\\ln2-\\ln1$' }] };
+    ok(!!drop(lq3, '1 + sin(\u03c0/2) = 2.', { steps: lq3.steps }), 'the argument of a logarithm answer is a leak');
+    ok(!drop(lq3, 'Use the chain rule.', { steps: lq3.steps }), 'a method name is kept'); }
   // sealed text is never a rung: a trap reason, a criterion's line or point, a step, the title, the question itself
   const sealedQ = { answerType: 'expression', answer: { expr: '-cos(x)/2' }, prompt: 'Find the inverse of $y=\\cos 2x$.', steps: [{ h: 'Swap', d: 'Swap x and y, then take cosine of both sides.' }], hints: [], traps: [{ expr: 'cos(x)/2', why: 'Use cos(π − x) = −cos x.' }], criteria: [{ marks: 1, point: 'Writes the line cos(2y) = x on its own', line: 'cos(2*y) = x' }] };
   const sealedCtx = { title: 'The inverse of a cosine', steps: sealedQ.steps, traps: sealedQ.traps, criteria: sealedQ.criteria };

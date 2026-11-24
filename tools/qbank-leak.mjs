@@ -17,6 +17,7 @@
 import { checkAnswer } from '../client/src/engine/checker.js';
 import { normalize, evalNumeric, parse } from '../client/src/engine/expr.js';
 import { repeats } from '../client/src/engine/hintLadder.js';
+import { evalMath } from './qbank-figure-risk.mjs';
 
 const MATH = /(?<!\\)\$((?:\\\$|[^$])+?)(?<!\\)\$/g;
 
@@ -260,6 +261,7 @@ function answerNumbers(q) {
     const c = a.value / Math.PI;
     for (let d = 1; d <= 12; d++) { const n = Math.round(c * d); if (n !== 0 && Math.abs(c * d - n) < 1e-9 * Math.max(1, Math.abs(n))) { out.push(n / d); break; } }
     if (Number.isInteger(a.value) && Math.abs(a.value) <= 12) out.push(10 ** a.value, 2 ** a.value, Math.E ** a.value);
+    if (Math.abs(a.value) <= 360) out.push(Math.sin(a.value * Math.PI / 180), Math.cos(a.value * Math.PI / 180), Math.tan(a.value * Math.PI / 180));
   }
   if (q?.answerType === 'interval' && typeof a.region === 'string') for (const m of a.region.matchAll(/\d+(?:\.\d+)?/g)) out.push(Number(m[0]));
   return out.filter(Number.isFinite);
@@ -367,6 +369,79 @@ function sideReason(q, side, accepted, keys, strict, whole = false) {
   return null;
 }
 
+// ── what a rung can DERIVE: values it produces in one step, tested against the real marker ─────────────────────────────
+const METHOD_NOUN = /\b(?:rule|theorem|law|method|identity|formula|principle|test|complement(?:ary)?|substitution|inverse|chain|product|quotient|symmetry|conditional|bayes|pythagoras|pythagorean|binomial|discriminant|remainder|factor|completing the square|by parts|partial fractions|trapezoidal|simpson|difference of (?:two )?squares|sine|cosine|tangent|domain|range|empirical|normal approximation|total probability|inclusion|exclusion|arrangements?|combinations?|permutations?|slots|gaps|restriction|tree|diagram)\b/i;
+/** A short noun phrase naming a rule, law, theorem or method, with no number in it: a good hint whatever else it matches. */
+const isMethodName = t => { const x = String(t).trim(); return !/\d|[=<>+*/^$\\]/.test(x) && x.split(/\s+/).length <= 6 && METHOD_NOUN.test(x) && !/\b(?:answer|result|equals?)\b/i.test(x); };
+const SUPERS = { '\u2070': '0', '\u00b9': '1', '\u00b2': '2', '\u00b3': '3', '\u2074': '4', '\u2075': '5', '\u2076': '6', '\u2077': '7', '\u2078': '8', '\u2079': '9', '\u2080': '0', '\u2081': '1', '\u2082': '2', '\u2083': '3', '\u2084': '4', '\u2085': '5', '\u2086': '6', '\u2087': '7', '\u2088': '8', '\u2089': '9' };
+const digitsOfScript = x => [...String(x)].map(c => SUPERS[c] ?? c).join('');
+const ncr = (n, r) => { if (r < 0 || r > n || n > 60) return null; let v = 1; for (let i = 1; i <= r; i++) v = v * (n - r + i) / i; return Math.round(v); };
+const npr = (n, r) => { if (r < 0 || r > n || n > 20) return null; let v = 1; for (let i = 0; i < r; i++) v *= n - i; return v; };
+const pi2 = x => String(x).replace(/π/g, 'pi');
+/** Values a rung produces in one line: "a of b", a divided by b, C(n,r) and nPr, a product of listed numbers, a one-line linear equation, a percentage. */
+function derivedValues(text) {
+  const t = plainUnicode(String(text)).replace(/\$/g, ' ');
+  const raw = String(text);
+  const out = [];
+  const add = (v, why) => { if (Number.isFinite(v)) out.push({ v, why }); };
+  for (const m of t.matchAll(/(\d+(?:\.\d+)?)\s+(?:of|out of|in)\s+(\d+(?:\.\d+)?)/gi)) add(Number(m[1]) / Number(m[2]), `"${m[0]}"`);
+  for (const m of t.matchAll(/divide\s+([\d.π*]*[\dπ])\s+by\s+([\d.π*]*[\dπ])/gi)) { const a = evalMath(pi2(m[1])), b = evalMath(pi2(m[2])); if (a && b) add(a / b, `"${m[0]}"`); }
+  for (const m of t.matchAll(/([\d.π*]*[\dπ])\s*(?:÷|divided by)\s*([\d.π*]*[\dπ])/gi)) { const a = evalMath(pi2(m[1])), b = evalMath(pi2(m[2])); if (a && b) add(a / b, `"${m[0]}"`); }
+  for (const m of raw.matchAll(/(?<![A-Za-z])C\(\s*(\d+)\s*,\s*(\d+)\s*\)|(?<![A-Za-z\d])(\d+)C(\d+)(?![\d])|\\binom\{(\d+)\}\{(\d+)\}/g)) { const n = Number(m[1] ?? m[3] ?? m[5]), r = Number(m[2] ?? m[4] ?? m[6]); add(ncr(n, r), `C(${n}, ${r})`); }
+  for (const m of raw.matchAll(/([\u2070\u00b9\u00b2\u00b3\u2074-\u2079\d]+)\s*P\s*([\u2080-\u2089\d]+)|\^?\{?(\d+)\}?P_?\{?(\d+)\}?/g)) { const n = Number(digitsOfScript(m[1] ?? m[3])), r = Number(digitsOfScript(m[2] ?? m[4])); if (Number.isFinite(n) && Number.isFinite(r)) add(npr(n, r), `${n}P${r}`); }
+  const nums = [...t.matchAll(/(?<![\w.^_])(\d+(?:\.\d+)?)(?![\w^_]|\.\d)/g)].map(m => Number(m[1]));
+  if (nums.length >= 3 && nums.length <= 6 && /\bthen\b|\u00d7|\*/i.test(t)) add(nums.reduce((a, b) => a * b, 1), `the product of ${nums.join(', ')}`);
+  for (const m of t.matchAll(/(\d+(?:\.\d+)?)\s*%/g)) { add(Number(m[1]), `${m[0]}`); add(Number(m[1]) / 100, `${m[0]}`); }
+  // one-line linear equation in one letter: 2b = 20, 45 = 2v
+  for (const m of t.matchAll(/([^=;,]+?)\s*=\s*([^=;,]+?)(?=[;,.]?\s*$|[;,]|\.\s)/g)) {
+    const L = pi2(m[1]), Rr = pi2(m[2]);
+    const letters = [...new Set((L + ' ' + Rr).replace(/\b(?:sin|cos|tan|ln|log|exp|sqrt|pi|e)\b/g, '').match(/[A-Za-z]/g) || [])];
+    if (letters.length !== 1) continue;
+    const v = letters[0];
+    const f = x => { const l = evalMath(L, { [v]: x }), r = evalMath(Rr, { [v]: x }); return l === null || r === null ? null : l - r; };
+    const f0 = f(0), f1 = f(1), f2 = f(2);
+    if (f0 === null || f1 === null || f2 === null || Math.abs((f2 - f1) - (f1 - f0)) > 1e-9 || Math.abs(f1 - f0) < 1e-12) continue;
+    add(-f0 / (f1 - f0), `the equation "${m[0].trim()}"`);
+  }
+  return out;
+}
+/** Why a rung derives the answer (or its complement) through the marker, or null. */
+function derivedLeak(q, text, accepted) {
+  const fmt = v => String(Number(v.toPrecision(12)));
+  for (const { v, why } of derivedValues(text)) {
+    for (const c of [v, 1 - v, 100 - v]) if (Number.isFinite(c) && accepted(fmt(c)) && !(c === 0 || c === 1 && v !== 1)) return `${why} gives ${fmt(c)}, which the marker accepts as the answer`;
+    for (const c of [v]) if (accepted(fmt(c))) return `${why} gives ${fmt(c)}, which the marker accepts as the answer`;
+  }
+  return null;
+}
+/** Numbers and sides of the LAST worked step, and the numbers the question states (a rung may repeat what is given). */
+function lastStepLeak(q, ctx, t, spans, prose) {
+  const steps = ctx.steps || q.steps || [];
+  const last = steps.length ? String(steps[steps.length - 1]?.d ?? '') : '';
+  if (!last) return null;
+  const lastPlain = plainUnicode(texToPlain(last.replace(/\$/g, '')).plain);
+  const stated = new Set([...String(q.prompt ?? '').matchAll(/(?<![\w.^_])(\d+(?:\.\d+)?)(?![\w.^_])/g)].map(m => Number(m[1])));
+  const lastAll = [...lastPlain.matchAll(/(?<![\w.^_])(\d+(?:\.\d+)?)(?![\w^_]|\.\d)/g)].map(m => Number(m[1])).filter(v => v !== 0);
+  const lastNums = lastAll.filter(v => !stated.has(v));
+  const lastSides = lastPlain.split(/=|\u21d2|\u2248/).map(fold).filter(x => x.length >= 2);
+  const rungSides = [];
+  for (const sp of spans) rungSides.push(...texToPlain(sp).plain.split(/=/));
+  rungSides.push(...(prose.includes('=') ? prose.split(/=/) : []));
+  for (const side of rungSides) {
+    const f = fold(side);
+    if (f.length >= 2 && lastSides.includes(f) && !(/^\d+(?:\.\d+)?$/.test(f) && stated.has(Number(f)))) return `a side of it ("${side.trim().slice(0, 30)}") is a result of the last worked step`;
+  }
+  const closed = [];
+  for (const side of rungSides.concat(proseRuns(prose))) { const v = numberOf(String(side).replace(/%/g, '').replace(/[.,;:\s]+$/, '')); if (typeof v === 'number' && v !== 0) closed.push(v); }
+  for (const m of prose.matchAll(/(\d+(?:\.\d+)?)\s*%/g)) closed.push(Number(m[1]), Number(m[1]) / 100);
+  const smallWhole = v => Number.isInteger(v) && Math.abs(v) < 10;       // a stated small count is a method ("choose 2 from the other 7"), not a result
+  for (const v of closed) {
+    if (!smallWhole(v)) for (const n of lastNums) if (near(v, n)) return `it states ${+v.toFixed(6)}, a number of the last worked step`;
+    for (const n of lastAll) if (n > 0 && n < 1 && near(v, 1 - n)) return `it states ${+v.toFixed(6)}, the complement of a number of the last worked step`;
+  }
+  return null;
+}
+
 /** Why this text must not be a rung of question `q` (a pack question as the server issues it), or null. `ctx`: { title, criteria, steps, traps }. */
 export function rungDropReason(q, text, ctx = {}) {
   const t = String(text ?? '').trim();
@@ -374,13 +449,16 @@ export function rungDropReason(q, text, ctx = {}) {
   const spans = [...t.matchAll(MATH)].map(m => m[1]);
   const prose = t.replace(MATH, ' ');
   const words = wordsOf(prose);
+  // A rule, law, theorem or method named in words with no number in it is a good hint: it is not thin, and a step heading that names the same
+  // method does not make it a leak (the heading is the method, not a result).
+  const methodName = isMethodName(t);
   // Thin hints. Two or more words are kept, whatever they say, unless they are only a bare verb (alone, or with "it"/"this"); one maths span
   // or one run of plain maths is kept when it passes every test below; a lone ordinary word is nothing to learn from.
   if (words.length + spans.length === 0) return 'empty';
   const plainWords = words.map(w => w.toLowerCase().replace(/[^a-z]/g, '')).filter(Boolean);
   const symbolOnly = spans.every(sp => /^\s*\\?[A-Za-z]{1,6}(?:_\{?\w+\}?)?\s*$/.test(sp));
-  if (plainWords.length && symbolOnly && plainWords.some(w => BARE_VERBS.has(w)) && plainWords.every(w => BARE_VERBS.has(w) || FILLER.has(w) || ARTICLES.has(w) || GENERIC_NOUNS.has(w) || w.length === 1)) return 'a bare verb';
-  if (words.length + spans.length === 1 && !spans.length && !/[0-9=+\-−×÷*/^²³]/.test(words[0])) return 'a single word';
+  if (!methodName && plainWords.length && symbolOnly && plainWords.some(w => BARE_VERBS.has(w)) && plainWords.every(w => BARE_VERBS.has(w) || FILLER.has(w) || ARTICLES.has(w) || GENERIC_NOUNS.has(w) || w.length === 1)) return 'a bare verb';
+  if (!methodName && words.length + spans.length === 1 && !spans.length && !/[0-9=+\-−×÷*/^²³]/.test(words[0])) return 'a single word';
 
   // Only a number, a fraction or a power of numbers: it names no method and gives, or is one step from, a value.
   { const bare = plainUnicode(texToPlain(spans.length ? spans.join(' ') + ' ' + prose : t).plain).replace(/[\s.,;:!?]+$/g, '').trim();
@@ -412,6 +490,20 @@ export function rungDropReason(q, text, ctx = {}) {
     const hit = numberHit(standaloneNumbers(cleanMath(run)), 'the prose'); if (hit) return hit;
   }
 
+  // What the rung produces in one line, through the real marker (the complement too), and what it repeats of the last worked step.
+  { const dl = derivedLeak(q, t, accepted); if (dl) return dl; const ls = lastStepLeak(q, ctx, t, spans, prose); if (ls) return ls; }
+  // One step from the answer of a logarithm, exponential or inverse trigonometric answer: its argument.
+  if (q?.answerType === 'expression' && typeof q.answer?.expr === 'string') {
+    const m = /^(ln|log|exp|asin|acos|atan|sqrt)\((.*)\)$/.exec(q.answer.expr.replace(/\s+/g, ''));
+    if (m) {
+      for (const sp of [...spans, ...proseRuns(prose)]) for (const side of String(sp).split(/=/)) {
+        const a1 = evalMath(texToPlain(side).plain, { x: 0.37 }), a2 = evalMath(m[2], { x: 0.37 });
+        const b1 = evalMath(texToPlain(side).plain, { x: 1.9 }), b2 = evalMath(m[2], { x: 1.9 });
+        if (a1 !== null && a2 !== null && b1 !== null && b2 !== null && Math.abs(a1 - a2) < 1e-9 && Math.abs(b1 - b2) < 1e-9 && !/^\s*x?\s*$/.test(side)) return `it states the argument of the answer (${m[2].slice(0, 20)})`;
+      }
+    }
+  }
+
   // A number spelled out as the result ("the answer is seven").
   for (const k of keys) if (Number.isInteger(k) && k >= 0 && k <= 20 && new RegExp(`(?:answer|result|equals?|gives?|get|so|therefore|hence|thus|is|are|=)\\s*(?:then\\s*)?(?:about\\s*)?${NUMBER_WORDS[k]}\\b`, 'i').test(prose)) return `the prose spells out ${NUMBER_WORDS[k]} as the result`;
 
@@ -425,6 +517,7 @@ export function rungDropReason(q, text, ctx = {}) {
     ['the title', ctx.title]
   ];
   for (const [what, ...fields] of sealed) for (const field of fields) {
+    if (methodName && what === 'a step heading') continue;
     if (field === undefined || field === null || field === '') continue;
     const g = fold(String(field));
     if (g.length >= 3 && f === g) return `it is word for word ${what}`;
