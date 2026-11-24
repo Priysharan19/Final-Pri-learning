@@ -64,12 +64,16 @@ if (!fs.existsSync(dist)) {
   const rel = f => path.relative(dist, f).split(path.sep).join('/');
   ok(!files.some(f => /(^|\/)qbank(\/|$)|qb-[ax]1[12]-m[ae]-/.test(rel(f))), 'no file of client/dist is, or is named for, a pack file');
   const secrets = [...new Set(questions.flatMap(q => [...q.steps.map(s => s.d), ...q.criteria.map(c => c.point), ...q.traps.map(t => t.why)]
-    .filter(t => t.length >= 24 && !q.hints.some(h => h.includes(t) || t.includes(h)) && !q.prompt.includes(t))))];
-  ok(secrets.length > 1000, `the check has worked-step, criterion and trap texts to look for (${secrets.length})`);
+    .filter(t => t.length >= 40 && !q.hints.some(h => h.includes(t) || t.includes(h)) && !q.prompt.includes(t))))];
+  ok(secrets.length > 500, `the check has worked-step, criterion and trap texts to look for (${secrets.length})`);
+  // Question ids are the author's own (A11-C1-089) and appear nowhere in the client; a long text can coincide with a generator's wording, an id cannot.
+  const ids = questions.map(q => q.id);
   const hits = [];
   for (const file of files.filter(f => TEXT.test(f) || /sw|workbox/i.test(path.basename(f)))) {
     const text = fs.readFileSync(file, 'utf8');
     if (NAMES.test(text) || text.includes(manifest.packVersion)) hits.push(`${rel(file)} names the pack`);
+    const idHit = ids.find(id => text.includes(id));
+    if (idHit) hits.push(`${rel(file)} names the question ${idHit}`);
     const found = secrets.find(s => text.includes(s));
     if (found) hits.push(`${rel(file)} contains pack text "${found.slice(0, 40)}"`);
   }
