@@ -44,8 +44,8 @@ const asMarks = (q, n, typeId) => ({ ...q, difficulty: n, steps: Array.from({ le
 const finalOf = lines => { const l = lines[lines.length - 1] || ''; return l.includes('=') ? l.slice(l.lastIndexOf('=') + 1).trim() : l.trim(); };
 
 // ── 1. the gates ───────────────────────────────────────────────────────────────────────────────────────────────────
-ok(Array.isArray(APPROVED_SCHEME_TYPES) && APPROVED_SCHEME_TYPES.length === 0 && Object.isFrozen(APPROVED_SCHEME_TYPES), 'the allow-list in the repository is empty and frozen');
-ok(bankPolicy('prithagoras').methodSchemeTypes === APPROVED_SCHEME_TYPES, 'the NSW bank carries the (empty) allow-list');
+ok(Array.isArray(APPROVED_SCHEME_TYPES) && Object.isFrozen(APPROVED_SCHEME_TYPES) && APPROVED_SCHEME_TYPES.every(a => isApproved(a.typeId, APPROVED_SCHEME_TYPES)), 'the allow-list in the repository is frozen and every entry is at its scheme\'s current digest');
+ok(bankPolicy('prithagoras').methodSchemeTypes === APPROVED_SCHEME_TYPES, 'the NSW bank carries the generated allow-list');
 ok(!('methodSchemeTypes' in bankPolicy('priyabhata')) && bankPolicy('priyabhata').marking === null, 'India has no allow-list and no seal');
 let sealedCount = 0, byTypeSealed = 0;
 const typed = [];
@@ -53,7 +53,7 @@ for (const s of SCHEMES) for (const q of R.questionsOfType(s, { limit: 12 })) ty
 for (const [s, q] of typed) {
   const generator = s.families[0];
   const a = JSON.parse(JSON.stringify({ ...q, _generator: generator })); const b = JSON.parse(JSON.stringify({ ...q, _generator: generator }));
-  const sealed = sealForEdition(a, bankPolicy('prithagoras'), generator);
+  const sealed = sealForEdition(a, { ...bankPolicy('prithagoras'), methodSchemeTypes: [] }, generator);
   // the seal of main, written out: identity and the final-answer seal, nothing else
   const main = sealed ? (() => { b._curriculum = a._curriculum; b._marking = FINAL_ANSWER_MARKING; return b; })() : null;
   if (!sealed) continue;
@@ -62,7 +62,7 @@ for (const [s, q] of typed) {
 }
 ok(sealedCount >= 20 && byTypeSealed === sealedCount, `empty list: ${byTypeSealed} of ${sealedCount} sealed questions are byte-identical to main's seal`);
 // the same, with the list given but empty explicitly, and for the pay function
-ok(typed.every(([s, q]) => { const p = schemePay({ q: asMarks(q, schemeMarks(s), s.id), report: { lines: [] }, correct: false, marksPossible: schemeMarks(s), env: ON }); return p.paid === false && p.reason === 'type-not-approved'; }), 'empty list: nothing is paid by a scheme even with the switch on');
+ok(typed.every(([s, q]) => { const p = schemePay({ q: asMarks(q, schemeMarks(s), s.id), report: { lines: [] }, correct: false, marksPossible: schemeMarks(s), env: ON, list: [] }); return p.paid === false && p.reason === 'type-not-approved'; }), 'empty list: nothing is paid by a scheme even with the switch on');
 ok(typed.every(([s, q]) => schemePay({ q, report: { lines: [] }, correct: false, marksPossible: 1, env: ON, list: LIST }).reason === 'not-a-scheme-question'), 'a question not stamped with a scheme is never paid by one');
 // approved in this process: stamped, others sealed
 {
@@ -103,13 +103,14 @@ ok(typed.every(([s, q]) => schemePay({ q, report: { lines: [] }, correct: false,
   ok(run(ON).paid === true, 'outside production the switch pays an approved type');
 }
 
-// (f) the repository's generated lists are empty (no author record is committed), and the tool generates them from records only
+// (f) the repository's generated lists equal what the tool derives from the committed records, and the tool generates them from records only
 {
   const AA = await import('../../tools/author-approvals.mjs');
   const { AUTHOR_APPROVED_SERVER } = await import('../platform/authorApproved.generated.js');
   const typesJson = JSON.parse(fs.readFileSync(new URL('../../owner-review/method-marks/types.json', import.meta.url), 'utf8')).types;
-  ok(AUTHOR_APPROVED_SERVER.length === 0 && Object.isFrozen(AUTHOR_APPROVED_SERVER) && APPROVED_SCHEME_TYPES === AUTHOR_APPROVED_SERVER, 'the generated server list is empty and frozen in the repository');
-  ok(AA.readRecords().length === 0 && AA.approvedTypes(AA.readRecords(), typesJson).length === 0, 'no author record is committed, so nothing is approved');
+  const derived = AA.approvedTypes(AA.readRecords(), typesJson).map(a => ({ typeId: a.typeId, digest: a.digest }));
+  ok(Object.isFrozen(AUTHOR_APPROVED_SERVER) && APPROVED_SCHEME_TYPES === AUTHOR_APPROVED_SERVER && JSON.stringify(AUTHOR_APPROVED_SERVER) === JSON.stringify(derived), 'the generated server list equals exactly what the tool derives from the committed records and types.json');
+  ok(AA.readRecords().flatMap(r => AA.recordProblems(r, typesJson)).length === 0 && derived.every(d => typesJson.find(t => t.id === d.typeId)?.digest === d.digest && SCHEMES.some(x => x.id === d.typeId && schemeDigest(x) === d.digest)), 'every committed record is valid and its digest is the type\'s current digest');
   // fixtures in a temporary directory: valid + approved + current digest is listed; stale digest, changes-needed, automation names are not
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pri-approvals-'));
   const rec = (typeId, o = {}) => ({ schemaVersion: 1, typeId, digest: typesJson.find(t => t.id === typeId).digest, verdict: 'approved', role: 'author (tutor)', approvedBy: 'Priysharan Tripathi', date: '2026-11-24', note: 'ok', ...o });

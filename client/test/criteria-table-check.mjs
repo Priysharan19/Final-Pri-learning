@@ -1,7 +1,8 @@
 // The criteria table: absent unless the author approved this type, for this digest, and the awards sum to the server mark.
 import { criteriaView } from '../src/components/criteriaTableModel.js';
 import { AUTHOR_APPROVED } from '../src/engine/authorApprovals.js';
-import { approvedTypes, recordProblems } from '../../tools/author-approvals.mjs';
+import fs from 'node:fs';
+import { approvedTypes, recordProblems, readRecords } from '../../tools/author-approvals.mjs';
 
 let pass = 0; const fail = [];
 const ok = (c, l) => { if (c) pass++; else fail.push(l); };
@@ -13,7 +14,12 @@ const crit = (over = {}) => ({ typeId: 'y12-stationary-x', digest: D, items: [
   { key: 'solve', text: 'Sets it to zero and solves', marks: 1, awarded: false, lines: [], reason: 'Line 3 is where it goes wrong.' }], ...over });
 const mark = { awarded: 1, possible: 2 };
 
-ok(AUTHOR_APPROVED.length === 0, 'nothing is approved in the build today: no author record exists');
+{
+  const typesJson = JSON.parse(fs.readFileSync(new URL('../../owner-review/method-marks/types.json', import.meta.url), 'utf8')).types;
+  const derived = approvedTypes(readRecords(), typesJson);
+  ok(JSON.stringify(AUTHOR_APPROVED) === JSON.stringify(derived), 'the build list equals exactly what the tool derives from the committed records and types.json');
+  ok(!AUTHOR_APPROVED.some(a => a.typeId === 'y12-stationary-x'), 'a type the page cannot verify is not approved in the build');
+}
 ok(criteriaView({ criteria: crit(), mark, cards }) === null, 'an unapproved type shows no criteria table at all');
 const v = criteriaView({ criteria: crit(), mark, cards, approved: FIX });
 ok(v && v.rows.length === 2 && v.earned === 1 && v.possible === 2, 'an approved type shows each criterion with its marks and the total');

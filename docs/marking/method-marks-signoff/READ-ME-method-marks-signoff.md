@@ -10,7 +10,7 @@
 
 Australia (Prithagoras), the author-approved tier (your decision of 24 Nov 2026). All four, for that type, and nothing pays until every one is in place:
 
-1. Your approval record for the type in `docs/marking/author-approvals/<type>.json`, for the digest printed in the packet. Running `node tools/author-approvals.mjs` then writes the type and digest into the server's list (`server/platform/authorApproved.generated.js`) and into the page's list. Nobody types that list by hand. It is empty today.
+1. Your approval record for the type in `docs/marking/author-approvals/<type>.json`, for the digest printed in the packet. Running `node tools/author-approvals.mjs` then writes the type and digest into the server's list (`server/platform/authorApproved.generated.js`) and into the page's list. Nobody types that list by hand. It lists the seven types you approved on 24 November 2026.
 2. `PRI_METHOD_MARKS=on` in the server's environment. Unset, off or misspelt means the final answer only. No examiner variable is needed or read.
 3. A question stamped with the scheme when it is issued, so only questions issued after the record is committed are paid by it.
 4. The scheme's marks equal the question's marks.
@@ -27,9 +27,9 @@ Approving in your own name (the reply line below) writes nothing by itself: the 
 
 # Signing off the step marks, one question type at a time
 
-This note is for you, the author. Nothing in it has been approved, and nothing is switched on. Students still get
-marks for the final answer only. Step marks stay off until you approve a type, and even then they show only for that
-type.
+This note is for you, the author. You filed your seven approval records on 24 November 2026, and nothing is switched on:
+`PRI_METHOD_MARKS` is not set, so students still get marks for the final answer only. Step marks pay only while that
+switch is on, and then only for an approved type.
 
 ## What you are being asked to do
 

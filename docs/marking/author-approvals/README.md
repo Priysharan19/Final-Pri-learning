@@ -10,7 +10,9 @@ examiners, while `PRI_METHOD_MARKS=on` is set on the server. India (Priyabhata) 
 rule. This tier is never called examiner-certified, and the examiner folder and variable are not used for it.
 
 This folder holds **one record per question type the author has actually reviewed**, and nothing else. Today it
-holds none: nothing has been reviewed, so no per-criterion mark is shown to any student.
+holds seven, filed by the author himself on 24 November 2026, one for each of the seven question types in
+`owner-review/method-marks/types.json`, each at the digest he read. No criterion is paid or shown until the Australian
+server also has `PRI_METHOD_MARKS=on`, so no student sees a per-criterion mark yet.
 
 - `schema.json` is the record format.
 - A record is written by the author, after reading the packet for that type in `owner-review/method-marks/`.
