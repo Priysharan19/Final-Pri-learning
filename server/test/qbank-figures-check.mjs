@@ -38,7 +38,8 @@ c.ok(pack && pack.questionCount > 2000, 'the committed pack loads');
 const sha = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const entries = qb.qbankEntries().map(e => ({ ...e.entry, family: e.family }));
 const withFigure = entries.filter(e => e.diagram);
-c.ok(withFigure.length > 400, `the pack holds ${withFigure.length} parts that have a figure`);
+c.ok(withFigure.length > 350, `the pack holds ${withFigure.length} parts that have a figure`);
+{ const { HELD_BY_EYE } = await import('../../tools/qbank-figure-risk.mjs'); c.deq(withFigure.filter(e => HELD_BY_EYE[e.group]).map(e => e.id), [], 'no packed question has a figure that was held after looking at it'); }
 
 // ── the committed files, against the pack and the sanitiser ─────────────────
 const dir = path.join(qb.DEFAULT_PACK_DIR, 'figures');

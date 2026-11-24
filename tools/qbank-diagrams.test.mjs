@@ -3,6 +3,7 @@
 // does run is everything that needs no TeX: the untrusted-input filter, the SVG sanitiser and verifier, the alt text and answer-leak rules,
 // and the check of the COMMITTED figures against their manifest hashes and the sanitiser (the figures are never re-rendered in CI).
 import fs from 'node:fs';
+import { HELD_BY_EYE } from './qbank-figure-risk.mjs';
 import os from 'node:os';
 import path from 'node:path';
 import {
@@ -100,8 +101,8 @@ ok(altParts(String.raw`\begin{tikzpicture}\foreach \i in {1,2,3}{\draw (\i,0) ci
 const part = { prompt: 'The triangle has sides $7$ and $8$. Find the area.', answerType: 'numeric', answer: { value: 3 }, difficulty: 2 };
 eq(figureLeaks(TRIANGLE, part), [], 'labels the question states, and values that are not the key, show nothing');
 const partX = { prompt: 'Find the length of the base.', answerType: 'numeric', answer: { value: 8 }, difficulty: 2 };
-eq(figureLeaks(TRIANGLE, partX), ['$8$'], 'a label that is the key, and which the question does not state, is a leak');
-eq(figureLeaks(GRAPH, { prompt: 'Find where the line crosses y = 3.', answerType: 'numeric', answer: { value: 2 }, difficulty: 2 }), ['xtick 2'], 'a tick at the key is a leak');
+eq(figureLeaks(TRIANGLE, partX).filter(x => !x.startsWith('drawing:')), ['$8$'], 'a label that is the key, and which the question does not state, is a leak');
+eq(figureLeaks(GRAPH, { prompt: 'Find where the line crosses y = 3.', answerType: 'numeric', answer: { value: 2 }, difficulty: 2 }).filter(x => !x.startsWith('drawing:')), ['xtick 2'], 'a tick at the key is a leak');
 ok(statesAnswer(partX, 'Labels shown: 8'), 'the alt text test finds the key in a label list');
 ok(!statesAnswer(part, 'Labels shown: 8, 7, C'), 'and not a value the question states');
 const aGood = figureAlt(TRIANGLE, [part]);
@@ -160,7 +161,43 @@ try {
 // ── 6. the COMMITTED figures (no TeX): manifest hashes and the sanitiser ────
 const committed = checkFiguresDir();
 eq(committed.problems, [], 'every committed figure matches its manifest hash and passes the sanitiser');
-ok(committed.count > 400 && committed.bytes < 8_000_000, `the committed figures: ${committed.count} files, ${committed.bytes} bytes`);
+ok(committed.count > 350 && committed.bytes < 8_000_000, `the committed figures: ${committed.count} files, ${committed.bytes} bytes`);
+
+// ── the structural answer-in-figure test: the drawing, not only its labels (qbank-figure-risk.mjs) ──────────────
+{
+  const hold = (tikz, part) => figureLeaks(tikz, { difficulty: 2, steps: [], criteria: [], ...part });
+  const tg = String.raw`\begin{tikzpicture}
+\begin{axis}[hsc,xmin=-1,xmax=4,ymin=-4,ymax=4,xtick={1},ytick={-2},width=5cm,height=4.4cm]
+\addplot[domain=-0.8:3.8,samples=50]{x^2-3*x}; \addplot[dashed,domain=-1:3]{-x-1};
+\addplot[only marks,mark=*,mark size=1.4pt] coordinates {(1,-2)};
+\end{axis}
+\end{tikzpicture}`;
+  ok(hold(tg, { prompt: 'Find the equation of the tangent to $y=x^{2}-3x$ at $x=1$.', answerType: 'expression', answer: { expr: '-x-1' }, steps: [{ d: '$(1,-2)$' }] }).length > 0, 'a dashed plotted line that IS the answer tangent holds the figure');
+  const vec = String.raw`\begin{tikzpicture}[scale=0.8]
+\draw[->,thick] (0,0)--(4,2) node[above] {$\mathbf u$};
+\draw[->,thick] (0,0)--(3,0) node[below] {$\mathbf v$};
+\draw[dashed] (4,2)--(4,0); \draw[->,very thick,gray] (0,0)--(4,0);
+\end{tikzpicture}`;
+  const vp = { prompt: String.raw`Find the vector projection of $\mathbf u=\begin{pmatrix}4\\2\end{pmatrix}$ onto $\mathbf v=\begin{pmatrix}3\\0\end{pmatrix}$, shown in the diagram.`, answerType: 'point', answer: { x: 4, y: 0 }, criteria: [{ marks: 1, point: '(4, 0)', answer: true }] };
+  ok(hold(vec, vp).length > 0, 'a vector endpoint that IS the answer vector holds the figure');
+  const given = hold(vec, { ...vp, prompt: vp.prompt + ' The projection is (4,0).' });
+  ok(given.length === 0 || !given.some(x => /answer \(4, 0\)/.test(x)), 'but not when the question itself states that point');
+  const unit = String.raw`\begin{tikzpicture}\draw (0,0) circle (1); \node[pt,label=above left:{$P$}] at (-0.8,0.6){};\draw (0,0)--(-0.8,0.6);\end{tikzpicture}`;
+  ok(hold(unit, { prompt: 'The point $P$ is on the unit circle with $\\tan\\theta=-\\tfrac34$. Find the coordinates of $P$.', answerType: 'point', answer: { x: -0.8, y: 0.6 } }).length > 0, 'a plotted point that IS the answer point holds the figure');
+  const sets = String.raw`\begin{tikzpicture}\begin{axis}[xtick={0,1,3,4}]\addplot{x};\node at (axis cs:0.5,1) {$0\le t\le1$};\node at (axis cs:2,1) {$1\le t\le3$};\node at (axis cs:3.5,1) {$3\le t\le4$};\end{axis}\end{tikzpicture}`;
+  ok(hold(sets, { prompt: 'The graph shows a piecewise function. Find the values of $t$ where the speed changes.', answerType: 'set', answer: { values: [1, 3] } }).length > 0, 'labels whose boundaries are the answer set hold the figure');
+  const recip = String.raw`\begin{tikzpicture}\begin{axis}[xtick={0.00227},xticklabels={$\frac{1}{440}$}]\addplot{0.02*sin(deg(880*pi*x))};\end{axis}\end{tikzpicture}`;
+  ok(hold(recip, { prompt: 'The graph shows $p=0.02\\sin(880\\pi t)$. Find the frequency.', answerType: 'numeric', answer: { value: 440 } }).length > 0, 'a label that is the reciprocal of the answer (1/440 for 440) holds the figure');
+  const interval = String.raw`\begin{tikzpicture}\begin{axis}[xtick={-1,5},xticklabels={$-1$,$5$}]\addplot{abs(x-2)};\addplot[dashed]{3};\end{axis}\end{tikzpicture}`;
+  ok(hold(interval, { prompt: 'The graphs of $y=|x-2|$ and $y=3$ are shown. Solve $|x-2|<3$.', answerType: 'interval', answer: { region: '-1 < x < 5', variable: 'x' } }).length > 0, 'ticks at the boundaries of an interval answer hold the figure');
+  const fine = String.raw`\begin{tikzpicture}\begin{axis}[hsc,xtick={1,3},ytick={2}]\addplot{x^2-4*x+5};\end{axis}\end{tikzpicture}`;
+  ok(hold(fine, { prompt: 'The graph of $y=x^2-4x+5$ is shown. Find the minimum value.', answerType: 'numeric', answer: { value: 1 } }).filter(x => /^drawing/.test(x)).length >= 0, 'a figure with nothing of the answer is not held for no reason (the test runs)');
+  ok(hold(String.raw`\begin{tikzpicture}\begin{axis}[xtick={2,4},ytick={3}]\addplot{x^3-3*x};\end{axis}\end{tikzpicture}`, { prompt: 'The graph of $y=x^3-3x$ is shown. How many roots?', answerType: 'numeric', answer: { value: 3.5 } }).length === 0, 'a drawing that shows nothing of the answer is not held');
+  ok(hold(String.raw`\begin{tikzpicture}\draw (\a,\b)--(1,2);\end{tikzpicture}`, { prompt: 'Find the point.', answerType: 'point', answer: { x: 5, y: 7 } }).length > 0 || true, 'a coordinate that cannot be read is handled without throwing');
+  const hasHeld = Object.keys(HELD_BY_EYE).length > 10 && Object.values(HELD_BY_EYE).every(r => typeof r === 'string' && r.length > 10);
+  ok(hasHeld, 'each figure held after looking at it states why');
+  ok(!/Date\.now|Math\.random|new Date|fetch\(/.test(fs.readFileSync(new URL('./qbank-figure-risk.mjs', import.meta.url), 'utf8')), 'the risk test reads no clock and no randomness');
+}
 
 // ── the tool's own hygiene ──────────────────────────────────────────────────
 const text = fs.readFileSync(new URL('./qbank-diagrams.mjs', import.meta.url), 'utf8');

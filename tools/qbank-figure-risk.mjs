@@ -90,7 +90,7 @@ export function geometryOf(tikz) {
     while (/\s/.test(s[i] ?? '')) i++;
     if (s.startsWith('coordinates', i)) {
       i += 'coordinates'.length; while (/\s/.test(s[i] ?? '')) i++;
-      if (s[i] === '{') { const j = balanced(s, i, '{', '}'); if (j > 0) { const body = s.slice(i + 1, j); for (const c of body.matchAll(/\(\s*([^(),]+?)\s*,\s*([^(),]+?)\s*\)/g)) { const x = evalMath(c[1], {}, { deg: true }), y = evalMath(c[2], {}, { deg: true }); if (x === null || y === null) unreadable.push(`coordinate (${c[1]},${c[2]})`); else points.push({ x, y, at: 'coordinates' }); } const pts = [...body.matchAll(/\(\s*([^(),]+?)\s*,\s*([^(),]+?)\s*\)/g)].map(c => ({ x: evalMath(c[1], {}, { deg: true }), y: evalMath(c[2], {}, { deg: true }) })).filter(p => p.x !== null && p.y !== null); for (let k = 0; k + 1 < pts.length; k++) segments.push({ p: pts[k], q: pts[k + 1] }); } }
+      if (s[i] === '{') { const j = balanced(s, i, '{', '}'); if (j > 0) { const body = s.slice(i + 1, j); const isDot = /only marks|\bmark\s*=|\bmark size/.test(opts); for (const c of body.matchAll(/\(\s*([^(),]+?)\s*,\s*([^(),]+?)\s*\)/g)) { const x = evalMath(c[1], {}, { deg: true }), y = evalMath(c[2], {}, { deg: true }); if (x === null || y === null) unreadable.push(`coordinate (${c[1]},${c[2]})`); else points.push({ x, y, at: 'coordinates', dot: isDot }); } const pts = [...body.matchAll(/\(\s*([^(),]+?)\s*,\s*([^(),]+?)\s*\)/g)].map(c => ({ x: evalMath(c[1], {}, { deg: true }), y: evalMath(c[2], {}, { deg: true }) })).filter(p => p.x !== null && p.y !== null); for (let k = 0; k + 1 < pts.length; k++) segments.push({ p: pts[k], q: pts[k + 1] }); } }
       continue;
     }
     if (s.startsWith('table', i) || s.startsWith('gnuplot', i)) { unreadable.push('addplot table'); continue; }
@@ -122,6 +122,9 @@ export function geometryOf(tikz) {
     const a = evalMath(m[1], {}, { deg: true }), r = evalMath(m[2], {}, { deg: true });
     if (a !== null && r !== null) points.push({ x: r * Math.cos(a * Math.PI / 180), y: r * Math.sin(a * Math.PI / 180), at: 'polar' });
   }
+  // marked dots: \fill / \filldraw ... (x,y) circle, and \node[pt ...] at (x,y)
+  for (const m of stripped.matchAll(/\\fill(?:draw)?\b[^;]*?\(\s*([^(),;:]+?)\s*,\s*([^(),;:]+?)\s*\)\s*circle/g)) { const x = evalMath(m[1], {}, { deg: true }), y = evalMath(m[2], {}, { deg: true }); if (x !== null && y !== null) points.push({ x, y, at: 'fill', dot: true }); }
+  for (const m of stripped.matchAll(/\\node\s*\[[^\]]*\b(?:pt|opt)\b[^\]]*\]\s*at\s*\(\s*([^(),;:]+?)\s*,\s*([^(),;:]+?)\s*\)/g)) { const x = evalMath(m[1], {}, { deg: true }), y = evalMath(m[2], {}, { deg: true }); if (x !== null && y !== null) points.push({ x, y, at: 'node', dot: true }); }
   // straight segments between two readable points: (p) -- (q)
   for (const m of stripped.matchAll(/\(\s*([^(),;:]+?)\s*,\s*([^(),;:]+?)\s*\)\s*--\s*\(\s*([^(),;:]+?)\s*,\s*([^(),;:]+?)\s*\)/g)) {
     const v = [m[1], m[2], m[3], m[4]].map(t => evalMath(t, {}, { deg: true }));
@@ -199,9 +202,23 @@ const keyValues = part => {
   if (part?.answerType === 'numeric' && Number.isFinite(a.value)) return [a.value];
   if (part?.answerType === 'set' && Array.isArray(a.values)) return a.values.filter(Number.isFinite);
   if (part?.answerType === 'point') return [a.x, a.y].filter(Number.isFinite);
+  if (part?.answerType === 'interval' && typeof a.region === 'string') {
+    const out = [];
+    for (const piece of a.region.split(/<=|>=|<|>|≤|≥|\bor\b|\band\b/)) { const t = piece.trim(); if (!t || /^[A-Za-z]$/.test(t)) continue; const v = evalMath(t); if (v !== null) out.push(v); }
+    return out;
+  }
   return [];
 };
-const promptStates = (part, v) => numbersIn(part.prompt).some(n => near(n, v)) || numbersIn(String(part.prompt).replace(/\\\(|\\\)/g, '')).some(n => near(n, v));
+/** Numbers the prompt states on their own (not a coefficient or exponent inside an expression: the 4 of 4x is not "4"), and the numbers of its tuples. */
+const standaloneNumbers = text => {
+  const t = texToPlain(String(text ?? '')).replace(/\\\(|\\\)/g, ' ');
+  const out = [];
+  for (const m of t.matchAll(/(?<![\w.^_])(-?\d+(?:\.\d+)?)(?![\w.^(_])/g)) out.push(Number(m[1]));
+  for (const [x, y] of tuplesIn(text)) out.push(x, y);
+  for (const m of t.matchAll(/(-?\d+)\s*\/\s*(\d+)/g)) out.push(Number(m[1]) / Number(m[2]));
+  return out;
+};
+const promptStates = (part, v) => standaloneNumbers(part.prompt).some(n => near(n, v));
 
 /** The numbers each printed label (and each tick) states. */
 function printedNumbers(tikz, { texts, ticks }) {
@@ -211,11 +228,36 @@ function printedNumbers(tikz, { texts, ticks }) {
 }
 
 /**
+ * Figures held after a person looked at the rasterised drawing beside the question and its answer (the rules above did not catch them).
+ * Each states what the picture shows. A held figure is not packed; the question goes on the owner's list.
+ */
+export const HELD_BY_EYE = Object.freeze({
+  'A11-C1-100': 'both intercepts the working needs (3/4 and -3) are labelled on the axes',
+  'A11-C1-023': 'the corners of the graph, which are the answer set, sit at the labelled ticks -1 and 3',
+  'A11-E1-051': 'the two intersections, whose x-values are the answer, are drawn as marked points',
+  'A11-F1-011': 'the dashed asymptote y = 1 is labelled, and the answer is that level',
+  'A11-F1-023': 'the two tangent lines y = x + c are drawn dashed, and their c values are the answer',
+  'A11-F1-062': 'the intersection is marked and its x-value is labelled, and that is the answer',
+  'A11-F1-123': 'the dashed asymptote y = 1 is labelled, and the range boundary is that level',
+  'A11-T2-008': 'the intersections whose x-values are the answer are drawn as marked points',
+  'A11-T2-015': 'the points whose x-values are the answer are drawn as marked points',
+  'A12-C2-010': 'the stationary point asked for is marked on the curve',
+  'A12-C3-018': 'the turning point and the point of inflection that bound the answer are marked',
+  'A12-C3-043': 'the maximising rectangle, with its corner (2, 8), is drawn and labelled',
+  'A12-C3-117': 'the maximising rectangle, with its corners at x = -2 and 2 and height 8, is drawn and labelled',
+  'A12-F2-011': 'the intersections that bound the answer are drawn as marked points',
+  'X11-F1-015': 'the point asked for is marked on the curve',
+  'X11-F1-017': 'the turning points asked for are marked on the curve',
+  'X12-C2-020': 'the tangent whose equation is asked for is drawn dashed'
+});
+
+/**
  * Why the DRAWING of this figure gives away the answer of `part` (an archive part: prompt, answerType, answer, criteria, steps), or [].
  * `parsed` is { texts, ticks } from qbank-diagrams.mjs (figureTexts, figureTicks).
  */
 export function structuralLeaks(tikz, part, parsed) {
   const out = [];
+  if (HELD_BY_EYE[part?.question]) out.push(`seen by eye: ${HELD_BY_EYE[part.question]}`);
   const geo = geometryOf(tikz);
   const tuples = answerTuples(part);
   // (a) the answer point or vector is drawn
@@ -257,6 +299,19 @@ export function structuralLeaks(tikz, part, parsed) {
     if (promptStates(part, v)) continue;
     const variants = [v, v !== 0 ? 1 / v : null, -v].filter(w => w !== null && Number.isFinite(w));
     for (const lb of labels) for (const n of lb.nums) if (variants.some(w => near(n, w))) { out.push(`the label "${lb.text.slice(0, 30)}" prints ${n}, the answer or a one step form of it (${v})`); }
+  }
+  for (const v of keys) {
+    if (promptStates(part, v)) continue;
+    const variants = [v, v !== 0 ? 1 / v : null, -v].filter(w => w !== null && Number.isFinite(w));
+    for (const tk of tickNums) if (variants.some(w => near(tk.v, w))) out.push(`the ${tk.axis} axis prints a tick at ${+tk.v.toFixed(4)}, the answer or a one step form of it (${+v.toFixed(4)})`);
+  }
+  // marked dots whose coordinate is an answer value (a marked intersection, a turning point), unless the question gives that point
+  if (keys.length && ['numeric', 'set', 'interval'].includes(part.answerType)) {
+    const stated = tuplesIn(part.prompt);
+    for (const v of keys) {
+      const hit = geo.points.find(p => p.dot && (near(p.x, v, 5e-3) || near(p.y, v, 5e-3)) && !stated.some(([a, b]) => near(a, p.x) && near(b, p.y)) && !(Math.abs(p.x) < 1e-9 && Math.abs(p.y) < 1e-9));
+      if (hit) { out.push(`a marked point (${+hit.x.toFixed(3)}, ${+hit.y.toFixed(3)}) is at the answer value ${+v.toFixed(4)}`); break; }
+    }
   }
   if (part.answerType === 'set' && keys.length >= 1) {
     const all = labels.filter(l => l.inequality).flatMap(l => l.nums);
