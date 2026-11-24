@@ -8,7 +8,9 @@
 //      (f'(x) too, when the question defines y = f(x)). A different left side is left alone and the engine refuses it as it always did.
 //   2. A NAMED PRECISION ON AN INTERVAL. "Solve 3^x > 20, to two decimal places": the key is x > 2.7268, and x > 2.73 is the same answer
 //      rounded as asked. Every number of the key is rounded to the named place; the student's region is also tried against that.
-//   3. NO PRECISION NAMED. A numeric key that is not a whole number and has more than 3 significant figures, on a prompt that names no
+//   3. NO PRECISION NAMED. A numeric key that is an irrational or recurring value (10 or more significant figures as authored; never a whole
+//      number or a terminating decimal as authored), on a prompt that is not about money, a count or "how many" (a currency sign, dollars,
+//      cents), on a prompt that names no
 //      decimal places, significant figures or "nearest" and asks for no exact form, is accepted when the student's value is the key correctly
 //      ROUNDED to at least 3 significant figures, counting the digits as typed (135 and 135.0 for 134.9537, never 130, never a truncation that
 //      is not also a rounding, never a neighbour). The form the author wrote the key in does not matter: 8/15 accepts 0.533 and 24 root 3
@@ -100,6 +102,8 @@ export function typedDecimal(text) {
 // decide (24 root 3 asked for with no precision is a decimal); the words do. A prompt that states a precision keeps the engine's reading.
 const ASKS_FOR_PRECISION = /significant|sig\.?\s*fig|decimal|d\.\s?p\.?|nearest|round|approximat|\bto\s+(?:one|two|three|four|five|\d)\b/i;
 const EXACT_WORDS = /exact|as a fraction|simplest|simplified|lowest terms|surd|rational denominator|rationalis|in terms of|leave your answer as|mixed number|closed form/i;
+/** A currency sign, dollars or cents, or "how many": a money, count or quantity question. */
+const WHOLE_THINGS = /\\\$|\bdollars?\b|\bcents?\b|\bhow many\b|\bnumber of\b/i;
 const stripTeX = t => String(t ?? '').replace(/\$/g, '').trim();
 /** Does the question ask for an exact form anywhere: its prompt, any criterion's point, any step heading? */
 export function asksForExact(q) {
@@ -114,7 +118,11 @@ export function asksForExact(q) {
 export function acceptsRoundedFigures(q) {
   const a = q?.answer;
   if (q?.answerType !== 'numeric' || !a || !Number.isFinite(a.value) || a.tol !== undefined || a.surdForm || a.simplestFraction) return false;
-  if (Number.isInteger(a.value) || digitsOf(a.value).digits.length <= 3) return false;     // a whole number or a short decimal is its own answer
+  // Only a key whose exact value is not the authored decimal: an irrational or a recurring value written out to float length (10 or more
+  // significant figures). A whole number or a terminating decimal as authored (22315.5, 0.3413, 4.375) is its own answer.
+  if (Number.isInteger(a.value) || digitsOf(a.value).digits.length < 10) return false;
+  // Money, counts and whole things take the authored value under the existing tolerance and nothing else.
+  if (WHOLE_THINGS.test(`${q.prompt ?? ''} ${q.answerSuffix ?? ''}`)) return false;
   if (ASKS_FOR_PRECISION.test(`${q.prompt ?? ''} ${q.answerSuffix ?? ''}`)) return false;
   if (namedDecimalPlaces(q) !== null || asksForExactValue(q) || asksForExact(q)) return false;
   return true;
