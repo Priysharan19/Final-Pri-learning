@@ -31,7 +31,14 @@ import * as G from '../client/src/engine/generators/index.js';
 import { stepEvidence, marksPossibleFor, practiceMarksEarned } from '../server/platform/markerOps.js';
 import { checkAnswer } from '../client/src/engine/checker.js';
 import { transcriptsFor } from './understanding-audit/corpus.mjs';
-import { TYPES } from './method-marks-drafts.mjs';
+import { TYPES as ALL_TYPES } from './method-marks-drafts.mjs';
+
+// This measurement is of the GENERIC method rubric (the examiner tier), for the seven types the author approved on 24 Nov 2026. The draft
+// types added later (mark-variants and equation solving) are paid only by the scheme path, never by the generic rubric, which is sealed
+// off every NSW question; their invariants are held by server/test/method-marks-scheme-check.mjs. Measured on the generic rubric they
+// would fail (equation lines are ticked as equivalent equations), which says nothing about what Prithagoras pays.
+const GENERIC_RUBRIC_TYPES = new Set(['y12-diff-rules', 'y12-trig-extreme', 'y12-trig-evaluate', 'y12-diff-explog', 'y11-poly-evaluate', 'y11-diff-gradient-plan', 'y11-diff-power-rule']);
+const TYPES = ALL_TYPES.filter(t => GENERIC_RUBRIC_TYPES.has(t.id));
 import { reconcileLostRows, displayOnlyCross } from '../client/src/engine/markExplanation.js';
 import { lostMarksForPage } from '../client/src/components/attemptEvidence.js';
 
