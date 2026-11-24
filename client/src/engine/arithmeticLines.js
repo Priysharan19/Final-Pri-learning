@@ -1635,10 +1635,13 @@ function stepCheckArithmeticWithinBudget(workingText, prep = null, tickOnly = fa
         if (fn) {
           const at = fn(Number(lab[2])), chainEnd = valueOf(src.slice(lab[0].length).split('=').pop());
           if (at === null || chainEnd === null || !closeLoose(at, chainEnd)) labelFalse = true;
-        } else if (KNOWN_LABELS && !/'/.test(lab[0]) && !KNOWN_LABELS.has(`${lab[1]}|${Number(lab[2])}`)) {
-          // a function the question does not define, set equal to a chain, at an argument the question and its worked solution never write: the
-          // chain may be true, but what it is the value OF cannot be said (`f(4) = … = -7` and `f(3) = … = -7` are the same chain)
-          labelFalse = true;
+        } else if (KNOWN_LABELS && !/'/.test(lab[0])) {
+          // a function the question does not define, set equal to a chain: the chain may be true, but what it is the value OF cannot be said
+          // (`f(4) = … = -7` and `f(3) = … = -7` are the same chain). The question's worked solution states f(3) and the value it reaches; a line
+          // names f(3) only if the chain reaches that value.
+          const stated = [...KNOWN_LABELS].filter(k => k.startsWith(`${lab[1]}|${Number(lab[2])}|`)).map(k => k.split('|')[2]);
+          const chainEnd = valueOf(src.slice(lab[0].length).split('=').pop());
+          if (!stated.length || (!stated.includes('*') && !(chainEnd !== null && stated.some(v => closeLoose(Number(v), chainEnd))))) labelFalse = true;
         }
       }
       src = src.replace(/^[A-Za-z]'{0,2}\(\s*-?\d+(?:\.\d+)?\s*\)\s*=\s*(?=[^=]+=)/, ''); }

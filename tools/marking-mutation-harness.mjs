@@ -65,7 +65,14 @@ let DEFS = {};
 export function setDefinitions(list) {
   DEFS = {};
   for (const text of list) {
-    const m = /^([A-Za-z])\(([a-z])\)\s*=\s*([^=]+)$/.exec(String(text).trim());
+    const t = String(text).trim();
+    let m = /^([A-Za-z])\(([a-z])\)\s*=\s*([^=]+)$/.exec(t);
+    if (!m) {
+      // `y = 3x^2 + 3x - 8`: y as a function of its one other letter
+      const w = /^([A-Za-z])\s*=\s*([^=]+)$/.exec(t);
+      const letters = w ? [...new Set(tokenize(w[2]).filter(k => k.t === 'v').map(k => k.v))].filter(v => v !== w[1]) : [];
+      if (w && letters.length === 1 && !tokenize(w[2]).some(k => k.t === 'v' && k.v === w[1])) m = [t, w[1], letters[0], w[2]];
+    }
     if (!m) continue;
     try { DEFS[m[1]] = { param: m[2], ast: parseSide(tokenize(m[3])) }; } catch { /* not a definition we can read */ }
   }
@@ -403,11 +410,27 @@ function satisfiesAPageEquation(mutant, others) {
     } catch { return false; }
   });
 }
+/** `x = 0.5` statements of the question: the point a line may be read at. */
+function givenPoint(given) {
+  const env = {};
+  for (const g of given) { const m = /^([A-Za-z])\s*=\s*(-?[\d.]+|[^=,]+)$/.exec(String(g).trim()); if (!m) continue; const v = sideValues(m[2], []); if (v && v[0] !== null) env[m[1]] = v[0]; }
+  return env;
+}
+function trueAtGivenPoint(mutant, env) {
+  if (!Object.keys(env).length) return false;
+  const sides = sidesOf(mutant);
+  if (sides.length < 2 || sides.some(x => !x)) return false;
+  try {
+    const vals = sides.map(x => evalNode(parseSide(tokenize(x)), env));
+    return vals.every(v => Number.isFinite(v) && Math.abs(v - vals[0]) <= 1e-7 * Math.max(1, Math.abs(v)));
+  } catch { return false; }
+}
 function echoesPage(lines, i, original, mutant, given = [], solutionNumbers = []) {
   const others = [...lines.filter((_, j) => j !== i), ...given];
   // a true statement whatever the page says: an identity (`5·1^x - 3 = 2`, `0 = 0`), a root of an equation the page states, or the original equation under another constant factor
   if (isIdentity(mutant) && !isIdentity(original)) return true;
   if (satisfiesAPageEquation(mutant, others)) return true;
+  if (trueAtGivenPoint(mutant, givenPoint(given))) return true;
   { const a = rootsOf(original), b = rootsOf(mutant); if (a && b && a.v === b.v && a.roots.length && a.roots.length === b.roots.length && b.roots.every(r => a.roots.some(q => Math.abs(q - r) < 1e-4))) return true; }
   const squash = t => String(t).replace(/\s+/g, '');
   if (others.some(o => squash(o) === squash(mutant) || judgeMutant(o, mutant) === 'same')) return true;

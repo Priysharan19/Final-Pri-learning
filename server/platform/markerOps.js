@@ -101,11 +101,29 @@ function solutionNumbers(q) {
   return [...out].slice(0, 400);
 }
 
-/** Every `f(3)` the question or its authored worked solution writes, as `f|3`: the values of a function a line of working may be the value OF. */
+/**
+ * Every `f(3) = … = v` the question or its authored worked solution states, as `f|3|v` (v the value the statement reaches, `*` when it is not a
+ * number): what a line of working that names f(3) may reach. A function value the solution never states is not one a line can be said to be.
+ */
 function functionLabels(q) {
   const out = new Set();
-  const texts = [String(q?.prompt ?? ''), ...(Array.isArray(q?.steps) ? q.steps.slice(0, 40).map(st => String(st?.d ?? '').slice(0, 2000)) : [])];
-  for (const t of texts) for (const m of t.replace(/\\(?:left|right)/g, '').matchAll(/(?<![A-Za-z\\])([A-Za-z])\s*\(\s*(-?\d+(?:\.\d+)?)\s*\)/g)) out.add(`${m[1]}|${Number(m[2])}`);
+  const spans = [];
+  for (const t of [String(q?.prompt ?? ''), ...(Array.isArray(q?.steps) ? q.steps.slice(0, 40).map(st => String(st?.d ?? '').slice(0, 2000)) : [])]) {
+    for (const m of t.replace(/\\\$/g, '\u0001').matchAll(/\$([^$]+)\$/g)) spans.push(m[1]);
+  }
+  for (const tex of spans) {
+    for (const part of tex.split(/\\(?:Rightarrow|Longrightarrow|therefore|quad|qquad|text\{[^}]*\})|[,;]/)) {
+      let plain = null;
+      try { plain = SOLUTION_INTERNALS.spanToPlain(part); } catch { plain = null; }
+      if (!plain) continue;
+      const sides = plain.split(/(?<![<>!])=(?!=)/).map(x => x.trim());
+      const head = /^([A-Za-z])\(\s*(-?\d+(?:\.\d+)?)\s*\)$/.exec(sides[0] || '');
+      if (!head || sides.length < 2) continue;
+      let v = null;
+      try { const i = arithmeticInfo(cleanStatement(sides[sides.length - 1])); v = i && i.value !== undefined ? i.value : null; } catch { v = null; }
+      out.add(`${head[1]}|${Number(head[2])}|${v === null ? '*' : Number(v.toPrecision(9))}`);
+    }
+  }
   return [...out];
 }
 
