@@ -2304,7 +2304,7 @@ async function replaySubmission(p, row, q, submissionId, requestDigest, answer, 
     ...(row.serverQuestionId ? readingFloorOf(row.serverReceipt?.reading) : {}),
     // Replayed mark explanations come from the same immutable server receipt.
     ...(row.serverQuestionId && row.serverReceipt?.markRows ? { markRows: row.serverReceipt.markRows } : {}),
-    ...(row.serverQuestionId && row.serverReceipt?.methodScheme?.paid === true && row.serverReceipt.methodCriteria ? { methodScheme: row.serverReceipt.methodScheme, methodCriteria: row.serverReceipt.methodCriteria } : {}),
+    ...(row.serverQuestionId && row.serverReceipt?.methodScheme?.paid === true && row.serverReceipt.methodCriteria && !['rush', 'match', 'placement'].includes(row.mode) ? { methodScheme: row.serverReceipt.methodScheme, methodCriteria: row.serverReceipt.methodCriteria } : {}),
     ...(row.serverQuestionId ? {
       ...replayMarks,
       authoritative: true, attemptId: row.serverReceipt.attemptId,
@@ -4357,7 +4357,7 @@ const routes = {
       ...certified,
       ...(authoritative.markRows ? { markRows: authoritative.markRows } : {}),
       // A scheme-paid reply's criteria table, as the server sent it: shown only for an approved scheme at its digest, and only when it adds up (components/criteriaTableModel.js).
-      ...(authoritative.methodScheme?.paid === true && authoritative.methodCriteria ? { methodScheme: authoritative.methodScheme, methodCriteria: authoritative.methodCriteria } : {}),
+      ...(authoritative.methodScheme?.paid === true && authoritative.methodCriteria && !['rush', 'match', 'placement'].includes(row.mode) ? { methodScheme: authoritative.methodScheme, methodCriteria: authoritative.methodCriteria } : {}),
       syncQueued: true,
       ...(submissionId ? { submissionId } : {})
     };
