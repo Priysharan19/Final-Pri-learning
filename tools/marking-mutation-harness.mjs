@@ -20,13 +20,18 @@
 //   --root points the engine at another checkout (the same harness measured against an older tree gives the "before" rate);
 //   --dump writes every authored line's verdict, --compare lists the ticks a tree lost or gained against such a dump.
 //
-// What is NOT held against the marker (counted in the totals, never silently dropped):
+// What is NOT held against the marker (each counted in the totals, by class, never silently dropped):
 //   echoes             a mutant that says something TRUE the page, the question or its solution says elsewhere (another authored line, a root of an
-//                      authored equation, a value the solution reaches, a true identity, a statement true at the question's given point);
+//                      authored equation, a value the solution reaches, a true identity, a statement true at the question's given point). An
+//                      equation between two expressions that both carry the letter is NEVER set aside because it shares roots with another equation:
+//                      it claims its sides are equal, so `P = 2(x-6)(x-3)(x+1)` for a P that is 3(x-6)(x-3)(x+1) is a false line and is held against the
+//                      marker. Only an `expression = number` equation is read by its roots. The totals print the classes (`setAside`);
 //   nameDefinitions   `b = 3 - (-1) = 4` where the page never said what b is: no line can be shown false;
 //   marginNumberTicks the owner's rule of 19 November 2026 (a number from the margin read into the front of a true line is not the line's claim; pinned
-//                      by client/test/arithmetic-lines-check.mjs): such a tick says in words what it left out;
+//                      by client/test/arithmetic-lines-check.mjs): such a tick says in words that the front "was not read". It is its own named class
+//                      and is reported, not counted as a false tick;
 //   undecided         a mutant the harness's own evaluator cannot read: never asserted either way.
+// Also checked: a self-contained TRUE arithmetic line (`2 + 3 = 5`) inserted after the first line and at the end of every authored page is never crossed.
 // ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 import fs from 'node:fs';
 import path from 'node:path';
@@ -488,7 +493,7 @@ function pick(list, n) {
   const out = []; for (let k = 0; k < n; k++) out.push(list[Math.floor((k * list.length) / n)]);
   return out;
 }
-function typedAnswer(q, mode, lines) {
+export function typedAnswer(q, mode, lines) {
   // a proof or a piece of working is typed as its last line; any other question gets a wrong number (the repro's) or, in 'right' mode, its key
   if (q.answerType === 'working') return String(lines[lines.length - 1] || '');
   if (mode !== 'right') return '99991';
@@ -499,14 +504,28 @@ function typedAnswer(q, mode, lines) {
   return '99991';
 }
 
-export async function run({ root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), seeds = [1], maxPerLine = 12, generators = null, typed = 'wrong', limitPages = Infinity, verbose = false } = {}) {
+/** The engine of one checkout: the generators, the real marker and the reader of the authored solution. */
+export async function loadEngine(root) {
   const G = await import(path.join(root, 'client/src/engine/generators/index.js'));
   const { NSW_BANK_LEDGER } = await import(path.join(root, 'server/platform/nswBanks.js'));
   const { stepEvidence } = await import(path.join(root, 'server/platform/markerOps.js'));
   const { checkAnswer } = await import(path.join(root, 'client/src/engine/checker.js'));
   const SM = await import(path.join(root, 'client/src/engine/solutionMatch.js'));
   await G.loadAllBanks();
-  const spanToPlain = SM._internals.spanToPlain;
+  return { G, NSW_BANK_LEDGER, stepEvidence, checkAnswer, spanToPlain: SM._internals.spanToPlain };
+}
+/** The real marker's report lines for a page, or null. */
+export function markPage(E, q, answer, page) {
+  const qq = { ...q };
+  let ev; try { ev = E.stepEvidence(qq, answer, page.join('\n'), E.checkAnswer(qq, answer), { slipWarnings: true }); } catch { return null; }
+  return ev && ev.stepReport && Array.isArray(ev.stepReport.lines) ? ev.stepReport.lines : null;
+}
+/** The report's line for page line i: by position when it judged every line, otherwise by the line's text (a proof is judged line by line from its own plan). */
+export const lineAt = (rep, page, i) => (rep && rep.length === page.length ? rep[i] : rep ? rep.find(l => String(l.text ?? '').trim() === page[i].trim()) : undefined);
+
+export async function run({ root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), seeds = [1], maxPerLine = 12, generators = null, typed = 'wrong', limitPages = Infinity, verbose = false } = {}) {
+  const E = await loadEngine(root);
+  const { G, NSW_BANK_LEDGER, spanToPlain } = E;
   const cells = [];
   for (const e of NSW_BANK_LEDGER) {
     if (!SCOPE.test(e.generator) || (generators && !generators.includes(e.generator))) continue;
@@ -530,13 +549,8 @@ export async function run({ root = path.resolve(path.dirname(fileURLToPath(impor
     setDefinitions([...given, ...lines]);
     const solutionNumbers = [...String((q.steps || []).map(x => x && x.d).join(' ')).matchAll(/-?\d+(?:\.\d+)?/g)].map(x => Number(x[0]));
     const answer = typedAnswer(q, typed, lines);
-    const mark = page => {
-      const qq = { ...q };
-      let ev; try { ev = stepEvidence(qq, answer, page.join('\n'), checkAnswer(qq, answer), { slipWarnings: true }); } catch { return null; }
-      return ev && ev.stepReport && Array.isArray(ev.stepReport.lines) ? ev.stepReport.lines : null;
-    };
-    // The report's line for page line i: by position when it judged every line, otherwise by the line's text (a proof is judged line by line from its own plan).
-    const at = (rep, page, i) => (rep && rep.length === page.length ? rep[i] : rep ? rep.find(l => String(l.text ?? '').trim() === page[i].trim()) : undefined);
+    const mark = page => markPage(E, q, answer, page);
+    const at = lineAt;
     const base = mark(lines);
     const key = `${cell.generator}|${cell.difficulty}|${cell.seed}`;
     trueStatus[key] = base ? lines.map((_, i) => { const l = at(base, lines, i); return l ? l.status : 'none'; }) : null;
@@ -547,6 +561,17 @@ export async function run({ root = path.resolve(path.dirname(fileURLToPath(impor
         if (l.status === 'ok') totals.trueTicks++;
         if (l.status === 'break') { totals.trueCrosses++; failures.trueCrosses.push({ ...cell, line: i, text: lines[i], note: l.note }); }
       });
+    }
+    // A self-contained TRUE arithmetic line (`2 + 3 = 5`) put into the page, after the first authored line and at its end, is never crossed.
+    if (base) {
+      for (const at0 of [1, lines.length]) {
+        const page = lines.slice(0, at0).concat(['2 + 3 = 5'], lines.slice(at0));
+        const rep = mark(page);
+        const rl = rep ? lineAt(rep, page, at0) : null;
+        if (!rl) continue;
+        totals.insertedTrue = (totals.insertedTrue || 0) + 1;
+        if (rl.status === 'break') { totals.trueCrosses++; totals.insertedTrueCrosses = (totals.insertedTrueCrosses || 0) + 1; failures.trueCrosses.push({ ...cell, line: at0, text: '2 + 3 = 5 (inserted)', inserted: true, note: rl.note }); }
+      }
     }
     lines.forEach((line, i) => {
       const wrong = [];

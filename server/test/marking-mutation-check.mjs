@@ -6,14 +6,21 @@
 //    Extension 1 generators: no true line is crossed, and no line that is provably wrong (one edit of a sign, a number, an exponent, a
 //    term, a function, a limit, a base or a constant, proved false by the harness's own numeric evaluation) is ticked.
 //
+// 3. The recorded corpus (server/test/fixtures/marking-mutation-corpus.json): every false tick and every crossed true line the harness found on
+//    origin/main over seeds 1-30 (not the owner's margin-number ticks). Each is re-marked here and must not be ticked / crossed. A change that
+//    brings any one of this PR's fixes back fails it (checked per file: README of the PR lists the result).
+// 4. A self-contained TRUE arithmetic line (`2 + 3 = 5`) inserted into every authored page is never crossed.
+//
 // Deterministic: fixed seeds, no model, no network.
-import { run, judgeMutant, mutationsOf, sidesOf, sideValues } from '../../tools/marking-mutation-harness.mjs';
+import fs from 'node:fs';
+import { run, judgeMutant, mutationsOf, sidesOf, sideValues, loadEngine, markPage, lineAt, authoredPage, typedAnswer } from '../../tools/marking-mutation-harness.mjs';
 
 const G = await import('../../client/src/engine/generators/index.js');
 const { stepEvidence } = await import('../platform/markerOps.js');
 const { checkAnswer } = await import('../../client/src/engine/checker.js');
 await G.loadAllBanks();
 
+const SEEDS = [1, 2, 3, 4, 5, 6];
 let checks = 0, failed = 0;
 const ok = (cond, label) => { checks++; if (!cond) { failed++; console.log(`FAIL: ${label}`); } };
 
@@ -85,15 +92,84 @@ ok(sidesOf('a = b = c').length === 3, 'oracle: splits a chain');
   t(gen('me12-further-calc', 3, 5), ['3[sin^(-1)((x)/(4))]', '((x)/4)', '((sqrt(2))/2)', '((sqrt(3))/2)'], 2, 'a limit value (5)');
 }
 
+// ── the second review round: four classes ────────────────────────────────────────────────────────────────────────────────────
+{
+  // an equation between two expressions is ticked only when its sides are EQUAL, not when they merely share roots
+  const q = gen('y11-polynomials', 4, 79);
+  const page = rhs => ['P(6)=0', '(x-6)', `3x^3-24x^2+27x+54=${rhs}`, 'x=6'];
+  for (const bad of ['2(x-6)(x-3)(x+1)', '1(x-6)(x-3)(x+1)', '4(x-6)(x-3)(x+1)', '(x-6)(x-3)(x+1)']) ok(statusOf(q, page(bad), 2) !== 'ok', `leading constant: ${bad} is not ticked`);
+  ok(statusOf(q, page('3(x-6)(x-3)(x+1)'), 2) === 'ok', 'leading constant: the true factorisation is ticked');
+  ok(statusOf(q, ['3x^3-24x^2+27x+54=0', '3(x-6)(x-3)(x+1)=0'], 0) === 'ok', 'leading constant: the question restated is ticked');
+  const q2 = gen('y11-polynomials', 4, 105);
+  for (const bad of ['1(x+2)(x-6)(x-3)', '3(x+2)(x-6)(x-3)']) ok(statusOf(q2, ['P(-2)=0', '(x+2)', `2x^3-14x^2+72=${bad}`, 'x=-2'], 2) !== 'ok', `leading constant (seed 105): ${bad} is not ticked`);
+}
+{
+  // a value that is no root, after a line it does not satisfy (16^(-10) and 8^(-10) are both below 1e-9, and not equal)
+  const q = gen('y11-explog', 3, 108);
+  const page = last => ['(2^(4))^(4x - 2) = (2^(3))^(2x - 6)', '16x-8=6x-18', '10x=-10', last];
+  ok(statusOf(q, page('x=-2'), 3) !== 'ok', 'a root of nothing, written after the line that gives x = -1, is not ticked');
+  ok(statusOf(q, page('x=-1'), 3) === 'ok', 'the root is ticked');
+}
+{
+  // a limit is its value, not its spelling
+  const q = gen('me12-calc', 3, 71);
+  const page = lim => ['3x=x^2', 'x=0', 'x=3', 'V=π∫_{0}^{3}(R^2-r^2)dx', 'R^2=3x', 'r^2=x^2', `V = pi[((3x^2)/(2)) - ((x^3)/(3))]_0^${lim}`];
+  for (const lim of ['(3)', '(3.0)', '(2+1)', '3', '3.0']) ok(statusOf(q, page(lim), 6) === 'ok', `a limit written ${lim} is the limit 3`);
+  for (const lim of ['(4)', '(2.9)', '(2+2)']) ok(statusOf(q, page(lim), 6) !== 'ok', `a limit written ${lim} is not ticked`);
+}
+{
+  // a true self-contained arithmetic line is never crossed, on a derivative page or any other
+  for (const [id, d, seed] of [['y11-diff', 1, 45], ['y11-diff', 2, 3], ['y12-diff', 1, 2], ['y12-diff', 3, 5]]) {
+    const q = gen(id, d, seed);
+    for (const at of [0, 1, 2]) {
+      const base = ['((dy)/(dx)) = 2x', 'x = 1', 'y = 3'].slice(0, 2);
+      const page = base.slice(0, at).concat(['2 + 3 = 5'], base.slice(at));
+      ok(statusOf(q, page, at) !== 'break', `2 + 3 = 5 is not crossed (${id} ${d} ${seed}, line ${at + 1})`);
+    }
+    ok(statusOf(q, ['2 + 3 = 6'], 0) !== 'ok', `2 + 3 = 6 is not ticked (${id} ${d} ${seed})`);
+  }
+}
+
+// ── the recorded corpus ────────────────────────────────────────────────────────────────────────────────────────────────────────
+const corpus = JSON.parse(fs.readFileSync(new URL('./fixtures/marking-mutation-corpus.json', import.meta.url), 'utf8'));
+let corpusFalse = 0, corpusCross = 0, corpusFalseTicked = 0, corpusCrossed = 0;
+{
+  const E = await loadEngine(new URL('../..', import.meta.url).pathname);
+  const pageOf = (generator, difficulty, seed) => {
+    const q = E.G.generateQuestion(generator, difficulty, seed);
+    const lines = authoredPage(q, E.spanToPlain);
+    return { q, lines, answer: typedAnswer(q, 'wrong', lines) };
+  };
+  const cache = new Map();
+  const page = (g, d, s) => { const k = `${g}|${d}|${s}`; if (!cache.has(k)) cache.set(k, pageOf(g, d, s)); return cache.get(k); };
+  for (const [g, d, s, i, mutant] of corpus.falseTicks) {
+    const { q, lines, answer } = page(g, d, s);
+    const p = lines.slice(); p[i] = mutant;
+    const rl = lineAt(markPage(E, q, answer, p), p, i);
+    corpusFalse++;
+    if (rl && rl.status === 'ok' && !/in front of it was not read/.test(rl.note || '')) { corpusFalseTicked++; ok(false, `corpus: ${g} ${d} ${s} line ${i + 1} is ticked again: ${mutant}`); }
+  }
+  for (const [g, d, s, i] of corpus.trueCrosses) {
+    const { q, lines, answer } = page(g, d, s);
+    const p = lines;
+    const rl = lineAt(markPage(E, q, answer, p), p, i);
+    corpusCross++;
+    if (rl && rl.status === 'break') { corpusCrossed++; ok(false, `corpus: ${g} ${d} ${s} line ${i + 1} is crossed again: ${lines[i]}`); }
+  }
+  ok(corpusFalse === corpus.falseTicks.length && corpusCross === corpus.trueCrosses.length, 'the corpus was read whole');
+  ok(corpusFalse >= 300 && corpusCross >= 20, `the corpus is not trivial (${corpusFalse} false ticks, ${corpusCross} crossed true lines)`);
+}
+
 // ── the harness over the authored pages ──────────────────────────────────────────────────────────────────────────────────────
 {
-  const res = await run({ seeds: [1, 2], maxPerLine: 8 });
+  const res = await run({ seeds: SEEDS, maxPerLine: 8 });
   const t = res.totals;
-  console.log(`harness: ${t.pages} pages, ${t.lines} authored lines, ${t.mutants} provably wrong mutants (${t.echoes || 0} true restatements and ${t.nameDefinitions || 0} name definitions set aside); ticks on authored lines ${t.trueTicks}`);
+  const aside = Object.entries(res.setAside).sort().map(([k, v]) => `${k} ${v}`).join(', ');
+  console.log(`MARKING MUTATION COUNTS: seeds ${SEEDS[0]}-${SEEDS[SEEDS.length - 1]}, ${t.pages} pages, ${t.lines} authored lines, ${t.mutants} mutants, false ticks ${t.falseTicks}, true crosses ${t.trueCrosses}, inserted true lines ${t.insertedTrue || 0} (crossed ${t.insertedTrueCrosses || 0}), authored ticks ${t.trueTicks}, margin-number ticks ${t.marginNumberTicks || 0} (owner rule, own class), name definitions ${t.nameDefinitions || 0}, set aside as true statements ${t.echoes || 0} (${aside}), corpus ${corpusFalse} false ticks and ${corpusCross} crossed true lines (ticked again ${corpusFalseTicked}, crossed again ${corpusCrossed})`);
   ok(t.pages >= 200 && t.mutants >= 2500, `the sample is not trivial (${t.pages} pages, ${t.mutants} mutants)`);
   ok(t.trueCrosses === 0, `no authored true line is crossed (${t.trueCrosses}: ${JSON.stringify(res.failures.trueCrosses.slice(0, 3))})`);
   ok(t.falseTicks === 0, `no provably wrong mutant is ticked (${t.falseTicks}: ${JSON.stringify(res.failures.falseTicks.slice(0, 3))})`);
-  ok(t.trueTicks >= 600, `authored true lines are still ticked (${t.trueTicks})`);
+  ok(t.trueTicks >= 600 * SEEDS.length / 2, `authored true lines are still ticked (${t.trueTicks})`);
 }
 
 console.log(failed ? `MARKING MUTATION: FAIL: ${failed} of ${checks} checks` : `MARKING MUTATION: PASS: ${checks} checks`);

@@ -403,6 +403,13 @@ export function assessCalculusLine(line, ctx, meta, stage = { claimed: false }) 
     }
     const real = read.filter(s => !s.label);
     if (!real.length) return null;
+    // A self-contained numeric statement that is TRUE (`2 + 3 = 5`) says nothing about the derivative or the integral: a note, never a cross.
+    if (segs.length >= 2 && real.length === segs.length && real.every(s => s.plainAst && !variablesOf(s.plainAst).size)) {
+      try {
+        const vals = real.map(s => evaluate(s.plainAst, {}));
+        if (vals.every(v => Number.isFinite(v) && Math.abs(v - vals[0]) <= 1e-9 * Math.max(1, Math.abs(v)))) return { status: 'note', note: 'This is a true statement of arithmetic, not a claim about the ' + (ctx.relation === 'antiderivative' ? 'integral' : 'derivative') + ', so it is not checked as one.' };
+      } catch { /* not numeric: judged below */ }
+    }
     const target = ctx.relation === 'antiderivative' ? x => valueAt(ctx.given, x, ctx.variable) : null;
 
     // The answer test the checker has always applied, EXACTLY (marks hang on it): the last
