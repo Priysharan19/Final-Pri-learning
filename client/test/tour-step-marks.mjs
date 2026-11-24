@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { startOnlinePlatform } from './support/online-session.mjs';
 import { createVerifiedProfile, switchSyllabus } from './support/verified-onboarding.mjs';
 import { authoredLines, genericPlan, GENERIC_ID } from '../../server/platform/genericSteps.js';
+import { markPage } from '../../tools/generic-steps-sweep.mjs';
 
 const CLIENT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const EDITION = 'prithagoras';
@@ -101,7 +102,9 @@ try {
     if (process.env.DBG) console.log('  skip', skips, 'd', sealed?.difficulty, 'mk', sealed?._marking, 'mode', sealed?._practiceMode, 'steps', sealed?.steps?.length, sealed?._methodScheme, sealed?.answerType, sealed?._generator, await answerBox.count(), await page.locator('[data-working-area]').count(), await page.locator('.mode-tab').count());
     if (sealed && sealed._methodScheme === GENERIC_ID && await answerBox.count() === 1 && sealed.answerType !== 'mcq' && await page.locator('[data-working-area="open"]').count() === 1) {
       const plan = genericPlan(sealed);
-      if (plan.keySteps.length >= 1 && authoredLines(sealed).length >= 2) break;
+      const ls = authoredLines(sealed).map(l => l.text);
+      // one the server will pay on this working: a correct method with a wrong last line
+      if (plan.keySteps.length >= 1 && ls.length >= 2 && markPage({ ...sealed, _methodScheme: GENERIC_ID }, ls.slice(0, -1).concat('x = 999991'), '999991').marks >= 1) break;
     }
     sealed = null;
     const leaving = await page.locator('.qpage[data-question-id]').getAttribute('data-question-id');

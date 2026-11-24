@@ -2014,6 +2014,8 @@ function sanitize(q, row) {
     // binds it. draft: opened with no connection, never markable.
     checkState: row.serverQuestionId ? 'issued' : row.prepared ? 'prepared' : row.draftOnly ? 'draft' : 'legacy',
     supportsSteps: publicShaped(row) ? q.supportsSteps === true : !!stepMetaFor(q),
+    // The server says, on the question it issued, that it will pay step marks on it (stamped, a paying mode, the switch on). Never inferred on the device.
+    stepMarks: publicShaped(row) && q.stepMarks === true,
     criteria: publicShaped(row)
       ? Array.from({ length: Math.min(4, Math.max(1, Number(q.criteriaCount) || 1)) },
         (_, i) => ({ mark: 1, text: translate('msg.methodCriterion', { n: i + 1 }) }))
