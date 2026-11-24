@@ -76,11 +76,57 @@ const hasMacro = s => /\\[A-Za-z]/.test(s);
  * The geometry of a figure: points [{x,y,at}], plotted functions [{expr, deg}], segments [{p,q}], and `unreadable` (coordinates or plots whose
  * numbers could not be read, with the reason).
  */
+/** Numeric \pgfmathsetmacro definitions substituted, and simple numeric \foreach loops unrolled. `hard` lists what could not be: computed coordinates. */
+export function expandTikz(tikz) {
+  let s = String(tikz);
+  const hard = [];
+  // \pgfmathsetmacro{\name}{expr}
+  const defs = {};
+  s = s.replace(/\\pgfmathsetmacro\s*\{\\([A-Za-z]+)\}\s*\{([^{}]*)\}\s*;?/g, (_, name, expr) => {
+    let e = expr; for (const [k, v] of Object.entries(defs)) e = e.replace(new RegExp(`\\\\${k}\\b`, 'g'), `(${v})`);
+    const v = evalMath(e, {}, { deg: true });
+    if (v === null) { hard.push(`macro ${name}`); return ' '; }
+    defs[name] = String(v); return ' ';
+  });
+  for (const [k, v] of Object.entries(defs)) s = s.replace(new RegExp(`\\\\${k}\\b`, 'g'), `(${v})`);
+  // \foreach \i in {a,b,c} or {a,...,b}, body a {group} or a statement up to ';'
+  for (let pass = 0; pass < 4; pass++) {
+    const re = /\\foreach\s*\\([A-Za-z]+)\s+in\s*\{([^{}]*)\}\s*/;
+    const m = re.exec(s);
+    if (!m) break;
+    const v = m[1];
+    const items = m[2].split(',').map(x => x.trim()).filter(Boolean);
+    let list = [];
+    const dots = items.indexOf('...');
+    if (dots > 0 && items.length === dots + 2) {
+      const a = evalMath(items[dots - 1]), b = evalMath(items[dots + 1]), prev = dots >= 2 ? evalMath(items[dots - 2]) : null;
+      if (a === null || b === null) { hard.push('foreach range'); s = s.slice(0, m.index) + s.slice(m.index + m[0].length); continue; }
+      const step = prev === null ? (b >= a ? 1 : -1) : a - prev;
+      if (!step || (b - a) / step < 0 || Math.abs((b - a) / step) > 400) { hard.push('foreach range'); s = s.slice(0, m.index) + s.slice(m.index + m[0].length); continue; }
+      list = items.slice(0, dots - 1).map(x => evalMath(x));
+      for (let x = a; step > 0 ? x <= b + 1e-9 : x >= b - 1e-9; x += step) list.push(x);
+    } else list = items.map(x => (/[/]/.test(x) ? null : evalMath(x)));
+    if (list.some(x => x === null)) { hard.push('foreach list'); s = s.slice(0, m.index) + s.slice(m.index + m[0].length); continue; }
+    let bodyStart = m.index + m[0].length, body, end;
+    if (s[bodyStart] === '{') { const j = balanced(s, bodyStart, '{', '}'); if (j < 0) { hard.push('foreach body'); break; } body = s.slice(bodyStart + 1, j); end = j + 1; }
+    else { let j = bodyStart, depth = 0; for (; j < s.length; j++) { if (s[j] === '{' || s[j] === '[') depth++; else if (s[j] === '}' || s[j] === ']') depth--; else if (s[j] === ';' && depth <= 0) break; } body = s.slice(bodyStart, j + 1); end = j + 1; }
+    const unrolled = list.map(x => body.replace(new RegExp(`\\\\${v}\\b`, 'g'), `(${x})`)).join(' ');
+    s = s.slice(0, m.index) + unrolled + s.slice(end);
+  }
+  if (/\\foreach/.test(s)) hard.push('foreach');
+  if (/\\edef|\\def\b|\\pgfmathparse|\\pgfmathsetmacro/.test(s)) hard.push('macro');
+  if (/\$\(|\bintersection|\bcalc\b/.test(s) && /\$\(|intersection-|name intersections/.test(s)) hard.push('calc or intersection coordinates');
+  if (/\\coordinate\s*\[[^\]]*\bpos\s*=/.test(s)) hard.push('coordinate at a position on a path');
+  for (let k = 0; k < 3; k++) s = s.replace(/\(\s*(-?\d+(?:\.\d+)?)\s*\)/g, '$1');
+  s = s.replace(/\brel axis cs\s*:/g, 'relcs:').replace(/\baxis cs\s*:/g, '').replace(/\baxis direction cs\s*:/g, '');
+  return { text: s, hard: [...new Set(hard)] };
+}
+
 export function geometryOf(tikz) {
-  const s = String(tikz);
-  const points = [], functions = [], segments = [], unreadable = [];
-  // a foreach loop or a pgfmath macro makes the coordinates after it depend on a variable
-  const dynamic = /\\foreach|\\pgfmathsetmacro|\\edef|\\def\b/.test(s);
+  const ex = expandTikz(tikz);
+  const s = ex.text;
+  const points = [], functions = [], segments = [], unreadable = [...ex.hard];
+  const dynamic = ex.hard.length > 0;
   // plotted expressions
   for (const m of s.matchAll(/\\addplot3?\b/g)) {
     let i = m.index + m[0].length;
@@ -211,14 +257,66 @@ const keyValues = part => {
 };
 /** Numbers the prompt states on their own (not a coefficient or exponent inside an expression: the 4 of 4x is not "4"), and the numbers of its tuples. */
 const standaloneNumbers = text => {
-  const t = texToPlain(String(text ?? '')).replace(/\\\(|\\\)/g, ' ');
+  const raw = String(text ?? '').replace(/\\\(|\\\)/g, ' ');
   const out = [];
+  // numbers in prose, in maths with no variable ($7$), after an equals sign (x=1, r=3), and the numbers of a tuple or vector; NOT the
+  // coefficients and constants inside an expression with a variable (the 2 of x+2, the 4 of 4x)
+  let prose = raw.replace(/\$([^$]+)\$/g, (_, m) => {
+    const plain = texToPlain(m);
+    const hasVar = /[A-Za-z]/.test(plain.replace(/\b(?:sin|cos|tan|exp|ln|log|sqrt|pi|e|text|mathrm|circ)\b/g, '').replace(/\\[A-Za-z]+/g, ''));
+    for (const q of plain.matchAll(/=\s*(-?\d+(?:\.\d+)?)(?![\w.^(_])/g)) out.push(Number(q[1]));
+    return hasVar ? ' ' : ` ${m} `;
+  });
+  const t = texToPlain(prose);
   for (const m of t.matchAll(/(?<![\w.^_])(-?\d+(?:\.\d+)?)(?![\w.^(_])/g)) out.push(Number(m[1]));
   for (const [x, y] of tuplesIn(text)) out.push(x, y);
   for (const m of t.matchAll(/(-?\d+)\s*\/\s*(\d+)/g)) out.push(Number(m[1]) / Number(m[2]));
   return out;
 };
 const promptStates = (part, v) => standaloneNumbers(part.prompt).some(n => near(n, v));
+
+/** The values that are, or are one step from, the answer and the results of every worked step: [{ v, kind: 'answer' | 'step', why }]. */
+export function decisiveValues(part) {
+  const out = [];
+  for (const v of keyValues(part)) out.push({ v, kind: 'answer', why: part.answerType === 'numeric' ? 'the answer' : `${part.answerType === 'interval' ? 'a boundary of' : 'a component of'} the answer` });
+  const tuple = answerTuples(part);
+  for (const [x, y] of tuple) out.push({ v: x, kind: 'answer', why: 'a component of the answer' }, { v: y, kind: 'answer', why: 'a component of the answer' });
+  // the author's own marking points ("Limits 0 and 4", "roots 1 and 3") and the limits of integrals and the values assigned in the working
+  for (const c of part.criteria || []) {
+    const t = String(c?.point ?? '').replace(/\\(?:text|mathrm)\{[^{}]*\}/g, ' ');
+    if (/\b(?:limits?|roots?|intersections?|intercepts?|boundaries|turning|stationary|crosses|meets|bounds?)\b/i.test(t) || /^\s*[-\d.(]/.test(t)) for (const n of numbersIn(t)) out.push({ v: n, kind: 'step', why: `a value the marking names ("${t.trim().slice(0, 24)}")` });
+  }
+  for (const st of part.steps || []) {
+    const d = String(st?.d ?? '');
+    for (const m of d.matchAll(/\\int_\{?([^\s^{}]+)\}?\^\{?([^\s{}(\\]+)\}?/g)) for (const lim of [m[1], m[2]]) { const v = evalMath(lim); if (v !== null) out.push({ v, kind: 'step', why: `a limit of integration (${lim})` }); }
+    for (const m of d.matchAll(/(?:^|[\s$,;])[a-zA-Z]\s*=\s*(-?\\?[dt]?frac\{[^{}]+\}\{[^{}]+\}|-?[\d.]+(?:\\pi)?)/g)) for (const n of numbersIn(m[1])) out.push({ v: n, kind: 'step', why: `a value found in the working (${+n.toFixed(4)})` });
+  }
+  let w = 0;
+  for (const st of part.steps || []) {
+    w++;
+    const whole = texToPlain(String(st?.d ?? '').replace(/\$/g, ''));
+    for (const [x, y] of tuplesIn(String(st?.d ?? ''))) out.push({ v: x, kind: 'step', why: `a component of a point in step ${w}` }, { v: y, kind: 'step', why: `a component of a point in step ${w}` });
+    for (const m of whole.matchAll(/(?<![\w.^_])(-?\d+(?:\.\d+)?)(?![\w.^(_])/g)) out.push({ v: Number(m[1]), kind: 'step', why: `a number of step ${w} (${m[1]})` });
+  }
+  let i = 0;
+  for (const st of part.steps || []) {
+    i++;
+    const d = String(st?.d ?? '').replace(/\$/g, '');
+    const segs = d.split(/\\approx|=|≈/).map(x => x.trim()).filter(Boolean);
+    const rhs = segs.length > 1 ? segs.slice(1) : segs;
+    for (const seg of rhs) {
+      const t = seg.replace(/\\(?:text|mathrm|quad|qquad)\{?[^{}]*\}?/g, ' ').replace(/\b(?:or|and)\b/g, ',');
+      const plain = texToPlain(t);
+      if (/[A-Za-z]/.test(plain.replace(/\b(?:sin|cos|tan|exp|ln|log|sqrt|pi|e)\b/g, ''))) continue;
+      for (const [x, y] of tuplesIn(t)) { out.push({ v: x, kind: 'step', why: `a component of the result of step ${i}` }, { v: y, kind: 'step', why: `a component of the result of step ${i}` }); }
+      for (const n of numbersIn(t)) out.push({ v: n, kind: 'step', why: `a result of step ${i} (${+n.toFixed(4)})` });
+      for (const m of plain.matchAll(/\d+(?:\.\d+)?/g)) out.push({ v: Number(m[0]), kind: 'step', why: `a number of step ${i} (${m[0]})` });
+      const whole = evalMath(t.replace(/,/g, ' '));
+      if (whole !== null) out.push({ v: whole, kind: 'step', why: `the result of step ${i} (${+whole.toFixed(4)})` });
+    }
+  }
+  return out;
+}
 
 /** The numbers each printed label (and each tick) states. */
 function printedNumbers(tikz, { texts, ticks }) {
@@ -246,6 +344,23 @@ export const HELD_BY_EYE = Object.freeze({
   'A12-C3-043': 'the maximising rectangle, with its corner (2, 8), is drawn and labelled',
   'A12-C3-117': 'the maximising rectangle, with its corners at x = -2 and 2 and height 8, is drawn and labelled',
   'A12-F2-011': 'the intersections that bound the answer are drawn as marked points',
+  'A11-F1-020': 'the lines of the family drawn include the tangents to the parabola, whose slopes bound the answer',
+  'A11-F1-038': 'the two tangent lines through (0, -1), whose slopes are the answer, are drawn dashed',
+  'A12-C3-011': 'the maximising rectangle, with its corners at x = plus and minus root 3 and height 6, is drawn',
+  'A12-C3-020': 'the maximising rectangle in the semicircle is drawn',
+  'A12-C3-059': 'the maximising rectangle in the semicircle is drawn',
+  'A12-C4-018': 'the x-axis tick e is the upper limit of x found in the working (x = e at y = 1)',
+  'A12-C4-045': 'the x-axis tick 4 is where the line meets the curve, the value the working finds',
+  'A12-C4-068': 'the x-axis tick 4 is where the line meets the curve, the value the working finds',
+  'A12-C4-090': 'the x-axis tick e is the upper limit of x found in the working (x = e at y = 1)',
+  'A12-T3-003': 'the two points where the depth equals 3, whose times the working finds, are marked',
+  'A12-T3-004': 'the three intersections, whose number is the answer, are marked with dots',
+  'X11-F1-041': 'the x-axis tick 1 is one of the solutions, which are the answer',
+  'X12-C3-017': 'the x-axis tick e is the upper limit of x found in the working (x = e at y = 1)',
+  'X12-C3-028': 'the x-axis tick 2 is where the curve meets the line y = 8, a value the working finds',
+  'X12-T3-031': 'the y-axis ticks 5 and -5 are the amplitude R that step 1 finds',
+  'X12-T3-048': 'the y-axis tick root 5 is the amplitude R that step 1 finds',
+  'X12-C3-099': 'the x-axis tick e squared is the upper limit of the working (the value of x at y = 2)',
   'X11-F1-015': 'the point asked for is marked on the curve',
   'X11-F1-017': 'the turning points asked for are marked on the curve',
   'X12-C2-020': 'the tangent whose equation is asked for is drawn dashed'
@@ -292,46 +407,59 @@ export function structuralLeaks(tikz, part, parsed) {
       if (!found && geo.unreadable.some(u => /^(addplot|parametric)/.test(u)) && !out.length) out.push(`a plotted curve could not be read (${geo.unreadable.find(u => /^(addplot|parametric)/.test(u))}): held`);
     }
   }
-  // (c) a label or tick states the answer, its reciprocal or negative, or the boundaries of a set answer
+  // (c) and (d): NO value that is the accepted answer (or a component, reciprocal or negative of it) or the result of ANY worked step may appear
+  // as an axis tick, tick label, label, annotation, marked point or coordinate. The main curve the question gives is allowed; a plotted
+  // auxiliary line that is a step's result is not. A value the question itself states is not a finding.
   const { labels, tickNums } = printedNumbers(tikz, parsed);
+  const decisive = decisiveValues(part);
   const keys = keyValues(part);
-  for (const v of keys) {
-    if (promptStates(part, v)) continue;
-    const variants = [v, v !== 0 ? 1 / v : null, -v].filter(w => w !== null && Number.isFinite(w));
-    for (const lb of labels) for (const n of lb.nums) if (variants.some(w => near(n, w))) { out.push(`the label "${lb.text.slice(0, 30)}" prints ${n}, the answer or a one step form of it (${v})`); }
-  }
-  for (const v of keys) {
-    if (promptStates(part, v)) continue;
-    const variants = [v, v !== 0 ? 1 / v : null, -v].filter(w => w !== null && Number.isFinite(w));
-    for (const tk of tickNums) if (variants.some(w => near(tk.v, w))) out.push(`the ${tk.axis} axis prints a tick at ${+tk.v.toFixed(4)}, the answer or a one step form of it (${+v.toFixed(4)})`);
-  }
-  // marked dots whose coordinate is an answer value (a marked intersection, a turning point), unless the question gives that point
-  if (keys.length && ['numeric', 'set', 'interval'].includes(part.answerType)) {
-    const stated = tuplesIn(part.prompt);
-    for (const v of keys) {
-      const hit = geo.points.find(p => p.dot && (near(p.x, v, 5e-3) || near(p.y, v, 5e-3)) && !stated.some(([a, b]) => near(a, p.x) && near(b, p.y)) && !(Math.abs(p.x) < 1e-9 && Math.abs(p.y) < 1e-9));
-      if (hit) { out.push(`a marked point (${+hit.x.toFixed(3)}, ${+hit.y.toFixed(3)}) is at the answer value ${+v.toFixed(4)}`); break; }
+  const shown = [
+    ...tickNums.map(t => ({ v: t.v, where: `the ${t.axis} axis tick ${+t.v.toFixed(4)}` })),
+    ...labels.flatMap(l => l.nums.map(n => ({ v: n, where: `the label "${l.text.replace(/\s+/g, ' ').slice(0, 28)}"` }))),
+    ...geo.points.flatMap(pt => [{ v: pt.x, where: `${pt.dot ? 'a marked point' : 'a coordinate'} (${+pt.x.toFixed(3)}, ${+pt.y.toFixed(3)})` }, { v: pt.y, where: `${pt.dot ? 'a marked point' : 'a coordinate'} (${+pt.x.toFixed(3)}, ${+pt.y.toFixed(3)})` }])
+  ];
+  const seen = new Set();
+  for (const d of decisive) {
+    if (Math.abs(d.v) < 1e-12 || promptStates(part, d.v)) continue;
+    const variants = d.kind === 'answer' ? [d.v, d.v !== 0 ? 1 / d.v : null, -d.v] : [d.v];
+    for (const sh of shown) {
+      if (!variants.some(w => w !== null && Number.isFinite(w) && near(sh.v, w, 3e-3))) continue;
+      const key = `${d.kind}|${sh.where}|${d.why}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(d.kind === 'answer' ? `answer: ${sh.where} is ${d.why}` : `step result: ${sh.where} is ${d.why}`);
     }
   }
+  // a set answer whose values are all the boundaries of inequality labels
   if (part.answerType === 'set' && keys.length >= 1) {
     const all = labels.filter(l => l.inequality).flatMap(l => l.nums);
     const unstated = keys.filter(v => !promptStates(part, v));
-    if (unstated.length && unstated.every(v => all.some(n => near(n, v)))) out.push('the labels print the boundaries that are the answer set');
+    if (unstated.length && unstated.every(v => all.some(n => near(n, v)))) out.push('answer: the labels print the boundaries that are the answer set');
   }
-  // (d) a worked step's result is a coordinate, a label or a tick
+  // worked results that are points
   for (const st of part.steps || []) {
     const d = String(st?.d ?? '');
     const results = d.split(/\\approx|=|≈/).slice(1).map(x => x.trim()).filter(Boolean);
     const last = results.length ? results[results.length - 1] : d;
     for (const t of tuplesIn(last)) {
       if (tupleStated(part, t) || (t[0] === 0 && t[1] === 0)) continue;
-      if (geo.points.some(p => near(p.x, t[0], 5e-3) && near(p.y, t[1], 5e-3))) out.push(`a worked result (${t[0]}, ${t[1]}) is drawn as a coordinate`);
+      if (geo.points.some(pt => near(pt.x, t[0], 5e-3) && near(pt.y, t[1], 5e-3))) out.push(`step result: a coordinate (${t[0]}, ${t[1]}) is drawn`);
     }
-    const nums = numbersIn(last);
-    if (nums.length === 1 && !trivial(nums[0]) && !promptStates(part, nums[0])) {
-      const v = nums[0];
-      if (labels.some(l => l.nums.some(n => near(n, v))) ) out.push(`a worked result (${+v.toFixed(4)}) is a label`);
-      if (tickNums.some(tk => near(tk.v, v))) out.push(`a worked result (${+v.toFixed(4)}) is a tick`);
+  }
+  // a plotted auxiliary line or curve that is a step's result (a tangent, a normal, an inverse), unless the question states that curve
+  {
+    const stepFns = [];
+    for (const st of part.steps || []) {
+      const segs = String(st?.d ?? '').replace(/\$/g, '').split(/\\approx|=|≈/).map(x => x.trim()).filter(Boolean);
+      for (const seg of segs) { const t = texToPlain(seg.replace(/\\(?:text|mathrm)\{[^{}]*\}/g, '')); if (/\bx\b/.test(t) && !/[A-Za-wyz]\b/.test(t.replace(/\b(?:sin|cos|tan|exp|ln|log|sqrt|pi|abs)\b/g, ''))) stepFns.push(seg); }
+    }
+    const promptFns = [...String(part.prompt).matchAll(/(?:y|f\(x\)|g\(x\))\s*=\s*([^,;$]+)/g)].map(m => m[1]);
+    for (const fn of geo.functions) {
+      const f = x => evalMath(fn.expr, { x }, { deg: true });
+      const same = expr => { let hits = 0; for (const x of [-2.3, -1.1, 0.4, 0.9, 1.7, 2.6, 3.3]) { const a = f(x), b = evalMath(expr, { x }); if (a === null || b === null) continue; if (Math.abs(a - b) > 1e-6 * Math.max(1, Math.abs(a), Math.abs(b))) return false; hits++; } return hits >= 3; };
+      if (promptFns.some(same)) continue;
+      const hit = stepFns.find(same);
+      if (hit) out.push(`step result: a plotted line or curve (${fn.expr.slice(0, 30)}) is the result of a worked step`);
     }
   }
   return [...new Set(out)];

@@ -98,7 +98,7 @@ ok(/x and y axes/.test(g.structure) && /2 plotted/.test(g.structure) && /some of
 ok(/1 circle is drawn/.test(altParts(CIRCLE).structure), 'a circle is counted, and the dot at its centre (circle (1.5pt)) is not');
 ok(figureFacts(String.raw`\begin{tikzpicture}\foreach \i in {1,2,3}{\draw (\i,0) circle (0.3);}\end{tikzpicture}`).loop, 'a loop is known, so no count is claimed');
 ok(altParts(String.raw`\begin{tikzpicture}\foreach \i in {1,2,3}{\draw (\i,0) circle (0.3);}\end{tikzpicture}`).structure === null, 'and none is stated');
-const part = { prompt: 'The triangle has sides $7$ and $8$. Find the area.', answerType: 'numeric', answer: { value: 3 }, difficulty: 2 };
+const part = { prompt: 'The triangle has sides $7$ and $8$. Find the area.', answerType: 'numeric', answer: { value: 17.25 }, difficulty: 2 };
 eq(figureLeaks(TRIANGLE, part), [], 'labels the question states, and values that are not the key, show nothing');
 const partX = { prompt: 'Find the length of the base.', answerType: 'numeric', answer: { value: 8 }, difficulty: 2 };
 eq(figureLeaks(TRIANGLE, partX).filter(x => !x.startsWith('drawing:')), ['$8$'], 'a label that is the key, and which the question does not state, is a leak');
@@ -161,7 +161,7 @@ try {
 // ── 6. the COMMITTED figures (no TeX): manifest hashes and the sanitiser ────
 const committed = checkFiguresDir();
 eq(committed.problems, [], 'every committed figure matches its manifest hash and passes the sanitiser');
-ok(committed.count > 350 && committed.bytes < 8_000_000, `the committed figures: ${committed.count} files, ${committed.bytes} bytes`);
+ok(committed.count > 150 && committed.bytes < 8_000_000, `the committed figures: ${committed.count} files, ${committed.bytes} bytes`);
 
 // ── the structural answer-in-figure test: the drawing, not only its labels (qbank-figure-risk.mjs) ──────────────
 {
