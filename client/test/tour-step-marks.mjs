@@ -98,7 +98,7 @@ try {
     if (await typeTab.count()) await typeTab.click();
     await online.settled();
     sealed = await sealedNow();
-    if (process.env.DBG) console.log('  skip', skips, sealed?._methodScheme, sealed?.answerType, sealed?._generator, await answerBox.count(), await page.locator('[data-working-area]').count(), await page.locator('.mode-tab').count());
+    if (process.env.DBG) console.log('  skip', skips, 'd', sealed?.difficulty, 'mk', sealed?._marking, 'mode', sealed?._practiceMode, 'steps', sealed?.steps?.length, sealed?._methodScheme, sealed?.answerType, sealed?._generator, await answerBox.count(), await page.locator('[data-working-area]').count(), await page.locator('.mode-tab').count());
     if (sealed && sealed._methodScheme === GENERIC_ID && await answerBox.count() === 1 && sealed.answerType !== 'mcq' && await page.locator('[data-working-area="open"]').count() === 1) {
       const plan = genericPlan(sealed);
       if (plan.keySteps.length >= 1 && authoredLines(sealed).length >= 2) break;
