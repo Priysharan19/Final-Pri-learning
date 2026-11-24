@@ -72,7 +72,7 @@ try {
   await page.route('**/v1/practice/issue', route => {
     const request = route.request(); let body = null;
     try { body = JSON.parse(request.postData() || 'null'); } catch { body = null; }
-    if (body && typeof body === 'object' && !body.prepared && !body.mode) return route.continue({ postData: JSON.stringify({ ...body, difficulty: 3 }) });
+    if (body && typeof body === 'object' && !body.prepared && (!body.mode || body.mode === 'practice')) return route.continue({ postData: JSON.stringify({ ...body, difficulty: 3 }) });
     return route.continue();
   });
   stage = 'open the app';
