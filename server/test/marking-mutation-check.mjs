@@ -130,6 +130,16 @@ ok(sidesOf('a = b = c').length === 3, 'oracle: splits a chain');
   }
 }
 
+// ── a function value is a claim, not a label (the area stages) ─────────────────────────────────────────────────────────────────
+{
+  const q = gen('y12-integration', 3, 83);
+  const page = l => ['F(x) = (((3x + 3)^(4))/(12))', l, '1620'];
+  for (const bad of ['F(3)=1728-108', 'F(3)F(1)=1728-108', '-F(1)=1728-108', 'F(1)=1728-108']) ok(statusOf(q, page(bad), 1) !== 'ok', `an area line that names F at a number is not ticked for the difference: ${bad}`);
+  ok(statusOf(q, page('F(3)-F(1)=1728-108'), 1) === 'ok', 'F(3) - F(1) = 1728 - 108 is ticked');
+  const q2 = gen('y12-integration', 3, 20);
+  ok(statusOf(q2, ['F(x) = (((4x + 2)^(4))/(16))', 'F(1)=81-1', '80'], 1) !== 'ok', 'F(1) = 81 - 1 is not ticked (F(1) is 81)');
+}
+
 // ── a rounded value is ticked only as the correct rounding or truncation to the places it shows ───────────────────────────────
 {
   const q = gen('y12-financial', 3, 19);
