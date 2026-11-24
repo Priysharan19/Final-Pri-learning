@@ -1109,6 +1109,35 @@ async function run() {
         if (!named) throw new Error('the figure is not drawn or has no text alternative');
         await wait(page, 400);
       });
+      // A worked-solution question (answerType manual: his show-that, prove, explain, sketch and unkeyed "find" questions, never marked): the card says
+      // so before it starts, and after the press shows his steps and a read-only list of what a marker looks for. Both states are walked.
+      let workedQ = null;
+      await step('practice · a worked-solution question, not marked, before the solution', '/practice', async () => {
+        await goTo(page, BASE, '/practice?subtopic=y11-diff');
+        await page.waitForSelector('.q-prompt', { timeout: 30000 });
+        for (let i = 0; i < 120 && !workedQ; i++) {
+          await online.settled();
+          const shown = await online.shownRow();
+          const row = shown?.serverQuestionId ? platform.db.prepare("SELECT response_json FROM idempotency_keys WHERE scope='practice-question' AND key=?").get(shown.serverQuestionId) : null;
+          const q = row ? JSON.parse(row.response_json) : null;
+          if (q && q.answerType === 'manual') { workedQ = q; break; }
+          await page.locator('.ctx-next').first().click();
+          await page.waitForSelector('.q-prompt', { timeout: 30000 });
+          await wait(page, SETTLE);
+        }
+        if (!workedQ) throw new Error('no worked-solution question was dealt within the bounded search');
+        await page.waitForSelector('[data-worked-notice]', { timeout: 15000 });
+        const typeTab = page.locator('.mode-tab').first();
+        if (await typeTab.count()) { await typeTab.click(); await wait(page, 250); }
+        await page.locator('textarea').first().fill('x = 1');
+        await wait(page, 500);
+      });
+      await step('practice · a worked-solution question, with the solution and what a marker looks for', '/practice', async () => {
+        if (!workedQ) throw new Error('no worked-solution question to show');
+        await page.getByRole('button', { name: /Show the worked solution/ }).click();
+        await page.waitForSelector('[data-worked-solution] [data-worked-criteria]', { timeout: 30000 });
+        await wait(page, 700);
+      });
     }
 
     await step('progress · overview', '/progress', async () => {

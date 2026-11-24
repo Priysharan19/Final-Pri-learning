@@ -44,7 +44,8 @@ import { authoredLines } from '../server/platform/genericSteps.js';
 import { checkBankAnswer } from '../server/platform/qbankMarking.js';
 import { rungDropReason, bankLadder } from './qbank-leak.mjs';
 import { PACK_FORMAT, DEFAULT_PACK_DIR, buildFamily, indexOf, loadPack, sha256 } from '../server/platform/qbankPack.js';
-import { loadFigureResults, packableFigure, figureRef, figureFiles } from './qbank-diagrams.mjs';
+import { loadFigureResults, packableFigure, figureRef, figureFiles, figureLeaks, figureAlt } from './qbank-diagrams.mjs';
+import { classifyManual, deriveKey, asDerivedPart, plausibleWrongs, stepResultLeak, stepResults } from './qbank-manual.mjs';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const katex = createRequire(path.join(ROOT, 'client', 'package.json'))('katex');
@@ -570,44 +571,151 @@ export const TAG_CORRECTIONS = Object.freeze({
   'X12-V1-116': 'V1.1c'    // a point dividing a line in a ratio, by vectors: geometric work with vectors, not component form
 });
 
+/** His printed answer for each marking part: the question's `ans`, or, on a multi-part question, the part's own (by order). */
+export function printedAnswers(archive) {
+  const byId = new Map(archive.questions.map(q => [q.id, q]));
+  const seen = new Map();
+  const out = new Map();
+  for (const part of archive.parts) {
+    const n = seen.get(part.question) || 0;
+    seen.set(part.question, n + 1);
+    const q = byId.get(part.question);
+    out.set(part, Array.isArray(q?.parts) ? q.parts[n]?.ans : q?.ans);
+  }
+  return out;
+}
+
+/** The ladder and the reasons a part (as the pack would hold it) is not packed: the checks an authored auto-markable part passes. */
+function evaluateAuto(part, question, archive, opts) {
+  const rec = checkPart(part, question, archive.tags, opts);
+  const q = engineQuestion(part, question);
+  const ctx = { figures: opts.figures, title: question?.title, criteria: part.criteria || [], steps: part.steps || [], traps: q.traps || [] };
+  const lad = bankLadder(q, ctx);
+  q.hints = lad.hints;
+  q.ladder = lad.ladder;
+  const reasons = rec.failures.some(f => f.startsWith('schema:')) ? rec.failures.filter(f => f.startsWith('schema:')) : rejectReasons(rec, part, q, ctx);
+  return { rec, q, ctx, lad, reasons };
+}
+
+/**
+ * Is a derived key one the pack may carry: the engine accepts it (evaluateAuto, above), and at least two plausible WRONG values are refused.
+ * Returns { ok, why }.
+ */
+export function derivedKeyRefusals(dpart, q) {
+  const wrongs = plausibleWrongs({ answerType: dpart.answerType, answer: dpart.answer });
+  const tested = wrongs.slice(0, 5);
+  if (tested.length < 2) return { ok: false, why: 'fewer-than-two-wrong-values' };
+  const accepted = tested.filter(w => safe(() => checkBankAnswer(q, w), { correct: true }).correct === true);
+  return accepted.length ? { ok: false, why: 'a-wrong-value-is-accepted' } : { ok: true, tested: tested.length };
+}
+
+/**
+ * A manual part that stays a worked-solution question: why it is not packed (empty when it is), and the line-feedback gate.
+ * Kinds: prove, explain, sketch, find. No key, no mark, ever.
+ */
+export function evaluateManual(part, question, archive, opts) {
+  const rec = checkPart(part, question, archive.tags, opts);
+  const reasons = [];
+  const schema = rec.failures.filter(f => f.startsWith('schema:'));
+  if (schema.length) return { rec, reasons: schema };
+  // The client must be able to draw it (the same TeX rules as an auto part), and a diagram only with a verified figure that shows no worked result.
+  for (const f of rec.failures) if (f.startsWith('latex:')) reasons.push(f.replace(/@.*$/, ''));
+  let diagram;
+  if (rec.diagram) {
+    const fig = packableFigure(opts.figures, part.question);
+    if (!fig) reasons.push(figureReject(opts.figures, part.question));
+    else if (safe(() => figureLeaks(question.tikz, part), ['unreadable']).length) reasons.push('diagram:answer-in-figure');
+    else { const alt = safe(() => figureAlt(question.tikz, [part]), null); diagram = alt ? figureRef({ ...fig, alt: alt.alt }) : null; if (!diagram) reasons.push('diagram:alt'); }
+  }
+  // The hints: his, each through the rung rule and the step-result rule (a hint may not state a result of his worked steps).
+  const q = engineQuestion(part, question);
+  const ctx = { figures: opts.figures, title: question?.title, criteria: part.criteria || [], steps: part.steps || [], traps: [] };
+  const lad = bankLadder(q, ctx);
+  const results = stepResults(part);
+  const kept = [], dropped = [...lad.dropped];
+  lad.hints.forEach(h => { const why = stepResultLeak(part, h, results); if (why) dropped.push({ index: -1, why }); else kept.push(h); });
+  const ladder = {};
+  ['nudge', 'method', 'worked'].forEach((rung, i) => { if (kept[i]) ladder[rung] = kept[i]; });
+  // Line feedback (ticks and notes on the student's own working) only where the step report never crosses his own steps.
+  const lineFeedback = rec.gates?.feedback === true && rec.checks?.steps?.state !== 'no-lines' && rec.checks?.steps?.state !== 'no-report';
+  return { rec, reasons: [...new Set(reasons)], hints: kept, ladder, dropped, lineFeedback, diagram, kind: classifyManual(part.prompt) };
+}
+
 export function compilePack(archive, opts = {}) {
   const byId = new Map(archive.questions.map(q => [q.id, q]));
+  const printed = printedAnswers(archive);
   const shards = new Map();
   const rejects = [];
+  const derived = { converted: [], byType: {}, held: {}, manualKinds: {}, manualServed: {}, manualRejected: {} };
   const ladderStats = { questions: 0, authoredHints: 0, rungsKept: 0, rungsDropped: 0, withRungs: { 0: 0, 1: 0, 2: 0, 3: 0 }, dropReasons: {} };
-  for (const part of archive.parts) {
-    const question = byId.get(part.question);
-    const rec = checkPart(part, question, archive.tags, opts);
-    const q = engineQuestion(part, question);
-    // The ladder this question shows: ONLY his authored hints, each kept when it passes the rung rule (tools/qbank-leak.mjs). Nothing is
-    // derived from a worked step or a heading.
-    const ctx = { figures: opts.figures, title: question?.title, criteria: part.criteria || [], steps: part.steps || [], traps: q.traps || [] };
-    const lad = bankLadder(q, ctx);
-    q.hints = lad.hints;
-    q.ladder = lad.ladder;
-    const reasons = rec.failures.some(f => f.startsWith('schema:')) ? rec.failures.filter(f => f.startsWith('schema:')) : rejectReasons(rec, part, q, ctx);
+  const shardOf = part => shards.get(familyOf(part)) || shards.set(familyOf(part), { family: familyOf(part), course: part.course, year: part.year, topic: part.topic, questions: [], manual: [] }).get(familyOf(part));
+  const stats = (lad, part) => {
+    ladderStats.questions++;
+    ladderStats.authoredHints += Math.min(3, (part.hints || []).length);
+    ladderStats.rungsKept += lad.hints.length;
+    ladderStats.rungsDropped += lad.dropped.length;
+    ladderStats.withRungs[lad.hints.length]++;
+    for (const d of lad.dropped) { const k = String(d.why).replace(/"[^"]*"/g, '"…"').replace(/\b\d+(?:\.\d+)?\b/g, 'N').slice(0, 60); ladderStats.dropReasons[k] = (ladderStats.dropReasons[k] || 0) + 1; }
+  };
+  for (const original of archive.parts) {
+    const question = byId.get(original.question);
+    let part = original;
+    let ev = original.answerType === 'manual' ? null : evaluateAuto(part, question, archive, opts);
+    let manual = null;
+    if (original.answerType === 'manual') {
+      const kind = classifyManual(original.prompt);
+      derived.manualKinds[kind] = (derived.manualKinds[kind] || 0) + 1;
+      // A "find" part may become auto-markable, only when its own printed answer is one unambiguous value that his last step reaches AND the
+      // part passes every check an authored auto-markable part passes AND the engine refuses two or more plausible wrong values.
+      let converted = false;
+      if (kind === 'find' && opts.derive !== false) {
+        const key = deriveKey(original, printed.get(original));
+        if (key.no) derived.held[key.no] = (derived.held[key.no] || 0) + 1;
+        else {
+          const dpart = asDerivedPart(original, key);
+          const dev = evaluateAuto(dpart, question, archive, opts);
+          const refusals = dev.reasons.length ? { ok: false, why: `pack-check:${dev.reasons[0]}` } : derivedKeyRefusals(dpart, dev.q);
+          if (refusals.ok && archive.tags?.[dpart.question]) { part = dpart; ev = dev; converted = true; derived.converted.push({ id: dev.rec.id, answerType: dpart.answerType, shown: key.shown, prompt: String(original.prompt).replace(/\s+/g, ' ').slice(0, 140), key: dpart.answer }); derived.byType[dpart.answerType] = (derived.byType[dpart.answerType] || 0) + 1; }
+          else derived.held[refusals.why] = (derived.held[refusals.why] || 0) + 1;
+        }
+      }
+      if (!converted) manual = evaluateManual(original, question, archive, opts);
+    }
+    if (manual) {
+      const rec = manual.rec;
+      const reasons = manual.reasons;
+      if (HELD_FOR_OWNER[rec.id] && !reasons.includes(HELD_FOR_OWNER[rec.id])) reasons.push(HELD_FOR_OWNER[rec.id]);
+      if (reasons.length || !question || !archive.tags?.[original.question]) {
+        const why = reasons.length ? reasons : [!question ? 'join:part-without-question' : 'join:no-dotpoint'];
+        rejects.push({ id: rec.id, reasons: why.map(r => `manual:${r}`) });
+        for (const r of why) derived.manualRejected[r] = (derived.manualRejected[r] || 0) + 1;
+        continue;
+      }
+      const entry = ordered({
+        id: rec.id, group: original.question, label: original.label ?? undefined, dp: TAG_CORRECTIONS[rec.id] ?? archive.tags[original.question], authored: original.difficulty, level: LEVEL_OF(original.difficulty),
+        marks: original.marks, title: question.title, prompt: original.prompt, answerType: 'manual', kind: manual.kind, hints: manual.hints, ladder: manual.ladder, steps: original.steps, criteria: original.criteria,
+        stepcheck: original.stepcheck, lineFeedback: manual.lineFeedback, diagram: manual.diagram
+      }, ['id', 'group', 'label', 'dp', 'authored', 'level', 'marks', 'title', 'prompt', 'answerType', 'kind', 'hints', 'ladder', 'steps', 'criteria', 'stepcheck', 'lineFeedback', 'diagram']);
+      shardOf(original).manual.push(entry);
+      derived.manualServed[manual.kind] = (derived.manualServed[manual.kind] || 0) + 1;
+      continue;
+    }
+    const { rec, q, lad } = ev;
+    const reasons = ev.reasons;
     if (HELD_FOR_OWNER[rec.id] && !reasons.includes(HELD_FOR_OWNER[rec.id])) reasons.push(HELD_FOR_OWNER[rec.id]);
     if (reasons.length || !question || !archive.tags?.[part.question]) {
       rejects.push({ id: rec.id, reasons: reasons.length ? reasons : [!question ? 'join:part-without-question' : 'join:no-dotpoint'] });
       continue;
     }
-    if (part.answerType !== 'manual') {
-      ladderStats.questions++;
-      ladderStats.authoredHints += Math.min(3, (part.hints || []).length);
-      ladderStats.rungsKept += lad.hints.length;
-      ladderStats.rungsDropped += lad.dropped.length;
-      ladderStats.withRungs[lad.hints.length]++;
-      for (const d of lad.dropped) { const k = String(d.why).replace(/"[^"]*"/g, '"…"').replace(/\b\d+(?:\.\d+)?\b/g, 'N').slice(0, 60); ladderStats.dropReasons[k] = (ladderStats.dropReasons[k] || 0) + 1; }
-    }
-    const family = familyOf(part);
+    stats(lad, part);
     const entry = ordered({
       id: rec.id, group: part.question, label: part.label ?? undefined, dp: TAG_CORRECTIONS[rec.id] ?? archive.tags[part.question], authored: part.difficulty, level: LEVEL_OF(part.difficulty),
       marks: part.marks, title: question.title, prompt: part.prompt, answerType: part.answerType, answer: part.answer,
       answerPrefix: part.answerPrefix, inputHint: part.inputHint, hints: lad.hints, ladder: lad.ladder, steps: part.steps, traps: q.traps, criteria: part.criteria, stepcheck: part.stepcheck,
+      derived: part.derivedKey ? true : undefined,
       diagram: rec.diagram ? figureRef(packableFigure(opts.figures, part.question)) : undefined
-    }, ['id', 'group', 'label', 'dp', 'authored', 'level', 'marks', 'title', 'prompt', 'answerType', 'answer', 'answerPrefix', 'inputHint', 'hints', 'ladder', 'steps', 'traps', 'criteria', 'stepcheck', 'diagram']);
-    const shard = shards.get(family) || shards.set(family, { family, course: part.course, year: part.year, topic: part.topic, questions: [] }).get(family);
-    shard.questions.push(entry);
+    }, ['id', 'group', 'label', 'dp', 'authored', 'level', 'marks', 'title', 'prompt', 'answerType', 'answer', 'answerPrefix', 'inputHint', 'hints', 'ladder', 'steps', 'traps', 'criteria', 'stepcheck', 'derived', 'diagram']);
+    shardOf(part).questions.push(entry);
   }
   const files = new Map();
   const entries = [];
@@ -615,10 +723,12 @@ export function compilePack(archive, opts = {}) {
   for (const family of [...shards.keys()].sort()) {
     const shard = shards.get(family);
     shard.questions.sort((a, b) => (a.id < b.id ? -1 : 1));
-    const text = json(ordered(shard, ['family', 'course', 'year', 'topic', 'questions']));
+    shard.manual.sort((a, b) => (a.id < b.id ? -1 : 1));
+    // `manual` (worked-solution questions, no key, no mark) is written only when the family has some.
+    const text = json(ordered({ ...shard, manual: shard.manual.length ? shard.manual : undefined }, ['family', 'course', 'year', 'topic', 'questions', 'manual']));
     const name = `shards/${family}.json`;
     files.set(name, text);
-    entries.push({ name, family, course: shard.course, year: shard.year, topic: shard.topic, questions: shard.questions.length, bytes: Buffer.byteLength(text), sha256: sha256(Buffer.from(text)) });
+    entries.push({ name, family, course: shard.course, year: shard.year, topic: shard.topic, questions: shard.questions.length, ...(shard.manual.length ? { manualQuestions: shard.manual.length } : {}), bytes: Buffer.byteLength(text), sha256: sha256(Buffer.from(text)) });
     families.set(family, buildFamily(shard));
   }
   const indexText = json({ format: PACK_FORMAT, families: indexOf(families) });
@@ -628,7 +738,7 @@ export function compilePack(archive, opts = {}) {
   const packVersion = sha256(Buffer.from([index.sha256, ...entries.map(e => `${e.name}:${e.sha256}`)].join('\n'))).slice(0, 12);
   const manifest = {
     format: PACK_FORMAT, packVersion, source: archive.files, index,
-    totals: { questions: entries.reduce((s, e) => s + e.questions, 0), shards: entries.length, bytes: entries.reduce((s, e) => s + e.bytes, 0) + index.bytes },
+    totals: { questions: entries.reduce((s, e) => s + e.questions, 0), manualQuestions: entries.reduce((s, e) => s + (e.manualQuestions || 0), 0), shards: entries.length, bytes: entries.reduce((s, e) => s + e.bytes, 0) + index.bytes },
     shards: entries
   };
   files.set('manifest.json', json(manifest));
@@ -638,9 +748,16 @@ export function compilePack(archive, opts = {}) {
   const byCourse = {};
   for (const e of entries) { const k = `${e.course === 'ADV' ? 'A' : 'X'}${e.year}`; byCourse[k] = (byCourse[k] || 0) + e.questions; }
   files.set('NOTICE', NOTICE);
-  if (opts.figures) for (const [name, text] of figureFiles(opts.figures, [...shards.values()].flatMap(sh => sh.questions.filter(e => e.diagram).map(e => e.group)))) files.set(name, text);
+  if (opts.figures) for (const [name, text] of figureFiles(opts.figures, [...shards.values()].flatMap(sh => [...sh.questions, ...sh.manual].filter(e => e.diagram).map(e => e.group)))) files.set(name, text);
   files.set('rejects.json', json({ note: 'ids and reasons only', parts: rejects.length, reasons: Object.fromEntries(Object.entries(reasonCounts).sort()), rejects }));
-  return { files, rejects, summary: { ladder: ladderStats, packVersion, questions: manifest.totals.questions, shards: entries.length, bytes: manifest.totals.bytes, byCourse, rejectedParts: rejects.length, reasons: Object.fromEntries(Object.entries(reasonCounts).sort()) } };
+  return { files, rejects, summary: { ladder: ladderStats, manual: derived, packVersion, questions: manifest.totals.questions, manualQuestions: manifest.totals.manualQuestions, shards: entries.length, bytes: manifest.totals.bytes, byCourse, rejectedParts: rejects.length, reasons: Object.fromEntries(Object.entries(reasonCounts).sort()) } };
+}
+
+/** 40 of the converted parts, in the order of a hash of their ids (the same 40 on every run), as markdown rows for a reader to verify. */
+export function derivedSample(converted, n = 40) {
+  const pick = [...converted].sort((a, b) => (sha256(Buffer.from(a.id)) < sha256(Buffer.from(b.id)) ? -1 : 1)).slice(0, n).sort((a, b) => (a.id < b.id ? -1 : 1));
+  const cell = t => String(t).replace(/\|/g, '\\|').replace(/\n/g, ' ');
+  return ['| Question | Prompt (start) | Kind | Derived key |', '|---|---|---|---|', ...pick.map(c => `| ${c.id} | ${cell(c.prompt)} | ${c.answerType} | \`${cell(JSON.stringify(c.key))}\` (his printed answer, read as \`${cell(c.shown)}\`) |`)].join('\n') + '\n';
 }
 
 export const NOTICE = 'Question bank content \u00a9 Priysharan Tripathi trading as Pri Learning. All rights reserved.\n';
@@ -660,6 +777,7 @@ export async function main(argv) {
     if (insideRepo(outDir) && path.resolve(outDir) !== path.resolve(DEFAULT_PACK_DIR)) { console.error(`refusing to write the pack inside the repository, except at ${path.relative(ROOT, DEFAULT_PACK_DIR)}: ${outDir}`); return 2; }
     if (fs.existsSync(outDir) && fs.readdirSync(outDir).length && !argv.includes('--overwrite')) { console.error(`${outDir} is not empty; pass --overwrite to write over a previous pack`); return 2; }
     const compiled = compilePack(loadArchive(archiveDir), { figures: flag('figures') ? loadFigureResults(flag('figures')) : null });
+    if (flag('derived-sample')) fs.writeFileSync(flag('derived-sample'), derivedSample(compiled.summary.manual.converted));
     // The pack must load exactly as the server will load it, before a byte is written.
     await loadPack(memorySource(compiled.files));
     if (flag('figures')) fs.rmSync(path.join(path.resolve(outDir), 'figures'), { recursive: true, force: true });   // a rebuilt pack holds exactly its own figures
@@ -672,6 +790,7 @@ export async function main(argv) {
       const s = compiled.summary;
       console.log(`pack ${s.packVersion}: ${s.questions} questions in ${s.shards} shards, ${s.bytes} bytes; rejected parts ${s.rejectedParts}`);
       { const l = s.ladder; console.log(`hints: ${l.authoredHints} authored (at most three a question) over ${l.questions} auto-markable parts; kept ${l.rungsKept}, dropped ${l.rungsDropped}; questions with 3/2/1/0 rungs: ${l.withRungs[3]}/${l.withRungs[2]}/${l.withRungs[1]}/${l.withRungs[0]}`); console.log(`drop reasons ${JSON.stringify(Object.fromEntries(Object.entries(l.dropReasons).sort((x, y) => y[1] - x[1]).slice(0, 12)))}`); }
+      { const m = s.manual; console.log(`manual parts by kind ${JSON.stringify(m.manualKinds)}; converted to auto-markable ${m.converted.length} ${JSON.stringify(m.byType)}; kept as worked-solution questions ${JSON.stringify(m.manualServed)} (${Object.values(m.manualServed).reduce((a, b) => a + b, 0)}); not served ${JSON.stringify(m.manualRejected)}`); console.log(`find parts left manual, why ${JSON.stringify(Object.fromEntries(Object.entries(m.held).sort((x, y) => y[1] - x[1])))}`); }
       console.log(`by course ${JSON.stringify(s.byCourse)}`);
       console.log(`reject reasons ${JSON.stringify(s.reasons)}`);
       console.log(`written to ${outDir}`);

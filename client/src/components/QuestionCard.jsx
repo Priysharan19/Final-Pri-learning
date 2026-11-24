@@ -168,6 +168,8 @@ const MistakeGraph = React.lazy(() => import('./MistakeGraph.jsx').catch(() => (
 // its own chunk; a chunk that cannot load shows the plain step report instead.
 const MarkedPage = React.lazy(() => import('./MarkedPage.jsx').catch(() => ({ default: () => null })));
 const SchemeTable = React.lazy(() => import('./SchemeTable.jsx').catch(() => ({ default: () => null })));
+// A worked-solution question's solution (answerType 'manual'), its own lazy chunk: nothing here marks, scores or stores anything.
+const WorkedSolution = React.lazy(() => import('./WorkedSolution.jsx').catch(() => ({ default: () => null })));
 const AnnotatedWorkingPart = React.lazy(() => import('./AnnotatedWorking.jsx').catch(() => ({ default: () => null })));
 
 class TutorBoundary extends React.Component {
@@ -423,6 +425,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [bookmarked, setBookmarked] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [state, setState] = useState({ phase: 'answering' });
+  // The server's worked solution for this question, and the lines of working it was asked about (a worked-solution question only).
+  const [workedRes, setWorkedRes] = useState(null);
+  const [workedLines, setWorkedLines] = useState([]);
   // Submit found that the server no longer holds the read of this page (it
   // was read long ago). Submit never buys a read: the student is asked to
   // press Read again, and the ink, the transcript and the typed answer stay.
@@ -609,7 +614,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const isMcq = question.answerType === 'mcq';
   // Whether this copy of the question can ever be marked (checkAccess.js).
   const unmarkable = useMemo(() => (diagnostic ? null : unmarkableNotice(question)), [diagnostic, question.checkState, question.subtopic]);
-  const isWorking = question.answerType === 'working';
+  // A worked-solution question (his show-that, prove, explain, sketch and unkeyed "find" questions): no key, so nothing marks it. The student writes or
+  // types working if they wish and presses for his worked solution; no mark is awarded, stored or shown as earned. Its working area is the working-only one.
+  const worked = question.answerType === 'manual';
+  const isWorking = question.answerType === 'working' || worked;
   const isSketch = question.answerType === 'graph-sketch';
   const totalMarks = question.criteria?.length || 1;
   // A question that carries method marks keeps its working area open, so
@@ -619,7 +627,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // rung is open, a correct answer is worth the ladder's mark weight — the
   // same table the server charged (engine/hintLadder.js).
   const ladderOffered = !diagnostic && question.hintLadder > 0;
-  const nextRung = ladderOffered ? (HINT_RUNGS[hintLevel] || null) : null;
+  // A worked-solution question offers his hints only: its solution is not a rung (it ends nothing and marks nothing), and a rung he gave no hint for is not shown.
+  const ladderRungs = worked ? HINT_RUNGS.slice(0, Math.min(3, Number(question.hintsAvailable) || 0)) : HINT_RUNGS;
+  const nextRung = ladderOffered ? (ladderRungs[hintLevel] || null) : null;
   const helpUsed = hintLevel + tutorUsed;
   const rungLevelUsed = Math.min(HINT_RUNGS.length, hintLevel);
   // Owner decision, 19 Nov 2026 (Prithagoras): hints are free. No percentage is
@@ -1963,6 +1973,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // `confirmed` is true only for a retry of a reveal the student already
   // confirmed with two presses; a click passes its event, which is not that.
   async function reveal(confirmed = false) {
+    // A worked-solution question is never revealed as a miss: its Retry asks for the solution again (showWorked).
+    if (worked) { await showWorked(); return; }
     if (inFlightRef.current || busy || resolved) return;
     if (confirmed !== true && !revealArmed) { setRevealArmed(true); return; }
     setRevealArmed(false);
@@ -1981,6 +1993,38 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       settleReveal(r);
     } catch (e) {
       // Nothing was revealed and nothing was spent. The working is untouched.
+      inkFrozenRef.current = wasFrozen;
+      refuseCheck(e, 'reveal');
+    } finally {
+      inFlightRef.current = false;
+      if (mountedRef.current) setBusy(false);
+    }
+  }
+
+  // A worked-solution question: ask the server for his solution. Nothing is submitted and nothing is marked; the working the student wrote is sent only
+  // so the server can tick the lines that hold (when it may), and nothing of it is kept as an answer.
+  async function showWorked() {
+    if (inFlightRef.current || busy || workedRes) return;
+    inFlightRef.current = true;
+    const wasFrozen = inkFrozenRef.current;
+    inkFrozenRef.current = true;
+    setBusy(true);
+    try {
+      const lines = (writeMode ? (inkResult?.lines || []).map(l => String(typeof l === 'string' ? l : l?.text ?? '')) : mode === 'photo' ? (photoLines?.lines || []).filter(l => !l.excluded).map(l => String(l.text ?? '')) : working.split('\n'))
+        .map(l => l.trim()).filter(Boolean).slice(0, 40).map(l => l.slice(0, 400));
+      const r = await api.post(`/practice/${question.id}/solution`, lines.length ? { lines } : {});
+      if (!mountedRef.current) return;
+      // Only the server's own receipt for this question opens it, and it must say it is a worked solution (never a verdict).
+      if (r?.authoritative !== true || r.worked !== true || r.resolved !== true || 'correct' in r || 'marksEarned' in r) throw new Error(gradingReceiptMismatch(language));
+      pendingRef.current = null;
+      clearPendingSubmission(question.id);
+      clearInkDraft(question.id);
+      setWorkedLines(lines);
+      setWorkedRes(r);
+      setState({ phase: 'answering' });   // a refusal that was on screen is over
+      refreshRecent?.();
+    } catch (e) {
+      // Nothing was shown and nothing was spent. The working is untouched.
       inkFrozenRef.current = wasFrozen;
       refuseCheck(e, 'reveal');
     } finally {
@@ -2500,7 +2544,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       if (['failed', 'unavailable'].includes(photoOCR.phase)) setMarkWanted(false);
     } else setMarkWanted(false);
   });
-  const primary = resolved || state.res?.conflict
+  const primary = worked && !unmarkable && !resolved && !state.res?.conflict
+    // A worked-solution question: one press shows his solution (there is nothing to submit); afterwards the way on is the next question.
+    ? (workedRes ? { label: t('practice.nextQuestion'), run: () => onNext?.(), disabled: false }
+      : { label: t(busy ? 'worked.showing' : 'worked.show'), run: showWorked, disabled: busy })
+    : resolved || state.res?.conflict
     ? { label: t('practice.nextQuestion'), run: () => onNext?.(), disabled: false }
     : unmarkable
       // The way forward on a question that cannot be marked is a question
@@ -2519,7 +2567,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // check (never Next; on a doubted reading it does not confirm; on an unremarkable one the reading is on screen beside the button). No other
   // shortcut in the app uses a modifier with Enter; Enter alone keeps its
   // field behaviour.
-  const instrumentCheckKey = INSTRUMENT && !!primary && !resolved && !state.res?.conflict && !unmarkable;
+  const instrumentCheckKey = INSTRUMENT && !!primary && !resolved && !state.res?.conflict && !unmarkable && !workedRes;
   const checkKeyRef = useRef(null);
   checkKeyRef.current = instrumentCheckKey && !primary.disabled ? primary.run : null;
   useEffect(() => {
@@ -2653,9 +2701,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   }, [hintSheet]);
   const sheetTouchY = useRef(null);
   const renderLadder = (inSheet = false) => (
-          <section className={`hints-block in-ladder${inSheet ? ' in-sheet' : ''}`} aria-label={t('verdict.hints')} data-hint-ladder={`${hintLevel}/${HINT_RUNGS.length}`}>
-            <div className="hints-block-title">{t('inst.ladderHead', { used: rungLevelUsed, total: HINT_RUNGS.length })}</div>
-            {HINT_RUNGS.map((rung, i) => {
+          <section className={`hints-block in-ladder${inSheet ? ' in-sheet' : ''}`} aria-label={t('verdict.hints')} data-hint-ladder={`${hintLevel}/${ladderRungs.length}`}>
+            <div className="hints-block-title">{t('inst.ladderHead', { used: rungLevelUsed, total: ladderRungs.length })}</div>
+            {ladderRungs.map((rung, i) => {
               const cost = rungCostText(rung);
               const shown = hints.find(h => h.rung === rung);
               if (shown) {
@@ -2697,7 +2745,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       {/* ── The question: the page's reference object ── */}
       <section className="ws-context" aria-label={t('verdict.questionRegion')}>
         <div className="q-topmeta">
-          {!serverAuthoritative && <span className="q-marks">{t('verdict.marksAvailable', { count: totalMarks, n: totalMarks })}</span>}
+          {!serverAuthoritative && !worked && <span className="q-marks">{t('verdict.marksAvailable', { count: totalMarks, n: totalMarks })}</span>}
           {/* The topic chip is where a student meets the name of what they are
               being asked, so it is the first place worth pairing. The question
               itself below is untouched: it will be in English in the exam hall. */}
@@ -2732,6 +2780,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         <div ref={promptRef} lang="en">
           <MathText block className="q-prompt" text={question.prompt} />
         </div>
+        {/* Said BEFORE the student starts: this one is shown, not marked. */}
+        {worked && !workedRes && <p className="q-worked-note" data-worked-notice>{t('worked.notice')}</p>}
         {figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: figure }} />}
         {question.diagram && <BankFigure serverQuestionId={question.serverQuestionId} diagram={question.diagram} />}
         {showWhy && why && <p className="q-why">{why}</p>}
@@ -3577,8 +3627,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         {narrowLadder && (
           <div className="in-hintrow no-print" data-hint-row="">
             <div className="in-hintrow-head">
-              <span className="in-meter" aria-hidden="true">{HINT_RUNGS.map((r, i) => <i key={r} className={i < hintLevel ? 'is-used' : undefined} />)}</span>
-              <span className="in-hintrow-label">{t('inst.ladderHead', { used: rungLevelUsed, total: HINT_RUNGS.length })}</span>
+              <span className="in-meter" aria-hidden="true">{ladderRungs.map((r, i) => <i key={r} className={i < hintLevel ? 'is-used' : undefined} />)}</span>
+              <span className="in-hintrow-label">{t('inst.ladderHead', { used: rungLevelUsed, total: ladderRungs.length })}</span>
               <button type="button" className="btn btn-quiet in-hintrow-all" 
                 onClick={(e) => { sheetOpener.current = e.currentTarget; setHintSheet(true); }}>{t('inst.allHints')}</button>
             </div>
@@ -3609,6 +3659,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               <button type="button" className="btn btn-quiet in-hintsheet-close" data-hint-sheet-close onClick={closeHintSheet}>{t('nav.close')}</button>
             </div>
           </>
+        )}
+
+        {/* A worked-solution question's solution: his steps and what a marker looks for, as information. No mark, no tick box, nothing stored. */}
+        {worked && workedRes && (
+          <React.Suspense fallback={null}>
+            <WorkedSolution res={workedRes} lines={workedLines} />
+          </React.Suspense>
         )}
 
         {/* Page furniture the host adds under the work (Practice's recent attempts): above the action bar, so the bar stays the last thing on the page. */}
@@ -3703,7 +3760,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               <button className="btn btn-quiet" onClick={dontKnow} disabled={busy}>{t('placement.dontKnow')}</button>
             )}
             {/* On a wide screen the footer Hint on the last rung and "Show solution" do the same thing (the server reveals the solution and spends the attempt, after a second press), so only the rung is offered then; it names the reveal. On a phone "Show solution" lives under More and stays. */}
-            {!resolved && !diagnostic && !unmarkable && !(INSTRUMENT && ladderOffered && nextRung === 'solution' && !narrow) && (() => {
+            {!resolved && !diagnostic && !unmarkable && !worked && !(INSTRUMENT && ladderOffered && nextRung === 'solution' && !narrow) && (() => {
               const showBtn = (
                 <button className={`btn ${revealArmed ? 'btn-ghost' : 'btn-quiet'}`} onClick={reveal} disabled={busy} aria-live="polite">
                   {revealArmed ? t('verdict.showSolutionConfirm') : t('verdict.showSolution')}

@@ -49,8 +49,8 @@ const policy = bankPolicy('prithagoras');
 const all = qb.qbankEntries();
 
 // ── THE TABLE ────────────────────────────────────────────────────────────────
-const packDots = new Set(all.map(x => `${x.family}.${x.entry.dp}`));
-c.eq(packDots.size, 113, 'the committed pack holds 113 author dot points');
+const packDots = new Set([...all, ...qb.qbankManualEntries()].map(x => `${x.family}.${x.entry.dp}`));
+c.eq(packDots.size, 117, 'the committed pack holds 117 author dot points (marked and worked-solution questions)');
 c.deq([...packDots].filter(id => { const i = id.lastIndexOf('.', id.lastIndexOf('.') - 1); return !productPlaceOf(id.slice(0, i), id.slice(i + 1)); }), [], 'every one is placed in a product subtopic');
 c.deq(Object.entries(QBANK_DOTPOINTS).flatMap(([family, row]) => Object.keys(row).map(code => `${family}.${code}`)).filter(id => !packDots.has(id)), [], 'and the table holds no dot point the pack does not');
 // Where the author's topic code is not the subtopic's: his questions practised in the nearest product subtopic of the same skill.
@@ -72,7 +72,7 @@ for (const [family, row] of Object.entries(QBANK_DOTPOINTS)) {
   }
 }
 c.deq(problems, [], 'every subtopic exists, is issued, is the author\'s course and carries his topic code (three named exceptions), and every numbered dot point exists');
-c.eq(numbered + topicOnly, 113, `${numbered} author dot points are numbered to a product dot point and ${topicOnly} are practised through their subtopic only`);
+c.eq(numbered + topicOnly, 117, `${numbered} author dot points are numbered to a product dot point and ${topicOnly} are practised through their subtopic only`);
 c.ok(all.every(x => policy.admits && qb.qbankServes(x.place.subtopic)), 'every question is served from a subtopic Prithagoras issues');
 console.log(`  numbered ${numbered}, subtopic only ${topicOnly}: ${topicOnlyList.join(' ')}`);
 
@@ -214,12 +214,18 @@ try {
       const r = await issue({ generator: cellSub, difficulty: cellLevel });
       c.eq(r.status, 201, `session issue ${i + 1}`);
       const sealed = await sealedOf(r.data.question.id);
-      dealt.push({ bank: sealed._bank ?? null, repeat: sealed._repeat === true });
+      // A worked-solution question (no key, no mark) is dealt on its own turn, never twice in a row: its solution is asked for and that is all.
+      const worked = sealed.answerType === 'manual';
+      dealt.push({ bank: worked ? null : (sealed._bank ?? null), worked: worked ? sealed._bank : null, repeat: sealed._repeat === true });
+      if (worked) { const shown = await h.request(`/v1/practice/${r.data.question.id}/solution`, { method: 'POST', jar: a.jar, body: {} }); c.eq(shown.status, 200, `session solution ${i + 1}`); continue; }
       const wrong = sealed.answerType === 'point' ? '(100, 100)' : sealed.answerType === 'set' ? '99' : sealed.answerType === 'interval' ? 'x > 100' : sealed.answerType === 'equation' ? 'y = 99*x' : sealed.answerType === 'expression' ? 'x + 987' : '12345.678';
       for (let t = 0; t < 2; t++) { const sid = `sess-${i}-${t}-xxxxxx`; const d = await submit(r.data.question.id, sid, wrong); if (d.data.resolved) break; }
     }
     const banks = dealt.map(d => d.bank).filter(Boolean);
-    c.ok(new Set(banks).size === banks.length && banks.length === cellIds.length && dealt.every(d => !d.repeat), `a session answers each of the cell's ${cellIds.length} authored questions once and no question is a repeat (${banks.length} authored, ${dealt.length - banks.length} generators')`);
+    c.ok(new Set(banks).size === banks.length && banks.length === cellIds.length && dealt.every(d => !d.repeat), `a session answers each of the cell's ${cellIds.length} authored questions once and no question is a repeat (${banks.length} authored, ${dealt.filter(d => d.worked).length} worked-solution, ${dealt.filter(d => !d.bank && !d.worked).length} generators')`);
+    const workedIds = dealt.map(d => d.worked).filter(Boolean);
+    c.ok(new Set(workedIds).size === workedIds.length, 'no worked-solution question is dealt twice in the session');
+    c.ok(dealt.every((d, i) => !(d.worked && dealt[i - 1]?.worked)), 'and never two in a row');
     const last = dealt.map(d => d.bank).lastIndexOf(dealt.map(d => d.bank).filter(Boolean).pop());
     c.ok(dealt.slice(last + 1).length >= 5 && dealt.slice(last + 1).every(d => d.bank === null), 'and once the pool is used, the generators answer to the end of the session');
   }
@@ -252,11 +258,13 @@ try {
         const r = await ask(acct);
         if (r.status !== 201) throw new Error(`issue ${i}: ${r.status}`);
         const sealed = await sealedFor(acct, r.data.question.id);
-        dealt.push({ id: r.data.question.id, bank: sealed._bank ?? null, repeat: sealed._repeat === true });
+        const worked = sealed.answerType === 'manual';   // a worked-solution question has its own solution route (and no reveal, no solution rung)
+        dealt.push({ id: r.data.question.id, bank: worked ? null : (sealed._bank ?? null), worked, repeat: sealed._repeat === true });
+        if (worked && mode !== 'abandon' && mode !== 'reveal-after') { await h.request(`/v1/practice/${r.data.question.id}/solution`, { method: 'POST', jar: acct.jar, body: {} }); continue; }
         if (mode === 'reveal') await h.request(`/v1/practice/${r.data.question.id}/reveal`, { method: 'POST', jar: acct.jar, body: {} });
-        if (mode === 'solution-rung') for (const rung of ['nudge', 'method', 'worked', 'solution']) { const x = await h.request(`/v1/practice/${r.data.question.id}/hint`, { method: 'POST', jar: acct.jar, body: { rung } }); if (x.status !== 200 && !(rung !== 'solution' && x.status === 409)) throw new Error(`hint ${rung}: ${x.status}`); if (x.status === 409) break; }
+        if (mode === 'solution-rung' && !worked) for (const rung of ['nudge', 'method', 'worked', 'solution']) { const x = await h.request(`/v1/practice/${r.data.question.id}/hint`, { method: 'POST', jar: acct.jar, body: { rung } }); if (x.status !== 200 && !(rung !== 'solution' && x.status === 409)) throw new Error(`hint ${rung}: ${x.status}`); if (x.status === 409) break; }
       }
-      if (mode === 'reveal-after') for (const d of dealt) await h.request(`/v1/practice/${d.id}/reveal`, { method: 'POST', jar: acct.jar, body: {} });
+      if (mode === 'reveal-after') for (const d of dealt) await h.request(`/v1/practice/${d.id}/${d.worked ? 'solution' : 'reveal'}`, { method: 'POST', jar: acct.jar, body: {} });
       const banks = dealt.map(d => d.bank).filter(Boolean);
       const dupes = banks.length - new Set(banks).size;
       c.deq([dupes, dealt.filter(d => d.bank && d.repeat).length], [0, 0], `${what}: ${banks.length} authored questions in 90 deals, ${dupes} dealt twice, none a repeat`);

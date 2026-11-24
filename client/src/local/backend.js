@@ -4386,6 +4386,37 @@ const routes = {
       ...certifiedPracticeMarks(serverReveal), syncQueued: true };
   },
 
+  // A worked-solution question (answerType 'manual': his show-that, prove, explain, sketch and unkeyed "find" questions). Nothing marks it, so this is
+  // NOT a reveal and NOT a resolution: no attempt, no rating, no review, no XP, no streak, no mastery, no mark, no sync event. The server sends his
+  // steps and his criteria (and a note on the student's own lines); the row is closed so it is not resumed, and that is all.
+  'POST /practice/:id/solution': async (body, params) => {
+    const p = await requireProfile();
+    const row = await get('questions', params.id);
+    if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    assertPracticeRow(row);
+    if (row.payload?.answerType !== 'manual') throw Object.assign(new Error('This question is marked, not shown.'), { status: 409, code: 'PRACTICE_NOT_A_WORKED_SOLUTION' });
+    if (row.workedReceipt) return row.workedReceipt;
+    if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409 });
+    if (row.discardedAt) throw Object.assign(new Error('Question was skipped'), { status: 409, code: 'QUESTION_DISCARDED' });
+    await requireServerIssue(row);
+    const lines = Array.isArray(body?.lines) ? body.lines.filter(l => typeof l === 'string').map(l => l.trim().slice(0, 400)).filter(Boolean).slice(0, 40) : [];
+    const receipt = await viaServer(() => cloud.workedSolutionPractice(row.serverQuestionId, lines));
+    if (receipt?.authoritative !== true || receipt.worked !== true || receipt.resolved !== true || receipt.questionId !== row.serverQuestionId
+        || !Array.isArray(receipt.solution?.steps) || !Array.isArray(receipt.solution?.criteria) || !Number.isFinite(receipt.serverAcknowledgedAt)) {
+      throw Object.assign(new Error('The server did not acknowledge the solution.'), { status: 503, code: 'REVEAL_ACK_MISSING' });
+    }
+    const out = { authoritative: true, worked: true, resolved: true, questionId: row.serverQuestionId, serverAcknowledgedAt: receipt.serverAcknowledgedAt,
+      solution: { steps: receipt.solution.steps.map(s => ({ h: String(s.h), d: String(s.d) })),
+        criteria: receipt.solution.criteria.map(c => ({ marks: Number(c.marks), point: String(c.point) })), marksAvailable: Number(receipt.solution.marksAvailable) || 0 },
+      ...(receipt.workNote && Number.isInteger(receipt.workNote.lines) && Number.isInteger(receipt.workNote.verified)
+        ? { workNote: { lines: receipt.workNote.lines, verified: receipt.workNote.verified, ...(Number.isInteger(receipt.workNote.lookAgain) ? { lookAgain: receipt.workNote.lookAgain } : {}) } } : {}) };
+    row.answered = true;
+    row.workedReceipt = out;
+    row.workedAt = Date.now();
+    await put('questions', row);
+    return out;
+  },
+
   // ---- reviews ----
   'GET /reviews': async () => {
     const p = await requireProfile();
@@ -6351,7 +6382,8 @@ async function entitlementGate(method, pattern, body, params) {
       await requireCapability(p, ENTITLEMENTS.JEE_ADVANCED);
     }
     return async result => {
-      if (!result?.resumed) await recordPracticeServed(p);
+      // A worked-solution question is not marked, so it is not a counted practice question.
+      if (!result?.resumed && result?.question?.answerType !== 'manual') await recordPracticeServed(p);
       return { ...result, allowance: await practiceAllowance(p) };
     };
   }
@@ -6908,6 +6940,7 @@ async function runGated(method, pattern, handler, body, params) {
   if (params?.id && (
     key === 'POST /practice/:id/submit'
     || key === 'POST /practice/:id/reveal'
+    || key === 'POST /practice/:id/solution'
     || key === 'POST /practice/:id/hint'
     || key === 'POST /practice/:id/help-plan'
     || key === 'POST /practice/:id/tutor'

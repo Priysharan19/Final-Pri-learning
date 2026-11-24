@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { packDirFor, qbankEntries, qbankVersion } from './qbankPack.js';
+import { packDirFor, qbankEntries, qbankManualEntries, qbankVersion } from './qbankPack.js';
 
 const FIGURE_ID = /^[AX][0-9]{2}-[A-Z][0-9]-[A-Z0-9]{3}$/;
 let byBank = null;
@@ -16,7 +16,8 @@ let byBankVersion = null;
 
 const entryOf = bankId => {
   if (byBank === null || byBankVersion !== qbankVersion()) {
-    byBank = new Map(qbankEntries().filter(e => e.entry.diagram).map(e => [e.entry.id, e.entry]));
+    // A worked-solution question's figure is one of the same directory's files, checked the same way.
+    byBank = new Map([...qbankEntries(), ...qbankManualEntries()].filter(e => e.entry.diagram).map(e => [e.entry.id, e.entry]));
     byBankVersion = qbankVersion();
   }
   return byBank.get(bankId) ?? null;

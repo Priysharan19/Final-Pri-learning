@@ -68,6 +68,33 @@ function keyShapeOk(type, a) {
 // A question with a figure (qbankFigures.js): its text alternative, its size, and the hash and length of the SVG the server will send.
 const diagramShapeOk = d => !!d && typeof d === 'object' && isStr(d.alt) && d.alt.length <= 500 && isNum(d.w) && d.w > 0 && isNum(d.h) && d.h > 0 && SHA.test(d.sha256 ?? '') && Number.isInteger(d.bytes) && d.bytes > 0;
 
+/**
+ * A WORKED-SOLUTION question (answerType 'manual'): his show-that, prove, explain, sketch and unkeyed "find" parts. It has NO answer and no
+ * trap: nothing can mark it. It carries his hints (the ladder), his steps and his criteria (shown only at the reveal), the kind it is, and
+ * whether the deterministic step report may give feedback on the student's working (`lineFeedback`).
+ */
+export const MANUAL_KINDS = Object.freeze(['prove', 'explain', 'sketch', 'find']);
+export function manualProblem(q) {
+  if (!q || typeof q !== 'object') return 'not an object';
+  if (!isStr(q.id) || q.id.length > 60) return 'id';
+  if (!PACK_LEVELS.includes(q.level)) return `${q.id}: level`;
+  if (!Number.isInteger(q.authored) || q.authored < 1 || q.authored > 6) return `${q.id}: authored difficulty`;
+  if (!Number.isInteger(q.marks) || q.marks < 1 || q.marks > 6) return `${q.id}: marks`;
+  if (!isStr(q.dp) || !/^[A-Za-z0-9.]{1,12}$/.test(q.dp)) return `${q.id}: dot point`;
+  if (!isStr(q.prompt) || q.prompt.length > 8000) return `${q.id}: prompt`;
+  if (q.answerType !== 'manual' || q.answer !== undefined || q.traps !== undefined) return `${q.id}: a worked-solution question has no answer and no trap`;
+  if (!MANUAL_KINDS.includes(q.kind)) return `${q.id}: kind`;
+  if (typeof q.lineFeedback !== 'boolean') return `${q.id}: lineFeedback`;
+  if (!Array.isArray(q.steps) || !q.steps.length || !q.steps.every(s => isStr(s?.h) && isStr(s?.d))) return `${q.id}: steps`;
+  if (!Array.isArray(q.hints) || !q.hints.every(isStr) || q.hints.length > 3) return `${q.id}: hints`;
+  if (!q.ladder || typeof q.ladder !== 'object' || Array.isArray(q.ladder) || JSON.stringify(['nudge', 'method', 'worked'].slice(0, q.hints.length).map(k => q.ladder[k])) !== JSON.stringify(q.hints) || Object.keys(q.ladder).length !== q.hints.length) return `${q.id}: ladder is not the hints`;
+  if (!Array.isArray(q.criteria) || !q.criteria.length || !q.criteria.every(c => Number.isInteger(c?.marks) && c.marks > 0 && isStr(c?.point))) return `${q.id}: criteria`;
+  if (q.criteria.reduce((s, c) => s + c.marks, 0) !== q.marks) return `${q.id}: criteria do not add up to the marks`;
+  if (q.stepcheck !== undefined && (!q.stepcheck || typeof q.stepcheck !== 'object')) return `${q.id}: stepcheck`;
+  if (q.diagram !== undefined && !diagramShapeOk(q.diagram)) return `${q.id}: diagram`;
+  return null;
+}
+
 /** Why one pack question is not well formed, or null. The loader refuses the whole pack on the first. */
 export function questionProblem(q, family) {
   if (!q || typeof q !== 'object') return 'not an object';
@@ -126,6 +153,13 @@ export async function loadPack(source) {
     if (!FAMILY.test(shard?.family ?? '') || entry.name !== `shards/${shard.family}.json` || families.has(shard.family)) throw new Error(`qbank pack: ${entry.name} names a bad or repeated family`);
     if (!isStr(shard.topic) || ![11, 12].includes(shard.year) || !['ADV', 'EXT1'].includes(shard.course) || shard.family !== `qb-${shard.course === 'ADV' ? 'a' : 'x'}${shard.year}-${shard.topic.toLowerCase()}`) throw new Error(`qbank pack: ${entry.name} is malformed`);
     if (!Array.isArray(shard.questions) || shard.questions.length !== entry.questions) throw new Error(`qbank pack: ${entry.name} holds a different number of questions than the manifest says`);
+    if ((shard.manual?.length ?? 0) !== (entry.manualQuestions ?? 0) || (shard.manual !== undefined && !Array.isArray(shard.manual))) throw new Error(`qbank pack: ${entry.name} holds a different number of worked-solution questions than the manifest says`);
+    for (const q of shard.manual ?? []) {
+      const problem = manualProblem(q);
+      if (problem) throw new Error(`qbank pack: ${entry.name}: ${problem}`);
+      if (ids.has(q.id)) throw new Error(`qbank pack: ${q.id} appears twice`);
+      ids.add(q.id);
+    }
     for (const q of shard.questions) {
       const problem = questionProblem(q, shard.family);
       if (problem) throw new Error(`qbank pack: ${entry.name}: ${problem}`);
@@ -137,7 +171,7 @@ export async function loadPack(source) {
   // The index is the picker's view (what may be asked for); it must say exactly what the shards hold.
   const fromShards = JSON.stringify(indexOf(families));
   if (JSON.stringify(index.families) !== fromShards) throw new Error('qbank pack: index.json does not match the shards');
-  return Object.freeze({ version: manifest.packVersion, families, product: productIndexOf(families), questionCount: ids.size, source: source.kind ?? 'custom' });
+  return Object.freeze({ version: manifest.packVersion, families, product: productIndexOf(families), questionCount: [...families.values()].reduce((n, f) => n + f.questions, 0), manualCount: [...families.values()].reduce((n, f) => n + f.manualQuestions, 0), source: source.kind ?? 'custom' });
 }
 
 const FAMILY_OF = new WeakMap();
@@ -154,12 +188,18 @@ export function buildFamily(shard) {
   for (const q of shard.questions) byLevel.set(q.level, [...(byLevel.get(q.level) || []), q]);
   for (const list of byLevel.values()) list.sort((a, b) => (a.id < b.id ? -1 : 1));
   for (const dp of dotpoints.values()) for (const list of dp.levels.values()) list.sort((a, b) => (a.id < b.id ? -1 : 1));
-  return Object.freeze({ family: shard.family, course: shard.course, year: shard.year, topic: shard.topic, questions: shard.questions.length, byLevel, dotpoints });
+  // The worked-solution questions are kept apart: nothing that reads `byLevel` or `dotpoints` (the picker, the tests that mark every key) sees them.
+  const manual = shard.manual ?? [];
+  for (const q of manual) FAMILY_OF.set(q, shard.family);
+  return Object.freeze({ family: shard.family, course: shard.course, year: shard.year, topic: shard.topic, questions: shard.questions.length, manualQuestions: manual.length, manual, byLevel, dotpoints });
 }
 
-/** The picker's view of a set of families: what may be requested, per family and dot point. Stable order. */
+/**
+ * The picker's view of a set of families: what may be requested, per family and dot point. Stable order. Only families with a MARKED question
+ * (a family of worked-solution questions alone, such as Extension 1 induction, is practised through its product subtopic and is not listed here).
+ */
 export function indexOf(families) {
-  return [...families.values()].sort((a, b) => (a.family < b.family ? -1 : 1)).map(f => ({
+  return [...families.values()].filter(f => f.questions > 0).sort((a, b) => (a.family < b.family ? -1 : 1)).map(f => ({
     family: f.family, course: f.course, year: f.year, topic: f.topic, questions: f.questions,
     requestable: [...f.byLevel.keys()].sort((a, b) => a - b),
     dotpoints: [...f.dotpoints.values()].sort((a, b) => (a.id < b.id ? -1 : 1)).map(dp => ({ id: dp.id, code: dp.code, requestable: [...dp.levels.keys()].sort((a, b) => a - b) }))
@@ -175,7 +215,7 @@ let loading = null;
 export function installPack(pack) { installed = pack; status = { configured: true, loaded: !!pack, error: null }; }
 /** Remove the installed pack and forget any load: the bank does not exist. */
 export function resetQbank() { installed = null; loading = null; status = { configured: false, loaded: false, error: null }; }
-export const qbankStatus = () => ({ ...status, version: installed?.version ?? null, questions: installed?.questionCount ?? 0 });
+export const qbankStatus = () => ({ ...status, version: installed?.version ?? null, questions: installed?.questionCount ?? 0, workedSolutions: installed?.manualCount ?? 0 });
 
 /** Where the pack is read from: PRI_QBANK_DIR, else the committed pack; null when the bank is off (PRI_QBANK_DIR=off) or this is not Prithagoras. */
 export function packDirFor(env = process.env) {
@@ -232,9 +272,27 @@ export function productIndexOf(families) {
       }
     }
   }
+  // The worked-solution pool of each product subtopic, by level, and by dot point where numbered to one.
+  for (const fam of families.values()) {
+    for (const entry of fam.manual) {
+      const place = productPlaceOf(fam.family, entry.dp);
+      if (!place) continue;
+      const sub = out.get(place.subtopic) || out.set(place.subtopic, { all: new Map(), ordinals: new Map() }).get(place.subtopic);
+      const m = sub.manual || (sub.manual = { all: new Map(), ordinals: new Map() });
+      m.all.set(entry.level, [...(m.all.get(entry.level) || []), entry]);
+      if (place.ordinal !== null) {
+        const levels = m.ordinals.get(place.ordinal) || m.ordinals.set(place.ordinal, new Map()).get(place.ordinal);
+        levels.set(entry.level, [...(levels.get(entry.level) || []), entry]);
+      }
+    }
+  }
   for (const sub of out.values()) {
     for (const list of sub.all.values()) list.sort((a, b) => (a.id < b.id ? -1 : 1));
     for (const levels of sub.ordinals.values()) for (const list of levels.values()) list.sort((a, b) => (a.id < b.id ? -1 : 1));
+    if (sub.manual) {
+      for (const list of sub.manual.all.values()) list.sort((a, b) => (a.id < b.id ? -1 : 1));
+      for (const levels of sub.manual.ordinals.values()) for (const list of levels.values()) list.sort((a, b) => (a.id < b.id ? -1 : 1));
+    }
   }
   return out;
 }
@@ -257,9 +315,14 @@ export const bankTurn = (poolSize, seed, key) => poolSize > 0 && mix((seed ^ 0x5
  * generator (practice.js calls this first): the product subtopic, the level asked for, the seed, and a product dot point id or null.
  * A dot point asked for is answered by a question numbered to it, at the level asked for, and never by another (the seek checks too).
  */
-export function qbankDraw(generator, level, seed, dotpointId = null, exclude = null) {
+export function qbankDraw(generator, level, seed, dotpointId = null, exclude = null, { manual = false } = {}) {
   const sub = installed?.product.get(generator);
   if (!sub) return null;
+  // A worked-solution question's turn (below) comes first, and only where the caller allows one (never two in a row, never in a timed mode).
+  if (manual && sub.manual) {
+    const picked = manualDraw(sub.manual, generator, level, seed, dotpointId, exclude);
+    if (picked) return picked;
+  }
   let pool;
   if (dotpointId != null) {
     const dp = dotpointById(dotpointId);
@@ -274,6 +337,69 @@ export function qbankDraw(generator, level, seed, dotpointId = null, exclude = n
   const rest = exclude && exclude.size ? pool.filter(e => !exclude.has(e.id)) : pool;
   if (!rest.length) return null;
   return productQuestion(rest[mix((seed ^ 0x2545f491) >>> 0, `pick|${key}`) % rest.length], generator, seed, dotpointId);
+}
+
+/**
+ * THE WORKED-SOLUTION MIX RULE. Where the pack holds worked-solution questions for the (subtopic or dot point, level) asked for, 1 seed in 6
+ * is one's turn; every other seed goes on to the rule above. The seed alone decides, so the same arguments are the same question. The
+ * caller passes `manual: true` only when the last question the account was dealt was not one, and never in a timed or one-try mode, so a
+ * student never meets two in a row and never more than about one in six. A pool the seek has used up is the generators' again.
+ */
+export const MANUAL_TURNS = Object.freeze({ of: 6, turn: 1 });
+export const manualTurn = (seed, key) => mix((seed ^ 0x3c6ef372) >>> 0, `manual|${key}`) % MANUAL_TURNS.of < MANUAL_TURNS.turn;
+function manualDraw(manualIndex, generator, level, seed, dotpointId, exclude) {
+  let pool;
+  if (dotpointId != null) {
+    const dp = dotpointById(dotpointId);
+    if (!dp || dp.subtopic !== generator) return null;
+    pool = manualIndex.ordinals.get(dp.ordinal)?.get(level);
+  } else pool = manualIndex.all.get(level);
+  if (!pool || !pool.length) return null;
+  const key = `${generator}|${dotpointId ?? ''}|${level}`;
+  if (!manualTurn(seed >>> 0, key)) return null;
+  const rest = exclude && exclude.size ? pool.filter(e => !exclude.has(e.id)) : pool;
+  if (!rest.length) return null;
+  return manualQuestion(rest[mix((seed ^ 0x6a09e667) >>> 0, `pick|${key}`) % rest.length], generator, seed, dotpointId);
+}
+
+/** The worked-solution questions of the loaded pack, with where each is practised. For the tests and the isolation check. */
+export function qbankManualEntries() {
+  const out = [];
+  for (const fam of installed?.families.values() ?? []) for (const entry of fam.manual) out.push({ entry, family: fam.family, place: productPlaceOf(fam.family, entry.dp) });
+  return out;
+}
+export function qbankManualQuestion(id, seed = 0) {
+  for (const { entry, family, place } of qbankManualEntries()) if (entry.id === id) {
+    if (!place) throw new Error(`Worked-solution question ${id} is placed nowhere`);
+    return manualQuestion(entry, place.subtopic, seed, null);
+  }
+  throw new Error(`No worked-solution question ${id}`);
+}
+
+/**
+ * One worked-solution entry as the practice path issues it. NO `answer`: nothing about it can mark. The prompt, the hints and the figure's
+ * description are public; his steps and criteria are held for the reveal.
+ */
+function manualQuestion(entry, generator, seed, requestedId) {
+  const family = FAMILY_OF.get(entry);
+  const place = productPlaceOf(family, entry.dp);
+  const ids = place.ordinal !== null ? [`${generator}.${place.ordinal + 1}`] : formDotpointOrdinals(generator, entry.level).map(i => `${generator}.${i + 1}`);
+  const contentHash = sha256(Buffer.from(JSON.stringify([entry.id, entry.prompt, 'worked']))).slice(0, 16);
+  const q = {
+    seed, subtopic: generator, difficulty: entry.level,
+    prompt: entry.prompt, answerType: 'manual',
+    hints: entry.hints, steps: entry.steps,
+    ...(entry.diagram ? { diagram: { alt: entry.diagram.alt, w: entry.diagram.w, h: entry.diagram.h } } : {}),
+    ...(entry.ladder ? { ladder: entry.ladder } : {}),
+    ...(entry.stepcheck ? { stepcheck: entry.stepcheck } : {}),
+    dotpoints: ids, dotpoint: ids.length === 1 ? ids[0] : null, dotpointSource: 'qbank',
+    contentId: `qbank:${entry.id}`, contentVersion: `qb.${installed.version}`, contentHash,
+    // Private to the server: never in PUBLIC_QUESTION_FIELDS. `_worked` says no mark is ever stored or shown for this question.
+    authoredMarks: entry.marks, authoredDifficulty: entry.authored, criteria: entry.criteria, _bank: entry.id, _family: family,
+    _worked: entry.kind, _lineFeedback: entry.lineFeedback
+  };
+  if (requestedId != null) { q.dotpointRequested = requestedId; q.dotpointExact = q.dotpoint === requestedId; }
+  return q;
 }
 
 /** One pack entry as the practice path issues it, whatever seed (tests, the isolation check). Throws when the table places it nowhere. */

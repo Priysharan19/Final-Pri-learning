@@ -1,0 +1,33 @@
+<svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' width='137.13' height='136.98' viewBox='-66.022 -66.022 102.845 102.732'>
+<defs>
+<path id='g0-54' d='M1.315-3.268V-3.507C1.315-6.027 2.55-6.386 3.059-6.386C3.298-6.386 3.716-6.326 3.935-5.988C3.786-5.988 3.387-5.988 3.387-5.539C3.387-5.23 3.626-5.081 3.846-5.081C4.005-5.081 4.304-5.171 4.304-5.559C4.304-6.157 3.866-6.635 3.039-6.635C1.763-6.635 .418-5.35 .418-3.148C.418-.488 1.574 .219 2.501 .219C3.606 .219 4.553-.717 4.553-2.032C4.553-3.298 3.666-4.254 2.56-4.254C1.883-4.254 1.514-3.746 1.315-3.268ZM2.501-.06C1.873-.06 1.574-.658 1.514-.807C1.335-1.275 1.335-2.072 1.335-2.252C1.335-3.029 1.654-4.025 2.55-4.025C2.71-4.025 3.168-4.025 3.477-3.407C3.656-3.039 3.656-2.531 3.656-2.042C3.656-1.564 3.656-1.066 3.487-.707C3.188-.11 2.73-.06 2.501-.06Z'/>
+</defs>
+<g id='page1'>
+<g stroke-miterlimit='10' transform='matrix(.996 0 0 -.996 -14.6 -21.403)' fill='#000' stroke='#000' stroke-width='0.4' stroke-linecap='round' stroke-linejoin='round'>
+<g stroke-width='0.8'>
+<path d='M51.215 0L25.608 44.387H-25.608L-51.215 0L-25.608-44.387H25.608Z' fill='none'/>
+</g>
+<g stroke-dasharray='3.0,3.0' stroke-dashoffset='0.0'>
+<path d='M0 0H51.215' fill='none'/>
+</g>
+<g stroke-dasharray='3.0,3.0' stroke-dashoffset='0.0'>
+<path d='M0 0L25.608 44.354' fill='none'/>
+</g>
+<g stroke-dasharray='3.0,3.0' stroke-dashoffset='0.0'>
+<path d='M0 0L-25.608 44.354' fill='none'/>
+</g>
+<g stroke-dasharray='3.0,3.0' stroke-dashoffset='0.0'>
+<path d='M0 0H-51.215' fill='none'/>
+</g>
+<g stroke-dasharray='3.0,3.0' stroke-dashoffset='0.0'>
+<path d='M0 0L-25.608-44.354' fill='none'/>
+</g>
+<g stroke-dasharray='3.0,3.0' stroke-dashoffset='0.0'>
+<path d='M0 0L25.608-44.354' fill='none'/>
+</g>
+<g transform='matrix(1.004 0 0 -1.004 12.155 -76.164)' stroke='none' fill='#000'>
+<use x='-14.6' y='-21.403' xlink:href='#g0-54'/>
+</g>
+</g>
+</g>
+</svg>

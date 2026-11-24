@@ -724,6 +724,9 @@ export const cloud = Object.freeze({
   resolveExamHandwriting: (examId, body, timeoutMs = 60000) => cloudRequest('/v1/exams/' + pathId(examId, 'exam id') + '/handwriting', { method: 'POST', body, timeoutMs }),
   repeatPractice: questionId => cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/repeat', { method: 'POST', body: {} }),
   revealPractice: questionId => cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/reveal', { method: 'POST', body: {} }),
+  // A worked-solution question (answerType 'manual', Prithagoras): nothing marks it, so this is not a reveal. The server sends his steps and criteria,
+  // and a note on the student's own lines; it records the question as seen and nothing else.
+  workedSolutionPractice: (questionId, lines) => cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/solution', { method: 'POST', body: Array.isArray(lines) && lines.length ? { lines } : {} }),
   // The hint ladder is served and charged by the server, one named rung at a
   // time; the error notebook and the per-dot-point review queue are derived
   // there from this account's server-marked attempts.

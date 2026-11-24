@@ -149,9 +149,9 @@ ok(hintLeaks(engineQuestion(fxPart('TQ-010'))).includes('hint 2'), 'a hint that 
 ok(hintLeaks(engineQuestion(fxPart('TQ-001'))).length === 0, 'authored hints that do not state the answer pass');
 ok(familyOf({ course: 'ADV', year: 11, topic: 'MA-C1' }) === 'qb-a11-ma-c1' && familyOf({ course: 'EXT1', year: 12, topic: 'ME-V1' }) === 'qb-x12-me-v1', 'a family is one course and topic');
 const cp = compilePack(fixtureArchive());
-ok(cp.summary.questions === 10 && cp.summary.rejectedParts === 3, 'the fixture compiles to ten questions and three rejects (a leaking hint is dropped from its question, which stays)');
+ok(cp.summary.questions === 10 && cp.summary.rejectedParts === 2 && cp.summary.manualQuestions === 1, 'the fixture compiles to ten questions, one worked-solution question (the proof) and two rejects (a leaking hint is dropped from its question, which stays)');
 ok(cp.summary.ladder.rungsKept + cp.summary.ladder.rungsDropped === cp.summary.ladder.authoredHints && Object.values(cp.summary.ladder.withRungs).reduce((a, b) => a + b, 0) === cp.summary.ladder.questions, 'the ladder counts add up: every authored hint is a rung kept or a rung dropped, and every question has 0 to 3');
-ok(!cp.files.get('shards/qb-a11-ma-c1.json').includes('TQ-009') && !cp.files.get('shards/qb-a11-ma-c1.json').includes('TQ-011'), 'a rejected part is not in a shard');
+ok(!cp.files.get('shards/qb-a11-ma-c1.json').includes('TQ-011') && JSON.parse(cp.files.get('shards/qb-a11-ma-c1.json')).manual.map(q => q.id).join() === 'TQ-009', 'a rejected part is not in a shard; the proof is in the shard\'s worked-solution list and not among its marked questions');
 ok(JSON.parse(cp.files.get('shards/qb-a11-ma-c1.json')).questions.every(q => Array.isArray(q.criteria) && q.criteria.length), 'criteria travel in the pack');
 const t2 = fs.mkdtempSync(path.join(os.tmpdir(), 'qbank-pack-'));
 const fx = fixtureArchive();

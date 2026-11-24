@@ -80,7 +80,7 @@ const UUID = /^[0-9a-f-]{36}$/i;
 // grading a question the server refuses to issue could never be checked. The
 // name is only a lookup key; an unknown one fails generation with 422.
 const AUTHORED_BANK = /^[a-z][a-z0-9]{0,11}-[a-z0-9][a-z0-9-]{1,95}$/;
-const ISSUE_FIELDS = new Set(['generator', 'difficulty', 'seed', 'curriculum', 'mode', 'prepared', 'avoid', 'trap', 'dotpoint', 'written', 'account', 'band']);
+const ISSUE_FIELDS = new Set(['generator', 'difficulty', 'seed', 'curriculum', 'mode', 'prepared', 'avoid', 'trap', 'dotpoint', 'written', 'account', 'band', 'worked']);
 // F7: practice of official JEE questions by length-of-working band (jeeBands.js).
 // Premium, decided by the server's entitlement record before anything is drawn.
 export const JEE_BAND_CAPABILITY = 'premium-exams';
@@ -164,8 +164,10 @@ const ensureBanks = () => { if (!banksReady) banksReady = loadAllBanks().catch(e
 // request that names `bank: false` (a timed paper) never draw from the bank.
 // `bank` is true, false, or the Set of authored question ids this seek has already found stale (resolved, or just served): those are not
 // drawn again, so once the pool is used the seek is answered by the generators.
-const generateQuestion = (generator, difficulty, seed, dotpoint, pick, bank = true) => (bank && !pick && qbankServes(generator)
-  ? qbankDraw(generator, difficulty, seed, dotpoint ?? null, bank instanceof Set ? bank : null) ?? generateGeneratorQuestion(generator, difficulty, seed, dotpoint, pick)
+// `manual`: a worked-solution question (no key, no mark) may be this draw (qbankPack.js MANUAL_TURNS). Only an account's own seek says so, and only
+// when the last question it was dealt was not one; a prepared (signed-out) question never is, nor a timed paper, Rush, Match or the placement check.
+const generateQuestion = (generator, difficulty, seed, dotpoint, pick, bank = true, manual = false) => (bank && !pick && qbankServes(generator)
+  ? qbankDraw(generator, difficulty, seed, dotpoint ?? null, bank instanceof Set ? bank : null, { manual: manual === true }) ?? generateGeneratorQuestion(generator, difficulty, seed, dotpoint, pick)
   : generateGeneratorQuestion(generator, difficulty, seed, dotpoint, pick));
 const ensureQbankFromEnv = () => ensureQbank();
 // Rush and Match are one-line, timed rounds: an authored question (up to six marks, a working to show) is not dealt in them, nor in a timed paper.
@@ -246,6 +248,8 @@ function safeQuestion(id, q, env = process.env) {
   // Only when the server will actually pay step marks on this question (stamped, a paying mode, the switch on): the device says so before the answer.
   if (stepMarksOpen({ q, env })) publicQ.stepMarks = true;
   for (const k of PUBLIC_Q) if (Object.hasOwn(q, k)) publicQ[k] = q[k];
+  // A worked-solution question (qbankPack.js): nothing marks it, so it says no marks and no step support before it is revealed.
+  if (q.answerType === 'manual') { delete publicQ.criteriaCount; publicQ.supportsSteps = false; publicQ.worked = true; }
   // An author-bank question carries the rungs its importer chose and none else: with none, the device is told no hint is offered (no control, no panel).
   if (q.ladder && typeof q.ladder === 'object' && !ladderAvailable(q)) publicQ.hintsOffered = false;
   if ('contentId' in publicQ) publicQ.contentId = opaqueContentId(q.contentId);
@@ -522,7 +526,7 @@ function* seekQuestion(request, { draw, tries, batches, admits = null }) {
   for (let round = 0; drawn < budget(); round++) {
     const size = Math.min(batches[Math.min(round, batches.length - 1)], budget() - drawn);
     const batch = [];
-    for (let i = 0; i < size; i++, drawn++) batch.push(generateQuestion(generator, difficulty, draw(), dotpoint, pick, bankAllowed(request) && staleBank));
+    for (let i = 0; i < size; i++, drawn++) batch.push(generateQuestion(generator, difficulty, draw(), dotpoint, pick, bankAllowed(request) && staleBank, request.allowManual === true));
     const resolved = yield batch;
     for (const [i, q] of batch.entries()) {
       // A form this edition does not issue (editionBanks.js `admits`) is never
@@ -567,7 +571,7 @@ function chooseQuestion(request, seed = null, { draw = () => randomInt(0x8000000
   // A bank outside this edition's is never drawn from, by any route (a twin included; D15 for India).
   if (!banks.issues(generator)) throw Object.assign(new Error(banks.outside.message), { code: banks.outside.code });
   if (seed !== null) {
-    const q = generateQuestion(generator, difficulty, seed, dotpoint, bandPick(request), bankAllowed(request));
+    const q = generateQuestion(generator, difficulty, seed, dotpoint, bandPick(request), bankAllowed(request), request.allowManual === true);
     if (banks.admits && !banks.admits(q, generator)) throw Object.assign(new Error('This form may not be issued.'), { code: 'PRACTICE_CONTENT_UNSUPPORTED' });
     return { q, repeat: false, trapDelivered: !!(trap && carriesTrap(trap.owner, q, trap.key)) };
   }
@@ -575,6 +579,14 @@ function chooseQuestion(request, seed = null, { draw = () => randomInt(0x8000000
   let step = seek.next();
   while (!step.done) step = seek.next(null);
   return step.value;
+}
+
+/** True unless the question this account was last dealt is a worked-solution question (so one is never dealt twice in a row). Reads only. */
+async function lastDealtWasNotWorked(db, accountId) {
+  const row = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' ORDER BY created_at DESC LIMIT 1", [accountId])
+    .catch(error => { throw Object.assign(error, { pickerStore: true }); });
+  if (!row) return true;
+  try { return JSON.parse(row.response_json)?.answerType !== 'manual'; } catch { return true; }
 }
 
 // An account's seek asks its records once per batch: a small first batch,
@@ -780,6 +792,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         // The archive's chapter bank is loaded on demand (it is not in loadAllBanks).
         await loadBanksFor([request.generator]);
       }
+      if (body.worked !== undefined && (body.worked !== true || body.seed === undefined)) return reject(res, 400, 'PRACTICE_SEED_INVALID', 'worked is a test flag that goes with a seed.');
       let seed = null;
       if (body.seed !== undefined) {
         if (!fixedSeedsAllowed(env)) return reject(res, 400, 'PRACTICE_SEED_NOT_ALLOWED', 'The server chooses the question.');
@@ -790,7 +803,9 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         seedGiven = true;
       }
       // A test's fixed seed is that question; otherwise the account's own records steer the seek.
-      try { ({ q, repeat, trapDelivered } = seed !== null ? chooseQuestion(request, seed, { banks }) : await chooseQuestionFor(db, accountId, request, now, { banks })); }
+      // A worked-solution question (no key, no mark) may be this draw only when the last question this account was dealt was not one: never two in a row.
+      // A test's fixed seed asks for one by name (`worked: true`, with the seed: the server chooses in production).
+      try { ({ q, repeat, trapDelivered } = seed !== null ? chooseQuestion({ ...request, allowManual: body.worked === true }, seed, { banks }) : await chooseQuestionFor(db, accountId, { ...request, allowManual: await lastDealtWasNotWorked(db, accountId) }, now, { banks })); }
       catch (error) { if (error?.pickerStore) throw error; return reject(res, 422, 'PRACTICE_CONTENT_UNSUPPORTED', 'The requested question form is unavailable.'); }
       practiceMode = request.mode;
       q._generator = request.generator;
@@ -828,7 +843,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     const publicResponse = { question: safeQuestion(id, q, env), ...(repeat ? { repeat: true } : {}), ...(q._repeatEvidence ? { repeatEvidence: q._repeatEvidence } : {}), ...(trySpent ? { triesLeft: 1 } : {}), ...(trapDelivered ? { trapDelivered: true } : {}) };
     // The free plan's daily cap counts the Practice surface's own modes; Rush,
     // Match and the placement check are "everything else", unlimited.
-    const counted = practiceModeCounted(practiceMode);
+    // A worked-solution question is not marked and calls no model, so it is not a counted practice question: it neither uses nor needs the free day's allowance.
+    const counted = practiceModeCounted(practiceMode) && q.answerType !== 'manual';
     const response = await db.transaction(async () => {
       // Replays come first: a question already issued is handed back whatever
       // today's count says. Then the account's standing against the free daily
@@ -1063,6 +1079,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     const completed = await db.get("SELECT key FROM idempotency_keys WHERE account_id=? AND scope='practice-completion' AND key=?", [accountId, qid]);
     if (completed) return { status: 409, code: 'QUESTION_ALREADY_GRADED' };
     const q = JSON.parse(escrow.response_json);
+    // A worked-solution question is never marked, so it is never "revealed as a miss": its solution has its own route (/solution), which records nothing.
+    if (q.answerType === 'manual') return { status: 409, code: 'PRACTICE_NOT_MARKED' };
     // Decided now, not only at issue: copies issued before the first of them
     // was resolved are repeats the moment its solution has been shown.
     const evidence = await contentSeenEvidence(db, accountId, q, now);
@@ -1140,6 +1158,70 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     const accountId = req.platformSession.account_id;
     const now = Date.now();
     const result = await db.transaction(() => commitReveal(accountId, qid, now), { accountScope: accountId, lock: syncLockKey(accountId) });
+    if (result.status) return reject(res, result.status, result.code, result.code === 'PRACTICE_NOT_MARKED' ? 'This question is not marked. Ask for its worked solution.' : 'The question is unavailable or already resolved.');
+    return res.status(200).json(result.response);
+  });
+
+  // ── A worked-solution question's solution (answerType 'manual': qbankPack.js) ──────────────────────────────────────────────────────────
+  // His show-that, prove, explain, sketch and unkeyed "find" questions have NO key, so nothing can mark them and no mark is ever invented. The
+  // student reads the question, may write or type working, and presses for the solution. This is a server call tied to the issued question and
+  // account, like marking: it sends his worked steps and his criteria (what a marker looks for, with his marks as information) and, where the
+  // question's own gate allows it (every step of his own page passes the deterministic step report, none crossed), a quiet note on the student's own
+  // lines: ticks for lines that follow, one "look again" at the first that does not. It never crosses a line and never says a mark.
+  //
+  // What it records: the question as completed (so it cannot be answered, hinted or revealed afterwards) and as SEEN (so the no-repeat rule passes
+  // over it). What it does NOT record: no graded attempt, no learning event, no mark earned or credited, no mastery, readiness, streak or XP: it
+  // is not a correct or an incorrect answer, so it counts as neither.
+  router.post('/:id/solution', rateLimit(db, 'practice-solution', { limit: 120, windowMs: 3600000 }), async (req, res) => {
+    const qid = String(req.params.id || '');
+    const body = req.body ?? {};
+    if (!UUID.test(qid)) return reject(res, 404, 'QUESTION_NOT_FOUND', 'This question does not belong to this account.');
+    if (!plain(body) || unknown(body, new Set(['lines'])).length
+      || (body.lines !== undefined && (!Array.isArray(body.lines) || body.lines.length > HINT_WORK_LIMITS.lines || !body.lines.every(l => typeof l === 'string' && l.length <= HINT_WORK_LIMITS.line))))
+      return reject(res, 400, 'PRACTICE_SOLUTION_INVALID', 'Ask for the solution of one question, with at most 40 lines of working of 400 characters.');
+    const accountId = req.platformSession.account_id;
+    const now = Date.now();
+    const lines = Array.isArray(body.lines) ? body.lines.map(l => l.trim()).filter(Boolean) : [];
+    const escrow = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=? AND expires_at>?", [accountId, qid, now]);
+    if (!escrow) return reject(res, 404, 'QUESTION_NOT_FOUND', 'This question does not belong to this account.');
+    let q;
+    try { q = JSON.parse(escrow.response_json); } catch { return reject(res, 404, 'QUESTION_NOT_FOUND', 'This question does not belong to this account.'); }
+    if (q.answerType !== 'manual') return reject(res, 409, 'PRACTICE_NOT_A_WORKED_SOLUTION', 'This question is marked, not shown.');
+    const prior = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-worked' AND key=? AND expires_at>?", [accountId, qid, now]);
+    if (prior) return res.status(200).json(JSON.parse(prior.response_json));
+    // The note on the student's own lines, from the marker pool (never on this thread), only for a question whose own page the report never crosses.
+    let note = null;
+    if (lines.length && q._lineFeedback === true && lineCheckFeatureEnabled(env) && !(await markerCooldownUntil(db, accountId))) {
+      let outcome = null;
+      try { outcome = await markerPool().run('worked', { q, lines }, { key: accountId }); } catch { outcome = null; }
+      if (outcome && !outcome.ok && outcome.code === MARKING_TOO_COMPLEX) await recordMarkerKills(db, accountId);
+      const evidence = outcome?.ok ? outcome.value : null;
+      if (evidence?.judged === true) note = { lines: lines.length, verified: Math.max(0, Math.min(lines.length, Number(evidence.verified) || 0)), ...(evidence.firstBreak >= 0 ? { lookAgain: evidence.firstBreak + 1 } : {}) };
+    }
+    const response = {
+      authoritative: true, worked: true, resolved: true, questionId: qid, serverAcknowledgedAt: now,
+      solution: {
+        steps: (q.steps || []).map(s => ({ h: String(s.h), d: String(s.d) })),
+        // What a marker looks for: his criteria, each with his marks, as information. The `line` of a criterion stays on the server.
+        criteria: (q.criteria || []).map(c => ({ marks: Number(c.marks), point: String(c.point) })),
+        marksAvailable: (q.criteria || []).reduce((n, c) => n + Number(c.marks || 0), 0)
+      },
+      ...(note ? { workNote: note } : {})
+    };
+    const result = await db.transaction(async () => {
+      const again = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-worked' AND key=?", [accountId, qid]);
+      if (again) return { response: JSON.parse(again.response_json) };
+      const done = await db.get("SELECT key FROM idempotency_keys WHERE account_id=? AND scope='practice-completion' AND key=?", [accountId, qid]);
+      if (done) return { status: 409, code: 'QUESTION_ALREADY_GRADED' };
+      // Seen, so the no-repeat rule passes over it; completed, so nothing else can be done to it. No learning event, no attempt, no mark.
+      await markContentSeen(db, accountId, q, now);
+      const hash = digest({ qid, operation: 'worked-solution' });
+      for (const [scope, value] of [['practice-worked', response], ['practice-completion', { worked: true }]]) {
+        await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,?,?,?,?,?,?)",
+          [accountId, scope, qid, JSON.stringify(value), hash, now, now + MAX_AGE]);
+      }
+      return { response };
+    }, { accountScope: accountId, lock: syncLockKey(accountId) });
     if (result.status) return reject(res, result.status, result.code, 'The question is unavailable or already resolved.');
     return res.status(200).json(result.response);
   });
@@ -1213,6 +1295,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       if (completed) return { status: 409, code: 'QUESTION_ALREADY_GRADED' };
       const q = JSON.parse(escrow.response_json);
       if (ONE_TRY_MODES.includes(q._practiceMode) || !ladderAvailable(q)) return { status: 409, code: 'HINT_NOT_AVAILABLE' };
+      // A worked-solution question offers its hints only: its solution is not a rung (it ends nothing and marks nothing; it has its own route).
+      if (q.answerType === 'manual' && body.rung === 'solution') return { status: 409, code: 'HINT_NOT_AVAILABLE' };
       const level = await hintLevelOf(accountId, qid);
       if (want > level + 1) return { status: 409, code: 'HINT_RUNG_ORDER', next: nextRungAfter(level) };
       const reached = Math.max(level, want);
@@ -1425,6 +1509,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       if (held.get('practice-completion')) return { status: 409, code: 'QUESTION_ALREADY_GRADED' };
 
       const q = JSON.parse(sealed.response_json);
+      // A worked-solution question has no key: nothing is marked, ever (its solution is /solution).
+      if (q.answerType === 'manual') return { status: 409, code: 'PRACTICE_NOT_MARKED' };
       // Whether this content has been resolved before, and whether a try has
       // been spent on any copy of it: both are records of one scope, asked for
       // together (they were two statements).
@@ -1452,6 +1538,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     };
     const refuse = outcome => reject(res, outcome.status, outcome.code,
       outcome.code === 'QUESTION_NOT_FOUND' ? 'This question does not belong to this account.'
+        : outcome.code === 'PRACTICE_NOT_MARKED' ? 'This question is not marked. Ask for its worked solution.'
         : outcome.code === 'AUTH_REQUIRED' ? 'Sign in again before retrying this answer.'
           : outcome.status === 403 ? 'Guardian consent changed while this answer was being checked.'
             : 'The submission cannot be accepted.');

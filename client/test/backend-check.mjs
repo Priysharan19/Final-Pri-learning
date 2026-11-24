@@ -1031,6 +1031,11 @@ async function run() {
     ok('reveal shows the worked solution', Array.isArray(revealed.solution?.steps) && revealed.solution.steps.length > 0, show(revealed.solution?.steps?.length));
     await rejects('a revealed question cannot then be answered',
       POST(`/practice/${revealTarget.question.id}/submit`, { answer: '1' }), { status: 409 });
+    // A worked-solution question (answerType manual: Pri shows its solution and never marks it) has its own route. A question Pri marks has no such
+    // solution to show: the route refuses it and records nothing, and the question stays open to be answered.
+    const markedOne = await nextQuestion({ mode: 'topic', subtopic: topicId });
+    await rejects('a marked question has no worked solution: that route is only for the questions Pri does not mark',
+      POST(`/practice/${markedOne.question.id}/solution`, {}), { status: 409, code: 'PRACTICE_NOT_A_WORKED_SOLUTION' });
 
     const discardTarget = await nextQuestion({ mode: 'topic', subtopic: topicId });
     const discarded = await POST(`/practice/${discardTarget.question.id}/discard`, {});

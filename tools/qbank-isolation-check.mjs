@@ -50,7 +50,8 @@ const TEXT = /\.(?:m?js|jsx|css|html|json|webmanifest|map|svg|txt|mjs|cjs)$/i;
 
 const manifest = JSON.parse(fs.readFileSync(path.join(PACK, 'manifest.json'), 'utf8'));
 const shards = manifest.shards.map(s => path.join(PACK, s.name));
-const questions = shards.flatMap(f => JSON.parse(fs.readFileSync(f, 'utf8')).questions);
+// The worked-solution questions (answerType manual: steps, criteria and hints, no key) are as sealed as the marked ones.
+const questions = shards.flatMap(f => { const shard = JSON.parse(fs.readFileSync(f, 'utf8')); return [...shard.questions, ...(shard.manual ?? [])]; });
 ok(questions.length > 0, 'the committed pack has questions to protect');
 
 // ── static ───────────────────────────────────────────────────────────────────
