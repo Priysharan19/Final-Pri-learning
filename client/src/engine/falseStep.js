@@ -235,12 +235,14 @@ export function crossDiagnosis(facts, example, ctx = null) {
   // Sides that are not both polynomials, or a polynomial case the term rules could not name: the single-edit repair of engine/wideFalseStep.js
   if (ctx && ctx.aboveSide && ctx.writtenSide && (!ex || !ex.type)) {
     let wx = null; try { wx = explainWide(ctx.aboveSide, ctx.writtenSide, ctx.strict || null); } catch { wx = null; }
-    if (wx) { ex = ex ? { ...ex } : { exact: false }; for (const k of ['type', 'whatChanged', 'whyWrong', 'corrected', 'check', 'checkAt']) if (wx[k] !== undefined && ex[k] === undefined) ex[k] = wx[k]; }
+    if (wx) { ex = ex ? { ...ex } : { exact: false }; for (const k of ['type', 'whatChanged', 'whyWrong', 'corrected', 'check', 'checkAt', 'quoted', 'correctedValue']) if (wx[k] !== undefined && ex[k] === undefined) ex[k] = wx[k]; }
   }
   if (ex) {
     if (ex.whatChanged) d.whatChanged = ex.whatChanged;
     if (ex.whyWrong) { d.whyWrong = ex.whyWrong; d.errorType = ex.type; }
     if (ex.corrected) d.corrected = ex.corrected;
+    if (ex.quoted) d.quoted = ex.quoted;
+    if (ex.correctedValue !== undefined) d.correctedValue = ex.correctedValue;
     if (ex.check) { d.check = ex.check; d.checkAt = ex.checkAt; }
   } else if (example && example.at && example.at.length) {
     d.check = `At ${example.at.map(a => `${a.v} = ${a.value}`).join(', ')} the line above gives ${example.above} but this line gives ${example.written}.`;
@@ -543,7 +545,7 @@ const ERROR_CATALOGUE = Object.freeze({
   'like-terms-wrong': 'Adding {terms} gives {sum}, not {written}.',
   'dropped-term': 'Every term of the line above has to be carried down: the {term} term is missing here.',
   'extra-term': 'The line above has no {term} term, so nothing here can produce one.',
-  'sign-error': 'The sign of the {term} term changed. A sign changes only when a term is multiplied by a negative or moved across the equals sign, and neither happens between these two lines.',
+  'sign-error': 'The sign of the {term} term changed: the two lines differ in that sign and in nothing else, so changing it back makes this line equal to the line above.',
   'exponent-changed': 'The power {from} became {to}. A power keeps its exponent unless it is multiplied or divided by another power of the same letter.',
   'bracket-product': 'Each term of one bracket multiplies each term of the other: {product} {state}.'
 });

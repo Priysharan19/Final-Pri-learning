@@ -917,6 +917,22 @@ function isPartOf(text, whole) {
   return false;
 }
 
+// ── the unit of an angle written as a plain number ───────────────────────────────────────────────────────────────────
+let PAGE_TRIG_UNIT = 'rad';
+/** 'deg' when the question or the page works in degrees, 'rad' when it works in radians (or writes π in an angle), null when it does not say. */
+export function trigUnitOf(text) {
+  const t = String(text ?? '');
+  const deg = /°|\\circ|\bdegrees?\b|\bbearings?\b|\^\s*o\b/i.test(t), rad = /\bradians?\b|π|\bpi\b|\\pi/i.test(t);
+  if (deg && rad) return null;
+  return deg ? 'deg' : rad ? 'rad' : null;
+}
+/** `sin(30)` and `tan 45` as degrees: each plain-number argument of a trig function is multiplied by π/180. */
+export function degreeForm(text) {
+  return String(text)
+    .replace(/(?<![a-z])(sin|cos|tan|sec|cosec|csc|cot)(\s*\^\s*-?\d+)?\s*\(\s*([-+]?\d+(?:\.\d+)?)\s*\)/gi, (_, f, pw, n) => `${f}${pw || ''}((${n})*pi/180)`)
+    .replace(/(?<![a-z])(sin|cos|tan|sec|cosec|csc|cot)(\s*\^\s*-?\d+)?\s+([-+]?\d+(?:\.\d+)?)(?![\d.])/gi, (_, f, pw, n) => `${f}${pw || ''}((${n})*pi/180)`);
+}
+
 function judgeExpressionLine(cleaned, meta, { reference = null, promptSpans = [], knownLetters = null } = {}) {
   const text = bareExpressionLine(cleaned);
   const same = (a, b) => exprEquivalent(a, b, { positiveOnly: meta.positiveOnly }) === true;
@@ -938,7 +954,12 @@ function judgeExpressionLine(cleaned, meta, { reference = null, promptSpans = []
   }
   // A statement between numbers that is false (1 = 2) is a mistake wherever it stands; a rounded
   // decimal (22/7 = 3.14) is not provably false and is left as a note.
-  const constants = parts.map(x => { const a = parseExpr(x); if (!a || variablesOf(a).size > ([...variablesOf(a)].includes('e') ? 1 : 0)) return null; try { const v = evaluate(a, {}); return Number.isFinite(v) ? v : null; } catch { return null; } });
+  // A trig function of a plain number: the angle is in degrees or in radians. The page says which (a degree sign, "degrees", a bearing; or a
+  // radian mark, π), and the line is worked out in THAT unit. Where it does not say, the line is never judged (tan(45) is 1 in degrees).
+  const TRIG_OF_NUMBER = /(?<![a-z])(?:sin|cos|tan|sec|cosec|csc|cot)\s*(?:\^\s*-?\d+\s*)?\(?\s*[-+]?\d/i;
+  const trigNumber = parts.some(x => TRIG_OF_NUMBER.test(x) && !/arc/i.test(x));
+  if (trigNumber && PAGE_TRIG_UNIT === null) return unread;
+  const constants = parts.map(x => { const a = parseExpr(trigNumber && PAGE_TRIG_UNIT === 'deg' ? degreeForm(x) : x); if (!a || variablesOf(a).size > ([...variablesOf(a)].includes('e') ? 1 : 0)) return null; try { const v = evaluate(a, {}); return Number.isFinite(v) ? v : null; } catch { return null; } });
   if (parts.length > 1 && constants.every(v => v !== null)) {
     const inexact = parts.some(x => /[.%]|pi|sqrt|√|π|e\b|ln|log|sin|cos|tan/i.test(x));
     const differs = constants.some(v => Math.abs(v - constants[0]) > (inexact ? 1e-2 : 1e-9) * Math.max(1, Math.abs(constants[0])));
@@ -1007,6 +1028,7 @@ const DERIVATIVE_CLAIM = /^(?:d[a-z]\/d[a-z]|[a-z]'(?:\([a-z]\))?|[a-z]\([a-z]\)
 const proseCleanOf = line => String(line).trim().replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore)\s+/i, '').replace(ANSWER_LABEL, '');
 
 function stepCheckSingle(meta, workingText, system = null, { loneBranches = false, calculus = null, named = false, prompt = '' } = {}) {
+  PAGE_TRIG_UNIT = trigUnitOf(`${prompt}\n${workingText}`);
   const calculusStage = { claimed: false };   // calculusSteps.js: has a line made a claim yet?
   const rawLines = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
   const unread = unreadLines(rawLines);

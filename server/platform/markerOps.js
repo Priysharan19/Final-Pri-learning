@@ -29,7 +29,7 @@ import { questionFacts } from '../../client/src/engine/questionFacts.js';
 import { missingSteps } from '../../client/src/engine/missingSteps.js';
 import { infoOf as arithmeticInfo, cleanStatement } from '../../client/src/engine/arithmeticLines.js';
 import { annotateMilestones } from '../../client/src/engine/milestones.js';
-import { solutionMatch } from '../../client/src/engine/solutionMatch.js';
+import { solutionMatch, _internals as SOLUTION_INTERNALS } from '../../client/src/engine/solutionMatch.js';
 import { lineChains } from '../../client/src/engine/lineChains.js';
 import { awardBoardScheme, matchBoardPoints } from '../../client/src/engine/boardScheme.js';
 import { constrainToShown, unsupportedCredit } from '../../client/src/engine/markExplanation.js';
@@ -89,10 +89,23 @@ export function marksPossibleFor(q) {
 }
 
 /** The true-as-written report for a working (engine/arithmeticLines.js), or null when it cannot be made. */
+/** Every number the question's authored worked solution writes (a value with a unit, a fraction, a decimal), for engine/arithmeticLines.js: a line that reaches one is the next authored step, not a false equality. */
+function solutionNumbers(q) {
+  const out = new Set();
+  try { for (const x of SOLUTION_INTERNALS.readSolution(q).values) if (Number.isFinite(x.v)) out.add(x.v); } catch { /* the numbers below stand */ }
+  for (const st of Array.isArray(q?.steps) ? q.steps.slice(0, 40) : []) {
+    const d = String(st?.d ?? '').slice(0, 2000);
+    for (const m of d.matchAll(/(-?)\s*\\[dt]?frac\{(-?\d+(?:\.\d+)?)\}\{(-?\d+(?:\.\d+)?)\}/g)) { const v = (m[1] ? -1 : 1) * Number(m[2]) / Number(m[3]); if (Number.isFinite(v)) out.add(v); }
+    for (const m of d.matchAll(/(?<![\w.])-?\d+(?:\.\d+)?(?:\s*\/\s*\d+(?:\.\d+)?)?/g)) { const parts = m[0].split('/').map(x => Number(x.trim())); const v = parts.length === 2 ? parts[0] / parts[1] : parts[0]; if (Number.isFinite(v)) out.add(v); }
+  }
+  return [...out].slice(0, 400);
+}
+
 function trueAsWritten(q, steps, opts) {
   try {
     const facts = opts && Object.hasOwn(opts, 'facts') ? opts.facts : questionFacts(q);
-    return stepCheckArithmetic(steps, { latex: opts && Array.isArray(opts.latex) ? opts.latex : null, facts });
+    const solutionValues = solutionNumbers(q);
+    return stepCheckArithmetic(steps, { latex: opts && Array.isArray(opts.latex) ? opts.latex : null, facts, solutionValues });
   } catch { return null; }
 }
 

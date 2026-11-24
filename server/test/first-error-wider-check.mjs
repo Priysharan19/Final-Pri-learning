@@ -19,6 +19,7 @@ import { stepEvidence, lineLevelFeedback } from '../platform/markerOps.js';
 import { checkAnswer } from '../../client/src/engine/checker.js';
 import * as G from '../../client/src/engine/generators/index.js';
 import { ERROR_TYPES, stepHow, stepHowWide } from '../../client/src/engine/falseStep.js';
+import { explainWide, sameEverywhere, valueAtText } from '../../client/src/engine/wideFalseStep.js';
 import { FAMILY_KEYS, SLIP_KINDS, buildPage } from '../../tools/first-error-corpus.mjs';
 import { SEEDS as AUDIT_SEEDS, EXTRA_SEEDS, loadFamilies, editionOf, questionsFor, transcriptsFor } from '../../tools/understanding-audit/corpus.mjs';
 
@@ -162,7 +163,7 @@ ok(stepHowWide('12 + 10', '22')?.kind === 'evaluated' && stepHowWide('12 + 10', 
 // ── 7: the authored true pages of every Australian family: the rule adds NO cross that the page did not already have without it ────
 {
   const fams = (await loadFamilies()).filter(id => editionOf(id) === 'NSW');
-  let pages = 0, added = 0, withDiagnosis = 0; const bad = [];
+  let pages = 0, added = 0, withDiagnosis = 0, crossedAll = 0; const bad = [], badAll = [];
   for (const id of fams) for (const q of questionsFor(id, [...AUDIT_SEEDS, ...EXTRA_SEEDS])) {
     let ts; try { ts = transcriptsFor(q); } catch { continue; }
     for (const t of ts) {
@@ -172,13 +173,83 @@ ok(stepHowWide('12 + 10', '22')?.kind === 'evaluated' && stepHowWide('12 + 10', 
       if (!on?.lines || !off?.lines) continue;
       pages++;
       const a = on.lines.map(l => l.status === 'break'), b = off.lines.map(l => l.status === 'break');
+      if (a.some(Boolean)) { crossedAll++; if (badAll.length < 5) badAll.push(`${id} ${JSON.stringify(t.lines.map(l => l.text))}`); }
       if (JSON.stringify(a) !== JSON.stringify(b)) { added++; if (bad.length < 3) bad.push(`${id} ${JSON.stringify(t.lines.map(l => l.text))}`); }
       if (on.lines.some(l => l.diagnosis?.code === 'false-continuation')) withDiagnosis++;
     }
   }
   ok(pages >= 8000, `the sweep covers the authored true pages: ${pages}`);
+  ok(crossedAll === 0, `a true authored page is crossed: ${crossedAll} of ${pages} ${badAll.join(' ')}`);
   ok(added === 0, `true authored pages given a new cross by the slip rule: ${added} of ${pages} ${bad.join(' ')}`);
   console.log(`authored true pages: ${pages} swept, ${added} newly crossed, ${withDiagnosis} carry a false-continuation diagnosis on a cross some other check made`);
+}
+
+// ── 8: degrees and radians ─────────────────────────────────────────────────────────────────────────────────────────
+{
+  const DEG = 'Find the exact value of $\\tan 45^\\circ$.', RAD = 'Find the exact value of $\\sin\\left(\\dfrac{\\pi}{6}\\right)$ (in radians).', NONE = 'Find the exact value.';
+  const degTrue = ['tan(45) = 1', 'tan 45 = 1', 'sin(30) = 1/2', 'cos(60) = 1/2', 'sin(90) = 1', 'cos(180) = -1', 'sin 30 = 1/2', 'tan(0) = 0', 'cos(0) = 1', 'sin(45) = sqrt(2)/2'];
+  for (const l of degTrue) { const r = mark(DEG, [l], '1'); ok(crossAt(r) === -1, `degrees: "${l}" is true and never crossed (${r.lines.map(x => x.status)})`); }
+  for (const l of ['sin(pi/6) = 1/2', 'cos(pi) = -1', 'tan(pi/4) = 1', 'sin(pi/2) = 1']) { const r = mark(RAD, [l], '1/2'); ok(crossAt(r) === -1, `radians: "${l}" is never crossed (${r.lines.map(x => x.status)})`); }
+  for (const l of degTrue.slice(0, 4)) { const r = mark(NONE, [l], '1'); ok(crossAt(r) === -1, `no unit stated: "${l}" is never crossed`); }
+  ok(crossAt(mark(DEG, ['sin(30) = 2'], '1')) === 0, 'in degrees a false line is still crossed: sin(30) = 2');
+  ok(crossAt(mark('Find the exact value of $\\sin 30^\\circ$.', ['sin(30) = 0.5', '= 1/2'], '1/2')) === -1, 'sin(30) = 0.5 in degrees is never crossed');
+  const r = mark(NONE, ['sin(30)', '= 1/2'], '1/2');
+  ok(falseCross(r).length === 0 && crossAt(r) === -1, 'a trig of a plain number with no unit stated is not crossed by the wide rule either');
+}
+
+// ── 9: every sentence of a diagnosis is checked by the engine for that page ──────────────────────────────────────────
+const sideOf = line => String(line).split('=').pop().trim();
+{
+  let checked = 0, bad = [];
+  const verify = (page, why) => {
+    const r = markPage(page); const l = r.lines[page.at]; const d = l?.diagnosis;
+    if (!d || d.code !== 'false-continuation') return;
+    const above = sideOf(page.aboveLine), written = sideOf(page.slipLine);
+    checked++;
+    // the corrected line equals the line above (a rounded decimal only where the working is not exact, and then at 4 places)
+    if (d.corrected) {
+      const body = d.corrected.replace(/^\s*[=≈]\s*/, '').replace(/\s*\(4 decimal places\)\s*$/, '');
+      if (d.correctedValue !== undefined) { if (!(Math.abs(valueAtText(body, '', 0) - valueAtText(above, '', 0)) < 6e-5 * Math.max(1, Math.abs(valueAtText(above, '', 0))))) bad.push(`${why}: corrected ${d.corrected} is not the line above ${above}`); }
+      else if (!sameEverywhere(above, body)) {
+        // polynomial diagnoses state the line above in its simplest form (checked by the polynomial engine); accept it when it is the same function
+        bad.push(`${why}: corrected ${d.corrected} is not equal to the line above ${above}`);
+      }
+    }
+    // the check is numerically true
+    const NUM = '(-?\\d+(?:\\.\\d+)?(?:e[+-]?\\d+)?)'; const m = new RegExp(`At (\\w) = ${NUM} the line above gives ${NUM} but this line gives ${NUM}`).exec(d.check || '');
+    if (m) {
+      const a = valueAtText(above, m[1], Number(m[2])), b = valueAtText(written, m[1], Number(m[2]));
+      const near = (x, y) => x !== null && Math.abs(x - Number(y)) <= 6e-4 * Math.max(1, Math.abs(Number(y)));
+      if (!near(a, m[3]) || !near(b, m[4])) bad.push(`${why}: check "${d.check}" is not true of ${above} and ${written}`);
+    }
+    // what the diagnosis quotes of the student's line is in the student's line
+    for (const q of d.quoted || []) if (!page.slipLine.replace(/\s+/g, '').includes(String(q).replace(/\s+/g, ''))) bad.push(`${why}: quoted "${q}" is not in "${page.slipLine}"`);
+    if (DASH.test(JSON.stringify(d))) bad.push(`${why}: a dash`);
+  };
+  for (const fam of FAMILY_KEYS) for (let seed = 1; seed <= 30; seed++) for (const kind of SLIP_KINDS) {
+    const p = buildPage(fam, seed, kind); if (!p) continue;
+    verify(p, `${fam}/${kind}/${seed}`);
+  }
+  ok(checked > 1500, `diagnoses re-checked by the engine: ${checked}`);
+  ok(bad.length === 0, `sentences not true of the page: ${bad.length}: ${bad.slice(0, 4).join(' | ')}`);
+}
+
+// ── 10: the sentences that were false or misleading (review of 24 November 2026) ───────────────────────────────────
+{
+  const sign = explainWide('sin(x + 2)', 'sin(x)cos(2) - cos(x)sin(2)');
+  ok(sign && !/only when a term is moved|neither happens/.test(JSON.stringify(sign)), `an identity or expansion is not told it may not change a sign: ${JSON.stringify(sign)}`);
+  const sg = explainWide('3x + 2cos(x)', '3x - 2cos(x)');
+  ok(sg?.type === 'sign-error' && /Changing only the sign in front of 2cos\(x\) makes this line equal to the line above/.test(sg.whyWrong) && !/moved across|multiplied by a negative/.test(sg.whyWrong), `sign slip says only what was verified: ${sg?.whyWrong}`);
+  const fr = explainWide('1/3 + 1/5', '2/8');
+  ok(fr.corrected === '= 8/15' && /8\/15/.test(fr.check) && !/0\.5333/.test(JSON.stringify({ ...fr, correctedValue: undefined })), `exact rationals give an exact value: ${fr.corrected} ${fr.check}`);
+  const dec = explainWide('0.1 + 0.25', '0.5');
+  ok(dec === null, 'decimal working is an approximation: never crossed or diagnosed here');
+  const irr = explainWide('ln(2) + ln(3)', 'ln(7)');
+  ok(/≈ 1\.7918 \(4 decimal places\)/.test(irr.corrected) && /about 1\.792/.test(irr.whatChanged), `an irrational value is marked as rounded: ${irr.corrected}`);
+  const sq = explainWide('sqrt(216)', '36sqrt(6)');
+  ok(sq.corrected === '= 6√6' && /This line says 36sqrt\(6\), which is about 88\.18\./.test(sq.whatChanged) && !/88\.1816/.test(JSON.stringify(sq)) && sq.whyWrong === '216 = 36 × 6, so √216 = 6√6.' && !/Working out sqrt\(216\) gives/.test(JSON.stringify(sq)), `the student's line is quoted as written and the step is explained: ${JSON.stringify(sq)}`);
+  const tw = explainWide('2sin(x)cos(x)', '2sin(x)sin(x)');
+  ok(tw.type === 'function-wrong' && /One of the sin factors in the term 2sin\(x\)sin\(x\) should be cos/.test(tw.whatChanged) && !/not one number or sign/.test(JSON.stringify(tw)), `one swapped factor is named: ${tw.whatChanged}`);
 }
 
 console.log(failures.length ? `FIRST ERROR WIDER: FAIL (${failures.length})\n${failures.map(f => '  ' + f).join('\n')}` : `FIRST ERROR WIDER: PASS: ${pass} checks`);

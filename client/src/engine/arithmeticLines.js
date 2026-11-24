@@ -1121,7 +1121,13 @@ function pageDefinitionsOnce(raw, out, firstBreak, prep, degreePrimed, tickOnly,
  * `opts.facts`: what the question's prompt gives (questionFacts.js). Used only to tick or leave a note; see "What the
  * question itself gives". Without it the check is exactly what it was.
  */
+// The numbers the question's authored worked solution reaches, for the one page being checked (set and cleared around it).
+let SOLUTION_VALUES = null;
 export function stepCheckArithmetic(workingText, opts = null) {
+  SOLUTION_VALUES = opts && Array.isArray(opts.solutionValues) ? opts.solutionValues.filter(v => Number.isFinite(v)) : null;
+  try { return stepCheckArithmeticBudgeted(workingText, opts); } finally { SOLUTION_VALUES = null; }
+}
+function stepCheckArithmeticBudgeted(workingText, opts) {
   return withEvaluationBudget(PAGE_BUDGET, () => {
     let prep = null;
     try { prep = opts && opts.facts ? prepareFacts(opts.facts) : null; } catch { prep = null; }
@@ -1797,6 +1803,13 @@ function stepCheckArithmeticWithinBudget(workingText, prep = null, tickOnly = fa
       }
     }
     if (trueUnderAnotherReading(allSides, allValues) || trueUnderExponentReading(allSides, allValues)) return note(line, MISREAD_NOTE);
+    // The question's own worked solution reaches the value this line gives (`= 60` after `4225 - 625 = 3600`, where the root was left
+    // unwritten): the line is the next step of the authored working with its operation missing, not a claim that the two are equal. A note.
+    if (continuation && before && SOLUTION_VALUES && SOLUTION_VALUES.some(v => closeLoose(v, allValues[allValues.findIndex(x => !close(x, allValues[0]))]))) {
+      return note(line, `This line does not equal the line above (${shown(allValues[0])}) as written, but it is a value the worked solution reaches, so it is left as a note. Write the step that gets from one to the other.`);
+    }
+    // A division sign with a fraction on the same line (1/10 ÷ 2/3) is read left to right by one convention and as written by another.
+    if (allSides.some(x => (/÷/.test(x) && /\d\s*\/\s*\d/.test(x)) || /\d\s*[\/÷]\s*\d+(?:\.\d+)?\s*[\/÷]\s*\d/.test(x))) return note(line, NOTE);   // 15 ÷ 5/8 and 1/10 ÷ 2/3: two readings
     const k = allValues.findIndex(v => !close(v, allValues[0]));
     const message = logFalseInBoth ? `${mathSpan(allSides[0])} does not equal ${mathSpan(allSides[k])}, whether log means base 10 or base e.`
       : continuation && before && k >= 1 && allValues.slice(1, k).every(v => close(v, allValues[0]))

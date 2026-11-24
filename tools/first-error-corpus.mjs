@@ -62,7 +62,9 @@ export function show(t, opts = {}) {
     case 'n': return Number.isInteger(t.v) ? String(t.v) : String(t.v);
     case 'v': return t.name;
     case 'e': return 'e';
-    case 'add': return t.ts.map((x, i) => {
+    case 'add': return t.ts.map((x0, i) => {
+      let x = x0;
+      if (x.t.k === 'n' && x.t.v < 0) x = { s: -x.s, t: N(-x.t.v) };   // x + (-2) is written x - 2
       let body = R(x.t, 1 + (x.t.k === 'add' ? 1 : 0));
       if (x.t.k === 'add') body = `(${show(x.t, opts)})`;
       if (i === 0) return x.s < 0 ? `-${body}` : body;

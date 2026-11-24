@@ -86,6 +86,7 @@ export function closedNumbersDiffer(aboveText, writtenText) {
   const ra = wideReadable(aboveText), rb = wideReadable(writtenText);
   if (!ra || !rb || ra.letter || rb.letter) return null;
   if (/\./.test(aboveText + writtenText)) return null;   // a decimal is an approximation: left as a note
+  if (/(?<![a-z])(?:sin|cos|tan)/i.test(aboveText + writtenText) && !/pi/i.test(tidy(aboveText + writtenText))) return null;   // sin(30): degrees or radians is not said here
   const A = astOf(aboveText), B = astOf(writtenText);
   if (!A || !B) return null;
   const a = valueOfAst(A, null, 0), b = valueOfAst(B, null, 0);
@@ -211,7 +212,7 @@ export function repairOf(aboveSide, writtenSide, v) {
     const flipped = ch === '+' ? '-' : '+';
     let text = `${w.slice(0, i)}${flipped}${w.slice(i + 1)}`;
     if (i === 0 && ch === '-') text = w.slice(1).trimStart();
-    if (equalEverywhere(Aast, text, v)) add('sign-error', ch, flipped, termAt(w, i + 1), text);
+    if (equalEverywhere(Aast, text, v)) add('sign-error', ch, flipped, termAt(w, i + 1).replace(/^[+-]\s*/, ''), text);
   }
   // one sin/cos swapped
   for (const m of w.matchAll(/(?<![a-z])(sin|cos)(?![a-z])/g)) {
@@ -223,36 +224,87 @@ export function repairOf(aboveSide, writtenSide, v) {
 }
 
 const WHY = Object.freeze({
-  'sign-error': 'A sign changes only when a term is moved across the equals sign or multiplied by a negative, and neither happens between these two lines.',
+  // each sentence states only what the engine verified for THESE two lines: the one change that makes the written line equal the line above
+  'sign-error': 'Changing only the sign in front of {term} makes this line equal to the line above, so that sign is the slip.',
   'coefficient-wrong': 'Putting {to} in place of {from} makes this line equal to the line above, so the coefficient {from} is the slip.',
   'constant-wrong': 'Putting {to} in place of {from} makes this line equal to the line above, so the number {from} is the slip.',
   'exponent-wrong': 'Putting {to} in place of {from} makes this line equal to the line above, so the power {from} is the slip.',
   'function-wrong': 'Putting {to} in place of {from} makes this line equal to the line above, so {from} is the wrong function here.',
-  'term-not-equal': 'More than one single change would fix the term {term}, so it is not one number or sign: work that term again from the line above.',
+  'term-not-equal': 'More than one single change would fix the term {term}, so no one number or sign is to blame: work that term again from the line above.',
   'arithmetic-slip': 'Working out {above} gives {value}, not {written}.'
 });
 const fillw = (t, slots) => t.replace(/\{(\w+)\}/g, (_, k) => slots[k]);
 const sentence = s => `${s.charAt(0).toUpperCase()}${s.slice(1)}`;
+const squash = t => String(t).replace(/\s+/g, ' ').trim();
+
+// ── an exact value, where the working is exact ──────────────────────────────────────────────────────────────────────────
+const gcdB = (a, b) => { a = a < 0n ? -a : a; b = b < 0n ? -b : b; while (b) [a, b] = [b, a % b]; return a || 1n; };
+const fr = (n, d = 1n) => { if (d < 0n) { n = -n; d = -d; } const g = gcdB(n, d); return { n: n / g, d: d / g }; };
+function decimalFraction(str) { const m = /^(\d+)(?:\.(\d+))?$/.exec(String(str)); if (!m) return null; const f = m[2] || ''; return fr(BigInt(m[1] + f), 10n ** BigInt(f.length)); }
+/** The value of an arithmetic tree as an exact fraction ({ n, d } BigInt), or null when it holds anything but + - × ÷ and whole powers. */
+function exactTree(node) {
+  if (!node || typeof node !== 'object') return null;
+  switch (node.t) {
+    case 'num': return decimalFraction(String(node.s ?? node.v));
+    case 'group': return exactTree(node.v);
+    case 'neg': { const a = exactTree(node.v); return a ? fr(-a.n, a.d) : null; }
+    case 'bin': {
+      const a = exactTree(node.l); if (!a) return null;
+      if (node.op === '^') { let ex = node.r; while (ex && ex.t === 'group') ex = ex.v; const e = ex && ex.t === 'num' ? Number(ex.v) : NaN; if (!Number.isInteger(e) || Math.abs(e) > 12) return null; let r = fr(1n); for (let k = 0; k < Math.abs(e); k++) r = fr(r.n * a.n, r.d * a.d); return e < 0 ? (r.n === 0n ? null : fr(r.d, r.n)) : r; }
+      const b = exactTree(node.r); if (!b) return null;
+      if (node.op === '+') return fr(a.n * b.d + b.n * a.d, a.d * b.d);
+      if (node.op === '-') return fr(a.n * b.d - b.n * a.d, a.d * b.d);
+      if (node.op === '*') return fr(a.n * b.n, a.d * b.d);
+      if (node.op === '/') return b.n === 0n ? null : fr(a.n * b.d, a.d * b.n);
+      return null;
+    }
+    default: return null;
+  }
+}
+/** { text, exact } : the value of a closed side in the form a student writes it (8/15, 6√6), or a 4 decimal place value marked as rounded. */
+function valueText(side, value) {
+  const ast = astOf(side); const f = ast ? exactTree(ast) : null;
+  if (f) return { text: f.d === 1n ? String(f.n) : `${f.n}/${f.d}`, exact: true };
+  const plain = exactForm(value).plain;
+  if (!/\./.test(plain)) return { text: plain, exact: true };
+  return { text: String(Number(value.toPrecision(4))), fixed: String(Number(value.toFixed(4))), exact: false };
+}
+/** The step √N = k√m for a lone square root, or null. */
+function surdStep(aboveSide) {
+  const m = /^\s*(?:sqrt|√)\s*\(?\s*(\d+)\s*\)?\s*$/.exec(tidy(aboveSide).replace(/sqrt/, 'sqrt'));
+  if (!m) return null;
+  const N = Number(m[1]);
+  let k = 1; for (let c = 2; c * c <= N; c++) if (N % (c * c) === 0) k = c;
+  const r = N / (k * k);
+  return k > 1 && r > 1 ? `${N} = ${k * k} × ${r}, so √${N} = ${k}√${r}` : null;
+}
+
+/** The terms and tokens of the written line the diagnosis quotes: each must be a substring of what the student wrote (spaces aside). */
+const quoteOf = (writtenSide, bits) => bits.filter(Boolean).map(b => String(b));
 
 /**
  * Everything computed about a false continuation of two sides that are not both polynomials: { type?, whatChanged?, whyWrong?, corrected?,
- * check?, checkAt?, exact: false }. null when a side is not readable. Each field only when it was computed.
+ * check?, checkAt?, quoted?, exact: false }. null when a side is not readable. Each field only when it was computed.
  */
 export function explainWide(aboveSide, writtenSide, strict = null) {
   const ra = wideReadable(aboveSide), rb = wideReadable(writtenSide);
   if (!ra || !rb) return null;
   const out = { exact: false };
+  const writtenAsWritten = squash(writtenSide), aboveAsWritten = squash(aboveSide);
   if (!ra.letter && !rb.letter) {
     const d = closedNumbersDiffer(aboveSide, writtenSide);
     if (!d) return null;
-    const computed = /[-+*/^(]/.test(String(aboveSide).replace(/^\s*-/, ''));   // a bare number above is a value, not a calculation to work out again
-    out.whatChanged = `The line above comes to ${fmt(d.above)}, but this line says ${fmt(d.written)}.`;
-    if (computed) {
-      out.type = 'arithmetic-slip';
-      out.whyWrong = sentence(fillw(WHY['arithmetic-slip'], { above: String(aboveSide).replace(/\s+/g, ' ').trim(), value: fmt(d.above), written: fmt(d.written) }));
-      out.check = `Check: ${String(aboveSide).replace(/\s+/g, ' ').trim()} = ${fmt(d.above)}.`;
-    }
-    out.corrected = `= ${fmt(d.above)}`;
+    const computed = /[-+*/^(]|sqrt|√/.test(aboveAsWritten.replace(/^\s*-/, ''));   // a bare number above is a value, not a calculation to work out again
+    const A = valueText(aboveSide, d.above), B = valueText(writtenSide, d.written);
+    const isBare = /^-?\d+(?:\.\d+)?$/.test(writtenAsWritten);
+    out.whatChanged = `The line above works out to ${A.exact ? '' : 'about '}${A.text}. This line says ${writtenAsWritten}${isBare ? '' : `, which is ${B.exact ? '' : 'about '}${B.text}`}.`;
+    out.quoted = quoteOf(writtenSide, [writtenAsWritten]);
+    const step = surdStep(aboveSide);
+    if (step) { out.type = 'arithmetic-slip'; out.whyWrong = sentence(`${step}.`); }
+    else if (computed && A.text.replace(/\s+/g, '') !== aboveAsWritten.replace(/\s+/g, '')) { out.type = 'arithmetic-slip'; out.whyWrong = sentence(fillw(WHY['arithmetic-slip'], { above: aboveAsWritten, value: `${A.exact ? '' : 'about '}${A.text}`, written: `${B.exact ? '' : 'about '}${B.text}` })); }
+    if (computed || step) out.check = A.exact ? `Check: ${aboveAsWritten} = ${A.text}.` : `Check: ${aboveAsWritten} is about ${A.fixed}, to 4 decimal places.`;
+    out.corrected = A.exact ? `= ${A.text}` : `≈ ${A.fixed} (4 decimal places)`;
+    out.correctedValue = d.above;
     return out;
   }
   const v = ra.letter || rb.letter;
@@ -263,20 +315,30 @@ export function explainWide(aboveSide, writtenSide, strict = null) {
   out.checkAt = { v, x: e.at[0].value, above: String(e.above), written: String(e.written) };
   const fixes = repairOf(aboveSide, writtenSide, v);
   const fix = fixes.length === 1 ? fixes[0] : null;
-  if (!fix && fixes.length > 1 && fixes.every(f => f.term === fixes[0].term)) {
+  const swaps = fixes.length > 1 && fixes.every(f => f.type === 'function-wrong' && f.from === fixes[0].from && f.to === fixes[0].to && f.term === fixes[0].term) ? fixes[0] : null;
+  if (swaps) {
+    // one factor is the wrong function: either of the repeated factors may be the one meant, so the engine says that, and no more
+    out.type = 'function-wrong';
+    out.corrected = `= ${swaps.text.trim()}`;
+    out.whatChanged = `One of the ${swaps.from} factors in the term ${swaps.term} should be ${swaps.to}.`;
+    out.whyWrong = `Changing one ${swaps.from} to ${swaps.to} makes this line equal to the line above, so that factor is the slip.`;
+    out.quoted = quoteOf(writtenSide, [swaps.term]);
+  } else if (!fix && fixes.length > 1 && fixes.every(f => f.term === fixes[0].term)) {
     out.type = 'term-not-equal';
     out.corrected = `= ${fixes[0].text.trim()}`;
     out.whatChanged = `The term ${fixes[0].term} is not equal to what the line above gives.`;
     out.whyWrong = sentence(fillw(WHY['term-not-equal'], { term: fixes[0].term }));
+    out.quoted = quoteOf(writtenSide, [fixes[0].term]);
   }
   if (fix) {
     out.type = fix.type;
     out.corrected = `= ${fix.text.trim()}`;
     const term = fix.term;
-    out.whatChanged = fix.type === 'sign-error' ? `The sign in the term ${term} is ${fix.from === '-' ? 'minus' : 'plus'} here, but the line above needs ${fix.to === '-' ? 'minus' : 'plus'}.`
+    out.whatChanged = fix.type === 'sign-error' ? `The sign in front of ${term} is ${fix.from === '-' ? 'minus' : 'plus'} here, but the line above has ${fix.to === '-' ? 'minus' : 'plus'}.`
       : fix.type === 'function-wrong' ? `The term ${term} uses ${fix.from}, but the line above needs ${fix.to}.`
         : `The ${fix.type === 'coefficient-wrong' ? 'coefficient' : fix.type === 'exponent-wrong' ? 'power' : 'number'} ${fix.from} in the term ${term} should be ${fix.to}.`;
-    out.whyWrong = sentence(fillw(WHY[fix.type], { from: fix.from, to: fix.to }));
+    out.whyWrong = sentence(fillw(WHY[fix.type], { from: fix.from, to: fix.to, term }));
+    out.quoted = quoteOf(writtenSide, [term]);
   }
   return out;
 }
@@ -287,4 +349,17 @@ export function closedValue(text) {
   if (!r || r.letter) return null;
   const ast = astOf(text);
   return ast ? valueOfAst(ast, null, 0) : null;
+}
+
+/** Two sides (text) are the same function at every sample point (or the same closed number): the engine's own test of a corrected line. */
+export function sameEverywhere(aText, bText) {
+  const ra = wideReadable(aText), rb = wideReadable(bText);
+  if (!ra || !rb || ra.letter !== rb.letter) return false;
+  const A = astOf(aText);
+  return !!A && equalEverywhere(A, bText, ra.letter);
+}
+/** The value of a side at x (a plain number), or null: used to re-check the numbers a diagnosis quotes. */
+export function valueAtText(text, v, x) {
+  const A = astOf(text);
+  return A ? valueOfAst(A, v, x) : null;
 }
