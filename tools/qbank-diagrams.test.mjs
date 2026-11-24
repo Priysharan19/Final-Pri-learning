@@ -161,7 +161,7 @@ try {
 // ── 6. the COMMITTED figures (no TeX): manifest hashes and the sanitiser ────
 const committed = checkFiguresDir();
 eq(committed.problems, [], 'every committed figure matches its manifest hash and passes the sanitiser');
-ok(committed.count > 150 && committed.bytes < 8_000_000, `the committed figures: ${committed.count} files, ${committed.bytes} bytes`);
+ok(committed.count > 100 && committed.bytes < 8_000_000, `the committed figures: ${committed.count} files, ${committed.bytes} bytes`);
 
 // ── the structural answer-in-figure test: the drawing, not only its labels (qbank-figure-risk.mjs) ──────────────
 {

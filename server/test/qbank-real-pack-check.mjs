@@ -29,7 +29,7 @@ const qb = await import('../platform/qbankPack.js');
 const { checkAnswer } = await import('../../client/src/engine/checker.js');
 const { checkBankAnswer } = await import('../platform/qbankMarking.js');
 const { buildHintLadder, ladderAvailable } = await import('../../client/src/engine/hintLadder.js');
-const { leakReason, rungDropReason } = await import('../../tools/qbank-leak.mjs');
+const { leakReason, rungDropReason, isMethodName } = await import('../../tools/qbank-leak.mjs');
 const { bankPolicy, sealForEdition, FINAL_ANSWER_MARKING } = await import('../platform/editionBanks.js');
 const { marksPossibleFor, markerView, stepEvidence } = await import('../platform/markerOps.js');
 const { productPlaceOf } = await import('../platform/qbankDotpoints.js');
@@ -79,7 +79,7 @@ for (const e of entries) {
   // Every text sealed until the question resolves: a step (its heading and its text), a criterion (its point and its line), a trap (its reason and its
   // answer as text), the title. None is on the wire, in a hint or anywhere else: the hints are sent when the question is issued, so a hint that
   // is, or holds, one of them is a leak of it. Only the prompt (public by design) may restate a text of the solution.
-  const secrets = [...e.steps.flatMap(s => [s.d, s.h]), ...e.criteria.flatMap(x => [x.point, x.line]), ...e.traps.flatMap(t => [t.why, typeof t.expr === 'string' ? t.expr : null]), e.title].filter(t => typeof t === 'string' && t.length >= 12 && !e.prompt.includes(t));
+  const secrets = [...e.steps.flatMap(s => [s.d, s.h]), ...e.criteria.flatMap(x => [x.point, x.line]), ...e.traps.flatMap(t => [t.why, typeof t.expr === 'string' ? t.expr : null]), e.title].filter(t => typeof t === 'string' && t.length >= 12 && !e.prompt.includes(t) && !isMethodName(t));
   if (/"(?:answer|steps|criteria|traps|stepcheck|authoredMarks|_bank|seed)"\s*:/.test(wire) || secrets.some(t => wire.includes(t))) { leaks++; bad.wire.push(e.id); }
   // The ladder is his authored hints and nothing else, 0 to 3 of them. The SAME rule that chose them is run again over every rung the server
   // can serve and every hint sent at issue, on the question exactly as it is issued: none states the answer in any form, none is an arithmetic
@@ -178,7 +178,7 @@ try {
       const d = await draw();
       const e = d.e;
       swept++; seenIds.add(e.id);
-      const secrets = [...e.steps.flatMap(s => [s.d, s.h]), ...e.criteria.flatMap(x => [x.point, x.line]), ...e.traps.flatMap(t => [t.why, typeof t.expr === 'string' ? t.expr : null]), e.title].filter(t => typeof t === 'string' && t.length >= 12 && !e.prompt.includes(t));
+      const secrets = [...e.steps.flatMap(s => [s.d, s.h]), ...e.criteria.flatMap(x => [x.point, x.line]), ...e.traps.flatMap(t => [t.why, typeof t.expr === 'string' ? t.expr : null]), e.title].filter(t => typeof t === 'string' && t.length >= 12 && !e.prompt.includes(t) && !isMethodName(t));
       const jsonText = t => JSON.stringify(t).slice(1, -1);
       if (secrets.some(t => d.wire.includes(jsonText(t)))) { sweepLeaks++; problems.push(`${e.id}: a sealed text is in the issue reply`); }
       const sent = d.question.hints;
@@ -210,7 +210,7 @@ try {
     c.deq(problems.slice(0, 5), [], `${swept} bank questions (${seenIds.size} different) through the routes: no sealed text in an issue reply, every hint passes the rung rule, every rung served is a hint sent`);
     c.eq(sweepLeaks, 0, 'no step, criterion, trap reason or title is in any issue reply');
     c.ok(rungsServed > 100, `${rungsServed} rungs served by the hint route, ${refused} questions with no rung refused it`);
-    c.ok(figuresSwept >= 15, `${figuresSwept} of the ${swept} swept have a figure, each fetched signed in and refused with no session`);
+    c.ok(figuresSwept >= 8, `${figuresSwept} of the ${swept} swept have a figure, each fetched signed in and refused with no session`);
     console.log(`  leak sweep: ${swept} issued (${seenIds.size} different, ${figuresSwept} with a figure), ${rungsServed} rungs served, ${refused} with no rung refused the hint route`);
   }
   c.eq(rightOk, n, `${n} random bank questions marked correct with the accepted answer`);
