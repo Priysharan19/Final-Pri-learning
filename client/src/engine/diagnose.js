@@ -28,7 +28,7 @@
 // needs no model and no network. A diagnosis is only ever returned when a
 // hypothesis actually reproduces the student's line; nothing is guessed.
 // ─────────────────────────────────────────────────────────────────────────────
-import { parse, evaluate, exprEquivalent, variablesOf, normalize, numsClose } from './expr.js';
+import { parse, evaluate, exprEquivalent, variablesOf, normalize, numsClose, equationHoldsNear } from './expr.js';
 import { CALCULUS_DIAGNOSIS_CODES } from './calculusSteps.js';
 
 const PREC = { '+': 1, '-': 1, '*': 2, '/': 2, '^': 4 };
@@ -808,6 +808,12 @@ function scanRoots(ast, name, LO, HI, STEP) {
   return [...new Set(out.map(v => Number(v.toPrecision(8))))];
 }
 
+/** The question states its root rounded (meta.tol): the line holds at the exact root within that rounding. */
+function roundedRootHolds(B, variable, sol, meta) {
+  const tol = Number(meta?.tol);
+  return equationHoldsNear(B, variable, sol, tol > 0 ? Math.min(tol, 0.05 * Math.max(1, Math.abs(sol))) : 0);
+}
+
 function rootAnalysis(B, meta) {
   if (!meta || meta.kind !== 'equation' || !Array.isArray(meta.solutions) || meta.solutions.length < 2) return null;
   if (B.t !== 'equation') return null;
@@ -817,7 +823,7 @@ function rootAnalysis(B, meta) {
     const env = { [meta.variable]: sol };
     const L = evaluate(B.l, env);
     const R = evaluate(B.r, env);
-    const holds = Number.isFinite(L) && Number.isFinite(R) && Math.abs(L - R) <= Math.max(1e-6, Math.abs(R) * 1e-6);
+    const holds = Number.isFinite(L) && Number.isFinite(R) && Math.abs(L - R) <= Math.max(1e-6, Math.abs(R) * 1e-6) || roundedRootHolds(B, meta.variable, sol, meta);
     (holds ? kept : lost).push(sol);
   }
   if (!kept.length || !lost.length) return null;
@@ -839,7 +845,7 @@ function counterexample(A, B, meta) {
         const L = evaluate(B.l, env);
         const R = evaluate(B.r, env);
         if (!Number.isFinite(L) || !Number.isFinite(R)) continue;
-        if (Math.abs(L - R) > Math.max(1e-6, Math.abs(R) * 1e-6)) {
+        if (Math.abs(L - R) > Math.max(1e-6, Math.abs(R) * 1e-6) && !roundedRootHolds(B, variable, sol, meta)) {
           return build('counterexample', {
             text: `Put a solution of the original equation in for ${variable} (try it yourself) and this line reads ${fmtNum(L)} = ${fmtNum(R)}, which is false: a correct step keeps every solution.`
           }, 'medium');

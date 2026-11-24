@@ -242,8 +242,13 @@ export const flow = {
         const said = flat(await page.locator('[data-working-evidence]').textContent().catch(() => ''));
         note(`checked method: server stepReport ${JSON.stringify(grade?.json?.stepReport?.lines?.map(l => l.status) || null)} → evidence ${JSON.stringify(want.evidence)} → "${said}"`);
         await check('checked method: the server marks it correct', grade?.json?.correct === true && grade.json.resolved === true, JSON.stringify(grade?.json?.correct));
-        await check('checked method: the server\'s step report says both submitted lines hold; the card claims nothing the report does not say — never "verified", never a logical chain',
-          !INFERRED.test(await cardText()) && grade.json.stepReport.lines.length === 2 && grade.json.stepReport.lines.every(l => l.status === 'ok') &&
+        // The first line is a bare value: a number in the working states no claim, so the server
+        // sets it aside as a note (not ticked, not crossed) and ticks only the final line, which
+        // is the answer as written. The card must say exactly that count, no more.
+        const st = grade?.json?.stepReport?.lines || [];
+        await check('checked method: the server\'s step report says the bare value line is a note and the answer line holds; the card claims nothing the report does not say — never "verified", never a logical chain',
+          !INFERRED.test(await cardText()) && st.length === 2 && st[0].status === 'note' && /not a claim about the answer/.test(String(st[0].note || '')) && st[1].status === 'ok' &&
+            want.evidence?.kind === 'some' && want.evidence.ok === 1 && want.evidence.total === 2 &&
             (said === '' || said === want.text),
           `card ${JSON.stringify(said)}; expected ${JSON.stringify(want.text)}; report ${JSON.stringify(grade?.json?.stepReport)}`);
         await check('checked method: the lines shown as checked on the marked page are the server\'s "ok" lines, no others',
