@@ -7,6 +7,7 @@
 // Then a sample goes through the real /v1 routes. Not evidence about real students; a check that the engine and the pack agree.
 // ─────────────────────────────────────────────────────────────────────────────
 import './support/hermetic.mjs';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -170,7 +171,7 @@ try {
   // refused the hint route (the control is not offered for it).
   {
     const sweepN = Number(process.env.PRI_QBANK_SWEEP || 300);
-    let sweepLeaks = 0, rungsServed = 0, refused = 0, swept = 0;
+    let sweepLeaks = 0, rungsServed = 0, refused = 0, swept = 0, figuresSwept = 0;
     const problems = [];
     const seenIds = new Set();
     for (let i = 0; i < sweepN; i++) {
@@ -188,6 +189,18 @@ try {
         const hint = await call(`/v1/practice/${d.question.id}/hint`, { rung: ['nudge', 'method', 'worked'][k] });
         if (hint.status !== 200 || hint.data.hint !== sent[k]) problems.push(`${e.id}: rung ${k + 1} served ${JSON.stringify(hint.data?.hint)}, not hint ${k + 1}`); else rungsServed++;
       }
+      // A question with a figure: the figure goes to the signed-in account it was issued to and to nobody else, it is the file the pack names, it holds
+      // no text a reader could take an answer from (glyphs are paths), and the issue reply carries its text alternative and size only.
+      if (e.diagram) {
+        figuresSwept++;
+        if (JSON.stringify(Object.keys(d.question.diagram || {}).sort()) !== JSON.stringify(['alt', 'h', 'w'])) problems.push(`${e.id}: the issued figure fields are not alt, w, h`);
+        const own = await h.request(`/v1/practice/${d.question.id}/figure`, { method: 'GET', jar: a.jar });
+        const anon = await h.request(`/v1/practice/${d.question.id}/figure`, { method: 'GET', jar: {} });
+        if (own.status !== 200 || !String(own.headers.get('content-type')).startsWith('image/svg+xml') || crypto.createHash('sha256').update(own.text).digest('hex') !== e.diagram.sha256) problems.push(`${e.id}: the signed-in account was not sent the pack's figure`);
+        else if (/<text\b|<tspan\b|<script\b/i.test(own.text) || secrets.some(t => own.text.includes(jsonText(t)))) { sweepLeaks++; problems.push(`${e.id}: the figure holds readable text or a sealed text`); }
+        if (anon.status === 200 || anon.text.includes('<svg')) { sweepLeaks++; problems.push(`${e.id}: the figure was sent with no session`); }
+        if (leakReason(d.sealed, e.diagram.alt)) { sweepLeaks++; problems.push(`${e.id}: the text alternative gives the answer`); }
+      }
       if ((d.question.hintsOffered === false) !== (sent.length === 0)) problems.push(`${e.id}: the device is ${d.question.hintsOffered === false ? 'told no hint is offered' : 'not told'} with ${sent.length} rungs`);
       if (!sent.length) {
         const hint = await call(`/v1/practice/${d.question.id}/hint`, { rung: 'nudge' });
@@ -197,7 +210,8 @@ try {
     c.deq(problems.slice(0, 5), [], `${swept} bank questions (${seenIds.size} different) through the routes: no sealed text in an issue reply, every hint passes the rung rule, every rung served is a hint sent`);
     c.eq(sweepLeaks, 0, 'no step, criterion, trap reason or title is in any issue reply');
     c.ok(rungsServed > 100, `${rungsServed} rungs served by the hint route, ${refused} questions with no rung refused it`);
-    console.log(`  leak sweep: ${swept} issued (${seenIds.size} different), ${rungsServed} rungs served, ${refused} with no rung refused the hint route`);
+    c.ok(figuresSwept >= 30, `${figuresSwept} of the ${swept} swept have a figure, each fetched signed in and refused with no session`);
+    console.log(`  leak sweep: ${swept} issued (${seenIds.size} different, ${figuresSwept} with a figure), ${rungsServed} rungs served, ${refused} with no rung refused the hint route`);
   }
   c.eq(rightOk, n, `${n} random bank questions marked correct with the accepted answer`);
   c.eq(marksEq, n, 'each for the authored marks');

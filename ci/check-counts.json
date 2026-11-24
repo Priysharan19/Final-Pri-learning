@@ -225,6 +225,7 @@
         {"has":"LANDING HOME: PASS — 97/97 checks","note":"The verified page: the landing demo's statuses come from the real Step Check and mistakeView, the social-proof slots stay hidden, Home shows only evidence that exists."},
         {"has":"LINE SYSTEM REGRESSION: PASS — 8000 prompts over 4000 seeds","note":"Examiner pre-review regression: no simultaneous pair is a single line; no line prints without its x term."},
         {"has":"QBANK IMPORT: PASS 129/129 checks","note":"89 -> 129, as printed after the second review round: the rung rule (the seven reviewer cases, plain-prose arithmetic, sealed texts, 0 to 3 rungs, nothing derived from a step) on a fixture written in the test."},
+        {"re":"QBANK DIAGRAMS: PASS (74/74|92/92) checks","note":"New pin: the TikZ-to-SVG renderer on three tiny figures (74 on CI, which has no TeX and skips the compile group by name; 92 where latex and dvisvgm are installed), the untrusted-input filter, the sanitiser, the alt text and answer-leak rules, and the committed figures against their manifest hashes."},
         {"has":"QBANK ISOLATION: PASS — 6/6 checks (1804 questions protected)","note":"1794 -> 1804 questions, as printed: the pack now keeps the questions whose leaking hint is dropped instead of rejecting them. Static isolation of the committed bank from the client (the built-client half runs after the build, with --require-dist, over every file of client/dist whatever its extension)."},
         {"has":"QBANK ISOLATION TEST: PASS 23/23 checks","note":"15 -> 23, as printed: the pack in a non-text extension, gzipped, brotli-compressed, answers alone, and a script of short numeric answers (in order and shuffled) all fail the scan; a table of whole numbers does not."}
       ]
@@ -772,6 +773,7 @@
         {"has":"E2E SUITE PASSED — 129/129 checks across 1 flows"},
         {"has":"NSW PRACTICE MARKED TOUR: PASS — 12/12 checks","note":"9 → 12 (train banks-1, as printed by running the tour on the merged tree): the quality sweep (77b9474e3) added three render checks of the Exams page (the paper generator entry, the exam-style practice sets with a Sit button each, and no generic Start practice paper card). A Prithagoras NSW Year 10 student is issued a question by the server and the server marks it (the device names the profile own course)."},
         {"has":"NSW PRACTICE BANK TOUR: PASS — 31/31 checks","note":"28 -> 31, as printed by running client/test/tour-nsw-practice-bank.js: his hints are the rungs (2 or 3 here), and a question with no rung offers no hint control and no empty panel (the 3 checks run when one is dealt within the bounded search, as it is in about one question in ten)."},
+        {"has":"NSW PRACTICE BANK FIGURE TOUR: PASS, 16/16 checks","note":"New pin, as printed by running client/test/tour-nsw-practice-bank-figure.js: a bank question with a diagram is dealt in ordinary practice, its figure is fetched through the authenticated route as an svg, drawn as an inert image, named by the server's text alternative, refused with no session, fits its column at 1180 and 360 px, and stays legible in the dark theme."},
         {"has":"GUEST TRIAL TOUR: PASS - 180 checks (priyabhata, prithagoras)","note":"ADR-0003: both editions, a visitor with no account, five server-marked questions, the sign-up prompt, Hindi where offered, and the same picker as the signed-in Home quick start. 129 -> 180: a wrong answer shows the first worked step and keeps the answer closed, one retry (recorded as after a worked step), the next steps one at a time, \"Try one like it\" and the three-state tally (re-derived by running the tour)."}
       ]
     },
@@ -875,6 +877,13 @@
       "log": "qbank-sealed.log",
       "pins": [
         {"has":"QBANK SEALED: PASS — 11/11 checks over 1804 questions","note":"1794 -> 1804 questions, as printed."}
+      ]
+    },
+    "platform/qbank-figures.log": {
+      "job": "platform-contracts",
+      "log": "qbank-figures.log",
+      "pins": [
+        {"has":"QBANK FIGURES: PASS — 41/41 checks over 519 parts with a figure","note":"New pin, as printed: the committed figures against the pack and the sanitiser, no text alternative that states an answer, the figure route (signed out refused; never issued, malformed and no-diagram all one 404; another account's question 404; bytes, headers, ETag, the JSON twin) and a figure file that is not the one the pack names is never sent."}
       ]
     }
   },
