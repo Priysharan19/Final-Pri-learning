@@ -299,7 +299,7 @@
       "job": "platform-contracts",
       "log": "final-attempt-sweep.log",
       "pins": [
-        {"has":"FINAL-ATTEMPT ORACLE SWEEP: PASS — 210222/210222 checks — 99 plan questions in 7 banks, 99 constant answers, 131334 round-4 probes, 44526 round-5 probes, 12320 sweep831 probes"}
+        {"has":"FINAL-ATTEMPT ORACLE SWEEP: PASS — 253032/253032 checks — 131 plan questions in 11 banks, 123 constant answers, 160908 round-4 probes, 47346 round-5 probes, 14960 sweep831 probes, right and wrong values byte-identical for every probe shape.","note":"MERGED TREE (task/solution-step-marks), as printed by running server/test/final-attempt-oracle-sweep-check.mjs: 210222 -> 253032 checks, 99 -> 131 plan questions in 7 -> 11 banks, 99 -> 123 constant answers, 131334 -> 160908 round-4, 44526 -> 47346 round-5 and 12320 -> 14960 sweep831 probes. Cause: the derived step plans (engine/schemePlans.js: gradient at a point, definite integral and area, tangent and normal) are plans too, so the sweep counts their questions and probes them; the right-and-wrong values are still byte-identical for every probe shape and no check was dropped."}
       ]
     },
     "platform/edition-ai-budgets.log": {
