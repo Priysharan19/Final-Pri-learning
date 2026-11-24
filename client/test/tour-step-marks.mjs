@@ -123,6 +123,12 @@ try {
     await page.getByRole('button', { name: /Submit answer/ }).click();
     await page.waitForSelector('.verdict-good, .verdict-bad, .eval-card', { timeout: 30000 });
     await online.settled();
+    // A wrong answer on the first try is not resolved (two tries): submit the same working again, which resolves it and is the reply that is paid.
+    if ((await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/)).at(-1)?.json?.resolved !== true) {
+      await page.getByRole('button', { name: /Submit answer|Check again|Try again/ }).first().click();
+      await page.waitForFunction(() => document.querySelector('[data-mp-criteria]') || document.querySelector('.eval-card .eval-marks'), null, { timeout: 30000 }).catch(() => {});
+      await online.settled();
+    }
     const grades = await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/);
     const last = grades.at(-1)?.json;
     if (process.env.DBG) console.log('  SENT', JSON.stringify(grades.at(-1)?.body ?? grades.at(-1)?.postData ?? Object.keys(grades.at(-1) || {})).slice(0, 500), '\n  REPLY', JSON.stringify({ lines: last?.stepReport?.lines?.map(l => [l.text, l.status]), ms: last?.methodScheme, partial: last?.partial }).slice(0, 900), '\n  WORKING', JSON.stringify(wrongLast));
