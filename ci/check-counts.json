@@ -221,7 +221,9 @@
         {"has":"STEP JUSTIFY: PASS — 777/777 checks","note":"773 → 777 (21 November: worked-solution line match): the two new aw.* strings (aw.body.restates, aw.summary.mixedAll) are walked by the two per-string checks, twice each. 755 → 773 (20 November: true-as-written fold, honest Evaluation copy, true-as-written headline): the nine new aw.* and mp.* strings are walked by the two per-string checks, twice each. 753 → 755 (#1072, printed by CI run 44481164559): the new card string aw.body.arithmetic is walked by the two per-string checks (has a Hindi string, has no praise word). Annotated working: named rules for valid steps (27 rules, negative and must-not-name cases), identity proofs straight, \"= RHS\" and meet-in-the-middle, receipt marks unchanged by the panel, no praise words."},
         {"has":"HSC PRIORITIES · 1437/1437 checks passed","note":"Prithagoras HSC 2027 priorities: NESA mapping-grid metadata (no text), the old → new map held to the NSW model, the pinned ranking, the backtest evidence doc, edition isolation, en-AU copy and a render."},
         {"has":"LANDING HOME: PASS — 97/97 checks","note":"The verified page: the landing demo's statuses come from the real Step Check and mistakeView, the social-proof slots stay hidden, Home shows only evidence that exists."},
-        {"has":"LINE SYSTEM REGRESSION: PASS — 8000 prompts over 4000 seeds","note":"Examiner pre-review regression: no simultaneous pair is a single line; no line prints without its x term."}
+        {"has":"LINE SYSTEM REGRESSION: PASS — 8000 prompts over 4000 seeds","note":"Examiner pre-review regression: no simultaneous pair is a single line; no line prints without its x term."},
+        {"has":"QBANK IMPORT: PASS 67/67 checks","note":"The validation-only importer and the pack compiler, on a fixture written in the test."},
+        {"has":"QBANK ISOLATION: PASS — 6/6 checks (1761 questions protected)","note":"Static isolation of the committed bank from the client (the built-client half runs after the build, with --require-dist)."}
       ]
     },
     "platform/blind.log": {
@@ -834,6 +836,20 @@
       "log": "reading-floor-http.log",
       "pins": [
         {"has":"READING FLOOR HTTP (sqlite): PASS: 71 checks"}
+      ]
+    },
+    "platform/qbank-pack.log": {
+      "job": "platform-contracts",
+      "log": "qbank-pack.log",
+      "pins": [
+        {"has":"QBANK PACK: PASS — 260/260 checks","note":"The author question bank: importer pack, loader refusal, no-pack identity, sealed issuance, marking, authored marks, trap reasons."}
+      ]
+    },
+    "platform/qbank-real-pack.log": {
+      "job": "platform-contracts",
+      "log": "qbank-real-pack.log",
+      "pins": [
+        {"has":"QBANK REAL PACK: PASS — 144/144 checks over 1761 questions","note":"Every committed bank question against the engine, and a sample over the real routes."}
       ]
     }
   },

@@ -80,6 +80,8 @@ export function isSchemeStep(step) {
 }
 
 export function marksPossibleFor(q) {
+  // An author-bank question is worth the marks its author set (server/platform/qbankPack.js seals it; no generator sets this field).
+  if (Number.isInteger(q.authoredMarks) && q.authoredMarks >= 1 && q.authoredMarks <= 6) return q.authoredMarks;
   // A past-paper question carrying the Board's transcribed scheme is worth the
   // marks the Board printed (boardScheme.js), not a number guessed from steps.
   if (Array.isArray(q.boardScheme) && Number.isInteger(q.marks)) return q.marks;

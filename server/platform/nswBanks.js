@@ -38,6 +38,7 @@ import {
   LEGACY_CROSSWALK, NEW_OUTCOME_GAPS, NSW_CURRENT_SYLLABUSES, NSW_OUTCOME_BY_CODE, NSW_SYLLABUS_BY_ID, outcomesOf
 } from '../../client/src/engine/curriculum-nsw/index.js';
 import { dotpointById, dotpointsFor, formDotpointOrdinals, DIFFICULTIES } from '../../client/src/engine/curriculum.js';
+import { qbankCurriculum } from './qbankPack.js';
 
 /** The course id a Prithagoras client names in a practice request. */
 export const NSW_COURSE = 'nsw';
@@ -232,7 +233,7 @@ function practiceTargets() {
   return byCode;
 }
 
-function buildCurriculum() {
+function buildCurriculum(bank = null) {
   const targets = practiceTargets();
   const gapNote = new Map(NEW_OUTCOME_GAPS.map(gap => [gap.outcome, true]));
   let total = 0, generated = 0;
@@ -275,6 +276,8 @@ function buildCurriculum() {
     marking: 'final-answer-only',
     outcomes: { total, generated, missing: total - generated },
     banks: { issued: NSW_BANK_COUNT, cells: NSW_CELL_COUNT },
+    // The author's question bank, when a pack is loaded (qbankPack.js): one extra key; every entry above and below is the generators' own.
+    ...(bank ? { authorBank: bank } : {}),
     // What may be OFFERED, by Pri subtopic (the unit the app's selectors show):
     // `requestable` is exactly the difficulties this server issues for the
     // subtopic and for each of its dot points. A subtopic or level absent
@@ -295,8 +298,14 @@ function buildCurriculum() {
 }
 
 let curriculumCache = null;
-/** The Prithagoras curriculum response. Static for a build; built once. */
+let bankCurriculumCache = null;
+/** The Prithagoras curriculum response. Static for a build; built once (again for each author-bank pack version, when one is loaded). */
 export function nswCurriculumResponse() {
+  const bank = qbankCurriculum();
+  if (bank) {
+    if (bankCurriculumCache?.version !== bank.version) bankCurriculumCache = { version: bank.version, response: buildCurriculum(bank) };
+    return bankCurriculumCache.response;
+  }
   if (!curriculumCache) curriculumCache = buildCurriculum();
   return curriculumCache;
 }

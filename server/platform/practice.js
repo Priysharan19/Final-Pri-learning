@@ -30,7 +30,8 @@ import { buildNotebook, firstErrorOf, isMistake } from '../../client/src/engine/
 import { PUBLIC_QUESTION_FIELDS } from '../../client/src/engine/publicQuestion.js';
 import { CONTENT_VERSION, UNVERSIONED_TOKEN_CONTENT_VERSION } from '../../client/src/engine/contentIdentity.js';
 import { consentState, consentBlockerCode } from './guardianConsent.js';
-import { loadAllBanks, loadBanksFor, generateQuestion } from '../../client/src/engine/generators/index.js';
+import { loadAllBanks, loadBanksFor, generateQuestion as generateGeneratorQuestion } from '../../client/src/engine/generators/index.js';
+import { ensureQbank, isQbankFamily, qbankGenerate, qbankVersion } from './qbankPack.js';
 // The marker itself (checkAnswer, stepCheck, methodMarks) is never called on
 // this thread: markerOps.js holds the operations and markerPool.js runs them in
 // worker threads under a hard deadline. Only the two pure rubric helpers
@@ -156,6 +157,12 @@ const unknown = (value, allowed) => Object.keys(value).filter(key => !allowed.ha
 const limitedText = (s, n) => typeof s === 'string' && s.length <= n && !/[\u0000-\u0008\u000b\u000e-\u001f]/.test(s);
 let banksReady;
 const ensureBanks = () => { if (!banksReady) banksReady = loadAllBanks().catch(e => { banksReady = null; throw e; }); return banksReady; };
+// The author bank's families (qbankPack.js) are drawn like generators; a family exists only while a pack is loaded, so with none
+// loaded this is generateQuestion unchanged. The pack is loaded (once) wherever the banks are.
+const generateQuestion = (generator, difficulty, seed, dotpoint, pick) => (isQbankFamily(generator)
+  ? qbankGenerate(generator, difficulty, seed, dotpoint ?? null)
+  : generateGeneratorQuestion(generator, difficulty, seed, dotpoint, pick));
+const ensureQbankFromEnv = () => ensureQbank();
 
 // ── What an open question may be told about its working ─────────────────────
 // A practice question allows two tries. Until it resolves, the reply to a
@@ -600,6 +607,7 @@ function clientVisibleGrade(response) {
 export function createPracticePrepareRoute(db, { banks = bankPolicy(), env = process.env } = {}) {
   db = asStore(db);
   return [rateLimit(db, 'practice-prepare', { limit: 90, windowMs: 60 * 60 * 1000 }), asyncHandler(async (req, res) => {
+    await ensureQbankFromEnv();
     const request = readQuestionRequest(req.body, PREPARE_FIELDS, banks);
     if (request.error) return reject(res, ...request.error);
     if (!subtopicOfferedIn(editionOffering(env), request.generator)) return refuseNotOffered(res);
@@ -612,7 +620,7 @@ export function createPracticePrepareRoute(db, { banks = bankPolicy(), env = pro
     try {
       prepared = encryptDeliveryToken(JSON.stringify({
         g: request.generator, d: request.difficulty, s: chosen.q.seed, m: request.mode,
-        ...(request.dotpoint ? { p: request.dotpoint } : {}), x: now + PREPARED_TTL, n: randomUUID(), c: CONTENT_VERSION
+        ...(request.dotpoint ? { p: request.dotpoint } : {}), ...(isQbankFamily(request.generator) ? { k: qbankVersion() } : {}), x: now + PREPARED_TTL, n: randomUUID(), c: CONTENT_VERSION
       }), PREPARED_CONTEXT);
     } catch { return reject(res, 503, 'PRACTICE_PREPARE_UNAVAILABLE', 'Questions cannot be prepared right now.'); }
     const question = safeQuestion(null, chosen.q);
@@ -712,6 +720,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       return reject(res, 400, 'PRACTICE_ISSUE_INVALID', 'A prepared question names the account it is for.');
     }
     await ensureBanks();
+    await ensureQbankFromEnv();
     let q, practiceMode, repeat = false, trapDelivered = false, preparedNonce = null, preparedExpiry = 0, seedGiven = false;
     if (plain(body) && body.prepared !== undefined) {
       // Binding a question the student started signed out. Nothing else in the
@@ -731,6 +740,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       const premiumGap = await premiumContentRefusal(db, { accountId, generator: sealed.g, now });
       if (premiumGap) return refusePremiumContent(res, premiumGap);
       if (!subtopicOfferedIn(editionOffering(env), sealed.g)) return refuseNotOffered(res);
+      // A bank question prepared under another pack would draw a different question from the one the student saw: expired, as above.
+      if (isQbankFamily(sealed.g) && sealed.k !== qbankVersion()) return reject(res, 410, 'PRACTICE_PREPARED_EXPIRED', 'This prepared question has expired.');
       try { q = generateQuestion(sealed.g, sealed.d, sealed.s, sealed.p); }
       catch { return reject(res, 422, 'PRACTICE_CONTENT_UNSUPPORTED', 'The requested question form is unavailable.'); }
       practiceMode = sealed.m;
@@ -2058,6 +2069,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     const original = JSON.parse(sealed.response_json);
     if (original.multipart || original.custom) return reject(res, 409, 'NOTEBOOK_TWIN_UNAVAILABLE', 'This question has no generated twin.');
     await ensureBanks();
+    await ensureQbankFromEnv();
     const generator = typeof original._generator === 'string' ? original._generator : original.subtopic;
     const premiumGap = await premiumContentRefusal(db, { accountId, generator, now });
     if (premiumGap) return refusePremiumContent(res, premiumGap);

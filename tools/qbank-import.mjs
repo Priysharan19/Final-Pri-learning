@@ -2,6 +2,7 @@
 // Author question bank importer, VALIDATION ONLY (Prithagoras, NSW Years 11-12).
 //
 //   node tools/qbank-import.mjs <archive-dir> <report.json> [--ids A11-F1-001,X12-V1-200] [--limit N] [--no-steps] [--quiet]
+//   node tools/qbank-import.mjs --pack <archive-dir> --out <pack-dir>        compile the content pack (see PACK below)
 //
 // Reads the owner's authored archive (data/pritagoras_qbank.json, data/pritagoras_marking.json, data/dotpoint_tags.json) as DATA.
 // It never runs anything in the archive, never writes into the archive and never writes into this repository: the report goes to the
@@ -20,6 +21,15 @@
 //   marks     whether the product's marksPossibleFor() would give the question the marks the author set
 // Failures block a part ("usable" in the report); notes (an undiagnosed trap, an unjudged line) do not.
 //
+// PACK. `--pack` compiles the questions that pass EVERY check into a content pack (format pri-qbank-pack-v1, read by
+// server/platform/qbankPack.js) written to a directory: the committed pack (server/content/qbank, the owner allowed it to be public on
+// 24 November 2026) or any directory outside this repository:
+// manifest.json (sha256 and size of every file, pack version), index.json, shards/<family>.json (one per course and topic),
+// rejects.json (ids and reasons only, no content) and NOTICE. A question goes in only when: it is auto-markable (not manual, not a working proof),
+// its key is accepted and every trap refused by the engine, its text renders, it has no diagram (phase A), the engine crosses no line of
+// its authored steps, and none of its hints (or the hint ladder's rungs) is a correct answer. Step marks are not paid in this phase;
+// the criteria travel in the pack. Deterministic: the same archive gives the same bytes.
+//
 // Pure and deterministic: no clock, no network, no model, no randomness.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -32,6 +42,9 @@ import { writtenAsLine, statesOnlyFinalAnswer } from '../client/src/engine/check
 import { boardSchemeProblems, matchBoardPoints, awardBoardScheme } from '../client/src/engine/boardScheme.js';
 import { stepEvidence, stepMetaFor, marksPossibleFor } from '../server/platform/markerOps.js';
 import { authoredLines } from '../server/platform/genericSteps.js';
+import { plainTex } from '../client/src/engine/checker.js';
+import { buildHintLadder } from '../client/src/engine/hintLadder.js';
+import { PACK_FORMAT, DEFAULT_PACK_DIR, buildFamily, indexOf, loadPack, sha256 } from '../server/platform/qbankPack.js';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const katex = createRequire(path.join(ROOT, 'client', 'package.json'))('katex');
@@ -137,13 +150,16 @@ export function engineTrap(t) {
   return t;
 }
 
+/** The bank family of a part: one per course and topic (`qb-a11-ma-f1`), the id the server's practice path is asked for. */
+export const familyOf = part => `qb-${part.course === 'ADV' ? 'a' : 'x'}${part.year}-${String(part.topic).toLowerCase()}`;
+
 /** The engine's question for one marking part: the shape the generators return, built from the author's record. */
 export function engineQuestion(part, question = null) {
   const q = {
     id: part.label ? `${part.question}${part.label}` : part.question,
     prompt: part.prompt, answerType: part.answerType, answer: part.answer,
     steps: part.steps, traps: (part.traps || []).map(engineTrap), hints: part.hints, difficulty: part.difficulty,
-    subtopic: `qbank-${String(part.topic || '').toLowerCase()}`,
+    subtopic: familyOf(part),
     contentId: `qbank:${part.question}${part.label || ''}`
   };
   if (part.answerPrefix) q.answerPrefix = part.answerPrefix;
@@ -482,12 +498,147 @@ function summarise({ files, problems, partRows, questionsOut, dupExact, dupSkele
   };
 }
 
+
+// ── hints that give the answer ───────────────────────────────────────────────
+/**
+ * Hint texts (the three authored hints, the answer box's own hint, and the three rungs the hint ladder would show) that state a correct
+ * answer: any math span, or the right of an `=` inside one, that the engine accepts as the answer. Returns the offending texts' labels.
+ */
+export function hintLeaks(q) {
+  const texts = [...(q.hints || []).map((t, i) => [`hint ${i + 1}`, t])];
+  if (typeof q.inputHint === 'string') texts.push(['inputHint', q.inputHint.replace(/^\s*e\.g\.?\s*/i, '')]);
+  try { buildHintLadder(q).forEach(r => { if (r.text) texts.push([`rung ${r.rung}`, r.text]); }); } catch { /* the authored hints stand */ }
+  const out = [];
+  for (const [label, text] of texts) {
+    const cands = new Set();
+    const t = String(text);
+    for (const m of t.matchAll(/(?<!\\)\$((?:\\\$|[^$])+?)(?<!\\)\$/g)) {
+      const plain = safe(() => plainTex(m[1]), null);
+      if (!plain) continue;
+      cands.add(plain);
+      for (const piece of String(plain).split(/=/).slice(1)) cands.add(piece);
+    }
+    if (label === 'inputHint') cands.add(t);
+    for (const c of cands) {
+      const typed = String(c).trim();
+      if (!typed || typed.length > 120) continue;
+      if (safe(() => checkAnswer(q, typed), {}).correct === true) { out.push(label); break; }
+    }
+  }
+  return [...new Set(out)];
+}
+
+// ── the pack ─────────────────────────────────────────────────────────────────
+const LEVEL_OF = d => Math.min(4, Math.max(1, d));
+const ordered = (o, keys) => Object.fromEntries(keys.filter(k => o[k] !== undefined).map(k => [k, o[k]]));
+const json = v => JSON.stringify(v) + '\n';
+
+/** The reasons a part is not in the pack (empty when it is). Stable codes, no content. */
+export function rejectReasons(rec, part, q) {
+  const out = [];
+  if (part.answerType === 'manual') out.push('manual');
+  else if (part.answerType === 'working') out.push('working-proof');
+  if (rec.diagram) out.push('diagram');
+  for (const f of rec.failures) {
+    if (f.startsWith('line:')) continue;                 // criteria lines matter for step marks, not for a final-answer pack
+    out.push(f.replace(/:\d+$/, '').replace(/@.*$/, '').replace(/(trap:accepted):\d+/, '$1'));
+  }
+  if (rec.autoMarkable && !out.length) { const leaks = hintLeaks(q); if (leaks.length) out.push('hint:leak'); }
+  return [...new Set(out)];
+}
+
+/**
+ * Compile the pack for an archive. Returns { files: Map(name -> string), rejects, summary }. Nothing is written here.
+ */
+export function compilePack(archive, opts = {}) {
+  const byId = new Map(archive.questions.map(q => [q.id, q]));
+  const shards = new Map();
+  const rejects = [];
+  for (const part of archive.parts) {
+    const question = byId.get(part.question);
+    const rec = checkPart(part, question, archive.tags, opts);
+    const q = engineQuestion(part, question);
+    const reasons = rec.failures.some(f => f.startsWith('schema:')) ? rec.failures.filter(f => f.startsWith('schema:')) : rejectReasons(rec, part, q);
+    if (reasons.length || !question || !archive.tags?.[part.question]) {
+      rejects.push({ id: rec.id, reasons: reasons.length ? reasons : [!question ? 'join:part-without-question' : 'join:no-dotpoint'] });
+      continue;
+    }
+    const family = familyOf(part);
+    const entry = ordered({
+      id: rec.id, group: part.question, label: part.label ?? undefined, dp: archive.tags[part.question], authored: part.difficulty, level: LEVEL_OF(part.difficulty),
+      marks: part.marks, title: question.title, prompt: part.prompt, answerType: part.answerType, answer: part.answer,
+      answerPrefix: part.answerPrefix, inputHint: part.inputHint, hints: part.hints, steps: part.steps, traps: q.traps, criteria: part.criteria, stepcheck: part.stepcheck
+    }, ['id', 'group', 'label', 'dp', 'authored', 'level', 'marks', 'title', 'prompt', 'answerType', 'answer', 'answerPrefix', 'inputHint', 'hints', 'steps', 'traps', 'criteria', 'stepcheck']);
+    const shard = shards.get(family) || shards.set(family, { family, course: part.course, year: part.year, topic: part.topic, questions: [] }).get(family);
+    shard.questions.push(entry);
+  }
+  const files = new Map();
+  const entries = [];
+  const families = new Map();
+  for (const family of [...shards.keys()].sort()) {
+    const shard = shards.get(family);
+    shard.questions.sort((a, b) => (a.id < b.id ? -1 : 1));
+    const text = json(ordered(shard, ['family', 'course', 'year', 'topic', 'questions']));
+    const name = `shards/${family}.json`;
+    files.set(name, text);
+    entries.push({ name, family, course: shard.course, year: shard.year, topic: shard.topic, questions: shard.questions.length, bytes: Buffer.byteLength(text), sha256: sha256(Buffer.from(text)) });
+    families.set(family, buildFamily(shard));
+  }
+  const indexText = json({ format: PACK_FORMAT, families: indexOf(families) });
+  // index.json holds `families` as loadPack compares it: the same array, in the same order.
+  files.set('index.json', indexText);
+  const index = { name: 'index.json', bytes: Buffer.byteLength(indexText), sha256: sha256(Buffer.from(indexText)) };
+  const packVersion = sha256(Buffer.from([index.sha256, ...entries.map(e => `${e.name}:${e.sha256}`)].join('\n'))).slice(0, 12);
+  const manifest = {
+    format: PACK_FORMAT, packVersion, source: archive.files, index,
+    totals: { questions: entries.reduce((s, e) => s + e.questions, 0), shards: entries.length, bytes: entries.reduce((s, e) => s + e.bytes, 0) + index.bytes },
+    shards: entries
+  };
+  files.set('manifest.json', json(manifest));
+  rejects.sort((a, b) => (a.id < b.id ? -1 : 1));
+  const reasonCounts = {};
+  for (const r of rejects) for (const x of r.reasons) reasonCounts[x] = (reasonCounts[x] || 0) + 1;
+  const byCourse = {};
+  for (const e of entries) { const k = `${e.course === 'ADV' ? 'A' : 'X'}${e.year}`; byCourse[k] = (byCourse[k] || 0) + e.questions; }
+  files.set('NOTICE', NOTICE);
+  files.set('rejects.json', json({ note: 'ids and reasons only', parts: rejects.length, reasons: Object.fromEntries(Object.entries(reasonCounts).sort()), rejects }));
+  return { files, rejects, summary: { packVersion, questions: manifest.totals.questions, shards: entries.length, bytes: manifest.totals.bytes, byCourse, rejectedParts: rejects.length, reasons: Object.fromEntries(Object.entries(reasonCounts).sort()) } };
+}
+
+export const NOTICE = 'Question bank content \u00a9 Priysharan Tripathi trading as Pri Learning. All rights reserved.\n';
+
+/** An in-memory pack source over compiled files, so a pack is proved loadable before it is written. */
+export const memorySource = files => ({ kind: 'memory', async read(name) { return files.has(name) ? Buffer.from(files.get(name)) : null; } });
+
 // ── command line ─────────────────────────────────────────────────────────────
 function insideRepo(p) { const rel = path.relative(ROOT, path.resolve(p)); return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel)); }
 
 export async function main(argv) {
-  const args = argv.filter(a => !a.startsWith('--'));
   const flag = name => { const i = argv.findIndex(a => a === `--${name}`); return i >= 0 ? argv[i + 1] : null; };
+  if (argv.includes('--pack')) {
+    const archiveDir = flag('pack'), outDir = flag('out');
+    if (!archiveDir || !outDir || archiveDir.startsWith('--') || outDir.startsWith('--')) { console.error('usage: node tools/qbank-import.mjs --pack <archive-dir> --out <pack-dir> [--overwrite] [--quiet]'); return 2; }
+    // The committed pack (server/content/qbank) is the one place in the repository a pack may be written.
+    if (insideRepo(outDir) && path.resolve(outDir) !== path.resolve(DEFAULT_PACK_DIR)) { console.error(`refusing to write the pack inside the repository, except at ${path.relative(ROOT, DEFAULT_PACK_DIR)}: ${outDir}`); return 2; }
+    if (fs.existsSync(outDir) && fs.readdirSync(outDir).length && !argv.includes('--overwrite')) { console.error(`${outDir} is not empty; pass --overwrite to write over a previous pack`); return 2; }
+    const compiled = compilePack(loadArchive(archiveDir));
+    // The pack must load exactly as the server will load it, before a byte is written.
+    await loadPack(memorySource(compiled.files));
+    for (const [name, text] of compiled.files) {
+      const file = path.join(path.resolve(outDir), name);
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, text);
+    }
+    if (!argv.includes('--quiet')) {
+      const s = compiled.summary;
+      console.log(`pack ${s.packVersion}: ${s.questions} questions in ${s.shards} shards, ${s.bytes} bytes; rejected parts ${s.rejectedParts}`);
+      console.log(`by course ${JSON.stringify(s.byCourse)}`);
+      console.log(`reject reasons ${JSON.stringify(s.reasons)}`);
+      console.log(`written to ${outDir}`);
+    }
+    return 0;
+  }
+  const args = argv.filter(a => !a.startsWith('--'));
   const [archiveDir, out] = args.filter(a => a !== flag('ids') && a !== flag('limit'));
   if (!archiveDir || !out) { console.error('usage: node tools/qbank-import.mjs <archive-dir> <report.json> [--ids a,b] [--limit N] [--no-steps] [--quiet]'); return 2; }
   if (insideRepo(out)) { console.error(`refusing to write the report inside the repository: ${out}`); return 2; }

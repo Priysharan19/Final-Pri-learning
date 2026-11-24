@@ -4,8 +4,11 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {
-  ROOT, loadArchive, validateArchive, checkPart, schemaProblems, acceptedInput, trapInput, engineTrap, engineQuestion, latexProblems, main
+  ROOT, loadArchive, validateArchive, checkPart, schemaProblems, acceptedInput, trapInput, engineTrap, engineQuestion, latexProblems, main,
+  hintLeaks, compilePack, familyOf
 } from './qbank-import.mjs';
+import { loadPack, directorySource } from '../server/platform/qbankPack.js';
+import { FIXTURE_PARTS, fixtureArchive } from '../server/test/support/qbank-fixture.mjs';
 
 let pass = 0; const failures = [];
 const ok = (c, m) => { if (c) pass++; else failures.push(m); };
@@ -137,6 +140,33 @@ const refused = await main([path.join(tmp, 'archive'), inRepo, '--quiet']);
 ok(refused === 2 && !fs.existsSync(inRepo), 'a report path inside the repository is refused and nothing is written');
 ok(await main([]) === 2, 'no arguments is a usage error');
 fs.rmSync(tmp, { recursive: true, force: true });
+
+
+// ── the content pack (--pack) ────────────────────────────────────────────────
+const fxPart = id => FIXTURE_PARTS.find(p => p.question === id && !p.label);
+ok(hintLeaks(engineQuestion(fxPart('TQ-010'))).includes('hint 2'), 'a hint that states the answer is found');
+ok(hintLeaks(engineQuestion(fxPart('TQ-001'))).length === 0, 'authored hints that do not state the answer pass');
+ok(familyOf({ course: 'ADV', year: 11, topic: 'MA-C1' }) === 'qb-a11-ma-c1' && familyOf({ course: 'EXT1', year: 12, topic: 'ME-V1' }) === 'qb-x12-me-v1', 'a family is one course and topic');
+const cp = compilePack(fixtureArchive());
+ok(cp.summary.questions === 9 && cp.summary.rejectedParts === 4, 'the fixture compiles to nine questions and four rejects');
+ok(!cp.files.get('shards/qb-a11-ma-c1.json').includes('TQ-009') && !cp.files.get('shards/qb-a11-ma-c1.json').includes('TQ-010') && !cp.files.get('shards/qb-a11-ma-c1.json').includes('TQ-011'), 'a rejected part is not in a shard');
+ok(JSON.parse(cp.files.get('shards/qb-a11-ma-c1.json')).questions.every(q => Array.isArray(q.criteria) && q.criteria.length), 'criteria travel in the pack');
+const t2 = fs.mkdtempSync(path.join(os.tmpdir(), 'qbank-pack-'));
+const fx = fixtureArchive();
+const fxData = path.join(t2, 'archive', 'data');
+fs.mkdirSync(fxData, { recursive: true });
+fs.writeFileSync(path.join(fxData, 'pritagoras_qbank.json'), JSON.stringify(fx.questions));
+fs.writeFileSync(path.join(fxData, 'pritagoras_marking.json'), JSON.stringify(fx.parts));
+fs.writeFileSync(path.join(fxData, 'dotpoint_tags.json'), JSON.stringify(fx.tags));
+const packDir = path.join(t2, 'pack');
+ok(await main(['--pack', path.join(t2, 'archive'), '--out', packDir, '--quiet']) === 0, '--pack writes a pack');
+const loaded2 = await loadPack(directorySource(packDir));
+ok(loaded2.questionCount === 9 && loaded2.version === cp.summary.packVersion, 'the written pack loads and is the compiled one');
+ok(await main(['--pack', path.join(t2, 'archive'), '--out', packDir, '--quiet']) === 2, 'a non-empty output directory is refused without --overwrite');
+ok(await main(['--pack', path.join(t2, 'archive'), '--out', packDir, '--quiet', '--overwrite']) === 0, 'and written over with it');
+ok(await main(['--pack', path.join(t2, 'archive'), '--out', path.join(ROOT, 'qbank-pack-should-not-exist'), '--quiet']) === 2 && !fs.existsSync(path.join(ROOT, 'qbank-pack-should-not-exist')), 'a pack directory inside the repository is refused');
+ok(await main(['--pack', path.join(t2, 'archive'), '--quiet']) === 2, '--pack without --out is a usage error');
+fs.rmSync(t2, { recursive: true, force: true });
 
 const text = fs.readFileSync(new URL('./qbank-import.mjs', import.meta.url), 'utf8');
 const dash = new RegExp(String.fromCharCode(0x2014));

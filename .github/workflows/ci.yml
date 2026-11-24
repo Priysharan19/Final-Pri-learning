@@ -379,6 +379,12 @@ jobs:
           # offered by chapter, marked per part by the engine, no plan or re-test, no PDF, India 404.
           node server/test/practice-sets-check.mjs 2>&1 | tee practice-sets.log
           node tools/ci-check-counts.mjs verify platform/practice-sets.log
+          # The author question bank (server/content/qbank, Prithagoras only): the importer's pack, the loader that refuses a damaged one,
+          # sealed issuance that sends public fields only, authored marks, trap reasons, and then every committed question against the engine.
+          node server/test/qbank-pack-check.mjs 2>&1 | tee qbank-pack.log
+          node tools/ci-check-counts.mjs verify platform/qbank-pack.log
+          node server/test/qbank-real-pack-check.mjs 2>&1 | tee qbank-real-pack.log
+          node tools/ci-check-counts.mjs verify platform/qbank-real-pack.log
           # The Exam Desk (ADR-0002 §8 plan F4a): the unmarked mode — server-stamped
           # clock, one open attempt per paper, the import, never a mark — and the
           # static proof that it reaches nothing of the marking path.
@@ -1185,6 +1191,9 @@ jobs:
         run: npm run build
       - name: Exact release identity
         run: node tools/verify-release-identity.mjs
+      # The author question bank is server-side only: nothing of it may be reachable from the built client.
+      - name: The question bank is not in the built client
+        run: node tools/qbank-isolation-check.mjs --require-dist
       # Plan E4: this build carries only its own edition's brand, and the
       # other edition's build (made here into a temporary folder) differs from
       # it only in the brand files and the one chunk holding the wordmark.

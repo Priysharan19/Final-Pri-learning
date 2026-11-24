@@ -43,6 +43,30 @@ tolerance (none found).
 That is 1,856 questions without a diagram (34 percent of the bank), 2,392 with diagrams counted in. Usable for what: issuing a
 question and marking its final answer. It is not yet usable for step marks, authored marks, or a figure.
 
+## Decided 24 November (CTO defaults, owner may overrule) and built
+
+Decided 24 Nov, CTO defaults, owner may overrule:
+
+1. A correct final answer pays the full authored marks, as everywhere else in the product.
+2. The authored-marks field is added (`authoredMarks`, read by `marksPossibleFor`; R4, to be independently reviewed).
+3. Difficulty 1, 2, 3 map to levels 1, 2, 3; 4, 5 and 6 map to level 4. The authored number is kept as a separate field.
+4. His question titles are shown (carried in the pack as `title`; no screen shows them yet).
+5. Order: the five weakest topics first, then every usable non-diagram question, then diagrams; manual parts later.
+
+Owner decision, 24 Nov ("Public is fine"): the bank may be committed to this public repository. So the compiled pack for every
+question that passes all checks is committed under `server/content/qbank/` (not the raw archive, the PDFs or his build scripts), with
+a NOTICE: "Question bank content (c) Priysharan Tripathi trading as Pri Learning. All rights reserved." It is server-side only: no
+client code imports it, and `tools/qbank-isolation-check.mjs` fails the build if any pack file or any worked step, criterion or trap
+reason is reachable from `client/dist`. `PRI_QBANK_DIR` names another pack directory, `off` turns the bank off, and only a Prithagoras
+server loads it.
+
+Built (phase A, final-answer marking only; step marks are not paid, the criteria travel in the pack): `tools/qbank-import.mjs --pack`,
+`server/platform/qbankPack.js` (loader behind one read function, a hash-checked pack), bank families `qb-<course><year>-<topic>`
+issued through the existing practice path and sealed final-answer-only, the `authorBank` key of `GET /v1/curriculum` (the generators' own
+entries are untouched). Pack: 1,761 questions in 25 shards (A11 504, A12 490, X11 415, X12 352). Rejected parts and reasons are in
+`server/content/qbank/rejects.json` (ids and reasons only): 3,087 manual, 1,683 diagram, 79 crossed authored line, 49 hint or hint-ladder
+rung that states the answer, 36 layout TeX, 14 working proofs (a part can have several reasons).
+
 ## 1. Schema, and how each field maps to the product
 
 ### 1.1 data/pritagoras_qbank.json (list of 5,465 question records)
