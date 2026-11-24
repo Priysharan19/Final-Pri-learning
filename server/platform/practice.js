@@ -161,12 +161,15 @@ const ensureBanks = () => { if (!banksReady) banksReady = loadAllBanks().catch(e
 // (qbankDotpoints.js): a seed is either an authored question's turn or a generator's, by the pack's mix rule. With no pack loaded (and
 // on every edition but Prithagoras) qbankDraw is null and this is generateQuestion unchanged. A picked item (a past-paper cell) and a
 // request that names `bank: false` (a timed paper) never draw from the bank.
+// `bank` is true, false, or the Set of authored question ids this seek has already found stale (resolved, or just served): those are not
+// drawn again, so once the pool is used the seek is answered by the generators.
 const generateQuestion = (generator, difficulty, seed, dotpoint, pick, bank = true) => (bank && !pick && qbankServes(generator)
-  ? qbankDraw(generator, difficulty, seed, dotpoint ?? null) ?? generateGeneratorQuestion(generator, difficulty, seed, dotpoint, pick)
+  ? qbankDraw(generator, difficulty, seed, dotpoint ?? null, bank instanceof Set ? bank : null) ?? generateGeneratorQuestion(generator, difficulty, seed, dotpoint, pick)
   : generateGeneratorQuestion(generator, difficulty, seed, dotpoint, pick));
 const ensureQbankFromEnv = () => ensureQbank();
 // Rush and Match are one-line, timed rounds: an authored question (up to six marks, a working to show) is not dealt in them, nor in a timed paper.
-const bankAllowed = request => request.bank !== false && request.mode !== 'rush' && request.mode !== 'match';
+// The placement check is a diagnostic of what the student knows: it is composed from the generators alone, as a timed paper is.
+const bankAllowed = request => request.bank !== false && request.mode !== 'rush' && request.mode !== 'match' && request.mode !== 'placement';
 
 // ── What an open question may be told about its working ─────────────────────
 // A practice question allows two tries. Until it resolves, the reply to a
@@ -507,13 +510,14 @@ function* seekQuestion(request, { draw, tries, batches, admits = null }) {
   // item can be guessed, which a diagnostic must avoid where it can.
   const springs = q => (!trap || carriesTrap(trap.owner, q, trap.key)) && (!written || (q.answerType !== 'mcq' && !q.multipart));
   const resolvedElsewhere = new Set();
+  const staleBank = new Set();   // authored questions this seek has found avoided or resolved: never drawn again in it
   const budget = () => tries ?? (dotpoint == null ? seekBudget(avoid.size + resolvedElsewhere.size)
     : Math.max(DOTPOINT_SEEK_TRIES, seekBudget(avoid.size + resolvedElsewhere.size)));
   let fallback = null, drawn = 0;
   for (let round = 0; drawn < budget(); round++) {
     const size = Math.min(batches[Math.min(round, batches.length - 1)], budget() - drawn);
     const batch = [];
-    for (let i = 0; i < size; i++, drawn++) batch.push(generateQuestion(generator, difficulty, draw(), dotpoint, pick, bankAllowed(request)));
+    for (let i = 0; i < size; i++, drawn++) batch.push(generateQuestion(generator, difficulty, draw(), dotpoint, pick, bankAllowed(request) && staleBank));
     const resolved = yield batch;
     for (const [i, q] of batch.entries()) {
       // A form this edition does not issue (editionBanks.js `admits`) is never
@@ -530,8 +534,10 @@ function* seekQuestion(request, { draw, tries, batches, admits = null }) {
       const done = resolved?.[i] === true;
       if (done && !avoided) resolvedElsewhere.add(hash);
       if (!avoided && !done && springs(q)) return { q, repeat: false, trapDelivered: !!trap };
+      if (typeof q._bank === 'string' && (done || avoided)) staleBank.add(q._bank);
       const rank = (done ? 0 : 2) + (avoided ? 0 : 1);
-      if (!fallback || rank > fallback.rank) fallback = { q, rank };
+      // Among equals a generator's question is preferred to an authored one: the mix rule says a generator takes over once the pool is used.
+      if (!fallback || rank > fallback.rank || (rank === fallback.rank && typeof fallback.q._bank === 'string' && typeof q._bank !== 'string')) fallback = { q, rank };
     }
   }
   if (!fallback) throw Object.assign(new Error('No form of this question may be issued.'), { code: 'PRACTICE_CONTENT_UNSUPPORTED' });

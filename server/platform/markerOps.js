@@ -16,6 +16,7 @@
 // must never import a server module: the worker has no store and no secrets.
 import { derivedMetaOff } from '../../client/src/engine/derivedMetaOff.js';
 import { checkAnswer, stepCheck, methodMarks, claimFreeReport } from '../../client/src/engine/checker.js';
+import { checkBankAnswer } from './qbankMarking.js';
 import { markObjective, markMultiCorrect } from '../../client/src/engine/indiaExams.js';
 import { markMatrixMatch } from '../../client/src/engine/matrixMatch.js';
 import { markGraphSketch, readFeatureSet, sketchMethodCredit, sketchVerdicts } from '../../client/src/engine/graphFeatures.js';
@@ -600,7 +601,7 @@ const RAW_MARKER_OPS = Object.freeze({
    * was not computed. Blank working costs nothing, so it is always "computed".
    */
   practice({ q, answer, working, workingLatex, workingGaps, evidenceIfWrong, policy }, emit) {
-    const result = sketchReport(q, answer, checkAnswer(q, answer));
+    const result = sketchReport(q, answer, checkBankAnswer(q, answer));   // an author-bank question is read as qbankMarking.js says; every other question is checkAnswer
     emit({ result });
     const wanted = result.correct || evidenceIfWrong || !String(working || '').trim();
     if (!wanted) return { result, evidence: null };

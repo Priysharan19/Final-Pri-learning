@@ -222,8 +222,9 @@
         {"has":"HSC PRIORITIES · 1437/1437 checks passed","note":"Prithagoras HSC 2027 priorities: NESA mapping-grid metadata (no text), the old → new map held to the NSW model, the pinned ranking, the backtest evidence doc, edition isolation, en-AU copy and a render."},
         {"has":"LANDING HOME: PASS — 97/97 checks","note":"The verified page: the landing demo's statuses come from the real Step Check and mistakeView, the social-proof slots stay hidden, Home shows only evidence that exists."},
         {"has":"LINE SYSTEM REGRESSION: PASS — 8000 prompts over 4000 seeds","note":"Examiner pre-review regression: no simultaneous pair is a single line; no line prints without its x term."},
-        {"has":"QBANK IMPORT: PASS 67/67 checks","note":"The validation-only importer and the pack compiler, on a fixture written in the test."},
-        {"has":"QBANK ISOLATION: PASS — 6/6 checks (1761 questions protected)","note":"Static isolation of the committed bank from the client (the built-client half runs after the build, with --require-dist)."}
+        {"has":"QBANK IMPORT: PASS 89/89 checks","note":"67 -> 89, as printed after the review round: the leak test (binomials, fractions, chains of equals signs, prose, fail closed), the ladder whose worked rung is never the last step, and a leaking hint dropped while its question stays; on a fixture written in the test."},
+        {"has":"QBANK ISOLATION: PASS — 6/6 checks (1794 questions protected)","note":"Static isolation of the committed bank from the client (the built-client half runs after the build, with --require-dist)."},
+        {"has":"QBANK ISOLATION TEST: PASS 15/15 checks","note":"New pin, as printed: a dist holding any kind of pack text (answer, prompt, trap answer or reason, hint, criterion, a worked step whole, cut to 39 or to 20 characters, a question id, the format) fails the isolation scan, and the clean one reports nothing."}
       ]
     },
     "platform/blind.log": {
@@ -843,28 +844,35 @@
       "job": "platform-contracts",
       "log": "qbank-pack.log",
       "pins": [
-        {"has":"QBANK PACK: PASS — 395/395 checks","note":"260 -> 395, as printed: the bank is mixed into the practice of the product subtopics and dot points (no family is a request); the mix draw, the dot point asked for, the marker's view, and the problem report carrying the bank question id are added to the importer pack, loader refusal, sealed issuance, marking, authored marks and trap reasons."}
+        {"has":"QBANK PACK: PASS — 392/392 checks","note":"395 -> 392, as printed after the review round (a fixture whose leaking hint is dropped, not rejected, is packed: ten questions, three rejects). 260 -> 395, as printed: the bank is mixed into the practice of the product subtopics and dot points (no family is a request); the mix draw, the dot point asked for, the marker's view, and the problem report carrying the bank question id are added to the importer pack, loader refusal, sealed issuance, marking, authored marks and trap reasons."}
       ]
     },
     "platform/qbank-real-pack.log": {
       "job": "platform-contracts",
       "log": "qbank-real-pack.log",
       "pins": [
-        {"has":"QBANK REAL PACK: PASS — 203/203 checks over 1761 questions","note":"144 -> 203, as printed: every question is placed in a product subtopic, no worked line of the author is crossed by the step report, the answer-box forms and the fraction display are checked, and the sample is drawn through the subtopic and dot point practice."}
+        {"has":"QBANK REAL PACK: PASS — 217/217 checks over 1794 questions","note":"203 -> 217, as printed after the review round: the real leak test over every hint and every rung served, no worked rung that is a last or only step, every nudge served, the bank reading of every key and trap. 144 -> 203, as printed: every question is placed in a product subtopic, no worked line of the author is crossed by the step report, the answer-box forms and the fraction display are checked, and the sample is drawn through the subtopic and dot point practice."}
       ]
     },
     "platform/qbank-mix.log": {
       "job": "platform-contracts",
       "log": "qbank-mix.log",
       "pins": [
-        {"has":"QBANK MIX: PASS — 149/149 checks","note":"New pin, as printed: the author dot point table held to the committed pack, the mix rule, a session's use of a pool, and the attempt records over the real routes."}
+        {"has":"QBANK MIX: PASS — 183/183 checks","note":"149 -> 183, as printed after the review round: placement, Rush, Match and a seeded placement never deal an authored question, a stale authored question is not drawn again, a session over the real routes deals each authored question once, and the two re-tagged and two held questions. New pin, as printed: the author dot point table held to the committed pack, the mix rule, a session's use of a pool, and the attempt records over the real routes."}
+      ]
+    },
+    "platform/qbank-marking.log": {
+      "job": "platform-contracts",
+      "log": "qbank-marking.log",
+      "pins": [
+        {"has":"QBANK MARKING: PASS — 30/30 checks over 1794 questions","note":"New pin, as printed: every prefixed question reads its answer with or without its own label and never a different left side, an interval that names a precision accepts the key rounded as asked, a numeric key with no precision named accepts a correct rounding to 3 or more figures (both sides of the boundary), and the practice marker operation applies them."}
       ]
     },
     "platform/qbank-sealed.log": {
       "job": "platform-contracts",
       "log": "qbank-sealed.log",
       "pins": [
-        {"has":"QBANK SEALED: PASS — 11/11 checks over 1761 questions","note":"New pin, as printed by running it on the merged tree: with method marks switched on and every scheme plus the generic solution-step rule approved, no packed question is stamped with a scheme or the rule, every one seals final-answer-only, and a wrong answer with the author's worked lines earns 0."}
+        {"has":"QBANK SEALED: PASS — 11/11 checks over 1794 questions","note":"New pin, as printed by running it on the merged tree: with method marks switched on and every scheme plus the generic solution-step rule approved, no packed question is stamped with a scheme or the rule, every one seals final-answer-only, and a wrong answer with the author's worked lines earns 0."}
       ]
     }
   },

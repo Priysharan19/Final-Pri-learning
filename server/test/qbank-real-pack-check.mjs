@@ -26,6 +26,9 @@ const { startApp, checks, registerAccount, verifyEmail } = await import('./suppo
 const { requestedEngine } = await import('./support/engine.mjs');
 const qb = await import('../platform/qbankPack.js');
 const { checkAnswer } = await import('../../client/src/engine/checker.js');
+const { checkBankAnswer } = await import('../platform/qbankMarking.js');
+const { buildHintLadder } = await import('../../client/src/engine/hintLadder.js');
+const { leakReason } = await import('../../tools/qbank-leak.mjs');
 const { bankPolicy, sealForEdition, FINAL_ANSWER_MARKING } = await import('../platform/editionBanks.js');
 const { marksPossibleFor, markerView, stepEvidence } = await import('../platform/markerOps.js');
 const { productPlaceOf } = await import('../platform/qbankDotpoints.js');
@@ -43,30 +46,30 @@ const entries = [];
 for (const s of manifest.shards) for (const e of JSON.parse(fs.readFileSync(path.join(qb.DEFAULT_PACK_DIR, s.name), 'utf8')).questions) entries.push({ ...e, family: s.name.replace(/^shards\/|\.json$/g, '') });
 c.eq(entries.length, pack.questionCount, 'every packed question is visited');
 const policy = bankPolicy('prithagoras');
-let displayed = 0, badDisplay = 0, hinted = 0, hintIsAnswer = 0, crossed = 0, ticked = 0, traps = 0, rungs = 0, accepted = 0, sealed = 0, marksOk = 0, leaks = 0, openers = 0;
+let rungsShown = 0, noNudge = 0, displayed = 0, badDisplay = 0, hinted = 0, hintIsAnswer = 0, crossed = 0, ticked = 0, traps = 0, rungs = 0, accepted = 0, sealed = 0, marksOk = 0, leaks = 0, openers = 0;
 const bad = { accepted: [], trap: [], marks: [], seal: [], wire: [], hint: [] };
 for (const e of entries) {
   const full = qb.qbankEntryQuestion(e.id, 17);
   const q = markerView(full);   // what the marker is shown
   const given = acceptedInput(e);
-  if (checkAnswer(q, given)?.correct === true) accepted++; else bad.accepted.push(e.id);
+  if (checkBankAnswer(q, given)?.correct === true) accepted++; else bad.accepted.push(e.id);
   for (const t of e.traps) {
     const input = trapInput(t);
     if (input === null) continue;
     traps++;
-    if (checkAnswer(q, input)?.correct === true) bad.trap.push(e.id);
+    if (checkBankAnswer(q, input)?.correct === true) bad.trap.push(e.id);
   }
   if (marksPossibleFor(full) === e.marks) marksOk++; else bad.marks.push(e.id);
   const sq = JSON.parse(JSON.stringify(full));
   sq._generator = full.subtopic;
   if (sealForEdition(sq, policy) && sq._marking === FINAL_ANSWER_MARKING && sq._methodScheme === undefined && sq._curriculum?.outcomes?.length) sealed++; else bad.seal.push(e.id);
   if (full.answerDisplay) { displayed++; const m = full.answerDisplay.match(/(-?\d+)\/(\d+)$/); if (!m || Math.abs(Number(m[1]) / Number(m[2]) - e.answer.value) > 1e-9) badDisplay++; }
-  if (full.inputHint) { hinted++; if (checkAnswer(q, String(full.inputHint).replace(/^e\.g\.\s*/i, ''))?.correct === true) hintIsAnswer++; }
+  if (full.inputHint) { hinted++; if (checkBankAnswer(q, String(full.inputHint).replace(/^e\.g\.\s*/i, ''))?.correct === true) hintIsAnswer++; }
   // Line marking never crosses a true line: the author's own worked steps, typed as a student's working through the marker as the product runs it
   // (the marker's view of the question), are crossed nowhere. A line it cannot judge stays unjudged; there is no page of crosses to hide.
   const page = authoredPage(q);
   if (page.length) {
-    const rep = stepEvidence(full, given ?? '', page.join('\n'), checkAnswer(q, given))?.stepReport;
+    const rep = stepEvidence(full, given ?? '', page.join('\n'), checkBankAnswer(q, given))?.stepReport;
     if (rep?.lines?.some(l => l.status === 'break')) crossed++;
     else if (rep?.lines?.some(l => l.status === 'ok')) ticked++;
   }
@@ -75,6 +78,17 @@ for (const e of entries) {
   const secrets = [...e.steps.map(s => s.d), ...e.criteria.map(x => x.point), ...e.traps.map(t => t.why)].filter(t => t.length >= 12 && !e.hints.some(h => h.includes(t) || t.includes(h)) && !e.prompt.includes(t));   // authored hints and the prompt are public by design; a step that restates one is not a leak of the step
   if (/"(?:answer|steps|criteria|traps|stepcheck|authoredMarks|_bank|seed)"\s*:/.test(wire) || secrets.some(t => wire.includes(t))) { leaks++; bad.wire.push(e.id); }
   // The authored hints are public and the ladder serves rungs: none states the answer.
+  // The real leak test over everything shown before the question resolves: every authored hint kept, and every rung the ladder serves
+  // (the server builds the same rungs from the sealed question). None states the answer, and the worked rung is never the last step.
+  const ladder = buildHintLadder(full);
+  const shownBefore = [...full.hints, ...ladder.filter(r => r.text).map(r => r.text)];
+  rungsShown += ladder.filter(r => r.text).length;
+  const leaked = shownBefore.filter(t => leakReason(full, t));
+  if (leaked.length) bad.hint.push(`${e.id}:leak:${leaked[0].slice(0, 40)}`);
+  const lastStep = e.steps[e.steps.length - 1].d, worked = ladder.find(r => r.rung === 'worked')?.text;
+  if (worked && e.steps.length >= 1 && worked === lastStep) bad.hint.push(`${e.id}:worked-rung-is-the-last-step`);
+  if (!ladder.find(r => r.rung === 'nudge')?.text) noNudge++;
+  if (e.steps.length === 1 && worked && e.steps[0].d === worked) bad.hint.push(`${e.id}:worked-rung-is-the-only-step`);
   const hl = hintLeaks(full);
   rungs += e.hints.length;
   if (hl.length) bad.hint.push(`${e.id}:${hl.join('+')}`);
@@ -90,7 +104,8 @@ c.ok(ticked > 1000, 'the step report ticks the author\'s lines where it can');
 c.ok(hinted > 150 && hintIsAnswer === 0, `a set, interval, equation or point shows the form it is written in (${hinted} do) and no shown form is the answer`);
 c.ok(displayed > 50 && badDisplay === 0, `a worked solution states a fraction key as the fraction it is (${displayed} do) and each is the author's value`);
 c.eq(leaks, 0, 'no public form carries a key, a step, a criterion or a trap reason');
-c.deq(bad.hint, [], `no hint or hint-ladder rung states the answer (${rungs} authored hints)`);
+c.deq(bad.hint, [], `no hint or hint-ladder rung states the answer, and none is a solution's last or only step (${rungs} authored hints, ${rungsShown} rungs served)`);
+c.ok(rungsShown > entries.length * 2.5 && noNudge === 0, 'and the ladder still serves a nudge for every question and nearly every rung');
 // the loader's own view of the families against the picker
 const fams = qb.qbankFamilies();
 c.ok(fams.every(f => f.requestable.length > 0 && f.dotpoints.every(d => d.requestable.length > 0)), 'every family and dot point has a question at some level');

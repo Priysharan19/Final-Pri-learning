@@ -8,6 +8,7 @@ import {
   hintLeaks, compilePack, familyOf
 } from './qbank-import.mjs';
 import { loadPack, directorySource } from '../server/platform/qbankPack.js';
+import { leakReason, bankLadder, texToPlain } from './qbank-leak.mjs';
 import { FIXTURE_PARTS, fixtureArchive } from '../server/test/support/qbank-fixture.mjs';
 
 let pass = 0; const failures = [];
@@ -148,8 +149,8 @@ ok(hintLeaks(engineQuestion(fxPart('TQ-010'))).includes('hint 2'), 'a hint that 
 ok(hintLeaks(engineQuestion(fxPart('TQ-001'))).length === 0, 'authored hints that do not state the answer pass');
 ok(familyOf({ course: 'ADV', year: 11, topic: 'MA-C1' }) === 'qb-a11-ma-c1' && familyOf({ course: 'EXT1', year: 12, topic: 'ME-V1' }) === 'qb-x12-me-v1', 'a family is one course and topic');
 const cp = compilePack(fixtureArchive());
-ok(cp.summary.questions === 9 && cp.summary.rejectedParts === 4, 'the fixture compiles to nine questions and four rejects');
-ok(!cp.files.get('shards/qb-a11-ma-c1.json').includes('TQ-009') && !cp.files.get('shards/qb-a11-ma-c1.json').includes('TQ-010') && !cp.files.get('shards/qb-a11-ma-c1.json').includes('TQ-011'), 'a rejected part is not in a shard');
+ok(cp.summary.questions === 10 && cp.summary.rejectedParts === 3, 'the fixture compiles to ten questions and three rejects (a leaking hint is dropped from its question, which stays)');
+ok(!cp.files.get('shards/qb-a11-ma-c1.json').includes('TQ-009') && !cp.files.get('shards/qb-a11-ma-c1.json').includes('TQ-011'), 'a rejected part is not in a shard');
 ok(JSON.parse(cp.files.get('shards/qb-a11-ma-c1.json')).questions.every(q => Array.isArray(q.criteria) && q.criteria.length), 'criteria travel in the pack');
 const t2 = fs.mkdtempSync(path.join(os.tmpdir(), 'qbank-pack-'));
 const fx = fixtureArchive();
@@ -161,12 +162,52 @@ fs.writeFileSync(path.join(fxData, 'dotpoint_tags.json'), JSON.stringify(fx.tags
 const packDir = path.join(t2, 'pack');
 ok(await main(['--pack', path.join(t2, 'archive'), '--out', packDir, '--quiet']) === 0, '--pack writes a pack');
 const loaded2 = await loadPack(directorySource(packDir));
-ok(loaded2.questionCount === 9 && loaded2.version === cp.summary.packVersion, 'the written pack loads and is the compiled one');
+ok(loaded2.questionCount === 10 && loaded2.version === cp.summary.packVersion, 'the written pack loads and is the compiled one');
 ok(await main(['--pack', path.join(t2, 'archive'), '--out', packDir, '--quiet']) === 2, 'a non-empty output directory is refused without --overwrite');
 ok(await main(['--pack', path.join(t2, 'archive'), '--out', packDir, '--quiet', '--overwrite']) === 0, 'and written over with it');
 ok(await main(['--pack', path.join(t2, 'archive'), '--out', path.join(ROOT, 'qbank-pack-should-not-exist'), '--quiet']) === 2 && !fs.existsSync(path.join(ROOT, 'qbank-pack-should-not-exist')), 'a pack directory inside the repository is refused');
 ok(await main(['--pack', path.join(t2, 'archive'), '--quiet']) === 2, '--pack without --out is a usage error');
 fs.rmSync(t2, { recursive: true, force: true });
+
+// ── the leak test is a real one ──────────────────────────────────────────────
+// Each case is a hint that gave the answer away in the first pack and that the plain-text test let through (it read no \binom, \tfrac or
+// a chain of equals signs). A case that must NOT leak is next to it.
+{
+  const num = (value, prompt = 'Find the value.') => ({ answerType: 'numeric', answer: { value }, prompt, steps: [], hints: [] });
+  const cases = [
+    [num(252), '$\\binom{10}{5}=252$', true, 'a binomial with its value'],
+    [num(252), '$\\binom{10}{5}$', true, 'a binomial the engine evaluates to the answer'],
+    [num(252), '$\\binom{10}{4}=210$', false, 'a different binomial'],
+    [num(8 / 15), '$\\tfrac{4}{10}\\cdot\\tfrac69+\\tfrac{6}{10}\\cdot\\tfrac49=\\tfrac{48}{90}$', true, 'a fraction that reduces to the answer'],
+    [num(20), '$10\\times2=20$', true, 'a product equal to the answer'],
+    [num(20), '$10\\times2$', true, 'the product alone'],
+    [num(7), '$\\dfrac{56}{8}$', true, 'one trivial division from the answer'],
+    [num(7), '$\\dfrac{56}{9}$', false, 'a fraction that is not the answer'],
+    [{ answerType: 'expression', answer: { expr: 'exp(2)' }, prompt: 'Solve $\\ln k=2$.', steps: [], hints: [] }, '$\\ln k=2\\Rightarrow k=e^{2}$', true, 'k equals e squared'],
+    [{ answerType: 'expression', answer: { expr: '3*x^2' }, prompt: 'Differentiate $y=x^3$.', steps: [], hints: [] }, 'Bring the power down: $\\dfrac{dy}{dx}=3x^{2}$.', true, 'the derivative written out'],
+    [{ answerType: 'expression', answer: { expr: '3*x^2' }, prompt: 'Differentiate $y=x^3$.', steps: [], hints: [] }, 'Bring the power down and reduce it by one.', false, 'the method in words'],
+    [num(1), 'cot(pi/4) = 1.', true, 'a value in prose with no TeX at all'],
+    [num(5), 'The answer is 5.', true, 'a number the prose announces as the result'],
+    [num(5), 'Use the 5 given values.', false, 'a number that is only mentioned'],
+    [{ answerType: 'set', answer: { values: [2, 3] }, prompt: 'Solve.', steps: [], hints: [] }, '$(x-2)(x-3)=0$, so $x=2$ or $x=3$.', true, 'both roots'],
+    [{ answerType: 'set', answer: { values: [2, 3] }, prompt: 'Solve.', steps: [], hints: [] }, 'Factorise the quadratic.', false, 'the first move']
+  ];
+  for (const [q, text, leaks, what] of cases) ok(!!leakReason(q, text) === leaks, `the leak test ${leaks ? 'finds' : 'passes'}: ${what}`);
+  ok(texToPlain('\\binom{10}{5}').plain === 'ncr(10,5)' && texToPlain('\\tfrac{1}{2}^{3}').plain === '((1)/(2))^(3)' && texToPlain('e^{ln 5}').plain === 'e^(ln 5)', 'TeX is read: binomials, fractions, braced powers');
+  ok(texToPlain('\\weirdcommand{3}').unread.includes('weirdcommand'), 'a command the reader has no reading of is reported, not guessed');
+  // fail closed: a numeric span with a command the reader cannot read is treated as leaking
+  ok(!!leakReason(num(3), '$\\weirdcommand{3}$'), 'an unreadable numeric span is treated as leaking (fail closed)');
+  // the ladder: the worked rung is never the last step, and a one-step solution has none of its own
+  const one = { answerType: 'numeric', answer: { value: 252 }, prompt: 'Find $\\binom{10}{5}$.', hints: ['Use the formula.', 'Write it out.', 'Evaluate it.'], steps: [{ h: 'Evaluate', d: '$\\binom{10}{5}=252$' }] };
+  const l1 = bankLadder(one);
+  ok(!Object.values(l1.ladder).some(t => /252|binom/.test(t)) && l1.ladder.worked === 'Evaluate it.', 'a one-step solution never shows its step as the worked rung');
+  const two = { ...one, steps: [{ h: 'Expand', d: '$\\dfrac{10!}{5!\\,5!}$' }, { h: 'Evaluate', d: '$252$' }], answer: { value: 252 } };
+  const l2 = bankLadder(two);
+  ok(l2.ladder.worked !== '$252$' && !leakReason(two, l2.ladder.worked) === true || l2.ladder.worked === 'Evaluate it.', 'the worked rung is never the last step');
+  const leakyHint = { ...one, hints: ['Use the formula.', 'It is $252$.', 'Evaluate it.'] };
+  const l3 = bankLadder(leakyHint);
+  ok(!l3.hints.includes('It is $252$.') && l3.dropped.some(d => d.source === 'hint 2') && l3.ladder.method !== 'It is $252$.', 'a hint that states the answer is dropped, and its rung is filled from the next text or left thin');
+}
 
 const text = fs.readFileSync(new URL('./qbank-import.mjs', import.meta.url), 'utf8');
 const dash = new RegExp(String.fromCharCode(0x2014));

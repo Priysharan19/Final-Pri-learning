@@ -36,14 +36,14 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { checkAnswer } from '../client/src/engine/checker.js';
 import { exprEquivalent, parse, normalize, evaluate } from '../client/src/engine/expr.js';
 import { writtenAsLine, statesOnlyFinalAnswer } from '../client/src/engine/checker.js';
 import { boardSchemeProblems, matchBoardPoints, awardBoardScheme } from '../client/src/engine/boardScheme.js';
 import { stepEvidence, stepMetaFor, marksPossibleFor } from '../server/platform/markerOps.js';
 import { authoredLines } from '../server/platform/genericSteps.js';
-import { plainTex } from '../client/src/engine/checker.js';
-import { buildHintLadder } from '../client/src/engine/hintLadder.js';
+import { buildHintLadder, repeats } from '../client/src/engine/hintLadder.js';
+import { checkBankAnswer } from '../server/platform/qbankMarking.js';
+import { leakReason, bankLadder } from './qbank-leak.mjs';
 import { PACK_FORMAT, DEFAULT_PACK_DIR, buildFamily, indexOf, loadPack, sha256 } from '../server/platform/qbankPack.js';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -160,7 +160,8 @@ export function engineQuestion(part, question = null) {
     prompt: part.prompt, answerType: part.answerType, answer: part.answer,
     steps: part.steps, traps: (part.traps || []).map(engineTrap), hints: part.hints, difficulty: part.difficulty,
     subtopic: familyOf(part),
-    contentId: `qbank:${part.question}${part.label || ''}`
+    contentId: `qbank:${part.question}${part.label || ''}`,
+    _bank: part.label ? `${part.question}${part.label}` : part.question
   };
   if (part.answerPrefix) q.answerPrefix = part.answerPrefix;
   if (part.inputHint) q.inputHint = part.inputHint;
@@ -220,21 +221,23 @@ function answerChecks(part, q) {
   let trapsTested = 0, trapsDiagnosed = 0, trapsUnmatchable = 0;
   if (!AUTO_TYPES.includes(part.answerType) && part.answerType !== 'working') return { failures, notes, trapsTested, trapsDiagnosed, trapsUnmatchable, accepted: null };
   const typed = acceptedInput(part);
-  const got = safe(() => checkAnswer(q, typed), { correct: false, error: true });
+  const got = safe(() => checkBankAnswer(q, typed), { correct: false, error: true });
   const v = got.error ? 'error' : verdict(got);
   if (v !== 'correct') failures.push(`answer:${v === 'error' ? 'error' : v === 'invalid' ? 'unreadable' : 'rejected'}`);
   if (part.answerType === 'working') return { failures, notes, trapsTested, trapsDiagnosed, trapsUnmatchable, accepted: v === 'correct' };
   // Over-wide tolerance: a clearly different number is also accepted (a note: the author may mean it).
   if (part.answerType === 'numeric' && v === 'correct') {
     const off = part.answer.value + Math.max(1, Math.abs(part.answer.value) * 0.1);
-    if (safe(() => checkAnswer(q, String(off)), {}).correct === true) notes.push('answer:wide-tolerance');
+    if (safe(() => checkBankAnswer(q, String(off)), {}).correct === true) notes.push('answer:wide-tolerance');
   }
   (part.traps || []).forEach((t, i) => {
     const input = trapInput(t);
     if (input === null) return;
     trapsTested++;
-    const r = safe(() => checkAnswer(q, input), { correct: false, error: true });
+    const r = safe(() => checkBankAnswer(q, input), { correct: false, error: true });
     if (r.correct === true) { failures.push(`trap:accepted:${i}`); return; }
+    // A trap's reason is shown when the trap is answered: it is never one of the hints (which are shown before an answer is given).
+    if (part.hints.some(h => sameText(h, t.why))) { failures.push(`trap:why-is-hint:${i}`); return; }
     if (r.invalid === true) { notes.push(`trap:unreadable:${i}`); return; }
     if (r.feedback === t.why) trapsDiagnosed++;
     else if (t.eq !== undefined || Array.isArray(t.values) || Array.isArray(t.point)) trapsUnmatchable++;
@@ -242,6 +245,10 @@ function answerChecks(part, q) {
   if (trapsTested && trapsDiagnosed < trapsTested) notes.push('trap:not-named-by-engine');
   return { failures, notes, trapsTested, trapsDiagnosed, trapsUnmatchable, accepted: v === 'correct' };
 }
+
+/** Word for word (case, spacing, TeX markup and punctuation aside), or one whole inside the other when it is a sentence. */
+const bare = t => String(t ?? '').replace(/\\(?:left|right|,|;|!|quad|displaystyle)|[$\\{}\s.,;:!]/g, '').toLowerCase();
+const sameText = (a, b) => { const x = bare(a), y = bare(b); return !!x && !!y && (x === y || (Math.min(x.length, y.length) >= 25 && (x.includes(y) || y.includes(x)))); };
 
 /** The authored steps as the student's page. */
 export const authoredPage = q => authoredLines(q).map(l => l.text);
@@ -286,7 +293,7 @@ function stepChecks(part, q, page) {
   const failures = [], notes = [];
   if (!page.length) return { failures, notes, state: 'no-lines', lines: 0 };
   const typed = acceptedInput(part);
-  const result = typed === null ? { correct: false } : safe(() => checkAnswer(q, typed), { correct: false });
+  const result = typed === null ? { correct: false } : safe(() => checkBankAnswer(q, typed), { correct: false });
   const ev = safe(() => stepEvidence(q, typed ?? '', page.join('\n'), result), null);
   const rep = ev && ev.stepReport;
   if (!rep || !Array.isArray(rep.lines) || !rep.lines.length) { notes.push('steps:no-report'); return { failures, notes, state: 'no-report', lines: page.length }; }
@@ -311,7 +318,7 @@ function schemeChecks(part, q, page) {
   // Earned in full: the authored page, with a WRONG final answer, must earn every working point (so the answer is the only mark left).
   const meta = safe(() => stepMetaFor(q));
   const typed = acceptedInput(part);
-  const result = safe(() => checkAnswer(q, typed), { correct: false });
+  const result = safe(() => checkBankAnswer(q, typed), { correct: false });
   const ev = safe(() => stepEvidence(q, typed, page.join('\n'), result), null);
   const ticked = matchBoardPoints({ scheme, lines: ev?.stepReport?.lines || [], meta });
   const award = awardBoardScheme({ scheme, ticked, correct: false });
@@ -501,29 +508,19 @@ function summarise({ files, problems, partRows, questionsOut, dupExact, dupSkele
 
 // ── hints that give the answer ───────────────────────────────────────────────
 /**
- * Hint texts (the three authored hints, the answer box's own hint, and the three rungs the hint ladder would show) that state a correct
- * answer: any math span, or the right of an `=` inside one, that the engine accepts as the answer. Returns the offending texts' labels.
+ * The labels of the texts a student is shown BEFORE the question resolves that state the answer: the authored hints, the answer box's own
+ * hint, and the rungs of the ladder as the server will build them. A real test (tools/qbank-leak.mjs): TeX is parsed and every side
+ * evaluated, so a binomial written out with its value and 56/8 are found; what cannot be read is treated as leaking.
  */
 export function hintLeaks(q) {
   const texts = [...(q.hints || []).map((t, i) => [`hint ${i + 1}`, t])];
   if (typeof q.inputHint === 'string') texts.push(['inputHint', q.inputHint.replace(/^\s*e\.g\.?\s*/i, '')]);
-  try { buildHintLadder(q).forEach(r => { if (r.text) texts.push([`rung ${r.rung}`, r.text]); }); } catch { /* the authored hints stand */ }
+  try { buildHintLadder(q).forEach(r => { if (r.text) texts.push([`rung ${r.rung}`, r.text]); }); } catch { texts.push(['ladder', 'unreadable']); }
   const out = [];
   for (const [label, text] of texts) {
-    const cands = new Set();
-    const t = String(text);
-    for (const m of t.matchAll(/(?<!\\)\$((?:\\\$|[^$])+?)(?<!\\)\$/g)) {
-      const plain = safe(() => plainTex(m[1]), null);
-      if (!plain) continue;
-      cands.add(plain);
-      for (const piece of String(plain).split(/=/).slice(1)) cands.add(piece);
-    }
-    if (label === 'inputHint') cands.add(t);
-    for (const c of cands) {
-      const typed = String(c).trim();
-      if (!typed || typed.length > 120) continue;
-      if (safe(() => checkAnswer(q, typed), {}).correct === true) { out.push(label); break; }
-    }
+    // The answer box's form hint is a form to write in, not a hint: it leaks only when it is itself the answer.
+    if (label === 'inputHint') { if (safe(() => checkBankAnswer(q, String(text).trim()), {}).correct === true) out.push(label); continue; }
+    if (leakReason(q, text)) out.push(label);
   }
   return [...new Set(out)];
 }
@@ -550,25 +547,64 @@ export function rejectReasons(rec, part, q) {
 /**
  * Compile the pack for an archive. Returns { files: Map(name -> string), rejects, summary }. Nothing is written here.
  */
+/**
+ * Questions held back for the owner's own re-reading, with why. Not a validation failure the importer can find: a person read the
+ * question against its trap and found them out of step. They stay out of the pack and in rejects.json until he decides.
+ */
+export const HELD_FOR_OWNER = Object.freeze({
+  'X11-C1-041': 'held:trap-does-not-match-its-reason',      // the trap value is 1/(10 pi); its reason says "used pi r instead of 2 pi r"
+  'A11-T2-092': 'held:trap-reason-is-a-hint'                // the trap reason is word for word the third hint, so it is sent at issue
+});
+
+/**
+ * Dot points the author's tag puts a question under that its own text is not about. Corrected here, at the pack, so the product's
+ * dot point table (server/platform/qbankDotpoints.js) stays one table per author dot point.
+ */
+export const TAG_CORRECTIONS = Object.freeze({
+  'A11-T1-074': 'T1.2b',   // the fraction of a circle's area a sector is: arc length, sector and segment area, not the area of a triangle
+  'X12-V1-116': 'V1.1c'    // a point dividing a line in a ratio, by vectors: geometric work with vectors, not component form
+});
+
 export function compilePack(archive, opts = {}) {
   const byId = new Map(archive.questions.map(q => [q.id, q]));
   const shards = new Map();
   const rejects = [];
+  const ladderStats = { questions: 0, hintsDropped: 0, questionsWithHintDropped: 0, oldLeakingRungs: 0, oldLeakingQuestions: 0, rungsChanged: 0, questionsChanged: 0, thinRungs: 0, noWorkedRung: 0 };
   for (const part of archive.parts) {
     const question = byId.get(part.question);
     const rec = checkPart(part, question, archive.tags, opts);
     const q = engineQuestion(part, question);
+    // The ladder this question will show: the old one (the engine's, from the authored hints and steps) is measured, then replaced by the
+    // one whose rungs do not give the answer (tools/qbank-leak.mjs).
+    const old = safe(() => buildHintLadder(q).filter(r => r.text).map(r => [r.rung, r.text]), []);
+    const lad = bankLadder(q);
+    q.hints = lad.hints;
+    q.ladder = lad.ladder;
     const reasons = rec.failures.some(f => f.startsWith('schema:')) ? rec.failures.filter(f => f.startsWith('schema:')) : rejectReasons(rec, part, q);
+    if (HELD_FOR_OWNER[rec.id] && !reasons.includes(HELD_FOR_OWNER[rec.id])) reasons.push(HELD_FOR_OWNER[rec.id]);
     if (reasons.length || !question || !archive.tags?.[part.question]) {
       rejects.push({ id: rec.id, reasons: reasons.length ? reasons : [!question ? 'join:part-without-question' : 'join:no-dotpoint'] });
       continue;
     }
+    if (part.answerType !== 'manual') {
+      const leaking = old.filter(([, text]) => leakReason(q, text));
+      ladderStats.questions++;
+      ladderStats.oldLeakingRungs += leaking.length;
+      if (leaking.length) ladderStats.oldLeakingQuestions++;
+      const now = { nudge: lad.ladder.nudge ?? null, method: lad.ladder.method ?? null, worked: lad.ladder.worked ?? null };
+      const changed = old.filter(([rung, text]) => rung !== 'solution' && now[rung] !== text).length;
+      ladderStats.rungsChanged += changed; if (changed) ladderStats.questionsChanged++;
+      ladderStats.thinRungs += ['nudge', 'method', 'worked'].filter(r => !now[r]).length;
+      if (!now.worked) ladderStats.noWorkedRung++;
+      const dropped = lad.dropped.filter(d => d.rung === 'hint').length;
+      ladderStats.hintsDropped += dropped; if (dropped) ladderStats.questionsWithHintDropped++;
+    }
     const family = familyOf(part);
     const entry = ordered({
-      id: rec.id, group: part.question, label: part.label ?? undefined, dp: archive.tags[part.question], authored: part.difficulty, level: LEVEL_OF(part.difficulty),
+      id: rec.id, group: part.question, label: part.label ?? undefined, dp: TAG_CORRECTIONS[rec.id] ?? archive.tags[part.question], authored: part.difficulty, level: LEVEL_OF(part.difficulty),
       marks: part.marks, title: question.title, prompt: part.prompt, answerType: part.answerType, answer: part.answer,
-      answerPrefix: part.answerPrefix, inputHint: part.inputHint, hints: part.hints, steps: part.steps, traps: q.traps, criteria: part.criteria, stepcheck: part.stepcheck
-    }, ['id', 'group', 'label', 'dp', 'authored', 'level', 'marks', 'title', 'prompt', 'answerType', 'answer', 'answerPrefix', 'inputHint', 'hints', 'steps', 'traps', 'criteria', 'stepcheck']);
+      answerPrefix: part.answerPrefix, inputHint: part.inputHint, hints: lad.hints, ladder: lad.ladder, steps: part.steps, traps: q.traps, criteria: part.criteria, stepcheck: part.stepcheck
+    }, ['id', 'group', 'label', 'dp', 'authored', 'level', 'marks', 'title', 'prompt', 'answerType', 'answer', 'answerPrefix', 'inputHint', 'hints', 'ladder', 'steps', 'traps', 'criteria', 'stepcheck']);
     const shard = shards.get(family) || shards.set(family, { family, course: part.course, year: part.year, topic: part.topic, questions: [] }).get(family);
     shard.questions.push(entry);
   }
@@ -602,7 +638,7 @@ export function compilePack(archive, opts = {}) {
   for (const e of entries) { const k = `${e.course === 'ADV' ? 'A' : 'X'}${e.year}`; byCourse[k] = (byCourse[k] || 0) + e.questions; }
   files.set('NOTICE', NOTICE);
   files.set('rejects.json', json({ note: 'ids and reasons only', parts: rejects.length, reasons: Object.fromEntries(Object.entries(reasonCounts).sort()), rejects }));
-  return { files, rejects, summary: { packVersion, questions: manifest.totals.questions, shards: entries.length, bytes: manifest.totals.bytes, byCourse, rejectedParts: rejects.length, reasons: Object.fromEntries(Object.entries(reasonCounts).sort()) } };
+  return { files, rejects, summary: { ladder: ladderStats, packVersion, questions: manifest.totals.questions, shards: entries.length, bytes: manifest.totals.bytes, byCourse, rejectedParts: rejects.length, reasons: Object.fromEntries(Object.entries(reasonCounts).sort()) } };
 }
 
 export const NOTICE = 'Question bank content \u00a9 Priysharan Tripathi trading as Pri Learning. All rights reserved.\n';
