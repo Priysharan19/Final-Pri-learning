@@ -267,7 +267,9 @@ try {
     assert.equal(sq.outcome, slots[i].outcome);
     assert.ok(nswCell(sq.generator, q.difficulty) && !indiaBank(sq.generator), `${sq.generator} is an issued NSW form`);
     assert.ok(q._curriculum.outcomes.some(o => o.code === slots[i].outcome), 'its sealed identity names the slot\'s outcome');
-    assert.equal(q._marking, 'final-answer-only');
+    // An eligible written question is stamped with the author-approved scheme at issue instead of the final-answer seal (24 Nov 2026). A paper still marks the
+    // final answer only: schemePay is called from the practice route alone, and the paper's own marking (asserted just below) has no method marks.
+    assert.ok((q._marking === 'final-answer-only') !== (typeof q._methodScheme === 'string'), 'sealed final-answer-only, or stamped with the approved scheme, never both');
     assert.ok(['numeric', 'mcq', 'expression', 'point', 'set'].includes(q.answerType) && !q.boardScheme && !q.multipart, 'a final-answer type');
     assert.deepEqual(sq.marking, { correct: slots[i].marks, incorrect: 0, unanswered: 0, partialPerOption: null });
   });
