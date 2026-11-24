@@ -16,6 +16,7 @@
 // must never import a server module: the worker has no store and no secrets.
 import { derivedMetaOff } from '../../client/src/engine/derivedMetaOff.js';
 import { checkAnswer, stepCheck, methodMarks, claimFreeReport } from '../../client/src/engine/checker.js';
+import { checkBankAnswer } from './qbankMarking.js';
 import { markObjective, markMultiCorrect } from '../../client/src/engine/indiaExams.js';
 import { markMatrixMatch } from '../../client/src/engine/matrixMatch.js';
 import { markGraphSketch, readFeatureSet, sketchMethodCredit, sketchVerdicts } from '../../client/src/engine/graphFeatures.js';
@@ -37,7 +38,16 @@ import { answerForm, effectiveSymbols, firstFinalAttempt, planGivens, readClaimF
 
 // Mirrors the shared deterministic checker input used by local practice;
 // questions, answer keys and stage meta remain server-private.
+/**
+ * What the marker is shown of an author-bank question (qbankPack.js): its subtopic is its bank family's, not the product subtopic it is
+ * practised in. The bank was audited against the engine under its family id (tools/qbank-import.mjs), and every rule the engine keys on a
+ * subtopic (derived step checks that are switched off, a calculus line rule) was written for that subtopic's generators, never for these
+ * questions. Marking, the step report and `supportsSteps` therefore see the family; progress, identity and the device see the subtopic.
+ */
+export const markerView = q => (q && typeof q._bank === 'string' && typeof q._family === 'string' && q.subtopic !== q._family ? { ...q, subtopic: q._family } : q);
+
 export function stepMetaFor(q) {
+  q = markerView(q);
   if (q.stepcheck) return q.stepcheck;
   if (derivedMetaOff(q)) return null;   // answer only until the family has a structured meta
   const a = q.answer;
@@ -46,7 +56,7 @@ export function stepMetaFor(q) {
   if (q.answerType === 'numeric' && a.value !== undefined) {
     const m = (q.answerPrefix || '').match(/^([a-z])\s*=$/i);
     // The letter as the question writes it: an angle $A$ is not the side $a$.
-    if (m) return { kind: 'equation', variable: m[1], solutions: [a.value] };
+    if (m) return { kind: 'equation', variable: m[1], solutions: [a.value], ...(a.tol > 0 ? { tol: a.tol } : {}) };
     // Some authored Class 8 algebra forms print only `$6m+15=7m+29$`
     // and omit answerPrefix. Derive the variable ONLY from that entire,
     // single-variable, plain algebraic equation. Other numeric prompts
@@ -58,7 +68,7 @@ export function stepMetaFor(q) {
         equation.split('=').length === 2 && Number.isFinite(Number(a.value))) {
       const symbols = [...new Set((equation.match(/[a-z]/gi) || []).map(v => v.toLowerCase()))];
       if (symbols.length === 1) return {
-        kind: 'equation', variable: symbols[0], solutions: [a.value], source: equation
+        kind: 'equation', variable: symbols[0], solutions: [a.value], ...(a.tol > 0 ? { tol: a.tol } : {}), source: equation
       };
     }
   }
@@ -80,6 +90,8 @@ export function isSchemeStep(step) {
 }
 
 export function marksPossibleFor(q) {
+  // An author-bank question is worth the marks its author set (server/platform/qbankPack.js seals it; no generator sets this field).
+  if (Number.isInteger(q.authoredMarks) && q.authoredMarks >= 1 && q.authoredMarks <= 6) return q.authoredMarks;
   // A past-paper question carrying the Board's transcribed scheme is worth the
   // marks the Board printed (boardScheme.js), not a number guessed from steps.
   if (Array.isArray(q.boardScheme) && Number.isInteger(q.marks)) return q.marks;
@@ -101,11 +113,37 @@ function solutionNumbers(q) {
   return [...out].slice(0, 400);
 }
 
+/**
+ * Every `f(3) = … = v` the question or its authored worked solution states, as `f|3|v` (v the value the statement reaches, `*` when it is not a
+ * number): what a line of working that names f(3) may reach. A function value the solution never states is not one a line can be said to be.
+ */
+function functionLabels(q) {
+  const out = new Set();
+  const spans = [];
+  for (const t of [String(q?.prompt ?? ''), ...(Array.isArray(q?.steps) ? q.steps.slice(0, 40).map(st => String(st?.d ?? '').slice(0, 2000)) : [])]) {
+    for (const m of t.replace(/\\\$/g, '\u0001').matchAll(/\$([^$]+)\$/g)) spans.push(m[1]);
+  }
+  for (const tex of spans) {
+    for (const part of tex.split(/\\(?:Rightarrow|Longrightarrow|therefore|quad|qquad|text\{[^}]*\})|[,;]/)) {
+      let plain = null;
+      try { plain = SOLUTION_INTERNALS.spanToPlain(part); } catch { plain = null; }
+      if (!plain) continue;
+      const sides = plain.split(/(?<![<>!])=(?!=)/).map(x => x.trim());
+      const head = /^([A-Za-z])\(\s*(-?\d+(?:\.\d+)?)\s*\)$/.exec(sides[0] || '');
+      if (!head || sides.length < 2) continue;
+      let v = null;
+      try { const i = arithmeticInfo(cleanStatement(sides[sides.length - 1])); v = i && i.value !== undefined ? i.value : null; } catch { v = null; }
+      out.add(`${head[1]}|${Number(head[2])}|${v === null ? '*' : Number(v.toPrecision(9))}`);
+    }
+  }
+  return [...out];
+}
+
 function trueAsWritten(q, steps, opts) {
   try {
     const facts = opts && Object.hasOwn(opts, 'facts') ? opts.facts : questionFacts(q);
     const solutionValues = solutionNumbers(q);
-    return stepCheckArithmetic(steps, { latex: opts && Array.isArray(opts.latex) ? opts.latex : null, facts, solutionValues, answerValue: typeof q?.answer?.value === 'number' ? q.answer.value : null });
+    return stepCheckArithmetic(steps, { latex: opts && Array.isArray(opts.latex) ? opts.latex : null, facts, solutionValues, knownLabels: functionLabels(q), answerValue: typeof q?.answer?.value === 'number' ? q.answer.value : null });
   } catch { return null; }
 }
 
@@ -580,7 +618,7 @@ function sketchReport(q, answer, result) {
 // examWorkingStage above stay the method rubric as written, so the rubric the
 // examiner is asked to sign (#499, tools/examiner-dossier.mjs) and its suites
 // are unchanged; only the operations the server runs apply the switch.
-export const MARKER_OPS = Object.freeze({
+const RAW_MARKER_OPS = Object.freeze({
   /**
    * A practice submission: the answer, then (only when the reply could need
    * it) the working. `evidenceIfWrong` is the request thread's reading of
@@ -589,7 +627,7 @@ export const MARKER_OPS = Object.freeze({
    * was not computed. Blank working costs nothing, so it is always "computed".
    */
   practice({ q, answer, working, workingLatex, workingGaps, evidenceIfWrong, policy }, emit) {
-    const result = sketchReport(q, answer, checkAnswer(q, answer));
+    const result = sketchReport(q, answer, checkBankAnswer(q, answer));   // an author-bank question is read as qbankMarking.js says; every other question is checkAnswer
     emit({ result });
     const wanted = result.correct || evidenceIfWrong || !String(working || '').trim();
     if (!wanted) return { result, evidence: null };
@@ -629,6 +667,9 @@ export const MARKER_OPS = Object.freeze({
     return stepCoachEvidence(q, lines, answerText);
   }
 });
+
+/** The operations the marker pool runs: each is handed the marker's view of the question (markerView). */
+export const MARKER_OPS = Object.freeze(Object.fromEntries(Object.entries(RAW_MARKER_OPS).map(([name, run]) => [name, (args, emit) => run(args && args.q ? { ...args, q: markerView(args.q) } : args, emit)])));
 
 /**
  * The live step coach's evidence (F1): one row per line, in order.

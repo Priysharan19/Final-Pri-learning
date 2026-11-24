@@ -126,6 +126,13 @@ export function assessEvaluationLine({ text, meta = null } = {}) {
       return { status: 'note', trusted: false, note: 'Pri could not prove every part of this substitution chain, so it is not marked correct.' };
     }
     if (!reached(value, ast)) {
+      // A chain that is TRUE arithmetic from end to end (`2 + 3 = 5`) says nothing about the expression it does not mention: a note, never a cross.
+      const selfConsistent = parts.every((p, k) => {
+        if (k === parts.length - 1) return true;
+        const a = astFor(p), v = a && a.t !== 'equation' ? finiteValue(a, meta.substitutions) : null;
+        return v !== null && numsClose(v, got, 1e-9);
+      });
+      if (selfConsistent) return { status: 'note', trusted: false, value: got, note: 'This is true arithmetic as written, but Pri cannot tie it to the substitution it is checking, so it is not marked as that step.' };
       const diagnosis = substitutionDiagnosis(expected, value);
       return { status: 'break', trusted: false, value: got, note: diagnosis.message, diagnosis };
     }

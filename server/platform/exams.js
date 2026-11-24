@@ -849,7 +849,8 @@ async function issueQuestions(read, ctx = {}) {
   };
   // The server chooses every question: the same chooser practice uses, with no
   // seed from the caller.
-  const draw = (generator, difficulty) => chooseQuestion({ generator, difficulty, avoid: new Set(), trap: null }).q;
+  // A timed paper is composed from the generators alone: its marks and time come from their forms, not the author bank's (qbankPack.js).
+  const draw = (generator, difficulty) => chooseQuestion({ generator, difficulty, avoid: new Set(), trap: null, bank: false }).q;
   // The last word on "one question, once per paper", at the seal. Every unit a
   // student is asked on an item — the item, its alternative, each part and
   // each part's alternative — is known by its engine content hash, and none

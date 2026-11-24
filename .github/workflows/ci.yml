@@ -379,6 +379,25 @@ jobs:
           # offered by chapter, marked per part by the engine, no plan or re-test, no PDF, India 404.
           node server/test/practice-sets-check.mjs 2>&1 | tee practice-sets.log
           node tools/ci-check-counts.mjs verify platform/practice-sets.log
+          # The author question bank (server/content/qbank, Prithagoras only): the importer's pack, the loader that refuses a damaged one,
+          # sealed issuance that sends public fields only, authored marks, trap reasons, and then every committed question against the engine.
+          # The importer checks each prompt with the client's KaTeX, so this step needs the client's dependencies (this job installs the server's only).
+          npm ci --prefix client --no-audit --no-fund
+          node server/test/qbank-pack-check.mjs 2>&1 | tee qbank-pack.log
+          node tools/ci-check-counts.mjs verify platform/qbank-pack.log
+          node server/test/qbank-real-pack-check.mjs 2>&1 | tee qbank-real-pack.log
+          node tools/ci-check-counts.mjs verify platform/qbank-real-pack.log
+          # The bank inside the practice of the subtopics and dot points it is placed at: the table, the mix rule, a session's use of a pool,
+          # and the attempt records, over the committed pack.
+          node server/test/qbank-mix-check.mjs 2>&1 | tee qbank-mix.log
+          node tools/ci-check-counts.mjs verify platform/qbank-mix.log
+          # How a bank answer is read: its own label, a named precision on an interval, 3 or more figures when none is named.
+          node server/test/qbank-marking-check.mjs 2>&1 | tee qbank-marking.log
+          node tools/ci-check-counts.mjs verify platform/qbank-marking.log
+          # No step mark is ever paid on a bank question: with method marks switched on and every scheme and the generic rule approved, none of the
+          # packed questions is stamped with either, and a wrong answer with the author's own worked lines earns 0.
+          node server/test/qbank-sealed-check.mjs 2>&1 | tee qbank-sealed.log
+          node tools/ci-check-counts.mjs verify platform/qbank-sealed.log
           # The Exam Desk (ADR-0002 §8 plan F4a): the unmarked mode — server-stamped
           # clock, one open attempt per paper, the import, never a mark — and the
           # static proof that it reaches nothing of the marking path.
@@ -1058,6 +1077,9 @@ jobs:
             node client/test/tour-nsw-practice-marked.js 2>&1 | tee -a browser.log
             # Step marks on the answer card: a scheme-paid reply draws its criteria table and the author's label (switch on in the tour's own server, the repository's approved list).
             node client/test/tour-step-marks.mjs 2>&1 | tee -a browser.log
+            # The author's questions inside a dot point's ordinary practice: dealt, marked for his marks, his hints, his trap reason and
+            # worked solution, no source shown, nothing sideways at 360 px.
+            node client/test/tour-nsw-practice-bank.js 2>&1 | tee -a browser.log
             # ADR-0003: a visitor with no account meets the question picker first, in both
             # editions, has up to five typed or multiple-choice questions marked by the
             # server, and then a calm sign-up prompt; nothing of an account is touched.
@@ -1187,6 +1209,9 @@ jobs:
         run: npm run build
       - name: Exact release identity
         run: node tools/verify-release-identity.mjs
+      # The author question bank is server-side only: nothing of it may be reachable from the built client.
+      - name: The question bank is not in the built client
+        run: node tools/qbank-isolation-check.mjs --require-dist
       # Plan E4: this build carries only its own edition's brand, and the
       # other edition's build (made here into a temporary folder) differs from
       # it only in the brand files and the one chunk holding the wordmark.

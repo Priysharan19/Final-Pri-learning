@@ -1051,6 +1051,47 @@ async function run() {
       liveVerdict = { before, after, grades: (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/(?:submit|reveal)$/)).filter(c => c.status === 200 && c.json?.authoritative === true).length };
     });
 
+    // The author's own questions are dealt inside the practice of the topics they sit in (server/platform/qbankPack.js): the same page, so the
+    // walk holds it, with an authored question on the desk, open (typed, a hint served) and marked. Prithagoras only: no other edition has the bank.
+    if (!INDIA) {
+      const dealt = [];
+      const authoredShown = async () => {
+        await online.settled();
+        const shown = await online.shownRow();
+        if (!shown?.serverQuestionId) return null;
+        const row = platform.db.prepare("SELECT response_json FROM idempotency_keys WHERE scope='practice-question' AND key=?").get(shown.serverQuestionId);
+        const q = row ? JSON.parse(row.response_json) : null;
+        dealt.push(q ? `${q._generator || q.subtopic}:${q.answerType}${q._bank ? ':bank' : ''}` : `${shown.serverQuestionId ? 'unsealed' : 'unissued'}:${shown.checkState}`);
+        return q && typeof q._bank === 'string' && ['numeric', 'expression'].includes(q.answerType) ? q : null;
+      };
+      let authored = null;
+      await step('practice · an author\'s question, hints open', '/practice', async () => {
+        await goTo(page, BASE, '/practice?subtopic=y11-explog');
+        await page.waitForSelector('.q-prompt', { timeout: 30000 });
+        for (let i = 0; i < 80 && !authored; i++) {
+          authored = await authoredShown();
+          if (authored) break;
+          await page.locator('.ctx-next').first().click();
+          await page.waitForSelector('.q-prompt', { timeout: 30000 });
+          await wait(page, SETTLE);
+        }
+        if (!authored) throw new Error(`no authored question was dealt within the bounded search (${dealt.slice(0, 8).join(' ')})`);
+        const typeTab = page.locator('.mode-tab').first();
+        if (await typeTab.count()) { await typeTab.click(); await wait(page, 250); }
+        const nudge = page.locator('[data-hint-rung="nudge"], [data-hint-rung-open="nudge"]').first();
+        if (await nudge.count()) { await nudge.click(); await wait(page, 700); }
+      });
+      await step('practice · an author\'s question, marked', '/practice', async () => {
+        if (!authored) throw new Error('no authored question to mark');
+        const closeSheet = page.locator('[data-hint-sheet-close]:visible');
+        if (await closeSheet.count()) await closeSheet.first().click();
+        await page.locator('.editor-body input.answer-input').fill(String(authored.answerType === 'expression' ? authored.answer.expr : authored.answer.value));
+        await page.getByRole('button', { name: /Submit answer/ }).click();
+        await page.waitForSelector('.eval-card, .verdict-good', { timeout: 20000 });
+        await wait(page, 900);
+      });
+    }
+
     await step('progress · overview', '/progress', async () => {
       await goTo(page, BASE, '/progress');
       // Either edition's Progress (Progress.jsx → the shared evidence page): the

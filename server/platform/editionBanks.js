@@ -64,7 +64,11 @@ export function sealForEdition(q, banks, generator = q?._generator ?? q?.subtopi
     if (!identity) return false;
     q._curriculum = identity;
   }
-  if (banks.marking) {
+  if (banks.marking && typeof q?._bank === 'string') {
+    // An author-bank question (qbankPack.js) is final-answer-only in this phase, whatever the scheme lists say: no scheme or generic step
+    // rule is ever stamped on it, so no step mark is paid on it.
+    q._marking = banks.marking;
+  } else if (banks.marking) {
     // An allow-listed type, at the digest the author read, is stamped with its scheme instead of the final-answer seal.
     // With the list empty (the repository default) this never looks at the question: every question is sealed as before.
     const typeId = banks.methodSchemeTypes?.length ? schemeTypeOf(q, generator) : null;

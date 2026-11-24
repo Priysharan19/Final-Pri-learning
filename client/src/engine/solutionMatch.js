@@ -23,6 +23,7 @@ import { texToPlain } from './texToPlain.js';
 import { plainTex } from './checker.js';
 import { evaluate, exprEquivalent, withEvaluationBudget } from './expr.js';
 import { infoOf, cleanStatement, exactForm } from './arithmeticLines.js';
+import { isWorkedSum } from './milestones.js';
 
 const PAGE_BUDGET = 120000;
 const MAX_LINES = 20;
@@ -87,6 +88,17 @@ function topLevelPieces(plain) {
   out.push(cur);
   return out.map(x => x.trim()).filter(Boolean);
 }
+// The limits of an evaluated bracket or an integral (`]_0^(2)`, `∫_0^2`) as number pairs: a line that evaluates a bracket between
+// limits the question and its solution never use may happen to reach the same value (F(3) = F(0) = 0), but it is not that step.
+const LIMIT_PAIR = /_\s*(\([^()]*\)|-?[A-Za-z0-9.π]+)\s*\^\s*(\([^()]*\)|-?[A-Za-z0-9.π]+)/g;
+function limitKeys(text) {
+  const out = [];
+  for (const m of String(text ?? '').matchAll(LIMIT_PAIR)) {
+    const key = x => { const v = numericOf(x); return v !== null ? String(Math.round(v * 1e9)) : canon(x); };
+    out.push(`${key(m[1])}|${key(m[2])}`);
+  }
+  return out;
+}
 const sidesOf = piece => piece.split(SPLIT_EQ).map(x => x.trim());
 
 /** Every statement of a text: [{ parts:[plain side, …] }] (one part = a bare expression). */
@@ -110,12 +122,16 @@ const braces = s => s.replace(/\^\{([^{}]*)\}/g, '^($1)').replace(/_\{([^{}]*)\}
 // A letter the question or its solution uses as a function name (f(x), S(n)): `f(x + 1)` there is an application, which the
 // engine would read as the product f·(x + 1). A side that applies one is not read at all.
 let FUNCS = new Set();
+const DIFFERENTIAL = /(?<![A-Za-z])d[a-z]?\s*\)?\s*\/\s*\(?\s*d[a-z]\b/;
 const readSide = side => {
   try {
     const t = braces(tidy(side));
     // a comma or semicolon list (a point, a vector, an interval) is never one number: it is compared component by component or not at all
     if (/[,;]/.test(t)) return null;
-    for (const f of FUNCS) if (new RegExp(`(?<![A-Za-z])${f}'*\\s*\\(`).test(t)) return null;
+    // d/dx, dy/dx, ((d)/(dx)): an operator, not the letters d and x divided
+    if (DIFFERENTIAL.test(t)) return null;
+    // `f^(-1)(-2)` is the inverse applied to -2, not the product f^(-1)·(-2): a power sits between the name and its argument.
+    for (const f of FUNCS) if (new RegExp(`(?<![A-Za-z])${f}(?:\\s*\\^\\s*(?:\\([^()]*\\)|-?\\d+))?'*\\s*\\(`).test(t)) return null;
     return infoOf(cleanStatement(t));
   } catch { return null; }
 };
@@ -184,8 +200,11 @@ function proportional(f, g) {
       c = fit;
     }
     const k = c[0] / c[1];
-    const scale = Math.abs(valAt(f.l, env) ?? 0) + Math.abs(valAt(f.r, env) ?? 0) + Math.abs(k) * (Math.abs(valAt(g.l, env) ?? 0) + Math.abs(valAt(g.r, env) ?? 0));
+    const terms = [valAt(f.l, env) ?? 0, valAt(f.r, env) ?? 0, valAt(g.l, env) ?? 0, valAt(g.r, env) ?? 0].map(Math.abs);
+    const scale = terms[0] + terms[1] + Math.abs(k) * (terms[2] + terms[3]);
     if (Math.abs(a - k * b) > 1e-10 * scale + 1e-12) return false;
+    // A point where one side of an equation is lost beside the other (16^(3x-6) beside 27^(3x+5)) tests only the large side: it proves nothing about the rest.
+    if (terms.some(t => t !== 0 && t < 1e-6 * Math.max(...terms))) continue;
     used++;
   }
   if (used < 5 || c === null) return false;
@@ -195,13 +214,17 @@ function proportional(f, g) {
 // ── the worked solution, read once ───────────────────────────────────────────
 function readSolution(q) {
   const steps = Array.isArray(q?.steps) ? q.steps : [];
-  const labelled = [], conditions = [], values = [], numeric = [];
+  const labelled = [], conditions = [], values = [], numeric = [], verbatim = [], every = [], limits = new Set();
+  for (const t of [String(q?.prompt ?? ''), ...steps.map(x => String(x?.d ?? ''))]) for (const m of t.replace(/\\\$/g, '\u0001').matchAll(TEX_SPAN)) { const pl = spanToPlain(m[1]); if (pl) for (const k of limitKeys(braces(pl))) limits.add(k); }
   steps.forEach((st, i) => {
     const heading = String(st?.h ?? '').trim();
     for (const m of String(st?.d ?? '').matchAll(TEX_SPAN)) { const r = roundedTail(m[1]); if (r !== null) values.push({ step: i, heading, v: Number(r), rounded: true }); }
     for (const s of statementsOfSpans(st?.d)) {
       s.parts.forEach(p => { const v = numericOf(p); if (v !== null) values.push({ step: i, heading, v }); });
       if (s.parts.length < 2) continue;
+      // a statement with a side the engine cannot evaluate (`f^(-1)(-1)`) is recognised only as the very same text
+      if (s.parts.some(p => readSide(p) === null)) verbatim.push({ step: i, heading, parts: s.parts });
+      every.push({ step: i, heading, parts: s.parts });
       if (s.parts.length === 2 && s.parts.every(p => numericOf(p) !== null)) numeric.push({ step: i, heading, parts: s.parts });
       const lab = labelOf(s.parts[0]);
       const last = s.parts[s.parts.length - 1];
@@ -226,7 +249,7 @@ function readSolution(q) {
     stated.set(l.label.name, set);
   }
   const multiRoot = [...stated.values()].some(set => set.size > 1);
-  return { steps, labelled, conditions, numeric, values, multiRoot, final: values.length ? values[values.length - 1] : null };
+  return { steps, labelled, conditions, numeric, verbatim, every, limits, values, multiRoot, final: values.length ? values[values.length - 1] : null };
 }
 
 function readPrompt(q) {
@@ -239,6 +262,9 @@ function readPrompt(q) {
   }
   return list;
 }
+
+// a function applied to a bare argument that is then raised to a power: `ln e^3`, `sin x^2`, `cos 2^x`
+const AMBIGUOUS_FUNCTION_POWER = /(?<![A-Za-z])(?:sin|cos|tan|sec|csc|cosec|cot|ln|log|exp)\s*[A-Za-z0-9]+\s*\^/;
 
 // ── a student line ───────────────────────────────────────────────────────────
 const FN_WORDS = /(?<![A-Za-z])(?:arcsin|arccos|arctan|cosec|sin|cos|tan|sec|csc|cot|ln|log|sqrt|exp|pi|e)(?![A-Za-z])/gi;
@@ -278,7 +304,9 @@ function readStudent(text) {
 
 // Restating the question is STRUCTURAL: the same tokens, differing only in spaces, bracket style, `*` and a unicode minus. Two
 // things that merely evaluate alike (f^(-2)(0) and f^(-1)(0) when f is read as a product) are never the same statement.
-const canon = s => tidy(s).replace(/\s+/g, '').replace(/[{}]/g, '').replace(/\[/g, '(').replace(/\]/g, ')').replace(/\^\(([^()]*)\)/g, '^$1').replace(/\*/g, '');
+// A limit is its VALUE, not its spelling: `]_0^(3.0)` and `]_0^(2+1)` are `]_0^(3)` (limitKeys compares values the same way).
+const limitsByValue = s => braces(tidy(s)).replace(LIMIT_PAIR, (m, a, b) => { const x = numericOf(a), y = numericOf(b); return x !== null && y !== null ? `_${x}^${y}` : m; });
+const canon = s => limitsByValue(s).replace(/\s+/g, '').replace(/[{}]/g, '').replace(/\[/g, '(').replace(/\]/g, ')').replace(/\^\(([^()]*)\)/g, '^$1').replace(/\*/g, '');
 function sameAsPromptStatement(parts, prompt) {
   for (const s of prompt) {
     if (s.parts.length !== parts.length) continue;
@@ -288,7 +316,32 @@ function sameAsPromptStatement(parts, prompt) {
 }
 
 /** A step of the worked solution an equation (or chain) of the student matches: { step, heading } or null. */
+/**
+ * `(1.06)^(20) = 3.2070`: a decimal literal beside an expression that is not itself a literal claims to be that expression's value to the places it
+ * shows. It is the line's claim only when it IS the correct rounding or the truncation of the exact value to those places; 3.2070 for 3.20713547 is
+ * not, whatever the worked solution's own (3-place) 3.207 says. Two plain numbers (`3.2070 = 3.207`) or an exact side keep the numeric match.
+ */
+function roundedAsWritten(parts, a, b) {
+  const literal = t => /^-?\d+\.\d+$/.test(tidy(t).replace(/\s+/g, '').replace(/^\((.*)\)$/, '$1'));
+  const lit = literal(parts[0]) ? 0 : literal(parts[1]) ? 1 : -1;
+  if (lit < 0 || literal(parts[1 - lit])) return true;
+  const written = tidy(parts[lit]).replace(/\s+/g, '').replace(/^\((.*)\)$/, '$1');
+  const places = written.split('.')[1].length;
+  const exact = lit === 0 ? b.value : a.value, shown = lit === 0 ? a.value : b.value;
+  if (!Number.isFinite(exact) || !Number.isFinite(shown)) return true;
+  const unit = 10 ** places, eps = 1e-9 / unit * Math.max(1, Math.abs(exact));
+  const rounded = Math.round(exact * unit) / unit, truncated = Math.trunc(exact * unit) / unit;
+  return Math.abs(shown - rounded) <= eps + 1e-12 || Math.abs(shown - truncated) <= eps + 1e-12 || Math.abs(shown - exact) <= 1e-9 * Math.max(1, Math.abs(exact));
+}
 function matchEquation(parts, sol, ctx) {
+  // a limit pair the question and its solution never use: not a step of this working, whatever value it reaches
+  if (!limitsKnown(parts, sol)) return null;
+  // `ln e^3` is ln(e^3) or (ln e)^3: the engine reads one, so a value it reaches says nothing about the other. Such a line is the solution's own statement
+  // (the same text) or it is not matched.
+  if (parts.some(p => AMBIGUOUS_FUNCTION_POWER.test(p))) {
+    for (const st of sol.every) if (st.parts.length === parts.length && parts.every((p, k) => canon(p) === canon(st.parts[k]))) return st;
+    return null;
+  }
   const lab = labelOf(parts[0]);
   if (lab) {
     const rest = parts.slice(1).map(readSide);
@@ -297,14 +350,15 @@ function matchEquation(parts, sol, ctx) {
         // a substitution fixes the argument: `x = 4: y' = …` is the statement about y'(4)
         const label = ctx && (lab.arg === null || lab.arg === ctx.name) ? { name: lab.name, arg: ctx.raw } : lab;
         if (!sameLabel(label, st.label)) continue;
-        if (rest.every((info, k) => sameSide(info, st.info, parts[k + 1], st.last))) return st;
+        // worked-out working (`-((-4)^3 + …)`) is matched as the same working, never by the number it reaches
+        if (rest.every((info, k) => sameSide(info, st.info, parts[k + 1], st.last) && (!isWorkedSum(parts[k + 1]) || canon(parts[k + 1]) === canon(st.last)))) return st;
       }
     }
   }
   if (parts.length === 2) {
     // (1.09)^19 = 5.142: a statement about numbers only, both sides as the solution has them
     const a = readSide(parts[0]), b = readSide(parts[1]);
-    if (a && b && a.value !== undefined && b.value !== undefined) {
+    if (a && b && a.value !== undefined && b.value !== undefined && roundedAsWritten(parts, a, b)) {
       for (const st of sol.numeric) {
         const x = readSide(st.parts[0]), y = readSide(st.parts[1]);
         if (x && y && closeLoose(a.value, x.value) && closeLoose(b.value, y.value)) return st;
@@ -322,6 +376,11 @@ function matchEquation(parts, sol, ctx) {
         if (proportional(cond, st.cond)) return st;
       }
     }
+  }
+  // The very same statement as one of the solution (canon: spaces, bracket style and `*` only), where a side cannot be evaluated: the last resort,
+  // so that a line another rule attributes to its own step is never taken by an earlier statement that merely reads alike.
+  if (!ctx && parts.some(p => readSide(p) === null)) {
+    for (const st of sol.verbatim) if (st.parts.length === parts.length && parts.every((p, k) => canon(p) === canon(st.parts[k]))) return st;
   }
   return null;
 }
@@ -465,6 +524,8 @@ function run(q, report) {
   };
 }
 export const _setFunctionsUnused = q => { FUNCS = functionNames(q); };
-export const _internals = { readSolution, readStudent, matchEquation, spanToPlain, conditionOf, readSide, sameSidePublic: sameSide };
+/** True when every limit pair written in `parts` is one the question or its solution uses (a line with no limits is true of this). */
+const limitsKnown = (parts, sol) => !parts.some(p => limitKeys(braces(tidy(p))).some(k => !sol.limits.has(k)));
+export const _internals = { limitsKnown, readSolution, readStudent, matchEquation, spanToPlain, conditionOf, readSide, sameSidePublic: sameSide };
 // For engine/lineChains.js (the pass that runs after this one).
 export const _forChains = { knownSubstitutions, statementsOfSpans, numericOf, canon, labelOf, topLevelPieces, sameLabel, setFunctions: q => { FUNCS = functionNames(q); } };

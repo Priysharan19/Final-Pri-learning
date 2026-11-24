@@ -84,6 +84,19 @@ export function milestonesOf(q) {
 /** The tick's comment: which step of the method the line matches. */
 export const milestoneNote = m => `Matches step ${m.step + 1} of the method${m.heading ? ` (${m.heading.replace(/\.$/, '')})` : ''}.`;
 
+/**
+ * A side that is a sum or product of several numbers worked out in place (`-((-4)^3 + 9(-4)^2 + 24(-4))`). Such a side is a piece of
+ * working, not a value: it ties to a step of the solution only as the same working, never by the number it happens to reach.
+ */
+export function isWorkedSum(plain) {
+  try {
+    const count = n => (!n || typeof n !== 'object' || n.t === 'call' ? 0 : n.t === 'num' ? 1 : ['l', 'r', 'v', 'arg'].reduce((a, k) => a + count(n[k]), 0));
+    const ast = parse(normalize(String(plain)));
+    // numbers worked out in place: a side with a letter in it (`(3x + 4)^3 / 9`) is an expression, not a value being worked out
+    return !variablesOf(ast).size && count(ast) >= 4;
+  } catch { return false; }
+}
+
 const SAME_SIDE = /(?<![<>!])=(?!=)/;
 
 /** The milestone a student line matches, or null. Same label, an equivalent value. */
@@ -98,11 +111,14 @@ export function matchMilestone(milestones, line) {
   if (!LABEL.test(label)) return null;
   let rhs;
   try { rhs = normalize(parts[1].trim()); parse(rhs); } catch { return null; }
+  // worked-out working is matched as the same working, not by the number it reaches (it may be wrong and still land on the value)
+  const worked = isWorkedSum(parts[1]);
   for (const m of milestones) {
     if (m.label !== label) continue;
     // The student's value must agree with the step's RESULT (its last form),
     // and use no letter the step does not use: "f'(x) = f'(x)" is not a step.
     const target = m.values[m.values.length - 1];
+    if (worked && String(normalize(target)).replace(/\s+/g, '') !== String(rhs).replace(/\s+/g, '')) continue;
     let ok = false;
     try {
       const want = variablesOf(parse(normalize(target)));

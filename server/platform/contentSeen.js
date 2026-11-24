@@ -243,6 +243,12 @@ function withoutChoice(item) {
 export const seenKeyOf = item => 'seen-c2:' + contentIdentityOf(withoutChoice(item));
 /** The one key a new spent-try record of this item is written under. */
 export const triedKeyOf = item => 'tried-c2:' + contentIdentityOf(withoutChoice(item));
+/**
+ * `issued-c2:<identity>` — an author-bank question this account was DEALT, whether or not it was ever resolved. It steers only the seek
+ * (practice.js chooseQuestionFor): a bank question that was issued and then revealed or abandoned is never dealt again while a fresh one
+ * can be found. It is NOT a repeat verdict (a question never seen through is not "seen"): repeatEvidenceOf reads seen and tried keys only.
+ */
+export const issuedKeyOf = item => 'issued-c2:' + contentIdentityOf(withoutChoice(item));
 
 // ── Version 1 and the engine-hash keys: read for records that predate v2 ────
 
@@ -407,4 +413,5 @@ export async function contentTried(db, accountId, item, now = Date.now()) {
 }
 
 /** Record a try spent on this content (under the canonical key alone). */
+export const markContentIssued = (db, accountId, item, now) => markSeen(db, accountId, [issuedKeyOf(item)], now, TRIED_AGE);
 export const markContentTried = (db, accountId, item, now) => markSeen(db, accountId, [triedKeyOf(item)], now, TRIED_AGE);

@@ -89,6 +89,30 @@ function sameFunction(fa, fb, rel = 1e-7) {
   return compared >= 4;
 }
 
+/** The numeric factor an expression opens with (75 in 75(5x - 4)^4, -2 in -2x), or 1. */
+function leadingFactor(node) {
+  let n = node;
+  while (n && n.t === 'group') n = n.v;
+  if (!n) return 1;
+  if (n.t === 'num') return n.v;
+  if (n.t === 'neg') return -leadingFactor(n.v);
+  if (n.t === 'bin' && n.op === '*') return leadingFactor(n.l) * (n.r && n.r.t === 'num' ? n.r.v : 1);
+  if (n.t === 'bin' && n.op === '/') return leadingFactor(n.l);
+  return 1;
+}
+/** `fa` is `k·fb` for one constant k at every sample point (k not 1), or null. */
+function constantRatio(fa, fb) {
+  let k = null, compared = 0;
+  for (const x of SAMPLE_POINTS) {
+    const a = fa(x), b = fb(x);
+    if (!Number.isFinite(a) || !Number.isFinite(b) || Math.abs(b) < 1e-9) continue;
+    const r = a / b;
+    if (k === null) k = r; else if (Math.abs(r - k) > 1e-7 * Math.max(1, Math.abs(k))) return null;
+    compared++;
+  }
+  return compared >= 4 && k !== null && Math.abs(k - 1) > 1e-9 ? k : null;
+}
+
 // ── Polynomials, for the power-rule catalogue ───────────────────────────────
 /** An expression in one variable as { power: coefficient }, or null when it is not a polynomial. */
 export function polyOf(ast, v = 'x', depth = 0) {
@@ -379,6 +403,13 @@ export function assessCalculusLine(line, ctx, meta, stage = { claimed: false }) 
     }
     const real = read.filter(s => !s.label);
     if (!real.length) return null;
+    // A self-contained numeric statement that is TRUE (`2 + 3 = 5`) says nothing about the derivative or the integral: a note, never a cross.
+    if (segs.length >= 2 && real.length === segs.length && real.every(s => s.plainAst && !variablesOf(s.plainAst).size)) {
+      try {
+        const vals = real.map(s => evaluate(s.plainAst, {}));
+        if (vals.every(v => Number.isFinite(v) && Math.abs(v - vals[0]) <= 1e-9 * Math.max(1, Math.abs(v)))) return { status: 'note', note: 'This is a true statement of arithmetic, not a claim about the ' + (ctx.relation === 'antiderivative' ? 'integral' : 'derivative') + ', so it is not checked as one.' };
+      } catch { /* not numeric: judged below */ }
+    }
     const target = ctx.relation === 'antiderivative' ? x => valueAt(ctx.given, x, ctx.variable) : null;
 
     // The answer test the checker has always applied, EXACTLY (marks hang on it): the last
@@ -412,8 +443,23 @@ export function assessCalculusLine(line, ctx, meta, stage = { claimed: false }) 
     });
     if (verdicts.includes('unread')) return null;
 
-    if (isAnswer) return { status: 'ok' };
-    const firstInvalid = verdicts.indexOf('invalid');
+    // The answer test judges the LAST '='-segment. A chain `dy/dx = 3(…)·4x = 8x(…)` that ends at the answer is still a chain: a middle
+    // piece the question's own relation proves false (a wrong coefficient, power or inner function) is the slip, so the line is not ticked.
+    // (the first piece of a chain may be the name of what is found, dA/dr or y', which is no claim)
+    const nameLike = t => /^\(*d[A-Za-z]?\)*\s*\/\s*\(*d[A-Za-z]\)*$|^(?:ans|answer|result)$|^[A-Za-z]\s*'{0,2}\s*(?:\(\s*[A-Za-z0-9]\s*\))?$/i.test(String(t).replace(/\s+/g, ' ').trim());
+    const badMiddle = real.some((seg, idx) => verdicts[idx] === 'invalid' && !(idx === 0 && real.length > 1 && nameLike(seg.text)) && idx !== real.length - 1);
+    if (isAnswer && !badMiddle) return { status: 'ok' };
+    const firstInvalid = verdicts.findIndex((v, idx) => v === 'invalid' && !(isAnswer && idx === 0 && real.length > 1 && nameLike(real[idx].text)));
+    // The constant factor of the question left out (75(5x - 4)^4 integrates to 3(5x - 4)^5, and (5x - 4)^5/25 is the integral of (5x - 4)^4): an
+    // intermediate worked solution writes it, and it is true of the integrand with its factor taken out. It is not the answer, and it is not
+    // a false line: a note that says what it is. (Left as the last line, it is the answer's slip: the answer box marks that.)
+    if (firstInvalid !== -1 && real.length === 1 && ctx.relation === 'antiderivative' && ctx.given) {
+      const lead = leadingFactor(ctx.given);
+      const r = constantRatio(real[0].asFunction, target);
+      if (r !== null && Math.abs(lead) > 1 && Math.abs(Math.abs(r) * Math.abs(lead) - 1) < 1e-7) {
+        return { status: 'note', note: `True of the integrand without its factor ${Math.abs(lead)}: this is not yet the integral of the whole integrand, so it is not marked as the answer.` };
+      }
+    }
     if (firstInvalid === -1) {
       const onlyStart = verdicts.every(x => x === 'start');
       return onlyStart ? { status: 'note', restates: true }
@@ -737,9 +783,9 @@ function formulaProvenFalse(rhsText, ctx, previousTexts) {
  */
 export function unbracketedReadings(line) {
   const text = String(line || '');
-  const FN = /(?<![a-z])(sin|cosec|cos|tan|sec|csc|cot|ln|log|exp|sqrt)(\s*\^\s*\d+)?\s*(?=[0-9a-z.])(?!\()/gi;
-  const TERM = /^(?:\d+(?:\.\d+)?|[a-z])(?:\s*\^\s*(?:-?\d+|[a-z]))?(?:\s*[a-z0-9.]+(?:\s*\^\s*(?:-?\d+|[a-z]))?)*/i;
-  const FIRST = /^(?:\d+(?:\.\d+)?|[a-z])(?:\s*\^\s*(?:-?\d+|[a-z]))?/i;
+  const FN = /(?<![a-z])(sin|cosec|cos|tan|sec|csc|cot|ln|log|exp|sqrt)(\s*\^\s*\d+)?\s*(?=[0-9a-zθ.])(?!\()/gi;
+  const TERM = /^(?:\d+(?:\.\d+)?|[a-zθ])(?:\s*\^\s*(?:-?\d+|[a-zθ]))?(?:\s*[a-zθ0-9.]+(?:\s*\^\s*(?:-?\d+|[a-zθ]))?)*/i;
+  const FIRST = /^(?:\d+(?:\.\d+)?|[a-zθ])(?:\s*\^\s*(?:-?\d+|[a-zθ]))?/i;
   if (!FN.test(text)) return null;
   const build = pick => {
     let out = '', i = 0, changed = false;
@@ -748,7 +794,7 @@ export function unbracketedReadings(line) {
     while ((m = FN.exec(text))) {
       const start = m.index + m[0].length;
       const rest = text.slice(start);
-      const run = (/^[0-9a-z.]/i.test(rest) ? (pick === 'first' ? FIRST : TERM).exec(rest) : null);
+      const run = (/^[0-9a-zθ.]/i.test(rest) ? (pick === 'first' ? FIRST : TERM).exec(rest) : null);
       if (!run) continue;
       out += text.slice(i, m.index) + m[1] + (m[2] || '') + '(' + run[0].trim() + ')';
       i = start + run[0].length; changed = true;

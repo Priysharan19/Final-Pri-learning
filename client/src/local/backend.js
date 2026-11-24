@@ -1910,7 +1910,7 @@ function stepMetaFor(q) {
   if (q.answerType === 'expression' && a.expr) return { kind: 'expression', canonical: a.expr };
   if (q.answerType === 'numeric' && a.value !== undefined) {
     const m = (q.answerPrefix || '').match(/^([a-z])\s*=$/i);
-    if (m) return { kind: 'equation', variable: m[1], solutions: [a.value] };
+    if (m) return { kind: 'equation', variable: m[1], solutions: [a.value], ...(a.tol > 0 ? { tol: a.tol } : {}) };
     // Kept identical to the server's stepMetaFor (server/platform/markerOps.js), the marker's authority: a
     // numeric prompt that is one plain single-variable equation is checked as that equation.
     const source = String(q.prompt || '').match(/^\s*\$([^$]+)\$\s*$/);
@@ -1918,7 +1918,7 @@ function stepMetaFor(q) {
     if (equation && /^[0-9a-z\s+*/().=\-]+$/i.test(equation) &&
         equation.split('=').length === 2 && Number.isFinite(Number(a.value))) {
       const symbols = [...new Set((equation.match(/[a-z]/gi) || []).map(v => v.toLowerCase()))];
-      if (symbols.length === 1) return { kind: 'equation', variable: symbols[0], solutions: [a.value], source: equation };
+      if (symbols.length === 1) return { kind: 'equation', variable: symbols[0], solutions: [a.value], ...(a.tol > 0 ? { tol: a.tol } : {}), source: equation };
     }
   }
   if (q.answerType === 'set' && Array.isArray(a.values) && a.values.length) {
@@ -2000,7 +2000,8 @@ function sanitize(q, row) {
     hintsAvailable: (q.hints || []).length, hintsUsed: row.hintsUsed || 0,
     // The hint ladder (engine/hintLadder.js): four rungs the server serves and
     // charges. `hintLevel` is the level the server committed for this row.
-    hintLadder: !q.multipart && !q.custom && !['rush', 'match', 'placement', 'exam'].includes(row.mode) && !row.examId ? HINT_RUNGS.length : 0,
+    // An author-bank question the server says has no rung (`hintsOffered: false`, safeQuestion) offers no ladder at all.
+    hintLadder: !q.multipart && !q.custom && !['rush', 'match', 'placement', 'exam'].includes(row.mode) && !row.examId && q.hintsOffered !== false ? HINT_RUNGS.length : 0,
     hintLevel: rungLevelOf(row.hintLevel),
     tutorLevel: row.tutorLevel || 0,
     triesLeft: 2 - (row.tries || 0),
