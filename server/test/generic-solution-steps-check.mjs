@@ -118,6 +118,14 @@ const seal = (item, list) => { const c = JSON.parse(JSON.stringify(item.q)); con
   ok(marksPossibleFor(one) === 1 && !genericEligible(one), 'a one-mark question is not eligible');
   const mcq = { answerType: 'mcq', difficulty: 3, steps: [{ h: 'a', d: '$x=1$' }, { h: 'b', d: '$x=2$' }] };
   ok(!genericEligible(mcq), 'an objective question is not eligible');
+  // The rule is approved for what the author's packet measured: Years 11 and 12, Mathematics Advanced and Extension 1. A Year 7 to 10 form (or Standard, Extension 2)
+  // that is structurally eligible is still sealed final-answer-only, with the repository's own list.
+  for (const [gen, d, seed] of [['y7-equations', 2, 3], ['y9-trig', 2, 1], ['y10-quadratics', 3, 1]]) {
+    const q0 = JSON.parse(JSON.stringify({ ...G.generateQuestion(gen, d, seed), _generator: gen }));
+    ok(genericEligible(q0), `${gen}: structurally eligible (a written question worth ${marksPossibleFor(q0)} marks)`);
+    const c0 = JSON.parse(JSON.stringify(q0)); const accepted = sealForEdition(c0, bankPolicy('prithagoras'), gen);
+    ok(accepted && c0._methodScheme === undefined && c0._marking === FINAL_ANSWER_MARKING, `${gen}: outside Years 11-12 Advanced and Extension 1, so sealed final-answer-only, not stamped by the rule`);
+  }
   // India: no allow-list, no seal
   const india = bankPolicy('priyabhata');
   ok(india.marking === null && !('methodSchemeTypes' in india), 'India has no seal and no allow-list: the rule can never be stamped there');

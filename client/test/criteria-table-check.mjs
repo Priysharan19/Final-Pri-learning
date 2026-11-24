@@ -47,6 +47,50 @@ ok(criteriaView({ criteria: earnedOn(4), mark: { awarded: 1, possible: 1 }, card
 ok(criteriaView({ criteria: earnedOn(1), mark: { awarded: 1, possible: 1 }, cards, approved: FIX })?.rows.length === 1, 'a ticked line may earn');
 ok(criteriaView({ criteria: crit({ items: [] }), mark, cards, approved: FIX }) === null, 'no criteria, no table');
 
+// The reply shapes a real paid reply takes (24 Nov 2026 review: 66 of 777 paid replies drew no table). For every approved per-type scheme and the generic rule,
+// real pages (a full page, a correct method with a wrong last line, a page whose later lines are not read) are marked by the server code, and the table the
+// answer card draws (cardsOfReport + criteriaView, the build's own approved list, the server's mark) must exist, add up, and carry the label.
+{
+  const G = await import('../src/engine/generators/index.js');
+  const R = await import('../../tools/method-marks-ready.mjs');
+  const { TYPES } = await import('../../tools/method-marks-drafts.mjs');
+  const { SCHEMES, schemePay, schemeMarks, schemeTypeOf } = await import('../../server/platform/schemeAward.js');
+  const { stepEvidence, marksPossibleFor } = await import('../../server/platform/markerOps.js');
+  const { checkAnswer } = await import('../src/engine/checker.js');
+  const { cardsOfReport } = await import('../src/components/criteriaTableModel.js');
+  const SW = await import('../../tools/generic-steps-sweep.mjs');
+  const { authoredLines, GENERIC_ID } = await import('../../server/platform/genericSteps.js');
+  await G.loadAllBanks();
+  ok(typeof cardsOfReport === 'function', 'the table model exports cardsOfReport, which the answer card\'s table uses');
+  const env = { PRI_METHOD_MARKS: 'on', PRI_EDITION: 'prithagoras' };
+  const shapes = [];   // { id, q, lines, answer }
+  for (const id of ['y12-trig-extreme-2', 'y12-diff-rules-3', 'y12-diff-gradient-2', 'y12-diff-gradient-3', 'y12-integral-2', 'y12-integral-3', 'y12-tangent-3']) {
+    const s = SCHEMES.find(x => x.id === id), t = TYPES.find(x => x.id === id); let n = 0;
+    for (const q of R.questionsOfType(s, { limit: 60 })) {
+      if (n >= 4 || schemeTypeOf(q) !== id || marksPossibleFor(q) !== schemeMarks(s)) continue;
+      const built = await t.build(q); if (!built) continue; n++;
+      shapes.push({ id, q: { ...q, _methodScheme: id }, lines: built.partial, answer: '999991' });
+      shapes.push({ id, q: { ...q, _methodScheme: id }, lines: [...built.partial.slice(0, 1), '= 0', ...built.partial.slice(1)], answer: '999991' });
+    }
+  }
+  for (const p of (await SW.payableQuestions({ seeds: 3 })).slice(0, 60)) {
+    const lines = authoredLines(p.q).map(l => l.text); if (lines.length < 2) continue;
+    shapes.push({ id: GENERIC_ID, q: p.q, lines: lines.slice(0, -1).concat(SW.falsifyByOne(lines[lines.length - 1]) ?? 'x = 999991'), answer: '999991' });
+  }
+  let paid = 0, drawn = 0, bad = [];
+  for (const sh of shapes) {
+    const N = marksPossibleFor(sh.q); const result = checkAnswer(sh.q, sh.answer);
+    const ev = stepEvidence(sh.q, sh.answer, sh.lines.join('\n'), result, { slipWarnings: true });
+    const pay = schemePay({ q: sh.q, report: ev.stepReport, topic: ev.topicTicks ?? null, correct: result.correct === true, marksPossible: N, env });
+    if (!pay.paid) continue;
+    paid++;
+    const earned = pay.items.reduce((n, i) => n + (i.awarded ? i.marks : 0), 0);
+    const view = criteriaView({ criteria: { typeId: pay.typeId, digest: pay.digest, items: pay.items }, mark: { awarded: earned, possible: N }, cards: cardsOfReport(ev.stepReport) });
+    if (view && view.earned === earned && view.possible === N) drawn++; else bad.push(`${sh.id}: ${sh.lines.join(' | ').slice(0, 80)}`);
+  }
+  ok(paid >= 60 && drawn === paid, `every paid reply shape draws a table that adds up (${drawn} of ${paid} paid pages over eight approvals, ${bad.slice(0, 2).join('; ')})`);
+}
+
 // the records: a digest change revokes; a fixture or an automation name is refused
 const types = [{ id: 'y12-stationary-x', digest: D }];
 const rec = (o = {}) => ({ file: 'y12-stationary-x.json', record: { schemaVersion: 1, typeId: 'y12-stationary-x', digest: D, verdict: 'approved', note: 'ok', approvedBy: 'Priysharan Tripathi', role: 'author (tutor)', date: '2026-11-19', ...o } });

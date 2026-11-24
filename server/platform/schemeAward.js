@@ -468,6 +468,20 @@ export function awardScheme(scheme, report, correct, topic = null, q = null) {
 }
 
 /**
+ * Whether step marks can be earned on this issued question RIGHT NOW: it carries an approved stamp, its mode is a paying one, and the author-approved
+ * tier's switch is on. The device reads this to say so honestly before the student answers; it decides nothing (schemePay does, at the mark).
+ */
+export function stepMarksOpen({ q, env = process.env, list = approved }) {
+  const typeId = typeof q?._methodScheme === 'string' ? q._methodScheme : null;
+  if (!typeId || !isApproved(typeId, list)) return false;
+  if (q._practiceMode !== undefined && !SCHEME_MODES.includes(q._practiceMode)) return false;
+  return authorTier(env) && authorTierRefusal(env) === null;
+}
+
+/** The practice modes whose questions a scheme may pay. Rush, Match and the placement check are one-try, final-answer-only modes. */
+export const SCHEME_MODES = Object.freeze(['practice', 'review', 'task']);
+
+/**
  * What a scheme pays one resolved practice question. `{ paid: false, reason }` when it must not pay it; otherwise
  * `{ paid: true, typeId, digest, items, awarded, partial }` where `partial` has the shape the rest of the reply already reads.
  */
@@ -476,6 +490,9 @@ export function schemePay({ q, report, topic = null, correct, marksPossible, env
   const generic = typeId === GENERIC_ID;
   const scheme = typeId ? byId.get(typeId) : null;
   if (!scheme && !generic) return { paid: false, reason: 'not-a-scheme-question' };
+  // Step marks are for practice, review and task questions only. The one-try modes (Rush, Match, the placement check) and anything else with a
+  // mode of its own stay on the final answer, whatever the question carries: a stamp is not enough.
+  if (q?._practiceMode !== undefined && !SCHEME_MODES.includes(q._practiceMode)) return { paid: false, typeId, reason: 'mode-final-answer-only' };
   if (!isApproved(typeId, list)) return { paid: false, typeId, reason: 'type-not-approved' };
   // The generic rule is the author-approved tier only: never under the examiner tier, whatever else is set.
   if (generic && !authorTier(env)) return { paid: false, typeId, reason: 'generic-author-tier-only' };

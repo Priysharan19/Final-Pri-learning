@@ -41,6 +41,9 @@ const POLICIES = Object.freeze({
   })
 });
 
+/** The generators the generic solution-step rule was measured on and approved for (docs/marking/author-approvals/generic-solution-steps.json). */
+const GENERIC_SCOPE = /^(y11|y12|me11|me12)-/;
+
 /** The bank policy of an edition (default: this server's). Unknown editions throw. */
 export function bankPolicy(edition = serverEdition()) {
   if (!Object.hasOwn(POLICIES, edition)) throw new Error(`No question banks are defined for edition ${JSON.stringify(edition)}`);
@@ -70,7 +73,9 @@ export function sealForEdition(q, banks, generator = q?._generator ?? q?.subtopi
     if (typeId && isApproved(typeId, banks.methodSchemeTypes) && marksPossibleFor(q) === schemeMarks(schemeById(typeId))) q._methodScheme = typeId;
     // No approved per-type scheme is in force for this question (none for its type, or the type's scheme is for other marks): the generic
     // rule (genericSteps.js), only while the author's record for it is at its current digest. A per-type approved scheme is never replaced.
-    else if (banks.methodSchemeTypes?.length && isApproved(GENERIC_ID, banks.methodSchemeTypes) && genericEligible(q)) q._methodScheme = GENERIC_ID;
+    // Only for the forms the author's packet measured and he approved it for: Years 11 and 12, Mathematics Advanced and Extension 1 (generators y11-, y12-, me11-, me12-).
+    // Years 7 to 10, Standard and Extension 2 forms are not in what he read, so they stay final-answer only.
+    else if (banks.methodSchemeTypes?.length && isApproved(GENERIC_ID, banks.methodSchemeTypes) && GENERIC_SCOPE.test(String(generator ?? '')) && genericEligible(q)) q._methodScheme = GENERIC_ID;
     else q._marking = banks.marking;
   }
   return true;

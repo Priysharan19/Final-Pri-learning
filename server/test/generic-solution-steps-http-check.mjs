@@ -55,11 +55,15 @@ try {
   const issue = body => h.request('/v1/practice/issue', { method: 'POST', jar: a.jar, body: { curriculum: 'nsw', ...body } });
   const submit = (qid, id, answer, steps) => h.request(`/v1/practice/${qid}/submit`, { method: 'POST', jar: a.jar, headers: { 'Idempotency-Key': id }, body: { submissionId: id, answer, mode: 'typed', steps } });
   const sealedOf = async qid => JSON.parse((await h.db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=?", [a.account.id, qid])).response_json);
-  const run = async (lines, answer, tag) => {
-    const r = await issue({ generator: GEN, difficulty: D, seed: SEED });
+  const run = async (lines, answer, tag, { mode, patch } = {}) => {
+    const r = await issue({ generator: GEN, difficulty: D, seed: SEED, ...(mode ? { mode } : {}) });
     c.eq(r.status, 201, `${tag}: issued`);
     const qid = r.data.question.id;
-    const sealed = await sealedOf(qid);
+    let sealed = await sealedOf(qid);
+    if (patch) { // a question stamped before its mode was known (legacy row): the pay-time check must still refuse it
+      sealed = { ...sealed, ...patch };
+      await h.db.run("UPDATE idempotency_keys SET response_json=? WHERE account_id=? AND scope='practice-question' AND key=?", [JSON.stringify(sealed), a.account.id, qid]);
+    }
     const one = await submit(qid, `${tag}-1`, answer, lines.join('\n'));
     const two = one.data.resolved ? one : await submit(qid, `${tag}-2`, answer, lines.join('\n'));
     return { sealed, reply: two.data };
@@ -90,6 +94,20 @@ try {
   c.eq(p3.reply.marksEarned, 3, 'phase 2: a right answer is 3 of 3');
   const p4 = await run([], '1042', 'phase2-none');
   c.eq(p4.reply.marksEarned, 0, 'phase 2: a wrong answer with no working is 0');
+
+  // The one-try modes stay final-answer only, whatever the repository's list holds (real list here, switch on): not stamped at issue, nothing paid, no table.
+  for (const mode of ['rush', 'match', 'placement']) {
+    const m = await run(wrongLines, '1042', `mode-${mode}`, { mode });
+    c.ok(m.sealed._methodScheme === undefined && m.sealed._marking === FINAL_ANSWER_MARKING && m.sealed._practiceMode === mode, `${mode}: sealed final-answer-only at issue, with no scheme stamp`);
+    c.ok(m.reply.marksEarned === 0 && clean(m.reply), `${mode}: correct method with a wrong last line earns 0, with no criteria table, scheme field or reason code`);
+    const right = await run(rightLines, '147', `mode-${mode}-right`, { mode });
+    c.eq(right.reply.marksEarned, right.reply.marksPossible, `${mode}: the right final answer is still full marks`);
+    // pay time: a legacy row stamped with the scheme in this mode (no seal) is refused too
+    const legacy = await run(wrongLines, '1042', `mode-${mode}-legacy`, { mode, patch: { _methodScheme: GENERIC_ID, _marking: undefined } });
+    c.ok(legacy.reply.marksEarned === 0 && clean(legacy.reply), `${mode}: a stamped row in this mode is still refused at pay time`);
+  }
+  const control = await run(wrongLines, '1042', 'mode-practice-control', { mode: 'practice' });
+  c.ok(control.sealed._methodScheme === GENERIC_ID && control.reply.marksEarned === 2, 'control: the same question in practice mode is stamped and earns 2 of 3');
 
   // the same question while the rule is NOT approved: sealed final-answer-only, earns nothing for working
   approveSchemeTypesForTests(REPO_LIST.filter(a => a.typeId !== GENERIC_ID));

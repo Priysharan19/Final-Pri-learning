@@ -23,6 +23,7 @@ import { dollarsBalanced, lineTex } from '../engine/commentTex.js';
 import { strokePath } from './originalWorkModel.js';
 import { STATE, STATE_WORD, boxesFromInk, boxesFromPhoto, buildMarkedPage, defaultLine, listOf, markerOf, stateOf } from './markedPageModel.js';
 import { criteriaView } from './criteriaTableModel.js';
+import CriteriaTable from './CriteriaTable.jsx';
 import { firstSentence } from './lineReportText.js';
 import { typesetProse } from './typesetProse.js';
 import './MarkedPage.css';
@@ -129,7 +130,7 @@ function Sheet({ source, geometry, page, selected, pick, onKey, markersRef, t, c
  * source: { kind: 'ink', strokes } or { kind: 'photo', src, lines } where `lines` are the judged
  * lines in order (each may carry the reader's normalised `box`). The geometry is worked out here.
  */
-export default function MarkedPage({ input, source, texOf = s => s, markReady = true, scoreShown = false, criteria = null, approved, reading = null, onCorrect = null, howRead = '' }) {
+export default function MarkedPage({ input, source, texOf = s => s, markReady = true, scoreShown = false, criteria = null, stepMarks = false, approved, reading = null, onCorrect = null, howRead = '' }) {
   const t = useT();
   const { language } = useLanguage();
   // The engine's own commentary from its structured facts (engine/lineCommentary.js): null keeps the engine's sentence as it was.
@@ -298,7 +299,7 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
   return (
     <section className="mp" aria-labelledby={`${uid}-h`} data-marked-page data-mp-source={source.kind} data-mp-aligned={page.aligned ? 'true' : 'false'} data-mp-selected={selected}>
       <h3 className="sr-only" id={`${uid}-h`}>{t('mp.title')}</h3>
-      <Header page={page} t={t} hasTable={!!table} scoreShown={scoreShown} />
+      <Header page={page} t={t} hasTable={!!table || stepMarks} scoreShown={scoreShown} />
       <div className="mp-body">
         <figure className="mp-page">
           <Sheet source={source} geometry={geometry} page={page} selected={selected} pick={pick} onKey={onKey(markersRef)} markersRef={markersRef} t={t} cleaned={cleaned} />
@@ -346,28 +347,7 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
           </ol>
         </div>
       </div>
-      {table && (
-        <div className="mp-criteria" data-mp-criteria={table.typeId}>
-          <table className="mp-table">
-            <caption>{t('mp.criteria.caption')}</caption>
-            <thead><tr><th scope="col">{t('mp.criteria.criterion')}</th><th scope="col">{t('mp.criteria.result')}</th></tr></thead>
-            <tbody>
-              {table.rows.map(r => (
-                <tr key={r.key} data-mp-criterion={r.key} data-awarded={r.awarded ? 'yes' : r.verified ? 'no' : 'unverified'}>
-                  <td><span>{r.text}</span>{r.reason ? <span className="mp-why">{r.reason}</span> : null}</td>
-                  <td>
-                    <Icon name={r.awarded ? 'check' : 'uncertain'} size={14} />
-                    <span>{r.awarded ? t('mp.criteria.awarded', { marks: r.marks, count: r.marks }) : t(r.verified ? 'mp.criteria.notAwarded' : 'mp.criteria.notVerified', { marks: r.marks, count: r.marks })}</span>
-                    {r.lines.length > 0 && <span className="mp-why">{t('mp.criteria.onLines', { count: r.lines.length, list: listOf(r.lines) })}</span>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot><tr><th scope="row">{t('mp.criteria.total')}</th><td>{t('mp.mark', { earned: table.earned, possible: table.possible })}</td></tr></tfoot>
-          </table>
-          <p className="mp-label" data-mp-approval-label>{t('mp.criteria.label')}</p>
-        </div>
-      )}
+      {table && <CriteriaTable view={table} />}
     </section>
   );
 }
