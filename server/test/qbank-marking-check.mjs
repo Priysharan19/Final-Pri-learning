@@ -15,7 +15,7 @@ import path from 'node:path';
 process.env.PRI_EDITION = 'prithagoras';
 delete process.env.PRI_QBANK_DIR;
 const qb = await import('../platform/qbankPack.js');
-const { checkBankAnswer, roundSignificant, roundPlaces, typedDecimal, acceptsRoundedFigures, asksForExact, readOwnPrefix } = await import('../platform/qbankMarking.js');
+const { checkBankAnswer, roundSignificant, roundPlaces, typedDecimal, acceptsRoundedFigures, asksForExact, isRational, readOwnPrefix } = await import('../platform/qbankMarking.js');
 const { MARKER_OPS, markerView } = await import('../platform/markerOps.js');
 const { checkAnswer } = await import('../../client/src/engine/checker.js');
 const { namedDecimalPlaces } = await import('../../client/src/engine/checker-core.js');
@@ -157,7 +157,7 @@ const served = e => markerView(qb.qbankEntryQuestion(e.id, 17));
   eq(bad.slice(0, 5), [], `over every numeric key of the pack the bank adds only the key correctly rounded to 3 or more significant figures (${addedByBank} readings added; 2 figure roundings, truncations and neighbours are never added)`);
   ok(bothSides >= rows.length * 3 - 3 && addedByBank > 100, `the rule accepts the roundings on one side of every boundary (${bothSides} accepted roundings over ${rows.length} questions)`);
   // the three the review found accept 3 significant figures; each other form is refused
-  for (const [id, yes, no] of [['A11-T1-124', ['41.6', '41.57', '41.569', '41.5692'], ['42', '41.5', '41.7', '41.56', '41.58', '40']], ['A11-C1-054', ['18.8', '18.85', '18.850', '18.8496'], ['19', '18.7', '18.9', '18.84', '18.86']], ['A11-S1-137', ['0.347', '0.3474', '0.34737'], ['0.35', '0.346', '0.348', '0.34', '0.3473']]]) {
+  for (const [id, yes, no] of [['A11-T1-124', ['41.6', '41.57', '41.569', '41.5692'], ['42', '41.5', '41.7', '41.56', '41.58', '40']], ['A11-C1-054', ['18.8', '18.85', '18.850', '18.8496'], ['19', '18.7', '18.9', '18.84', '18.86']], ]) {
     const q = served(entries.find(x => x.id === id));
     ok(acceptsRoundedFigures(q) && yes.every(t => checkBankAnswer(q, t).correct === true), `${id}: ${yes.join(', ')} are right`);
     ok(no.every(t => checkBankAnswer(q, t).correct === false), `${id}: ${no.join(', ')} are wrong (two figures, a truncation that is not a rounding, a neighbour)`);
@@ -197,6 +197,13 @@ const served = e => markerView(qb.qbankEntryQuestion(e.id, 17));
     [mk({ prompt: 'The price rises by 3\\% of 85 dollars. Find the new price.' }), 'dollars'],
     [mk({ prompt: 'Find the interest earned in cents.' }), 'cents'],
     [mk({ prompt: 'How many whole boxes can be filled?' }), 'how many (whole things)'],
+    [mk({ prompt: 'What fraction of the paths pass through the centre?', answer: { value: 0.5142857142857142 } }), 'what fraction (18/35)'],
+    [mk({ prompt: 'Find the fraction of the area that is shaded.' }), 'fraction of'],
+    [mk({ prompt: 'Express the probability in the form $a/b$.' }), 'in the form'],
+    [mk({ prompt: 'Express the length as a surd.' }), 'express as'],
+    [mk({ prompt: 'Simplify the expression.' }), 'simplify'],
+    [mk({ prompt: 'Evaluate $\\log_8 4$.', answer: { value: 0.6666666666666666 } }), 'evaluate a log with a rational value (2/3 refuses 0.667)'],
+    [mk({ prompt: 'Find the probability.', answer: { value: 0.3055555555555556 } }), 'a rational key (11/36)'],
     [mk({ prompt: 'Find the angle to the nearest degree.' }), 'an angle to the nearest degree'],
     [mk({ prompt: 'Find the bearing to the nearest minute.' }), 'a bearing to the nearest minute'],
     [mk({ answer: { value: 134.953712345, tol: 0.01 } }), 'a key with its own tolerance'],
@@ -204,6 +211,7 @@ const served = e => markerView(qb.qbankEntryQuestion(e.id, 17));
     [mk({ prompt: 'Give your answer correct to 4 significant figures.' }), 'a stated precision in figures'],
     [mk({ answer: { value: 1234 } }), 'a whole number']
   ];
+  { const e = entries.find(x => x.id === 'A11-S1-137'); if (e) ok(!acceptsRoundedFigures(served(e)), 'A11-S1-137 (33/95) is a rational key: only exact forms, no rounding reading'); }
   for (const [q, what] of exactCases) ok(!acceptsRoundedFigures(q), `the rounding rule does not apply: ${what}`);
   // the author's form does not matter when the words ask for no exact form
   for (const [over, what] of [
@@ -212,10 +220,11 @@ const served = e => markerView(qb.qbankEntryQuestion(e.id, 17));
     [{ criteria: [{ marks: 1, point: '12√3π', answer: true }] }, 'a key authored as a multiple of pi'],
     [{ steps: [{ h: 'Sum', d: '$x=\\sqrt{17}$' }] }, 'a last worked line that ends in a surd'],
     [{ steps: [{ h: 'Differentiate', d: '$\\dfrac{dy}{dx}=\\dfrac{3}{4}$' }] }, 'a last worked line that holds a fraction and a d over d'],
-    [{ answer: { value: 0.36363636363636365 } }, 'a value that reads as 4/11'],
     [{ prompt: 'For $A=\\pi r^{2}$, find $\\dfrac{dA}{dr}$ when $r=3$.' }, 'a prompt that holds \\pi but does not ask for it'],
     [{ prompt: 'Find the value of $\\sqrt{17}+\\ln 3$.' }, 'a prompt that holds a root and a logarithm']
   ]) ok(acceptsRoundedFigures(mk(over)) && checkBankAnswer(mk(over), String(roundSignificant(over.answer?.value ?? decimal, 3))).correct === true, `the rounding rule applies: ${what}`);
+  ok(isRational(0.6666666666666666) && isRational(0.3055555555555556) && !isRational(Math.PI) && !isRational(Math.sqrt(2)) && !isRational(41.569219381653056), 'rational keys are told from irrational ones');
+  ok(checkBankAnswer(mk({ prompt: 'Evaluate $\\log_8 4$.', answer: { value: 0.6666666666666666 } }), '0.667').correct === false, 'log base 8 of 4 refuses 0.667');
   ok(roundSignificant(134.95, 4) === 135 && roundSignificant(2.675, 3) === 2.68 && roundSignificant(0.0005, 1) === 0.0005 && roundPlaces(2.7268, 2) === 2.73 && roundPlaces(0.005, 2) === 0.01 && roundPlaces(0.004, 2) === 0, 'rounding is half up from the decimal the key is written as, not from its binary value');
   // a stated precision keeps the engine's reading: that precision and any more precise correct rounding, never fewer places
   const places = numeric.filter(e => e.answer.tol === undefined && namedDecimalPlaces(served(e)) !== null && !/exact/i.test(e.prompt));
