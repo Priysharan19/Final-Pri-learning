@@ -563,6 +563,23 @@ ok(/this one is a repeat/.test(en['practice.repeatNote']) && /will not count tow
   const between = (from, to) => card.slice(card.indexOf(from), card.indexOf(to, card.indexOf(from)));
   ok(!/deviceMarkedResponse|deviceRevealResponse|deviceGrade|serverIssued|data-grade-device/.test(card), 'the card accepts no device verdict and reads no serverIssued flag');
   ok(!/selfMarks|CriteriaTable/.test(card), 'and has no self-marked marks for practice');
+  // UPDATED 24 Nov 2026, narrowly, with the guard above left whole. WHAT THE GUARD PROTECTS (added 10 Oct 2026, ADR-0001 amendment of that date): marking is
+  // online-only and server-authoritative, so the practice card must hold no self-marked marks: no criteria the student ticks, no mark the device works out. The
+  // old `CriteriaTable` it bans was that self-marking checklist, and the ban on that name and on `selfMarks` stays exactly as it was.
+  // WHAT CHANGED: the owner's decision of 24 Nov 2026 (docs/release/V1_DECISIONS_2026-11-01.md, docs/marking/author-approvals/README.md) lets the Australian
+  // server pay step marks by the author's approved schemes. The server's reply then carries the criteria it paid, and the card must show them. That table is not a
+  // self-mark: it is drawn from the server's reply only, for an approved scheme at its digest, and only when its rows add up to the server's own mark.
+  // So the card may mount exactly ONE display-only `SchemeTable`, fed only by the reply's server fields, and nothing else may make a table.
+  {
+    const uses = card.match(/<SchemeTable\b[^>]*>/g) || [];
+    ok(uses.length === 1 && /criteria=\{res\.methodCriteria\}/.test(uses[0]) && /mark=\{\{ awarded: res\.marksEarned, possible: res\.marksPossible \}\}/.test(uses[0]) && /report=\{res\.stepReport\}/.test(uses[0]) && !/onChange|checked|onClick|awarded=\{/.test(uses[0]),
+      'the card mounts one SchemeTable, fed only by the server reply (its criteria, its mark, its step report), with no handler and no mark of its own');
+    ok(/res\.methodScheme\?\.paid === true && res\.methodCriteria && !res\.revealed && \(\s*<React\.Suspense fallback=\{null\}>\s*<SchemeTable/.test(card), 'and only when the server says a scheme paid this reply, and never on a reveal');
+    const table = read('src/components/SchemeTable.jsx'), model = read('src/components/criteriaTableModel.js');
+    ok(!/<input|<button|onChange|onClick|useState|checked/.test(table) && /criteriaView\(\{ criteria, mark, cards: cardsOfReport\(report\) \}\)/.test(table), 'the table is display only, and goes through criteriaView with the server\'s mark');
+    ok(/a\.typeId === criteria\.typeId && a\.digest === criteria\.digest/.test(model) && /earned !== Number\(mark\.awarded\) \|\| possible !== Number\(mark\.possible\)\) return null/.test(model), 'criteriaView refuses a table for a type or digest the author has not approved, and one that does not add up to the server\'s mark');
+    ok(/methodCriteria && !\['rush', 'match', 'placement'\]\.includes\(row\.mode\)/.test(read('src/local/backend.js')), 'the device never carries a criteria table for a one-try mode (the server sends none either)');
+  }
 
   const deliver = between('async function deliver(', '/** The submit, reveal or walkthrough did not go through');
   ok(/if \(!diagnostic && !matchingGradeResponse\(r, question\.id, body\.submissionId\)\) \{[\s\S]{0,400}?throw new Error\(gradingReceiptMismatch\(language\)\);/.test(deliver), 'a practice submit is valid only as a matched server receipt');

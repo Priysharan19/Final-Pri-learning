@@ -1,13 +1,14 @@
 // ───────────────────────────────────────────────────────────────────────────────
 // Pri Learning · the generic step-mark rule over the real submit path (R4)
 //
-// Boots the shipped /v1 app as Prithagoras and approves the generic rule IN THIS TEST PROCESS ONLY (approveSchemeTypesForTests; the repository's
-// list stays empty and no author record is written). Issues, submits and reads real replies:
+// Boots the shipped /v1 app as Prithagoras with the repository's OWN approved list, which carries the generic rule since the author's record of
+// 24 Nov 2026 (no test hook is used for phases 1 to 3; no author record is written here). Only the last phase narrows the list, to show a question
+// issued while the rule is not approved. Issues, submits and reads real replies:
 //
 //   PHASE 1  switch OFF: the question is stamped with the rule at issue and nothing is paid: main's reply, no criteria, no method row, no scheme field
 //   PHASE 2  switch ON (author-approved tier, no examiner variable): correct method and a wrong final answer is paid 2 of 3 from the lines the page
 //            ticks, the reply carries the criteria table and says the rule paid; a right answer is 3 of 3; the same question issued while the rule is
-//            NOT approved is sealed final-answer-only and earns 0
+//            NOT approved (a list without the rule, narrowed in this process only) is sealed final-answer-only and earns 0
 //
 //   node server/test/generic-solution-steps-http-check.mjs
 // SYNTHETIC: generated questions and a scripted client. Not evidence about real students.
@@ -41,7 +42,7 @@ await G.loadAllBanks();
 
 const c = checks();
 const REPO_LIST = APPROVED_SCHEME_TYPES;
-c.ok(!REPO_LIST.some(a => a.typeId === GENERIC_ID), 'the repository\'s own list does not contain the generic rule');
+c.ok(REPO_LIST.some(a => a.typeId === GENERIC_ID && a.digest === genericDigest()), 'the repository\'s own list contains the generic rule at its current digest');
 const GEN = 'y12-appdiff', D = 3, SEED = 1;
 const q0 = G.generateQuestion(GEN, D, SEED);
 const texts = authoredLines(q0).map(l => l.text);
@@ -55,25 +56,28 @@ try {
   const issue = body => h.request('/v1/practice/issue', { method: 'POST', jar: a.jar, body: { curriculum: 'nsw', ...body } });
   const submit = (qid, id, answer, steps) => h.request(`/v1/practice/${qid}/submit`, { method: 'POST', jar: a.jar, headers: { 'Idempotency-Key': id }, body: { submissionId: id, answer, mode: 'typed', steps } });
   const sealedOf = async qid => JSON.parse((await h.db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=?", [a.account.id, qid])).response_json);
-  const run = async (lines, answer, tag) => {
-    const r = await issue({ generator: GEN, difficulty: D, seed: SEED });
+  const run = async (lines, answer, tag, { mode, patch } = {}) => {
+    const r = await issue({ generator: GEN, difficulty: D, seed: SEED, ...(mode ? { mode } : {}) });
     c.eq(r.status, 201, `${tag}: issued`);
     const qid = r.data.question.id;
-    const sealed = await sealedOf(qid);
+    let sealed = await sealedOf(qid);
+    if (patch) { // a question stamped before its mode was known (legacy row): the pay-time check must still refuse it
+      sealed = { ...sealed, ...patch };
+      await h.db.run("UPDATE idempotency_keys SET response_json=? WHERE account_id=? AND scope='practice-question' AND key=?", [JSON.stringify(sealed), a.account.id, qid]);
+    }
     const one = await submit(qid, `${tag}-1`, answer, lines.join('\n'));
     const two = one.data.resolved ? one : await submit(qid, `${tag}-2`, answer, lines.join('\n'));
-    return { sealed, reply: two.data };
+    return { sealed, reply: two.data, issued: r.data.question };
   };
   const clean = reply => !reply.methodCriteria && !reply.methodScheme && !JSON.stringify(reply).includes('criteria-count') && !JSON.stringify(reply).includes('type-not-approved') && !JSON.stringify(reply).includes('generic-');
 
-  // the rule approved in this process only
-  approveSchemeTypesForTests([{ typeId: GENERIC_ID, digest: genericDigest() }]);
-
+  // the rule is approved by the repository's own list: nothing is set up here
   // PHASE 1: switch off
   const p1 = await run(wrongLines, '1042', 'phase1');
   c.eq(p1.sealed._methodScheme, GENERIC_ID, 'phase 1: the question is stamped with the rule at issue');
   c.ok(p1.sealed._marking === undefined, 'phase 1: and not sealed final-answer-only');
   c.deq([p1.reply.resolved, p1.reply.marksEarned], [true, 0], 'phase 1: with the switch off nothing is paid');
+  c.ok(p1.issued.stepMarks === undefined, 'phase 1: the issued question does not claim step marks while the switch is off');
   c.ok(clean(p1.reply) && !p1.reply.markRows?.method, 'phase 1: no criteria, no method row, no scheme field, no reason code');
 
   // PHASE 2: switch on
@@ -88,13 +92,29 @@ try {
   c.deq(p2.reply.methodScheme, { typeId: GENERIC_ID, paid: true }, 'phase 2: the reply says the rule paid, and nothing more');
   c.deq(p2.reply.solution.criteria, cr.items.map(i => ({ mark: i.marks, text: i.text })), 'phase 2: the solution shows the criteria, because the rule paid');
   c.ok(!JSON.stringify(p2.reply).includes('reason":"criteria-count') && !JSON.stringify(p2.reply).includes('generic-no-usable'), 'phase 2: no reason code reaches the client');
+  c.ok(p2.issued.stepMarks === true, 'phase 2: the issued question says step marks can be earned on it (stamped, practice mode, switch on)');
   const p3 = await run(rightLines, '147', 'phase2-right');
   c.eq(p3.reply.marksEarned, 3, 'phase 2: a right answer is 3 of 3');
   const p4 = await run([], '1042', 'phase2-none');
   c.eq(p4.reply.marksEarned, 0, 'phase 2: a wrong answer with no working is 0');
 
+  // The one-try modes stay final-answer only, whatever the repository's list holds (real list here, switch on): not stamped at issue, nothing paid, no table.
+  for (const mode of ['rush', 'match', 'placement']) {
+    const m = await run(wrongLines, '1042', `mode-${mode}`, { mode });
+    c.ok(m.issued.stepMarks === undefined, `${mode}: the issued question does not claim step marks`);
+    c.ok(m.sealed._methodScheme === undefined && m.sealed._marking === FINAL_ANSWER_MARKING && m.sealed._practiceMode === mode, `${mode}: sealed final-answer-only at issue, with no scheme stamp`);
+    c.ok(m.reply.marksEarned === 0 && clean(m.reply), `${mode}: correct method with a wrong last line earns 0, with no criteria table, scheme field or reason code`);
+    const right = await run(rightLines, '147', `mode-${mode}-right`, { mode });
+    c.eq(right.reply.marksEarned, right.reply.marksPossible, `${mode}: the right final answer is still full marks`);
+    // pay time: a legacy row stamped with the scheme in this mode (no seal) is refused too
+    const legacy = await run(wrongLines, '1042', `mode-${mode}-legacy`, { mode, patch: { _methodScheme: GENERIC_ID, _marking: undefined } });
+    c.ok(legacy.reply.marksEarned === 0 && clean(legacy.reply), `${mode}: a stamped row in this mode is still refused at pay time`);
+  }
+  const control = await run(wrongLines, '1042', 'mode-practice-control', { mode: 'practice' });
+  c.ok(control.sealed._methodScheme === GENERIC_ID && control.reply.marksEarned === 2, 'control: the same question in practice mode is stamped and earns 2 of 3');
+
   // the same question while the rule is NOT approved: sealed final-answer-only, earns nothing for working
-  approveSchemeTypesForTests(REPO_LIST);
+  approveSchemeTypesForTests(REPO_LIST.filter(a => a.typeId !== GENERIC_ID));
   const p5 = await run(wrongLines, '1042', 'phase2-unapproved');
   c.eq(p5.sealed._marking, FINAL_ANSWER_MARKING, 'unapproved: the question is sealed final-answer-only at issue');
   c.ok(p5.sealed._methodScheme === undefined && p5.reply.marksEarned === 0 && clean(p5.reply), 'unapproved: it carries no scheme, earns 0 and shows main\'s reply');

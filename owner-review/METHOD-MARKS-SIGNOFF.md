@@ -1,8 +1,9 @@
 # Signing off the step marks, one question type at a time
 
-This note is for you, the author. Nothing in it has been approved, and nothing is switched on. Students still get
-marks for the final answer only. Step marks stay off until you approve a type, and even then they show only for that
-type.
+This note is for you, the author. It is the earlier, shorter version of the sign-off note, and its list of ten types is out of date. The current one is
+docs/marking/method-marks-signoff/READ-ME-method-marks-signoff.md, with the eighteen packets in owner-review/method-marks/.
+Status, 24 November 2026: your records approve fourteen types and the generic solution-step rule. Students get marks for the final answer only
+while the Australian server's marking switch is off; with it on, an approved type is paid by its scheme and every other question stays on the final answer.
 
 ## What you are being asked to do
 
