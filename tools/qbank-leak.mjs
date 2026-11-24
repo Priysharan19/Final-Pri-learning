@@ -15,7 +15,8 @@
 // Deterministic. No clock, no network, no model.
 // ─────────────────────────────────────────────────────────────────────────────
 import { checkAnswer } from '../client/src/engine/checker.js';
-import { normalize, evalNumeric } from '../client/src/engine/expr.js';
+import { normalize, evalNumeric, parse } from '../client/src/engine/expr.js';
+import { repeats } from '../client/src/engine/hintLadder.js';
 
 const MATH = /(?<!\\)\$((?:\\\$|[^$])+?)(?<!\\)\$/g;
 
@@ -217,51 +218,217 @@ export function leaksOf(q, texts) {
   return out;
 }
 
-// ── the ladder of one bank question ──────────────────────────────────────────
-import { repeats } from '../client/src/engine/hintLadder.js';
 
-const nonEmpty = v => (typeof v === 'string' && v.trim() ? v.trim() : null);
+// ─────────────────────────────────────────────────────────────────────────────
+// The rung rule (fail closed). A bank question's hint ladder is built ONLY from the author's own hints, in his order; nothing is derived
+// from a worked step or a step heading. A hint becomes a rung only when every test below passes; a hint that fails any is dropped,
+// and a question may end with 0 to 3 rungs (with none the hint control is not offered for it).
+//
+//   · empty, a single word, or under 4 words with no mathematical content: nothing to learn from it;
+//   · every TeX span is read; one the reader cannot read is dropped; so is any side of it the engine's parser cannot parse;
+//   · every maths run written in plain prose ("56/8", "100 − 50", "2 ln 3 = ln 9") is read the same way;
+//   · ANY side, run, list or number in it that is the accepted answer, any accepted form of it, or an arithmetic expression that
+//     evaluates to it, is a leak (leakReason, and the standalone-number and plain-run tests here);
+//   · it is not the text of the question, of its answer box, of a criterion, a step, a trap's reason or expression, or the title, and
+//     a hint that contains one of those long texts whole is dropped (those are sealed until the question resolves, and the hints are
+//     sent when it is issued).
+// ─────────────────────────────────────────────────────────────────────────────
+
+const RELATION = /\s*(?:<=|>=|!=|=|<|>|≤|≥|≈)\s*/;
+/** A text folded to what it says: no TeX markup, spacing, case or punctuation. */
+const fold = t => String(t ?? '').toLowerCase().replace(/\\[dt]?frac/g, 'frac').replace(/\\(?:left|right|displaystyle|quad|qquad|,|;|!)/g, '')
+  .replace(/\\(?:cdot|times)/g, '').replace(/[*×]/g, '').replace(/[−–—]/g, '-').replace(/[$\\{}\s.,;:!?'"`]/g, '');
+
+const wordsOf = prose => prose.split(/\s+/).filter(w => /[A-Za-z0-9]/.test(w));
+
+/** The numbers the accepted answer is, in every place it can be a number (a numeric key, a set's elements, a point's coordinates, an interval's ends). */
+function answerNumbers(q) {
+  const a = q?.answer || {};
+  const out = [...keyNumbers(q)];
+  if (q?.answerType === 'interval' && typeof a.region === 'string') for (const m of a.region.matchAll(/\d+(?:\.\d+)?/g)) out.push(Number(m[0]));
+  return out.filter(Number.isFinite);
+}
+
+/** The standalone numbers of a reading: not an exponent or subscript, not a coefficient of a letter, function or bracket. */
+function standaloneNumbers(plain) {
+  const out = [];
+  for (const m of String(plain).matchAll(/(?<![A-Za-z0-9_.])(\d+(?:\.\d+)?)(?![A-Za-z0-9_.(])/g)) {
+    const before = plain.slice(Math.max(0, m.index - 2), m.index);
+    if (/[\^_]\(?$/.test(before)) continue;     // an exponent or a subscript
+    out.push(Number(m[1]));
+  }
+  return out;
+}
+
+/** The maths runs of prose written without TeX: maximal runs of number, operator and function tokens (a lone letter joins one only beside a number or operator). */
+const SUP = { '⁰': '0', '¹': '1', '²': '2', '³': '3', '⁴': '4', '⁵': '5', '⁶': '6', '⁷': '7', '⁸': '8', '⁹': '9', '⁻': '-', 'ˣ': 'x', 'ⁿ': 'n', '⁺': '+' };
+const SUB = { '₀': '0', '₁': '1', '₂': '2', '₃': '3', '₄': '4', '₅': '5', '₆': '6', '₇': '7', '₈': '8', '₉': '9', 'ₙ': 'n' };
+const VULGAR = { '½': '(1/2)', '⅓': '(1/3)', '⅔': '(2/3)', '¼': '(1/4)', '¾': '(3/4)', '⅕': '(1/5)', '⅛': '(1/8)' };
+/** Prose maths written in Unicode (x², aₙ, ½) as the plain ASCII the reader parses. */
+export function plainUnicode(t) {
+  return String(t)
+    .replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹⁻⁺ˣⁿ]+/g, m => `^${[...m].map(c => SUP[c]).join('')}`)
+    .replace(/[₀₁₂₃₄₅₆₇₈₉ₙ]+/g, m => `_${[...m].map(c => SUB[c]).join('')}`)
+    .replace(/[½⅓⅔¼¾⅕⅛]/g, m => VULGAR[m]);
+}
+export function proseRuns(proseRaw) {
+  const prose = plainUnicode(proseRaw);
+  const FN = '(?:arcsin|arccos|arctan|cosec|sqrt|sin|cos|tan|sec|cot|log|exp|ln|pi)';
+  const L = 'A-Za-zα-ωΑ-Ω';
+  const kindOf = tok => {
+    const t = tok.replace(/[.,;:!?]+$/, '');
+    if (!t) return 'x';
+    if (new RegExp(`^[${L}]$`).test(t)) return 'v';
+    if (new RegExp(`^${FN}$`).test(t)) return 'f';
+    const rest = t.replace(new RegExp(FN, 'g'), '').replace(new RegExp(`(?<![${L}])[${L}](?![${L}])`, 'g'), '');
+    if (/^[0-9.+\-−–×÷*/^()=π√°%<>≤≥′″'_]*$/.test(rest) && /[0-9π√=+\-−–×÷*/^]/.test(t)) return 'm';
+    if (/^[()_′″']*$/.test(rest) && new RegExp(`[${L}]`).test(t)) return 'v';      // x), P(X, f(x): symbols and brackets
+    return 'x';
+  };
+  const runs = [];
+  let cur = [];
+  const flush = () => {
+    while (cur.length && cur[0].k === 'v' && /^[aAI]$/.test(cur[0].t)) cur.shift();
+    while (cur.length && cur[cur.length - 1].k === 'v' && /^[aAI]$/.test(cur[cur.length - 1].t)) cur.pop();
+    if (cur.some(x => x.k === 'm')) runs.push(cur.map(x => x.t).join(' ').replace(/[,;:]+$/, '').replace(/^[=<>≤≥+×÷*/^\s]+/, '').replace(/[=<>≤≥+−–×÷*/^\s-]+$/, ''));
+    cur = [];
+  };
+  for (const raw of prose.split(/\s+/).filter(Boolean)) {
+    const k = kindOf(raw);
+    if (k === 'x') { flush(); continue; }
+    cur.push({ k, t: raw.replace(/[.!?]+$/, '') });
+    if (/[.!?]$/.test(raw)) flush();
+  }
+  flush();
+  return runs;
+}
+
+/** Inverse trigonometric notation, minus signs and the multiplication sign, as the engine writes them. */
+const cleanMath = s => s.replace(/\b(sin|cos|tan)\s*\^\s*\(?-1\)?/g, 'arc$1').replace(/[−–]/g, '-').replace(/[×]/g, '*').replace(/÷/g, '/').replace(/[:;]/g, ',');
+/** What the engine's parser needs to be asked "is this readable": subscripts, primes and Greek letters it has no spelling for are made plain. */
+const forParse = s => s.replace(/\^\(°\)/g, '°').replace(/_\(?([A-Za-z0-9]+)\)?/g, '$1').replace(/[′″'‴]+/g, '').replace(/[α-ωΑ-Ω]/g, m => (m === 'θ' || m === 'π' ? m : 'q')).replace(/°/g, '*pi/180').replace(/%/g, '/100');
+const bareFns = s => s.replace(/\b(arcsin|arccos|arctan|cosec|sqrt|sin|cos|tan|sec|cot|log|exp|ln)\b(?!\s*[0-9(A-Za-zπθ√])/g, '$1(1)');
+const SYMBOL = /^[A-Za-zα-ωΑ-Ω]+(?:_\(?[A-Za-z0-9]+\)?)?['′″]*$/;
+const balance = s => { let depth = 0; let out = ''; for (const ch of s) { if (ch === '(') { depth++; out += ch; } else if (ch === ')') { if (depth > 0) { depth--; out += ch; } } else out += ch; } return out + ')'.repeat(depth); };
+const parsable = s => { const t = forParse(s); for (const u of [t, bareFns(t)]) { try { parse(normalize(u)); return true; } catch { /* next */ } } return false; };
+/** Can the engine's parser read it? A relation inside brackets (P(X = 0)) is read a side at a time. */
+function readable(s) {
+  const t = cleanMath(s);
+  if (parsable(t)) return true;
+  if (!RELATION.test(t)) return false;
+  return t.split(RELATION).map(x => balance(x.trim())).filter(Boolean).every(parsable);
+}
+
+/** `s` split at the relations that are not inside brackets. */
+function splitTop(s) {
+  const out = []; let depth = 0, cur = '';
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if ('([{'.includes(ch)) depth++; else if (')]}'.includes(ch)) depth--;
+    const m = depth === 0 ? /^\s*(?:<=|>=|!=|=|<|>|≤|≥|≈)\s*/.exec(s.slice(i)) : null;
+    if (m && m[0].trim()) { out.push(cur); cur = ''; i += m[0].length - 1; } else cur += ch;
+  }
+  out.push(cur);
+  return out;
+}
+const sidesOf = v => [...new Set(splitTop(v).flatMap(part => topLevelList(unwrap(part))))];
+
+/** Why a side states the answer or cannot be read, or null. `strict` (TeX): what cannot be read is dropped; prose: only a side that is all digits and operators. */
+function sideReason(q, side, accepted, keys, strict, whole = false) {
+  const s = balance(cleanMath(side.trim()));
+  if (!s) return null;
+  if (accepted(s) || accepted(s.replace(/^[A-Za-z']+(\([a-z]\))?\s*=\s*/, ''))) return `the engine accepts "${s.slice(0, 40)}" as the answer`;
+  if (whole) return null;
+  const letters = hasFreeLetters(s) || bareFns(forParse(s)) !== forParse(s);
+  if (!letters && /\d/.test(s) && !RELATION.test(s)) {
+    const v = numberOf(s);
+    if (v === undefined) return `a closed value "${s.slice(0, 40)}" cannot be read (fail closed)`;
+    if (v !== null && keys.some(k => near(v, k))) return `"${s.slice(0, 40)}" evaluates to the answer`;
+  }
+  if ((strict || (!letters && /\d/.test(s))) && /[A-Za-z0-9α-ωΑ-Ω]/.test(s) && !SYMBOL.test(s) && !readable(s)) return `"${s.slice(0, 40)}" cannot be parsed (fail closed)`;
+  return null;
+}
+
+/** Why this text must not be a rung of question `q` (a pack question as the server issues it), or null. `ctx`: { title, criteria, steps, traps }. */
+export function rungDropReason(q, text, ctx = {}) {
+  const t = String(text ?? '').trim();
+  if (!t) return 'empty';
+  const spans = [...t.matchAll(MATH)].map(m => m[1]);
+  const prose = t.replace(MATH, ' ');
+  const words = wordsOf(prose);
+  if (words.length + spans.length <= 1) return 'a single word';
+  if (words.length + spans.length < 4 && !spans.length && !/[0-9=+\-−×÷*/^]/.test(t)) return 'under 4 words with no mathematical content';
+
+  const direct = leakReason(q, t);
+  if (direct) return direct;
+
+  const keys = answerNumbers(q);
+  const accepted = c => { try { return checkAnswer(q, c)?.correct === true; } catch { return false; } };
+  const numberHit = (list, where) => { const n = list.find(v => keys.some(k => near(v, k))); return n === undefined ? null : `${where} states the number ${n}, which is in the answer`; };
+
+  for (const span of spans) {
+    const { plain, unread } = texToPlain(span);
+    if (unread.length) return `unread TeX (${unread.join(' ')}) (fail closed)`;
+    const variants = plain.includes('±') || plain.includes('∓') ? [plain.replace(/[±∓]/g, '+'), plain.replace(/[±∓]/g, '-')] : [plain];
+    for (const v of variants) {
+      for (const side of sidesOf(v)) { const r = sideReason(q, side, accepted, keys, true); if (r) return r; }
+    }
+    const hit = numberHit(standaloneNumbers(cleanMath(plain)), 'a maths span'); if (hit) return hit;
+  }
+  for (const run of proseRuns(prose)) {
+    const variants = run.includes('±') ? [run.replace(/±/g, '+'), run.replace(/±/g, '-')] : [run];
+    for (const v of variants) {
+      const clean = x => x;
+      const whole = sideReason(q, clean(v), accepted, keys, false, true); if (whole) return whole;
+      for (const side of sidesOf(v)) { const r = sideReason(q, clean(side), accepted, keys, false); if (r) return r; }
+    }
+    const hit = numberHit(standaloneNumbers(cleanMath(run)), 'the prose'); if (hit) return hit;
+  }
+
+  // The same words as another thing a student is sent or that is sealed until the question resolves.
+  const f = fold(t);
+  const steps = ctx.steps || q.steps || [], criteria = ctx.criteria || q.criteria || [], traps = ctx.traps || q.traps || [];
+  const sealed = [
+    ['a step heading', ...steps.map(s => s?.h)], ['a step', ...steps.map(s => s?.d)],
+    ['a criterion', ...criteria.flatMap(c => [c?.point, c?.line])],
+    ['a trap reason', ...traps.map(x => x?.why)], ['a trap answer', ...traps.flatMap(x => [x?.expr, x?.value])],
+    ['the title', ctx.title]
+  ];
+  for (const [what, ...fields] of sealed) for (const field of fields) {
+    if (field === undefined || field === null || field === '') continue;
+    const g = fold(String(field));
+    if (g.length >= 3 && f === g) return `it is word for word ${what}`;
+    if (g.length >= 10 && f.includes(g)) return `it contains ${what} whole`;
+  }
+  const open = [['the question', q.prompt], ['the answer box hint', q.inputHint], ['the answer box label', q.answerPrefix]];
+  for (const [what, field] of open) {
+    if (!field) continue;
+    const g = fold(field);
+    if (g.length >= 3 && (f === g || (g.length >= 8 && (f.includes(g) || g.includes(f))))) return `it repeats ${what}`;
+  }
+  // A span whose whole reading is a criterion's line or a trap's expression is that line.
+  const lines = new Set([...criteria.map(c => c?.line), ...traps.map(x => (typeof x?.expr === 'string' ? x.expr : null))].filter(Boolean).map(fold).filter(x => x.length >= 4));
+  for (const span of spans) if (lines.has(fold(texToPlain(span).plain)) || lines.has(fold(span))) return 'a maths span is a criterion line or a trap expression';
+  for (const run of proseRuns(prose)) if (lines.has(fold(run))) return 'a maths run is a criterion line or a trap expression';
+  return null;
+}
 
 /**
- * The three rungs a bank question shows before the full solution, and its hints with every leaking one removed.
- *
- *   nudge   the author's first hint, else the first step's heading;
- *   method  his second hint, else the next step's heading;
- *   worked  the first step actually worked, but only a step that is NOT the last one and does not state the answer in any form the engine
- *           accepts or that is one trivial calculation from it; else his third hint, else the first step's heading alone; else none.
- *           A solution of one step has no worked step: the rung is his third hint or the heading, or it is not offered (a thin rung).
- *
- * A candidate that leaks (leakReason), or that repeats a rung already chosen, is passed over for the next; nothing is invented. Returns
- * { hints, ladder, dropped } where `dropped` lists what was set aside and why (for the importer's report).
+ * The ladder of one bank question: ONLY his authored hints (`q.hints`, in his order, at most three), each kept as a rung when it passes
+ * rungDropReason and does not repeat a rung already kept. Nothing is derived from a step or a heading. Returns
+ * { hints, ladder, dropped }: `hints` the kept texts in order, `ladder` { nudge, method, worked } filled from the front (a question may have
+ * 0 to 3 rungs), `dropped` [{ index, why }].
  */
-export function bankLadder(q) {
-  const hints = (q.hints || []).map(nonEmpty);
-  const steps = Array.isArray(q.steps) ? q.steps : [];
-  const dropped = [];
-  const chosen = [];
-  const take = (rung, candidates) => {
-    for (const [source, text] of candidates) {
-      const t = nonEmpty(text);
-      if (!t) continue;
-      const why = leakReason(q, t);
-      if (why) { dropped.push({ rung, source, why }); continue; }
-      if (chosen.some(c => repeats(c, t))) continue;
-      chosen.push(t);
-      return t;
-    }
-    return null;
-  };
-  const head = i => nonEmpty(steps[i]?.h);
-  const nudge = take('nudge', [['hint 1', hints[0]], ['step 1 heading', head(0)]]);
-  const method = take('method', [['hint 2', hints[1]], ['step 2 heading', head(1)], ['step 1 heading', head(0)]]);
-  const notLast = steps.length > 1 ? [['step 1', steps[0]?.d]] : [];
-  const worked = take('worked', [...notLast, ['hint 3', hints[2]], ['step 1 heading', head(0)]]);
+export function bankLadder(q, ctx = {}) {
+  const authored = (Array.isArray(q.hints) ? q.hints : []).slice(0, 3);
+  const kept = [], dropped = [];
+  authored.forEach((h, index) => {
+    const text = typeof h === 'string' ? h.trim() : '';
+    let why = rungDropReason(q, text, ctx);
+    if (!why && kept.some(k => repeats(k, text))) why = 'it repeats a rung already kept';
+    if (why) dropped.push({ index, why }); else kept.push(text);
+  });
   const ladder = {};
-  if (nudge) ladder.nudge = nudge;
-  if (method) ladder.method = method;
-  if (worked) ladder.worked = worked;
-  // The hints that stay: each authored hint that does not leak and says something the ladder has not already said is kept in order.
-  const kept = hints.filter(h => h && !leakReason(q, h));
-  for (const [i, h] of hints.entries()) if (h && leakReason(q, h)) dropped.push({ rung: 'hint', source: `hint ${i + 1}`, why: leakReason(q, h) });
+  ['nudge', 'method', 'worked'].forEach((rung, i) => { if (kept[i]) ladder[rung] = kept[i]; });
   return { hints: kept, ladder, dropped };
 }

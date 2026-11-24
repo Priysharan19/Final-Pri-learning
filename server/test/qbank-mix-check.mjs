@@ -210,7 +210,7 @@ try {
   // dealt once, and when the pool is used the generators take over, with no repeat.
   {
     const dealt = [];
-    for (let i = 0; i < cellIds.length + 20; i++) {
+    for (let i = 0; i < cellIds.length + 80; i++) {   // the last fresh authored question is found at about 1 issue in 7 once it is nearly alone: 80 spare issues make a miss about 1 in 10000
       const r = await issue({ generator: cellSub, difficulty: cellLevel });
       c.eq(r.status, 201, `session issue ${i + 1}`);
       const sealed = await sealedOf(r.data.question.id);
@@ -233,6 +233,36 @@ try {
   c.ok(again && again.sealed._repeat === true, 'the same authored question, drawn again, is sealed as a repeat');
   const repeatDone = await submit(again.r.data.question.id, 'mix-bank-2-xxxx', acceptedInput(target.entry));
   c.ok(repeatDone.data.repeat === true && repeatDone.data.correct === true, 'and is marked as a repeat, which progress does not count (as a generator\'s repeat is)');
+  // A bank question that was issued and then REVEALED, or ABANDONED, is as seen as one that was answered: y12-integration, level 3, 90 issues, none answered.
+  {
+    const ask = (acct, extra = {}) => h.request('/v1/practice/issue', { method: 'POST', jar: acct.jar, body: { curriculum: 'nsw', generator: 'y12-integration', difficulty: 3, ...extra } });
+    const sealedFor = async (acct, qid) => JSON.parse((await h.db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=?", [acct.account.id, qid])).response_json);
+    const scenarios = [
+      ['each revealed as soon as it is dealt', 'reveal'],
+      ['each revealed through the ladder\'s solution rung', 'solution-rung'],
+      ['all 90 dealt, and only then revealed', 'reveal-after'],
+      ['never answered, never revealed (abandoned)', 'abandon']
+    ];
+    let n = 0;
+    for (const [what, mode] of scenarios) {
+      const acct = await registerAccount(h, { email: `qbank.rep${++n}@example.test`, deviceId: `ipad-qbank-rep-${n}` });
+      await verifyEmail(h, acct.account.id);
+      const dealt = [];
+      for (let i = 0; i < 90; i++) {
+        const r = await ask(acct);
+        if (r.status !== 201) throw new Error(`issue ${i}: ${r.status}`);
+        const sealed = await sealedFor(acct, r.data.question.id);
+        dealt.push({ id: r.data.question.id, bank: sealed._bank ?? null, repeat: sealed._repeat === true });
+        if (mode === 'reveal') await h.request(`/v1/practice/${r.data.question.id}/reveal`, { method: 'POST', jar: acct.jar, body: {} });
+        if (mode === 'solution-rung') for (const rung of ['nudge', 'method', 'worked', 'solution']) { const x = await h.request(`/v1/practice/${r.data.question.id}/hint`, { method: 'POST', jar: acct.jar, body: { rung } }); if (x.status !== 200 && !(rung !== 'solution' && x.status === 409)) throw new Error(`hint ${rung}: ${x.status}`); if (x.status === 409) break; }
+      }
+      if (mode === 'reveal-after') for (const d of dealt) await h.request(`/v1/practice/${d.id}/reveal`, { method: 'POST', jar: acct.jar, body: {} });
+      const banks = dealt.map(d => d.bank).filter(Boolean);
+      const dupes = banks.length - new Set(banks).size;
+      c.deq([dupes, dealt.filter(d => d.bank && d.repeat).length], [0, 0], `${what}: ${banks.length} authored questions in 90 deals, ${dupes} dealt twice, none a repeat`);
+      c.ok(banks.length > 20, `${what}: the authored pool is used (${new Set(banks).size} different)`);
+    }
+  }
 } finally {
   await h.close();
   for (const key of keys) { if (before[key] === undefined) delete process.env[key]; else process.env[key] = before[key]; }

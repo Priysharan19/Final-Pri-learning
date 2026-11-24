@@ -78,6 +78,8 @@ export function questionProblem(q, family) {
   if (!Array.isArray(q.steps) || !q.steps.every(s => isStr(s?.h) && isStr(s?.d))) return `${q.id}: steps`;
   if (!Array.isArray(q.hints) || !q.hints.every(isStr)) return `${q.id}: hints`;
   if (q.ladder !== undefined && (!q.ladder || typeof q.ladder !== 'object' || Array.isArray(q.ladder) || !Object.entries(q.ladder).every(([k, v]) => ['nudge', 'method', 'worked'].includes(k) && isStr(v)))) return `${q.id}: ladder`;
+  // The hint ladder is the author's hints and nothing else: 0 to 3 of them, each one rung, in his order (tools/qbank-leak.mjs bankLadder).
+  if (q.hints.length > 3 || !q.ladder || JSON.stringify(['nudge', 'method', 'worked'].slice(0, q.hints.length).map(k => q.ladder[k])) !== JSON.stringify(q.hints) || Object.keys(q.ladder).length !== q.hints.length) return `${q.id}: ladder is not the hints`;
   if (!Array.isArray(q.traps) || !q.traps.every(t => t && typeof t === 'object' && isStr(t.why))) return `${q.id}: traps`;
   if (!Array.isArray(q.criteria) || !q.criteria.every(c => Number.isInteger(c?.marks) && isStr(c?.point))) return `${q.id}: criteria`;
   if (q.criteria.reduce((s, c) => s + c.marks, 0) !== q.marks) return `${q.id}: criteria do not add up to the marks`;

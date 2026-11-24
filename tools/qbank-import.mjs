@@ -41,9 +41,8 @@ import { writtenAsLine, statesOnlyFinalAnswer } from '../client/src/engine/check
 import { boardSchemeProblems, matchBoardPoints, awardBoardScheme } from '../client/src/engine/boardScheme.js';
 import { stepEvidence, stepMetaFor, marksPossibleFor } from '../server/platform/markerOps.js';
 import { authoredLines } from '../server/platform/genericSteps.js';
-import { buildHintLadder, repeats } from '../client/src/engine/hintLadder.js';
 import { checkBankAnswer } from '../server/platform/qbankMarking.js';
-import { leakReason, bankLadder } from './qbank-leak.mjs';
+import { rungDropReason, bankLadder } from './qbank-leak.mjs';
 import { PACK_FORMAT, DEFAULT_PACK_DIR, buildFamily, indexOf, loadPack, sha256 } from '../server/platform/qbankPack.js';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -512,15 +511,16 @@ function summarise({ files, problems, partRows, questionsOut, dupExact, dupSkele
  * hint, and the rungs of the ladder as the server will build them. A real test (tools/qbank-leak.mjs): TeX is parsed and every side
  * evaluated, so a binomial written out with its value and 56/8 are found; what cannot be read is treated as leaking.
  */
-export function hintLeaks(q) {
+export function hintLeaks(q, ctx = {}) {
   const texts = [...(q.hints || []).map((t, i) => [`hint ${i + 1}`, t])];
   if (typeof q.inputHint === 'string') texts.push(['inputHint', q.inputHint.replace(/^\s*e\.g\.?\s*/i, '')]);
-  try { buildHintLadder(q).forEach(r => { if (r.text) texts.push([`rung ${r.rung}`, r.text]); }); } catch { texts.push(['ladder', 'unreadable']); }
+  // The rungs are the author's hints and nothing else (bankLadder); nothing is derived from a step.
+  for (const [rung, text] of Object.entries(q.ladder || {})) texts.push([`rung ${rung}`, text]);
   const out = [];
   for (const [label, text] of texts) {
     // The answer box's form hint is a form to write in, not a hint: it leaks only when it is itself the answer.
     if (label === 'inputHint') { if (safe(() => checkBankAnswer(q, String(text).trim()), {}).correct === true) out.push(label); continue; }
-    if (leakReason(q, text)) out.push(label);
+    if (rungDropReason(q, text, ctx)) out.push(label);
   }
   return [...new Set(out)];
 }
@@ -531,7 +531,7 @@ const ordered = (o, keys) => Object.fromEntries(keys.filter(k => o[k] !== undefi
 const json = v => JSON.stringify(v) + '\n';
 
 /** The reasons a part is not in the pack (empty when it is). Stable codes, no content. */
-export function rejectReasons(rec, part, q) {
+export function rejectReasons(rec, part, q, ctx = {}) {
   const out = [];
   if (part.answerType === 'manual') out.push('manual');
   else if (part.answerType === 'working') out.push('working-proof');
@@ -540,7 +540,7 @@ export function rejectReasons(rec, part, q) {
     if (f.startsWith('line:')) continue;                 // criteria lines matter for step marks, not for a final-answer pack
     out.push(f.replace(/:\d+$/, '').replace(/@.*$/, '').replace(/(trap:accepted):\d+/, '$1'));
   }
-  if (rec.autoMarkable && !out.length) { const leaks = hintLeaks(q); if (leaks.length) out.push('hint:leak'); }
+  if (rec.autoMarkable && !out.length) { const leaks = hintLeaks(q, ctx); if (leaks.length) out.push('hint:leak'); }
   return [...new Set(out)];
 }
 
@@ -569,35 +569,30 @@ export function compilePack(archive, opts = {}) {
   const byId = new Map(archive.questions.map(q => [q.id, q]));
   const shards = new Map();
   const rejects = [];
-  const ladderStats = { questions: 0, hintsDropped: 0, questionsWithHintDropped: 0, oldLeakingRungs: 0, oldLeakingQuestions: 0, rungsChanged: 0, questionsChanged: 0, thinRungs: 0, noWorkedRung: 0 };
+  const ladderStats = { questions: 0, authoredHints: 0, rungsKept: 0, rungsDropped: 0, withRungs: { 0: 0, 1: 0, 2: 0, 3: 0 }, dropReasons: {} };
   for (const part of archive.parts) {
     const question = byId.get(part.question);
     const rec = checkPart(part, question, archive.tags, opts);
     const q = engineQuestion(part, question);
-    // The ladder this question will show: the old one (the engine's, from the authored hints and steps) is measured, then replaced by the
-    // one whose rungs do not give the answer (tools/qbank-leak.mjs).
-    const old = safe(() => buildHintLadder(q).filter(r => r.text).map(r => [r.rung, r.text]), []);
-    const lad = bankLadder(q);
+    // The ladder this question shows: ONLY his authored hints, each kept when it passes the rung rule (tools/qbank-leak.mjs). Nothing is
+    // derived from a worked step or a heading.
+    const ctx = { title: question?.title, criteria: part.criteria || [], steps: part.steps || [], traps: q.traps || [] };
+    const lad = bankLadder(q, ctx);
     q.hints = lad.hints;
     q.ladder = lad.ladder;
-    const reasons = rec.failures.some(f => f.startsWith('schema:')) ? rec.failures.filter(f => f.startsWith('schema:')) : rejectReasons(rec, part, q);
+    const reasons = rec.failures.some(f => f.startsWith('schema:')) ? rec.failures.filter(f => f.startsWith('schema:')) : rejectReasons(rec, part, q, ctx);
     if (HELD_FOR_OWNER[rec.id] && !reasons.includes(HELD_FOR_OWNER[rec.id])) reasons.push(HELD_FOR_OWNER[rec.id]);
     if (reasons.length || !question || !archive.tags?.[part.question]) {
       rejects.push({ id: rec.id, reasons: reasons.length ? reasons : [!question ? 'join:part-without-question' : 'join:no-dotpoint'] });
       continue;
     }
     if (part.answerType !== 'manual') {
-      const leaking = old.filter(([, text]) => leakReason(q, text));
       ladderStats.questions++;
-      ladderStats.oldLeakingRungs += leaking.length;
-      if (leaking.length) ladderStats.oldLeakingQuestions++;
-      const now = { nudge: lad.ladder.nudge ?? null, method: lad.ladder.method ?? null, worked: lad.ladder.worked ?? null };
-      const changed = old.filter(([rung, text]) => rung !== 'solution' && now[rung] !== text).length;
-      ladderStats.rungsChanged += changed; if (changed) ladderStats.questionsChanged++;
-      ladderStats.thinRungs += ['nudge', 'method', 'worked'].filter(r => !now[r]).length;
-      if (!now.worked) ladderStats.noWorkedRung++;
-      const dropped = lad.dropped.filter(d => d.rung === 'hint').length;
-      ladderStats.hintsDropped += dropped; if (dropped) ladderStats.questionsWithHintDropped++;
+      ladderStats.authoredHints += Math.min(3, (part.hints || []).length);
+      ladderStats.rungsKept += lad.hints.length;
+      ladderStats.rungsDropped += lad.dropped.length;
+      ladderStats.withRungs[lad.hints.length]++;
+      for (const d of lad.dropped) { const k = String(d.why).replace(/"[^"]*"/g, '"…"').replace(/\b\d+(?:\.\d+)?\b/g, 'N').slice(0, 60); ladderStats.dropReasons[k] = (ladderStats.dropReasons[k] || 0) + 1; }
     }
     const family = familyOf(part);
     const entry = ordered({

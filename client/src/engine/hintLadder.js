@@ -234,6 +234,9 @@ export function buildHintLadder(q) {
  */
 export function ladderAvailable(q) {
   if (!q || q.multipart || q.placement || q.custom) return false;
+  // An author-bank question carries the rungs its importer chose, and only those (tools/qbank-leak.mjs bankLadder): with none, no hint is offered
+  // (the solution is still there to be revealed). Its steps never stand in for a rung.
+  if (q.ladder && typeof q.ladder === 'object') return !!(text(q.ladder.nudge) || text(q.ladder.method) || text(q.ladder.worked));
   return (Array.isArray(q.hints) && q.hints.length > 0) || (Array.isArray(q.steps) && q.steps.length > 0);
 }
 

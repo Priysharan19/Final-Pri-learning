@@ -27,8 +27,8 @@ const { requestedEngine } = await import('./support/engine.mjs');
 const qb = await import('../platform/qbankPack.js');
 const { checkAnswer } = await import('../../client/src/engine/checker.js');
 const { checkBankAnswer } = await import('../platform/qbankMarking.js');
-const { buildHintLadder } = await import('../../client/src/engine/hintLadder.js');
-const { leakReason } = await import('../../tools/qbank-leak.mjs');
+const { buildHintLadder, ladderAvailable } = await import('../../client/src/engine/hintLadder.js');
+const { leakReason, rungDropReason } = await import('../../tools/qbank-leak.mjs');
 const { bankPolicy, sealForEdition, FINAL_ANSWER_MARKING } = await import('../platform/editionBanks.js');
 const { marksPossibleFor, markerView, stepEvidence } = await import('../platform/markerOps.js');
 const { productPlaceOf } = await import('../platform/qbankDotpoints.js');
@@ -46,7 +46,7 @@ const entries = [];
 for (const s of manifest.shards) for (const e of JSON.parse(fs.readFileSync(path.join(qb.DEFAULT_PACK_DIR, s.name), 'utf8')).questions) entries.push({ ...e, family: s.name.replace(/^shards\/|\.json$/g, '') });
 c.eq(entries.length, pack.questionCount, 'every packed question is visited');
 const policy = bankPolicy('prithagoras');
-let rungsShown = 0, noNudge = 0, displayed = 0, badDisplay = 0, hinted = 0, hintIsAnswer = 0, crossed = 0, ticked = 0, traps = 0, rungs = 0, accepted = 0, sealed = 0, marksOk = 0, leaks = 0, openers = 0;
+let rungsShown = 0, rungsTested = 0, authoredHints = 0, withRungs = { 0: 0, 1: 0, 2: 0, 3: 0 }, noLadderNoHints = 0, noNudge = 0, displayed = 0, badDisplay = 0, hinted = 0, hintIsAnswer = 0, crossed = 0, ticked = 0, traps = 0, rungs = 0, accepted = 0, sealed = 0, marksOk = 0, leaks = 0, openers = 0;
 const bad = { accepted: [], trap: [], marks: [], seal: [], wire: [], hint: [] };
 for (const e of entries) {
   const full = qb.qbankEntryQuestion(e.id, 17);
@@ -75,21 +75,29 @@ for (const e of entries) {
   }
   // What a device is sent: public fields only, and none of the sealed material in them.
   const wire = JSON.stringify(safeQuestion('00000000-0000-4000-8000-000000000000', full));
-  const secrets = [...e.steps.map(s => s.d), ...e.criteria.map(x => x.point), ...e.traps.map(t => t.why)].filter(t => t.length >= 12 && !e.hints.some(h => h.includes(t) || t.includes(h)) && !e.prompt.includes(t));   // authored hints and the prompt are public by design; a step that restates one is not a leak of the step
+  // Every text sealed until the question resolves: a step (its heading and its text), a criterion (its point and its line), a trap (its reason and its
+  // answer as text), the title. None is on the wire, in a hint or anywhere else: the hints are sent when the question is issued, so a hint that
+  // is, or holds, one of them is a leak of it. Only the prompt (public by design) may restate a text of the solution.
+  const secrets = [...e.steps.flatMap(s => [s.d, s.h]), ...e.criteria.flatMap(x => [x.point, x.line]), ...e.traps.flatMap(t => [t.why, typeof t.expr === 'string' ? t.expr : null]), e.title].filter(t => typeof t === 'string' && t.length >= 12 && !e.prompt.includes(t));
   if (/"(?:answer|steps|criteria|traps|stepcheck|authoredMarks|_bank|seed)"\s*:/.test(wire) || secrets.some(t => wire.includes(t))) { leaks++; bad.wire.push(e.id); }
-  // The authored hints are public and the ladder serves rungs: none states the answer.
-  // The real leak test over everything shown before the question resolves: every authored hint kept, and every rung the ladder serves
-  // (the server builds the same rungs from the sealed question). None states the answer, and the worked rung is never the last step.
+  // The ladder is his authored hints and nothing else, 0 to 3 of them. The SAME rule that chose them is run again over every rung the server
+  // can serve and every hint sent at issue, on the question exactly as it is issued: none states the answer in any form, none is an arithmetic
+  // expression that evaluates to it, none is a criterion line or a trap expression or reason, none holds a sealed text, none is empty, a single
+  // word, or thin, and none is identical to another field sent at issue (the prompt, the answer box's own hint or label, another rung).
+  const ctx = { title: e.title, criteria: e.criteria, steps: e.steps, traps: e.traps };
   const ladder = buildHintLadder(full);
-  const shownBefore = [...full.hints, ...ladder.filter(r => r.text).map(r => r.text)];
-  rungsShown += ladder.filter(r => r.text).length;
-  const leaked = shownBefore.filter(t => leakReason(full, t));
-  if (leaked.length) bad.hint.push(`${e.id}:leak:${leaked[0].slice(0, 40)}`);
-  const lastStep = e.steps[e.steps.length - 1].d, worked = ladder.find(r => r.rung === 'worked')?.text;
-  if (worked && e.steps.length >= 1 && worked === lastStep) bad.hint.push(`${e.id}:worked-rung-is-the-last-step`);
-  if (!ladder.find(r => r.rung === 'nudge')?.text) noNudge++;
-  if (e.steps.length === 1 && worked && e.steps[0].d === worked) bad.hint.push(`${e.id}:worked-rung-is-the-only-step`);
-  const hl = hintLeaks(full);
+  const served = ladder.filter(r => r.text).map(r => r.text);
+  const sent = full.hints;
+  authoredHints += 3;
+  withRungs[sent.length]++;
+  rungsShown += served.length; rungsTested += sent.length + served.length;
+  if (JSON.stringify(sent) !== JSON.stringify(e.hints) || JSON.stringify(served) !== JSON.stringify(e.hints) || sent.length > 3) bad.hint.push(`${e.id}:rungs-are-not-the-hints`);
+  if (ladderAvailable(full) !== (sent.length > 0)) bad.hint.push(`${e.id}:ladder-offered-with-no-rung-or-withheld-with-one`);
+  for (const t of [...sent, ...served]) { const why = rungDropReason(full, t, ctx) || leakReason(full, t); if (why) bad.hint.push(`${e.id}:rung:${t.slice(0, 30)}:${why.slice(0, 40)}`); }
+  const wireFields = Object.entries(JSON.parse(wire).question ?? JSON.parse(wire)).filter(([k, v]) => typeof v === 'string' && k !== 'id' && k !== 'hints').map(([, v]) => v.trim().toLowerCase());
+  for (const t of sent) if (wireFields.includes(t.trim().toLowerCase())) bad.hint.push(`${e.id}:rung-identical-to-a-field-sent-at-issue`);
+  if (new Set(sent.map(t => t.trim().toLowerCase())).size !== sent.length) bad.hint.push(`${e.id}:two-rungs-identical`);
+  const hl = hintLeaks(full, ctx);
   rungs += e.hints.length;
   if (hl.length) bad.hint.push(`${e.id}:${hl.join('+')}`);
 }
@@ -104,8 +112,10 @@ c.ok(ticked > 1000, 'the step report ticks the author\'s lines where it can');
 c.ok(hinted > 150 && hintIsAnswer === 0, `a set, interval, equation or point shows the form it is written in (${hinted} do) and no shown form is the answer`);
 c.ok(displayed > 50 && badDisplay === 0, `a worked solution states a fraction key as the fraction it is (${displayed} do) and each is the author's value`);
 c.eq(leaks, 0, 'no public form carries a key, a step, a criterion or a trap reason');
-c.deq(bad.hint, [], `no hint or hint-ladder rung states the answer, and none is a solution's last or only step (${rungs} authored hints, ${rungsShown} rungs served)`);
-c.ok(rungsShown > entries.length * 2.5 && noNudge === 0, 'and the ladder still serves a nudge for every question and nearly every rung');
+c.deq(bad.hint, [], `every rung of every packed question passes the rung rule again: ${rungs} hints kept of ${authoredHints} authored, ${rungsTested} rung texts tested (sent at issue and served), none states the answer or is sealed text`);
+c.eq(withRungs[0] + withRungs[1] + withRungs[2] + withRungs[3], entries.length, 'every question has 0 to 3 rungs');
+c.ok(rungs === withRungs[1] + 2 * withRungs[2] + 3 * withRungs[3] && rungs > entries.length, 'the rung counts agree with the hints kept');
+console.log(`  rungs kept ${rungs} of ${authoredHints} authored, dropped ${authoredHints - rungs}; questions with 3 rungs ${withRungs[3]}, 2 ${withRungs[2]}, 1 ${withRungs[1]}, 0 ${withRungs[0]}`);
 // the loader's own view of the families against the picker
 const fams = qb.qbankFamilies();
 c.ok(fams.every(f => f.requestable.length > 0 && f.dotpoints.every(d => d.requestable.length > 0)), 'every family and dot point has a question at some level');
@@ -133,7 +143,7 @@ try {
       c.eq(r.status, 201, `issue ${place.subtopic} level ${pick.level}`);
       const row = await h.db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=?", [a.account.id, r.data.question.id]);
       const sealedQ = JSON.parse(row.response_json);
-      if (typeof sealedQ._bank === 'string') return { question: r.data.question, sealed: sealedQ, e: entries.find(x => x.id === sealedQ._bank) };
+      if (typeof sealedQ._bank === 'string') return { question: r.data.question, sealed: sealedQ, e: entries.find(x => x.id === sealedQ._bank), wire: JSON.stringify(r.data) };
       generators++;
     }
   };
@@ -154,6 +164,39 @@ try {
     trapSent++;
     if (w1.data.correct === false && w2.data.correct === false) trapNot++;
     if (t.value !== undefined || t.expr !== undefined || t.region !== undefined) { matchable++; if (w2.data.trapWhy === t.why || w2.data.feedback) named++; }
+  }
+  // The leak sweep over the routes: 300 bank questions as a student is dealt them. The issue reply holds no step, criterion, trap reason or title, no
+  // hint is a sealed text or states the answer, and each rung the hint route serves is one of the hints sent, in order; a question with no rung is
+  // refused the hint route (the control is not offered for it).
+  {
+    const sweepN = Number(process.env.PRI_QBANK_SWEEP || 300);
+    let sweepLeaks = 0, rungsServed = 0, refused = 0, swept = 0;
+    const problems = [];
+    const seenIds = new Set();
+    for (let i = 0; i < sweepN; i++) {
+      const d = await draw();
+      const e = d.e;
+      swept++; seenIds.add(e.id);
+      const secrets = [...e.steps.flatMap(s => [s.d, s.h]), ...e.criteria.flatMap(x => [x.point, x.line]), ...e.traps.flatMap(t => [t.why, typeof t.expr === 'string' ? t.expr : null]), e.title].filter(t => typeof t === 'string' && t.length >= 12 && !e.prompt.includes(t));
+      const jsonText = t => JSON.stringify(t).slice(1, -1);
+      if (secrets.some(t => d.wire.includes(jsonText(t)))) { sweepLeaks++; problems.push(`${e.id}: a sealed text is in the issue reply`); }
+      const sent = d.question.hints;
+      if (JSON.stringify(sent) !== JSON.stringify(e.hints)) problems.push(`${e.id}: the hints sent are not the packed ones`);
+      const ctx = { title: e.title, criteria: e.criteria, steps: e.steps, traps: e.traps };
+      for (const t of sent) { const why = rungDropReason(d.sealed, t, ctx); if (why) problems.push(`${e.id}: a hint sent at issue fails the rung rule (${why.slice(0, 40)})`); }
+      for (let k = 0; k < Math.min(sent.length, 3); k++) {
+        const hint = await call(`/v1/practice/${d.question.id}/hint`, { rung: ['nudge', 'method', 'worked'][k] });
+        if (hint.status !== 200 || hint.data.hint !== sent[k]) problems.push(`${e.id}: rung ${k + 1} served ${JSON.stringify(hint.data?.hint)}, not hint ${k + 1}`); else rungsServed++;
+      }
+      if (!sent.length) {
+        const hint = await call(`/v1/practice/${d.question.id}/hint`, { rung: 'nudge' });
+        if (hint.status === 409 && hint.data?.error?.code === 'HINT_NOT_AVAILABLE') refused++; else problems.push(`${e.id}: no rung, and the hint route did not refuse (${hint.status})`);
+      }
+    }
+    c.deq(problems.slice(0, 5), [], `${swept} bank questions (${seenIds.size} different) through the routes: no sealed text in an issue reply, every hint passes the rung rule, every rung served is a hint sent`);
+    c.eq(sweepLeaks, 0, 'no step, criterion, trap reason or title is in any issue reply');
+    c.ok(rungsServed > 100, `${rungsServed} rungs served by the hint route, ${refused} questions with no rung refused it`);
+    console.log(`  leak sweep: ${swept} issued (${seenIds.size} different), ${rungsServed} rungs served, ${refused} with no rung refused the hint route`);
   }
   c.eq(rightOk, n, `${n} random bank questions marked correct with the accepted answer`);
   c.eq(marksEq, n, 'each for the authored marks');

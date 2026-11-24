@@ -67,6 +67,26 @@ const served = e => markerView(qb.qbankEntryQuestion(e.id, 17));
   eq(readOwnPrefix({ ...dydx }, 'dy/dx = 5').input, '5', 'the label is taken off');
   const ginv = { _bank: 'x', answerType: 'expression', answer: { expr: 'x^2' }, answerPrefix: 'f⁻¹(x) =', prompt: 'Find the inverse.' };
   ok(checkBankAnswer(ginv, 'f^-1(x) = x^2').correct === true && checkBankAnswer(ginv, 'f⁻¹(x)=x^2').correct === true && checkBankAnswer(ginv, 'f^{-1}(x) = x^2').correct === true, 'the inverse label is one spelling in any of its forms');
+  // one quantity under its names: dy/dx, y' and d/dx(y); f'(x) too when the question defines y = f(x); never a different quantity
+  {
+    const named = entries.filter(e => e.answerPrefix === 'dy/dx =' && e.answerType === 'expression');
+    ok(named.length >= 70, `${named.length} questions have a dy/dx = box`);
+    let primed = 0, primeUnicode = 0, wrongQuantity = 0, fPrimeRefused = 0;
+    for (const e of named) {
+      const q = served(e);
+      const given = acceptedInput(e);
+      if (checkBankAnswer(q, `y' = ${given}`).correct === true) primed++; else bad.push(`${e.id}: y' = ... in a dy/dx box`);
+      if (checkBankAnswer(q, `y\u2032=${given}`).correct === true) primeUnicode++; else bad.push(`${e.id}: y\u2032 = ... in a dy/dx box`);
+      if (['y = ', 'dx/dy = ', "y'' = ", 'f(x) = '].every(l => checkBankAnswer(q, `${l}${given}`).correct !== true)) wrongQuantity++; else bad.push(`${e.id}: another quantity was accepted in a dy/dx box`);
+      const defines = /y\s*=\s*f\(x\)/.test(e.prompt.replace(/[$\\{}]/g, ''));
+      if (defines || checkBankAnswer(q, `f'(x) = ${given}`).correct !== true) fPrimeRefused++; else bad.push(`${e.id}: f'(x) accepted though the question does not define y = f(x)`);
+    }
+    eq([primed, primeUnicode, wrongQuantity, fPrimeRefused], [named.length, named.length, named.length, named.length], "y' =, y\u2032 =, and refusal of y =, dx/dy =, y'' =, f(x) = (and of f'(x) =, unless y = f(x) is defined), over every dy/dx = box");
+    const yp = entries.filter(e => e.answerPrefix === "y' =" && e.answerType === 'expression');
+    ok(yp.length > 5 && yp.every(e => checkBankAnswer(served(e), `dy/dx = ${acceptedInput(e)}`).correct === true), "and dy/dx = in a y' = box");
+    const f1 = { _bank: 'x', answerType: 'expression', answer: { expr: '2*x' }, answerPrefix: "f'(x) =", prompt: 'Given $y=f(x)=x^2$, find the derivative.' };
+    ok(['f\'(x) = 2x', 'dy/dx = 2x', "y' = 2x", '2x'].every(t => checkBankAnswer(f1, t).correct === true) && checkBankAnswer({ ...f1, prompt: 'Given $f(x)=x^2$, find the derivative.' }, 'dy/dx = 2x').correct === false, "f'(x) names the same quantity as dy/dx only when the question defines y = f(x)");
+  }
   // not a bank question: the engine alone, as ever
   ok(checkBankAnswer({ ...dydx, _bank: undefined }, 'y = 3x^2').correct === checkAnswer({ ...dydx, _bank: undefined }, 'y = 3x^2').correct, 'a question that is not the bank\'s is read by the engine alone');
 }
@@ -95,53 +115,65 @@ const served = e => markerView(qb.qbankEntryQuestion(e.id, 17));
 }
 
 // ── 3. no precision named ────────────────────────────────────────────────────
+// A rounded decimal is accepted only where the key is a long decimal the author wrote as one AND the question asks for no exact form. It is never
+// the answer to "a fraction in simplest form", "a rational denominator", "exact", "in terms of", or a key the author wrote as a fraction, a surd,
+// a multiple of pi or a logarithm.
 {
-  const rows = entries.filter(e => e.answerType === 'numeric' && acceptsRoundedFigures(served(e)));
-  ok(rows.length > 150, `${rows.length} numeric keys name no precision and are not whole numbers`);
-  let engineBand = 0, threeOk = 0, fourOk = 0, twoRefused = 0, twoTried = 0, offByOne = 0, bandRefused = 0;
-  const bad = [];
-  for (const e of rows) {
+  const numeric = entries.filter(e => e.answerType === 'numeric');
+  const rows = numeric.filter(e => acceptsRoundedFigures(served(e)));
+  console.log(`  the rounding rule applies to ${rows.length} of ${numeric.length} numeric questions of the pack: ${rows.map(e => e.id).join(' ') || 'none'}`);
+  eq(rows.map(e => e.id), [], 'swept over every numeric question: none is a long decimal the author wrote as a decimal on a prompt that asks for no exact form');
+  // the three the review found, and the rest of their kind: whatever the engine says of a rounded decimal, the bank's own reading adds nothing to it
+  const typedFor = e => { const v = e.answer.value; return [roundSignificant(v, 3), roundSignificant(v, 4)].map(String); };
+  let addedByBank = 0, tried = 0;
+  for (const e of numeric) {
+    if (e.answer.tol !== undefined || Number.isInteger(e.answer.value)) continue;
     const q = served(e);
-    const v = e.answer.value;
-    const r3 = roundSignificant(v, 3), r4 = roundSignificant(v, 4), r2 = roundSignificant(v, 2);
-    const sig = n => typedDecimal(String(n))?.[1] ?? 0;
-    const say = n => (Number.isInteger(n) ? String(n) : String(n));
-    // the typed value must carry the figures it claims: 135 is three, 135.0 four
-    const typed3 = Number.isInteger(r3) ? String(r3) : String(r3);
-    if (sig(typed3) >= 3) { if (checkBankAnswer(q, typed3).correct === true) threeOk++; else bad.push(`${e.id}: ${typed3} refused`); } else threeOk++;
-    const typed4 = Number(r4).toFixed(Math.max(0, 3 - Math.floor(Math.log10(Math.abs(r4)))));
-    if (typedDecimal(typed4) && typedDecimal(typed4)[1] >= 4 && Number(typed4) === roundSignificant(v, typedDecimal(typed4)[1])) { if (checkBankAnswer(q, typed4).correct === true) fourOk++; else bad.push(`${e.id}: ${typed4} refused`); } else fourOk++;
-    if (r2 !== v && sig(say(r2)) <= 2 && Math.abs(r2 - v) > 1e-12 * Math.abs(v)) {
-      // The engine's own band (about a tenth of a per cent) is its own reading and is untouched; what this reading adds is never two figures.
-      if (checkAnswer(q, say(r2)).correct === true) engineBand++;
-      else {
-        twoTried++;
-        if (checkBankAnswer(q, say(r2)).correct !== true) twoRefused++; else bad.push(`${e.id}: two figures ${say(r2)} accepted`);
-      }
-    }
-    // a third figure one up or down is not the key's rounding (unless the key rounds that way too)
-    const unit = 10 ** (Math.floor(Math.log10(Math.abs(v))) - 2);
-    const off = Number((r3 + unit).toPrecision(12));
-    if (off !== r3 && Math.abs(off - v) > Math.abs(unit) * 0.5 + 1e-12 * Math.abs(v) && sig(off) >= 3) { if (checkBankAnswer(q, String(off)).correct !== true) offByOne++; else bad.push(`${e.id}: ${off} accepted`); } else offByOne++;
-    for (const t of e.traps) { const input = trapInput(t); if (input !== null && checkBankAnswer(q, input).correct === true) bad.push(`${e.id}: a trap accepted`); }
-    bandRefused++;
+    for (const t of typedFor(e)) { tried++; if (checkBankAnswer(q, t).correct === true && checkAnswer(q, t).correct !== true) addedByBank++; }
   }
-  eq(bad.slice(0, 5), [], 'every key accepts its 3 and 4 figure roundings, and nothing off by a unit or at two figures');
-  eq([threeOk, fourOk, offByOne, bandRefused], [rows.length, rows.length, rows.length, rows.length], 'three figures, four figures, one unit off and every trap, over every such key');
-  ok(twoTried > 50 && twoRefused === twoTried, `${twoTried} two-figure answers are all refused (${engineBand} more are inside the engine's own band, which this reading does not touch)`);
-  // the boundary on keys written here
-  const mk = (value, over = {}) => ({ _bank: 'x', answerType: 'numeric', answer: { value }, prompt: 'Find the value.', ...over });
-  const k = mk(134.95);
-  ok(['135', '135.0', '134.95'].every(t => checkBankAnswer(k, t).correct === true), '134.95: 135, 135.0 and 134.95 are right');
-  ok(['130', '140', '134.9', '135.1', '136', '13'].every(t => checkBankAnswer(k, t).correct === false), '134.95: 130, 140, 134.9, 135.1, 136 and 13 are not');
-  const third = mk(8 / 15);
-  ok(['0.533', '0.5333', '0.53333', '8/15'].every(t => checkBankAnswer(third, t).correct === true), '8/15: 0.533, 0.5333, 0.53333 and 8/15 are right');
-  ok(['0.53', '0.5', '0.534', '0.54', '0.5334'].every(t => checkBankAnswer(third, t).correct === false), '8/15: 0.53, 0.5, 0.534, 0.54 and 0.5334 are not');
-  const small = mk(0.00018099547511312217);
-  ok(['0.000181', '0.0001810', '0.00018100'].every(t => checkBankAnswer(small, t).correct === true) && ['0.00018', '0.0002', '0.000182'].every(t => checkBankAnswer(small, t).correct === false), 'a small key: 0.000181 right; 0.00018, 0.0002 and 0.000182 not');
-  // stated precision, a tolerance, an exact ask, a whole number: the engine alone
-  ok(!acceptsRoundedFigures(mk(134.95, { prompt: 'Find the value to 1 decimal place.' })) && !acceptsRoundedFigures(mk(134.95, { prompt: 'Give your answer correct to 4 significant figures.' })) && !acceptsRoundedFigures(mk(134.95, { prompt: 'Find the exact value.' })) && !acceptsRoundedFigures({ ...mk(134.95), answer: { value: 134.95, tol: 0.01 } }) && !acceptsRoundedFigures(mk(1234)), 'a stated precision, a tolerance, an exact value and a whole number keep the engine\'s reading alone');
-  ok(checkBankAnswer(mk(1234), '1230').correct === false && checkBankAnswer(mk(134.95, { prompt: 'Find the value to 1 decimal place.' }), '135').correct === false || true, 'a whole number key is exact');
+  eq(addedByBank, 0, `over every numeric key of the pack (${tried} roundings to 3 and 4 figures) the bank's own reading accepts no decimal the engine refuses`);
+  for (const id of ['A12-M1-021', 'A12-M1-033', 'A11-F1-164']) {
+    const e = entries.find(x => x.id === id);
+    if (!e) { ok(false, `${id} is in the pack`); continue; }
+    const q = served(e);
+    const typedByReview = id.endsWith('021') ? ['0.3636', '0.36364'] : id.endsWith('033') ? ['0.1222', '0.12222'] : ['11.2', '11.20', '11.196'];
+    ok([...typedFor(e), ...typedByReview].every(t => checkBankAnswer(q, t).correct === false), `${id}: every decimal of the key, including the one the review typed (${typedByReview[0]}), is refused: the question asks for an exact form`);
+  }
+  ok(checkBankAnswer(served(entries.find(e => e.id === 'A12-M1-021')), '4/11').correct === true && checkBankAnswer(served(entries.find(e => e.id === 'A12-M1-033')), '11/90').correct === true, 'and the exact fraction is');
+  const kind = e => e.criteria.find(x => x.answer)?.point;
+  ok(numeric.every(e => !acceptsRoundedFigures(served(e))) && kind(entries.find(e => e.id === 'A11-F1-164')) === 'Simplified', 'a prompt that asks for a rational denominator keeps the engine\'s reading alone');
+  // the rule itself, on keys written here: a decimal authored as a decimal, then each way of asking for an exact form
+  const decimal = 134.953712345;
+  const mk = (over = {}) => ({ _bank: 'x', answerType: 'numeric', answer: { value: decimal }, prompt: 'Find the value.', steps: [{ h: 'Compute', d: '$1.5\\times 89.969141563 \\approx 134.9537$' }], criteria: [{ marks: 1, point: 'Correct value', answer: true }], ...over });
+  const k = mk();
+  ok(acceptsRoundedFigures(k) && ['135', '135.0', '134.95', '134.954'].every(t => checkBankAnswer(k, t).correct === true), 'a long decimal authored as a decimal: 135, 135.0, 134.95 and 134.954 are right (three figures or more, as typed)');
+  ok(['130', '140', '134.9', '135.1', '136', '13', '1.3e2'].every(t => checkBankAnswer(k, t).correct === false), 'and 130, 140, 134.9, 135.1, 136 and 13 are not');
+  const exactCases = [
+    [mk({ prompt: 'Write the value as a fraction in simplest form.' }), 'fraction in simplest form'],
+    [mk({ prompt: 'Express the value with a rational denominator.' }), 'rational denominator'],
+    [mk({ prompt: 'Find the exact value.' }), 'exact'],
+    [mk({ prompt: 'Give the value in terms of $\\pi$.' }), 'in terms of'],
+    [mk({ prompt: 'Simplify, giving a surd.' }), 'surd'],
+    [mk({ criteria: [{ marks: 1, point: '4/11', answer: true }] }), 'a key authored as a fraction'],
+    [mk({ criteria: [{ marks: 1, point: '$\\dfrac{4}{11}$', answer: true }] }), 'a key authored as a TeX fraction'],
+    [mk({ criteria: [{ marks: 1, point: '2√5 + 2√2', answer: true }] }), 'a key authored as a surd'],
+    [mk({ criteria: [{ marks: 1, point: '12√3π', answer: true }] }), 'a key authored as a multiple of pi'],
+    [mk({ criteria: [{ marks: 1, point: 'x = ln 2', answer: true }] }), 'a key authored as a logarithm'],
+    [mk({ criteria: [{ marks: 1, point: 'Correct exact answer', answer: true }] }), 'a criterion that says exact'],
+    [mk({ steps: [{ h: 'Sum', d: '$\\dfrac{0.36}{0.99}=\\dfrac{4}{11}$' }] }), 'a last worked line that ends in a fraction'],
+    [mk({ steps: [{ h: 'Sum', d: '$x=\\sqrt{17}$' }] }), 'a last worked line that ends in a surd'],
+    [{ ...mk(), steps: undefined, criteria: undefined }, 'the author\'s form unknown (fail closed)'],
+    [mk({ answer: { value: 0.36363636363636365 } }), 'a value that reads as 4/11'],
+    [mk({ answer: { value: 11.196152422706632 } }), 'a value that reads as 6 + 3 sqrt 3'],
+    [mk({ answer: { value: 0.6931471805599453 } }), 'a value that reads as ln 2'],
+    [mk({ answer: { value: 134.95 } }), 'a short decimal'],
+    [mk({ answer: { value: 134.953712345, tol: 0.01 } }), 'a key with its own tolerance'],
+    [mk({ prompt: 'Find the value to 1 decimal place.' }), 'a stated precision'],
+    [mk({ prompt: 'Give your answer correct to 4 significant figures.' }), 'a stated precision in figures'],
+    [mk({ answer: { value: 1234 } }), 'a whole number']
+  ];
+  for (const [q, what] of exactCases) ok(!acceptsRoundedFigures(q), `the rounding rule does not apply: ${what}`);
+  ok(checkBankAnswer(mk({ prompt: 'Write the value as a fraction in simplest form.', answer: { value: 0.36363636363636365 } }), '0.3636').correct === false && checkBankAnswer(mk({ answer: { value: 0.36363636363636365 }, prompt: 'Write 0.\\dot3\\dot6 as a fraction in simplest form.' }), '0.36364').correct === false, 'a decimal is not the answer to a fraction in simplest form');
   ok(roundSignificant(134.95, 4) === 135 && roundSignificant(2.675, 3) === 2.68 && roundSignificant(0.0005, 1) === 0.0005 && roundPlaces(2.7268, 2) === 2.73 && roundPlaces(0.005, 2) === 0.01 && roundPlaces(0.004, 2) === 0, 'rounding is half up from the decimal the key is written as, not from its binary value');
   // a bank question is the only one read this way
   ok(checkBankAnswer({ ...k, _bank: undefined }, '135').correct === checkAnswer({ ...k, _bank: undefined }, '135').correct, 'a question that is not the bank\'s is read by the engine alone');

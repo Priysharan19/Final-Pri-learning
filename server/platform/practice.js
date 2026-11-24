@@ -17,7 +17,7 @@ import { asStore } from './store.js';
 import { nextSyncCursor, syncLockKey } from './db.js';
 import { requireSession, requireVerifiedEmail, requireRole, rateLimit, consumeRateLimit, sessionFromRequest, sha256 } from './security.js';
 import { encryptDeliveryToken, decryptDeliveryToken } from './deliveryCrypto.js';
-import { opaqueContentId, opaqueContentHash, contentSeenEvidence, markContentSeen, contentTried, markContentTried, seenAmong, seenKeysOf, triedKeysOf, repeatEvidenceOf } from './contentSeen.js';
+import { opaqueContentId, opaqueContentHash, contentSeenEvidence, markContentSeen, contentTried, markContentTried, markContentIssued, issuedKeyOf, seenAmong, seenKeysOf, triedKeysOf, repeatEvidenceOf } from './contentSeen.js';
 import { misconceptionIdForTrap, misconceptionIdForDiagnosis, misconceptionById } from '../../client/src/engine/misconceptions.js';
 import { slipHint } from '../../client/src/engine/slipHint.js';
 import { cleanLatex, safeLatexLines } from '../../client/src/engine/texSafe.js';
@@ -594,7 +594,8 @@ async function chooseQuestionFor(db, accountId, request, now, { draw = () => ran
   const seek = seekQuestion(request, { draw, tries, batches: ACCOUNT_SEEK_BATCHES, admits: banks.admits });
   let step = seek.next();
   while (!step.done) {
-    const keys = step.value.map(q => seenKeysOf(q));
+    // An author-bank question this account was already dealt (resolved or not: revealed, abandoned) is as stale as one it answered.
+    const keys = step.value.map(q => [...seenKeysOf(q), ...(typeof q._bank === 'string' ? [issuedKeyOf(q)] : [])]);
     // A failed read is the store's failure, not an unsupported question: it is
     // tagged so the routes rethrow it rather than answer 422.
     const known = await seenAmong(db, accountId, keys.flat(), now).catch(error => { throw Object.assign(error, { pickerStore: true }); });
@@ -853,6 +854,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       }
       await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-question',?,?,?,?,?)",
         [accountId, id, payload, digest(payload), now, now + MAX_AGE]);
+      // Dealt is dealt: an author-bank question steers the seek from here on, whatever becomes of it (contentSeen.js issuedKeyOf).
+      if (typeof q._bank === 'string') await markContentIssued(db, accountId, q, now);
       if (idem) await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-issue',?,?,?,?,?)",
         [accountId, idem, JSON.stringify(publicResponse), requestDigest, now, now + MAX_AGE]);
       if (preparedNonce) await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-prepared',?,?,?,?,?)",

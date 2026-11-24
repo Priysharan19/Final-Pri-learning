@@ -226,12 +226,13 @@ try {
     drawn.set(e.id, question.id);
     c.deq(Object.keys(question).filter(k => !allowed.has(k)), [], `${tag}: the issued question holds public fields only`);
     c.ok(!PRIVATE_KEYS.test(wire), `${tag}: no private field name is on the wire`);
-    const secrets = [e.steps.map(s => s.d), e.criteria.map(x => x.point), e.traps.map(t => t.why), e.title].flat();
+    const secrets = [e.steps.flatMap(s => [s.d, s.h]), e.criteria.flatMap(x => [x.point, x.line]), e.traps.map(t => t.why), e.title].flat().filter(t => typeof t === 'string' && t.length >= 12);
     c.ok(secrets.every(t => !wire.includes(t)), `${tag}: no step, criterion, trap reason or title is on the wire`);
     const keyText = acceptedInput(e);
     c.ok(!wire.includes(JSON.stringify(e.answer)) && !(e.answerType === 'expression' && wire.includes(e.answer.expr)), `${tag}: the key is not on the wire`);
     c.deq([question.criteriaCount, question.supportsSteps === true || question.supportsSteps === false], [e.marks, true], `${tag}: the device is told the authored marks and nothing more`);
-    c.ok(question.hints.length === e.hints.length && e.hints.length >= 2 && question.hints.every(t => !keyText || t !== keyText), `${tag}: the authored hints that do not state the answer are served`);
+    c.ok(JSON.stringify(question.hints) === JSON.stringify(e.hints) && e.hints.length <= 3 && question.hints.every(t => !keyText || t !== keyText), `${tag}: the authored hints that pass the rung rule are served, and only those (${e.hints.length})`);
+    c.ok(Object.values(e.ladder).join('|') === e.hints.join('|'), `${tag}: the ladder is the hints, in his order`);
     c.ok(question.difficulty === e.level && question.subtopic === place.subtopic && question.dotpoints.length > 0 && question.dotpoints.every(id => id.startsWith(`${place.subtopic}.`)), `${tag}: it is practised in its product subtopic, at its level, under product dot points`);
     c.eq(question.dotpoint, place.ordinal === null ? (question.dotpoints.length === 1 ? question.dotpoints[0] : null) : `${place.subtopic}.${place.ordinal + 1}`, `${tag}: a numbered dot point is its one dot point and a topic-level one names the cell's dot point only when the cell has one`);
     c.deq([sealed._marking, sealed._methodScheme, sealed.authoredMarks, sealed.criteria.length > 0], [FINAL_ANSWER_MARKING, undefined, e.marks, true], `${tag}: sealed final-answer-only, with its authored marks and criteria held server-side`);

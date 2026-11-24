@@ -3,15 +3,17 @@
 // The engine's checkAnswer still decides every mark. For a bank question only, three readings of what the student typed are added, each
 // narrow, none able to make a wrong value right:
 //
-//   1. THE ANSWER BOX'S OWN PREFIX. A question whose box is labelled `dy/dx =` is answered with the label or without it. Exactly the
-//      declared label is removed (spacing, ′ for ', ⁻¹ for ^-1 are one spelling); a different left side is left alone and the engine
-//      refuses it as it always did.
+//   1. THE ANSWER BOX'S OWN PREFIX. A question whose box is labelled `dy/dx =` is answered with the label or without it. The declared
+//      label is removed (spacing, ′ for ', ⁻¹ for ^-1 are one spelling), and so is another name for the SAME quantity: y' and dy/dx are one
+//      (f'(x) too, when the question defines y = f(x)). A different left side is left alone and the engine refuses it as it always did.
 //   2. A NAMED PRECISION ON AN INTERVAL. "Solve 3^x > 20, to two decimal places": the key is x > 2.7268, and x > 2.73 is the same answer
 //      rounded as asked. Every number of the key is rounded to the named place; the student's region is also tried against that.
-//   3. NO PRECISION NAMED. A numeric key that is not a whole number, on a prompt that names no decimal places, significant figures or
-//      "nearest", is accepted when the student's value is the key correctly rounded to at least 3 significant figures, counting the digits
-//      as typed (so 135 and 135.0 for 134.95, never 130; 0.533 and 0.5333 for 8/15, never 0.53 or 0.534). The worked solution states
-//      the exact value. A key that carries its own tolerance (`tol`) or asks for the exact value keeps the engine's reading alone.
+//   3. NO PRECISION NAMED. A numeric key that the author wrote as a long decimal (7 or more significant figures: a recurring or irrational
+//      value), on a prompt that names no decimal places, significant figures or "nearest" and asks for no exact form, is accepted when the
+//      student's value is the key correctly rounded to at least 3 significant figures, counting the digits as typed (so 135 and 135.0 for
+//      134.9537, never 130). It is NEVER accepted where the prompt asks for an exact form (a fraction, a surd, a rational denominator, "exact",
+//      "in terms of", "simplest form") or where the author wrote the key as one (its criterion or last worked line is a fraction, a surd,
+//      a multiple of π, a logarithm, or its value reads as one): 0.3636 is not 4/11. A key that carries its own tolerance (`tol`) keeps the engine's reading alone.
 //
 // Pure and deterministic.
 import { checkAnswer } from '../../client/src/engine/checker.js';
@@ -20,7 +22,19 @@ import { namedDecimalPlaces, asksForExactValue } from '../../client/src/engine/c
 export const isBankQuestion = q => !!q && typeof q._bank === 'string';
 
 // ── 1. the prefix ────────────────────────────────────────────────────────────
-const spelled = t => String(t ?? '').replace(/\s+/g, '').replace(/[′’‘]/g, "'").replace(/⁻¹/g, '^-1').replace(/\^\{-1\}|\^\(-1\)/g, '^-1').replace(/[−–—]/g, '-');
+const spelled = t => String(t ?? '').replace(/\s+/g, '').replace(/″/g, "''").replace(/[′’‘]/g, "'").replace(/⁻¹/g, '^-1').replace(/\^\{-1\}|\^\(-1\)/g, '^-1').replace(/[−–—]/g, '-');
+/**
+ * The quantity a left side names. dy/dx, y' and d/dx(y) are one quantity (the first derivative of y), as are d²y/dx², y'' and d/dx(y');
+ * f'(x) is that same quantity only when the question defines y = f(x). Any other left side is its own spelling and nothing else.
+ */
+function quantityOf(left, q) {
+  const definesYasF = /y=f\(x\)/.test(String(q?.prompt ?? '').replace(/[\s$\\{}]/g, ''));
+  if (/^(?:dy\/dx|y'|d\/dx\(y\))$/.test(left)) return 'first derivative of y';
+  if (/^(?:d(?:\^?2|²)y\/dx(?:\^?2|²)|y''|d\/dx\(y'\))$/.test(left)) return 'second derivative of y';
+  if (definesYasF && /^f'\(x\)$/.test(left)) return 'first derivative of y';
+  if (definesYasF && /^f''\(x\)$/.test(left)) return 'second derivative of y';
+  return left;
+}
 /**
  * The input with the question's own declared label taken off its front: { input, otherSide }. `otherSide` is true when the student wrote
  * a left side that is NOT the declared one ("y = 3x^2" on a box labelled dy/dx =): that is a different quantity, never the answer.
@@ -35,7 +49,7 @@ export function readOwnPrefix(q, raw) {
   if (at < 0) return same;
   const rest = raw.slice(at + 1).trim();
   if (/(?<![<>!:=])=(?!=)/.test(rest)) return same;       // a chain or a list of equations: the engine reads it as written
-  if (spelled(raw.slice(0, at)) === left) return { input: rest, otherSide: false };
+  if (quantityOf(spelled(raw.slice(0, at)), q) === quantityOf(left, q)) return { input: rest, otherSide: false };
   return { input: raw, otherSide: ['expression', 'numeric', 'set'].includes(q.answerType) };
 }
 /** The input with the question's own declared label taken off its front, or the input unchanged. */
@@ -79,16 +93,63 @@ export function typedDecimal(text) {
   return [Number(t), sig.length];
 }
 
+// What the question asks for, and what form the author wrote the key in. A rounded decimal is a reading of a key that is only ever a decimal
+// approximation; it is never accepted where the question asks for an exact form (a fraction, a surd, a rational denominator, "in terms of
+// π", "exact", "simplest form") or where the author wrote the key as one (a fraction, a surd, a multiple of π, a logarithm).
+const ASKS_FOR_PRECISION = /significant|sig\.?\s*fig|decimal|d\.\s?p\.?|nearest|round|approximat|\bto\s+(?:one|two|three|four|five|\d)\b/i;
+const ASKS_FOR_EXACT_FORM = /exact|fraction|simplest|simplif|surd|rational|rationalis|denominator|numerator|in terms of|closed form|mixed number|recurring|\\dot|\\overline|\bratio\b|\\pi|\\sqrt|\\ln|\\log|\bsurd\b/i;
+const EXACT_MARKERS = /\\[dt]?frac|\\sqrt|\\pi|\\ln|\\log|\\binom|√|π|[½⅓⅔¼¾⅕⅛]|\bln\b|\blog\b|\bsqrt\b|\bpi\b|\be\s*\^|\^\s*\{?\s*\\?[a-z]|\d\s*\/\s*\d|\d\s*\\?\s*(?:ln|log)/i;
+const stripTeX = t => String(t ?? '').replace(/\$/g, '').trim();
+/** The last side of the author's final worked line, with the TeX kept: "\dfrac{0.36}{0.99}=\dfrac4{11}" gives "\dfrac4{11}". */
+function lastSide(step) {
+  const t = stripTeX(step?.d);
+  const parts = t.split(/\\approx|\\fallingdotseq|=|≈/).map(x => x.trim()).filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : '';
+}
+/** Did the author write the key as an exact form? Read from the answer's own criterion and the last side of his final line. Unknown: yes (fail closed). */
+export function authoredAsExact(q) {
+  const criteria = Array.isArray(q?.criteria) ? q.criteria : null;
+  const steps = Array.isArray(q?.steps) ? q.steps : null;
+  if (!criteria && !steps) return true;
+  const point = stripTeX((criteria || []).find(c => c?.answer)?.point);
+  if (point && (EXACT_MARKERS.test(point) || /exact/i.test(point))) return true;
+  const side = steps?.length ? lastSide(steps[steps.length - 1]) : '';
+  if (side && EXACT_MARKERS.test(side)) return true;
+  return false;
+}
+/** Is `w` a root of a x² + b x + c with small whole coefficients (a whole number, a fraction or a quadratic surd)? */
+function smallQuadraticRoot(w) {
+  if (!Number.isFinite(w) || Math.abs(w) > 1e7) return false;
+  for (let a = 1; a <= 12; a++) for (let b = -60; b <= 60; b++) {
+    const c = -(a * w * w + b * w);
+    const r = Math.round(c);
+    if (Math.abs(r) <= 250 && Math.abs(c - r) < 1e-13 * Math.max(1, Math.abs(c), Math.abs(a * w * w), Math.abs(b * w))) return true;
+  }
+  return false;
+}
+/** Does the value read as an exact form: a fraction, a surd, a multiple of π, a logarithm or an exponential of one? Only the value is looked at. */
+export function looksExact(v) {
+  if (!Number.isFinite(v)) return false;
+  const probes = [v, v / Math.PI, ...(Math.abs(v) < 40 ? [Math.exp(v)] : []), v / Math.LN2, v / Math.log(3), v / Math.LN10, v * (Math.E - 1), v / Math.E, v * Math.E];
+  return probes.some(smallQuadraticRoot);
+}
+/** A key written as a long decimal: the shortest decimal it is written as has 7 or more significant figures (a recurring or irrational value, not 134.9 or 22315.5). */
+export const isLongDecimal = v => Number.isFinite(v) && !Number.isInteger(v) && digitsOf(v).digits.length >= 7;
+
 /** Does this numeric question accept a correctly rounded answer to at least 3 significant figures? */
 export function acceptsRoundedFigures(q) {
   const a = q?.answer;
   if (q?.answerType !== 'numeric' || !a || !Number.isFinite(a.value) || a.tol !== undefined || a.surdForm || a.simplestFraction) return false;
-  if (Number.isInteger(a.value)) return false;
-  const prompt = String(q.prompt ?? '');
-  if (/significant|sig\.?\s*fig|decimal|d\.\s?p\.?|nearest|round|approximat|exact|\bto\s+(?:one|two|three|four|five|\d)\b/i.test(`${prompt} ${q.answerSuffix ?? ''}`)) return false;
+  if (Number.isInteger(a.value) || !isLongDecimal(a.value)) return false;
+  const prompt = `${q.prompt ?? ''} ${q.answerSuffix ?? ''}`;
+  if (ASKS_FOR_PRECISION.test(prompt) || ASKS_FOR_EXACT_FORM.test(prompt)) return false;
   if (namedDecimalPlaces(q) !== null || asksForExactValue(q)) return false;
+  if (authoredAsExact(q) || looksExact(a.value)) return false;
   return true;
 }
+/** The prompt asks for an exact form in so many words: a fraction, simplest form, a surd, a rational denominator, "exact", "in terms of". */
+const DEMANDS_EXACT_FORM = /exact|fraction|simplest|surd|rational|rationalis|denominator|in terms of|mixed number|closed form/i;
+export const demandsExactForm = q => DEMANDS_EXACT_FORM.test(`${q?.prompt ?? ''} ${q?.answerSuffix ?? ''}`.replace(/\$[^$]*\$/g, m => (/\\(?:sqrt|dfrac|frac)/.test(m) ? ' ' : m)));
 /** The correctly rounded reading: the typed number is the key rounded to the figures the student typed, at least three. */
 export function isRoundedKey(q, typed) {
   if (!acceptsRoundedFigures(q)) return false;
@@ -108,6 +169,14 @@ export function checkBankAnswer(q, raw) {
   const { input, otherSide } = readOwnPrefix(q, raw);
   if (otherSide) return { correct: false, feedback: `This box is for ${String(q.answerPrefix).replace(/\s*=\s*$/, '')}. Write the answer to that.` };
   const first = checkAnswer(q, input);
+  // Where the question demands an exact form, a plain decimal that is not the key itself is never the answer, whatever band the engine reads a number in
+  // (0.36364 is not "4/11 in simplest form"). The key typed as the decimal it is (0.5, 0.25) is.
+  if (first?.correct === true && q.answerType === 'numeric' && q.answer?.tol === undefined && Number.isFinite(q.answer?.value) && demandsExactForm(q)) {
+    const typed = typedDecimal(input);
+    if (typed && Math.abs(typed[0] - q.answer.value) > 1e-12 * Math.max(1, Math.abs(q.answer.value))) {
+      return { correct: false, feedback: 'This question asks for the exact form, not a decimal. Write it as a fraction, a surd or in terms of the constant it asks for.' };
+    }
+  }
   if (first?.correct === true) return first;
   if (q.answerType === 'interval' && q.answer && typeof q.answer.region === 'string') {
     const places = namedDecimalPlaces(q);

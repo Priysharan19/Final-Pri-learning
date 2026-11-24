@@ -8,7 +8,7 @@ import {
   hintLeaks, compilePack, familyOf
 } from './qbank-import.mjs';
 import { loadPack, directorySource } from '../server/platform/qbankPack.js';
-import { leakReason, bankLadder, texToPlain } from './qbank-leak.mjs';
+import { leakReason, bankLadder, rungDropReason, proseRuns, texToPlain } from './qbank-leak.mjs';
 import { FIXTURE_PARTS, fixtureArchive } from '../server/test/support/qbank-fixture.mjs';
 
 let pass = 0; const failures = [];
@@ -150,6 +150,7 @@ ok(hintLeaks(engineQuestion(fxPart('TQ-001'))).length === 0, 'authored hints tha
 ok(familyOf({ course: 'ADV', year: 11, topic: 'MA-C1' }) === 'qb-a11-ma-c1' && familyOf({ course: 'EXT1', year: 12, topic: 'ME-V1' }) === 'qb-x12-me-v1', 'a family is one course and topic');
 const cp = compilePack(fixtureArchive());
 ok(cp.summary.questions === 10 && cp.summary.rejectedParts === 3, 'the fixture compiles to ten questions and three rejects (a leaking hint is dropped from its question, which stays)');
+ok(cp.summary.ladder.rungsKept + cp.summary.ladder.rungsDropped === cp.summary.ladder.authoredHints && Object.values(cp.summary.ladder.withRungs).reduce((a, b) => a + b, 0) === cp.summary.ladder.questions, 'the ladder counts add up: every authored hint is a rung kept or a rung dropped, and every question has 0 to 3');
 ok(!cp.files.get('shards/qb-a11-ma-c1.json').includes('TQ-009') && !cp.files.get('shards/qb-a11-ma-c1.json').includes('TQ-011'), 'a rejected part is not in a shard');
 ok(JSON.parse(cp.files.get('shards/qb-a11-ma-c1.json')).questions.every(q => Array.isArray(q.criteria) && q.criteria.length), 'criteria travel in the pack');
 const t2 = fs.mkdtempSync(path.join(os.tmpdir(), 'qbank-pack-'));
@@ -197,16 +198,67 @@ fs.rmSync(t2, { recursive: true, force: true });
   ok(texToPlain('\\weirdcommand{3}').unread.includes('weirdcommand'), 'a command the reader has no reading of is reported, not guessed');
   // fail closed: a numeric span with a command the reader cannot read is treated as leaking
   ok(!!leakReason(num(3), '$\\weirdcommand{3}$'), 'an unreadable numeric span is treated as leaking (fail closed)');
-  // the ladder: the worked rung is never the last step, and a one-step solution has none of its own
-  const one = { answerType: 'numeric', answer: { value: 252 }, prompt: 'Find $\\binom{10}{5}$.', hints: ['Use the formula.', 'Write it out.', 'Evaluate it.'], steps: [{ h: 'Evaluate', d: '$\\binom{10}{5}=252$' }] };
-  const l1 = bankLadder(one);
-  ok(!Object.values(l1.ladder).some(t => /252|binom/.test(t)) && l1.ladder.worked === 'Evaluate it.', 'a one-step solution never shows its step as the worked rung');
-  const two = { ...one, steps: [{ h: 'Expand', d: '$\\dfrac{10!}{5!\\,5!}$' }, { h: 'Evaluate', d: '$252$' }], answer: { value: 252 } };
-  const l2 = bankLadder(two);
-  ok(l2.ladder.worked !== '$252$' && !leakReason(two, l2.ladder.worked) === true || l2.ladder.worked === 'Evaluate it.', 'the worked rung is never the last step');
-  const leakyHint = { ...one, hints: ['Use the formula.', 'It is $252$.', 'Evaluate it.'] };
-  const l3 = bankLadder(leakyHint);
-  ok(!l3.hints.includes('It is $252$.') && l3.dropped.some(d => d.source === 'hint 2') && l3.ladder.method !== 'It is $252$.', 'a hint that states the answer is dropped, and its rung is filled from the next text or left thin');
+  // ── the rung rule: a rung is one of his three authored hints, kept only when every test passes (fail closed) ──
+  const drop = (q, text, ctx) => rungDropReason(q, text, ctx);
+  const rungCases = [
+    // the seven the reviewer found, as the hints (or the rungs derived from steps) read
+    [num(8), '8.', true, 'a lone answer'],
+    [num(4), '20/5.', true, 'one division from the answer, in prose'],
+    [num(2), '20/10.', true, 'one division from the answer, in prose'],
+    [num(50), '100 − 50.', true, 'a subtraction with a Unicode minus that gives the answer'],
+    [num(7), '56/8.', true, 'one division from the answer, in prose'],
+    [num(0.5), '9/16 − 1/16.', true, 'a difference of fractions that is the answer'],
+    [{ answerType: 'expression', answer: { expr: 'ln(9)' }, prompt: 'Simplify.', steps: [], hints: [] }, '2 ln 3 = ln 9.', true, 'a logarithm identity whose right side is the answer'],
+    [num(9), '2 ln 3 = ln 9.', true, 'a value in it that is the answer'],
+    [num(9), '3² = 9.', true, 'a power with its value'],
+    // useless ones
+    [num(7), 'Simplify.', true, 'a single word'],
+    [num(7), 'Solve', true, 'a single word with no full stop'],
+    [num(7), '', true, 'empty'],
+    [num(7), 'Product law.', true, 'under four words with no maths'],
+    [num(7), 'Check the domain.', true, 'under four words with no maths'],
+    // kept: real help that is not the answer
+    [num(7), 'Write the bracket as a power first.', false, 'a method in words'],
+    [num(7), 'Use $y-y_1=m(x-x_1)$ with the midpoint.', false, 'a formula that is not the answer'],
+    [num(7), 'Take out the common factor $x$.', false, 'a step in words and one symbol'],
+    [num(7), 'Write $0.1$ as a fraction first.', false, 'a number that is not the answer'],
+    // closed expressions that evaluate to the answer in any spelling
+    [num(7), '$\\dfrac{56}{8}$', true, 'a TeX fraction'],
+    [num(7), 'Divide $56 \\div 8$ then add nothing.', true, 'a \\div'],
+    [num(252), 'Note that $\\binom{10}{5}$ is the count.', true, 'a binomial'],
+    [num(0.5), 'It is $\\tfrac{1}{2}$ of the area.', true, 'a tfrac'],
+    [num(20), 'Multiply $10 \\times 2$.', true, 'a \\times'],
+    [num(8), 'Cube it: $2^{3}$.', true, 'a power'],
+    [num(Math.E), 'Remember $e^{1}$ here.', true, 'e to a power'],
+    [num(Math.log(5)), 'Take $\\ln 5$ of both sides.', true, 'a ln'],
+    [num(3), 'Subtract: $5 - 2$.', true, 'a Unicode or ASCII minus'],
+    // unparseable maths is dropped
+    [num(3), 'Use $\\weirdcommand{3}$ for this one.', true, 'a TeX command the reader has no reading of'],
+    [num(3), 'Write $[1, 2 \\cup 5$ down first.', true, 'a span that cannot be read']
+  ];
+  for (const [q, text, dropped, what] of rungCases) ok(!!drop(q, text, {}) === dropped, `a hint is ${dropped ? 'dropped' : 'kept'}: ${what}`);
+  // sealed text is never a rung: a trap reason, a criterion's line or point, a step, the title, the question itself
+  const sealedQ = { answerType: 'expression', answer: { expr: '-cos(x)/2' }, prompt: 'Find the inverse of $y=\\cos 2x$.', steps: [{ h: 'Swap', d: 'Swap x and y, then take cosine of both sides.' }], hints: [], traps: [{ expr: 'cos(x)/2', why: 'Use cos(π − x) = −cos x.' }], criteria: [{ marks: 1, point: 'Writes the line cos(2y) = x on its own', line: 'cos(2*y) = x' }] };
+  const sealedCtx = { title: 'The inverse of a cosine', steps: sealedQ.steps, traps: sealedQ.traps, criteria: sealedQ.criteria };
+  ok(!!drop(sealedQ, 'Use cos(π − x) = −cos x.', sealedCtx), 'a hint that is a trap reason word for word is dropped (the reason is sent at issue otherwise)');
+  ok(!!drop(sealedQ, 'Remember: use cos(π − x) = −cos x. Then continue.', sealedCtx), 'and one that contains it whole');
+  ok(!!drop(sealedQ, 'Swap x and y, then take cosine of both sides.', sealedCtx), 'a hint that is a worked step word for word is dropped');
+  ok(!!drop(sealedQ, 'Writes the line cos(2y) = x on its own', sealedCtx), 'a hint that is a criterion is dropped');
+  ok(!!drop(sealedQ, 'The inverse of a cosine function.', sealedCtx), 'a hint that contains the title is dropped');
+  ok(!!drop(sealedQ, 'Find the inverse of $y=\\cos 2x$.', sealedCtx), 'a hint that is the question is dropped');
+  ok(!!drop(sealedQ, 'Start with $\\cos(2y) = x$.', sealedCtx), 'a hint whose maths is a criterion line is dropped');
+  ok(!drop(sealedQ, 'Think about what happens to the argument first.', sealedCtx), 'a hint that is none of those is kept');
+  ok(proseRuns('Compute 56/8 and then 100 − 50, so 2 ln 3 = ln 9.').join(' | ') === '56/8 | 100 \u2212 50 | 2 ln 3 = ln 9', 'plain maths in prose is read as runs: 56/8, 100 − 50, 2 ln 3 = ln 9');
+  // the ladder: only his hints, in his order; none derived from a step or a heading
+  const base = { answerType: 'numeric', answer: { value: 252 }, prompt: 'Find $\\binom{10}{5}$.', steps: [{ h: 'Evaluate', d: '$\\binom{10}{5}=252$' }] };
+  const none = bankLadder({ ...base, hints: ['Use it.', 'Write it out.', 'Evaluate it.'] });
+  ok(none.hints.length === 0 && Object.keys(none.ladder).length === 0 && none.dropped.length === 3, 'a question whose hints are all too thin has no rung and nothing takes their place (not its step, not its heading)');
+  const two = bankLadder({ ...base, hints: ['Think about the factorial formula.', 'It is $252$.', 'Write the numerator out in full.'] });
+  ok(two.hints.length === 2 && two.ladder.nudge === 'Think about the factorial formula.' && two.ladder.method === 'Write the numerator out in full.' && !two.ladder.worked && two.dropped[0].index === 1, 'a hint that states the answer is dropped and the next one moves up: two rungs, in his order');
+  const three = bankLadder({ ...base, hints: ['Think about the factorial formula.', 'Write the numerator out in full.', 'Cancel the common factors first.'] });
+  ok(three.hints.length === 3 && Object.keys(three.ladder).join() === 'nudge,method,worked', 'three good hints are three rungs');
+  const dup = bankLadder({ ...base, hints: ['Write the numerator out in full.', 'Write the numerator out in full.', 'Cancel the common factors first.'] });
+  ok(dup.hints.length === 2, 'a hint that repeats a rung already kept is dropped');
 }
 
 const text = fs.readFileSync(new URL('./qbank-import.mjs', import.meta.url), 'utf8');

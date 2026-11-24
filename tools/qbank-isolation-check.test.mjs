@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { scanDist, needlesOf, CHANCE_ANSWERS } from './qbank-isolation-check.mjs';
 
@@ -58,6 +59,22 @@ for (const [kind, text] of cases) ok(scanDist(plant(kind.replace(/\W+/g, '-'), t
 // every answer, trap reason, prompt and truncated step in one file, as the reviewer's counter-example had them
 const everything = questions.flatMap(q => [q.prompt, ...(q.traps || []).map(t => t.why), ...q.steps.map(s => s.d.slice(0, 39)), JSON.stringify(q.answer)]).join('\n');
 ok(scanDist(plant('everything', everything), questions, manifest.packVersion).length > 0, 'a dist holding every prompt, trap reason, answer and a worked step cut to 39 characters fails the scan');
+
+// The reviewer's two bypasses, and the shapes of them: the whole pack in a file whose extension is not text, the pack compressed, and a script
+// that holds nothing but the pack's short answers (no id, no prompt, no key). Each is the real pack's own content, so a change to the pack keeps them real.
+const plantFile = (name, file, data) => { const dir = dist(name); fs.writeFileSync(path.join(dir, 'assets', file), data); return dir; };
+const packJson = JSON.stringify(questions);
+ok(scanDist(plantFile('dat', 'k.dat', packJson), questions, manifest.packVersion).length > 0, 'the whole pack JSON in assets/k.dat (an extension that is not text) fails the scan');
+ok(scanDist(plantFile('gz', 'k.bin', zlib.gzipSync(packJson)), questions, manifest.packVersion).length > 0, 'the pack gzipped in assets/k.bin fails the scan');
+ok(scanDist(plantFile('br', 'k.br', zlib.brotliCompressSync(packJson)), questions, manifest.packVersion).length > 0, 'the pack brotli-compressed in assets/k.br fails the scan');
+ok(scanDist(plantFile('nokeys', 'k.dat', JSON.stringify(questions.map(q => ({ answer: q.answer })))), questions, manifest.packVersion).length > 0, 'the pack answers alone, with no id, prompt or text, in a .dat file fail the scan');
+const shortNumeric = questions.filter(q => q.answerType === 'numeric' && String(q.answer.value).length <= 6).map(q => q.answer.value);
+ok(shortNumeric.length > 500, `the pack has ${shortNumeric.length} short numeric answers for the bypass below`);
+ok(scanDist(plantFile('shortjs', 'a.js', `${stock}var n=[${shortNumeric.join(',')}];\n`), questions, manifest.packVersion).length > 0, `a script holding ${shortNumeric.length} short numeric answers, in the pack's order, fails the scan`);
+const shuffled = [...shortNumeric].map((v, i) => [(i * 7919) % shortNumeric.length, v]).sort((x, y) => x[0] - y[0]).map(x => x[1]);
+ok(scanDist(plantFile('shuffled', 'a.js', `${stock}var n=[${shuffled.map(v => JSON.stringify(String(v))).join(',')}];\n`), questions, manifest.packVersion).length > 0, 'and the same answers quoted and shuffled fail it too');
+// false positives: ordinary code that holds numbers is not the pack
+ok(scanDist(plantFile('tables', 'tables.js', `${stock}var w=[${Array.from({ length: 400 }, (_, i) => (i * 37) % 1000).join(',')}];var f=[${Array.from({ length: 300 }, (_, i) => i).join(',')}];\n`), questions, manifest.packVersion).length === 0, 'tables of whole numbers in a script are not reported');
 
 const { needles, runs } = needlesOf(questions);
 ok(needles.length > 5000 && runs.size > 20000, `the scan has needles for every kind (${needles.length}, ${runs.size} step runs)`);
