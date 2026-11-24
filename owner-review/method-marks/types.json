@@ -288,6 +288,38 @@
       "digest": "51055d287d31ce88cf90d971e2ee694faa3b213e639265636fad21d5660142e6"
     },
     {
+      "id": "y12-tangent-3",
+      "title": "Find the equation of a tangent or a normal",
+      "course": "Year 12 Mathematics Advanced",
+      "year": 12,
+      "families": [
+        "y12-appdiff"
+      ],
+      "file": "y12-tangent-3.md",
+      "totalMarks": 3,
+      "criteria": [
+        {
+          "key": "derivative",
+          "text": "Differentiates the curve correctly.",
+          "marks": 1,
+          "by": "line"
+        },
+        {
+          "key": "gradient",
+          "text": "Finds the gradient of the tangent at the point correctly.",
+          "marks": 1,
+          "by": "line"
+        },
+        {
+          "key": "equation",
+          "text": "Gives the equation of the line correctly (the final answer).",
+          "marks": 1,
+          "by": "final"
+        }
+      ],
+      "digest": "8e0013beecf267d0a84b39636c15d8d6255732d0f652e0d065684e82c0004269"
+    },
+    {
       "id": "y11-poly-evaluate",
       "title": "Evaluate a polynomial or find a remainder by substitution",
       "course": "Year 11 Mathematics Advanced",
@@ -488,16 +520,6 @@
   ],
   "notProvable": [
     {
-      "id": "y12-diff-gradient",
-      "title": "Differentiate, then find the gradient at a point",
-      "course": "Year 12 Mathematics Advanced",
-      "families": [
-        "y12-diff"
-      ],
-      "reason": "The question has no step plan, so the page leaves the derivative line unchecked; only the final value is verified. \"Differentiates correctly\" cannot be decided from the lines the student sees.",
-      "unavailable": true
-    },
-    {
       "id": "y12-stationary-x",
       "title": "Find the x-coordinates of the stationary points",
       "course": "Year 12 Mathematics Advanced",
@@ -505,16 +527,6 @@
         "y12-appdiff"
       ],
       "reason": "The page leaves the derivative line and the \"let the derivative equal zero\" line unchecked (it checks the equation and the roots only), so two of the three criteria cannot be decided from the lines the student sees.",
-      "unavailable": true
-    },
-    {
-      "id": "y12-tangent",
-      "title": "Find the equation of a tangent",
-      "course": "Year 12 Mathematics Advanced",
-      "families": [
-        "y12-appdiff"
-      ],
-      "reason": "The page ticks the line that finds the point of contact but leaves the derivative line unchecked, so \"differentiates correctly\" cannot be decided from the lines the student sees.",
       "unavailable": true
     },
     {

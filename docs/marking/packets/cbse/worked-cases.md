@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `a16dbf615e48f0c42de9104a24321a23e625caeee1f129bd76cc554bdacdef12` (`docs/marking/order14-examiner-certification-dossier.md`).
+Dossier digest: `9e6a07c56532b198521cbc36a52f68cfb54ce947e7b964ed38effeb65cc658ce` (`docs/marking/order14-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -1300,6 +1300,26 @@ partial:
 ```text
 (working with the right method, ending in a wrong value)
 Final answer: 8
+```
+</details>
+
+## `cbse-bank:y12-appdiff/D3` — seed 32685
+
+> Find the equation of the **tangent** to $y = x^2 + 4x - 5$ at the point where $x = 1$. Answer in the form $y = mx + c$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `6x + -6` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `(6x + -6)` | yes | 3/3 | 3/3 | The same expression written with brackets. |
+| common wrong | `(6x + -6) + 1` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(6x + -6) + 1` | no | 0/3 | 0/3 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: (6x + -6) + 1
 ```
 </details>
 

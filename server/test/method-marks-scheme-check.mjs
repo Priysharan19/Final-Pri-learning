@@ -329,7 +329,7 @@ for (const s of SCHEMES) ok(R.questionsOfType(s, { limit: 3 }).length === 3, `${
 
 // ── 2b4. the Years 11-12 draft schemes (24 Nov 2026): unapproved in the repository; approved here in the TEST PROCESS only; gamed lines earn nothing ──
 {
-  const NEW = ['y12-diff-rules-3', 'y12-diff-gradient-2', 'y12-diff-gradient-3', 'y12-integral-2', 'y12-integral-3'];
+  const NEW = ['y12-diff-rules-3', 'y12-diff-gradient-2', 'y12-diff-gradient-3', 'y12-integral-2', 'y12-integral-3', 'y12-tangent-3'];
   ok(NEW.every(id => SCHEMES.some(s => s.id === id) && !APPROVED_SCHEME_TYPES.some(a => a.typeId === id) && !isApproved(id)), 'the Years 11-12 draft schemes exist and none is on the repository\'s approved list');
   {
     let stamped = 0, tried = 0;
@@ -365,6 +365,14 @@ for (const s of SCHEMES) ok(R.questionsOfType(s, { limit: 3 }).length === 3, `${
         const wrong = built.zero[0];
         g.tried++; if (earnedKeys(run(s, q, [wrong, built.full[0], built.full[1]])).length) g.earned++;
         g.controls++; if (earnedKeys(run(s, q, built.full.slice(0, 2))).join() === 'derivative,second') g.controlEarned++; else if (process.env.DEBUG_CONTROL) console.log('control', id, q.prompt.slice(0, 90), JSON.stringify(built.full), earnedKeys(run(s, q, built.full.slice(0, 2))));
+      } else if (id === 'y12-tangent-3') {
+        const st = q.stepcheck.stages; const slope = st[1].expected; const D = built.full[0];
+        // the value alone is a true line at the second stage and earns the gradient only under a gradient label; the final line restated; the curve restated
+        lists.push([`y = ${String(q.answer.expr)}`], [`m = ${num(slope)}`, `y = ${String(q.answer.expr)}`], [`${num(slope)}`], [`dy/dx = ${num(slope)}`], [`2 + 2 = ${num(slope)}`], [`m = ${num(slope + 1)}`], [`m = ${num(slope - 3)} + 1 + 1 + 1`, D]);
+        for (const ls of lists) { g.tried++; const k = earnedKeys(run(s, q, ls)); if (k.includes('derivative') && !ls.includes(D)) g.earned++; if (k.includes('gradient') && !(ls.length && /^m\b/.test(ls[0]) && ls[0] === `m = ${num(slope)}`) && !/^m = .*=/.test(ls.join('|'))) { if (!(ls.some(x => /^dy\/dx = /.test(x) && x.endsWith(`= ${num(slope)}`)))) g.earned++; } }
+        g.tried++; if (earnedKeys(run(s, q, [built.zero[0], built.full[1]])).length) g.earned++;
+        g.controls++; if (earnedKeys(run(s, q, built.partial)).join() === 'derivative,gradient') g.controlEarned++; else if (process.env.DEBUG_CONTROL) console.log('control', id, q.prompt.slice(0, 90), JSON.stringify(built.partial), earnedKeys(run(s, q, built.partial)));
+        continue;
       } else if (id.startsWith('y12-integral')) {
         const st = q.stepcheck.stages; const val = st[1].expected; const F = built.full[0];
         const integrand = st[0].integrand;
@@ -468,7 +476,8 @@ for (const s of SCHEMES) ok(R.questionsOfType(s, { limit: 3 }).length === 3, `${
   ok(types.types.every(t => { const s = SCHEMES.find(x => x.id === t.id); return t.totalMarks === schemeMarks(s) && t.criteria.length === s.criteria.length && t.criteria.every((c, i) => c.key === s.criteria[i].key && c.marks === s.criteria[i].marks && c.text === s.criteria[i].text); }), 'every packet criterion, mark and text is the server\'s');
   const owner = id => fs.readFileSync(new URL(`../../docs/marking/method-marks-signoff/method-marks/${id}.md`, import.meta.url), 'utf8');
   ok(SCHEMES.every(s => owner(s.id).includes(schemeDigest(s)) && s.criteria.every(c => owner(s.id).includes(c.text))), 'the owner packets carry the digest and every criterion');
-  ok(UNAVAILABLE.length === 3 && UNAVAILABLE.every(u => !SCHEMES.some(s => s.id === u.id) && !fs.existsSync(new URL(`../../docs/marking/method-marks-signoff/method-marks/${u.id}.md`, import.meta.url))), 'the three unavailable types have no scheme and no packet');
+  // Three until the Years 11-12 pass (24 Nov 2026): the gradient at a point and the tangent now have a derived step plan and a scheme each (y12-diff-gradient-2/-3, y12-tangent-3), so they left this list; the stationary points stay.
+  ok(UNAVAILABLE.length === 1 && UNAVAILABLE[0].id === 'y12-stationary-x' && UNAVAILABLE.every(u => !SCHEMES.some(s => s.id === u.id) && !fs.existsSync(new URL(`../../docs/marking/method-marks-signoff/method-marks/${u.id}.md`, import.meta.url))), 'the unavailable type has no scheme and no packet');
   const index = fs.readFileSync(new URL('../../docs/marking/method-marks-signoff/method-marks/INDEX.md', import.meta.url), 'utf8');
   ok(/## Not available yet/.test(index) && UNAVAILABLE.every(u => index.includes(u.reason.slice(0, 40))), 'INDEX.md says "not available yet", with the reason for each');
   const readme = fs.readFileSync(new URL('../../docs/marking/method-marks-signoff/READ-ME-method-marks-signoff.md', import.meta.url), 'utf8');

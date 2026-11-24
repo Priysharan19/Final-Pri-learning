@@ -5,7 +5,7 @@
     "cbse-mathematics-2026-27"
   ],
   "dossier": "docs/marking/order14-examiner-certification-dossier.md",
-  "dossierDigest": "a16dbf615e48f0c42de9104a24321a23e625caeee1f129bd76cc554bdacdef12",
+  "dossierDigest": "9e6a07c56532b198521cbc36a52f68cfb54ce947e7b964ed38effeb65cc658ce",
   "minExaminers": 1,
   "items": [
     "cbse-policy:ap-ecf",
@@ -60,6 +60,7 @@
     "cbse-bank:y11-diff/D3",
     "cbse-bank:y11-diff/D4",
     "cbse-bank:y11-explog/D3",
+    "cbse-bank:y12-appdiff/D3",
     "cbse-bank:y12-diff/D2",
     "cbse-bank:y12-diff/D3",
     "cbse-bank:y12-diff/D4",

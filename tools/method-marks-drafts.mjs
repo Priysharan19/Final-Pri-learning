@@ -360,13 +360,35 @@ const INTEGRAL_CANNOT = [
 EXTRAS['y12-integral-2'] = { marksMatch: true, form: 'A definite integral is given, or the area under a curve between two values of x, and the student finds its value (two marks).', cannot: INTEGRAL_CANNOT, build: integralBuild(false) };
 EXTRAS['y12-integral-3'] = { marksMatch: true, form: 'A definite integral is given, or the area under a curve between two values of x, and the student finds its value (three marks): integrate, put the limits in, subtract.', cannot: INTEGRAL_CANNOT, build: integralBuild(true) };
 
+// ── tangent and normal (24 Nov 2026) ───────────────────────────────────────────────────────────────────────────────────────
+EXTRAS['y12-tangent-3'] = {
+  marksMatch: true,
+  form: 'The equation of the tangent, or of the normal, to a curve at a stated value of x is asked for, in the form y = mx + c (three marks).',
+  cannot: [
+    'It reads the derivative only when the line is labelled dy/dx, y\' or f\'(x), and the gradient only when it is labelled m, m_T, gradient or dy/dx with the value at the point. The point of contact, the point-gradient line and the normal\'s own gradient are not marked as criteria.',
+    'A normal question is paid for the tangent\'s gradient (the method both share); the normal\'s gradient is not a criterion.',
+    'The equation is read from the final answer only (the answer checker), in the form the question asks.'
+  ],
+  async build(q) {
+    const st = q.stepcheck.stages; const x0 = st[1].substitutions.x; const D = diffText(st[0].source); const S = at(D, x0);
+    const key = String(q.answer.expr); const slope = num(st[1].expected);
+    const w = await firstWrong(q, c => `dy/dx = ${c}`, bumpedExprs(D));
+    const wrongKey = bumpedExprs(key).find(c => c !== key);
+    if (!D || !w || !wrongKey) return null;
+    return {
+      full: [`dy/dx = ${D}`, `m = ${S} = ${slope}`, `y = ${key}`],
+      partial: [`dy/dx = ${D}`, `m = ${S} = ${slope}`, `y = ${wrongKey}`],
+      zero: [`dy/dx = ${w.text}`, `y = ${wrongKey}`],
+      slip: [`dy/dx = ${w.text}`, `= ${w.text}`]
+    };
+  }
+};
+
 export const TYPES = SCHEMES.map(s => ({ ...s, ...EXTRAS[s.id] }));
 
 // ── types the marked page cannot verify line by line (server/platform/schemeAward.js UNAVAILABLE) ─
 const UNAVAILABLE_PROBES = {
-  'y12-diff-gradient': { family: 'y12-diff', d: 1, seed: 29, lines: ['dy/dx = 24x^2 + 72x + 54', 'dy/dx = 150'], unverified: [1] },
-  'y12-stationary-x': { family: 'y12-appdiff', d: 1, seed: 7, lines: ['dy/dx = 6x^2 - 294', 'Let dy/dx = 0', '6x^2 - 294 = 0', 'x = -7 or x = 7'], unverified: [1, 2] },
-  'y12-tangent': { family: 'y12-appdiff', d: 3, seed: 7, lines: ['dy/dx = 2x - 5', 'y(1) = 2', 'y = -3x + 5'], unverified: [1] }
+  'y12-stationary-x': { family: 'y12-appdiff', d: 1, seed: 7, lines: ['dy/dx = 6x^2 - 294', 'Let dy/dx = 0', '6x^2 - 294 = 0', 'x = -7 or x = 7'], unverified: [1, 2] }
 };
 const UNAVAILABLE_PROBED = UNAVAILABLE.map(u => ({ ...u, probe: UNAVAILABLE_PROBES[u.id] }));
 
@@ -550,7 +572,7 @@ export async function build() {
     `- Criteria in all: ${crit}. Earned by a ticked line of the marked page: ${by('line')}. Earned by a correct final answer (the answer checker): ${by('final')}.`,
     `- Size of the review job: ${done.length} types, about ${awardsToRead} worked awards to read (one full, one partial, one zero and one earlier-slip award for each type), and ${crit} criteria whose marks to set.`, '',
     '## Not available yet', '',
-    'These three question types had a draft in an earlier version of this packet. They are NOT available now: the marked page the student sees cannot verify one of their criteria line by line, and the server pays only from that page, so nothing about them can be approved or paid. Each reason was checked by running a plausible correct transcript.', '',
+    'These question types had a draft in an earlier version of this packet. They are NOT available now: the marked page the student sees cannot verify one of their criteria line by line, and the server pays only from that page, so nothing about them can be approved or paid. Each reason was checked by running a plausible correct transcript.', '',
     ...notProvable.filter(n => n.unavailable).map(n => `- ${plain(n.title)} (${n.course}; families ${n.families.map(f => `\`${f}\``).join(', ')}): ${plain(n.reason)}`),
     '', '## Could not be given a provable scheme', '',
     'These types were tried. A scheme is not offered because at least one criterion cannot be decided by the engine from the student\'s lines. Each reason was checked by running a plausible correct transcript.', '');

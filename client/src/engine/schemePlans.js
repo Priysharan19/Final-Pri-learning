@@ -112,7 +112,7 @@ function gradientPlan(payload) {
   return {
     kind: 'plan', scheme: 'gradient-at-point', creditPerStage: true,
     stages: [
-      { kind: 'derivative', variable: 'x', source },
+      { kind: 'derivative', variable: 'x', source, requireLabel: true },
       { kind: 'evaluation', source: deriv, substitutions: { x: x0 }, expected: value, labels: ['m', 'gradient', 'dy/dx', 'y\''], ...(places === null ? {} : { roundTo: places }) }
     ]
   };
@@ -157,12 +157,43 @@ function integralPlan(payload) {
   };
 }
 
+
+// ── tangent and normal ───────────────────────────────────────────────────────────────────────────────────────────────────
+// "the equation of the tangent / normal to y = f at x = a, in the form y = mx + c": the plan asks for the derivative and the tangent's gradient
+// at the point (the method both share). It is returned only when the line the engine builds from f (through the point, with the tangent's
+// gradient or its negative reciprocal) is the keyed expression at several values of x.
+function tangentPlan(payload) {
+  if (payload?.answerType !== 'expression' || typeof payload.answer?.expr !== 'string') return null;
+  const m = /^Find the equation of the \*\*(tangent|normal)\*\* to (?:the curve )?\$y\s*=\s*([^$]+)\$ at the point where \$x\s*=\s*(-?[\d.]+)\$/i.exec(oneLine(payload.prompt));
+  if (!m) return null;
+  const normal = m[1].toLowerCase() === 'normal';
+  const source = texExpr(m[2]); const x0 = num(m[3]);
+  const f = source && parsed(source);
+  if (!f || x0 === null || [...variablesOf(f)].some(v => v !== 'x')) return null;
+  const deriv = derivativeText(source); const d = deriv && parsed(deriv);
+  const slope = d && at(d, 'x', x0); const y0 = at(f, 'x', x0);
+  if (slope === null || slope === undefined || y0 === null || (normal && Math.abs(slope) < 1e-12)) return null;
+  const key = parsed(texExpr(payload.answer.expr) ?? payload.answer.expr);
+  if (!key) return null;
+  const k = normal ? -1 / slope : slope;
+  for (const t of [-2.3, -0.4, 0.9, 3.1]) { const got = at(key, 'x', t); if (got === null || Math.abs(got - (k * (t - x0) + y0)) > 1e-7 * Math.max(1, Math.abs(got))) return null; }
+  if (Math.abs(slope) < 1e-12) return null;   // a horizontal tangent: m = 0 leaves no gradient line to tick
+  return {
+    kind: 'plan', scheme: 'tangent-normal', creditPerStage: true,
+    stages: [
+      { kind: 'derivative', variable: 'x', source, requireLabel: true },
+      { kind: 'evaluation', source: deriv, substitutions: { x: x0 }, expected: slope, labels: ['m', 'm_T', 'm_t', 'mT', 'gradient', 'tangent gradient', 'dy/dx', 'y\''] }
+    ]
+  };
+}
+
 /** The plan a generated question of these forms is checked against, or null. `subtopicId` limits the forms read. */
 export function schemePlanFor(payload, subtopicId) {
   if (!payload || payload.stepcheck) return null;
   try {
     if (subtopicId === 'y12-diff') return gradientPlan(payload);
     if (subtopicId === 'y12-integration' || subtopicId === 'y12-integral-calc') return integralPlan(payload);
+    if (subtopicId === 'y12-appdiff') return tangentPlan(payload);
   } catch { /* an unreadable prompt has no plan */ }
   return null;
 }

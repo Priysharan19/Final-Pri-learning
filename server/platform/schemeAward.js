@@ -373,17 +373,23 @@ export const SCHEMES = Object.freeze([
       { key: 'limits', by: 'line', marks: 1, text: 'Substitutes the limits into the antiderivative correctly.', how: 'a line the step check ticks at the plan\'s second stage (it has a difference of two numbers equal to the value of the integral) whose two numbers are the antiderivative the student wrote above, put at the upper and at the lower limit; a difference that merely comes to the value earns nothing', line: limitsShown },
       { ...ANSWER, key: 'value', marks: 1, text: 'Finds the value correctly (the final answer).' }
     ]
+  },
+  {
+    id: 'y12-tangent-3', title: 'Find the equation of a tangent or a normal', course: 'Year 12 Mathematics Advanced', year: 12, level: 1,
+    families: ['y12-appdiff'],
+    pick: q => q.answerType === 'expression' && planOf(q)?.scheme === 'tangent-normal',
+    criteria: [
+      { key: 'derivative', by: 'line', marks: 1, text: 'Differentiates the curve correctly.', how: 'a line the step check ticks as equal to the derivative of the curve (the plan\'s first stage), in any form; a line that only restates the curve does not count', line: (l, k, lines, q) => l.stage === 0 && !restates(l, q) },
+      { key: 'gradient', by: 'line', marks: 1, text: 'Finds the gradient of the tangent at the point correctly.', how: 'a line the step check ticks at the plan\'s second stage: its value is the derivative of the curve at the point (the substitution, or the value), with the label m, m_T, gradient or dy/dx', line: (l, k, lines, q) => l.stage === 1 && /^\s*(?:m|m_?t|mt|gradient|tangent gradient|dy\s*\/\s*dx|y['′])\b/i.test(String(l.text ?? '')) },
+      { ...ANSWER, key: 'equation', marks: 1, text: 'Gives the equation of the line correctly (the final answer).' }
+    ]
   }
 ]);
 
 /** Types the page cannot verify line by line today, each with the reason. They are never paid by a scheme. */
 export const UNAVAILABLE = Object.freeze([
-  { id: 'y12-diff-gradient', title: 'Differentiate, then find the gradient at a point', course: 'Year 12 Mathematics Advanced', level: 1, families: ['y12-diff'],
-    reason: 'The question has no step plan, so the page leaves the derivative line unchecked; only the final value is verified. "Differentiates correctly" cannot be decided from the lines the student sees.' },
   { id: 'y12-stationary-x', title: 'Find the x-coordinates of the stationary points', course: 'Year 12 Mathematics Advanced', level: 1, families: ['y12-appdiff'],
-    reason: 'The page leaves the derivative line and the "let the derivative equal zero" line unchecked (it checks the equation and the roots only), so two of the three criteria cannot be decided from the lines the student sees.' },
-  { id: 'y12-tangent', title: 'Find the equation of a tangent', course: 'Year 12 Mathematics Advanced', level: 1, families: ['y12-appdiff'],
-    reason: 'The page ticks the line that finds the point of contact but leaves the derivative line unchecked, so "differentiates correctly" cannot be decided from the lines the student sees.' }
+    reason: 'The page leaves the derivative line and the "let the derivative equal zero" line unchecked (it checks the equation and the roots only), so two of the three criteria cannot be decided from the lines the student sees.' }
 ]);
 
 const byId = new Map(SCHEMES.map(s => [s.id, s]));

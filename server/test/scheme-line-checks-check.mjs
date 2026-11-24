@@ -30,21 +30,21 @@ let pass = 0; const failures = [];
 const ok = (c, l) => { if (c) pass++; else failures.push(l); };
 await G.loadAllBanks();
 
-const PLAN_TYPES = ['y12-diff-gradient-2', 'y12-diff-gradient-3', 'y12-integral-2', 'y12-integral-3'];
+const PLAN_TYPES = ['y12-diff-gradient-2', 'y12-diff-gradient-3', 'y12-integral-2', 'y12-integral-3', 'y12-tangent-3'];
 const finalOf = lines => { const l = lines[lines.length - 1] || ''; return l.includes('=') ? l.slice(l.lastIndexOf('=') + 1).trim() : l.trim(); };
 const bump = text => { const m = [...String(text).matchAll(/\d+/g)].pop(); return m ? text.slice(0, m.index) + (Number(m[0]) + 1) + text.slice(m.index + m[0].length) : null; };
 
 // ── 1. a plan comes from the prompt, and agrees with the key ──────────────────────────────────────────────────────────────
 let planned = 0, unplanned = 0, india = 0;
-for (const fam of ['y12-diff', 'y12-integration', 'y12-integral-calc']) {
+for (const fam of ['y12-diff', 'y12-integration', 'y12-integral-calc', 'y12-appdiff']) {
   for (let d = 1; d <= 4; d++) for (let seed = 1; seed <= 60; seed++) {
     let q; try { q = G.generateQuestion(fam, d, seed); } catch { continue; }
     if (!q) continue;
     if (q.stepcheck?.scheme) {
       planned++;
-      ok(JSON.stringify(q.stepcheck).includes('"stages"') && q.answerType === 'numeric', `${fam} D${d} seed ${seed}: a derived plan is on a numeric question`);
+      ok(JSON.stringify(q.stepcheck).includes('"stages"') && (q.answerType === 'numeric' || q.stepcheck.scheme === 'tangent-normal'), `${fam} D${d} seed ${seed}: a derived plan is on a numeric question`);
       const st = q.stepcheck.stages; const exp = st[st.length - 1].expected;
-      ok(Math.abs(exp - q.answer.value) <= Math.max(Number(q.answer.tol) || 0, 1e-9 * Math.max(1, Math.abs(q.answer.value))), `${fam} D${d} seed ${seed}: the plan's value is the key`);
+      if (q.stepcheck.scheme !== 'tangent-normal') ok(Math.abs(exp - q.answer.value) <= Math.max(Number(q.answer.tol) || 0, 1e-9 * Math.max(1, Math.abs(q.answer.value))), `${fam} D${d} seed ${seed}: the plan's value is the key`);
     } else unplanned++;
   }
 }
@@ -55,6 +55,9 @@ ok(schemePlanFor({ prompt: 'Find the gradient of $y = x^2$ at the point where $x
 ok(schemePlanFor({ prompt: 'Find the gradient of $y = x^2$ at the point where $x = 2$.', answerType: 'numeric', answer: { value: 4 }, stepcheck: { kind: 'plan', stages: [] } }, 'y12-diff') === null, 'an authored plan is never replaced');
 ok(schemePlanFor({ prompt: 'Find the gradient of $y = x^2$ at the point where $x = 2$.', answerType: 'numeric', answer: { value: 4 } }, 'y9-linear') === null, 'a bank outside the forms has none');
 ok(schemePlanFor({ prompt: 'Find the gradient of $y = 5$ at the point where $x = 2$.', answerType: 'numeric', answer: { value: 0 } }, 'y12-diff') === null, 'a constant function (derivative zero everywhere) has no plan');
+ok(schemePlanFor({ prompt: 'Find the equation of the **tangent** to $y = x^2 - 5x + 6$ at the point where $x = 1$. Answer in the form $y = mx + c$.', answerType: 'expression', answer: { expr: '-3x + 5' } }, 'y12-appdiff')?.scheme === 'tangent-normal', 'a tangent prompt has a plan');
+ok(schemePlanFor({ prompt: 'Find the equation of the **tangent** to $y = x^2 - 5x + 6$ at the point where $x = 1$. Answer in the form $y = mx + c$.', answerType: 'expression', answer: { expr: '-3x + 6' } }, 'y12-appdiff') === null, 'a tangent line the engine does not reach gives no plan');
+ok(schemePlanFor({ prompt: 'Find the equation of the **normal** to the curve $y = x^2 + 3x + 1$ at the point where $x = 2$. Give your answer in the form $y = mx + c$.', answerType: 'expression', answer: { expr: '-x/7 + 79/7' } }, 'y12-appdiff')?.scheme === 'tangent-normal', 'a normal prompt has a plan');
 ok(schemePlanFor({ prompt: 'Find the area under the curve $y = x - 3$ from $x = 0$ to $x = 2$.', answerType: 'numeric', answer: { value: -4 } }, 'y12-integration') === null, 'an area under a curve that dips below the axis has no plan');
 ok(schemePlanFor({ prompt: 'Evaluate $\\displaystyle\\int_{0}^{3} (x^2 + x)\\,dx$.', answerType: 'numeric', answer: { value: 13.5 } }, 'y12-integration')?.scheme === 'definite-integral', 'a definite integral has a plan');
 ok(schemePlanFor({ prompt: 'Use the substitution $u = x^2$ to evaluate $\\displaystyle\\int_{0}^{3} 2x\\,dx$.', answerType: 'numeric', answer: { value: 9 } }, 'y12-integral-calc') === null, 'integration by substitution has none');
@@ -65,7 +68,7 @@ for (const id of ['india-c10-ap', 'c11-sequences-series', 'y12-series']) ok(sche
 }
 
 // ── 2 and 3. true pages are never crossed; wrong lines are never ticked ───────────────────────────────────────────────────
-const N = { questions: 0, truePages: 0, trueCrossed: 0, needTicked: 0, needMissed: 0, wrongLines: 0, wrongTicked: 0, falsified: 0, falsifiedTicked: 0 };
+const N = { unlabelled: 0, unlabelledCrossed: 0, questions: 0, truePages: 0, trueCrossed: 0, needTicked: 0, needMissed: 0, wrongLines: 0, wrongTicked: 0, falsified: 0, falsifiedTicked: 0 };
 for (const id of PLAN_TYPES) {
   const s = SCHEMES.find(x => x.id === id); const type = TYPES.find(t => t.id === id);
   for (const q of R.questionsOfType(s, { limit: 80 })) {
@@ -86,6 +89,8 @@ for (const id of PLAN_TYPES) {
       const r = page(lines).rows[k];
       if (r && r.status === 'ok' && r.stage === st[k] && r.ecf !== true) { N.falsifiedTicked++; if (process.env.DEBUG_CONTROL) console.log('ticked', id, q.prompt.slice(0, 100), JSON.stringify(lines)); }
     }
+    // a true line that is not a derivative is never crossed as one: the final line alone, and the final line before the derivative (a student who differentiates in their head)
+    if (id === 'y12-tangent-3') { N.unlabelled++; if (page([built.full[2]]).rows.some(r => r.status === 'break') || page([built.full[2], built.full[0], built.full[1]]).rows.some(r => r.status === 'break')) N.unlabelledCrossed++; }
     // the zero page's wrong lines
     for (let k = 0; k < built.zero.length; k++) { N.wrongLines++; const r = page(built.zero).rows[k]; if (r && r.status === 'ok' && r.stage !== undefined && r.stage !== null && r.ecf !== true && k === 0) N.wrongTicked++; }
   }
@@ -95,6 +100,7 @@ ok(N.questions >= 150, `${N.questions} questions of the plan forms`);
 ok(N.trueCrossed === 0, `no true page is crossed by a new check (${N.trueCrossed})`);
 ok(N.needMissed === 0 && N.needTicked >= 250, `the line each criterion needs is ticked on every true page (${N.needTicked} ticked, ${N.needMissed} missed)`);
 ok(N.falsifiedTicked === 0 && N.falsified >= 250, `a line with one number changed is never ticked at its stage (${N.falsifiedTicked} of ${N.falsified})`);
+ok(N.unlabelled >= 10 && N.unlabelledCrossed === 0, `a true line that is not labelled as a derivative is never crossed as one (${N.unlabelledCrossed} of ${N.unlabelled})`);
 ok(N.wrongTicked === 0, `a wrong first line is never ticked (${N.wrongTicked} of ${N.wrongLines})`);
 
 // ── 4. the area stages only tick or abstain ─────────────────────────────────────────────────────────────────────────────────
