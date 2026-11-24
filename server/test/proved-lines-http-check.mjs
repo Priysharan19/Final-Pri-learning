@@ -14,7 +14,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const keys = ['NODE_ENV', 'PRI_OFFERING', 'PRI_PLATFORM_DB', 'PRI_AUTH_DELIVERY_KEY', 'PRI_PUBLIC_ORIGIN', 'PRI_FREE_PRACTICE_PER_DAY', 'PRI_EDITION', 'PRI_METHOD_MARKS', 'PRI_METHOD_MARKS_EXAMINER_RESULT'];
+const keys = ['NODE_ENV', 'PRI_OFFERING', 'PRI_PLATFORM_DB', 'PRI_AUTH_DELIVERY_KEY', 'PRI_PUBLIC_ORIGIN', 'PRI_FREE_PRACTICE_PER_DAY', 'PRI_EDITION', 'PRI_METHOD_MARKS', 'PRI_METHOD_MARKS_EXAMINER_RESULT', 'PRI_QBANK_DIR'];
 const before = Object.fromEntries(keys.map(key => [key, process.env[key]]));
 const scratch = mkdtempSync(join(tmpdir(), 'pri-generic-http-'));
 process.env.NODE_ENV = 'test';
@@ -23,6 +23,7 @@ process.env.PRI_AUTH_DELIVERY_KEY = 'c4'.repeat(32);
 process.env.PRI_FREE_PRACTICE_PER_DAY = '100000';
 delete process.env.PRI_METHOD_MARKS;
 process.env.PRI_EDITION = 'prithagoras';
+process.env.PRI_QBANK_DIR = 'off';   // this suite is about generator questions; the author bank is never touched by the pass (proved-lines-qbank-check.mjs)
 process.env.PRI_OFFERING = 'catalogue';
 delete process.env.PRI_METHOD_MARKS_EXAMINER_RESULT;
 delete process.env.PRI_PUBLIC_ORIGIN;
