@@ -707,3 +707,16 @@ export function serveMarker(port, ops = MARKER_OPS) {
   });
   port.postMessage({ ready: true });
 }
+
+/**
+ * The sentence a resolved wrong answer carries INSTEAD of an authored trap for the typed value, or null. An authored trap says why a student
+ * would write that value ("the sine is 1"); when the page has verified lines and then a crossed line, the crossed line's own message is what
+ * is said, because the trap would otherwise contradict correct working the student wrote (sin(5π/6) = 1/2, then a wrong sum). A multiple-choice
+ * explanation, an answer that is right, an invalid entry and a page with no verified line before its first cross keep the marker's own text.
+ */
+export function lineLevelFeedback(stepReport, { resolved, invalid, correct, optionWhy } = {}) {
+  if (!resolved || invalid || correct || optionWhy || !Array.isArray(stepReport?.lines)) return null;
+  const at = stepReport.lines.findIndex(l => l?.status === 'break' && typeof l.note === 'string' && l.note.trim());
+  if (at < 1 || !stepReport.lines.slice(0, at).some(l => l?.status === 'ok')) return null;
+  return stepReport.lines[at].note.trim().slice(0, 3000);
+}

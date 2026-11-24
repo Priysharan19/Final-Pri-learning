@@ -20,6 +20,7 @@ import { parse, normalize } from './expr.js';
 import { cleanStatement } from './arithmeticLines.js';
 import { literalFraction } from './exact.js';
 import { texToPlain } from './texToPlain.js';
+import { explainWide, closedValue, WIDE_ERROR_TYPES } from './wideFalseStep.js';
 
 const tidy = s => String(s ?? '').replace(/[−–—]/g, '-').replace(/[′’`]/g, "'").replace(/[×·]/g, '*').replace(/÷/g, '/').trim();
 
@@ -29,14 +30,15 @@ const CONTEXT = [
   /\b(?:when|at|if|where|given|for|whenever|substitut\w*|evaluat\w*|approximat\w*|estimat\w*|nearest|decimal|significant|sig\.?\s*fig\w*)\b/i,
   /\b(?:solv\w*|solution|roots?|zeros?|intercepts?|equations?|inequalit\w*|simultaneous|satisf\w*|prove|show that|verif\w*|identity|identities|tangent|normal|stationary|turning|maxim\w*|minim\w*|optimi\w*)\b/i,
   /\b(?:integra\w*|antiderivative|primitive|limits?|lim|series|sum|sequence|domain|range|exact value|numerically)\b/i,
-  /\b(?:complex|imagin\w*|modulus|argument|vectors?|matri(?:x|ces)|sets?|union|intersect\w*|subscript\w*|polar|conjugate|surds?|radicals?|logarithm\w*|exponential|trigonometr\w*)\b|[±∪∩∈]|\\pm|\\mathbb|\\cup|\\cap|\\in\b|\\vec|\\begin/i,
+  /\b(?:complex|imagin\w*|modulus|argument|vectors?|matri(?:x|ces)|sets?|union|intersect\w*|subscript\w*|polar|conjugate|surds?|radicals?)\b|[±∪∩∈]|\\pm|\\mathbb|\\cup|\\cap|\\in\b|\\vec|\\begin/i,
   /[<>≤≥≈∫]|\\int|\\approx|\\le(?![a-z])|\\ge(?![a-z])|\\leq|\\geq|\\lim|\\sum/
 ];
 /** One question, one target: a part label, a second part, a second expression to work on, or a second paragraph is a different question. */
-export function isMultiPart(prompt) {
+export function isMultiPart(prompt, light = false) {
   const raw = String(prompt ?? '');
   if (/\n\s*\S/.test(raw.trim())) return true;
   if (/(?:^|[\s(])\(?[a-hi]{1,3}\)|\(\s*(?:i{1,3}|iv|v)\s*\)|\bpart\b|\bparts\b|\bhence\b|\bthen\b[^.]*\b(?:find|simplify|expand|differentiate)\b|\b(?:first|second|also|and then|next)\b/i.test(raw.replace(/\$[^$]*\$/g, ' $ '))) return true;
+  if (light) return false;   // a closed-number page: several expressions in ONE question is not several parts
   // more than one expression to work on: two or more TeX spans that are not a bare letter or number
   const spans = [...raw.matchAll(/\$+([^$]+)\$+/g)].map(m => m[1].trim()).filter(t => !/^[A-Za-z]$/.test(t) && !/^-?\d+(?:\.\d+)?$/.test(t));
   if (spans.length > 1) return true;
@@ -55,6 +57,16 @@ export function contextAllowsCross(prompt) {
   const p = String(prompt ?? '').replace(/\$+/g, ' ');
   if (!p.trim() || p.length > 1500) return false;
   return TASK.test(p) && !CONTEXT.some(re => re.test(p)) && !isMultiPart(prompt);
+}
+
+/**
+ * A page of closed numbers (no letter): a chain `= 12 + 10`, `= 22` is a rewrite whatever the question says about its context. Not when the
+ * question rounds or approximates, asks to prove or solve, has several parts, or works in sets, vectors, complex numbers or integrals.
+ */
+export function contextAllowsNumericCross(prompt) {
+  const p = String(prompt ?? '').replace(/\$+/g, ' ');
+  if (!p.trim() || p.length > 1500 || isMultiPart(prompt, true)) return false;
+  return !/\b(?:approximat\w*|estimat\w*|nearest|decimal|significant|sig\.?\s*fig\w*|round\w*|correct to|solv\w*|equations?|inequalit\w*|prove|show that|verif\w*|integra\w*|limits?|series|sum|sequence|complex|imagin\w*|vectors?|matri(?:x|ces)|sets?|union|intersect\w*|polar|conjugate|percent\w*|interest|currency|\bcost\b|\bpay\w*)\b|[±∪∩∈≈∫<>≤≥%]|\\pm|\\approx|\\int|\\le(?![a-z])|\\ge(?![a-z])|\\begin|\\vec|\\sum|\\lim/i.test(p);
 }
 
 // ── the page ───────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -89,7 +101,7 @@ export function readingIsAmbiguous(text) {
   return /\^\s*-?\s*\d+(?:\.\d+)?\s*[a-z(]/i.test(t)                                   // e^2x, x^2y
     || /\^\s*-?\s*\d+(?:\.\d+)?\s*\/\s*[\d(a-z]/i.test(t)                              // x^-1/2
     || /(?<![A-Za-z])(?:sin|cos|tan|sec|cosec|csc|cot|ln|log|arcsin|arccos|arctan|sinh|cosh|tanh)\s*(?:\^\s*-?\d+\s*)?[-+]?\s*[\da-z]/i.test(t)   // sin 2x, cos x
-    || /\/\s*(?:\d+(?:\.\d+)?|[a-z])\s*(?:[a-z(]|\d)/i.test(t)                          // 1/2x, x/2y
+    || /\/\s*(?:\d+(?:\.\d+)?(?![\d.])|[a-z])\s*(?:[a-z(]|\d)/i.test(t)                          // 1/2x, x/2y
     || /\d\s+\d/.test(t);                                                               // two numbers run together
 }
 
@@ -215,7 +227,16 @@ export function crossDiagnosis(facts, example, ctx = null) {
   }
   // the annotation: structured, each field only when the engine computed it
   let ex = null;
-  if (ctx && ctx.aboveSide && ctx.writtenSide) { try { ex = explainFalseStep(ctx.aboveSide, ctx.writtenSide); } catch { ex = null; } }
+  if (ctx && ctx.aboveSide && ctx.writtenSide) {
+    // two closed numbers have no terms to name: the arithmetic is told by engine/wideFalseStep.js
+    let closed = false; try { const pa = readPoly(ctx.aboveSide), pb = readPoly(ctx.writtenSide); closed = !!(pa && pb && !pa.v && !pb.v); } catch { closed = false; }
+    if (!closed) { try { ex = explainFalseStep(ctx.aboveSide, ctx.writtenSide); } catch { ex = null; } }
+  }
+  // Sides that are not both polynomials, or a polynomial case the term rules could not name: the single-edit repair of engine/wideFalseStep.js
+  if (ctx && ctx.aboveSide && ctx.writtenSide && (!ex || !ex.type)) {
+    let wx = null; try { wx = explainWide(ctx.aboveSide, ctx.writtenSide, ctx.strict || null); } catch { wx = null; }
+    if (wx) { ex = ex ? { ...ex } : { exact: false }; for (const k of ['type', 'whatChanged', 'whyWrong', 'corrected', 'check', 'checkAt']) if (wx[k] !== undefined && ex[k] === undefined) ex[k] = wx[k]; }
+  }
   if (ex) {
     if (ex.whatChanged) d.whatChanged = ex.whatChanged;
     if (ex.whyWrong) { d.whyWrong = ex.whyWrong; d.errorType = ex.type; }
@@ -354,6 +375,64 @@ function monomial(text) {
 }
 const polyEqual = (a, b) => { if (!a || !b) return false; const ks = new Set([...a.c.keys(), ...b.c.keys()]); for (const k of ks) if (!sameC(a.c.get(k), b.c.get(k))) return false; return !(a.v && b.v && a.v !== b.v && a.c.size); };
 const signedText = (terms, tex) => terms.map((t, i) => { const s = termText(t.v || 'x', t.d, t.c, tex); return i === 0 ? s : (s.startsWith('-') ? ` - ${s.slice(1)}` : ` + ${s}`); }).join('');
+/** The factors of a single product `2x(x + 2)` as expanded TeX, each a polynomial in one letter; at least two, one of them carrying the letter. null otherwise. */
+function productFactors(side) {
+  const ast = astOf(side); if (!ast) return null;
+  let node = ast; while (node && node.t === 'group') node = node.v;
+  const flat = [];
+  const walk = n => { if (n && n.t === 'bin' && n.op === '*') { walk(n.l); walk(n.r); } else flat.push(n); };
+  walk(node);
+  if (flat.length < 2 || flat.length > 5) return null;
+  // the plain factors (a number, a power of the letter) are one factor, written first; each bracket is its own factor
+  const plain = flat.filter(n => n.t !== 'group'), groups = flat.filter(n => n.t === 'group');
+  const parts = [];
+  if (plain.length) parts.push(plain.reduce((l, r) => ({ t: 'bin', op: '*', l, r })));
+  parts.push(...groups);
+  if (parts.length < 2) return null;
+  const out = []; let letter = false;
+  for (const f of parts) {
+    const st = { v: null }; const c = polyOf(f, st);
+    if (!c || !c.size) return null;
+    if (st.v) letter = true;
+    out.push(polyText({ v: st.v || 'x', c }, true));
+  }
+  return letter ? out : null;
+}
+/** Where `top / bottom` is the whole side (one division at depth 0): [top, bottom] as text, else null. */
+function splitSlash(side) {
+  const t = tidy(side).replace(/\s+/g, ' ').trim();
+  let depth = 0, at = -1;
+  for (let i = 0; i < t.length; i++) {
+    const ch = t[i];
+    if (ch === '(') depth++; if (ch === ')') depth--;
+    if (depth === 0 && ch === '/') { if (at >= 0) return null; at = i; }
+    if (depth === 0 && at < 0 && (ch === '+' || ch === '-') && i > 0 && t[i - 1] !== '^' && t[i - 1] !== '(' ) return null;   // a sum, not one fraction
+  }
+  if (at <= 0) return null;
+  const strip = x => { x = x.trim(); while (/^\(.*\)$/.test(x) && (() => { let d = 0; for (let i = 0; i < x.length; i++) { if (x[i] === '(') d++; if (x[i] === ')') { d--; if (d === 0 && i < x.length - 1) return false; } } return true; })()) x = x.slice(1, -1).trim(); return x; };
+  const top = strip(t.slice(0, at)), bottom = strip(t.slice(at + 1));
+  return top && bottom ? [top, bottom] : null;
+}
+/**
+ * How `thisSide` follows from `aboveSide` where the sides are not both polynomials: { kind } | null. Only claims that recompute exactly.
+ *   cancelled  the line above is one fraction whose denominator divides the numerator exactly, and this line is the quotient
+ *   evaluated  the line above is arithmetic on numbers and this line is that value written as a single number
+ */
+export function stepHowWide(aboveSide, thisSide) {
+  const parts = splitSlash(aboveSide);
+  if (parts) {
+    const num = readPoly(parts[0]), den = readPoly(parts[1]), q = readPoly(thisSide);
+    if (num && den && q && den.v && den.c.size >= 1 && (!q.v || q.v === den.v) && (!num.v || num.v === den.v)) {
+      const prod = readPoly(`(${thisSide})*(${parts[1]})`);
+      if (prod && polyEqual(prod, num)) return { kind: 'cancelled', factorTex: polyText({ v: den.v, c: den.c }, true) };
+    }
+  }
+  const a = closedValue(aboveSide), b = closedValue(thisSide);
+  if (a !== null && b !== null && Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a)) && /^-?\d+(?:\.\d+)?$/.test(tidy(thisSide).replace(/\s+/g, '')) && !/^-?\d+(?:\.\d+)?$/.test(tidy(aboveSide).replace(/\s+/g, ''))) {
+    return { kind: 'evaluated', valueTex: String(thisSide).trim() };
+  }
+  return null;
+}
 
 /**
  * How `thisSide` follows from `aboveSide` (both the part after `=`): { kind, ... } | null. Only claims that recompute exactly.
@@ -372,6 +451,16 @@ export function stepHow(aboveSide, thisSide) {
   const at = topTerms(aboveSide), bt = topTerms(thisSide);
   if (!at || !bt || A === B) return A === B ? null : { kind: 'equal-above' };
   const bracketed = s => /[()]/.test(s);
+  // factorised: a line with no brackets became ONE product of two or more factors (each a polynomial), equal exactly (checked above)
+  if (!at.some(bracketed) && bt.length === 1 && bracketed(bt[0]) && at.length >= 2) {
+    const fs = productFactors(thisSide);
+    if (fs) return { kind: 'factorised', factors: fs };
+  }
+  // expanded (one product of brackets): the line above is a single product and this line has no bracket: the exact expansion of that product
+  if (at.length === 1 && bracketed(at[0]) && !bt.some(bracketed) && productFactors(aboveSide)) {
+    const pa = readPoly(aboveSide);
+    if (pa && pa.v) return { kind: 'expanded', items: [{ fromText: tidy(aboveSide).replace(/\s+/g, ' '), toTex: polyText(pa, true) }] };
+  }
   // expanded: bracketed summands replaced by their exact expansion, the others kept as they are
   if (at.some(bracketed) && !bt.some(bracketed)) {
     const expected = []; const shown = [];
@@ -458,6 +547,8 @@ const ERROR_CATALOGUE = Object.freeze({
   'exponent-changed': 'The power {from} became {to}. A power keeps its exponent unless it is multiplied or divided by another power of the same letter.',
   'bracket-product': 'Each term of one bracket multiplies each term of the other: {product} {state}.'
 });
+/** Every error type a false-continuation diagnosis may name: closed, so a card never shows an invented category. */
+export const ERROR_TYPES = Object.freeze([...Object.keys(ERROR_CATALOGUE), ...WIDE_ERROR_TYPES]);
 const monos = side => { const ts = topTerms(side); if (!ts) return null; const ms = ts.map(monomial); return ms.every(Boolean) ? ms : null; };
 const evalAt = (p, x) => { let sum = frac(0n); for (const [d, c] of p.c) { let pw = frac(1n); for (let k = 0; k < d; k++) pw = fMul(pw, x); sum = fAdd(sum, fMul(c, pw)); } return sum; };
 const fText = a => (a.d === 1n ? String(a.n) : `${a.n}/${a.d}`);
