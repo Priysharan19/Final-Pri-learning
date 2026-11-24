@@ -1124,7 +1124,15 @@ function pageDefinitionsOnce(raw, out, firstBreak, prep, degreePrimed, tickOnly,
  * `opts.facts`: what the question's prompt gives (questionFacts.js). Used only to tick or leave a note; see "What the
  * question itself gives". Without it the check is exactly what it was.
  */
+// The numbers the question's authored worked solution reaches, for the one page being checked (set and cleared around it).
+let SOLUTION_VALUES = null;
+let ANSWER_VALUE = null;
 export function stepCheckArithmetic(workingText, opts = null) {
+  SOLUTION_VALUES = opts && Array.isArray(opts.solutionValues) ? opts.solutionValues.filter(v => Number.isFinite(v)) : null;
+  ANSWER_VALUE = opts && Number.isFinite(opts.answerValue) ? opts.answerValue : null;
+  try { return stepCheckArithmeticBudgeted(workingText, opts); } finally { SOLUTION_VALUES = null; ANSWER_VALUE = null; }
+}
+function stepCheckArithmeticBudgeted(workingText, opts) {
   return withEvaluationBudget(PAGE_BUDGET, () => {
     let prep = null;
     try { prep = opts && opts.facts ? prepareFacts(opts.facts) : null; } catch { prep = null; }
@@ -1727,7 +1735,7 @@ function stepCheckArithmeticWithinBudget(workingText, prep = null, tickOnly = fa
     const values = sides.map(valueOf);
     // The last side carries to a `= …` line below, whether or not this line states anything.
     const last = values[values.length - 1];
-    if (last !== null) prev = { value: last, text: sides[sides.length - 1], ...(underLetters ? { calculus: true } : {}) };
+    if (last !== null) prev = { value: last, text: sides[sides.length - 1], prior: prev && typeof prev.value === 'number' ? prev.value : undefined, lineSides: sides.length, lineContinuation: continuation, lineInternal: values.every(v => v !== null && close(v, values[0])), labelled: !continuation && sides.length >= 2 && /[A-Za-z]/.test(sides[0]), ...(underLetters ? { calculus: true } : {}) };
     if (values.some(v => v === null)) return note(line, NOTE);
     // After a line worked out numerically (an integral) or a line of letters, a `=` line of numbers is ticked when it
     // agrees and is otherwise a note: the value above came from limits or letters that may have been misread.
@@ -1800,6 +1808,30 @@ function stepCheckArithmeticWithinBudget(workingText, prep = null, tickOnly = fa
       }
     }
     if (trueUnderAnotherReading(allSides, allValues) || trueUnderExponentReading(allSides, allValues)) return note(line, MISREAD_NOTE);
+    // The question's own worked solution reaches the value this line gives, and the line is plainly the START of the next authored step with
+    // its lazy `=`, not a claim that it equals the line above. Only these shapes are a note; anything else that continues an evaluable line
+    // and differs from it stays a cross (a value that merely appears somewhere in the solution is no reason to excuse it):
+    //   · the line begins from the value above (`= 7 - 2 = 5` after `7`);
+    //   · it is the value above after one operation left unwritten (a root or a square: `= 60` after `3600`; doubling and halving are NOT excused, because a dropped or extra factor of 2 is the commonest slip);
+    //   · two parallel calculations, each a complete true equation (`= 4 - (-5) = 9` then `= -5 + 4 = -1`);
+    //   · a value listed after a value listed (`= 10` then `= 6`), or a value after a named quantity (`sin B = 48/73` then `= (…)/365`).
+    if (continuation && before && SOLUTION_VALUES) {
+      const kk = allValues.findIndex(x => !close(x, allValues[0]));
+      const W = kk >= 0 ? allValues[kk] : null, V = allValues[0];
+      const bareToken = /^\s*-?\d+(?:\.\d+)?\s*$/.test(String(before.text ?? '')) ? String(before.text).trim() : null;
+      const startsFromAbove = bareToken !== null && new RegExp(`(?<![\\d.])${bareToken.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\d.])`).test(String(sides[0]));
+      const oneOperation = [Math.sqrt(Math.abs(V)), V * V, 10 * V, V / 10].some(x => W !== null && closeLoose(x, W));
+      const parallel = sides.length >= 2 && values.every(v => close(v, values[0])) && before.lineSides >= 2 && before.lineInternal === true;
+      const combined = W !== null && typeof before.prior === 'number' && (closeLoose(W, V + before.prior) || closeLoose(W, V * before.prior) || closeLoose(W, Math.abs(V - before.prior)));   // the two results above combined (55/78 and 1/78 give 28/39)
+      const isAnswer = W !== null && typeof ANSWER_VALUE === 'number' && closeLoose(W, ANSWER_VALUE);   // the question's correct answer, written lazily after the working
+      const listed = sides.length === 1 && /^\s*-?\d+(?:\.\d+)?(?:\s*\/\s*\d+)?\s*$/.test(sides[0]) && before.lineSides === 1 && before.lineContinuation === true;
+      const afterName = before.labelled === true || before.calculus === true;
+      if (W !== null && SOLUTION_VALUES.some(v => closeLoose(v, W)) && (startsFromAbove || oneOperation || parallel || listed || afterName || combined || isAnswer)) {
+        return note(line, `This line does not equal the line above (${shown(allValues[0])}) as written, but it is a value the worked solution reaches and it reads as the start of the next step, so it is left as a note. Write the step that gets from one to the other.`);
+      }
+    }
+    // A division sign with a fraction on the same line (1/10 ÷ 2/3) is read left to right by one convention and as written by another.
+    if (allSides.some(x => (/÷/.test(x) && /\d\s*\/\s*\d/.test(x)) || /\d\s*[\/÷]\s*\d+(?:\.\d+)?\s*[\/÷]\s*\d/.test(x))) return note(line, NOTE);   // 15 ÷ 5/8 and 1/10 ÷ 2/3: two readings
     const k = allValues.findIndex(v => !close(v, allValues[0]));
     const message = logFalseInBoth ? `${mathSpan(allSides[0])} does not equal ${mathSpan(allSides[k])}, whether log means base 10 or base e.`
       : continuation && before && k >= 1 && allValues.slice(1, k).every(v => close(v, allValues[0]))

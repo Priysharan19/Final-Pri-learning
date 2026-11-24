@@ -113,7 +113,7 @@ function gradientPlan(payload) {
     kind: 'plan', scheme: 'gradient-at-point', creditPerStage: true,
     stages: [
       { kind: 'derivative', variable: 'x', source, requireLabel: true },
-      { kind: 'evaluation', source: deriv, substitutions: { x: x0 }, expected: value, labels: ['m', 'gradient', 'dy/dx', 'y\''], ...(places === null ? {} : { roundTo: places }) }
+      { kind: 'evaluation', source: deriv, substitutions: { x: x0 }, expected: value, requireLabel: true, labels: ['m', 'gradient', 'dy/dx', 'y\''], ...(places === null ? {} : { roundTo: places }) }
     ]
   };
 }
@@ -182,7 +182,7 @@ function tangentPlan(payload) {
     kind: 'plan', scheme: 'tangent-normal', creditPerStage: true,
     stages: [
       { kind: 'derivative', variable: 'x', source, requireLabel: true },
-      { kind: 'evaluation', source: deriv, substitutions: { x: x0 }, expected: slope, labels: ['m', 'm_T', 'm_t', 'mT', 'gradient', 'tangent gradient', 'dy/dx', 'y\''] }
+      { kind: 'evaluation', source: deriv, substitutions: { x: x0 }, expected: slope, requireLabel: true, labels: ['m', 'm_T', 'm_t', 'mT', 'gradient', 'tangent gradient', 'dy/dx', 'y\''] }
     ]
   };
 }

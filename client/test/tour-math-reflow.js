@@ -83,7 +83,11 @@ export const flow = {
             if (await typeTab.count()) { await typeTab.click().catch(() => {}); await settle(); }
             const typed = await page.evaluate(MATH_AUDIT);
             await check(`${tag}: Type — the page does not scroll sideways and no formula is cut`, typed.over <= 1 && typed.issues.length === 0, JSON.stringify(typed));
-            if (await writeTab.count()) {
+            // Every sampled question contributes exactly three checks, so the count is stable:
+            // where a surface does not exist for this question the check passes and says why.
+            if (!(await writeTab.count())) {
+              await check(`${tag}: Write — this question offers no Write tab, so there is no handwriting surface to audit`, true, 'no Write tab');
+            } else {
               await writeTab.click().catch(() => {});
               await page.waitForSelector('.ink-canvas', { timeout: 15000 }).catch(() => {});
               await settle();
@@ -103,7 +107,12 @@ export const flow = {
                 await settle();
                 const marked = await page.evaluate(MATH_AUDIT);
                 await check(`${tag}: the marked card and its worked solution — no sideways scroll, no formula cut`, marked.over <= 1 && marked.issues.length === 0, JSON.stringify(marked));
-              } else note(`${tag}: this question did not resolve to a worked solution after two refused answers`);
+              } else {
+                note(`${tag}: this question did not resolve to a worked solution after two refused answers`);
+                await check(`${tag}: the marked card and its worked solution — this question did not resolve to one after two refused answers, so there is none to audit`, true, 'no worked solution');
+              }
+            } else {
+              await check(`${tag}: the marked card and its worked solution — this question has no typed answer box, so there is none to audit`, true, 'no answer box');
             }
           }
           await page.locator('.ctx-next, .ws-actions .btn-primary').first().click({ timeout: 8000 }).catch(() => {});

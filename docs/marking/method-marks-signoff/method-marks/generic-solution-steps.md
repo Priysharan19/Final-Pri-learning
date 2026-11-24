@@ -64,39 +64,39 @@ Measured on the generated Year 11 and 12 Advanced and Extension 1 written questi
 | Topic | Multi-mark written | Your seven types today | Rule can pay | Share | Rule can pay all N-1 |
 |---|---:|---:|---:|---:|---:|
 | Advanced · Algebra | 191 | 40 | 46 | 24.1% | 12 |
-| Advanced · Calculus | 851 | 23 | 584 | 68.6% | 347 |
+| Advanced · Calculus | 851 | 23 | 584 | 68.6% | 354 |
 | Advanced · Financial Maths | 219 | 0 | 82 | 37.4% | 45 |
 | Advanced · Functions | 780 | 0 | 415 | 53.2% | 285 |
 | Advanced · Statistics & Probability | 342 | 0 | 87 | 25.4% | 77 |
 | Advanced · Trigonometry | 362 | 2 | 76 | 21.0% | 52 |
 | Extension 1 · Algebra | 590 | 0 | 204 | 34.6% | 112 |
-| Extension 1 · Calculus | 518 | 0 | 191 | 36.9% | 119 |
+| Extension 1 · Calculus | 518 | 0 | 192 | 37.1% | 120 |
 | Extension 1 · Functions | 109 | 0 | 75 | 68.8% | 24 |
 | Extension 1 · Statistics & Probability | 307 | 0 | 96 | 31.3% | 72 |
-| Extension 1 · Trigonometry | 330 | 0 | 204 | 61.8% | 59 |
-| ALL | 4599 | 65 | 2060 | 44.8% | 1204 |
+| Extension 1 · Trigonometry | 330 | 0 | 194 | 58.8% | 59 |
+| ALL | 4599 | 65 | 2051 | 44.6% | 1212 |
 
-Before this rule only 1.4% of these questions could earn a step mark. With it, 44.8% can. On the 2060 questions it can pay, it can pay 2378 of the 3302 marks below full (72.0%).
+Before this rule only 1.4% of these questions could earn a step mark. With it, 44.6% can. On the 2051 questions it can pay, it can pay 2376 of the 3283 marks below full (72.4%).
 
 ## The sweep: does it pay anything it should not
 
-Run with the rule approved in the test process only (nothing is approved in the repository), over every topic, seeds 1 to 6: 305 payable questions, 7440 marked pages.
+Run with the rule approved in the test process only (nothing is approved in the repository), over every topic, seeds 1 to 6: 302 payable questions, 7374 marked pages.
 
-- Authored working with only the final line wrong (295 pages): marks earned 1 mark(s) on 232, 2 mark(s) on 60, 3 mark(s) on 3.
-- Authored working in full with the right answer: N on 233 of 233. Full working with a wrong typed answer: N on 0 of 297.
-- Wrong from a key step onward (363 pages): marks earned on or after the wrong step: 0. One wrong line only (359 pages): the wrong line earned 0, anything at or after a crossed line earned 0.
-- Gaming, restate the question (297 pages): a mark was earned on 0, exceptions 0.
-- Gaming, another questions working (273 pages): a mark was earned on 0, exceptions 0.
-- Gaming, given numbers (297 pages): a mark was earned on 0, exceptions 0.
-- Gaming, irrelevant true arithmetic (297 pages): a mark was earned on 0, exceptions 0.
-- Gaming, irrelevant true arithmetic outside the question (297 pages): a mark was earned on 0, exceptions 0.
-- Gaming, lines no check can read (297 pages): a mark was earned on 0, exceptions 0.
-- Gaming, naming a formula (297 pages): a mark was earned on 0, exceptions 0.
+- Authored working with only the final line wrong (292 pages): marks earned 1 mark(s) on 229, 2 mark(s) on 60, 3 mark(s) on 3.
+- Authored working in full with the right answer: N on 230 of 230. Full working with a wrong typed answer: N on 0 of 294.
+- Wrong from a key step onward (360 pages): marks earned on or after the wrong step: 0. One wrong line only (356 pages): the wrong line earned 0, anything at or after a crossed line earned 0.
+- Gaming, restate the question (294 pages): a mark was earned on 0, exceptions 0.
+- Gaming, another questions working (270 pages): a mark was earned on 0, exceptions 0.
+- Gaming, given numbers (294 pages): a mark was earned on 0, exceptions 0.
+- Gaming, irrelevant true arithmetic (294 pages): a mark was earned on 0, exceptions 0.
+- Gaming, irrelevant true arithmetic outside the question (294 pages): a mark was earned on 0, exceptions 0.
+- Gaming, lines no check can read (294 pages): a mark was earned on 0, exceptions 0.
+- Gaming, naming a formula (294 pages): a mark was earned on 0, exceptions 0.
 - Gaming, same value other operations (177 pages): a mark was earned on 0, exceptions 0.
 - Gaming, bare intermediate value alone (193 pages): a mark was earned on 0, exceptions 0.
 - Gaming, bare intermediate value after earlier lines (193 pages): a mark was earned on 40, exceptions 0.
-- Gaming, lines after the first crossed line (295 pages): a mark was earned on 0, exceptions 0.
-- Gaming, numbers of the solution without working (172 pages): a mark was earned on 0, exceptions 0.
+- Gaming, lines after the first crossed line (292 pages): a mark was earned on 0, exceptions 0.
+- Gaming, numbers of the solution without working (169 pages): a mark was earned on 0, exceptions 0.
 - Every page: a wrong answer at full marks 0, above N 0, a mark on an unticked line 0, a mark at or after a crossed line 0, the answer mark earned by working 0.
 
 ## Twelve worked examples
@@ -445,10 +445,10 @@ Marks: **2 of 2**.
 
 These are measured, in the same sweep (seeds 1 to 6), and rewritten each time the packet is generated.
 
-- **A different valid method earns less.** The same correct route, with a wrong last line, earns on average 1.23 marks when it is written the way the author wrote it (267 pages). Written with the sides of each equation swapped it earns 0.57, and with every equation moved to one side it earns 1.17. The rule recognises the authored route best. A student who solves it another valid way, or writes an equivalent line in a different shape, is paid less than they deserve and sometimes nothing.
-- **Over-credit after a wrong line the page cannot see.** One middle line was made wrong in turn, and the authored lines left after it (702 pages, hard test, tolerance 0): 338 marks were earned against an ideal of 374 (the steps written before the wrong line); pages above the ideal: 0; marks earned by the wrong line or a line after it: 0. The cost of the stop rule is that true working is sometimes not paid: a true line the page can only note (a bare list of numbers, an inequality, a definition it does not read) ends the paying. The stop rule and the bare-line test together reduced the questions the rule can pay from 52.5 percent to 44.8 percent of the multi-mark written questions (45.8 percent with your seven types), seeds 1 to 40, and the marks paid on the authored route with a wrong last line from 2702 over 2260 pages (1.20 a page) to 2257 over 1940 pages (1.16 a page): a loss of 16.5 percent of marks, almost all of it questions that no longer pay at all, not a lower mark on those that still do.
+- **A different valid method earns less.** The same correct route, with a wrong last line, earns on average 1.23 marks when it is written the way the author wrote it (264 pages). Written with the sides of each equation swapped it earns 0.57, and with every equation moved to one side it earns 1.17. The rule recognises the authored route best. A student who solves it another valid way, or writes an equivalent line in a different shape, is paid less than they deserve and sometimes nothing.
+- **Over-credit after a wrong line the page cannot see.** One middle line was made wrong in turn, and the authored lines left after it (696 pages, hard test, tolerance 0): 335 marks were earned against an ideal of 371 (the steps written before the wrong line); pages above the ideal: 0; marks earned by the wrong line or a line after it: 0. The cost of the stop rule is that true working is sometimes not paid: a true line the page can only note (a bare list of numbers, an inequality, a definition it does not read) ends the paying. The stop rule and the bare-line test together reduced the questions the rule can pay from 52.5 percent to 44.8 percent of the multi-mark written questions (45.8 percent with your seven types), seeds 1 to 40, and the marks paid on the authored route with a wrong last line from 2702 over 2260 pages (1.20 a page) to 2257 over 1940 pages (1.16 a page): a loss of 16.5 percent of marks, almost all of it questions that no longer pay at all, not a lower mark on those that still do.
 - **A single bare line.** A letter equal to a number, or a number, alone (260 pages, hard test, tolerance 0): a mark was earned on 9, every one a step whose one result that is (9); over-credit 0. Examples that no longer earn: v = 0 alone, and x = -6 alone for the domain of a composite function.
-- **A true first line, then nothing readable.** 297 pages: a mark was earned on 224. In 214 of those the step is the first step of the solution, and the line is a derived expression on 224 and a bare value on 0. This is intended: a derived first line (a derivative, the equation set up from the question) is a true result a student had to find, and it earns one mark, the same as it does at the answer step of an examiner's scheme. A bare value as the first step does not pay (it is set-up).
+- **A true first line, then nothing readable.** 294 pages: a mark was earned on 221. In 211 of those the step is the first step of the solution, and the line is a derived expression on 221 and a bare value on 0. This is intended: a derived first line (a derivative, the equation set up from the question) is a true result a student had to find, and it earns one mark, the same as it does at the answer step of an examiner's scheme. A bare value as the first step does not pay (it is set-up).
 - It reads only what the page can tick. A question whose solution is in words, in a table, as an inequality, as a sketch or as a vector or matrix the page cannot read has no usable steps, and stays on the final answer.
 - A value counts for a numeric step only if it is worked from the question's or the solution's own numbers with the same operations on the same numbers as the authored step (so 2 + 2 = 4 is not the step 2^2 = 4, and 9 / 3 = 3 is not 27 / 9 = 3).
 - Another question's correct working earns nothing, except where one of its lines is also a true statement of this question's own solution (the same root, an equivalent equation). That is rare in the sweep and each case is listed in the test output.
