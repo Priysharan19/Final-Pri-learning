@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import { run, judgeMutant, mutationsOf, sidesOf, sideValues, loadEngine, markPage, lineAt, authoredPage, typedAnswer } from '../../tools/marking-mutation-harness.mjs';
 
 const G = await import('../../client/src/engine/generators/index.js');
-const { stepEvidence } = await import('../platform/markerOps.js');
+const { stepEvidence, stepMetaFor } = await import('../platform/markerOps.js');
 const { checkAnswer } = await import('../../client/src/engine/checker.js');
 await G.loadAllBanks();
 
@@ -130,9 +130,33 @@ ok(sidesOf('a = b = c').length === 3, 'oracle: splits a chain');
   }
 }
 
+// ── a root the question states rounded (answer.tol) ──────────────────────────────────────────────────────────────────────────
+{
+  // the diagnosis never says a line "lost a root" or "is false" for a root it holds to within the question's own rounding
+  const { diagnoseStep } = await import('../../client/src/engine/diagnose.js');
+  const lost = diagnoseStep({ brokenText: 'x^2 = 2', meta: { kind: 'equation', variable: 'x', solutions: [1.41, 3], tol: 0.01 } });
+  ok(lost && lost.code === 'lost-root', `rounded root: the line holds at 1.41 within the stated rounding, so only 3 is lost (${lost && lost.code})`);
+  const none = diagnoseStep({ brokenText: 'x^2 = 2', meta: { kind: 'equation', variable: 'x', solutions: [1.41], tol: 0.01 } });
+  ok(none === null, `rounded root: no counterexample against a root the line holds to within the stated rounding (${none && none.code})`);
+  const wrong = diagnoseStep({ brokenText: 'x^2 = 5', meta: { kind: 'equation', variable: 'x', solutions: [1.41], tol: 0.01 } });
+  ok(wrong !== null, 'rounded root: a line that fails at the root even within the rounding is still diagnosed');
+}
+{
+  // the local backend names the same step metadata as the server's marker (tol included)
+  const B = await import('../../client/src/local/backend.js');
+  let n = 0, withTol = 0, same = 0;
+  for (const id of ['y11-sine-cosine-rule', 'y12-explogcalc', 'y12-trigcalc', 'y11-explog', 'y12-appdiff']) for (let d = 1; d <= 4; d++) for (let sd = 1; sd <= 3; sd++) {
+    let q; try { q = G.generateQuestion(id, d, sd); } catch { continue; }
+    n++; if (q.answer && q.answer.tol > 0) withTol++;
+    if (JSON.stringify(B.examStepMeta(q)) === JSON.stringify(stepMetaFor(q))) same++;
+  }
+  ok(n >= 40 && withTol >= 10, `step metadata sample is not trivial (${n} questions, ${withTol} with a stated rounding)`);
+  ok(same === n, `the local backend and the server's marker read the same step metadata (${same} of ${n})`);
+}
+
 // ── the recorded corpus ────────────────────────────────────────────────────────────────────────────────────────────────────────
 const corpus = JSON.parse(fs.readFileSync(new URL('./fixtures/marking-mutation-corpus.json', import.meta.url), 'utf8'));
-let corpusFalse = 0, corpusCross = 0, corpusFalseTicked = 0, corpusCrossed = 0;
+let corpusFalse = 0, corpusCross = 0, corpusFalseTicked = 0, corpusCrossed = 0, corpusInserted = 0;
 {
   const E = await loadEngine(new URL('../..', import.meta.url).pathname);
   const pageOf = (generator, difficulty, seed) => {
@@ -156,6 +180,16 @@ let corpusFalse = 0, corpusCross = 0, corpusFalseTicked = 0, corpusCrossed = 0;
     corpusCross++;
     if (rl && rl.status === 'break') { corpusCrossed++; ok(false, `corpus: ${g} ${d} ${s} line ${i + 1} is crossed again: ${lines[i]}`); }
   }
+  let corpusIns = 0, corpusInsCrossed = 0;
+  for (const [g, d, sd, at] of corpus.insertedCrosses) {
+    const { q, lines, answer } = page(g, d, sd);
+    const p = lines.slice(0, at).concat(['2 + 3 = 5'], lines.slice(at));
+    const rl = lineAt(markPage(E, q, answer, p), p, at);
+    corpusIns++;
+    if (rl && rl.status === 'break') { corpusInsCrossed++; ok(false, `corpus: 2 + 3 = 5 is crossed again at line ${at + 1} of ${g} ${d} ${sd}`); }
+  }
+  corpusInserted = corpusIns;
+  ok(corpusIns === corpus.insertedCrosses.length && corpusIns >= 90, `the inserted-line corpus was read whole (${corpusIns})`);
   ok(corpusFalse === corpus.falseTicks.length && corpusCross === corpus.trueCrosses.length, 'the corpus was read whole');
   ok(corpusFalse >= 300 && corpusCross >= 20, `the corpus is not trivial (${corpusFalse} false ticks, ${corpusCross} crossed true lines)`);
 }
@@ -165,7 +199,7 @@ let corpusFalse = 0, corpusCross = 0, corpusFalseTicked = 0, corpusCrossed = 0;
   const res = await run({ seeds: SEEDS, maxPerLine: 8 });
   const t = res.totals;
   const aside = Object.entries(res.setAside).sort().map(([k, v]) => `${k} ${v}`).join(', ');
-  console.log(`MARKING MUTATION COUNTS: seeds ${SEEDS[0]}-${SEEDS[SEEDS.length - 1]}, ${t.pages} pages, ${t.lines} authored lines, ${t.mutants} mutants, false ticks ${t.falseTicks}, true crosses ${t.trueCrosses}, inserted true lines ${t.insertedTrue || 0} (crossed ${t.insertedTrueCrosses || 0}), authored ticks ${t.trueTicks}, margin-number ticks ${t.marginNumberTicks || 0} (owner rule, own class), name definitions ${t.nameDefinitions || 0}, set aside as true statements ${t.echoes || 0} (${aside}), corpus ${corpusFalse} false ticks and ${corpusCross} crossed true lines (ticked again ${corpusFalseTicked}, crossed again ${corpusCrossed})`);
+  console.log(`MARKING MUTATION COUNTS: seeds ${SEEDS[0]}-${SEEDS[SEEDS.length - 1]}, ${t.pages} pages, ${t.lines} authored lines, ${t.mutants} mutants, false ticks ${t.falseTicks}, true crosses ${t.trueCrosses}, inserted true lines ${t.insertedTrue || 0} (crossed ${t.insertedTrueCrosses || 0}), authored ticks ${t.trueTicks}, margin-number ticks ${t.marginNumberTicks || 0} (owner rule, own class), name definitions ${t.nameDefinitions || 0}, set aside as true statements ${t.echoes || 0} (${aside}), corpus ${corpusFalse} false ticks, ${corpusCross} crossed true lines and ${corpusInserted} crossed inserted true lines (ticked again ${corpusFalseTicked}, crossed again ${corpusCrossed})`);
   ok(t.pages >= 200 && t.mutants >= 2500, `the sample is not trivial (${t.pages} pages, ${t.mutants} mutants)`);
   ok(t.trueCrosses === 0, `no authored true line is crossed (${t.trueCrosses}: ${JSON.stringify(res.failures.trueCrosses.slice(0, 3))})`);
   ok(t.falseTicks === 0, `no provably wrong mutant is ticked (${t.falseTicks}: ${JSON.stringify(res.failures.falseTicks.slice(0, 3))})`);

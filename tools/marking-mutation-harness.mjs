@@ -454,6 +454,14 @@ function echoClass(lines, i, original, mutant, given = [], solutionNumbers = [])
   if (satisfiesAPageEquation(mutant, others)) return 'root-of-a-page-equation';
   if (trueAtGivenPoint(mutant, givenPoint(given))) return 'true-at-the-given-point';
   if (hasConstantSide(mutant)) { const a = rootsOf(original), b = rootsOf(mutant); if (a && b && a.v === b.v && a.roots.length && a.roots.length === b.roots.length && b.roots.every(r => a.roots.some(q => Math.abs(q - r) < 1e-4))) return 'same-roots-as-the-authored-equation'; }
+  // a sub-chain of another authored line that is itself a true chain (`y = 2` under `y = (1)^2 + 1 = 2`): every side of the mutant is a side of that line
+  { const ms = sidesOf(mutant);
+    if (ms.length >= 2 && others.some(o => {
+      const os = sidesOf(o);
+      if (os.length < ms.length || /,/.test(o) || /,/.test(mutant)) return false;   // (an authored line is a true chain: any of its sides equal each other)
+      const same = (a, b) => { const vars = [...new Set([...lettersIn(a), ...lettersIn(b)])].sort(), x = sideValues(a, vars), y = sideValues(b, vars); return !!x && !!y && x.every((v, k) => (v === null) === (y[k] === null) && (v === null || Math.abs(v - y[k]) <= 1e-9 * Math.max(1, Math.abs(v)))); };
+      return ms.every(m => os.some(t => t === m || same(t, m)));
+    })) return 'a-sub-chain-of-another-line'; }
   const squash = t => String(t).replace(/\s+/g, '');
   if (others.some(o => squash(o) === squash(mutant) || judgeMutant(o, mutant) === 'same')) return 'another-authored-line';
   const sides = sidesOf(mutant);
