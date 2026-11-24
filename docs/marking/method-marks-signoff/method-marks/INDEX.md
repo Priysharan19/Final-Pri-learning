@@ -58,3 +58,7 @@ These types were tried. A scheme is not offered because at least one criterion c
 - Arithmetic and geometric sequences and series (Year 12 Mathematics Advanced; families `y12-series`): The formula line and the substitution line are not read, and the question has no engine plan, so only the final value can be checked.
 - Financial mathematics: compound interest, annuities and loans (Year 12 Mathematics Advanced; families `y12-financial`, `y12-fin-exact`): Only the final amount is checked. The formula and the substitution lines are not read, so no method criterion can be decided.
 - Probability, random variables and the normal distribution (Year 12 Mathematics Advanced; families `y12-stats`, `y12-random-var`): The formula line (z-score, E(X), Var(X)) is not read, and a substitution line is checked only as arithmetic, not as the right substitution into the right formula, so "uses the correct formula" cannot be decided.
+
+## One rule for every multi-mark written question
+
+Besides the per-type schemes above, one generic rule can pay step marks for a wrong or missing final answer on most multi-mark written Year 11 and Year 12 questions, from each question's own authored worked solution. It is a separate approval, not one of the types above, and it is not approved. Read [generic-solution-steps.md](generic-solution-steps.md).

@@ -25,6 +25,7 @@ import { parse, normalize } from '../client/src/engine/expr.js';
 import { differentiateAst } from '../client/src/engine/reason-v2.js';
 import { evaluate } from '../client/src/engine/expr.js';
 import { prettyText } from '../client/src/engine/schemePlans.js';
+import { genericPacket } from './generic-steps-packet.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const OUT_DIR = path.join(ROOT, 'owner-review', 'method-marks');
@@ -577,8 +578,10 @@ export async function build() {
     '', '## Could not be given a provable scheme', '',
     'These types were tried. A scheme is not offered because at least one criterion cannot be decided by the engine from the student\'s lines. Each reason was checked by running a plausible correct transcript.', '');
   notProvable.filter(n => !n.unavailable).sort((a, b) => a.level - b.level).forEach(n => I.push(`- ${plain(n.title)} (${n.course}; families ${n.families.map(f => `\`${f}\``).join(', ')}): ${plain(n.reason)}`));
-  I.push('');
+  I.push('', '## One rule for every multi-mark written question', '',
+    'Besides the per-type schemes above, one generic rule can pay step marks for a wrong or missing final answer on most multi-mark written Year 11 and Year 12 questions, from each question\'s own authored worked solution. It is a separate approval, not one of the types above, and it is not approved. Read [generic-solution-steps.md](generic-solution-steps.md).', '');
   files.set('INDEX.md', plain(I.join('\n')));
+  files.set('generic-solution-steps.md', plain(await genericPacket({ banner: BANNER })));
   const json = {
     status: 'draft: not approved',
     types: sorted.map(d => ({

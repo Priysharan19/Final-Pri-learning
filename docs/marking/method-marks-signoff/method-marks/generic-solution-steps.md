@@ -1,0 +1,460 @@
+DRAFT for the author's review: not approved. Nothing in this file is switched on.
+
+# Step marks drawn from the authored worked solution (generic rule)
+
+Approval id: `generic-solution-steps`. This is ONE rule for every multi-mark written Year 11 and Year 12 question (Mathematics Advanced and Extension 1), where each type used to need its own hand-built scheme.
+
+## What you are asked to decide
+
+Whether the rule below may pay step marks, in Australia only, for a student whose method is right and whose final answer is wrong or missing. It pays nothing until you approve it. It is a separate approval from your seven question types, which are unchanged: a question whose type you approved still uses that type's scheme.
+
+If you approve it the server pays it only while all of these hold: the Australian server has the method-marks switch on, the question was marked as a rule question when it was issued, and your record names the digest at the foot of this packet. Change one word of the rule and the digest changes, and the approval no longer counts.
+
+## The rule in plain words
+
+1. A question worth N marks (N is 2 or more) with a correct final answer earns N, as it always did. Working never earns the final-answer mark.
+2. With a wrong or missing final answer the student can earn at most N minus 1: one mark for each KEY STEP of the authored worked solution that one of their lines reaches.
+3. A line reaches a key step only if all of these hold. The marked page ticks the line (the page the engine builds, never the interpreter's extra reading). It comes before the first line the page crosses. It states the step's result by the same matching the page already uses to say "matches step 2 of the worked solution". It is real progress (below).
+4. One line pays one step, and one step is paid once.
+5. The reply carries a table of the key steps (earned, not earned, or not verified, with the line numbers) and the words: "Pri practice marking, approved by the author (Priysharan Tripathi, tutor). Not an official NESA guideline."
+
+## How the key steps are chosen, and how the marks are shared out
+
+The authored solution has steps. Steps headed Check, Note or Bonus are left out. The last step states the answer, so it is never a key step.
+
+A step before it is a candidate if it is real progress and the engine can read it. Key steps are the LAST N minus 1 distinct candidates, in order (last N-1 distinct non-trivial results before the answer step).
+
+Why the last ones: the early steps of a worked solution are mostly set-up (writing the function, naming the rule). The later ones are the results a student has to derive. The usual slip is near the end, so the steps a student with a slip still reaches are the ones the marks sit on. A fixed list also means every mark has a named step you can read in the table.
+
+If the solution has more usable steps than N minus 1, only the last N minus 1 count. If it has fewer, one mark is paid per usable step and the answer criterion carries the rest (a 3 mark question with one usable step pays at most 1 mark for working, and the answer criterion is worth 2). If it has none, the question is not paid by this rule and stays on the final answer.
+
+A step is "readable" only if the engine, given the author's own line for that step as if a student wrote it, ticks it and recognises it as that step. This is a self-test run on every question, so a step the engine cannot tick when you wrote it is never paid.
+
+## Real progress, and what never earns
+
+A step is real progress only if its result is not the question's own statement or expression, not a number the question gives, and not the same as the answer step. A line earns nothing if it is:
+
+- a restatement of the question, or the question's own expression copied;
+- a number or value the question gives;
+- a line that only names a formula with nothing put in (unless the authored step is exactly that);
+- true but irrelevant arithmetic (2 + 2 = 4), unless it uses the same operations on the question's own numbers as the authored step does;
+- a number from the solution written without the working, when the step's result is an expression (an equation, a derivative, an antiderivative);
+- a line the page only notes, or one that comes at or after the first crossed line;
+- a line carried forward from an earlier slip.
+
+## The choices you can see
+
+| Name | Value | What it means |
+|---|---|---|
+| BARE_VALUE_EVIDENCE | true | A correct intermediate value written as a bare number is evidence of the step that produces it, as an examiner would credit it. It counts only for a step whose result is a number, only when the marked page itself ticks the line as the value at that step (the page does this only after an earlier line of the working that it recognised, in order), and only if the value is not a number the question gives or something computed in a different way. As the very first line, alone, the page does not tick a bare value, so it earns nothing. Set the choice to false and a bare value never earns. |
+| WRONG_ANSWER_CAP_BELOW_FULL | 1 | A wrong or missing final answer earns at most N minus this. |
+| MIN_MARKS | 2 | The rule applies to questions worth at least this. |
+| KEY_STEP_CHOICE | last N-1 distinct non-trivial results before the answer step | Which steps carry the marks. |
+
+## Coverage: how many questions the rule can pay
+
+Measured on the generated Year 11 and 12 Advanced and Extension 1 written questions that the NSW bank issues, seeds 1 to 40 per issued cell. "Can pay" means the question is worth 2 or more marks and the rule has at least one key step to pay. "All N-1" means it has a key step for every mark below full.
+
+| Topic | Multi-mark written | Your seven types today | Rule can pay | Share | Rule can pay all N-1 |
+|---|---:|---:|---:|---:|---:|
+| Advanced · Algebra | 191 | 40 | 103 | 53.9% | 29 |
+| Advanced · Calculus | 851 | 23 | 651 | 76.5% | 402 |
+| Advanced · Financial Maths | 219 | 0 | 101 | 46.1% | 59 |
+| Advanced · Functions | 780 | 0 | 467 | 59.9% | 331 |
+| Advanced · Statistics & Probability | 342 | 0 | 95 | 27.8% | 85 |
+| Advanced · Trigonometry | 362 | 2 | 90 | 24.9% | 59 |
+| Extension 1 · Algebra | 590 | 0 | 236 | 40.0% | 117 |
+| Extension 1 · Calculus | 518 | 0 | 264 | 51.0% | 193 |
+| Extension 1 · Functions | 109 | 0 | 81 | 74.3% | 35 |
+| Extension 1 · Statistics & Probability | 307 | 0 | 105 | 34.2% | 72 |
+| Extension 1 · Trigonometry | 330 | 0 | 221 | 67.0% | 106 |
+| ALL | 4599 | 65 | 2414 | 52.5% | 1488 |
+
+Before this rule only 1.4% of these questions could earn a step mark. With it, 52.5% can. On the 2414 questions it can pay, it can pay 2864 of the 3893 marks below full (73.6%).
+
+## The sweep: does it pay anything it should not
+
+Run with the rule approved in the test process only (nothing is approved in the repository), over every topic, seeds 1 to 6: 364 payable questions, 5972 marked pages.
+
+- Authored working with only the final line wrong (350 pages): marks earned 1 mark(s) on 271, 2 mark(s) on 76, 3 mark(s) on 3.
+- Authored working in full with the right answer: N on 282 of 282. Full working with a wrong typed answer: N on 0 of 352.
+- Wrong from a key step onward (435 pages): marks earned on or after the wrong step: 0. One wrong line only (429 pages): the wrong line earned 0, anything at or after a crossed line earned 0.
+- Gaming, restate the question (352 pages): a mark was earned on 0, exceptions 0.
+- Gaming, another questions working (318 pages): a mark was earned on 0, exceptions 0.
+- Gaming, given numbers (352 pages): a mark was earned on 0, exceptions 0.
+- Gaming, irrelevant true arithmetic (352 pages): a mark was earned on 0, exceptions 0.
+- Gaming, irrelevant true arithmetic outside the question (352 pages): a mark was earned on 0, exceptions 0.
+- Gaming, lines no check can read (352 pages): a mark was earned on 0, exceptions 0.
+- Gaming, naming a formula (352 pages): a mark was earned on 0, exceptions 0.
+- Gaming, same value other operations (227 pages): a mark was earned on 0, exceptions 0.
+- Gaming, bare intermediate value alone (253 pages): a mark was earned on 0, exceptions 0.
+- Gaming, bare intermediate value after earlier lines (253 pages): a mark was earned on 55, exceptions 0.
+- Gaming, lines after the first crossed line (350 pages): a mark was earned on 198, exceptions 0.
+- Gaming, numbers of the solution without working (189 pages): a mark was earned on 0, exceptions 0.
+- Every page: a wrong answer at full marks 0, above N 0, a mark on an unticked line 0, a mark at or after a crossed line 0, the answer mark earned by working 0.
+
+## Twelve worked examples
+
+Each is a real run of the rule on a generated question. "Not checked" means the page could not judge the line, which is not the same as wrong.
+
+### Example 1: Integration (Advanced, Calculus)
+
+A student sets up the equation correctly and then slips at the last line.
+
+Question (3 marks): The area under the line y=2x+5 between x=0 and x=k is 84 square units, where k > 0. Find k.
+
+The authored worked solution, step by step:
+
+1. Integral: int_0^k (2x + 5)dx = k^2 + 5k
+2. Equation: k^2+5k-84=0
+3. Solve: k=7
+
+Final answer typed: `62`. The answer checker says it is not correct.
+
+| Line | What the student wrote | What the marked page shows | Earns |
+|---:|---|---|---|
+| 1 | `k^2+5k-84=0` | ticked | step 2 |
+| 2 | `k=62` | not checked | nothing |
+
+| Criterion | Marks | Result | Lines |
+|---|---:|---|---|
+| Step 2 of the worked solution (Equation): k^2+5k-84=0 | 1 | earned | 1 |
+| Gives the final answer correctly, in the form the question asks. | 2 | not earned | - |
+
+Marks: **1 of 3**.
+
+### Example 2: Stationary points (Advanced, Calculus)
+
+A student differentiates, solves for the stationary point and shows the second derivative, then slips on the final value.
+
+Question (3 marks): A ball is thrown upward from a balcony. Its height h(t) metres above the ground, t seconds after release, is modelled by h(t)=-3t^2+36t+39 for t>=0. Find the greatest height the ball reaches.
+
+The authored worked solution, step by step:
+
+1. Differentiate: h'(t) = -6t + 36
+2. Stationary point: -6t+36=0; t=6
+3. Nature: h'' = -6
+4. Value: h(6)=147
+
+Final answer typed: `1042`. The answer checker says it is not correct.
+
+| Line | What the student wrote | What the marked page shows | Earns |
+|---:|---|---|---|
+| 1 | `h'(t) = -6t + 36` | ticked | nothing |
+| 2 | `-6t+36=0` | ticked | step 2 |
+| 3 | `t=6` | ticked | nothing |
+| 4 | `h'' = -6` | ticked | step 3 |
+| 5 | `h(6)=1042` | not checked | nothing |
+
+| Criterion | Marks | Result | Lines |
+|---|---:|---|---|
+| Step 2 of the worked solution (Stationary point): -6t+36=0; t=6 | 1 | earned | 2 |
+| Step 3 of the worked solution (Nature): h'' = -6 | 1 | earned | 4 |
+| Gives the final answer correctly, in the form the question asks. | 1 | not earned | - |
+
+Marks: **2 of 3**.
+
+### Example 3: Series (Advanced, Functions)
+
+A student finds the common ratio and then miscalculates the term.
+
+Question (2 marks): A colony has 5 cells at the end of day 1. Its size triples every day. How many cells are there at the end of day 6?
+
+The authored worked solution, step by step:
+
+1. Type of sequence: r=3
+2. Term: T_6 = 5(3)^(5) = 1215
+
+Final answer typed: `8518`. The answer checker says it is not correct.
+
+| Line | What the student wrote | What the marked page shows | Earns |
+|---:|---|---|---|
+| 1 | `r=3` | ticked | step 1 |
+| 2 | `T_6 = 5(3)^(5) = 8518` | not checked | nothing |
+
+| Criterion | Marks | Result | Lines |
+|---|---:|---|---|
+| Step 1 of the worked solution (Type of sequence): r=3 | 1 | earned | 1 |
+| Gives the final answer correctly, in the form the question asks. | 1 | not earned | - |
+
+Marks: **1 of 2**.
+
+### Example 4: Financial mathematics (Advanced)
+
+A student finds the monthly rate and the number of periods correctly, but is wrong from the second key step onward (a slip carried down the page).
+
+Question (3 marks): A savings plan pays 9% p.a. interest, compounded monthly. Equal deposits are made at the END of each month for 2 years. What deposit is needed each month so that the balance immediately after the last deposit is $40,000? Give your answer to the nearest cent.
+
+The authored worked solution, step by step:
+
+1. Rate and periods: r=0.0075; n=24
+2. Rearrange: M = ((40000* 0.0075)/((1 + 0.0075)^(24) - 1))
+3. Evaluate: M=1527.39
+
+Final answer typed: `99991`. The answer checker says it is not correct.
+
+| Line | What the student wrote | What the marked page shows | Earns |
+|---:|---|---|---|
+| 1 | `r=0.0075` | ticked | step 1 |
+| 2 | `n=24` | ticked | nothing |
+| 3 | `M = ((40000* 0.0075)/((1 + 0.0075)^(24) - 20))` | not checked | nothing |
+| 4 | `M=1527.286` | not checked | nothing |
+
+| Criterion | Marks | Result | Lines |
+|---|---:|---|---|
+| Step 1 of the worked solution (Rate and periods): r=0.0075; n=24 | 1 | earned | 1 |
+| Step 2 of the worked solution (Rearrange): M = ((40000* 0.0075)/((1 + 0.0075)^(24) - 1)) | 1 | not verified | - |
+| Gives the final answer correctly, in the form the question asks. | 1 | not earned | - |
+
+Marks: **1 of 3**.
+
+### Example 5: Trigonometric equations (Extension 1)
+
+A student factorises and finds both factors, then gives wrong solutions.
+
+Question (3 marks): Solve sin^2*θ=-(1/(sqrt(2)))*sinθ for -360° le theta le 0°.
+
+The authored worked solution, step by step:
+
+1. Move everything to one side: sin^2*θ--(1/(sqrt(2)))*sinθ=0
+2. Factorise: sinθ(sinθ--(1/(sqrt(2))))=0
+3. Solve both factors: sinθ=0; sinθ=-(1/(sqrt(2)))
+4. All solutions: theta = -360°, -180°, -135°, -45°, 0°
+
+Final answer typed: `99991`. The answer checker says it is not correct.
+
+| Line | What the student wrote | What the marked page shows | Earns |
+|---:|---|---|---|
+| 1 | `sin^2*θ--(1/(sqrt(2)))*sinθ=0` | ticked | nothing |
+| 2 | `sinθ(sinθ--(1/(sqrt(2))))=0` | ticked | step 2 |
+| 3 | `sinθ=0` | ticked | step 3 |
+| 4 | `sinθ=-(1/(sqrt(2)))` | ticked | nothing |
+
+| Criterion | Marks | Result | Lines |
+|---|---:|---|---|
+| Step 2 of the worked solution (Factorise): sinθ(sinθ--(1/(sqrt(2))))=0 | 1 | earned | 2 |
+| Step 3 of the worked solution (Solve both factors): sinθ=0; sinθ=-(1/(sqrt(2))) | 1 | earned | 3 |
+| Gives the final answer correctly, in the form the question asks. | 1 | not earned | - |
+
+Marks: **2 of 3**.
+
+### Example 6: Probability (Extension 1, binomial)
+
+A student finds p correctly, then slips. Only one step of this solution is one the page can read, so the rule pays at most one mark.
+
+Question (3 marks): A binomial random variable has n=10 trials and mean 5.2. Find its standard deviation, correct to 2 decimal places.
+
+The authored worked solution, step by step:
+
+1. Find p: p=(5.2/10)=0.52
+2. Variance: np(1-p)=2.496
+3. Standard deviation: sigma approx 1.58
+
+Final answer typed: `99991`. The answer checker says it is not correct.
+
+| Line | What the student wrote | What the marked page shows | Earns |
+|---:|---|---|---|
+| 1 | `p=(5.2/10)=0.52` | ticked | step 1 |
+| 2 | `np(1-p)=2.496` | ticked | nothing |
+
+| Criterion | Marks | Result | Lines |
+|---|---:|---|---|
+| Step 1 of the worked solution (Find p): p=(5.2/10)=0.52 | 1 | earned | 1 |
+| Gives the final answer correctly, in the form the question asks. | 2 | not earned | - |
+
+Marks: **1 of 3**.
+
+### Example 7: Polynomials (Extension 1)
+
+A student differentiates and finds the repeated-root candidates, then slips on k.
+
+Question (4 marks): Find all values of k for which the equation x^3+9x^2+24x+k=0 has a repeated root.
+
+The authored worked solution, step by step:
+
+1. A repeated root is a root of the derivative: P'(x) = 3x^2 + 18x + 24 = 3(x + 4)(x + 2)
+2. Candidate positions: x=-4; x=-2
+3. Substitute into P(x) = 0: k=-((-4)^3+9((-4))^2+24((-4))); x=-2
+4. Both values of k: k=16; k=20
+
+Final answer typed: `153`. The answer checker says it is not correct.
+
+| Line | What the student wrote | What the marked page shows | Earns |
+|---:|---|---|---|
+| 1 | `P'(x) = 3x^2 + 18x + 24 = 3(x + 4)(x + 2)` | ticked | step 1 |
+| 2 | `x=-4` | ticked | step 2 |
+| 3 | `x=-2` | ticked | nothing |
+| 4 | `k=-((-4)^3+9((-4))^2+24((-4)))` | ticked | nothing |
+| 5 | `x=-2` | ticked | nothing |
+| 6 | `k=16` | ticked | nothing |
+| 7 | `k=153` | crossed (first wrong line) | nothing |
+
+| Criterion | Marks | Result | Lines |
+|---|---:|---|---|
+| Step 1 of the worked solution (A repeated root is a root of the derivative): P'(x) = 3x^2 + 18x + 24 = 3(x + 4)(x + 2) | 1 | earned | 1 |
+| Step 2 of the worked solution (Candidate positions): x=-4; x=-2 | 1 | earned | 2 |
+| Gives the final answer correctly, in the form the question asks. | 2 | not earned | - |
+
+Marks: **2 of 4**.
+
+### Example 8: Vectors (Extension 1)
+
+A student sets the dot product to zero, then solves it wrongly.
+
+Question (2 marks): The vectors a = (1, 9) and b = (k, 9) are perpendicular. Find k.
+
+The authored worked solution, step by step:
+
+1. Dot product is zero: 1k+81=0
+2. Solve: k=-81
+
+Final answer typed: `-580`. The answer checker says it is not correct.
+
+| Line | What the student wrote | What the marked page shows | Earns |
+|---:|---|---|---|
+| 1 | `1k+81=0` | ticked | step 1 |
+| 2 | `k=-580` | not checked | nothing |
+
+| Criterion | Marks | Result | Lines |
+|---|---:|---|---|
+| Step 1 of the worked solution (Dot product is zero): 1k+81=0 | 1 | earned | 1 |
+| Gives the final answer correctly, in the form the question asks. | 1 | not earned | - |
+
+Marks: **1 of 2**.
+
+### Example 9: Integration, restating the question
+
+A student only copies the question out. Nothing is credited: copying the question is not progress.
+
+Question (3 marks): The area under the line y=2x+5 between x=0 and x=k is 84 square units, where k > 0. Find k.
+
+The authored worked solution, step by step:
+
+1. Integral: int_0^k (2x + 5)dx = k^2 + 5k
+2. Equation: k^2+5k-84=0
+3. Solve: k=7
+
+Final answer typed: `99991`. The answer checker says it is not correct.
+
+| Line | What the student wrote | What the marked page shows | Earns |
+|---:|---|---|---|
+| 1 | `y = 2x + 5` | ticked | nothing |
+| 2 | `x = 0` | not checked | nothing |
+| 3 | `x = k` | ticked | nothing |
+| 4 | `84` | not checked | nothing |
+
+| Criterion | Marks | Result | Lines |
+|---|---:|---|---|
+| Step 2 of the worked solution (Equation): k^2+5k-84=0 | 1 | not verified | - |
+| Gives the final answer correctly, in the form the question asks. | 2 | not earned | - |
+
+Marks: **0 of 3**.
+
+### Example 10: Financial mathematics, a bare value and true but irrelevant sums
+
+A student writes one correct intermediate value and some true sums that have nothing to do with the question.
+
+Question (2 marks): $5,000 is deposited at the end of each year for 7 years into an account paying 3% p.a., compounded annually. How much of the balance immediately after the last deposit is interest? Give your answer to the nearest cent.
+
+The authored worked solution, step by step:
+
+1. Future value: FV = 5000*(((1 + 0.03)^(7) - 1)/(0.03)) = 38312.31
+2. Paid in: 7*5000=35000
+3. Interest: 38312.31-35000=3312.31
+
+Final answer typed: `99991`. The answer checker says it is not correct.
+
+| Line | What the student wrote | What the marked page shows | Earns |
+|---:|---|---|---|
+| 1 | `2 + 2 = 4` | ticked | nothing |
+| 2 | `3 * 5 = 15` | ticked | nothing |
+| 3 | `7 - 3 = 4` | ticked | nothing |
+| 4 | `12 - 5 = 7` | ticked | nothing |
+| 5 | `35000` | not checked | nothing |
+
+| Criterion | Marks | Result | Lines |
+|---|---:|---|---|
+| Step 2 of the worked solution (Paid in): 7*5000=35000 | 1 | not verified | - |
+| Gives the final answer correctly, in the form the question asks. | 1 | not earned | - |
+
+Marks: **0 of 2**.
+
+### Example 11: Calculus, volume of revolution (Extension 1), no final answer
+
+A student sets up the integral and integrates, but leaves the final answer box empty.
+
+Question (3 marks): The curve y=sqrt(5x) and the line y=x enclose a region. The region is rotated about the x-axis. Find the **exact** volume of the solid formed.
+
+The authored worked solution, step by step:
+
+1. Intersections: 5x=x^2; x=0; x=5
+2. Washer volume formula: V=π∫_{0}^{5}(R^2-r^2)dx; R^2=5x; r^2=x^2
+3. Integrate: V = pi[((5x^2)/(2)) - ((x^3)/(3))]_0^(5)
+4. Evaluate: V=((125π)/6)
+
+Final answer typed: (left empty). The answer checker says it is not correct.
+
+| Line | What the student wrote | What the marked page shows | Earns |
+|---:|---|---|---|
+| 1 | `5x=x^2` | ticked | step 1 |
+| 2 | `x=0` | ticked | nothing |
+| 3 | `x=5` | ticked | nothing |
+| 4 | `V=π∫_{0}^{5}(R^2-r^2)dx` | ticked | nothing |
+| 5 | `R^2=5x` | ticked | step 2 |
+| 6 | `r^2=x^2` | ticked | nothing |
+| 7 | `V = pi[((5x^2)/(2)) - ((x^3)/(3))]_0^(5)` | ticked | nothing |
+
+| Criterion | Marks | Result | Lines |
+|---|---:|---|---|
+| Step 1 of the worked solution (Intersections): 5x=x^2; x=0; x=5 | 1 | earned | 1 |
+| Step 2 of the worked solution (Washer volume formula): V=π∫_{0}^{5}(R^2-r^2)dx; R^2=5x; r^2=x^2 | 1 | earned | 5 |
+| Gives the final answer correctly, in the form the question asks. | 1 | not earned | - |
+
+Marks: **2 of 3**.
+
+### Example 12: Calculus, motion, right answer and no working
+
+A student types only the correct final answer. This was always full marks, and still is.
+
+Question (2 marks): A particle's displacement from the origin is x(t) = 8e^(-2t) metres after t seconds, for t>=0. Find its **initial acceleration**.
+
+The authored worked solution, step by step:
+
+1. Velocity: v = -16e^(-2t)
+2. Acceleration: a = 32e^(-2t)
+3. At t = 0: a(0)=32
+
+Final answer typed: `32`. The answer checker says it is correct.
+
+No working was written.
+
+| Criterion | Marks | Result | Lines |
+|---|---:|---|---|
+| Step 2 of the worked solution (Acceleration): a = 32e^(-2t) | 1 | earned | the final answer |
+| Gives the final answer correctly, in the form the question asks. | 1 | earned | the final answer |
+
+Marks: **2 of 2**.
+
+## What the rule cannot see, and its known weaknesses
+
+- It reads only what the page can tick. A question whose solution is in words, in a table, as an inequality, as a sketch or as a vector or matrix the page cannot read has no usable steps, and stays on the final answer.
+- A correct method that is not the authored one (a different but valid route) earns only where its lines match the authored results. A student who solves it another way may earn less than they deserve.
+- Another question's correct working earns nothing, except where one of its lines is also a true statement of this question's own solution (the same root, an equivalent equation). That is rare in the sweep and each case is listed in the test output.
+- It trusts the page's ticks. If the page wrongly ticks a line, the rule can pay for it. The sweep above looked for this by writing wrong lines and found none that earned; it cannot prove none exists.
+- A value counts for a numeric step only if it is worked from the question's or the solution's own numbers with the same operations on the same numbers as the authored step (so 2 + 2 = 4 is not the step 2^2 = 4, and 9 / 3 = 3 is not 27 / 9 = 3). A student who reaches a step's value by a different valid computation (a different grouping, another route) may earn less than they deserve; a line that repeats the authored computation exactly cannot be told from honest work.
+- Only the LAST N minus 1 usable steps pay. A student who does the early steps correctly and goes wrong in the middle may earn nothing for working although they did earn something in an examiner's eyes.
+- A wrong line the page cannot judge is a note, not a cross. Correct lines written after it can then earn. A page where later lines follow from a wrong line earned nothing in the sweep, but a slip the page cannot see is not stopped.
+- It never pays on a question worth one mark, and never for a model's reading: only the engine's own tick.
+- The mark split between steps is the same, one mark each. It does not weigh a hard step more than an easy one.
+
+Nothing here is an official NESA marking guideline.
+
+## Review record
+
+To be filled in by the author (the tutor). Leave blank until reviewed.
+
+- Decision (approved by the author / changes needed): 
+- Note: 
+- Name: 
+- Date: 
+- Scheme digest: `ba5f417fdba7cb97362f0d233f082adbf6cd96f8b4a388641f3eb62daf5a457e`

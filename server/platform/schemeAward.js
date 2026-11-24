@@ -43,6 +43,7 @@ import { makeFn, polynomial, extremes } from './lineInterpreter/truth.js';
 import { editionMarkingPolicy, editionMethodMarksRefusal } from './editionMarking.js';
 import { AUTHOR_APPROVED_SERVER } from './authorApproved.generated.js';
 import { marksPossibleFor } from './markerOps.js';
+import { GENERIC_ID, genericDigest, awardGeneric, GENERIC_WORDING } from './genericSteps.js';
 
 /** Editions on the author-approved tier: schemes only, on the author's approval and PRI_METHOD_MARKS=on. */
 export const AUTHOR_APPROVED_EDITIONS = Object.freeze(['prithagoras']);
@@ -423,6 +424,8 @@ export function schemeTypeOf(q, generator = q?._generator ?? q?.subtopic) {
 
 /** Is this type approved, for the digest it has now? `list` defaults to the repository's (empty) allow-list. */
 export const isApproved = (typeId, list = approved) => {
+  // The generic rule (genericSteps.js) is not one of SCHEMES: its own approval id, its own digest over the rule's code and wording.
+  if (typeId === GENERIC_ID) return Array.isArray(list) && list.some(a => a?.typeId === GENERIC_ID && a.digest === genericDigest());
   const s = byId.get(typeId);
   return !!s && list.some(a => a?.typeId === typeId && a.digest === schemeDigest(s));
 };
@@ -469,9 +472,12 @@ export function awardScheme(scheme, report, correct, topic = null, q = null) {
  */
 export function schemePay({ q, report, topic = null, correct, marksPossible, env = process.env, list = approved }) {
   const typeId = typeof q?._methodScheme === 'string' ? q._methodScheme : null;
+  const generic = typeId === GENERIC_ID;
   const scheme = typeId ? byId.get(typeId) : null;
-  if (!scheme) return { paid: false, reason: 'not-a-scheme-question' };
+  if (!scheme && !generic) return { paid: false, reason: 'not-a-scheme-question' };
   if (!isApproved(typeId, list)) return { paid: false, typeId, reason: 'type-not-approved' };
+  // The generic rule is the author-approved tier only: never under the examiner tier, whatever else is set.
+  if (generic && !authorTier(env)) return { paid: false, typeId, reason: 'generic-author-tier-only' };
   if (authorTier(env)) {
     // Author-approved tier: the listed type above plus the explicit switch. The examiner result is neither needed nor read.
     const why = authorTierRefusal(env);
@@ -479,6 +485,22 @@ export function schemePay({ q, report, topic = null, correct, marksPossible, env
   } else if (editionMarkingPolicy(env).methodMarks !== true) {
     // Examiner tier, every existing gate unchanged: the switch, the production examiner result, and the edition's certification.
     return { paid: false, typeId, reason: editionMethodMarksRefusal(env)?.code ?? 'method-marks-off' };
+  }
+  if (generic) {
+    // The generic rule: criteria are drawn from this question's own authored solution (genericSteps.js). Same gates as above, same reply shape.
+    const award = awardGeneric(q, report, correct === true);
+    if (!award) return { paid: false, typeId, reason: 'generic-no-usable-steps' };
+    if (award.possible !== marksPossible) return { paid: false, typeId, reason: `criteria-count: the rule has ${award.possible} marks and this question is worth ${marksPossible}, so it stays on the final answer` };
+    const awarded = correct === true ? award.possible : Math.min(award.total, award.possible - 1);
+    const earnedLines = award.items.filter(i => i.awarded && i.basis === 'lines').length;
+    return {
+      paid: true, typeId, digest: genericDigest(), items: award.items, awarded,
+      partial: {
+        okLines: earnedLines, awarded,
+        note: awarded > 0 ? GENERIC_WORDING.note.replace('{n}', String(awarded)).replace('{N}', String(award.possible)) : GENERIC_WORDING.none,
+        lines: [], lost: [], scheme: typeId
+      }
+    };
   }
   const possible = schemeMarks(scheme);
   if (possible !== marksPossible) return { paid: false, typeId, reason: `criteria-count: the scheme has ${possible} marks and this question is worth ${marksPossible}, so it stays on the final answer` };

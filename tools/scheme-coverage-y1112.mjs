@@ -15,6 +15,7 @@ import * as G from '../client/src/engine/generators/index.js';
 import { NSW_BANK_LEDGER, nswIssuable } from '../server/platform/nswBanks.js';
 import { SCHEMES, schemeTypeOf, schemeMarks } from '../server/platform/schemeAward.js';
 import { marksPossibleFor } from '../server/platform/markerOps.js';
+import { genericPlan, genericEligible } from '../server/platform/genericSteps.js';
 import { AUTHOR_APPROVED_SERVER } from '../server/platform/authorApproved.generated.js';
 import { SUBTOPIC_BY_ID, entryIdOf } from '../client/src/engine/curriculum.js';
 
@@ -43,7 +44,9 @@ export async function measure({ seeds = SEEDS } = {}) {
         rows.push({
           generator: entry.generator, strand: sub.strand || '?', course: courseOf(entry.generator), difficulty: cell.difficulty,
           written: !OBJECTIVE.has(q.answerType), answerType: q.answerType, marks, fit: fit?.id ?? null, approved: !!fit && approvedIds.has(fit.id),
-          stepKind: q.stepcheck?.kind ?? null
+          stepKind: q.stepcheck?.kind ?? null,
+          // the generic rule (server/platform/genericSteps.js): can it pay a wrong-answer mark here, and how many (u of N - 1)
+          generic: genericEligible(q) ? genericPlan(q).keySteps.length : 0, why: genericEligible(q) ? (genericPlan(q).why ?? null) : 'not-eligible'
         });
       }
     }
@@ -58,7 +61,7 @@ export function tables(rows) {
   const line = (label, rs) => {
     const written = rs.filter(r => r.written); const multi = written.filter(r => r.marks >= 2);
     const mk = n => written.filter(r => r.marks === n).length;
-    return { label, issued: rs.length, written: written.length, m1: mk(1), m2: mk(2), m3: mk(3), m4: mk(4), multi: multi.length, today: multi.filter(r => r.approved).length, drafts: multi.filter(r => r.fit).length };
+    return { label, issued: rs.length, written: written.length, m1: mk(1), m2: mk(2), m3: mk(3), m4: mk(4), multi: multi.length, today: multi.filter(r => r.approved).length, drafts: multi.filter(r => r.fit).length, generic: multi.filter(r => r.generic > 0).length, either: multi.filter(r => r.approved || r.generic > 0).length, full: multi.filter(r => r.generic >= r.marks - 1 && r.generic > 0).length };
   };
   for (const [name, key] of [['topic (strand)', r => `${r.course} · ${r.strand}`]]) {
     const rowsOut = [...by(key)].map(([k, rs]) => line(k, rs)).sort((a, b) => a.label.localeCompare(b.label));
@@ -71,8 +74,8 @@ export function render(rows) {
   const lines = [];
   for (const t of tables(rows)) {
     lines.push(`by ${t.name}: written questions by marks value, multi-mark count, and how many can earn step marks`);
-    lines.push(['topic'.padEnd(46), 'issued'.padStart(6), 'writ'.padStart(5), '1m'.padStart(5), '2m'.padStart(5), '3m'.padStart(5), '4m'.padStart(5), 'multi'.padStart(6), 'today'.padStart(6), 'drafts'.padStart(7), 'share(today/drafts)'.padStart(22)].join(' '));
-    for (const r of t.rows) lines.push([r.label.padEnd(46), String(r.issued).padStart(6), String(r.written).padStart(5), String(r.m1).padStart(5), String(r.m2).padStart(5), String(r.m3).padStart(5), String(r.m4).padStart(5), String(r.multi).padStart(6), String(r.today).padStart(6), String(r.drafts).padStart(7), `${pct(r.today, r.multi)} / ${pct(r.drafts, r.multi)}`.padStart(22)].join(' '));
+    lines.push(['topic'.padEnd(46), 'issued'.padStart(6), 'writ'.padStart(5), '1m'.padStart(5), '2m'.padStart(5), '3m'.padStart(5), '4m'.padStart(5), 'multi'.padStart(6), 'today'.padStart(6), 'drafts'.padStart(7), 'generic'.padStart(8), 'full'.padStart(6), 'share(today/drafts)'.padStart(22), 'share(generic/either)'.padStart(24)].join(' '));
+    for (const r of t.rows) lines.push([r.label.padEnd(46), String(r.issued).padStart(6), String(r.written).padStart(5), String(r.m1).padStart(5), String(r.m2).padStart(5), String(r.m3).padStart(5), String(r.m4).padStart(5), String(r.multi).padStart(6), String(r.today).padStart(6), String(r.drafts).padStart(7), String(r.generic).padStart(8), String(r.full).padStart(6), `${pct(r.today, r.multi)} / ${pct(r.drafts, r.multi)}`.padStart(22), `${pct(r.generic, r.multi)} / ${pct(r.either, r.multi)}`.padStart(24)].join(' '));
   }
   return lines.join('\n');
 }
