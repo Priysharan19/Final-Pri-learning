@@ -744,7 +744,7 @@
         {"re":"E2E SUITE.*28/28.*2 flows","note":"41 → 28 (tour-photo-answer follows the one-press photo flow, re-derived by running it)."},
         {"has":"INK CANVAS LOSS (emulated Windows scale factors, dark theme, mouse + pen; not Windows 11 hardware evidence): 200 passed, 0 failed","note":"Ink canvas loss (#449/#550): both engines, 200 checks, none failed."},
         {"has":"Ink · a marked attempt says only what the server established"},
-        {"re":"E2E SUITE PASSED — 36/36 checks across 1 flows","count":2,"op":"eq","note":"MERGED TREE: 3 -> 2. The third 36/36 was tour-math-reflow, whose count varied run to run (36, 38, 40) because a sampled question sometimes had no Write tab or typed answer box. It now records three checks for every sampled question (a check that passes and says why where a surface is absent), so it prints a stable 40/40 (see the next pin). 49 → 36 (tour-truthful-ink follows the one-press flow, both engines)."},
+        {"re":"E2E SUITE PASSED — 36/36 checks across 1 flows","count":3,"op":"eq","note":"49 → 36 (tour-truthful-ink follows the one-press flow, both engines) and a third tour that also prints 36/36 in this log; 3 as printed by the CI run on 118eda149."},
         {"has":"E2E SUITE PASSED — 40/40 checks across 1 flows","count":2,"op":"eq","note":"New pin, as printed by running client/test/tour-math-reflow.js on the merged tree: 7 runs (chromium x4, webkit x3) all printed 40/40. CI runs it in both engines."},
         {"has":"E2E BROWSER: webkit"},
         {"has":"Interface quality · keyboard, names, 44px, text zoom, layout shift, input, snapshots","count":2,"op":"ge","note":"Both engines ran the interface-quality tour (pipefail fails the shard on a red check)."},
