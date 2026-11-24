@@ -86,7 +86,8 @@ try {
     if (await skip.count()) { await skip.first().click().catch(() => {}); await page.waitForTimeout(300); }
   };
   const sideways = () => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-  const shot = async name => { if (SHOTS) await page.screenshot({ path: join(SHOTS, name), fullPage: true }); };
+  // The figure in the viewport (a full-page picture would put the sticky bar over it).
+  const shot = async name => { if (SHOTS) { await page.locator('.qpage [data-bank-figure]').first().scrollIntoViewIfNeeded(); await page.evaluate(() => window.scrollBy(0, -140)); await page.waitForTimeout(200); await page.screenshot({ path: join(SHOTS, name) }); } };
 
   stage = 'reach a question with a diagram';
   await page.goto(`${platform.origin}/practice?subtopic=${CHAPTER}&dotpoint=${ORDINAL}`, { waitUntil: 'domcontentloaded' });
