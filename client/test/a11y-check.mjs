@@ -1090,6 +1090,25 @@ async function run() {
         await page.waitForSelector('.eval-card, .verdict-good', { timeout: 20000 });
         await wait(page, 900);
       });
+      // A bank question with a diagram (components/BankFigure.jsx): the same page with the figure on a white sheet, named by the server's text
+      // alternative, fetched with the session. Dealt from the subtopic whose authored questions mostly have one (the bank figure tour's).
+      let withFigure = null;
+      await step('practice · an author\'s question with a diagram', '/practice', async () => {
+        await goTo(page, BASE, '/practice?subtopic=y12-integration&dotpoint=2');
+        await page.waitForSelector('.q-prompt', { timeout: 30000 });
+        for (let i = 0; i < 80 && !withFigure; i++) {
+          const q = await authoredShown();
+          if (q?.diagram) { withFigure = q; break; }
+          await page.locator('.ctx-next').first().click();
+          await page.waitForSelector('.q-prompt', { timeout: 30000 });
+          await wait(page, SETTLE);
+        }
+        if (!withFigure) throw new Error('no authored question with a diagram was dealt within the bounded search');
+        await page.waitForSelector('[data-bank-figure] img', { timeout: 20000 });
+        const named = await page.$eval('[data-bank-figure] img', el => (el.getAttribute('alt') || '').trim().length > 0 && el.complete && el.naturalWidth > 0);
+        if (!named) throw new Error('the figure is not drawn or has no text alternative');
+        await wait(page, 400);
+      });
     }
 
     await step('progress · overview', '/progress', async () => {
