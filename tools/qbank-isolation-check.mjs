@@ -11,13 +11,28 @@
 // text: an answer (6 characters or more), a prompt, a trap's wrong answer or its reason, a hint, a criterion, or a run of 20 characters
 // or more of a worked step (so a truncated step is found as surely as a whole one). tools/qbank-isolation-check.test.mjs plants each
 // kind in a copy of a dist and requires this scan to fail on it.
+//
+// FIGURES. A figure of the pack (any SVG of server/content/qbank/figures, which is served only to the account a question was issued to) must not
+// be in the built client either: no dist file has the SHA-256 of a figure file, and no text of the dist (a file, or a string inside a bundle,
+// in any of the readings above) contains a long slice of a figure's SVG.
+//
+// WHAT THIS IS NOT. It is a tripwire for the ways the pack is likely to get into a build by accident or by a careless change, not a proof
+// that the pack is absent. It CANNOT detect: a list of small whole-number answers on its own (the numbers 0 to 99 are in every bundle, and
+// a shuffled list of them is indistinguishable from a table); text that has been re-encoded beyond gzip, zlib and brotli (base64, hex,
+// XOR, a custom compression, splitting a string across files); text that has been paraphrased or translated; or an answer that is a short
+// common expression. The protection that matters is the server's: nothing in client/ imports the pack, the server serves static files from
+// client/dist only, and the pack's public fields are the only ones ever issued (qbank-real-pack-check.mjs sweeps the routes).
+// BOUNDED. A scan has a hard cap (SCAN_CAP_MS, 60 s; the real builds take about 15 s); a scan that has not finished by then FAILS, so
+// an input made to be slow cannot pass by being slow.
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PACK = path.join(ROOT, 'server', 'content', 'qbank');
+const FIGURES = path.join(PACK, 'figures');
 const failures = [];
 let pass = 0;
 const ok = (cond, message) => { if (cond) pass++; else failures.push(message); };
@@ -51,7 +66,7 @@ const serverText = walk(path.join(ROOT, 'server', 'platform')).filter(f => f.end
 const serving = serverText.filter(f => /express\.static|sendFile/.test(fs.readFileSync(f, 'utf8')) && /content\/qbank|DEFAULT_PACK_DIR/.test(fs.readFileSync(f, 'utf8')));
 ok(serving.length === 0, 'no server module that serves files names the pack');
 const importers = serverText.filter(f => /from '\.\/qbankPack\.js'/.test(fs.readFileSync(f, 'utf8'))).map(f => path.basename(f)).sort();
-ok(importers.every(n => ['editionBanks.js', 'nswBanks.js', 'practice.js', 'qbankPack.js'].includes(n)), `only the issuing path imports the pack module (${importers.join(', ')})`);
+ok(importers.every(n => ['editionBanks.js', 'nswBanks.js', 'practice.js', 'qbankFigures.js', 'qbankPack.js'].includes(n)), `only the issuing path imports the pack module (${importers.join(', ')})`);
 
 const staticPass = pass;
 // ── built client ─────────────────────────────────────────────────────────────
@@ -62,6 +77,8 @@ const FRAGMENT = 20;
  * not listed is never excused, and a build holding any other pack text fails whatever it also holds.
  */
 export const CHANCE_ANSWERS = Object.freeze(['0.6931471805599453', '(e-1)/2']);
+// A trap that is a bare comparison any library's code holds (a PDF worker's own `x >= 2`): its text alone proves nothing; the pack's shape, ids and runs still would.
+export const CHANCE_TRAPS = Object.freeze(['x >= 2']);
 const squash = t => String(t ?? '').replace(/\s+/g, ' ').trim();
 /** The answer, written the ways it is stored. */
 const answerTexts = q => {
@@ -82,7 +99,7 @@ export function needlesOf(questions) {
   const runs = new Map();
   for (const q of questions) {
     for (const t of answerTexts(q)) if (!CHANCE_ANSWERS.includes(t) && t.length >= (/^-?[\d.]+$/.test(t) ? 12 : 6)) needles.push(['answer', t, q.id]);   // a bare number is in every bundle by chance (1048576), unless it is long
-    for (const t of trapTexts(q)) if (t.length >= FRAGMENT || (/[=<>(]|\\/.test(t) && t.length >= 6)) needles.push(['trap', t, q.id]);
+    for (const t of trapTexts(q)) if (!CHANCE_TRAPS.includes(t) && (t.length >= FRAGMENT || (/[=<>(]|\\/.test(t) && t.length >= 6))) needles.push(['trap', t, q.id]);
     if (squash(q.prompt).length >= FRAGMENT) needles.push(['prompt', squash(q.prompt), q.id]);
     for (const h of [...q.hints, ...Object.values(q.ladder || {})]) if (squash(h).length >= FRAGMENT) needles.push(['hint', squash(h), q.id]);
     for (const c of q.criteria) if (squash(c.point).length >= FRAGMENT) needles.push(['criterion', squash(c.point), q.id]);
@@ -99,6 +116,9 @@ export function needlesOf(questions) {
  * substitution") is in it, and a pack text that is only that phrase is not a leak of the pack.
  */
 let ambientText = null;
+const ambientMemo = new Map();
+/** Does the client's own source hold this text (memoised: the source is megabytes and a window is asked about again and again)? */
+const inAmbient = t => { let v = ambientMemo.get(t); if (v === undefined) { v = ambient().includes(t); ambientMemo.set(t, v); } return v; };
 const ambient = () => (ambientText ??= (() => {
   const raw = [...walk(path.join(ROOT, 'client', 'src')), ...walk(path.join(ROOT, 'client', 'public'))].filter(f => TEXT.test(f)).map(f => fs.readFileSync(f, 'utf8')).join(' ');
   return squash(raw) + ' ' + squash(raw.replace(/\\\\/g, '\\').replace(/\\"/g, '"').replace(/\\'/g, "'"));
@@ -110,7 +130,9 @@ const PACK_ID = /\b[AX](?:11|12)-[A-Z]\d-\d{3}\b/g;
 const SHAPES = [/"marks"\s*:\s*\d\s*,\s*"point"\s*:\s*"/g, /"why"\s*:\s*"/g, /"h"\s*:\s*"[^"]{0,80}"\s*,\s*"d"\s*:\s*"/g, /"authored"\s*:\s*\d\s*,\s*"level"\s*:/g, /"nudge"\s*:\s*"/g, /"answerPrefix"\s*:\s*"/g, /"stepcheck"\s*:\s*\{/g];
 const SHAPE_LIMIT = 25;       // a build holds none of these; more than this many in one file is a pack (or a large part of one)
 const ID_RUN_LIMIT = 3;       // distinct pack question ids in one file
-const WINDOW = 200, WINDOW_DISTINCT = 80, WINDOW_FLAGGED = 120;   // a window of tokens that is mostly pack answers, and many different ones
+/** The hard cap on a scan of a dist, in milliseconds. A scan that has not finished by then FAILS: it is treated as a finding, never as a pass. */
+export const SCAN_CAP_MS = Number(process.env.PRI_QBANK_SCAN_CAP_MS) || 60_000;
+const WINDOW = 200, WINDOW_DISTINCT = 40, WINDOW_FLAGGED = 120;   // a window of tokens that is mostly pack answers, and many different ones that are not small whole numbers (a bundle's own tables of small numbers, such as a decoder's, hold dozens of those by chance: 87 different ones, 22 of them not small)
 const PAIR_RUN = 40, PAIR_RARE = 20;   // consecutive tokens that follow the pack's own order of answers, and how many of them are not a small whole number
 const SMALL = /^-?\d{1,2}$/;
 
@@ -147,15 +169,15 @@ function structural(text, tokens, ids) {
   const seq = [];
   for (const m of text.matchAll(TOKEN)) seq.push(normToken(m[1] ?? m[2] ?? m[0]));
   if (seq.length >= WINDOW) {
-    const counts = new Map(); let flagged = 0, best = 0, bestAt = 0;
-    const add = i => { if (tokens.set.has(seq[i])) { flagged++; counts.set(seq[i], (counts.get(seq[i]) || 0) + 1); } };
-    const drop = i => { if (tokens.set.has(seq[i])) { flagged--; const c = counts.get(seq[i]) - 1; if (c) counts.set(seq[i], c); else counts.delete(seq[i]); } };
+    const counts = new Map(); let flagged = 0, big = 0, best = 0, bestAt = 0;
+    const add = i => { if (tokens.set.has(seq[i])) { flagged++; const c = counts.get(seq[i]) || 0; counts.set(seq[i], c + 1); if (!c && !SMALL.test(seq[i])) big++; } };
+    const drop = i => { if (tokens.set.has(seq[i])) { flagged--; const c = counts.get(seq[i]) - 1; if (c) counts.set(seq[i], c); else { counts.delete(seq[i]); if (!SMALL.test(seq[i])) big--; } } };
     for (let i = 0; i < seq.length; i++) {
       add(i);
       if (i >= WINDOW) drop(i - WINDOW);
-      if (i >= WINDOW - 1 && flagged >= WINDOW_FLAGGED && counts.size >= WINDOW_DISTINCT && counts.size > best) { best = counts.size; bestAt = i; }
+      if (i >= WINDOW - 1 && flagged >= WINDOW_FLAGGED && big >= WINDOW_DISTINCT && big > best) { best = big; bestAt = i; }
     }
-    if (best) out.push(`a run of ${WINDOW} tokens holds ${best} different pack answers (token ${bestAt})`);
+    if (best) out.push(`a run of ${WINDOW} tokens holds ${best} different pack answers that are not small whole numbers (token ${bestAt})`);
     // the pack's own order of answers: a run of tokens each following the last as in the pack, with many that no code would hold by chance
     // (a bundle's own tables of small whole numbers follow the pack's order for a while; they hold few such tokens)
     let run = 0, rare = 0, longest = 0;
@@ -185,9 +207,23 @@ export function readingsOf(buf, depth = 0, out = []) {
 /** The strings to read a buffer as: UTF-8, and Latin-1 when it is not text (so a compressed or binary file's ASCII runs are still read). */
 const stringsOf = buf => { const u = buf.toString('utf8'); return u.includes('�') ? [u, buf.toString('latin1')] : [u]; };
 
+/** The pack's figures: their hashes, and a slice of the middle of each (long enough that nothing but that figure holds it). */
+export function figureSignatures(dir = FIGURES) {
+  const hashes = new Map(), slices = [];
+  if (!fs.existsSync(dir)) return { hashes, slices };
+  for (const f of fs.readdirSync(dir).filter(x => x.endsWith('.svg')).sort()) {
+    const buf = fs.readFileSync(path.join(dir, f)), text = buf.toString('utf8'), id = f.replace(/\.svg$/, '');
+    hashes.set(crypto.createHash('sha256').update(buf).digest('hex'), id);
+    const at = Math.max(0, Math.floor(text.length / 2) - 60);
+    slices.push([text.slice(at, at + 120), id]);
+  }
+  return { hashes, slices };
+}
+
 /** Scan a directory (a built client). EVERY file is read, whatever its extension. Returns the findings, empty when it is clean. */
-export function scanDist(dist, questions, version) {
+export function scanDist(dist, questions, version, { capMs = SCAN_CAP_MS, figuresDir = FIGURES } = {}) {
   const files = walk(dist);
+  const figs = figureSignatures(figuresDir);
   const rel = f => path.relative(dist, f).split(path.sep).join('/');
   const hits = [];
   if (files.some(f => /(^|\/)qbank(\/|$)|qb-[ax]1[12]-m[ae]-/.test(rel(f)))) hits.push('a file of the dist is, or is named for, a pack file');
@@ -200,7 +236,13 @@ export function scanDist(dist, questions, version) {
     else { const k = n[1].slice(0, 6); shorts.set(k, [...(shorts.get(k) || []), n]); }
   }
   const idList = [...ids];
+  // A cheap filter for the per-character loop: a window can only match a needle or a step run when its first 6 characters are the first 6 of one.
+  const first6 = new Set([...runs.keys(), ...prefixes.keys(), ...shorts.keys()].map(k => k.slice(0, 6)));
+  const first2 = new Set([...first6].map(k => k.slice(0, 2)));
+  const deadline = Date.now() + capMs;
+  let timedOut = false;
   for (const file of files) {
+    if (timedOut || Date.now() > deadline) { timedOut = true; break; }
     const fileStart = hits.length;
     const capped = () => hits.length - fileStart >= 6;   // a file that already fails needs no more evidence (and a whole pack would take minutes to list)
     const buf = fs.readFileSync(file);
@@ -208,10 +250,12 @@ export function scanDist(dist, questions, version) {
     readings.forEach((reading, layer) => {
       if (capped()) return;
       const where = layer ? `${rel(file)} (decoded, layer ${layer})` : rel(file);
+      { const h = crypto.createHash('sha256').update(reading).digest('hex'); if (figs.hashes.has(h)) hits.push(`${where} is the figure of ${figs.hashes.get(h)} (same SHA-256)`); }
       for (const text of stringsOf(reading)) {
         if (capped()) break;
         if (NAMES.test(text) || (version && text.includes(version))) hits.push(`${where} names the pack`);
-        const idHit = text.length >= 10 ? idList.find(id => text.includes(id)) : null;
+        for (const [slice, fid] of figs.slices) if (slice.length >= 80 && text.includes(slice)) { hits.push(`${where} holds the SVG of the figure of ${fid}`); break; }
+        const idHit = text.length >= 10 ? (text.match(PACK_ID) || []).find(id => ids.has(id)) : null;
         if (idHit) hits.push(`${where} names the question ${idHit}`);
         for (const f of structural(text, tokens, ids)) hits.push(`${where}: ${f}`);
         // A bundle holds a string as JavaScript or JSON writes it: backslashes doubled, quotes and newlines escaped. Each reading is scanned:
@@ -221,18 +265,21 @@ export function scanDist(dist, questions, version) {
           // Long needles are found by their first 20 characters then confirmed whole; short ones by their own length.
           const found = new Set();
           for (let k = 0; k + FRAGMENT <= flat.length && !capped(); k++) {
+            if ((k & 0xffff) === 0 && Date.now() > deadline) { timedOut = true; break; }
+            if (!first2.has(flat.slice(k, k + 2)) || !first6.has(flat.slice(k, k + 6))) continue;
             const w = flat.slice(k, k + FRAGMENT);
             const id = runs.get(w);
-            if (id && !found.has('run') && !ambient().includes(w)) { found.add('run'); hits.push(`${where} holds a run of a worked step of ${id}: "${flat.slice(k, k + 40)}"`); }
+            if (id && !found.has('run') && !inAmbient(w)) { found.add('run'); hits.push(`${where} holds a run of a worked step of ${id}: "${flat.slice(k, k + 40)}"`); }
             const short = shorts.get(flat.slice(k, k + 6));
-            if (short) for (const [kind, t, nid] of short) if (flat.startsWith(t, k) && !found.has(t) && !ambient().includes(t)) { found.add(t); hits.push(`${where} holds a ${kind} of ${nid}: "${t}"`); }
+            if (short) for (const [kind, t, nid] of short) if (flat.startsWith(t, k) && !found.has(t) && !inAmbient(t)) { found.add(t); hits.push(`${where} holds a ${kind} of ${nid}: "${t}"`); }
             const list = prefixes.get(w);
-            if (list) for (const [kind, t, nid] of list) if (flat.startsWith(t, k) && !found.has(t) && !ambient().includes(t)) { found.add(t); hits.push(`${where} holds a ${kind} of ${nid}: "${t.slice(0, 40)}"`); }
+            if (list) for (const [kind, t, nid] of list) if (flat.startsWith(t, k) && !found.has(t) && !inAmbient(t)) { found.add(t); hits.push(`${where} holds a ${kind} of ${nid}: "${t.slice(0, 40)}"`); }
           }
         }
       }
     });
   }
+  if (timedOut) hits.push(`the scan did not finish within its ${capMs / 1000} s cap (fail closed): a file this large or this repetitive is not a build`);
   return hits;
 }
 

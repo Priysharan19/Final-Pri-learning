@@ -82,6 +82,8 @@ const keyOf = q => { const a = q.answer || {}; switch (q.answerType) {
   case 'point': return `(${a.x}, ${a.y})`;
   case 'set': return a.values.join(', ');
   case 'ratio': return `${a.a}:${a.b}`;
+  case 'equation': return `${a.lhs} = ${a.rhs}`;   // the author's questions (server/content/qbank) also come as an equation or an interval
+  case 'interval': return a.region;
   default: return null; } };
 
 let offeredCells = 0, marked = 0, unissuedAsked = 0, hiddenRefused = 0, catalogueGenerated = 0;

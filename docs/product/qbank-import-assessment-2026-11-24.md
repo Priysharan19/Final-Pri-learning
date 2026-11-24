@@ -542,3 +542,92 @@ The second independent review returned CHANGES REQUIRED; each point is fixed at 
   scope and expiry as a try; it is not a repeat verdict).
 - Trap reasons. A hint that is or contains a trap reason, a criterion or a step is dropped, so none is in an issue reply.
 - `y' =`, `dy/dx =` and `d/dx(y) =` are one left side (and `f'(x) =` when the question defines y = f(x)); another quantity is still refused.
+
+## Diagrams, built 25 November (phase B1)
+
+`tools/qbank-diagrams.mjs` compiles each question's TikZ to a plain SVG at authoring time, outside the repository. The app never runs TeX.
+
+- **Input is untrusted.** The TikZ is refused before any compile if it reads or writes a file, runs a program, loads a package, redefines the document,
+  hides any of that behind `^^` escapes, or plots from a file. TeX runs with `-no-shell-escape` and in paranoid file mode, in a fresh temp directory,
+  with a minimal environment. The preamble is the bank's own (read from `source/build.py`), with `pgfsys-dvisvgm.def` declared first.
+- **Output is inert and repeatable.** `dvisvgm --no-fonts` turns every glyph into a path; the file is normalised (no comment or version stamp, sizes in px)
+  so a rerun is byte-identical, then held to an allow-list of elements and attributes (no script, event attribute, style, image, `foreignObject` or
+  external reference), a size cap and a nonzero drawing.
+- **Text alternative.** Built only from what the source states: the axes, how many plots or closed shapes it draws (no count where the source loops), the
+  labels it prints and the values at its ticks. A version that states an answer the question does not state is dropped for a shorter one; with nothing left,
+  the neutral sentence "Diagram for this question; the measurements are given in the question text."
+- **Answer in the figure.** A figure whose printed labels or tick values state a key the question does not state is not packed (reason
+  `diagram:answer-in-figure`) and is left for the owner to review. Automatic ticks, which the source does not state, are not tested.
+- **Packing and serving.** A diagram question is packed only with a verified figure. The pack entry carries `diagram: { alt, w, h, sha256, bytes }`; the file is
+  `server/content/qbank/figures/<question id>.svg` with a manifest of hashes. `GET /v1/practice/:id/figure` (and `/figure/data`, JSON, for the native
+  bridge) sends it to the account the question was issued to only, after checking length and sha256 against the pack. The page draws it in an `<img>` on a
+  white sheet (as a paper's diagrams are), which reads the same in the light and dark themes.
+- **Rebuild.** `node tools/qbank-diagrams.mjs render <archive> --work <dir>` then
+  `node tools/qbank-import.mjs --pack <archive> --out server/content/qbank --overwrite --figures <dir>`. CI has no TeX: it checks the committed figures
+  against their manifest hashes and the sanitiser (`node tools/qbank-diagrams.mjs check`), never re-renders.
+
+## Round two, 25 November: more of the author's hints kept, 3 significant figure answers where no precision is stated
+
+**Hints.** An independent review found that about 65% of the sampled dropped hints were good ones. The old rule dropped a hint under four words with no
+maths, a single word, and a lone formula span. The new rule (`tools/qbank-leak.mjs`, `rungDropReason`) is: two or more words are kept unless the hint is
+only a bare verb from a stoplist (evaluate, simplify, multiply, substitute, solve, calculate, expand, factorise, differentiate, integrate, rearrange and
+similar), alone or with "it" or "this"; a lone maths span or plain run is kept when it passes every leak test (not the accepted answer or any accepted
+form, not an arithmetic expression that evaluates to it, not a criterion line, trap expression, trap reason or worked step, and it parses fully); a
+number spelled out as the result ("the answer is eight") is a leak. Everything that states or trivially gives the answer stays dropped (`56/8`,
+`100 - 50`, `3 ln 2 = ln 2^3` when the answer is ln 8). Measured by building the pack from the same archive with each rule (2,340 auto-markable parts, at
+most three authored hints each, 7,020 hints):
+
+| | kept | dropped | 3 / 2 / 1 / 0 rungs |
+|---|---|---|---|
+| old rule | 3,827 | 3,193 | 350 / 1,012 / 753 / 225 |
+| new rule | 5,389 | 1,631 | 1,027 / 1,022 / 264 / 27 |
+
+The importer prints these numbers on every `--pack` build. 1,566 hints are newly kept across 1,222 questions. A random 40 of them (ordered by a hash of
+the question id and the text), with the accepted answer, so that a reader can see none gives it away:
+
+| Question | Newly kept hint | Accepted answer |
+|---|---|---|
+| A11-F1-173 | Expand to check. | (3*x-2)*(9*x^2+6*x+4) |
+| A12-F2-050 | Two periods. | 4 |
+| A12-F2-061 | Opens down. | y = -2*x^2+4 |
+| X11-A1-151 | Glue the pair. | 48 |
+| X11-A1-E01 | Count each pattern. | 384 |
+| X11-A1-197 | Two blocks. | 288 |
+| A12-C4-141 | Integrate each interval. | 8.1667 |
+| X11-F1-012 | Sign diagram. | -1 < x < 2 or x > 3 |
+| X12-S1-057 | Read the table. | 0.84 |
+| X12-S1-005 | Round up. | 14 |
+| X11-A1-178 | Multiply pairs. | 3 |
+| A11-C1-172 | Outer power rule. | 12*(3*x-2)^3 |
+| X12-V1-053 | Substitute into y. | 10 |
+| A12-C4-017 | Split the integral. | 12 |
+| X12-C3-008 | Integrate both sides. | 2*exp(x^2/2) |
+| A11-F1-171 | Expand carefully. | (x+7)/((x-2)*(x+1)) |
+| X12-S1-105 | σ = √(p(1−p)/n). | 0.0668 |
+| X12-C3-162 | Square each. | 64*pi/15 |
+| A11-T1-140 | Arc rθ. | 29.8501 |
+| A11-T1-131 | tan⁻¹(east/north). | 53 |
+| X11-A1-106 | No three collinear. | 56 |
+| X12-C2-047 | Find the intersections. | pi/2-1 |
+| A12-C4-044 | x³ is odd. | 12.8 |
+| A12-M1-027 | Find a. | 765 |
+| X12-C2-076 | Standard tan⁻¹. | atan(exp(x))+C |
+| X12-C3-062 | Multiply by eʸ. | ln(1+x^2/2) |
+| X11-T2-085 | Positive root. | 0.3333 |
+| A11-C1-057 | Differentiate x⁻¹. | 2 |
+| A12-S3-152 | Lower tail. | 0.0668 |
+| A12-C4-013 | Integrate and evaluate. | 3 |
+| A11-F1-196 | Read the vertex. | y = (x-2)^2+1 |
+| X12-T3-016(ii) | Adjust the domain. | 0.5236, 4.7124 |
+| X12-V1-083 | Inverse cosine. | 45 |
+| A11-S1-067 | Divide by P(L). | 0.5625 |
+| A12-M1-094 | Positive root. | 20 |
+| A11-S1-104 | Multiply by trials. | 100 |
+| A12-C4-251 | Take absolute values. | 2.6667 |
+| A11-F1-149 | Centre and radius. | (x-3)^2+(y-2)^2 = 4 |
+| A11-E1-035 | I₀ cancels. | 3.01 |
+| X12-C3-048 | Square the factor. | 35 |
+
+**Numeric answers with no stated precision.** The rule of #1114 stands unchanged: a key written as a long decimal that the author did not write as an exact form, on a prompt that states no precision and asks for no exact form, accepts the key correctly rounded to 3 or more significant figures. An independent review required that it never apply where the prompt, any criterion or any step heading asks for an exact value, or where the key is authored as an exact form (24 root 3, 6 pi, 33/95); those guards are in place and the original assertions restored. In the 1,604 numeric questions of the pack the rule applies to none today (printed by `server/test/qbank-marking-check.mjs`), and A11-E1-011, A11-T1-059, A12-C4-094, A12-C4-106, X12-C2-101 and X12-C2-105 refuse a 3 significant figure decimal.
+
+**Figures (review round).** The answer-in-figure test is now structural (`tools/qbank-figure-risk.mjs`): a coordinate, plotted point or vector endpoint equal to the answer, a plotted curve or line equal to the answer or its tangent or normal (by sampling), a label or tick equal to the answer, its reciprocal or negative or an interval boundary, a marked point at an answer value, or a worked result drawn; a coordinate it cannot read holds the figure. 17 more were held after looking at the rasterised figure beside the question and answer. 212 of 1,565 figures are held (250 parts); 392 packed questions have a figure.

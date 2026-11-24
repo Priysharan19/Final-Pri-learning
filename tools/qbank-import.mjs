@@ -44,6 +44,7 @@ import { authoredLines } from '../server/platform/genericSteps.js';
 import { checkBankAnswer } from '../server/platform/qbankMarking.js';
 import { rungDropReason, bankLadder } from './qbank-leak.mjs';
 import { PACK_FORMAT, DEFAULT_PACK_DIR, buildFamily, indexOf, loadPack, sha256 } from '../server/platform/qbankPack.js';
+import { loadFigureResults, packableFigure, figureRef, figureFiles } from './qbank-diagrams.mjs';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const katex = createRequire(path.join(ROOT, 'client', 'package.json'))('katex');
@@ -530,12 +531,16 @@ const LEVEL_OF = d => Math.min(4, Math.max(1, d));
 const ordered = (o, keys) => Object.fromEntries(keys.filter(k => o[k] !== undefined).map(k => [k, o[k]]));
 const json = v => JSON.stringify(v) + '\n';
 
+// Why a part with a diagram has no figure to go with: none supplied, none that rendered and verified, or one that shows an answer.
+const figureReject = (figures, id) => { const r = figures?.results.get(id); return !r ? 'diagram' : !r.ok ? 'diagram:render' : r.leaks?.length ? 'diagram:answer-in-figure' : 'diagram'; };
+
 /** The reasons a part is not in the pack (empty when it is). Stable codes, no content. */
 export function rejectReasons(rec, part, q, ctx = {}) {
+  const figures = ctx.figures ?? null;
   const out = [];
   if (part.answerType === 'manual') out.push('manual');
   else if (part.answerType === 'working') out.push('working-proof');
-  if (rec.diagram) out.push('diagram');
+  if (rec.diagram && !packableFigure(figures, part.question)) out.push(figureReject(figures, part.question));   // a diagram is packed only with a verified figure (qbank-diagrams.mjs)
   for (const f of rec.failures) {
     if (f.startsWith('line:')) continue;                 // criteria lines matter for step marks, not for a final-answer pack
     out.push(f.replace(/:\d+$/, '').replace(/@.*$/, '').replace(/(trap:accepted):\d+/, '$1'));
@@ -576,7 +581,7 @@ export function compilePack(archive, opts = {}) {
     const q = engineQuestion(part, question);
     // The ladder this question shows: ONLY his authored hints, each kept when it passes the rung rule (tools/qbank-leak.mjs). Nothing is
     // derived from a worked step or a heading.
-    const ctx = { title: question?.title, criteria: part.criteria || [], steps: part.steps || [], traps: q.traps || [] };
+    const ctx = { figures: opts.figures, title: question?.title, criteria: part.criteria || [], steps: part.steps || [], traps: q.traps || [] };
     const lad = bankLadder(q, ctx);
     q.hints = lad.hints;
     q.ladder = lad.ladder;
@@ -598,8 +603,9 @@ export function compilePack(archive, opts = {}) {
     const entry = ordered({
       id: rec.id, group: part.question, label: part.label ?? undefined, dp: TAG_CORRECTIONS[rec.id] ?? archive.tags[part.question], authored: part.difficulty, level: LEVEL_OF(part.difficulty),
       marks: part.marks, title: question.title, prompt: part.prompt, answerType: part.answerType, answer: part.answer,
-      answerPrefix: part.answerPrefix, inputHint: part.inputHint, hints: lad.hints, ladder: lad.ladder, steps: part.steps, traps: q.traps, criteria: part.criteria, stepcheck: part.stepcheck
-    }, ['id', 'group', 'label', 'dp', 'authored', 'level', 'marks', 'title', 'prompt', 'answerType', 'answer', 'answerPrefix', 'inputHint', 'hints', 'ladder', 'steps', 'traps', 'criteria', 'stepcheck']);
+      answerPrefix: part.answerPrefix, inputHint: part.inputHint, hints: lad.hints, ladder: lad.ladder, steps: part.steps, traps: q.traps, criteria: part.criteria, stepcheck: part.stepcheck,
+      diagram: rec.diagram ? figureRef(packableFigure(opts.figures, part.question)) : undefined
+    }, ['id', 'group', 'label', 'dp', 'authored', 'level', 'marks', 'title', 'prompt', 'answerType', 'answer', 'answerPrefix', 'inputHint', 'hints', 'ladder', 'steps', 'traps', 'criteria', 'stepcheck', 'diagram']);
     const shard = shards.get(family) || shards.set(family, { family, course: part.course, year: part.year, topic: part.topic, questions: [] }).get(family);
     shard.questions.push(entry);
   }
@@ -632,6 +638,7 @@ export function compilePack(archive, opts = {}) {
   const byCourse = {};
   for (const e of entries) { const k = `${e.course === 'ADV' ? 'A' : 'X'}${e.year}`; byCourse[k] = (byCourse[k] || 0) + e.questions; }
   files.set('NOTICE', NOTICE);
+  if (opts.figures) for (const [name, text] of figureFiles(opts.figures, [...shards.values()].flatMap(sh => sh.questions.filter(e => e.diagram).map(e => e.group)))) files.set(name, text);
   files.set('rejects.json', json({ note: 'ids and reasons only', parts: rejects.length, reasons: Object.fromEntries(Object.entries(reasonCounts).sort()), rejects }));
   return { files, rejects, summary: { ladder: ladderStats, packVersion, questions: manifest.totals.questions, shards: entries.length, bytes: manifest.totals.bytes, byCourse, rejectedParts: rejects.length, reasons: Object.fromEntries(Object.entries(reasonCounts).sort()) } };
 }
@@ -648,13 +655,14 @@ export async function main(argv) {
   const flag = name => { const i = argv.findIndex(a => a === `--${name}`); return i >= 0 ? argv[i + 1] : null; };
   if (argv.includes('--pack')) {
     const archiveDir = flag('pack'), outDir = flag('out');
-    if (!archiveDir || !outDir || archiveDir.startsWith('--') || outDir.startsWith('--')) { console.error('usage: node tools/qbank-import.mjs --pack <archive-dir> --out <pack-dir> [--overwrite] [--quiet]'); return 2; }
+    if (!archiveDir || !outDir || archiveDir.startsWith('--') || outDir.startsWith('--')) { console.error('usage: node tools/qbank-import.mjs --pack <archive-dir> --out <pack-dir> [--figures <diagrams-work-dir>] [--overwrite] [--quiet]'); return 2; }
     // The committed pack (server/content/qbank) is the one place in the repository a pack may be written.
     if (insideRepo(outDir) && path.resolve(outDir) !== path.resolve(DEFAULT_PACK_DIR)) { console.error(`refusing to write the pack inside the repository, except at ${path.relative(ROOT, DEFAULT_PACK_DIR)}: ${outDir}`); return 2; }
     if (fs.existsSync(outDir) && fs.readdirSync(outDir).length && !argv.includes('--overwrite')) { console.error(`${outDir} is not empty; pass --overwrite to write over a previous pack`); return 2; }
-    const compiled = compilePack(loadArchive(archiveDir));
+    const compiled = compilePack(loadArchive(archiveDir), { figures: flag('figures') ? loadFigureResults(flag('figures')) : null });
     // The pack must load exactly as the server will load it, before a byte is written.
     await loadPack(memorySource(compiled.files));
+    if (flag('figures')) fs.rmSync(path.join(path.resolve(outDir), 'figures'), { recursive: true, force: true });   // a rebuilt pack holds exactly its own figures
     for (const [name, text] of compiled.files) {
       const file = path.join(path.resolve(outDir), name);
       fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -663,6 +671,7 @@ export async function main(argv) {
     if (!argv.includes('--quiet')) {
       const s = compiled.summary;
       console.log(`pack ${s.packVersion}: ${s.questions} questions in ${s.shards} shards, ${s.bytes} bytes; rejected parts ${s.rejectedParts}`);
+      { const l = s.ladder; console.log(`hints: ${l.authoredHints} authored (at most three a question) over ${l.questions} auto-markable parts; kept ${l.rungsKept}, dropped ${l.rungsDropped}; questions with 3/2/1/0 rungs: ${l.withRungs[3]}/${l.withRungs[2]}/${l.withRungs[1]}/${l.withRungs[0]}`); console.log(`drop reasons ${JSON.stringify(Object.fromEntries(Object.entries(l.dropReasons).sort((x, y) => y[1] - x[1]).slice(0, 12)))}`); }
       console.log(`by course ${JSON.stringify(s.byCourse)}`);
       console.log(`reject reasons ${JSON.stringify(s.reasons)}`);
       console.log(`written to ${outDir}`);

@@ -36,6 +36,7 @@ import { clearPhotoDraft, confirmPhotoDraftSaved, readPhotoDraft, savePhotoDraft
 import { lineMarks } from './workingEvidence.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
 import QuestionReport from './QuestionReport.jsx';
+import BankFigure from './BankFigure.jsx';
 import { renderPdfPages, MAX_PDF_INPUT_BYTES } from '../ink/pdfPage.js';
 import { intakeImageFile, intakeMessageKey, isPdfFile, claimsHeic, PHOTO_OR_PDF_ACCEPT } from '../ink/photoIntake.js';
 import useFileDrop from '../lib/useFileDrop.js';
@@ -2732,6 +2733,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           <MathText block className="q-prompt" text={question.prompt} />
         </div>
         {figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: figure }} />}
+        {question.diagram && <BankFigure serverQuestionId={question.serverQuestionId} diagram={question.diagram} />}
         {showWhy && why && <p className="q-why">{why}</p>}
         {reportOpen && question.serverQuestionId && (
           <QuestionReport questionId={question.serverQuestionId} onClose={() => setReportOpen(false)}
@@ -3739,6 +3741,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           <div className="sheet" role="dialog" aria-modal="true" aria-label={t('verdict.questionRegion')} ref={peekRef}>
             <MathText block text={question.prompt} />
             {figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: figure }} />}
+            {question.diagram && <BankFigure serverQuestionId={question.serverQuestionId} diagram={question.diagram} />}
             <div className="sheet-actions"><button className="btn btn-primary" onClick={() => setPeekOpen(false)}>{t('verdict.backToWork')}</button></div>
           </div>
         </>

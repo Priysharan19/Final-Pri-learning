@@ -633,6 +633,8 @@ const safeInt = (v, lo, hi, dflt = lo) => {
 };
 const safeTime = (v) => { const n = Number(primitive(v)); return Number.isFinite(n) && n > 0 ? Math.min(n, 4102444800000) : null; };
 const safeFigure = (v) => sanitizeFigure(typeof v === 'string' ? v : '') || null;
+// A bank question's server-held diagram: its text alternative and size only (the file is fetched with the session, components/BankFigure.jsx).
+const safeDiagram = d => (d && typeof d.alt === 'string' && d.alt.length <= 500 && Number.isFinite(d.w) && d.w > 0 && d.w <= 1200 && Number.isFinite(d.h) && d.h > 0 && d.h <= 1200 ? { alt: d.alt, w: d.w, h: d.h } : null);
 
 // Names, titles and provenance labels are never mathematical, so anything
 // tag-shaped in one came from a file rather than from a person and goes. Maths
@@ -1989,6 +1991,7 @@ function sanitize(q, row) {
     // Which features a graph-sketch answer form asks for: names only, never values.
     ...(q.answerType === 'graph-sketch' ? { sketchAsk: safeSketchAsk(q.sketchAsk) } : {}),
     figure: safeFigure(q.figure), code: s?.code || null,
+    ...(safeDiagram(q.diagram) ? { diagram: safeDiagram(q.diagram) } : {}),
     // A previous-year question carries its sitting and its sources with it, so
     // the card can say "JEE Advanced 2025 · Paper 1 · Q12" and mean it.
     pyq: !!q.pyq,

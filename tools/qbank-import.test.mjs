@@ -215,8 +215,47 @@ fs.rmSync(t2, { recursive: true, force: true });
     [num(7), 'Simplify.', true, 'a single word'],
     [num(7), 'Solve', true, 'a single word with no full stop'],
     [num(7), '', true, 'empty'],
-    [num(7), 'Product law.', true, 'under four words with no maths'],
-    [num(7), 'Check the domain.', true, 'under four words with no maths'],
+    [num(7), 'Product law.', false, 'two words with no maths are kept'],
+    [num(7), 'Check the domain.', false, 'three words are kept'],
+    [num(7), 'Simplify it.', true, 'a bare verb with it'],
+    [num(1 / 6), 'Total 6 of 36.', true, 'a of b gives the answer'],
+    [num(0.5), '2 of 4.', true, 'a of b gives the answer'],
+    [num(5), 'Remaining 5%.', true, 'a percentage that is the answer'],
+    [num(5), '95% between.', true, 'the complement of a percentage that is the answer'],
+    [num(21), 'C(7, 2).', true, 'C(n, r) that is the answer'],
+    [num(56), '= C(8, 3).', true, 'C(n, r) that is the answer'],
+    [num(120), '5 choices, then 4, 3, 2.', true, 'a product of listed numbers that is the answer'],
+    [num(22.5), '45 = 2v.', true, 'a one-line linear equation whose solution is the answer'],
+    [num(10), '2b = 20.', true, 'a one-line linear equation whose solution is the answer'],
+    [num(0.3183098861837907), 'Divide 100 by 100\u03c0.', true, 'a division that gives the answer'],
+    [num(21), 'Choose 2 from the other 7.', false, 'a method with small counts is kept'],
+    [num(15660.19), 'Multiply by 0.85 each year.', false, 'a factor named in words is a method'],
+    [num(14023.73), '78 periods.', false, 'a count named in words is a method'],
+    [num(7), 'Complement.', false, 'a one word method name'],
+    [num(7), 'Use the complement.', false, 'a method name'],
+    [num(7), 'Cosine rule.', false, 'a method name'],
+    [num(7), 'Pythagoras.', false, 'a method name'],
+    [num(7), 'Product law.', false, 'a method name'],
+    [num(7), 'Check the domain.', false, 'a method name'],
+    [num(5 * Math.PI / 4), '5/4.', true, 'only a fraction (the coefficient of pi of the answer)'],
+    [num(3), '10\u00b3.', true, 'only a power (the argument of the logarithm that is the answer)'],
+    [num(7), '$10^{3}$', true, 'only a power in maths'],
+    [num(7), '1/2', true, 'only a fraction'],
+    [num(7), 'Write it as $10^3$ first.', false, 'a power inside a method in words'],
+    [num(7), 'Use the graph.', true, 'a bare verb and the graph'],
+    [num(7), 'Read the graph.', true, 'a bare verb and the graph'],
+    [num(7), 'Find k.', true, 'a bare verb and a symbol'],
+    [num(7), 'Find $x$.', true, 'a bare verb and a symbol in maths'],
+    [num(7), 'Find the gradient first.', false, 'a method in words'],
+    [num(4 * Math.PI / 3), '\u03c0 + \u03c0/3.', true, 'a sum of constants that is the answer'],
+    [num(4 * Math.PI / 3), 'Related \u03c0/3.', false, 'a related angle that is not the answer'],
+    [num(8), '3 ln 2 = ln 2\u00b3.', true, 'the logarithm of the answer'],
+    [num(7), 'Hint', true, 'a lone ordinary word'],
+    [num(7), '$x^2+1$', false, 'a lone formula that is not the answer'],
+    [num(8), '$2^3$', true, 'a lone formula that is the answer'],
+    [{ answerType: 'expression', answer: { expr: 'ln(8)' }, prompt: 'Simplify.', steps: [], hints: [] }, '$3 \\ln 2 = \\ln 2^3$', true, 'a chain with a side that is the answer'],
+    [num(8), '56/7', true, 'a lone division that gives the answer'],
+    [num(8), 'The answer is eight.', true, 'a number spelled out as the result'],
     // kept: real help that is not the answer
     [num(7), 'Write the bracket as a power first.', false, 'a method in words'],
     [num(7), 'Use $y-y_1=m(x-x_1)$ with the midpoint.', false, 'a formula that is not the answer'],
@@ -237,6 +276,13 @@ fs.rmSync(t2, { recursive: true, force: true });
     [num(3), 'Write $[1, 2 \\cup 5$ down first.', true, 'a span that cannot be read']
   ];
   for (const [q, text, dropped, what] of rungCases) ok(!!drop(q, text, {}) === dropped, `a hint is ${dropped ? 'dropped' : 'kept'}: ${what}`);
+  { const lq = { answerType: 'numeric', answer: { value: 0.3413 }, prompt: 'Using $P(Z<1)=0.8413$, find $P(0<Z<1)$.', steps: [{ h: 'Subtract', d: '$0.8413-0.5$' }] };
+    ok(!!drop(lq, 'P(Z < 0) = 0.5.', { steps: lq.steps }), 'a number of the last worked step (0.5) is a leak');
+    const lq2 = { answerType: 'numeric', answer: { value: 0.8384 }, prompt: 'Using $P(Z<1.4)=0.9192$, find $P(|Z|<1.4)$.', steps: [{ h: 'Symmetry', d: '$2(0.9192)-1$' }] };
+    ok(!!drop(lq2, 'Lower tail 0.0808.', { steps: lq2.steps }), 'the complement of a number of the last worked step is a leak');
+    const lq3 = { answerType: 'expression', answer: { expr: 'ln(2)' }, prompt: 'Evaluate the integral.', steps: [{ h: 'Antiderivative', d: '$\\ln(1+\\sin x)$' }, { h: 'Limits', d: '$\\ln2-\\ln1$' }] };
+    ok(!!drop(lq3, '1 + sin(\u03c0/2) = 2.', { steps: lq3.steps }), 'the argument of a logarithm answer is a leak');
+    ok(!drop(lq3, 'Use the chain rule.', { steps: lq3.steps }), 'a method name is kept'); }
   // sealed text is never a rung: a trap reason, a criterion's line or point, a step, the title, the question itself
   const sealedQ = { answerType: 'expression', answer: { expr: '-cos(x)/2' }, prompt: 'Find the inverse of $y=\\cos 2x$.', steps: [{ h: 'Swap', d: 'Swap x and y, then take cosine of both sides.' }], hints: [], traps: [{ expr: 'cos(x)/2', why: 'Use cos(π − x) = −cos x.' }], criteria: [{ marks: 1, point: 'Writes the line cos(2y) = x on its own', line: 'cos(2*y) = x' }] };
   const sealedCtx = { title: 'The inverse of a cosine', steps: sealedQ.steps, traps: sealedQ.traps, criteria: sealedQ.criteria };
@@ -251,7 +297,7 @@ fs.rmSync(t2, { recursive: true, force: true });
   ok(proseRuns('Compute 56/8 and then 100 − 50, so 2 ln 3 = ln 9.').join(' | ') === '56/8 | 100 \u2212 50 | 2 ln 3 = ln 9', 'plain maths in prose is read as runs: 56/8, 100 − 50, 2 ln 3 = ln 9');
   // the ladder: only his hints, in his order; none derived from a step or a heading
   const base = { answerType: 'numeric', answer: { value: 252 }, prompt: 'Find $\\binom{10}{5}$.', steps: [{ h: 'Evaluate', d: '$\\binom{10}{5}=252$' }] };
-  const none = bankLadder({ ...base, hints: ['Use it.', 'Write it out.', 'Evaluate it.'] });
+  const none = bankLadder({ ...base, hints: ['Use it.', 'Solve.', 'Evaluate it.'] });
   ok(none.hints.length === 0 && Object.keys(none.ladder).length === 0 && none.dropped.length === 3, 'a question whose hints are all too thin has no rung and nothing takes their place (not its step, not its heading)');
   const two = bankLadder({ ...base, hints: ['Think about the factorial formula.', 'It is $252$.', 'Write the numerator out in full.'] });
   ok(two.hints.length === 2 && two.ladder.nudge === 'Think about the factorial formula.' && two.ladder.method === 'Write the numerator out in full.' && !two.ladder.worked && two.dropped[0].index === 1, 'a hint that states the answer is dropped and the next one moves up: two rungs, in his order');

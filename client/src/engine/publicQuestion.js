@@ -8,6 +8,8 @@ export const PUBLIC_QUESTION_FIELDS = Object.freeze([
   'hints', 'pyq', 'pyqSource', 'pyqYear', 'pyqExam', 'archive',
   'subtopic', 'difficulty', 'dotpoint', 'dotpoints', 'dotpointRequested', 'dotpointExact',
   'contentId', 'contentVersion', 'contentHash', 'figure',
+  // A bank question's server-held diagram: { alt, w, h } only (the SVG is fetched with the session, server/platform/qbankFigures.js).
+  'diagram',
   // A graph-sketch question: WHICH features the answer form asks for (never their values).
   'sketchAsk'
 ]);
