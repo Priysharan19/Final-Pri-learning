@@ -36,7 +36,7 @@ import { loadAllBanks, loadBanksFor, generateQuestion } from '../../client/src/e
 // worker threads under a hard deadline. Only the two pure rubric helpers
 // below, which read the server's own question and run no student text through
 // the engine, are used directly here.
-import { stepMetaFor, marksPossibleFor, practiceMarksEarned } from './markerOps.js';
+import { stepMetaFor, marksPossibleFor, practiceMarksEarned, lineLevelFeedback } from './markerOps.js';
 import { LINE_CHECKS_PER_QUESTION, LINE_CHECK_WINDOW_MS, lineCheckFeatureEnabled, tutorDailyLimit } from './tutor.js';
 import { markRowsFor } from './markRows.js';
 import { schemePay } from './schemeAward.js';
@@ -1612,9 +1612,14 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // A question answered BY its working (the answer is the lines) has a
       // marker's verdict that is itself a verdict on the lines.
       const answeredByWorking = q.answerType === 'working' || Boolean(result.stepReport);
-      const answerFeedback = String(optionWhy || result.feedback || '').slice(0, 3000);
-      const ownTrap = !result.correct
-        ? trapProbes.find(t => t?.why && String(t.why) === answerFeedback)?.why || null : null;
+      const markerFeedback = String(optionWhy || result.feedback || '').slice(0, 3000);
+      // An authored trap for a typed value says WHY a student would write that value ("the sine is 1"). It is shown only when the
+      // student's own lines do not already answer it: when the page has verified lines and then a crossed line, the crossed line's own
+      // message is what is said (the trap would otherwise contradict correct working, e.g. sin(5π/6) = 1/2 written, then a wrong sum).
+      const lineLevel = lineLevelFeedback(stepReport, { resolved, invalid, correct: result.correct === true, optionWhy });
+      const answerFeedback = lineLevel || markerFeedback;
+      const ownTrap = !result.correct && !lineLevel
+        ? trapProbes.find(t => t?.why && String(t.why) === markerFeedback)?.why || null : null;
       // What the marker says about a wrong answer is information about the
       // right one. An authored trap for a typed value can state the answer
       // outright ("… so the least value is 16"); so can "there are 7 solutions

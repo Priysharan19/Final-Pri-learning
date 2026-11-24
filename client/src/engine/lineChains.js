@@ -19,7 +19,8 @@
 import { _forChains as FC, _internals as SM, noteStep, noteValue, NOTE_GIVEN } from './solutionMatch.js';
 import { infoOf, cleanStatement, exactForm } from './arithmeticLines.js';
 import { evaluate, parse, normalize, withEvaluationBudget } from './expr.js';
-import { contextAllowsCross, pageBlocksCross, readingIsAmbiguous, falseStepFacts, readPoly, crossDiagnosis, readDefinitions, factorsOfQuestion, isProductRuleStatement, isContextLine, isRealVariable, isPartialWork, derivativeClaims, stepHow, readDerivativeStatements, isRuleSubstitution } from './falseStep.js';
+import { contextAllowsCross, pageBlocksCross, readingIsAmbiguous, falseStepFacts, readPoly, crossDiagnosis, readDefinitions, factorsOfQuestion, isProductRuleStatement, isContextLine, isRealVariable, isPartialWork, derivativeClaims, stepHow, readDerivativeStatements, isRuleSubstitution, contextAllowsNumericCross, stepHowWide } from './falseStep.js';
+import { wideReadable, strictlyDiffer, closedNumbersDiffer, isPartialWide } from './wideFalseStep.js';
 
 const BUDGET = 120000;
 const MAX_LINES = 20;
@@ -270,6 +271,30 @@ export function lineChains(q, report, opts = null) {
   try { return withEvaluationBudget(BUDGET, () => run(q, report, !!(opts && opts.warn), opts)); } catch { return { report, matched: 0, warned: 0 }; }
 }
 
+/** The line above is something a continuation `= …` continues: itself a continuation, or `name = expr` where the name is a bare label (y, y', dy/dx, f(2), P(1)). An equation is not. */
+function chainAbove(up) {
+  if (!up || !up.s || up.s.multi || up.s.ctx || up.status !== 'ok') return false;
+  if (up.s.continuation) return true;
+  const parts = up.s.parts || [];
+  if (parts.length === 1) return true;   // a bare expression (the page's first line)
+  return parts.length === 2 && /^(?:[A-Za-z]'{0,2}|d[A-Za-z]\/d[A-Za-z]|[A-Za-z]'{0,2}\(\s*[A-Za-z0-9]{1,3}\s*\))$/.test(tidy(parts[0]).replace(/\s+/g, ''));
+}
+
+/** A page of closed numbers only: every line is a number sum, or a name (`P(1)`, `x`, `y`) equal to one. A letter anywhere else is an equation or an expression. */
+function numericPage(texts) {
+  const label = /^(?:[A-Za-z]\w*(?:\([^()]*\))?'*|d[a-z]\/d[a-z])$/;
+  for (const raw of texts) {
+    const t = tidy(String(raw ?? '')).replace(/^\s*(?:∴|so\b|hence\b|therefore\b)\s*/i, '');
+    if (!t) continue;
+    const parts = t.replace(/^=\s*/, '').split('=').map(x => x.trim());
+    for (let k = 0; k < parts.length; k++) {
+      if (k === 0 && parts.length >= 2 && !/^\s*=/.test(t) && label.test(parts[0].replace(/\s+/g, ''))) continue;
+      const r = wideReadable(parts[k]);
+      if (!r || r.letter) return false;
+    }
+  }
+  return true;
+}
 function run(q, report, warn, opts = null) {
   FC.setFunctions(q);
   const lines = report.lines.slice(0, MAX_LINES);
@@ -288,8 +313,36 @@ function run(q, report, warn, opts = null) {
   const gaps = new Set(opts && Array.isArray(opts.gaps) ? opts.gaps : []);
   const pageTexts = report.lines.map(x => String(x?.text ?? ''));
   const crossOpen = warn && stop === Infinity && contextAllowsCross(world.prompt);
+  const crossOpenNumeric = warn && stop === Infinity && contextAllowsNumericCross(world.prompt);
+  let enriched = 0;
   let crossedAt = -1, crossedDiagnosis = null, setups = 0, defs = null;
   const contextLines = [];
+
+
+  // earlier sides of the page: a restart from an earlier line is not a false rewrite of the line above
+  const earlierSides = i => { const e = []; for (let k = 0; k < i - 1; k++) for (const part of String(pageTexts[k] || '').split('=')) { const t = part.trim(); if (t) e.push(t); } return e; };
+  /** A cross for sides that are not both polynomials (exp, log, trig, fractions, indices), or for two closed numbers: the diagnosis, or null. */
+  const wideCross = (aboveSide, writtenSide, i, text, aboveText) => {
+    if (gaps.has(i) || readingIsAmbiguous(text) || readingIsAmbiguous(aboveText || '')) return null;
+    const ra = wideReadable(aboveSide), rb = wideReadable(writtenSide);
+    if (!ra || !rb) return null;
+    const letter = ra.letter || rb.letter;
+    if (ra.letter !== rb.letter) return null;   // the same one letter on both sides, or two closed numbers: a letter that appears from nowhere is a unit or a label
+    if (letter) {
+      if (!isRealVariable(world.prompt, letter)) return null;
+      if (pageBlocksCross(pageTexts, [letter])) return null;
+      if (isPartialWide(aboveSide, writtenSide, letter, earlierSides(i))) return null;
+      const st = strictlyDiffer(aboveSide, writtenSide, letter);
+      if (!st) return null;
+      return crossDiagnosis(null, st.example, { aboveSide, writtenSide, lineNo: i + 1, checkedBefore: 0, strict: st });
+    }
+    if (pageBlocksCross(pageTexts, []) || !numericPage(pageTexts)) return null;
+    const d = closedNumbersDiffer(aboveSide, writtenSide);
+    if (/^\s*-?\d+(?:\.\d+)?(?:\s*\/\s*\d+)?\s*$/.test(String(aboveSide)) || !/[-+*/^(]|sqrt|√/.test(String(aboveSide).replace(/^\s*-/, ''))) return null;   // a bare value above: a new calculation may start here with a lazy `=`
+    if (!d || Math.abs(d.written + d.above) <= 1e-9 * Math.max(1, Math.abs(d.above))) return null;   // a value and its negative: the other root of a pair
+    if (isPartialWide(aboveSide, writtenSide, '', earlierSides(i))) return null;
+    return crossDiagnosis(null, null, { aboveSide, writtenSide, lineNo: i + 1, checkedBefore: 0 });
+  };
 
   const stepFor = (vec) => { const h = world.vecSteps.find(v => v.vec.length === vec.length && v.vec.every((x, i) => close(x, vec[i]))); return h ? h.step : null; };
   const verified = (note, step) => ({ state: 'verified', note, step });
@@ -368,10 +421,57 @@ function run(q, report, warn, opts = null) {
           diag = crossDiagnosis(f, w.facts.example, { aboveSide: w.facts.aboveSide, writtenSide: w.facts.writtenSide, lineNo: i + 1, checkedBefore: 0 });
         }
       }
+      // sides that are not both polynomials: the wide rule (exp, log, trig, fractions, indices), read only from the allow-list
+      if (!diag && crossOpen && crossedAt < 0 && w.facts && w.facts.strict && !(readPoly(w.facts.aboveSide) && readPoly(w.facts.writtenSide))) {
+        diag = wideCross(w.facts.aboveSide, w.facts.writtenSide, i, l.text, prevAbove ? prevAbove.text : '');
+      }
       if (diag) { crossedAt = i; crossedDiagnosis = diag; out[i] = { text: l.text, status: 'break', state: 'wrong', note: diag.message, diagnosis: diag }; continue; }
       out[i] = { text: l.text, status: 'note', state: 'unverified', unverified: true, note: w.note, slipWarning: true }; continue;   // a warned line ticks nothing below it
     }
+    // two closed numbers: a continuation `= 4` after a ticked line that comes to 2 is not a rewrite of it
+    if (!w && crossOpenNumeric && crossedAt < 0 && /^\s*=/.test(l.text) && s && !s.multi && !s.ctx && s.continuation && s.parts.length === 1 && prevAbove && chainAbove(prevAbove) && prevAbove.last) {
+      let nd = null; try { nd = wideCross(prevAbove.last, s.parts[0], i, l.text, prevAbove.text); } catch { nd = null; }
+      if (nd) { warned++; bad = true; crossedAt = i; crossedDiagnosis = nd; out[i] = { text: l.text, status: 'break', state: 'wrong', note: nd.message, diagnosis: nd }; continue; }
+    }
+    // Not crossed (the page or the question leaves room for it), but two closed numbers that are plainly not equal: the note says so, with both values
+    if (warn && !w && crossedAt < 0 && /^\s*=/.test(l.text) && s && !s.multi && !s.ctx && s.continuation && s.parts.length === 1 && prevAbove && chainAbove(prevAbove) && prevAbove.last) {
+      let d = null; try { d = closedNumbersDiffer(prevAbove.last, s.parts[0]); } catch { d = null; }
+      if (d && Math.abs(d.written + d.above) > 1e-9 * Math.max(1, Math.abs(d.above)) && !/[≈≃~,:;<>%°|]/.test(l.text)) {
+        const val = x => exactForm(x).plain;
+        warned++; bad = true;
+        out[i] = { text: l.text, status: 'note', state: 'unverified', unverified: true, note: `This line comes to ${val(d.written)}, but the line above comes to ${val(d.above)}, so the two are not equal. Check this step.`, slipWarning: true }; continue;
+      }
+    }
     if (contradicted(s)) bad = true; else { above = describe(); if (above) hist.push(above); }
+  }
+  // A cross some other check already made, with no diagnosis of its own: the same facts are told for it (feedback only: status, state and note stay)
+  if (warn && stop !== Infinity && stop >= 1 && lines[stop] && lines[stop].status === 'break' && !lines[stop].diagnosis && /^\s*=/.test(String(lines[stop].text)) && chainAbove(above)
+      && (contextAllowsCross(world.prompt) || contextAllowsNumericCross(world.prompt))) {
+    try {
+      const l = lines[stop];
+      const s = readLine(l.text) || loose(l.text);
+      if (s && !s.multi && !s.ctx && s.continuation && s.parts.length === 1) {
+        const aboveSide = above.last, writtenSide = s.parts[0];
+        const pa = readPoly(aboveSide), pb = readPoly(writtenSide);
+        let diag = null;
+        if (pa && pb && (pa.v || pb.v) && contextAllowsCross(world.prompt)) {
+          const letter = pa.v || pb.v || null;
+          const f = falseStepFacts(aboveSide, writtenSide);
+          if (f && letter && (!pa.v || !pb.v || pa.v === pb.v) && isRealVariable(world.prompt, letter) && !gaps.has(stop) && !readingIsAmbiguous(l.text) && !readingIsAmbiguous(above.text)
+              && !pageBlocksCross(pageTexts, [letter]) && !isPartialWork(aboveSide, writtenSide, earlierSides(stop))) diag = crossDiagnosis(f, null, { aboveSide, writtenSide, lineNo: stop + 1, checkedBefore: 0 });
+        } else if (!(pa && pb && (pa.v || pb.v))) {
+          diag = wideCross(aboveSide, writtenSide, stop, l.text, above.text);
+        }
+        if (diag) {
+          const before = out.slice(0, stop);
+          if (before.some(x => x && x.status === 'ok') && before.every(x => x && (x.status === 'ok' || x.context === true))) {
+            const kept = `Every line checked before line ${stop + 1} is correct.`;
+            diag = { ...diag, kept, comment: `${diag.comment} ${kept}`, message: `${diag.comment} ${kept}` };
+          }
+          out[stop] = { ...out[stop], diagnosis: diag }; enriched++;
+        }
+      }
+    } catch { /* the cross stands as it was */ }
   }
   // What each ticked line DID (engine/falseStep.js stepHow): recomputed from the line and the line above, never from a note. Words only.
   let howed = 0;
@@ -396,7 +496,7 @@ function run(q, report, warn, opts = null) {
       if (!up || up.status !== 'ok' || typeof up.text !== 'string') continue;
       let how = null;
       if (i - 1 === ruleAt && ruleRhs && defs && derivs && isRuleSubstitution(ruleRhs, after(l.text), defs, derivs)) how = { kind: 'substituted', names: [defs[0].name, defs[1].name] };
-      else { const sides = String(up.text).split('='); how = stepHow(sides[sides.length - 1], after(l.text)); }
+      else { const sides = String(up.text).split('='); how = stepHow(sides[sides.length - 1], after(l.text)); if ((!how || how.kind === 'equal-above') && !(l.fact && l.fact.valueOnly === true)) how = stepHowWide(sides[sides.length - 1], after(l.text)) || how; }
       if (how) { out[i] = { ...l, how }; howed++; }
     }
   }
@@ -412,7 +512,7 @@ function run(q, report, warn, opts = null) {
       out[crossedAt] = { ...out[crossedAt], note: comment, diagnosis: crossedDiagnosis };
     }
   }
-  if (!matched && !warned && !followed && !setups && !howed) return { report, matched: 0, warned: 0 };
+  if (!matched && !warned && !followed && !setups && !howed && !enriched) return { report, matched: 0, warned: 0 };
 
   function tickLine(l, s0, up) {
     const text = l.text;
@@ -620,7 +720,7 @@ function run(q, report, warn, opts = null) {
   const { arithmetic: _a, ...rest } = report;
   const anyOk = stated.some(x => x.solutionMatch === true || x.status === 'ok');
   return {
-    matched: matched + setups + howed, warned: warned + followed, crossed: crossedAt >= 0 ? crossedAt : -1,
+    matched: matched + setups + howed, warned: warned + followed + enriched, crossed: crossedAt >= 0 ? crossedAt : -1,
     report: {
       ...(report.arithmetic === true && !anyOk ? report : rest), lines: stated, source: 'value-chain', ...(matched ? { solutionMatched: true } : {}),
       // the first crossed line (zero-based, like every report's firstBreak) and its 1-based number: the client says "correct until line N"

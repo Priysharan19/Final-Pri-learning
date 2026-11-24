@@ -87,6 +87,9 @@ export const CATALOGUE = Object.freeze({
   howOne: { en: ['Multiplying by $1$ changes nothing, so this equals the line above.'] },
   howExpanded: { en: ['Correct expansion: {items}.'] },
   howCollected: { en: ['Like terms collected correctly: {items}.'] },
+  howFactorised: { en: ['Correct factorisation: {factors} multiply to give the line above.'] },
+  howCancelled: { en: ['Correct cancelling: the common factor {factor} divides out of the top and the bottom.'] },
+  howEvaluated: { en: ['Correct arithmetic: the line above works out to {value}.'] },
   howEqualAbove: { en: ['Equal to the line above.'] },
   crossSidesDiffer: {
     en: ['The two sides do not match: {left} comes to {leftValue}, and {right} comes to {rightValue}.', 'The two sides are not equal: {left} comes to {leftValue}, but {right} comes to {rightValue}.', 'The two sides differ: {left} comes to {leftValue} and {right} comes to {rightValue}.']
@@ -94,7 +97,7 @@ export const CATALOGUE = Object.freeze({
 });
 /** Every template kind, grouped by polarity, for the tests. */
 export const TEMPLATE_KINDS = Object.freeze(Object.keys(CATALOGUE));
-export const HOW_KINDS = Object.freeze(['howFactors', 'howRule', 'howDerivatives', 'howSubstituted', 'howOne', 'howExpanded', 'howCollected', 'howEqualAbove']);
+export const HOW_KINDS = Object.freeze(['howFactors', 'howRule', 'howDerivatives', 'howSubstituted', 'howOne', 'howExpanded', 'howCollected', 'howFactorised', 'howCancelled', 'howEvaluated', 'howEqualAbove']);
 export const POSITIVE_KINDS = Object.freeze(['restates', 'stepHeading', 'step', 'stepValue', 'ruleResult', 'rule', ...HOW_KINDS]);
 export const EQUALITY_KINDS = Object.freeze(['bothSides', 'equalsAbove']);
 export const CROSS_KINDS = Object.freeze(['crossAbove', 'crossComputed', 'crossSidesDiffer', 'crossTerms', 'crossExact', 'crossExample']);
@@ -237,6 +240,13 @@ function howComment(card, ctx = {}) {
     const parts = h.items.map(i => { const from = typeof i.fromText === 'string' ? inner(mathSpan(i.fromText)) : null, to = okTex(i.toTex); return from && to ? `$${from} = ${to}$` : null; });
     return parts.some(x => x === null) ? null : done('howExpanded', { items: parts.join(' and ') }, { items: h.items });
   }
+  if (h.kind === 'factorised' && Array.isArray(h.factors) && h.factors.length >= 2 && h.factors.length <= 4) {
+    const parts = h.factors.map(t => (okTex(t) ? `$${t}$` : null));
+    if (parts.some(x => x === null)) return null;
+    return done('howFactorised', { factors: parts.length === 2 ? `${parts[0]} and ${parts[1]}` : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}` }, { factors: h.factors });
+  }
+  if (h.kind === 'cancelled' && okTex(h.factorTex)) return done('howCancelled', { factor: `$${h.factorTex}$` }, { factor: h.factorTex });
+  if (h.kind === 'evaluated' && typeof h.valueTex === 'string') { const v = inner(mathSpan(h.valueTex)); return v ? done('howEvaluated', { value: `$${v}$` }, { value: v }) : null; }
   if (h.kind === 'collected' && Array.isArray(h.groups) && h.groups.length >= 1) {
     const parts = h.groups.map(g => (okTex(g.fromTex) && okTex(g.toTex) ? `$${g.fromTex} = ${g.toTex}$` : null));
     return parts.some(x => x === null) ? null : done('howCollected', { items: parts.join(' and ') }, { groups: h.groups });

@@ -563,6 +563,23 @@ export function antiderivativeSlip({ given: givenAst, canonical, student: studen
   return null;
 }
 
+/** How many terms of the line, as written (top-level sums and differences), carry the power q of the letter v. */
+function writtenTermsAt(ast, q, v) {
+  const flat = [];
+  const walk = n => {
+    if (!n || typeof n !== 'object') return;
+    if (n.t === 'bin' && (n.op === '+' || n.op === '-')) { walk(n.l); walk(n.r); } else flat.push(n);
+  };
+  walk(ast);
+  let count = 0;
+  for (const t of flat) {
+    let m = null;
+    try { m = polyOf(t, v); } catch { m = null; }
+    if (m && m.get(q) !== undefined && Math.abs(m.get(q)) > 1e-12) count++;
+  }
+  return count;
+}
+
 /** The named power-rule or chain-rule slip in a student's derivative, or null. */
 export function derivativeSlip({ given: givenAst, canonical, student: studentAst, variable: v }) {
   if (!studentAst) return null;
@@ -593,6 +610,9 @@ export function derivativeSlip({ given: givenAst, canonical, student: studentAst
     }
     if (c === undefined) return null;
     const shown = term(c, p, v);
+    // A line not yet collected (`6x^2 + 4x + 6x`) can carry the right term for this power beside another: the collected value is then
+    // wrong, but the term that came out right must never be named as the slip. Several written terms at one power: nothing specific is said.
+    if (s !== 0 && writtenTermsAt(studentAst, q, v) >= 2) return null;
     if (s !== 0) {
       if (near(s, c) && p !== 1) {
         return D('diff-no-multiply', 'Forgot to multiply by the old power',

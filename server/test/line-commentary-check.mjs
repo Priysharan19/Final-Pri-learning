@@ -22,7 +22,7 @@ import { stepEvidence, stepMetaFor } from '../platform/markerOps.js';
 import { buildAnnotatedWorking } from '../../client/src/components/annotatedWorkingModel.js';
 import { commentFor, CATALOGUE, HOW_KINDS, POSITIVE_KINDS, EQUALITY_KINDS, CROSS_KINDS, TEMPLATE_KINDS, variantsOf } from '../../client/src/engine/lineCommentary.js';
 import { exactForm } from '../../client/src/engine/arithmeticLines.js';
-import { stepHow } from '../../client/src/engine/falseStep.js';
+import { stepHow, stepHowWide } from '../../client/src/engine/falseStep.js';
 import { mathSpan, plainComment } from '../../client/src/engine/commentTex.js';
 import { chainDiagnosis } from '../../client/src/engine/reason-chain.js';
 import { normalize, parse } from '../../client/src/engine/expr.js';
@@ -86,6 +86,15 @@ for (const id of families) {
           if (!again || again.kind !== want) problems.push(`how-comment not recomputed (${want}): ${tag}`);
           howRecomputed += 1;
         }
+        // the three newer kinds are recomputed here too, independently of the card
+        if (['howFactorised', 'howCancelled', 'howEvaluated'].includes(c.kind)) {
+          const upText = String(report.lines[i - 1]?.text ?? ''), side = upText.split('=').pop(), mine = String(line.text).replace(/^\s*=\s*/, '');
+          const again = i > 0 ? (stepHow(side, mine) || stepHowWide(side, mine)) : null;
+          const wantKind = { howFactorised: 'factorised', howCancelled: 'cancelled', howEvaluated: 'evaluated' }[c.kind];
+          const again2 = again && again.kind === 'equal-above' ? stepHowWide(side, mine) : again;
+          if (!again2 || again2.kind !== wantKind) problems.push(`how-comment not recomputed (${wantKind}): ${tag}`);
+          howRecomputed += 1;
+        }
         if (card.valueChain === 'arithmetic' && !EQUALITY_KINDS.includes(c.kind) && !HOW_KINDS.includes(c.kind)) problems.push(`arithmetic tick with a non-equality template: ${tag}`);
         if (EQUALITY_KINDS.includes(c.kind) && card.valueChain !== 'arithmetic') problems.push(`equality template on a non-arithmetic line: ${tag}`);
         // maths comes only from the line's structured facts
@@ -104,6 +113,9 @@ for (const id of families) {
         if (c.kind === 'stepValue') allowed.add('$' + line.fact.tex + '$');
         if (card.how && ['howExpanded', 'howCollected', 'howDerivatives'].includes(c.kind)) for (const it of [...(card.how.items || []), ...(card.how.groups || [])]) { const sp = (it.fromText ? '$' + (mathSpan(it.fromText).slice(1, -1)) + ' = ' + it.toTex + '$' : it.fromTex ? '$' + it.fromTex + ' = ' + it.toTex + '$' : '$' + it.nameTex + ' = ' + it.exprTex + '$'); allowed.add(sp); }
         if (c.kind === 'howOne') allowed.add('$1$');
+        if (c.kind === 'howFactorised') for (const f of card.how.factors) allowed.add('$' + f + '$');
+        if (c.kind === 'howCancelled') allowed.add('$' + card.how.factorTex + '$');
+        if (c.kind === 'howEvaluated') allowed.add('$' + String(card.how.valueTex).trim() + '$');
         if (c.kind === 'howFactors') for (const n of line.fact.names) allowed.add('$' + n + '$');
         if (c.kind === 'howSubstituted') for (const n of card.how.names) { allowed.add('$' + n + '$'); allowed.add('$' + n + "'$"); }
         const dE = line.diagnosis?.expectedTex !== undefined ? '$' + line.diagnosis.expectedTex + '$' : line.diagnosis?.expected !== undefined ? tex(line.diagnosis.expected) : null;
@@ -249,6 +261,9 @@ const SAMPLE = {
   howOne: { n: 2, status: 'checked', valueChain: 'verified', text: '= x', how: { kind: 'one' } },
   howExpanded: { n: 2, status: 'checked', valueChain: 'verified', text: '= 2x^2 - 2x', how: { kind: 'expanded', items: [{ fromText: '2x(x - 1)', toTex: '2x^2 - 2x' }] } },
   howCollected: { n: 2, status: 'checked', valueChain: 'verified', text: '= 3x^2', how: { kind: 'collected', groups: [{ fromTex: '2x^2 + x^2', toTex: '3x^2' }] } },
+  howFactorised: { n: 2, status: 'checked', valueChain: 'verified', text: '= 2x(x + 2)', how: { kind: 'factorised', factors: ['2x', 'x + 2'] } },
+  howCancelled: { n: 2, status: 'checked', valueChain: 'verified', text: '= x + 3', how: { kind: 'cancelled', factorTex: 'x - 3' } },
+  howEvaluated: { n: 2, status: 'checked', valueChain: 'verified', text: '= 22', how: { kind: 'evaluated', valueTex: '22' } },
   howEqualAbove: { n: 2, status: 'checked', valueChain: 'verified', text: '= x', how: { kind: 'equal-above' } },
   crossTerms: { n: 3, status: 'first-error', text: '= 3x^2 - x', diagnosis: { expectedFrom: 'symbolic', exact: true, aboveTex: '3x^2 - 2x', writtenTex: '3x^2 - x', correctedTex: '3x^2 - 2x', changed: [{ fromTex: '-2x', toTex: '-x' }], same: ['3x^2'] } },
   crossExact: { n: 3, status: 'first-error', text: '= x', diagnosis: { expectedFrom: 'symbolic', exact: true, aboveTex: '3x^2 - 2x', writtenTex: 'x', correctedTex: '3x^2 - 2x', changed: [], same: [] } },
