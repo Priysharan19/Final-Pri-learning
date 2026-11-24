@@ -21,8 +21,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { serverEdition } from './edition.js';
-import { LEGACY_CROSSWALK, NSW_OUTCOME_BY_CODE, NSW_SYLLABUS_BY_ID } from '../../client/src/engine/curriculum-nsw/index.js';
-import { dotpointsFor } from '../../client/src/engine/curriculum.js';
+import { dotpointById, formDotpointOrdinals } from '../../client/src/engine/curriculum.js';
+import { productPlaceOf } from './qbankDotpoints.js';
+import { withSafeInputHints } from '../../client/src/engine/inputHint.js';
 
 /** The committed pack: server content, never reachable from the client. */
 export const DEFAULT_PACK_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'content', 'qbank');
@@ -129,7 +130,7 @@ export async function loadPack(source) {
   // The index is the picker's view (what may be asked for); it must say exactly what the shards hold.
   const fromShards = JSON.stringify(indexOf(families));
   if (JSON.stringify(index.families) !== fromShards) throw new Error('qbank pack: index.json does not match the shards');
-  return Object.freeze({ version: manifest.packVersion, families, questionCount: ids.size, source: source.kind ?? 'custom' });
+  return Object.freeze({ version: manifest.packVersion, families, product: productIndexOf(families), questionCount: ids.size, source: source.kind ?? 'custom' });
 }
 
 const FAMILY_OF = new WeakMap();
@@ -198,111 +199,141 @@ export function ensureQbank(env = process.env, { strict = false, source = null }
 }
 
 // ── What the rest of the server asks ─────────────────────────────────────────
-export const isQbankFamily = id => typeof id === 'string' && !!installed && installed.families.has(id);
 export const qbankVersion = () => installed?.version ?? null;
 export const qbankFamilies = () => (installed ? indexOf(installed.families) : []);
+/** Does the loaded pack hold any question practised in this product subtopic? */
+export const qbankServes = subtopic => typeof subtopic === 'string' && !!installed?.product.has(subtopic);
+
+/**
+ * The product's view of the pack: for each product subtopic, its questions by level (every dot point of it, topic-level ones included)
+ * and, for each product dot point a question is numbered to, its questions by level. Where a question sits is qbankDotpoints.js; a dot
+ * point of the pack that table does not hold is not practised anywhere (the test holds the committed pack to the table, so none is).
+ */
+export function productIndexOf(families) {
+  const out = new Map();
+  for (const fam of families.values()) {
+    for (const list of fam.byLevel.values()) {
+      for (const entry of list) {
+        const place = productPlaceOf(fam.family, entry.dp);
+        if (!place) continue;
+        const sub = out.get(place.subtopic) || out.set(place.subtopic, { all: new Map(), ordinals: new Map() }).get(place.subtopic);
+        sub.all.set(entry.level, [...(sub.all.get(entry.level) || []), entry]);
+        if (place.ordinal !== null) {
+          const levels = sub.ordinals.get(place.ordinal) || sub.ordinals.set(place.ordinal, new Map()).get(place.ordinal);
+          levels.set(entry.level, [...(levels.get(entry.level) || []), entry]);
+        }
+      }
+    }
+  }
+  for (const sub of out.values()) {
+    for (const list of sub.all.values()) list.sort((a, b) => (a.id < b.id ? -1 : 1));
+    for (const levels of sub.ordinals.values()) for (const list of levels.values()) list.sort((a, b) => (a.id < b.id ? -1 : 1));
+  }
+  return out;
+}
 
 const mix = (a, b) => { let h = (a ^ 0x9e3779b9) >>> 0; for (let i = 0; i < b.length; i++) h = Math.imul(h ^ b.charCodeAt(i), 0x01000193) >>> 0; h ^= h >>> 15; h = Math.imul(h, 0x2c1b3c6d) >>> 0; h ^= h >>> 12; return h >>> 0; };
 
 /**
- * One question of a family, drawn the way a generator draws one: the same (family, level, seed, dot point) is always the same question.
- * `dotpointId` is `<family>.<code>`; a dot point or level with no question throws, as a generator with no such form does. Returns a
- * question object of the generator's shape plus the sealed private fields (`criteria`, `authoredMarks`).
+ * THE MIX RULE. Where the pack holds questions for the (subtopic or dot point, level) a student asked for, a seed is an authored question's
+ * turn for 3 draws in 4 when the pool has six or more questions and 1 in 2 when it has fewer; every other seed is the generators'. The
+ * seed alone decides (no clock, no counter), so the same (subtopic, level, dot point, seed) is always the same question. Which question
+ * of the pool an authored turn draws is the seed's too. The practice seek (practice.js seekQuestion) then does the rest, exactly as for a
+ * generator: it passes over a question the account has resolved or the device has just been served, so an authored question is never
+ * served twice while a fresh one can be found, and when the pool has run dry the seek keeps drawing and is answered by a generator.
  */
-export function qbankGenerate(family, level, seed, dotpointId = null) {
-  const fam = installed?.families.get(family);
-  if (!fam) throw new Error(`No question bank ${family}`);
+export const BANK_TURNS = Object.freeze({ large: 3, small: 2, of: 4, largeFrom: 6 });
+export const bankTurn = (poolSize, seed, key) => poolSize > 0 && mix((seed ^ 0x51ed270b) >>> 0, `turn|${key}`) % BANK_TURNS.of < (poolSize >= BANK_TURNS.largeFrom ? BANK_TURNS.large : BANK_TURNS.small);
+
+/**
+ * The authored question this draw is, or null when the draw is a generator's (no pool, or not the pool's turn). Same arguments as a
+ * generator (practice.js calls this first): the product subtopic, the level asked for, the seed, and a product dot point id or null.
+ * A dot point asked for is answered by a question numbered to it, at the level asked for, and never by another (the seek checks too).
+ */
+export function qbankDraw(generator, level, seed, dotpointId = null) {
+  const sub = installed?.product.get(generator);
+  if (!sub) return null;
   let pool;
   if (dotpointId != null) {
-    const dp = fam.dotpoints.get(dotpointId);
-    if (!dp) throw new Error(`No dot point ${dotpointId} in ${family}`);
-    pool = dp.levels.get(level);
-  } else pool = fam.byLevel.get(level);
-  if (!pool || !pool.length) throw new Error(`No question of ${family} at level ${level}`);
-  return questionOf(pool[mix(seed >>> 0, `${family}|${dotpointId ?? ''}|${level}`) % pool.length], seed, dotpointId);
+    const dp = dotpointById(dotpointId);
+    if (!dp || dp.subtopic !== generator) return null;
+    pool = sub.ordinals.get(dp.ordinal)?.get(level);
+  } else pool = sub.all.get(level);
+  if (!pool || !pool.length) return null;
+  const key = `${generator}|${dotpointId ?? ''}|${level}`;
+  if (!bankTurn(pool.length, seed >>> 0, key)) return null;
+  return productQuestion(pool[mix((seed ^ 0x2545f491) >>> 0, `pick|${key}`) % pool.length], generator, seed, dotpointId);
 }
 
-/** The question object of one pack entry (see qbankGenerate). Tests and the isolation check use it to visit every question. */
+/** One pack entry as the practice path issues it, whatever seed (tests, the isolation check). Throws when the table places it nowhere. */
 export function qbankEntryQuestion(id, seed = 0) {
-  for (const fam of installed?.families.values() ?? []) for (const list of fam.byLevel.values()) { const e = list.find(x => x.id === id); if (e) return questionOf(e, seed, null); }
+  for (const fam of installed?.families.values() ?? []) for (const list of fam.byLevel.values()) {
+    const e = list.find(x => x.id === id);
+    if (!e) continue;
+    const place = productPlaceOf(fam.family, e.dp);
+    if (!place) throw new Error(`Bank question ${id} is placed nowhere`);
+    return productQuestion(e, place.subtopic, seed, null);
+  }
   throw new Error(`No bank question ${id}`);
 }
 
-function questionOf(entry, seed, dotpointId) {
+/** The pack entries, with the product subtopic and dot point each is practised in. For the tests and the isolation check. */
+export function qbankEntries() {
+  const out = [];
+  for (const fam of installed?.families.values() ?? []) for (const list of fam.byLevel.values()) for (const entry of list) out.push({ entry, family: fam.family, place: productPlaceOf(fam.family, entry.dp) });
+  return out;
+}
+
+function productQuestion(entry, generator, seed, requestedId) {
   const family = FAMILY_OF.get(entry);
-  const level = entry.level;
-  const dpId = `${family}.${entry.dp}`;
+  const place = productPlaceOf(family, entry.dp);
+  // A numbered dot point is the question's one dot point. A topic-level one names the dot points its cell exercises, none of them exact,
+  // as a generator's cell that names several does (curriculum.js formDotpointOrdinals).
+  const ids = place.ordinal !== null ? [`${generator}.${place.ordinal + 1}`] : formDotpointOrdinals(generator, entry.level).map(i => `${generator}.${i + 1}`);
   const contentHash = sha256(Buffer.from(JSON.stringify([entry.id, entry.prompt, entry.answer]))).slice(0, 16);
   const q = {
-    seed, subtopic: family, difficulty: level,
+    seed, subtopic: generator, difficulty: entry.level,
     prompt: entry.prompt, answerType: entry.answerType, answer: entry.answer,
     ...(entry.answerPrefix ? { answerPrefix: entry.answerPrefix } : {}),
     ...(entry.inputHint ? { inputHint: entry.inputHint } : {}),
     ...(entry.traps.length ? { traps: entry.traps } : {}),
     hints: entry.hints, steps: entry.steps,
     ...(entry.stepcheck ? { stepcheck: entry.stepcheck } : {}),
-    dotpoints: [dpId], dotpoint: dpId, dotpointSource: 'qbank',
+    dotpoints: ids, dotpoint: ids.length === 1 ? ids[0] : null, dotpointSource: 'qbank',
     contentId: `qbank:${entry.id}`, contentVersion: `qb.${installed.version}`, contentHash,
-    // Private to the server: never in PUBLIC_QUESTION_FIELDS.
-    authoredMarks: entry.marks, authoredDifficulty: entry.authored, criteria: entry.criteria, _bank: entry.id
+    // Private to the server: never in PUBLIC_QUESTION_FIELDS. `_family` is what the marker sees as the question's subtopic
+    // (markerOps.js markerView): the bank was audited against the engine under its own family id, so its marking is never that of
+    // a generator that happens to share the subtopic.
+    authoredMarks: entry.marks, authoredDifficulty: entry.authored, criteria: entry.criteria, _bank: entry.id, _family: family
   };
-  if (dotpointId != null) { q.dotpointRequested = dotpointId; q.dotpointExact = true; }
-  return q;
-}
-
-// ── Curriculum identity (ADR-0002 decision 7) ────────────────────────────────
-// The outcome codes the crosswalk locates a TOPIC at: the codes of every dot point of the registry whose topic code is this one
-// (a composite code such as MA-C3/C4 counts for each). "Located at" is the crosswalk's claim, never that the question covers the outcome.
-let topicCodes = null;
-function outcomesOfTopic(topic) {
-  if (!topicCodes) {
-    topicCodes = new Map();
-    for (const row of LEGACY_CROSSWALK) {
-      if (row.status !== 'mapped') continue;
-      for (const dp of dotpointsFor(row.subtopicId)) {
-        const pieces = String(dp.code).split('/');
-        // A composite code names its second topic without the prefix: MA-C3/C4 is MA-C3 and MA-C4.
-        for (const part of pieces.map((x, i) => (i > 0 && !x.includes('-') ? `${pieces[0].split('-')[0]}-${x}` : x))) {
-          const set = topicCodes.get(part) || topicCodes.set(part, new Set()).get(part);
-          for (const code of row.dotpoints[dp.ordinal] || []) if (Object.hasOwn(NSW_OUTCOME_BY_CODE, code)) set.add(code);
-        }
-      }
-    }
+  if (requestedId != null) { q.dotpointRequested = requestedId; q.dotpointExact = q.dotpoint === requestedId; }
+  // The worked solution states a non-integer numeric key as the fraction it is, not as a binary64 decimal (display only: the key and the marking
+  // are the author's and untouched).
+  if (entry.answerType === 'numeric' && entry.answer.tol === undefined && !Number.isInteger(entry.answer.value)) {
+    const fraction = smallFraction(entry.answer.value);
+    if (fraction) q.answerDisplay = `${entry.answerPrefix ? entry.answerPrefix + ' ' : ''}${fraction}`;
   }
-  return [...(topicCodes.get(topic) || [])].sort();
-}
-export const qbankTopicOutcomes = outcomesOfTopic;
-
-/** The identity sealed with a bank question, or null (then it is not issued). */
-export function qbankIdentity(q) {
-  const fam = installed?.families.get(q?.subtopic);
-  if (!fam || typeof q?._bank !== 'string') return null;
-  const codes = outcomesOfTopic(fam.topic);
-  if (!codes.length) return null;
-  const outcomes = codes.map(code => ({ code, syllabus: NSW_OUTCOME_BY_CODE[code].syllabus, syllabusVersion: NSW_SYLLABUS_BY_ID[NSW_OUTCOME_BY_CODE[code].syllabus]?.version ?? null }));
-  const want = fam.course === 'EXT1' ? 'extension1-11-12' : 'advanced-11-12';
-  const owner = outcomes.find(o => String(o.syllabus).includes(want)) || outcomes[0];
-  return {
-    jurisdiction: NSW_SYLLABUS_BY_ID[owner.syllabus].jurisdiction,
-    authority: NSW_SYLLABUS_BY_ID[owner.syllabus].authority,
-    syllabus: owner.syllabus, syllabusVersion: owner.syllabusVersion, labelledSyllabus: owner.syllabus,
-    outcomes, dotpoints: [...(q.dotpoints || [])], exact: true
-  };
+  // The answer box shows the FORM a set, interval, equation or point is written in, as the generators' own questions do (the author's
+  // bank names none). Neutral shapes only; withSafeInputHints drops any that the marker would accept as the answer.
+  if (!q.inputHint) {
+    const form = FORM_HINTS[entry.answerType]?.(entry.answer);
+    if (form) q.inputHint = form;
+  }
+  return withSafeInputHints(q);
 }
 
-/** May this bank question be issued? (A bank question has its final answer by construction; the loader refused any that had none.) */
-export const qbankAdmits = q => !!q && typeof q._bank === 'string' && qbankIdentity(q) !== null;
-
-/**
- * What the curriculum response adds for the loaded pack, under ONE new key (`authorBank`) and nothing else: the generators' own entries
- * (`subtopics`, each outcome's `practice`) are exactly what they were, so what the device and the suites hold for them stays true. Each
- * family says what may be requested (levels, dot points and their levels) and the outcome codes its topic is located at. No question text.
- * Null when no pack is loaded.
- */
-export function qbankCurriculum() {
-  if (!installed) return null;
-  return {
-    version: installed.version, questions: installed.questionCount,
-    families: indexOf(installed.families).map(f => ({ ...f, outcomes: outcomesOfTopic(f.topic) }))
-  };
+/** n/d for a value that is one with a denominator of at most 200 (to 1e-12) and not a short decimal, else null. */
+function smallFraction(v) {
+  if (!Number.isFinite(v) || Math.abs(v) > 1e6) return null;
+  if (Math.abs(v - Number(v.toFixed(4))) < 1e-12) return null;   // a decimal the author wrote (0.25) stays a decimal
+  for (let d = 2; d <= 200; d++) { const n = Math.round(v * d); if (Math.abs(v - n / d) < 1e-12 * Math.max(1, Math.abs(v))) { const g = gcd(Math.abs(n), d); return `${n / g}/${d / g}`; } }
+  return null;
 }
+const gcd = (a, b) => (b ? gcd(b, a % b) : a);
+
+const FORM_HINTS = Object.freeze({
+  set: () => 'e.g. 2, 5',
+  interval: a => `e.g. 1 < ${/^[A-Za-z]$/.test(a.variable) ? a.variable : 'x'} < 4`,
+  equation: a => (/^[A-Za-z]$/.test(a.lhs) ? `e.g. ${a.lhs} = 2x + 1` : null),
+  point: () => 'e.g. (3, -4)'
+});

@@ -24,13 +24,6 @@ import { approvedSchemeTypes, schemeTypeOf, schemeById, schemeMarks, isApproved 
 import { GENERIC_ID, genericEligible } from './genericSteps.js';
 import { marksPossibleFor } from './markerOps.js';
 import { nswBank, nswIssuable, nswQuestionIdentity, BANK_OUTSIDE_NSW, NSW_COURSE } from './nswBanks.js';
-import { isQbankFamily, qbankAdmits, qbankIdentity } from './qbankPack.js';
-
-// The author's question bank (qbankPack.js) is a set of families that exist only while a pack is loaded; with none loaded these three
-// reduce to the NSW generators' own functions, so a server without a pack behaves exactly as before.
-const nswIssues = g => nswBank(g) || isQbankFamily(g);
-const nswAdmits = (q, g) => (isQbankFamily(g) ? qbankAdmits(q) : nswIssuable(q, g));
-const nswIdentity = (q, g) => (isQbankFamily(g) ? qbankIdentity(q) : nswQuestionIdentity(q, g));
 
 /** Sealed on a question whose mark is its final answer's alone, whatever the working shows. */
 export const FINAL_ANSWER_MARKING = 'final-answer-only';
@@ -41,8 +34,8 @@ const POLICIES = Object.freeze({
     admits: null, identityOf: indiaQuestionIdentity, marking: null
   }),
   prithagoras: Object.freeze({
-    edition: 'prithagoras', curriculum: NSW_COURSE, issues: nswIssues, outside: BANK_OUTSIDE_NSW,
-    admits: nswAdmits, identityOf: nswIdentity, marking: FINAL_ANSWER_MARKING,
+    edition: 'prithagoras', curriculum: NSW_COURSE, issues: nswBank, outside: BANK_OUTSIDE_NSW,
+    admits: nswIssuable, identityOf: nswQuestionIdentity, marking: FINAL_ANSWER_MARKING,
     // The question types the author has approved for payment by a scheme (schemeAward.js). EMPTY: every question is sealed.
     get methodSchemeTypes() { return approvedSchemeTypes(); }
   })
@@ -68,8 +61,9 @@ export function sealForEdition(q, banks, generator = q?._generator ?? q?.subtopi
     if (!identity) return false;
     q._curriculum = identity;
   }
-  if (banks.marking && isQbankFamily(generator)) {
-    // A bank question is final-answer-only in this phase, whatever the scheme lists say: no scheme or generic step rule is ever stamped on it.
+  if (banks.marking && typeof q?._bank === 'string') {
+    // An author-bank question (qbankPack.js) is final-answer-only in this phase, whatever the scheme lists say: no scheme or generic step
+    // rule is ever stamped on it, so no step mark is paid on it.
     q._marking = banks.marking;
   } else if (banks.marking) {
     // An allow-listed type, at the digest the author read, is stamped with its scheme instead of the final-answer seal.

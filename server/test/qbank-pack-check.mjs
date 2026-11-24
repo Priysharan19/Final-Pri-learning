@@ -40,8 +40,10 @@ const { compilePack, memorySource, acceptedInput, trapInput } = await import('..
 const { fixtureArchive } = await import('./support/qbank-fixture.mjs');
 const qb = await import('../platform/qbankPack.js');
 const { bankPolicy, sealForEdition, FINAL_ANSWER_MARKING } = await import('../platform/editionBanks.js');
+const { productPlaceOf } = await import('../platform/qbankDotpoints.js');
+const { dotpointById } = await import('../../client/src/engine/curriculum.js');
 const { nswCurriculumResponse } = await import('../platform/nswBanks.js');
-const { marksPossibleFor } = await import('../platform/markerOps.js');
+const { marksPossibleFor, markerView } = await import('../platform/markerOps.js');
 const { approveSchemeTypesForTests } = await import('../platform/schemeAward.js');
 const { GENERIC_ID, genericDigest } = await import('../platform/genericSteps.js');
 const { generateQuestion, loadAllBanks } = await import('../../client/src/engine/generators/index.js');
@@ -109,7 +111,7 @@ qb.resetQbank();
 const PRI = { PRI_EDITION: 'prithagoras' };
 c.eq(await qb.ensureQbank({ ...PRI, PRI_QBANK_DIR: 'off' }), null, 'with PRI_QBANK_DIR=off nothing is loaded');
 c.deq([qb.qbankStatus().configured, qb.qbankStatus().loaded], [false, false], 'and the status says so');
-c.ok(!qb.isQbankFamily('qb-a11-ma-c1') && qb.qbankFamilies().length === 0, 'no bank family exists');
+c.ok(!qb.qbankServes('y11-diff') && !qb.qbankServes('me11-comb') && qb.qbankFamilies().length === 0, 'no subtopic is served from a bank');
 c.eq(sha(JSON.stringify(nswCurriculumResponse())), MAIN_CURRICULUM_SHA, 'the curriculum response is byte-identical to main\'s');
 c.ok(!bankPolicy('prithagoras').issues('qb-a11-ma-c1') && !bankPolicy('priyabhata').issues('qb-a11-ma-c1'), 'neither edition issues a bank family');
 await loadAllBanks();
@@ -120,11 +122,11 @@ writePack(broken, compiled.files);
 fs.appendFileSync(path.join(broken, 'shards/qb-a11-ma-c1.json'), ' ');
 c.eq(await qb.ensureQbank({ ...PRI, PRI_QBANK_DIR: broken }), null, 'a refused pack leaves no bank');
 c.ok(qb.qbankStatus().configured && !qb.qbankStatus().loaded && /does not match/.test(qb.qbankStatus().error), 'and the status says why');
-c.ok(!qb.isQbankFamily('qb-a11-ma-c1'), 'so no family exists');
+c.ok(!qb.qbankServes('y11-diff'), 'so no subtopic is served from a bank');
 qb.resetQbank();
 // The committed pack is the default on a Prithagoras server and never on another edition.
 c.eq(await qb.ensureQbank({ PRI_EDITION: 'priyabhata' }), null, 'on Priyabhata no bank is loaded, even by default');
-c.ok(!qb.qbankStatus().configured && !qb.isQbankFamily('qb-a11-ma-c1'), 'and none exists');
+c.ok(!qb.qbankStatus().configured && !qb.qbankServes('y11-diff'), 'and none exists');
 c.eq(qb.packDirFor({ PRI_EDITION: 'priyabhata', PRI_QBANK_DIR: dir }), null, 'nor from a named directory');
 c.eq(qb.packDirFor({ ...PRI }), qb.DEFAULT_PACK_DIR, 'on Prithagoras the default source is the committed pack');
 const committed = await qb.ensureQbank({ ...PRI }, { strict: true });
@@ -135,22 +137,31 @@ qb.resetQbank();
 
 // ── a loaded pack, below the routes ──────────────────────────────────────────
 qb.installPack(pack);
-c.ok(qb.isQbankFamily('qb-a11-ma-c1') && !bankPolicy('priyabhata').issues('qb-a11-ma-c1') && bankPolicy('prithagoras').issues('qb-a11-ma-c1'), 'a loaded pack is issued by Prithagoras and never by Priyabhata');
-c.ok(!bankPolicy('prithagoras').issues('qb-a11-ma-zz'), 'a family the pack does not hold is not issued');
-const a1 = qb.qbankGenerate('qb-a11-ma-c1', 2, 1234), a2 = qb.qbankGenerate('qb-a11-ma-c1', 2, 1234);
-c.ok(JSON.stringify(a1) === JSON.stringify(a2), 'the same family, level and seed draw the same question');
-let thrown = 0;
-for (const f of [() => qb.qbankGenerate('qb-x11-me-a1', 1, 1), () => qb.qbankGenerate('qb-a11-ma-c1', 2, 1, 'qb-a11-ma-c1.C9.9z'), () => qb.qbankGenerate('qb-zz', 1, 1)]) { try { f(); } catch { thrown++; } }
-c.eq(thrown, 3, 'a level, dot point or family with no question is not drawn');
-const idq = qb.qbankGenerate('qb-x11-me-a1', 2, 1);
+c.ok(qb.qbankServes('y11-diff') && qb.qbankServes('me11-comb') && !qb.qbankServes('y9-indices-sci'), 'a loaded pack serves the subtopics its questions are placed at, and no other');
+c.ok(!bankPolicy('prithagoras').issues('qb-a11-ma-c1') && !bankPolicy('priyabhata').issues('y11-diff') && bankPolicy('prithagoras').issues('y11-diff'), 'a bank family is never requested; a subtopic is issued by Prithagoras and never by Priyabhata');
+const draws = [];
+for (let seed = 1; seed <= 400; seed++) draws.push([seed, qb.qbankDraw('y11-diff', 2, seed)]);
+const authored = draws.filter(([, d]) => d);
+c.ok(authored.length > 100 && authored.length < 300, 'with a pool, some seeds are an authored question\'s turn and some are a generator\'s');
+c.ok(draws.every(([seed, d]) => JSON.stringify(d) === JSON.stringify(qb.qbankDraw('y11-diff', 2, seed))), 'the same subtopic, level and seed is always the same draw');
+c.ok(authored.every(([, d]) => d.subtopic === 'y11-diff' && d.difficulty === 2 && d.dotpoints.every(id => /^y11-diff\.[123]$/.test(id)) && d._bank && d._family === 'qb-a11-ma-c1'), 'an authored draw is in the product subtopic, at the level asked for, with a product dot point');
+c.eq(qb.qbankDraw('y11-diff', 2, 1, 'y11-diff.3'), null, 'a dot point with no authored question at that level is a generator\'s draw');
+c.ok(qb.qbankDraw('y9-indices-sci', 2, 1) === null && qb.qbankDraw('y11-diff', 2, 1, 'y11-explog.1') === null, 'a subtopic with no pool, or a dot point of another subtopic, is a generator\'s draw');
+const dpDraws = [...Array(300).keys()].map(seed => qb.qbankDraw('y11-diff', 2, seed + 1, 'y11-diff.1')).filter(Boolean);
+c.ok(dpDraws.length > 0 && dpDraws.every(d => d.dotpoint === 'y11-diff.1' && d.dotpointRequested === 'y11-diff.1' && d.dotpointExact === true && d._bank === 'TQ-001'), 'a dot point asked for is answered only by a question numbered to it');
+const idq = qb.qbankEntryQuestion('TQ-008', 1);
 const sealedHere = JSON.parse(JSON.stringify(idq));
-c.ok(sealForEdition(sealedHere, bankPolicy('prithagoras')) && sealedHere._marking === FINAL_ANSWER_MARKING && sealedHere._curriculum.outcomes.some(o => o.code === 'ME1-11-05'), 'a bank question is sealed final-answer-only with the outcomes its topic is located at');
+sealedHere._generator = sealedHere.subtopic;
+c.ok(sealForEdition(sealedHere, bankPolicy('prithagoras')) && sealedHere._marking === FINAL_ANSWER_MARKING && sealedHere._curriculum.outcomes.some(o => o.code === 'ME1-11-04') && sealedHere._curriculum.dotpoints.join() === 'me11-comb.1', 'a bank question is sealed final-answer-only with the identity of its product dot point');
 // The generic step rule, approved, must never be stamped on a bank question (this phase pays no step marks).
 approveSchemeTypesForTests([{ typeId: GENERIC_ID, digest: genericDigest() }]);
-const withApproval = JSON.parse(JSON.stringify(qb.qbankGenerate('qb-a11-ma-c1', 2, 1)));
+const withApproval = JSON.parse(JSON.stringify(qb.qbankEntryQuestion('TQ-001', 1)));
+withApproval._generator = withApproval.subtopic;
 c.ok(sealForEdition(withApproval, bankPolicy('prithagoras')) && withApproval._methodScheme === undefined && withApproval._marking === FINAL_ANSWER_MARKING, 'even with the generic step rule approved, a bank question is sealed final-answer-only');
 approveSchemeTypesForTests([]);
 c.ok(marksPossibleFor(withApproval) === withApproval.authoredMarks && withApproval.authoredMarks >= 1, 'the authored marks are what the question is worth');
+c.eq(markerView(withApproval).subtopic, 'qb-a11-ma-c1', 'the marker is shown the question under its bank family');
+c.eq(markerView(g).subtopic, g.subtopic, 'and a generator question as it is');
 qb.resetQbank();
 
 // ── the routes, no pack ──────────────────────────────────────────────────────
@@ -186,32 +197,30 @@ try {
   const submit = (qid, id, answer) => h.request(`/v1/practice/${qid}/submit`, { method: 'POST', jar: a.jar, headers: { 'Idempotency-Key': id }, body: { submissionId: id, answer, mode: 'typed' } });
 
   const cur = await h.request('/v1/curriculum', { jar: a.jar });
-  const fam = cur.data.authorBank?.families.find(f => f.family === 'qb-a11-ma-c1');
-  c.ok(cur.data.authorBank?.version === manifest.packVersion && cur.data.authorBank.questions === 9 && fam?.requestable.join() === '1,2,3,4' && fam.outcomes.includes('MAV-11-06'), 'the curriculum response lists the loaded bank under one key, with the outcomes its topic is located at');
-  c.ok(fam.dotpoints.some(d => d.id === 'qb-a11-ma-c1.C1.3a'), 'and its dot points');
-  const { authorBank, ...rest } = cur.data;
-  c.eq(sha(JSON.stringify(rest)), MAIN_CURRICULUM_SHA, 'every other entry of the response is main\'s, byte for byte');
-  c.ok(!/Differentiate|gradient|Fixture/.test(JSON.stringify(authorBank)), 'and it carries no question text');
+  c.eq(sha(JSON.stringify(cur.data)), MAIN_CURRICULUM_SHA, 'with the pack loaded the curriculum response is still main\'s, byte for byte: the bank adds no entry and no key');
 
-  /** The next issue of exactly this pack question: the dot point and level name its pool, a fixed seed draws from it. */
+  /** The next issue of exactly this pack question, asked for the way a student asks: its dot point and level when the product offers that dot point at that level, else its subtopic and level. A fixed seed draws from the pool. */
   let seed = 100;
   const drawn = new Map();
   const issueExact = async entry => {
-    for (let i = 0; i < 300; i++) {
-      const r = await issue({ generator: `qb-${entry.course}`, difficulty: entry.level, dotpoint: `qb-${entry.course}.${entry.dp}`, seed: (seed += 11) });
+    const place = productPlaceOf(entry.family, entry.dp);
+    const dp = place.ordinal === null ? null : dotpointById(`${place.subtopic}.${place.ordinal + 1}`);
+    const asked = dp && dp.forms.includes(entry.level) ? { dotpoint: dp.id } : {};
+    for (let i = 0; i < 400; i++) {
+      const r = await issue({ generator: place.subtopic, difficulty: entry.level, ...asked, seed: (seed += 11) });
       c.ok(r.status === 201, `issue ${entry.id}`);
       const sealed = await sealedOf(h, a.account.id, r.data.question.id);
-      if (sealed._bank === entry.id) return { question: r.data.question, sealed, wire: JSON.stringify(r.data) };
+      if (sealed._bank === entry.id) return { question: r.data.question, sealed, wire: JSON.stringify(r.data), place };
     }
     throw new Error(`never drew ${entry.id}`);
   };
   const entries = [];
-  for (const s of manifest.shards) for (const q of JSON.parse(fs.readFileSync(path.join(dir, s.name), 'utf8')).questions) entries.push({ ...q, course: s.name.replace(/^shards\/qb-|\.json$/g, '') });
+  for (const s of manifest.shards) for (const q of JSON.parse(fs.readFileSync(path.join(dir, s.name), 'utf8')).questions) entries.push({ ...q, family: s.name.replace(/^shards\/|\.json$/g, '') });
   c.eq(entries.length, 9, 'the nine pack questions are all drawn below');
   const allowed = new Set([...PUBLIC_QUESTION_FIELDS, 'id', 'supportsSteps', 'criteriaCount']);
 
   for (const e of entries) {
-    const { question, sealed, wire } = await issueExact(e);
+    const { question, sealed, wire, place } = await issueExact(e);
     const tag = e.id;
     drawn.set(e.id, question.id);
     c.deq(Object.keys(question).filter(k => !allowed.has(k)), [], `${tag}: the issued question holds public fields only`);
@@ -222,9 +231,10 @@ try {
     c.ok(!wire.includes(JSON.stringify(e.answer)) && !(e.answerType === 'expression' && wire.includes(e.answer.expr)), `${tag}: the key is not on the wire`);
     c.deq([question.criteriaCount, question.supportsSteps === true || question.supportsSteps === false], [e.marks, true], `${tag}: the device is told the authored marks and nothing more`);
     c.ok(question.hints.length === 3 && question.hints.every(t => !keyText || t !== keyText), `${tag}: the three authored hints are served`);
-    c.ok(question.dotpoint === `qb-${e.course}.${e.dp}` && question.difficulty === e.level && question.subtopic === `qb-${e.course}`, `${tag}: it is the dot point and level asked for`);
+    c.ok(question.difficulty === e.level && question.subtopic === place.subtopic && question.dotpoints.length > 0 && question.dotpoints.every(id => id.startsWith(`${place.subtopic}.`)), `${tag}: it is practised in its product subtopic, at its level, under product dot points`);
+    c.eq(question.dotpoint, place.ordinal === null ? null : `${place.subtopic}.${place.ordinal + 1}`, `${tag}: a numbered dot point is its one dot point and a topic-level one names none`);
     c.deq([sealed._marking, sealed._methodScheme, sealed.authoredMarks, sealed.criteria.length > 0], [FINAL_ANSWER_MARKING, undefined, e.marks, true], `${tag}: sealed final-answer-only, with its authored marks and criteria held server-side`);
-    c.ok(sealed._curriculum.outcomes.length > 0 && sealed._curriculum.jurisdiction === 'NSW', `${tag}: sealed with a curriculum identity`);
+    c.ok(sealed._curriculum.outcomes.length > 0 && sealed._curriculum.jurisdiction === 'NSW' && sealed._curriculum.dotpoints.every(id => id.startsWith(`${place.subtopic}.`)), `${tag}: sealed with a curriculum identity`);
   }
 
   // marking: a wrong answer, a trap (his reason shown when the question resolves), and the right answer, each on a fresh issue
@@ -256,13 +266,19 @@ try {
   const nudge = await h.request(`/v1/practice/${hq.question.id}/hint`, { method: 'POST', jar: a.jar, body: { rung: 'nudge' } });
   c.ok(nudge.status === 200 && typeof nudge.data.hint === 'string' && nudge.data.hint.length > 0 && !/\b6\b/.test(nudge.data.hint.replace(/\$[^$]*\$/g, '')), 'the existing hint path serves the authored nudge');
 
-  // a bank question is never offered to Priyabhata's request shape, and an unknown dot point is refused
-  const off = await issue({ generator: 'qb-a11-ma-c1', difficulty: 2, dotpoint: 'qb-a11-ma-c1.C9.9z', seed: 5 });
-  c.eq(off.status, 422, 'a dot point the family does not hold is refused');
-  const lvl = await issue({ generator: 'qb-x11-me-a1', difficulty: 4, seed: 5 });
-  c.eq(lvl.status, 422, 'a level the family does not hold is refused');
-  const unsigned = await h.request('/v1/practice/prepare', { method: 'POST', body: { generator: 'qb-a11-ma-c1', difficulty: 2, curriculum: 'nsw' } });
+  // the family ids are no request at all, and a dot point of another subtopic is refused
+  const fam = await issue({ generator: 'qb-a11-ma-c1', difficulty: 2, seed: 5 });
+  c.deq([fam.status, fam.data.error.code], [422, 'PRACTICE_BANK_OUTSIDE_CURRICULUM'], 'a bank family is not a request');
+  const off = await issue({ generator: 'y11-diff', difficulty: 2, dotpoint: 'y11-explog.1', seed: 5 });
+  c.ok(off.status >= 400, 'a dot point of another subtopic is refused');
+  const unsigned = await h.request('/v1/practice/prepare', { method: 'POST', body: { generator: 'y11-diff', difficulty: 2, dotpoint: 'y11-diff.1', curriculum: 'nsw' } });
   c.ok(unsigned.status === 200 && !PRIVATE_KEYS.test(JSON.stringify(unsigned.data)), 'a signed-out preparation carries public fields only');
+  // a report of a bank question carries its id, read from the escrow (never from the request)
+  const rq = await issueExact(entries.find(e => e.id === 'TQ-001'));
+  const rep = await h.request('/v1/reports', { method: 'POST', jar: a.jar, body: { category: 'other', questionId: rq.question.id, contentId: rq.question.contentId, context: { surface: 'question', bankQuestion: 'FORGED' } } });
+  c.eq(rep.status, 201, 'a problem report is accepted');
+  const row = await h.db.get('SELECT context_json FROM issue_reports WHERE id=?', [rep.data.report.id]);
+  c.eq(JSON.parse(row.context_json).bankQuestion, 'TQ-001', 'and carries the bank question\'s id, whatever the device says');
 } finally {
   await h.close();
   for (const key of keys) { if (before[key] === undefined) delete process.env[key]; else process.env[key] = before[key]; }

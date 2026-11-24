@@ -385,6 +385,10 @@ jobs:
           node tools/ci-check-counts.mjs verify platform/qbank-pack.log
           node server/test/qbank-real-pack-check.mjs 2>&1 | tee qbank-real-pack.log
           node tools/ci-check-counts.mjs verify platform/qbank-real-pack.log
+          # The bank inside the practice of the subtopics and dot points it is placed at: the table, the mix rule, a session's use of a pool,
+          # and the attempt records, over the committed pack.
+          node server/test/qbank-mix-check.mjs 2>&1 | tee qbank-mix.log
+          node tools/ci-check-counts.mjs verify platform/qbank-mix.log
           # The Exam Desk (ADR-0002 §8 plan F4a): the unmarked mode — server-stamped
           # clock, one open attempt per paper, the import, never a mark — and the
           # static proof that it reaches nothing of the marking path.
@@ -1062,6 +1066,9 @@ jobs:
             # A Prithagoras NSW student's practice is issued and marked by the
             # server: the device names the profile's own course, never 'in'.
             node client/test/tour-nsw-practice-marked.js 2>&1 | tee -a browser.log
+            # The author's questions inside a dot point's ordinary practice: dealt, marked for his marks, his hints, his trap reason and
+            # worked solution, no source shown, nothing sideways at 360 px.
+            node client/test/tour-nsw-practice-bank.js 2>&1 | tee -a browser.log
             # ADR-0003: a visitor with no account meets the question picker first, in both
             # editions, has up to five typed or multiple-choice questions marked by the
             # server, and then a calm sign-up prompt; nothing of an account is touched.

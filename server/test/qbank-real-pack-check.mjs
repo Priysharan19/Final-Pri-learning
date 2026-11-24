@@ -27,9 +27,11 @@ const { requestedEngine } = await import('./support/engine.mjs');
 const qb = await import('../platform/qbankPack.js');
 const { checkAnswer } = await import('../../client/src/engine/checker.js');
 const { bankPolicy, sealForEdition, FINAL_ANSWER_MARKING } = await import('../platform/editionBanks.js');
-const { marksPossibleFor } = await import('../platform/markerOps.js');
+const { marksPossibleFor, markerView, stepEvidence } = await import('../platform/markerOps.js');
+const { productPlaceOf } = await import('../platform/qbankDotpoints.js');
+const { dotpointById } = await import('../../client/src/engine/curriculum.js');
 const { safeQuestion } = await import('../platform/practice.js');
-const { acceptedInput, trapInput, hintLeaks } = await import('../../tools/qbank-import.mjs');
+const { acceptedInput, trapInput, hintLeaks, authoredPage } = await import('../../tools/qbank-import.mjs');
 
 const c = checks();
 const pack = await qb.ensureQbank(process.env, { strict: true });
@@ -41,10 +43,11 @@ const entries = [];
 for (const s of manifest.shards) for (const e of JSON.parse(fs.readFileSync(path.join(qb.DEFAULT_PACK_DIR, s.name), 'utf8')).questions) entries.push({ ...e, family: s.name.replace(/^shards\/|\.json$/g, '') });
 c.eq(entries.length, pack.questionCount, 'every packed question is visited');
 const policy = bankPolicy('prithagoras');
-let traps = 0, rungs = 0, accepted = 0, sealed = 0, marksOk = 0, leaks = 0, openers = 0;
+let displayed = 0, badDisplay = 0, hinted = 0, hintIsAnswer = 0, crossed = 0, ticked = 0, traps = 0, rungs = 0, accepted = 0, sealed = 0, marksOk = 0, leaks = 0, openers = 0;
 const bad = { accepted: [], trap: [], marks: [], seal: [], wire: [], hint: [] };
 for (const e of entries) {
-  const q = qb.qbankEntryQuestion(e.id, 17);
+  const full = qb.qbankEntryQuestion(e.id, 17);
+  const q = markerView(full);   // what the marker is shown
   const given = acceptedInput(e);
   if (checkAnswer(q, given)?.correct === true) accepted++; else bad.accepted.push(e.id);
   for (const t of e.traps) {
@@ -53,16 +56,26 @@ for (const e of entries) {
     traps++;
     if (checkAnswer(q, input)?.correct === true) bad.trap.push(e.id);
   }
-  if (marksPossibleFor(q) === e.marks) marksOk++; else bad.marks.push(e.id);
-  const sq = JSON.parse(JSON.stringify(q));
-  sq._generator = q.subtopic;
+  if (marksPossibleFor(full) === e.marks) marksOk++; else bad.marks.push(e.id);
+  const sq = JSON.parse(JSON.stringify(full));
+  sq._generator = full.subtopic;
   if (sealForEdition(sq, policy) && sq._marking === FINAL_ANSWER_MARKING && sq._methodScheme === undefined && sq._curriculum?.outcomes?.length) sealed++; else bad.seal.push(e.id);
+  if (full.answerDisplay) { displayed++; const m = full.answerDisplay.match(/(-?\d+)\/(\d+)$/); if (!m || Math.abs(Number(m[1]) / Number(m[2]) - e.answer.value) > 1e-9) badDisplay++; }
+  if (full.inputHint) { hinted++; if (checkAnswer(q, String(full.inputHint).replace(/^e\.g\.\s*/i, ''))?.correct === true) hintIsAnswer++; }
+  // Line marking never crosses a true line: the author's own worked steps, typed as a student's working through the marker as the product runs it
+  // (the marker's view of the question), are crossed nowhere. A line it cannot judge stays unjudged; there is no page of crosses to hide.
+  const page = authoredPage(q);
+  if (page.length) {
+    const rep = stepEvidence(full, given ?? '', page.join('\n'), checkAnswer(q, given))?.stepReport;
+    if (rep?.lines?.some(l => l.status === 'break')) crossed++;
+    else if (rep?.lines?.some(l => l.status === 'ok')) ticked++;
+  }
   // What a device is sent: public fields only, and none of the sealed material in them.
-  const wire = JSON.stringify(safeQuestion('00000000-0000-4000-8000-000000000000', q));
+  const wire = JSON.stringify(safeQuestion('00000000-0000-4000-8000-000000000000', full));
   const secrets = [...e.steps.map(s => s.d), ...e.criteria.map(x => x.point), ...e.traps.map(t => t.why)].filter(t => t.length >= 12 && !e.hints.some(h => h.includes(t) || t.includes(h)) && !e.prompt.includes(t));   // authored hints and the prompt are public by design; a step that restates one is not a leak of the step
   if (/"(?:answer|steps|criteria|traps|stepcheck|authoredMarks|_bank|seed)"\s*:/.test(wire) || secrets.some(t => wire.includes(t))) { leaks++; bad.wire.push(e.id); }
   // The authored hints are public and the ladder serves rungs: none states the answer.
-  const hl = hintLeaks(q);
+  const hl = hintLeaks(full);
   rungs += e.hints.length;
   if (hl.length) bad.hint.push(`${e.id}:${hl.join('+')}`);
 }
@@ -72,30 +85,42 @@ c.ok(traps > 1200, `every trap is a wrong answer (${traps} tried)`);
 c.deq(bad.trap, [], 'and none is marked correct');
 c.eq(marksOk, entries.length, 'every question is worth the marks its author set');
 c.eq(sealed, entries.length, 'every question seals final-answer-only with a curriculum identity and no method scheme');
+c.eq(crossed, 0, `no line of any authored worked solution is crossed by the step report (${ticked} questions have at least one line ticked)`);
+c.ok(ticked > 1000, 'the step report ticks the author\'s lines where it can');
+c.ok(hinted > 150 && hintIsAnswer === 0, `a set, interval, equation or point shows the form it is written in (${hinted} do) and no shown form is the answer`);
+c.ok(displayed > 50 && badDisplay === 0, `a worked solution states a fraction key as the fraction it is (${displayed} do) and each is the author's value`);
 c.eq(leaks, 0, 'no public form carries a key, a step, a criterion or a trap reason');
 c.deq(bad.hint, [], `no hint or hint-ladder rung states the answer (${rungs} authored hints)`);
 // the loader's own view of the families against the picker
 const fams = qb.qbankFamilies();
 c.ok(fams.every(f => f.requestable.length > 0 && f.dotpoints.every(d => d.requestable.length > 0)), 'every family and dot point has a question at some level');
 c.eq(fams.reduce((n, f) => n + f.questions, 0), entries.length, 'the picker view accounts for every question');
+c.eq(qb.qbankEntries().filter(x => !x.place).length, 0, 'every question is placed in a product subtopic');
 
 // ── a sample through the real routes ─────────────────────────────────────────
 const h = await startApp({ engine: requestedEngine() });
 try {
-  let a = null, used = 0, acct = 0;
+  let a = null, used = 0, acct = 0, generators = 0;
   const fresh = async () => { acct++; a = await registerAccount(h, { email: `qbank.real${acct}@example.test`, deviceId: `ipad-qbank-real-${acct}` }); await verifyEmail(h, a.account.id); used = 0; };
   await fresh();
   let seed = 1000, rnd = 4242;
   const rand = () => (rnd = (Math.imul(rnd, 1103515245) + 12345) >>> 0) / 2 ** 32;
-  const call = async (path_, body, headers = {}) => { used++; return h.request(path_, { method: 'POST', jar: a.jar, headers, body }); };
+  const call = async (path_, body, headers = {}) => { if (path_.endsWith('/issue')) used++; return h.request(path_, { method: 'POST', jar: a.jar, headers, body }); };
   const draw = async () => {
-    if (used >= 50) await fresh();   // a new account only between questions, never between an issue and its answers
-    const e = entries[Math.floor(rand() * entries.length)];
-    const r = await call('/v1/practice/issue', { curriculum: 'nsw', generator: e.family, difficulty: e.level, dotpoint: `${e.family}.${e.dp}`, seed: (seed += 7919) % 0x7fffffff });
-    c.eq(r.status, 201, `issue ${e.family} level ${e.level}`);
-    const row = await h.db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=?", [a.account.id, r.data.question.id]);
-    const sealedQ = JSON.parse(row.response_json);
-    return { question: r.data.question, sealed: sealedQ, e: entries.find(x => x.id === sealedQ._bank) };
+    // A student asks for a subtopic (or a dot point) and a level; the mix rule decides whether this draw is an authored question. Ask until it is.
+    for (;;) {
+      if (used >= 80) await fresh();   // a new account only between questions, never between an issue and its answers
+      const pick = entries[Math.floor(rand() * entries.length)];
+      const place = productPlaceOf(pick.family, pick.dp);
+      const dp = place.ordinal === null ? null : dotpointById(`${place.subtopic}.${place.ordinal + 1}`);
+      const asked = dp && dp.forms.includes(pick.level) ? { dotpoint: dp.id } : {};
+      const r = await call('/v1/practice/issue', { curriculum: 'nsw', generator: place.subtopic, difficulty: pick.level, ...asked, seed: (seed += 7919) % 0x7fffffff });
+      c.eq(r.status, 201, `issue ${place.subtopic} level ${pick.level}`);
+      const row = await h.db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=?", [a.account.id, r.data.question.id]);
+      const sealedQ = JSON.parse(row.response_json);
+      if (typeof sealedQ._bank === 'string') return { question: r.data.question, sealed: sealedQ, e: entries.find(x => x.id === sealedQ._bank) };
+      generators++;
+    }
   };
   const n = Number(process.env.PRI_QBANK_SAMPLE || 60);
   let rightOk = 0, marksEq = 0, trapSent = 0, trapNot = 0, named = 0, matchable = 0;
@@ -119,7 +144,8 @@ try {
   c.eq(marksEq, n, 'each for the authored marks');
   c.eq(trapNot, trapSent, `${trapSent} trap answers, none marked correct`);
   c.ok(named >= matchable - 3, 'a trap the engine can name resolves with feedback');
-  console.log(`  sample: ${n} accepted, ${trapSent} traps, ${acct} accounts`);
+  c.ok(generators > 0, 'the generators still serve their share of the draws');
+  console.log(`  sample: ${n} accepted, ${trapSent} traps, ${generators} generator draws passed over, ${acct} accounts`);
 } finally {
   await h.close();
   for (const key of keys) { if (before[key] === undefined) delete process.env[key]; else process.env[key] = before[key]; }

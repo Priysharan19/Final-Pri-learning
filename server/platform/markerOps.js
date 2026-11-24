@@ -37,7 +37,16 @@ import { answerForm, effectiveSymbols, firstFinalAttempt, planGivens, readClaimF
 
 // Mirrors the shared deterministic checker input used by local practice;
 // questions, answer keys and stage meta remain server-private.
+/**
+ * What the marker is shown of an author-bank question (qbankPack.js): its subtopic is its bank family's, not the product subtopic it is
+ * practised in. The bank was audited against the engine under its family id (tools/qbank-import.mjs), and every rule the engine keys on a
+ * subtopic (derived step checks that are switched off, a calculus line rule) was written for that subtopic's generators, never for these
+ * questions. Marking, the step report and `supportsSteps` therefore see the family; progress, identity and the device see the subtopic.
+ */
+export const markerView = q => (q && typeof q._bank === 'string' && typeof q._family === 'string' && q.subtopic !== q._family ? { ...q, subtopic: q._family } : q);
+
 export function stepMetaFor(q) {
+  q = markerView(q);
   if (q.stepcheck) return q.stepcheck;
   if (derivedMetaOff(q)) return null;   // answer only until the family has a structured meta
   const a = q.answer;
@@ -582,7 +591,7 @@ function sketchReport(q, answer, result) {
 // examWorkingStage above stay the method rubric as written, so the rubric the
 // examiner is asked to sign (#499, tools/examiner-dossier.mjs) and its suites
 // are unchanged; only the operations the server runs apply the switch.
-export const MARKER_OPS = Object.freeze({
+const RAW_MARKER_OPS = Object.freeze({
   /**
    * A practice submission: the answer, then (only when the reply could need
    * it) the working. `evidenceIfWrong` is the request thread's reading of
@@ -631,6 +640,9 @@ export const MARKER_OPS = Object.freeze({
     return stepCoachEvidence(q, lines, answerText);
   }
 });
+
+/** The operations the marker pool runs: each is handed the marker's view of the question (markerView). */
+export const MARKER_OPS = Object.freeze(Object.fromEntries(Object.entries(RAW_MARKER_OPS).map(([name, run]) => [name, (args, emit) => run(args && args.q ? { ...args, q: markerView(args.q) } : args, emit)])));
 
 /**
  * The live step coach's evidence (F1): one row per line, in order.

@@ -31,7 +31,7 @@ import { PUBLIC_QUESTION_FIELDS } from '../../client/src/engine/publicQuestion.j
 import { CONTENT_VERSION, UNVERSIONED_TOKEN_CONTENT_VERSION } from '../../client/src/engine/contentIdentity.js';
 import { consentState, consentBlockerCode } from './guardianConsent.js';
 import { loadAllBanks, loadBanksFor, generateQuestion as generateGeneratorQuestion } from '../../client/src/engine/generators/index.js';
-import { ensureQbank, isQbankFamily, qbankGenerate, qbankVersion } from './qbankPack.js';
+import { ensureQbank, qbankDraw, qbankServes, qbankVersion } from './qbankPack.js';
 // The marker itself (checkAnswer, stepCheck, methodMarks) is never called on
 // this thread: markerOps.js holds the operations and markerPool.js runs them in
 // worker threads under a hard deadline. Only the two pure rubric helpers
@@ -157,12 +157,16 @@ const unknown = (value, allowed) => Object.keys(value).filter(key => !allowed.ha
 const limitedText = (s, n) => typeof s === 'string' && s.length <= n && !/[\u0000-\u0008\u000b\u000e-\u001f]/.test(s);
 let banksReady;
 const ensureBanks = () => { if (!banksReady) banksReady = loadAllBanks().catch(e => { banksReady = null; throw e; }); return banksReady; };
-// The author bank's families (qbankPack.js) are drawn like generators; a family exists only while a pack is loaded, so with none
-// loaded this is generateQuestion unchanged. The pack is loaded (once) wherever the banks are.
-const generateQuestion = (generator, difficulty, seed, dotpoint, pick) => (isQbankFamily(generator)
-  ? qbankGenerate(generator, difficulty, seed, dotpoint ?? null)
+// The author's question bank (qbankPack.js) is mixed into the practice of the subtopic and dot point each of its questions is placed at
+// (qbankDotpoints.js): a seed is either an authored question's turn or a generator's, by the pack's mix rule. With no pack loaded (and
+// on every edition but Prithagoras) qbankDraw is null and this is generateQuestion unchanged. A picked item (a past-paper cell) and a
+// request that names `bank: false` (a timed paper) never draw from the bank.
+const generateQuestion = (generator, difficulty, seed, dotpoint, pick, bank = true) => (bank && !pick && qbankServes(generator)
+  ? qbankDraw(generator, difficulty, seed, dotpoint ?? null) ?? generateGeneratorQuestion(generator, difficulty, seed, dotpoint, pick)
   : generateGeneratorQuestion(generator, difficulty, seed, dotpoint, pick));
 const ensureQbankFromEnv = () => ensureQbank();
+// Rush and Match are one-line, timed rounds: an authored question (up to six marks, a working to show) is not dealt in them, nor in a timed paper.
+const bankAllowed = request => request.bank !== false && request.mode !== 'rush' && request.mode !== 'match';
 
 // ── What an open question may be told about its working ─────────────────────
 // A practice question allows two tries. Until it resolves, the reply to a
@@ -263,6 +267,7 @@ function answerTextFor(q) {
   switch (q.answerType) {
     case 'mcq': return q.mcqOptions?.[a.correctIndex] ?? '';
     case 'numeric':
+      if (typeof q.answerDisplay === 'string') return q.answerDisplay;   // an author-bank question (qbankPack.js): the fraction its decimal key is
       if (a.canonicalInput) return a.canonicalInput;
       if (a.simplestFraction) return a.simplestFraction.n + '/' + a.simplestFraction.d;
       if (a.surdForm) return (a.surdForm.k === 1 ? '' : a.surdForm.k) + '√' + a.surdForm.r;
@@ -508,7 +513,7 @@ function* seekQuestion(request, { draw, tries, batches, admits = null }) {
   for (let round = 0; drawn < budget(); round++) {
     const size = Math.min(batches[Math.min(round, batches.length - 1)], budget() - drawn);
     const batch = [];
-    for (let i = 0; i < size; i++, drawn++) batch.push(generateQuestion(generator, difficulty, draw(), dotpoint, pick));
+    for (let i = 0; i < size; i++, drawn++) batch.push(generateQuestion(generator, difficulty, draw(), dotpoint, pick, bankAllowed(request)));
     const resolved = yield batch;
     for (const [i, q] of batch.entries()) {
       // A form this edition does not issue (editionBanks.js `admits`) is never
@@ -551,7 +556,7 @@ function chooseQuestion(request, seed = null, { draw = () => randomInt(0x8000000
   // A bank outside this edition's is never drawn from, by any route (a twin included; D15 for India).
   if (!banks.issues(generator)) throw Object.assign(new Error(banks.outside.message), { code: banks.outside.code });
   if (seed !== null) {
-    const q = generateQuestion(generator, difficulty, seed, dotpoint, bandPick(request));
+    const q = generateQuestion(generator, difficulty, seed, dotpoint, bandPick(request), bankAllowed(request));
     if (banks.admits && !banks.admits(q, generator)) throw Object.assign(new Error('This form may not be issued.'), { code: 'PRACTICE_CONTENT_UNSUPPORTED' });
     return { q, repeat: false, trapDelivered: !!(trap && carriesTrap(trap.owner, q, trap.key)) };
   }
@@ -620,7 +625,7 @@ export function createPracticePrepareRoute(db, { banks = bankPolicy(), env = pro
     try {
       prepared = encryptDeliveryToken(JSON.stringify({
         g: request.generator, d: request.difficulty, s: chosen.q.seed, m: request.mode,
-        ...(request.dotpoint ? { p: request.dotpoint } : {}), ...(isQbankFamily(request.generator) ? { k: qbankVersion() } : {}), x: now + PREPARED_TTL, n: randomUUID(), c: CONTENT_VERSION
+        ...(request.dotpoint ? { p: request.dotpoint } : {}), ...(qbankServes(request.generator) ? { k: qbankVersion() } : {}), x: now + PREPARED_TTL, n: randomUUID(), c: CONTENT_VERSION
       }), PREPARED_CONTEXT);
     } catch { return reject(res, 503, 'PRACTICE_PREPARE_UNAVAILABLE', 'Questions cannot be prepared right now.'); }
     const question = safeQuestion(null, chosen.q);
@@ -741,8 +746,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       if (premiumGap) return refusePremiumContent(res, premiumGap);
       if (!subtopicOfferedIn(editionOffering(env), sealed.g)) return refuseNotOffered(res);
       // A bank question prepared under another pack would draw a different question from the one the student saw: expired, as above.
-      if (isQbankFamily(sealed.g) && sealed.k !== qbankVersion()) return reject(res, 410, 'PRACTICE_PREPARED_EXPIRED', 'This prepared question has expired.');
-      try { q = generateQuestion(sealed.g, sealed.d, sealed.s, sealed.p); }
+      if ((qbankServes(sealed.g) ? qbankVersion() : undefined) !== sealed.k) return reject(res, 410, 'PRACTICE_PREPARED_EXPIRED', 'This prepared question has expired.');
+      try { q = generateQuestion(sealed.g, sealed.d, sealed.s, sealed.p, null, bankAllowed({ mode: sealed.m })); }
       catch { return reject(res, 422, 'PRACTICE_CONTENT_UNSUPPORTED', 'The requested question form is unavailable.'); }
       practiceMode = sealed.m;
       q._generator = sealed.g;
