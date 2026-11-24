@@ -62,6 +62,8 @@ const FRAGMENT = 20;
  * not listed is never excused, and a build holding any other pack text fails whatever it also holds.
  */
 export const CHANCE_ANSWERS = Object.freeze(['0.6931471805599453', '(e-1)/2']);
+// A trap that is a bare comparison any library's code holds (a PDF worker's own `x >= 2`): its text alone proves nothing; the pack's shape, ids and runs still would.
+export const CHANCE_TRAPS = Object.freeze(['x >= 2']);
 const squash = t => String(t ?? '').replace(/\s+/g, ' ').trim();
 /** The answer, written the ways it is stored. */
 const answerTexts = q => {
@@ -82,7 +84,7 @@ export function needlesOf(questions) {
   const runs = new Map();
   for (const q of questions) {
     for (const t of answerTexts(q)) if (!CHANCE_ANSWERS.includes(t) && t.length >= (/^-?[\d.]+$/.test(t) ? 12 : 6)) needles.push(['answer', t, q.id]);   // a bare number is in every bundle by chance (1048576), unless it is long
-    for (const t of trapTexts(q)) if (t.length >= FRAGMENT || (/[=<>(]|\\/.test(t) && t.length >= 6)) needles.push(['trap', t, q.id]);
+    for (const t of trapTexts(q)) if (!CHANCE_TRAPS.includes(t) && (t.length >= FRAGMENT || (/[=<>(]|\\/.test(t) && t.length >= 6))) needles.push(['trap', t, q.id]);
     if (squash(q.prompt).length >= FRAGMENT) needles.push(['prompt', squash(q.prompt), q.id]);
     for (const h of [...q.hints, ...Object.values(q.ladder || {})]) if (squash(h).length >= FRAGMENT) needles.push(['hint', squash(h), q.id]);
     for (const c of q.criteria) if (squash(c.point).length >= FRAGMENT) needles.push(['criterion', squash(c.point), q.id]);
@@ -110,7 +112,7 @@ const PACK_ID = /\b[AX](?:11|12)-[A-Z]\d-\d{3}\b/g;
 const SHAPES = [/"marks"\s*:\s*\d\s*,\s*"point"\s*:\s*"/g, /"why"\s*:\s*"/g, /"h"\s*:\s*"[^"]{0,80}"\s*,\s*"d"\s*:\s*"/g, /"authored"\s*:\s*\d\s*,\s*"level"\s*:/g, /"nudge"\s*:\s*"/g, /"answerPrefix"\s*:\s*"/g, /"stepcheck"\s*:\s*\{/g];
 const SHAPE_LIMIT = 25;       // a build holds none of these; more than this many in one file is a pack (or a large part of one)
 const ID_RUN_LIMIT = 3;       // distinct pack question ids in one file
-const WINDOW = 200, WINDOW_DISTINCT = 80, WINDOW_FLAGGED = 120;   // a window of tokens that is mostly pack answers, and many different ones
+const WINDOW = 200, WINDOW_DISTINCT = 40, WINDOW_FLAGGED = 120;   // a window of tokens that is mostly pack answers, and many different ones that are not small whole numbers (a bundle's own tables of small numbers, such as a decoder's, hold dozens of those by chance: 87 different ones, 22 of them not small)
 const PAIR_RUN = 40, PAIR_RARE = 20;   // consecutive tokens that follow the pack's own order of answers, and how many of them are not a small whole number
 const SMALL = /^-?\d{1,2}$/;
 
@@ -147,15 +149,15 @@ function structural(text, tokens, ids) {
   const seq = [];
   for (const m of text.matchAll(TOKEN)) seq.push(normToken(m[1] ?? m[2] ?? m[0]));
   if (seq.length >= WINDOW) {
-    const counts = new Map(); let flagged = 0, best = 0, bestAt = 0;
-    const add = i => { if (tokens.set.has(seq[i])) { flagged++; counts.set(seq[i], (counts.get(seq[i]) || 0) + 1); } };
-    const drop = i => { if (tokens.set.has(seq[i])) { flagged--; const c = counts.get(seq[i]) - 1; if (c) counts.set(seq[i], c); else counts.delete(seq[i]); } };
+    const counts = new Map(); let flagged = 0, big = 0, best = 0, bestAt = 0;
+    const add = i => { if (tokens.set.has(seq[i])) { flagged++; const c = counts.get(seq[i]) || 0; counts.set(seq[i], c + 1); if (!c && !SMALL.test(seq[i])) big++; } };
+    const drop = i => { if (tokens.set.has(seq[i])) { flagged--; const c = counts.get(seq[i]) - 1; if (c) counts.set(seq[i], c); else { counts.delete(seq[i]); if (!SMALL.test(seq[i])) big--; } } };
     for (let i = 0; i < seq.length; i++) {
       add(i);
       if (i >= WINDOW) drop(i - WINDOW);
-      if (i >= WINDOW - 1 && flagged >= WINDOW_FLAGGED && counts.size >= WINDOW_DISTINCT && counts.size > best) { best = counts.size; bestAt = i; }
+      if (i >= WINDOW - 1 && flagged >= WINDOW_FLAGGED && big >= WINDOW_DISTINCT && big > best) { best = big; bestAt = i; }
     }
-    if (best) out.push(`a run of ${WINDOW} tokens holds ${best} different pack answers (token ${bestAt})`);
+    if (best) out.push(`a run of ${WINDOW} tokens holds ${best} different pack answers that are not small whole numbers (token ${bestAt})`);
     // the pack's own order of answers: a run of tokens each following the last as in the pack, with many that no code would hold by chance
     // (a bundle's own tables of small whole numbers follow the pack's order for a while; they hold few such tokens)
     let run = 0, rare = 0, longest = 0;
