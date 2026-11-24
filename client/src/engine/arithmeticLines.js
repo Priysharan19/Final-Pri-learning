@@ -1809,7 +1809,7 @@ function stepCheckArithmeticWithinBudget(workingText, prep = null, tickOnly = fa
     // its lazy `=`, not a claim that it equals the line above. Only these shapes are a note; anything else that continues an evaluable line
     // and differs from it stays a cross (a value that merely appears somewhere in the solution is no reason to excuse it):
     //   · the line begins from the value above (`= 7 - 2 = 5` after `7`);
-    //   · it is the value above after one operation left unwritten (a root, a square, doubling or halving: `= 60` after `3600`);
+    //   · it is the value above after one operation left unwritten (a root or a square: `= 60` after `3600`; doubling and halving are NOT excused, because a dropped or extra factor of 2 is the commonest slip);
     //   · two parallel calculations, each a complete true equation (`= 4 - (-5) = 9` then `= -5 + 4 = -1`);
     //   · a value listed after a value listed (`= 10` then `= 6`), or a value after a named quantity (`sin B = 48/73` then `= (…)/365`).
     if (continuation && before && SOLUTION_VALUES) {
@@ -1817,7 +1817,7 @@ function stepCheckArithmeticWithinBudget(workingText, prep = null, tickOnly = fa
       const W = kk >= 0 ? allValues[kk] : null, V = allValues[0];
       const bareToken = /^\s*-?\d+(?:\.\d+)?\s*$/.test(String(before.text ?? '')) ? String(before.text).trim() : null;
       const startsFromAbove = bareToken !== null && new RegExp(`(?<![\\d.])${bareToken.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\d.])`).test(String(sides[0]));
-      const oneOperation = [Math.sqrt(Math.abs(V)), V * V, 2 * V, V / 2, 10 * V, V / 10].some(x => W !== null && closeLoose(x, W));
+      const oneOperation = [Math.sqrt(Math.abs(V)), V * V, 10 * V, V / 10].some(x => W !== null && closeLoose(x, W));
       const parallel = sides.length >= 2 && values.every(v => close(v, values[0])) && before.lineSides >= 2 && before.lineInternal === true;
       const combined = W !== null && typeof before.prior === 'number' && (closeLoose(W, V + before.prior) || closeLoose(W, V * before.prior) || closeLoose(W, Math.abs(V - before.prior)));   // the two results above combined (55/78 and 1/78 give 28/39)
       const isAnswer = W !== null && typeof ANSWER_VALUE === 'number' && closeLoose(W, ANSWER_VALUE);   // the question's correct answer, written lazily after the working
