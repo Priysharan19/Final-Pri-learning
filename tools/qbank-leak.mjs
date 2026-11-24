@@ -542,8 +542,26 @@ export function rungDropReason(q, text, ctx = {}) {
   const lines = new Set([...criteria.map(c => c?.line), ...traps.map(x => (typeof x?.expr === 'string' ? x.expr : null))].filter(Boolean).map(fold).filter(x => x.length >= 4));
   for (const span of spans) if (lines.has(fold(texToPlain(span).plain)) || lines.has(fold(span))) return 'a maths span is a criterion line or a trap expression';
   for (const run of proseRuns(prose)) if (lines.has(fold(run))) return 'a maths run is a criterion line or a trap expression';
+  // A rung that is a sentence of clauses ("x = u², so dx = 2u du.") is a criterion line when any one clause is: split the plain reading at
+  // commas, semicolons, full stops and the joining words, and compare each clause.
+  { const plain = plainUnicode(texToPlain(t.replace(/\$/g, ' ')).plain);
+    for (const clause of plain.split(/[,;.]|\b(?:so|then|hence|thus|therefore|giving|gives|and|which)\b|\u21d2/i)) if (fold(clause).length >= 4 && lines.has(fold(clause))) return 'a clause of it is a criterion line or a trap expression'; }
   return null;
 }
+
+/**
+ * Single hint rungs a person read against the answer and dropped (the question stays). Key: `<question id>#<index of the hint, from 0>`.
+ */
+export const DROPPED_RUNGS = Object.freeze({
+  'A11-S1-052#0': 'states the probability of a six, 1/6, the step before the answer',
+  'A11-S1-104#0': 'states P(six) = 1/6, one step from the key (600 x 1/6)',
+  'A12-S3-033#0': 'states the density 1/6, one step from the answer',
+  'A12-S3-049#1': 'states the primitive x^4/16, one step from the answer',
+  'X12-C2-195#2': 'states the primitive (2/3)u^(3/2), one step from the answer',
+  'X11-T1-056#1': 'states the hypotenuse 5, a worked step result',
+  'X11-T1-039#1': 'states the Pythagoras result 12, a worked step result',
+  'X12-V1-191#1': 'states 2k - 12, one step from the answer'
+});
 
 /**
  * The ladder of one bank question: ONLY his authored hints (`q.hints`, in his order, at most three), each kept as a rung when it passes
@@ -556,7 +574,7 @@ export function bankLadder(q, ctx = {}) {
   const kept = [], dropped = [];
   authored.forEach((h, index) => {
     const text = typeof h === 'string' ? h.trim() : '';
-    let why = rungDropReason(q, text, ctx);
+    let why = DROPPED_RUNGS[`${q.id}#${index}`] ? `dropped by eye: ${DROPPED_RUNGS[`${q.id}#${index}`]}` : rungDropReason(q, text, ctx);
     if (!why && kept.some(k => repeats(k, text))) why = 'it repeats a rung already kept';
     if (why) dropped.push({ index, why }); else kept.push(text);
   });

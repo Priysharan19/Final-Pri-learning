@@ -401,7 +401,13 @@ export const HELD_BY_EYE = Object.freeze({
   'X12-C3-099': 'the x-axis tick e squared is the upper limit of the working (the value of x at y = 2)',
   'X11-F1-015': 'the point asked for is marked on the curve',
   'X11-F1-017': 'the turning points asked for are marked on the curve',
-  'X12-C2-020': 'the tangent whose equation is asked for is drawn dashed'
+  'X12-C2-020': 'the tangent whose equation is asked for is drawn dashed',
+  'X11-A1-011': 'the figure draws the five gaps, which is a marking criterion',
+  'X11-T2-008': 'the hypotenuse is labelled 5, a step result',
+  'A11-T1-139': 'the width is labelled 3, a step result',
+  'X12-C2-012': 'the quarter circle its step names is shaded',
+  'X11-C1-106': 'legibility: the label r is overlapped',
+  'A11-T1-030': 'legibility: the 40 degree label is overlapped'
 });
 
 /**
