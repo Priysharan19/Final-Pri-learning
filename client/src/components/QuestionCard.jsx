@@ -2280,8 +2280,17 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // A photographed line keeps the reader's own TeX (when it passed the safe-TeX gate) beside its text, so the marked page can set the
   // line as it was written. Display only; the lines themselves, and what is marked, are unchanged.
   if (pageReading && !writeMode) { const tex = includedLatex(photoLines || { lines: [] }); pageReading.lines = pageReading.lines.map((text, i) => (tex[i] ? { text, latex: tex[i] } : text)); }
+  // A final-answer-only result or a short handwritten answer may have no
+  // multi-line step report. It still has a real reading the student must be
+  // able to inspect and correct after marking, without inventing line marks.
+  const simpleMarkedInk = !markedOn && resolved && serverAuthoritative && !res?.revealed && !res?.invalid
+    && writeMode && judged?.viaInk === true && judged.questionId === String(question.id)
+    && !!res?.reading && Array.isArray(judged.lines) && judged.lines.length > 0;
+  const simpleInkCanCorrect = simpleMarkedInk && !!onRedo && !diagnostic && !busy && !res?.earlierAnswer
+    && inkResult?.stale !== true && !!latestInk.current?.length
+    && sameLines(judged.lines, inkResult?.kept?.reading?.lines?.map(l => l.text));
   const correctReadLine = (i, text) => {
-    if (!onRedo || busy || !markedOn) return;
+    if (!onRedo || busy || !(markedOn || simpleInkCanCorrect)) return;
     const clean = String(text ?? '').replace(/\s+/g, ' ').trim();
     if (!clean) return;
     if (writeMode) {
@@ -2984,8 +2993,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                             </div>
                           )}
                           {/* One press of Mark my working reads the photo and marks it (owner decision, 19 Nov 2026). */}
-                          {photoOCR.phase === 'idle' && !(cloudReadingEnabled(user) && !offline && !resolved) && <span className="muted">{photoAwaitingOnlineReader(language)}</span>}
-                          {photoOCR.phase === 'idle' && heldPdf && cloudReadingEnabled(user) && !offline && !resolved && <p className="muted" style={{ fontSize: 12, marginTop: 4 }} data-photo-pdf-cost>{t('photo.readPdfHint')}</p>}
+                          {/* A network interface can be online while Pri is down: the issued
+                              draft's check state, not navigator.onLine alone, is authoritative. */}
+                          {photoOCR.phase === 'idle' && (unmarkable || !(cloudReadingEnabled(user) && !offline && !resolved)) && <span className="muted">{photoAwaitingOnlineReader(language)}</span>}
+                          {photoOCR.phase === 'idle' && heldPdf && !unmarkable && cloudReadingEnabled(user) && !offline && !resolved && <p className="muted" style={{ fontSize: 12, marginTop: 4 }} data-photo-pdf-cost>{t('photo.readPdfHint')}</p>}
                         </div>
                           </div>
                         )}
@@ -3469,6 +3480,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                     working: with no report, the working was not checked. */}
                 {workEvidenceCopy && (
                   <div data-working-evidence={workEvidence.kind}>{t(workEvidenceCopy.key, workEvidenceCopy.vars)}</div>
+                )}
+                {simpleMarkedInk && (
+                  <OpenTryReading t={t} texOf={texOf} lines={judged.lines.map(l => String(typeof l === 'string' ? l : l?.text ?? ''))}
+                    unread={(res.reading.excludedLines || []).map(i => i + 1)}
+                    onCorrect={simpleInkCanCorrect ? correctReadLine : null} />
                 )}
                 {/* Which steps of the worked solution are nowhere on the page (the server's finding; feedback only). */}
                 {workEvidence && !verdictGood && Array.isArray(res?.stepReport?.missing) && res.stepReport.missing.length > 0 && (

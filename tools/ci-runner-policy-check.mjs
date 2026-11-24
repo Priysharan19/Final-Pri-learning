@@ -64,7 +64,9 @@ for (const [name, source, image, xcode, runtime] of [
   assert.match(source, /xcodebuild -version \| tee xcode-version\.txt/, `${name} asserts the Xcode version before building`);
   assert.match(source, /xcrun simctl list runtimes \| tee runtimes\.txt/, `${name} asserts the simulator runtime before building`);
   assert.match(source, /node scripts\/ci-provision-simulators\.mjs --boot ipad/, `${name} provisions simulators through the pinned provisioner`);
-  assert.match(source, /e\.simulator\.runtimePinned !== true/, `${name} refuses evidence that did not run on the pinned runtime`);
+  assert.match(source, /node scripts\/verify-journey-evidence\.mjs "\$PRI_JOURNEY_EVIDENCE" "\$PRI_JOURNEY_FAMILY" "\$PRI_SIM_RUNTIME" "\$GITHUB_SHA"/, `${name} verifies each family artifact against its exact pinned runtime and checkout`);
+  assert.match(source, /family: \[ipad, iphone\]/, `${name} runs both device families`);
+  assert.match(source, /fail-fast: false\s+max-parallel: 1/, `${name} retains both independent results without increasing concurrent runner usage`);
   assert.doesNotMatch(source, /newest runtime/i, `${name} does not describe itself as running on the newest runtime`);
 }
 const appHealthNative = appHealth.match(/\n  native:\n([\s\S]*?)(?=\n  [a-z][a-z0-9-]*:\n|$)/)?.[1] || '';

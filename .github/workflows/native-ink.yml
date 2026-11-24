@@ -19,7 +19,7 @@
 # When this workflow does not trigger for a PR head there is no run to wait on,
 # which Main Integrity must treat as "not pending" (docs/release/release-policy.md).
 #
-# The job keeps ONE simulator booted at a time and builds the Swift package
+# Each family job keeps ONE simulator booted and builds the Swift package
 # ONCE (scripts/simulator-fleet.mjs): hosted macOS runners are 3-core/7 GB, and
 # two booted simulators plus three xcodebuilds stalled `simctl install` for 24
 # minutes and pushed `log show` reads past their bound.
@@ -36,6 +36,9 @@ on:
       - 'client/test/native-ink-check.mjs'
       - 'scripts/native-bridge-selfcheck.mjs'
       - 'scripts/iphone-journey.mjs'
+      - 'scripts/journey-evidence-reader.mjs'
+      - 'scripts/journey-evidence-reader-check.mjs'
+      - 'scripts/verify-journey-evidence.mjs'
       - 'scripts/cloud-fixture-server.mjs'
       - 'scripts/journey-oracle.mjs'
       - 'scripts/synthetic-reader-server.mjs'
@@ -55,6 +58,9 @@ on:
       - 'client/test/native-ink-check.mjs'
       - 'scripts/native-bridge-selfcheck.mjs'
       - 'scripts/iphone-journey.mjs'
+      - 'scripts/journey-evidence-reader.mjs'
+      - 'scripts/journey-evidence-reader-check.mjs'
+      - 'scripts/verify-journey-evidence.mjs'
       - 'scripts/cloud-fixture-server.mjs'
       - 'scripts/journey-oracle.mjs'
       - 'scripts/synthetic-reader-server.mjs'
@@ -86,7 +92,15 @@ jobs:
   native-ink:
     # Lane gate: on a pull request only task/train-* heads run this job; main, dispatch and trains always do (docs/release/ci-lanes.md).
     if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'task/train-')
-    name: Swift build, capture gate and bridge smoke test (iOS 26)
+    name: Native ink and student journey (iOS 26) — ${{ matrix.family }}
+    # Separate runners prevent a slow second device from erasing the first
+    # device's evidence at the job deadline. No duplicate trigger; at most one
+    # matrix runner active per workflow, and neither family cancels the other.
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        family: [ipad, iphone]
     runs-on: macos-26
     timeout-minutes: 70
 
@@ -99,6 +113,9 @@ jobs:
           cache-dependency-path: |
             client/package-lock.json
             server/package-lock.json
+
+      - name: Journey evidence reader regression checks
+        run: node scripts/journey-evidence-reader-check.mjs
 
       - name: Canonical native source has no stale duplicate
         run: node scripts/check-native-package-sync.mjs
@@ -129,18 +146,21 @@ jobs:
 
       # V1 needs both families (#504). Hosted images do not always ship an
       # iPad device, so create any missing one on the PINNED iOS runtime.
-      # Only the iPad is booted here — the first simulator steps use it — and
-      # each later step boots its own family and shuts the other down, so the
-      # runner never carries two booted simulators. Fails when the pinned
+      # Only the selected matrix family is booted; no device switching in
+      # a single runner. Fails when the pinned
       # runtime or a device type of a family is missing.
-      - name: iPad and iPhone simulators on iOS ${{ env.PRI_SIM_RUNTIME }}
+      - name: Provision pinned simulators and boot iPad
+        if: matrix.family == 'ipad'
         run: node scripts/ci-provision-simulators.mjs --boot ipad
+      - name: Provision pinned simulators and boot iPhone
+        if: matrix.family == 'iphone'
+        run: node scripts/ci-provision-simulators.mjs --boot iphone
 
       - name: JS ↔ Swift ink contract
         run: npm run test:ink:bridge
 
       # One simulator build of the canonical shipping package itself (no
-      # scratch copy), reused by every simulator step below on iPhone and iPad.
+      # scratch copy), reused by every simulator step below for this family.
       # A generic destination needs no booted simulator.
       - name: Build the simulator app (canonical iPhone + iPad package)
         run: |
@@ -154,12 +174,14 @@ jobs:
       # every point and the Pencil signal intact; the surface sits where the
       # page said. Nothing native reads ink (owner decision 2026-10-02, D16).
       - name: Native PencilKit capture self-check (iPad)
+        if: matrix.family == 'ipad'
         run: node scripts/ink-native-check.mjs --app "$PRI_SIM_APP"
 
       # CP-02: the priNative contract inside real WebKit — deep-frozen host
       # descriptor, no OS identity, main-frame envelope round trip, and a
       # same-origin subframe refused by the sender gate. Simulator evidence.
       - name: priNative bridge self-check (iPad simulator)
+        if: matrix.family == 'ipad'
         run: node scripts/native-bridge-selfcheck.mjs --family ipad --app "$PRI_SIM_APP"
 
       # CP-04 × #504: main is the V1 Apple shipping target — iPhone (portrait)
@@ -187,6 +209,7 @@ jobs:
       # SIMULATOR + SYNTHETIC READER evidence records are uploaded; they are
       # never device, Pencil or real-provider evidence.
       - name: priNative bridge self-check (iPhone simulator)
+        if: matrix.family == 'iphone'
         run: node scripts/native-bridge-selfcheck.mjs --family iphone --app "$PRI_SIM_APP"
 
       # CP-05: the iPhone certification journey adds, on the same install, the
@@ -209,29 +232,31 @@ jobs:
       # Pre-journey ~21 min + iPhone up to 15 + iPad up to 25 fits inside
       # the 70-minute job cap, with buffer for evidence upload.
       - name: iPhone certification journey (simulator)
+        if: matrix.family == 'iphone'
         timeout-minutes: 15
         run: node scripts/iphone-journey.mjs --family iphone --app "$PRI_SIM_APP" --cloud --dynamic-type --lifecycle --a11y --evidence journey-iphone.json
 
       - name: iPad journey (simulator)
+        if: matrix.family == 'ipad'
         timeout-minutes: 25
         run: node scripts/iphone-journey.mjs --family ipad --app "$PRI_SIM_APP" --dynamic-type --lifecycle --a11y --evidence journey-ipad.json
 
-      - name: The evidence names the pinned runtime
+      - name: The evidence names the pinned runtime, family and exact checkout
         if: always()
+        env:
+          PRI_JOURNEY_FAMILY: ${{ matrix.family }}
+          PRI_JOURNEY_EVIDENCE: journey-${{ matrix.family }}.json
         run: |
           set -euo pipefail
-          for f in journey-iphone.json journey-ipad.json; do
-            test -s "$f" || continue
-            node -e "const e=require('./$f'); if (e.simulator.runtimePinned !== true || e.simulator.pinnedRuntime !== process.env.PRI_SIM_RUNTIME || !/^iOS-26-5$/.test(e.simulator.runtime)) { console.error('$f ran on', e.simulator.runtime, 'pinned', e.simulator.pinnedRuntime); process.exit(1); } console.log('$f: ' + e.simulator.name + ' on ' + e.simulator.runtime + ' (pinned ' + e.simulator.pinnedRuntime + ') ' + e.result);"
-          done
+          node scripts/verify-journey-evidence.mjs "$PRI_JOURNEY_EVIDENCE" "$PRI_JOURNEY_FAMILY" "$PRI_SIM_RUNTIME" "$GITHUB_SHA"
 
       - name: Simulator evidence records
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: native-simulator-evidence
+          name: native-simulator-evidence-${{ matrix.family }}
           path: |
-            journey-*.json
+            journey-${{ matrix.family }}.json
             xcode-version.txt
             runtimes.txt
           if-no-files-found: warn
