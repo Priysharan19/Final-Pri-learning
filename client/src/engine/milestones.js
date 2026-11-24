@@ -109,13 +109,14 @@ export function matchMilestone(milestones, line) {
   if (!LABEL.test(label)) return null;
   let rhs;
   try { rhs = normalize(parts[1].trim()); parse(rhs); } catch { return null; }
-  // worked-out working is not matched by the number it reaches (the working may be wrong and still land on the value)
-  if (isWorkedSum(parts[1])) return null;
+  // worked-out working is matched as the same working, not by the number it reaches (it may be wrong and still land on the value)
+  const worked = isWorkedSum(parts[1]);
   for (const m of milestones) {
     if (m.label !== label) continue;
     // The student's value must agree with the step's RESULT (its last form),
     // and use no letter the step does not use: "f'(x) = f'(x)" is not a step.
     const target = m.values[m.values.length - 1];
+    if (worked && String(normalize(target)).replace(/\s+/g, '') !== String(rhs).replace(/\s+/g, '')) continue;
     let ok = false;
     try {
       const want = variablesOf(parse(normalize(target)));

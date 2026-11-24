@@ -1005,7 +1005,7 @@ export function degreeForm(text) {
     .replace(/(?<![a-z])(sin|cos|tan|sec|cosec|csc|cot)(\s*\^\s*-?\d+)?\s+([-+]?\d+(?:\.\d+)?)(?![\d.])/gi, (_, f, pw, n) => `${f}${pw || ''}((${n})*pi/180)`);
 }
 
-function judgeExpressionLine(cleaned, meta, { reference = null, promptSpans = [], knownLetters = null } = {}) {
+function judgeExpressionLine(cleaned, meta, { reference = null, promptSpans = [], knownLetters = null, earlier = [] } = {}) {
   const text = bareExpressionLine(cleaned);
   // A trig function of a plain number is worked out in the unit the page states; with none stated, a pair is the same when it is the same in either unit
   const eq = (a, b) => exprEquivalent(a, b, { positiveOnly: meta.positiveOnly }) === true;
@@ -1084,7 +1084,8 @@ function judgeExpressionLine(cleaned, meta, { reference = null, promptSpans = []
       if (reference && (isPartOf(tail, reference) || isPartialProduct(tail, reference))) return unread;
       // A bare `x` or `x/2` under a line that is not linear (`y = (x - 1)^2`) is the argument being replaced, a substitution piece (replace x by x/2),
       // not a claim that the whole expression equals it: the page says nothing the engine can prove false.
-      if (isAffineInOneLetter(tail) && !isAffineInOneLetter(reference || meta.canonical)) return unread;
+      // (only with a line above that uses that letter: a lone `= 11p` on a page of its own is a claim about the answer)
+      if (isAffineInOneLetter(tail) && !isAffineInOneLetter(reference || meta.canonical) && earlier.some(t => [...variablesOf(parseExpr(tail))].filter(v => v !== 'e').every(v => new RegExp(`(?<![A-Za-z])${v}(?![A-Za-z])`).test(String(t))))) return unread;
       if (promptSpans.some(span => isPartialProduct(tail, span) || isPartOf(tail, span))) return unread;
       // A line that only restates something the question writes is not a claim about the answer.
       if (promptSpans.some(span => { try { return same(tail, span); } catch { return false; } })) return unread;
@@ -1765,6 +1766,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
           const judged = judgeExpressionLine(cleaned, meta, {
             reference: expressionReference(meta, prompt, out, { lineAbove: /^\s*=/.test(bareExpressionLine(cleaned)) }),
             promptSpans: [...String(prompt || '').matchAll(/\$([^$]+)\$/g)].map(m => { try { return plainTex(m[1]); } catch { return ''; } }).filter(t => t && !/[=<>≤≥,]/.test(t) && parseExpr(t)),
+            earlier: rawLines.slice(0, i),
             knownLetters: prompt ? new Set((`${[...String(prompt).matchAll(/\$([^$]+)\$/g)].map(m => m[1]).join(' ')} ${meta.canonical || ''} ${meta.source || ''} ${out.map(l => l.text).join(' ')}`.replace(/\\[a-zA-Z]+/g, ' ').match(/[A-Za-z]/g) || [])) : null
           });
           status = judged.status;
@@ -1777,8 +1779,8 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
     }
 
     // "Find the least k for which …": the answer is the one value that meets the condition, and a value tried on the way (`k = 1`: it fails) is no
-    // claim that k = 1. The derived equation would cross it for differing from the answer; it is a trial, so a note.
-    if (status === 'break' && meta.kind === 'equation' && EXTREMUM_PROMPT.test(String(prompt || '').replace(/\$[^$]*\$/g, ' ').replace(/[*_]/g, '')) && /^\s*(?:∴\s*)?[A-Za-z]\s*=\s*-?\d+(?:\.\d+)?\s*$/.test(String(line))) {
+    // claim that k = 1. The derived equation would cross it for differing from the answer; it is a trial, so a note (the last line is the answer's claim).
+    if (status === 'break' && meta.kind === 'equation' && i < rawLines.length - 1 && EXTREMUM_PROMPT.test(String(prompt || '').replace(/\$[^$]*\$/g, ' ').replace(/[*_]/g, '')) && /^\s*(?:∴\s*)?[A-Za-z]\s*=\s*-?\d+(?:\.\d+)?\s*$/.test(String(line))) {
       status = 'note';
       note = 'A value tried on the way to the least or greatest one is not a claim that it is the answer, so it is not marked right or wrong.';
       lineDiagnosis = null;
