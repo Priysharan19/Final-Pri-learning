@@ -438,8 +438,11 @@ export function assessCalculusLine(line, ctx, meta, stage = { claimed: false }) 
 
     // The answer test judges the LAST '='-segment. A chain `dy/dx = 3(…)·4x = 8x(…)` that ends at the answer is still a chain: a middle
     // piece the question's own relation proves false (a wrong coefficient, power or inner function) is the slip, so the line is not ticked.
-    if (isAnswer && !verdicts.includes('invalid')) return { status: 'ok' };
-    const firstInvalid = verdicts.indexOf('invalid');
+    // (the first piece of a chain may be the name of what is found, dA/dr or y', which is no claim)
+    const nameLike = t => /^\(*d[A-Za-z]?\)*\s*\/\s*\(*d[A-Za-z]\)*$|^[A-Za-z]\s*'{0,2}\s*(?:\(\s*[A-Za-z0-9]\s*\))?$/.test(String(t).replace(/\s+/g, ' ').trim());
+    const badMiddle = real.some((seg, idx) => verdicts[idx] === 'invalid' && !(idx === 0 && real.length > 1 && nameLike(seg.text)) && idx !== real.length - 1);
+    if (isAnswer && !badMiddle) return { status: 'ok' };
+    const firstInvalid = verdicts.findIndex((v, idx) => v === 'invalid' && !(isAnswer && idx === 0 && real.length > 1 && nameLike(real[idx].text)));
     // The constant factor of the question left out (75(5x - 4)^4 integrates to 3(5x - 4)^5, and (5x - 4)^5/25 is the integral of (5x - 4)^4): an
     // intermediate worked solution writes it, and it is true of the integrand with its factor taken out. It is not the answer, and it is not
     // a false line: a note that says what it is. (Left as the last line, it is the answer's slip: the answer box marks that.)

@@ -101,11 +101,19 @@ function solutionNumbers(q) {
   return [...out].slice(0, 400);
 }
 
+/** Every `f(3)` the question or its authored worked solution writes, as `f|3`: the values of a function a line of working may be the value OF. */
+function functionLabels(q) {
+  const out = new Set();
+  const texts = [String(q?.prompt ?? ''), ...(Array.isArray(q?.steps) ? q.steps.slice(0, 40).map(st => String(st?.d ?? '').slice(0, 2000)) : [])];
+  for (const t of texts) for (const m of t.replace(/\\(?:left|right)/g, '').matchAll(/(?<![A-Za-z\\])([A-Za-z])\s*\(\s*(-?\d+(?:\.\d+)?)\s*\)/g)) out.add(`${m[1]}|${Number(m[2])}`);
+  return [...out];
+}
+
 function trueAsWritten(q, steps, opts) {
   try {
     const facts = opts && Object.hasOwn(opts, 'facts') ? opts.facts : questionFacts(q);
     const solutionValues = solutionNumbers(q);
-    return stepCheckArithmetic(steps, { latex: opts && Array.isArray(opts.latex) ? opts.latex : null, facts, solutionValues, answerValue: typeof q?.answer?.value === 'number' ? q.answer.value : null });
+    return stepCheckArithmetic(steps, { latex: opts && Array.isArray(opts.latex) ? opts.latex : null, facts, solutionValues, knownLabels: functionLabels(q), answerValue: typeof q?.answer?.value === 'number' ? q.answer.value : null });
   } catch { return null; }
 }
 

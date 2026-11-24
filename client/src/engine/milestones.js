@@ -90,7 +90,7 @@ export const milestoneNote = m => `Matches step ${m.step + 1} of the method${m.h
  */
 export function isWorkedSum(plain) {
   try {
-    const count = n => (!n || typeof n !== 'object' ? 0 : n.t === 'num' ? 1 : ['l', 'r', 'v', 'arg'].reduce((a, k) => a + count(n[k]), 0));
+    const count = n => (!n || typeof n !== 'object' || n.t === 'call' ? 0 : n.t === 'num' ? 1 : ['l', 'r', 'v', 'arg'].reduce((a, k) => a + count(n[k]), 0));
     return count(parse(normalize(String(plain)))) >= 4;
   } catch { return false; }
 }

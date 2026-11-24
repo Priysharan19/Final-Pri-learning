@@ -833,14 +833,19 @@ function putGivenInIntegrals(raw, prep) {
 // `8 y = 3/tan x` is ambiguous: a definition y = 3/tan x with a question number in front, or the equation 8y = 3/tan x (y = 3/(8 tan x)).
 // The page is read three ways: without either (exactly as it always was), as the definition ('D') and as the equation ('E'). A line is ticked when
 // the plain reading ticks it, or when BOTH readings tick it; no reading ever crosses.
-/** True when the expression has a product in which one factor is exactly 0 and another is not: whatever that other factor is, the product is 0. */
+/**
+ * True when the expression has a product in which one factor is a difference that cancels to exactly 0 (a substituted `x - 1/3` at x = 1/3) and another
+ * factor is not 0: whatever that other factor is, the product is 0. (A plain 0, or a power of 0, is not this: `2·0^3` is an honest evaluation.)
+ */
 function hasVanishingFactor(ast) {
   const val = n => { try { const y = evaluate(n, {}); return typeof y === 'number' && Number.isFinite(y) ? y : null; } catch { return null; } };
+  const unwrap = n => { while (n && n.t === 'group') n = n.v; return n; };
+  const cancels = n => { n = unwrap(n); if (!n || n.t !== 'bin' || (n.op !== '+' && n.op !== '-')) return false; const l = val(n.l), r = val(n.r); return l !== null && r !== null && l !== 0 && r !== 0 && val(n) === 0; };
   const walk = n => {
     if (!n || typeof n !== 'object') return false;
     if (n.t === 'bin' && n.op === '*') {
       const a = val(n.l), b = val(n.r);
-      if (a !== null && b !== null && ((a === 0) !== (b === 0))) return true;
+      if (a !== null && b !== null && ((a === 0 && cancels(n.l) && b !== 0) || (b === 0 && cancels(n.r) && a !== 0))) return true;
     }
     return ['l', 'r', 'v', 'arg'].some(k => n[k] && typeof n[k] === 'object' && walk(n[k]));
   };
@@ -1158,10 +1163,13 @@ function pageDefinitionsOnce(raw, out, firstBreak, prep, degreePrimed, tickOnly,
 // The numbers the question's authored worked solution reaches, for the one page being checked (set and cleared around it).
 let SOLUTION_VALUES = null;
 let ANSWER_VALUE = null;
+// The function values (`f|3`) the question or its worked solution writes, when a question is in hand; null without one.
+let KNOWN_LABELS = null;
 export function stepCheckArithmetic(workingText, opts = null) {
   SOLUTION_VALUES = opts && Array.isArray(opts.solutionValues) ? opts.solutionValues.filter(v => Number.isFinite(v)) : null;
   ANSWER_VALUE = opts && Number.isFinite(opts.answerValue) ? opts.answerValue : null;
-  try { return stepCheckArithmeticBudgeted(workingText, opts); } finally { SOLUTION_VALUES = null; ANSWER_VALUE = null; }
+  KNOWN_LABELS = opts && Array.isArray(opts.knownLabels) ? new Set(opts.knownLabels) : null;
+  try { return stepCheckArithmeticBudgeted(workingText, opts); } finally { SOLUTION_VALUES = null; ANSWER_VALUE = null; KNOWN_LABELS = null; }
 }
 function stepCheckArithmeticBudgeted(workingText, opts) {
   return withEvaluationBudget(PAGE_BUDGET, () => {
@@ -1627,9 +1635,9 @@ function stepCheckArithmeticWithinBudget(workingText, prep = null, tickOnly = fa
         if (fn) {
           const at = fn(Number(lab[2])), chainEnd = valueOf(src.slice(lab[0].length).split('=').pop());
           if (at === null || chainEnd === null || !closeLoose(at, chainEnd)) labelFalse = true;
-        } else if (!/'/.test(lab[0])) {
-          // a function this page does not define here: the chain may be true, but what it is the value OF cannot be said (`f(4) = … = -7` and
-          // `f(3) = … = -7` are the same chain). The question's own worked solution, or a definition above, ticks the line where it states it.
+        } else if (KNOWN_LABELS && !/'/.test(lab[0]) && !KNOWN_LABELS.has(`${lab[1]}|${Number(lab[2])}`)) {
+          // a function the question does not define, set equal to a chain, at an argument the question and its worked solution never write: the
+          // chain may be true, but what it is the value OF cannot be said (`f(4) = … = -7` and `f(3) = … = -7` are the same chain)
           labelFalse = true;
         }
       }

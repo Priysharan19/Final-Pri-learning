@@ -384,9 +384,9 @@ function productEqualsZero(ast) {
 }
 
 /** Which of the authored solutions satisfy this line. */
-/** How many number literals an expression contains. */
+/** How many number literals an expression contains outside a function's brackets (a root's radicand, a power's formula are one operation). */
 function numericLeaves(n) {
-  if (!n || typeof n !== 'object') return 0;
+  if (!n || typeof n !== 'object' || n.t === 'call') return 0;
   if (n.t === 'num') return 1;
   return ['l', 'r', 'v', 'arg'].reduce((a, k) => a + numericLeaves(n[k]), 0);
 }
@@ -1115,7 +1115,8 @@ const AUXILIARY_CALCULUS = /[∫→]|d\/d[a-z]\s*[(\[a-z0-9]|\b[uvw]\b|\bd[uvw]\
 const DERIVATIVE_CLAIM = /^(?:d[a-z]\/d[a-z]|[a-z]'(?:\([a-z]\))?|[a-z]\([a-z]\)')=/i;
 const proseCleanOf = line => String(line).trim().replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore)\s+/i, '').replace(ANSWER_LABEL, '');
 
-const EXTREMUM_PROMPT = /\b(?:least|greatest|smallest|largest|minimum|maximum|lowest|highest)\b/i;
+// "the least integer k for which …": a search over whole numbers, so a smaller number tried on the way is a trial
+const EXTREMUM_PROMPT = /(?=[^]*\b(?:inequality|inequalities|holds?)\b)\b(?:least|greatest|smallest|largest)\s+(?:positive\s+|natural\s+|whole\s+)?(?:integer|whole number|natural number)/i;
 function stepCheckSingle(meta, workingText, system = null, { loneBranches = false, calculus = null, named = false, prompt = '' } = {}) {
   PAGE_TRIG_UNIT = trigUnitOf(`${prompt}\n${workingText}`);
   const calculusStage = { claimed: false };   // calculusSteps.js: has a line made a claim yet?
@@ -1777,7 +1778,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
 
     // "Find the least k for which …": the answer is the one value that meets the condition, and a value tried on the way (`k = 1`: it fails) is no
     // claim that k = 1. The derived equation would cross it for differing from the answer; it is a trial, so a note.
-    if (status === 'break' && meta.kind === 'equation' && EXTREMUM_PROMPT.test(String(prompt || '').replace(/\$[^$]*\$/g, ' ')) && /^\s*(?:∴\s*)?[A-Za-z]\s*=\s*-?\d+(?:\.\d+)?\s*$/.test(String(line))) {
+    if (status === 'break' && meta.kind === 'equation' && EXTREMUM_PROMPT.test(String(prompt || '').replace(/\$[^$]*\$/g, ' ').replace(/[*_]/g, '')) && /^\s*(?:∴\s*)?[A-Za-z]\s*=\s*-?\d+(?:\.\d+)?\s*$/.test(String(line))) {
       status = 'note';
       note = 'A value tried on the way to the least or greatest one is not a claim that it is the answer, so it is not marked right or wrong.';
       lineDiagnosis = null;
@@ -2642,12 +2643,12 @@ function namesOfQuestion(meta, prompt) {
 function notAClaim(text, names, words) {
   const t = String(text).trim().replace(/[−–—]/g, '-').replace(/\s*\.\s*$/, '');
   if (BARE_NUMBER.test(t)) return B_NOTE;
+  // C: no relation sign of any kind, numbers and arithmetic signs only, at least one digit and one operator.
+  if (!/[=<>≤≥≈⇒]/.test(t) && SIDE_SUM.test(t) && /\d/.test(t) && /[+*\/×÷^-]/.test(t.replace(/^-/, ''))) return C_NOTE;
   // …and a bare number however it is written: ((sqrt(2))/2), (1/2), 3π/4. No relation sign, no letter but a constant, and it comes to one value.
   if (!/[=<>≤≥≈⇒]/.test(t) && t.length <= 60 && /[\d√]|sqrt|pi|π/i.test(t)) {
     try { const a = parse(normalize(t)); if (a.t !== 'equation' && ![...variablesOf(a)].some(v => v !== 'e') && Number.isFinite(evaluate(a, {}))) return B_NOTE; } catch { /* not a number */ }
   }
-  // C: no relation sign of any kind, numbers and arithmetic signs only, at least one digit and one operator.
-  if (!/[=<>≤≥≈⇒]/.test(t) && SIDE_SUM.test(t) && /\d/.test(t) && /[+*\/×÷^-]/.test(t.replace(/^-/, ''))) return C_NOTE;
   const m = /^([A-Za-z][A-Za-z ]{0,24}?)(?:\(\s*[a-z]\s*\))?('{0,2})\s*=\s*([^=]+)$/.exec(t);
   if (!m || !m[3].trim()) return null;
   const head = m[1].trim();

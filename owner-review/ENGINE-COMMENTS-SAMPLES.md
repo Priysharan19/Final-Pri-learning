@@ -28,7 +28,7 @@ Rule names below are shown as `Rule <id>`; the page uses the interface’s own r
 | 4 | `0 = 6x^2 + 18x` | tick | This sets the derivative above to zero. | (unchanged) |
 | 5 | `0 = 6x[x + 3]` | tick | The same equation as the one before it, rearranged. | (unchanged) |
 | 6 | `x = 0 or x = -3` | tick | x = 0, x = −3 each satisfy 0 = 6x(x + 3) above. This does not say these are all the solutions. | (unchanged) |
-| 7 | `y(0) = 0` | note | The arithmetic on this line is right, but this value was not accepted as the answer. | (unchanged) |
+| 7 | `y(0) = 0` | note | Not checked: Pri cannot tell from this line alone whether it is true. | (unchanged) |
 | 8 | `Smallest: (0,0)` | note | Not checked: this line has no arithmetic Pri can check on its own. | (unchanged) |
 
 ## IMG_1233, the vectors page
