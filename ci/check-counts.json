@@ -859,6 +859,13 @@
       "pins": [
         {"has":"QBANK MIX: PASS — 149/149 checks","note":"New pin, as printed: the author dot point table held to the committed pack, the mix rule, a session's use of a pool, and the attempt records over the real routes."}
       ]
+    },
+    "platform/qbank-sealed.log": {
+      "job": "platform-contracts",
+      "log": "qbank-sealed.log",
+      "pins": [
+        {"has":"QBANK SEALED: PASS — 11/11 checks over 1761 questions","note":"New pin, as printed by running it on the merged tree: with PRI_METHOD_MARKS=on and every scheme plus the generic solution-step rule approved, no packed question is stamped with a scheme or the rule, every one seals final-answer-only, and a wrong answer with the author's worked lines earns 0."}
+      ]
     }
   },
   "retired": [

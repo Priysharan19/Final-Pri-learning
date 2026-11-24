@@ -389,6 +389,10 @@ jobs:
           # and the attempt records, over the committed pack.
           node server/test/qbank-mix-check.mjs 2>&1 | tee qbank-mix.log
           node tools/ci-check-counts.mjs verify platform/qbank-mix.log
+          # No step mark is ever paid on a bank question: with PRI_METHOD_MARKS=on and every scheme and the generic rule approved, none of the
+          # packed questions is stamped with either, and a wrong answer with the author's own worked lines earns 0.
+          node server/test/qbank-sealed-check.mjs 2>&1 | tee qbank-sealed.log
+          node tools/ci-check-counts.mjs verify platform/qbank-sealed.log
           # The Exam Desk (ADR-0002 §8 plan F4a): the unmarked mode — server-stamped
           # clock, one open attempt per paper, the import, never a mark — and the
           # static proof that it reaches nothing of the marking path.

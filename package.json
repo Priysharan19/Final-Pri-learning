@@ -302,6 +302,7 @@
     "test:nsw:practice:tour": "node client/test/tour-nsw-practice-marked.js",
     "test:nsw:practice:bank:tour": "node client/test/tour-nsw-practice-bank.js",
     "test:qbank:mix": "node server/test/qbank-mix-check.mjs",
+    "test:qbank:sealed": "node server/test/qbank-sealed-check.mjs",
     "test:guest": "node server/test/guest-trial-check.mjs && node server/test/guest-menu-issuable-check.mjs && node server/test/guest-steps-leak-check.mjs && npm run test:guest:boundary",
     "test:guest:boundary": "node client/test/guest-trial-boundary-check.mjs",
     "test:guest:tour": "node client/test/tour-guest-trial.js",

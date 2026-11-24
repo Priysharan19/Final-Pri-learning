@@ -22,7 +22,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const keys = ['NODE_ENV', 'PRI_OFFERING', 'PRI_PLATFORM_DB', 'PRI_AUTH_DELIVERY_KEY', 'PRI_PUBLIC_ORIGIN', 'PRI_FREE_PRACTICE_PER_DAY', 'PRI_EDITION', 'PRI_METHOD_MARKS', 'PRI_METHOD_MARKS_EXAMINER_RESULT'];
+const keys = ['NODE_ENV', 'PRI_OFFERING', 'PRI_PLATFORM_DB', 'PRI_AUTH_DELIVERY_KEY', 'PRI_PUBLIC_ORIGIN', 'PRI_FREE_PRACTICE_PER_DAY', 'PRI_EDITION', 'PRI_METHOD_MARKS', 'PRI_METHOD_MARKS_EXAMINER_RESULT', 'PRI_QBANK_DIR'];
 const before = Object.fromEntries(keys.map(key => [key, process.env[key]]));
 const scratch = mkdtempSync(join(tmpdir(), 'pri-scheme-http-'));
 process.env.NODE_ENV = 'test';
@@ -32,6 +32,7 @@ process.env.PRI_FREE_PRACTICE_PER_DAY = '100000';
 delete process.env.PRI_METHOD_MARKS;
 process.env.PRI_EDITION = 'prithagoras';
 process.env.PRI_OFFERING = 'catalogue';
+process.env.PRI_QBANK_DIR = 'off';   // this suite is about the generator types' schemes; the author bank is sealed final-answer-only (qbank-sealed-check.mjs)
 delete process.env.PRI_METHOD_MARKS_EXAMINER_RESULT;
 delete process.env.PRI_PUBLIC_ORIGIN;
 
