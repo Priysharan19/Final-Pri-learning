@@ -1123,7 +1123,7 @@ function changesOneSideOfTheQuestion(ast, meta, prompt) {
         for (const [ml, mr] of [[ast.l, ast.r], [ast.r, ast.l]]) {
           if (!variablesOf(gl).size || exprEquivalent(ml, gl) !== true) continue;
           if (exprEquivalent(mr, gr) === true) return false;     // the question's equation, restated
-          changes = true;
+          if (variablesOf(mr).size) changes = true;     // `S = 0` for a constant other side is an equation to solve, not a claim that two expressions are equal
         }
       }
     }
