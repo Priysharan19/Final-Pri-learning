@@ -289,6 +289,27 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
       if (more && (more.matched > 0 || more.warned > 0)) report = more.report;
     } catch { /* the report stands */ }
   }
+  // Feedback only, after every mark (topicTicks and `partial` above read `decided`, never this): a question that carries a DERIVED step plan
+  // (engine/schemePlans.js) had, before the plan, the whole page judged against the answer (an expression question: equivalence to the keyed
+  // answer). The plan replaced that check as the page's topic check, so a LAST line restating the final answer (`2x + -5`, `ans = 12`) was left
+  // "not checked". The tick the question had without the plan is carried over for that one line, exactly as it was (never a cross, never a new
+  // tick on a line that was not ticked there, never a mark: it is not in `decided`).
+  try {
+    if (q.stepcheck && q.stepcheck.kind === 'plan' && typeof q.stepcheck.scheme === 'string' && typeof steps === 'string' && steps.trim() && report && Array.isArray(report.lines) && report.lines.length && !(opts && opts.planFinal === false)) {
+      const k = report.lines.length - 1, mine = report.lines[k];
+      const unjudged = mine?.status === 'note' && (mine.state === undefined || mine.state === 'unverified') && mine.note !== 'Follows from the earlier slip.' && mine.unreadable !== true;
+      if (unjudged && !report.lines.some(l => l?.status === 'break')) {
+        const { stepcheck: _plan, ...bare } = q;
+        const before = stepEvidence(bare, answer, steps, result, { ...(opts || {}), planFinal: false }).stepReport;
+        const theirs = before?.lines?.[k];
+        if (theirs && theirs.status === 'ok' && before.lines.length === report.lines.length && String(theirs.text).trim() === String(mine.text).trim()) {
+          const { stage: _s, credit: _c, ...tick } = theirs;
+          const lines = report.lines.map((l, i) => (i === k ? { ...tick, state: tick.state || 'verified' } : l));
+          report = { ...report, lines };
+        }
+      }
+    }
+  } catch { /* the report stands */ }
   // A true-as-written tick on a line that ends at the student's own WRONG answer (`so 10^1 = 10` when the answer is 30)
   // reads as "this is right". The arithmetic is; the value was not accepted (it may be wrong, or right in a form or unit
   // the question did not accept: the note claims only what is true in both cases). Such a tick becomes that note.
@@ -328,15 +349,17 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
     const { report: bounded, clipped } = unsupported.length ? constrainToShown(decided, report?.lines, unsupported) : { report: decided, clipped: 0 };
     if (clipped) { try { partial = partialOf(bounded); decided = bounded; } catch { /* the marks stand */ } }
   }
-  // Feedback only, after EVERY mark and after the reconcile above (it reads the shown ticks, so this pass comes after the reconcile and before the stored record of what decided the marks, which then covers it): a note line
-  // that Pri can prove true (a solution list, a rounded value, a labelled substitution, a restated equation: engine/provedLines.js)
-  // is ticked, with the proof in its sentence. Never a cross, never a changed verdict, never a mark. `opts.proved === false` is the
-  // measurement's "before" switch, and `solutionMatch: false` (the switch that turns the display ticks off) turns it off too. Prithagoras (NSW Years 11-12) content only: the India banks are not touched.
+  // Feedback only, and DISPLAY ONLY: a note line that Pri can prove true (a solution list, a rounded value, a labelled substitution, a restated
+  // equation: engine/provedLines.js) is ticked, with the proof in its sentence, in `shownReport`. `stepReport` is NOT changed: it stays the
+  // deterministic report the marks, the scheme pay (schemeAward.schemePay), the generic solution-step rule and the stored record all read, so no
+  // proved tick can open a step mark. Never a cross, never a changed verdict, never a mark. `opts.proved === false` is the measurement's "before"
+  // switch, and `solutionMatch: false` (the switch that turns the display ticks off) turns it off too. Prithagoras (NSW Years 11-12) content only.
+  let shownReport = null;
   if (typeof steps === 'string' && steps.trim() && !OBJECTIVE.has(q.answerType) && q.answerType !== 'graph-sketch' && !Array.isArray(q.boardScheme) && !(opts && (opts.proved === false || opts.solutionMatch === false)) && /^gen:(?:y11|y12|me11|me12)-/.test(String(q.contentId ?? ''))) {
     try {
       const base = report || trueAsWritten(q, steps, opts);
       const more = base ? provedLines(q, meta, base) : null;
-      if (more && more !== base) report = more;
+      if (more && more !== base) shownReport = more;
     } catch { /* the report stands */ }
   }
   let markingReport = null;
@@ -348,7 +371,7 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
   // A scheme question (schemeAward.js) also learns which lines the topic check ITSELF verified: the page ticks more than that (a copied
   // given, a rule statement, a true-as-written sum), and "writes a correct derivative" is earned only by a line the check found equal to it.
   const topicTicks = q._methodScheme ? (decided ? decided.lines.flatMap((l, i) => (l?.status === 'ok' ? [i] : [])) : null) : undefined;
-  return { stepReport: report, partial, ...(board ? { board } : {}), ...(markingReport ? { markingReport } : {}), ...(topicTicks !== undefined ? { topicTicks } : {}) };
+  return { stepReport: report, ...(shownReport ? { shownReport } : {}), partial, ...(board ? { board } : {}), ...(markingReport ? { markingReport } : {}), ...(topicTicks !== undefined ? { topicTicks } : {}) };
 }
 
 /** The Board-scheme award for a question carrying one, from the deterministic report. */
@@ -612,7 +635,7 @@ export const MARKER_OPS = Object.freeze({
     if (!wanted) return { result, evidence: null };
     const evidence = stepEvidence(q, answer, working, result, { slipWarnings: true, ...(Array.isArray(workingGaps) ? { gaps: workingGaps } : {}), ...(Array.isArray(workingLatex) ? { latex: workingLatex } : {}) });
     // Final answer only: the step report stays, the method mark does not.
-    return { result, evidence: policyOf({ policy }).methodMarks ? evidence : { stepReport: evidence.stepReport, partial: null, ...(evidence.board ? { board: evidence.board } : {}), ...(evidence.topicTicks !== undefined ? { topicTicks: evidence.topicTicks } : {}) } };
+    return { result, evidence: policyOf({ policy }).methodMarks ? evidence : { stepReport: evidence.stepReport, ...(evidence.shownReport ? { shownReport: evidence.shownReport } : {}), partial: null, ...(evidence.board ? { board: evidence.board } : {}), ...(evidence.topicTicks !== undefined ? { topicTicks: evidence.topicTicks } : {}) } };
   },
   /** One examination response: the answer stage, then (method marks on) the working stage. */
   exam({ q, given, working, grid, policy }, emit) {

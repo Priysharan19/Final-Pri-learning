@@ -304,7 +304,9 @@ function readStudent(text) {
 
 // Restating the question is STRUCTURAL: the same tokens, differing only in spaces, bracket style, `*` and a unicode minus. Two
 // things that merely evaluate alike (f^(-2)(0) and f^(-1)(0) when f is read as a product) are never the same statement.
-const canon = s => tidy(s).replace(/\s+/g, '').replace(/[{}]/g, '').replace(/\[/g, '(').replace(/\]/g, ')').replace(/\^\(([^()]*)\)/g, '^$1').replace(/\*/g, '');
+// A limit is its VALUE, not its spelling: `]_0^(3.0)` and `]_0^(2+1)` are `]_0^(3)` (limitKeys compares values the same way).
+const limitsByValue = s => braces(tidy(s)).replace(LIMIT_PAIR, (m, a, b) => { const x = numericOf(a), y = numericOf(b); return x !== null && y !== null ? `_${x}^${y}` : m; });
+const canon = s => limitsByValue(s).replace(/\s+/g, '').replace(/[{}]/g, '').replace(/\[/g, '(').replace(/\]/g, ')').replace(/\^\(([^()]*)\)/g, '^$1').replace(/\*/g, '');
 function sameAsPromptStatement(parts, prompt) {
   for (const s of prompt) {
     if (s.parts.length !== parts.length) continue;
@@ -314,6 +316,23 @@ function sameAsPromptStatement(parts, prompt) {
 }
 
 /** A step of the worked solution an equation (or chain) of the student matches: { step, heading } or null. */
+/**
+ * `(1.06)^(20) = 3.2070`: a decimal literal beside an expression that is not itself a literal claims to be that expression's value to the places it
+ * shows. It is the line's claim only when it IS the correct rounding or the truncation of the exact value to those places; 3.2070 for 3.20713547 is
+ * not, whatever the worked solution's own (3-place) 3.207 says. Two plain numbers (`3.2070 = 3.207`) or an exact side keep the numeric match.
+ */
+function roundedAsWritten(parts, a, b) {
+  const literal = t => /^-?\d+\.\d+$/.test(tidy(t).replace(/\s+/g, '').replace(/^\((.*)\)$/, '$1'));
+  const lit = literal(parts[0]) ? 0 : literal(parts[1]) ? 1 : -1;
+  if (lit < 0 || literal(parts[1 - lit])) return true;
+  const written = tidy(parts[lit]).replace(/\s+/g, '').replace(/^\((.*)\)$/, '$1');
+  const places = written.split('.')[1].length;
+  const exact = lit === 0 ? b.value : a.value, shown = lit === 0 ? a.value : b.value;
+  if (!Number.isFinite(exact) || !Number.isFinite(shown)) return true;
+  const unit = 10 ** places, eps = 1e-9 / unit * Math.max(1, Math.abs(exact));
+  const rounded = Math.round(exact * unit) / unit, truncated = Math.trunc(exact * unit) / unit;
+  return Math.abs(shown - rounded) <= eps + 1e-12 || Math.abs(shown - truncated) <= eps + 1e-12 || Math.abs(shown - exact) <= 1e-9 * Math.max(1, Math.abs(exact));
+}
 function matchEquation(parts, sol, ctx) {
   // a limit pair the question and its solution never use: not a step of this working, whatever value it reaches
   if (!limitsKnown(parts, sol)) return null;
@@ -322,10 +341,6 @@ function matchEquation(parts, sol, ctx) {
   if (parts.some(p => AMBIGUOUS_FUNCTION_POWER.test(p))) {
     for (const st of sol.every) if (st.parts.length === parts.length && parts.every((p, k) => canon(p) === canon(st.parts[k]))) return st;
     return null;
-  }
-  // The very same statement as one of the solution (canon: spaces, bracket style and `*` only), where a side cannot be evaluated.
-  if (!ctx && parts.some(p => readSide(p) === null)) {
-    for (const st of sol.verbatim) if (st.parts.length === parts.length && parts.every((p, k) => canon(p) === canon(st.parts[k]))) return st;
   }
   const lab = labelOf(parts[0]);
   if (lab) {
@@ -343,7 +358,7 @@ function matchEquation(parts, sol, ctx) {
   if (parts.length === 2) {
     // (1.09)^19 = 5.142: a statement about numbers only, both sides as the solution has them
     const a = readSide(parts[0]), b = readSide(parts[1]);
-    if (a && b && a.value !== undefined && b.value !== undefined) {
+    if (a && b && a.value !== undefined && b.value !== undefined && roundedAsWritten(parts, a, b)) {
       for (const st of sol.numeric) {
         const x = readSide(st.parts[0]), y = readSide(st.parts[1]);
         if (x && y && closeLoose(a.value, x.value) && closeLoose(b.value, y.value)) return st;
@@ -361,6 +376,11 @@ function matchEquation(parts, sol, ctx) {
         if (proportional(cond, st.cond)) return st;
       }
     }
+  }
+  // The very same statement as one of the solution (canon: spaces, bracket style and `*` only), where a side cannot be evaluated: the last resort,
+  // so that a line another rule attributes to its own step is never taken by an earlier statement that merely reads alike.
+  if (!ctx && parts.some(p => readSide(p) === null)) {
+    for (const st of sol.verbatim) if (st.parts.length === parts.length && parts.every((p, k) => canon(p) === canon(st.parts[k]))) return st;
   }
   return null;
 }

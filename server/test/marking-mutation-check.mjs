@@ -6,20 +6,27 @@
 //    Extension 1 generators: no true line is crossed, and no line that is provably wrong (one edit of a sign, a number, an exponent, a
 //    term, a function, a limit, a base or a constant, proved false by the harness's own numeric evaluation) is ticked.
 //
+// 3. The recorded corpus (server/test/fixtures/marking-mutation-corpus.json): every false tick and every crossed true line the harness found on
+//    origin/main over seeds 1-30 (not the owner's margin-number ticks). Each is re-marked here and must not be ticked / crossed. A change that
+//    brings any one of this PR's fixes back fails it (checked per file: README of the PR lists the result).
+// 4. A self-contained TRUE arithmetic line (`2 + 3 = 5`) inserted into every authored page is never crossed.
+//
 // Deterministic: fixed seeds, no model, no network.
-import { run, judgeMutant, mutationsOf, sidesOf, sideValues } from '../../tools/marking-mutation-harness.mjs';
+import fs from 'node:fs';
+import { run, judgeMutant, mutationsOf, roundingMutants, sidesOf, sideValues, loadEngine, markPage, lineAt, authoredPage, typedAnswer } from '../../tools/marking-mutation-harness.mjs';
 
 const G = await import('../../client/src/engine/generators/index.js');
-const { stepEvidence } = await import('../platform/markerOps.js');
+const { stepEvidence, stepMetaFor } = await import('../platform/markerOps.js');
 const { checkAnswer } = await import('../../client/src/engine/checker.js');
 await G.loadAllBanks();
 
+const SEEDS = [1, 2, 3, 4, 5, 6];
 let checks = 0, failed = 0;
 const ok = (cond, label) => { checks++; if (!cond) { failed++; console.log(`FAIL: ${label}`); } };
 
 const statusOf = (q, lines, index, typed = '99991') => {
   const ev = stepEvidence({ ...q }, typed, lines.join('\n'), checkAnswer(q, typed), { slipWarnings: true });
-  const l = ev.stepReport && ev.stepReport.lines && ev.stepReport.lines[index];
+  const rep = ev.shownReport || ev.stepReport, l = rep && rep.lines && rep.lines[index];
   return l ? l.status : 'none';
 };
 const gen = (id, d, s) => { const q = G.generateQuestion(id, d, s); if (q.stepcheck && q.stepcheck.scheme) delete q.stepcheck; return q; };
@@ -125,15 +132,154 @@ ok(sidesOf('a = b = c').length === 3, 'oracle: splits a chain');
   ok(statusOf(q, ['f(0) = 1(1)^2 + 3(1) - 4'], 0) !== 'ok', 'identity: a function value written f(0) is never read as a product');
 }
 
+// ── the second review round: four classes ────────────────────────────────────────────────────────────────────────────────────
+{
+  // an equation between two expressions is ticked only when its sides are EQUAL, not when they merely share roots
+  const q = gen('y11-polynomials', 4, 79);
+  const page = rhs => ['P(6)=0', '(x-6)', `3x^3-24x^2+27x+54=${rhs}`, 'x=6'];
+  for (const bad of ['2(x-6)(x-3)(x+1)', '1(x-6)(x-3)(x+1)', '4(x-6)(x-3)(x+1)', '(x-6)(x-3)(x+1)']) ok(statusOf(q, page(bad), 2) !== 'ok', `leading constant: ${bad} is not ticked`);
+  ok(statusOf(q, page('3(x-6)(x-3)(x+1)'), 2) === 'ok', 'leading constant: the true factorisation is ticked');
+  ok(statusOf(q, ['3x^3-24x^2+27x+54=0', '3(x-6)(x-3)(x+1)=0'], 0) === 'ok', 'leading constant: the question restated is ticked');
+  const q2 = gen('y11-polynomials', 4, 105);
+  for (const bad of ['1(x+2)(x-6)(x-3)', '3(x+2)(x-6)(x-3)']) ok(statusOf(q2, ['P(-2)=0', '(x+2)', `2x^3-14x^2+72=${bad}`, 'x=-2'], 2) !== 'ok', `leading constant (seed 105): ${bad} is not ticked`);
+}
+{
+  // a value that is no root, after a line it does not satisfy (16^(-10) and 8^(-10) are both below 1e-9, and not equal)
+  const q = gen('y11-explog', 3, 108);
+  const page = last => ['(2^(4))^(4x - 2) = (2^(3))^(2x - 6)', '16x-8=6x-18', '10x=-10', last];
+  ok(statusOf(q, page('x=-2'), 3) !== 'ok', 'a root of nothing, written after the line that gives x = -1, is not ticked');
+  ok(statusOf(q, page('x=-1'), 3) === 'ok', 'the root is ticked');
+}
+{
+  // a limit is its value, not its spelling
+  const q = gen('me12-calc', 3, 71);
+  const page = lim => ['3x=x^2', 'x=0', 'x=3', 'V=π∫_{0}^{3}(R^2-r^2)dx', 'R^2=3x', 'r^2=x^2', `V = pi[((3x^2)/(2)) - ((x^3)/(3))]_0^${lim}`];
+  for (const lim of ['(3)', '(3.0)', '(2+1)', '3', '3.0']) ok(statusOf(q, page(lim), 6) === 'ok', `a limit written ${lim} is the limit 3`);
+  for (const lim of ['(4)', '(2.9)', '(2+2)']) ok(statusOf(q, page(lim), 6) !== 'ok', `a limit written ${lim} is not ticked`);
+}
+{
+  // a true self-contained arithmetic line is never crossed, on a derivative page or any other
+  for (const [id, d, seed] of [['y11-diff', 1, 45], ['y11-diff', 2, 3], ['y12-diff', 1, 2], ['y12-diff', 3, 5]]) {
+    const q = gen(id, d, seed);
+    for (const at of [0, 1, 2]) {
+      const base = ['((dy)/(dx)) = 2x', 'x = 1', 'y = 3'].slice(0, 2);
+      const page = base.slice(0, at).concat(['2 + 3 = 5'], base.slice(at));
+      ok(statusOf(q, page, at) !== 'break', `2 + 3 = 5 is not crossed (${id} ${d} ${seed}, line ${at + 1})`);
+    }
+    ok(statusOf(q, ['2 + 3 = 6'], 0) !== 'ok', `2 + 3 = 6 is not ticked (${id} ${d} ${seed})`);
+  }
+}
+
+// ── a function value is a claim, not a label (the area stages) ─────────────────────────────────────────────────────────────────
+{
+  const q = gen('y12-integration', 3, 83);
+  const page = l => ['F(x) = (((3x + 3)^(4))/(12))', l, '1620'];
+  for (const bad of ['F(3)=1728-108', 'F(3)F(1)=1728-108', '-F(1)=1728-108', 'F(1)=1728-108']) ok(statusOf(q, page(bad), 1) !== 'ok', `an area line that names F at a number is not ticked for the difference: ${bad}`);
+  ok(statusOf(q, page('F(3)-F(1)=1728-108'), 1) === 'ok', 'F(3) - F(1) = 1728 - 108 is ticked');
+  const q2 = gen('y12-integration', 3, 20);
+  ok(statusOf(q2, ['F(x) = (((4x + 2)^(4))/(16))', 'F(1)=81-1', '80'], 1) !== 'ok', 'F(1) = 81 - 1 is not ticked (F(1) is 81)');
+}
+
+// ── a rounded value is ticked only as the correct rounding or truncation to the places it shows ───────────────────────────────
+{
+  const q = gen('y12-financial', 3, 19);
+  const page = v => ['FV = a(((1+r)^n - 1)/(r)) = 2600(((1.06)^(20) - 1)/(0.06))', `(1.06)^(20) = ${v}`];
+  // (1.06)^20 = 3.20713547...
+  for (const bad of ['3.2070', '3.2072', '3.206', '3.208', '3.20712', '3.20715']) ok(statusOf(q, page(bad), 1) !== 'ok', `a value one digit off is not ticked: (1.06)^(20) = ${bad}`);
+  ok(statusOf(q, page('3.207'), 1) === 'ok', 'the authored 3.207 is ticked');
+  // 3.20714 is NOT one digit off: 3.20713547... correct to 5 places IS 3.20714, so the page shows it ticked (the pass of engine/provedLines.js, feedback only); 3.20715 above is the wrong one
+  ok(statusOf(q, page('3.20714'), 1) === 'ok', '3.20714 is the correct rounding to 5 places and is ticked');
+  const m = mutationsOf('x = 1') ; ok(Array.isArray(m), 'mutationsOf still reads a plain line');
+  const kinds = roundingMutants('(1.06)^(20) = 3.207').map(x => x.text);
+  for (const t of ['(1.06)^(20) = 3.2070', '(1.06)^(20) = 3.2072', '(1.06)^(20) = 3.206', '(1.06)^(20) = 3.208']) ok(kinds.includes(t), `the harness generates the rounding mutant ${t}`);
+}
+
+// ── a lazy `=` that begins the next step ──────────────────────────────────────────────────────────────────────────────────────
+{
+  // `x = π/2` then `= 8` (the area): the value the worked solution reaches, begun under an unrelated value, is the start of the next step, never a false rewrite
+  for (const [d, sd] of [[3, 104], [3, 109], [4, 104], [4, 109]]) {
+    const q = gen('y12-trigcalc', d, sd);
+    const lines = authoredPage(q, (await import('../../client/src/engine/solutionMatch.js'))._internals.spanToPlain);
+    const at = lines.findIndex(l => /^=/.test(l));
+    ok(at < 0 || statusOf(q, lines, at) !== 'break', `y12-trigcalc ${d} ${sd}: the line "${lines[at]}" is not crossed`);
+    ok(at >= 0, `y12-trigcalc ${d} ${sd}: the authored page has a lazy "=" line`);
+  }
+}
+
+// ── a root the question states rounded (answer.tol) ──────────────────────────────────────────────────────────────────────────
+{
+  // the diagnosis never says a line "lost a root" or "is false" for a root it holds to within the question's own rounding
+  const { diagnoseStep } = await import('../../client/src/engine/diagnose.js');
+  const lost = diagnoseStep({ brokenText: 'x^2 = 2', meta: { kind: 'equation', variable: 'x', solutions: [1.41, 3], tol: 0.01 } });
+  ok(lost && lost.code === 'lost-root', `rounded root: the line holds at 1.41 within the stated rounding, so only 3 is lost (${lost && lost.code})`);
+  const none = diagnoseStep({ brokenText: 'x^2 = 2', meta: { kind: 'equation', variable: 'x', solutions: [1.41], tol: 0.01 } });
+  ok(none === null, `rounded root: no counterexample against a root the line holds to within the stated rounding (${none && none.code})`);
+  const wrong = diagnoseStep({ brokenText: 'x^2 = 5', meta: { kind: 'equation', variable: 'x', solutions: [1.41], tol: 0.01 } });
+  ok(wrong !== null, 'rounded root: a line that fails at the root even within the rounding is still diagnosed');
+}
+{
+  // the local backend names the same step metadata as the server's marker (tol included)
+  const B = await import('../../client/src/local/backend.js');
+  let n = 0, withTol = 0, same = 0;
+  for (const id of ['y11-sine-cosine-rule', 'y12-explogcalc', 'y12-trigcalc', 'y11-explog', 'y12-appdiff']) for (let d = 1; d <= 4; d++) for (let sd = 1; sd <= 3; sd++) {
+    let q; try { q = G.generateQuestion(id, d, sd); } catch { continue; }
+    n++; if (q.answer && q.answer.tol > 0) withTol++;
+    if (JSON.stringify(B.examStepMeta(q)) === JSON.stringify(stepMetaFor(q))) same++;
+  }
+  ok(n >= 40 && withTol >= 10, `step metadata sample is not trivial (${n} questions, ${withTol} with a stated rounding)`);
+  ok(same === n, `the local backend and the server's marker read the same step metadata (${same} of ${n})`);
+}
+
+// ── the recorded corpus ────────────────────────────────────────────────────────────────────────────────────────────────────────
+const corpus = JSON.parse(fs.readFileSync(new URL('./fixtures/marking-mutation-corpus.json', import.meta.url), 'utf8'));
+let corpusFalse = 0, corpusCross = 0, corpusFalseTicked = 0, corpusCrossed = 0, corpusInserted = 0;
+{
+  const E = await loadEngine(new URL('../..', import.meta.url).pathname);
+  const pageOf = (generator, difficulty, seed) => {
+    const q = E.G.generateQuestion(generator, difficulty, seed);
+    const lines = authoredPage(q, E.spanToPlain);
+    return { q, lines, answer: typedAnswer(q, 'wrong', lines) };
+  };
+  const cache = new Map();
+  const page = (g, d, s) => { const k = `${g}|${d}|${s}`; if (!cache.has(k)) cache.set(k, pageOf(g, d, s)); return cache.get(k); };
+  for (const [g, d, s, i, mutant] of corpus.falseTicks) {
+    const { q, lines, answer } = page(g, d, s);
+    const p = lines.slice(); p[i] = mutant;
+    const rl = lineAt(markPage(E, q, answer, p), p, i);
+    corpusFalse++;
+    if (rl && rl.status === 'ok' && !/in front of it was not read/.test(rl.note || '')) { corpusFalseTicked++; ok(false, `corpus: ${g} ${d} ${s} line ${i + 1} is ticked again: ${mutant}`); }
+  }
+  for (const [g, d, s, i] of corpus.trueCrosses) {
+    const { q, lines, answer } = page(g, d, s);
+    const p = lines;
+    const rl = lineAt(markPage(E, q, answer, p), p, i);
+    corpusCross++;
+    if (rl && rl.status === 'break') { corpusCrossed++; ok(false, `corpus: ${g} ${d} ${s} line ${i + 1} is crossed again: ${lines[i]}`); }
+  }
+  let corpusIns = 0, corpusInsCrossed = 0;
+  for (const [g, d, sd, at] of corpus.insertedCrosses) {
+    const { q, lines, answer } = page(g, d, sd);
+    const p = lines.slice(0, at).concat(['2 + 3 = 5'], lines.slice(at));
+    const rl = lineAt(markPage(E, q, answer, p), p, at);
+    corpusIns++;
+    if (rl && rl.status === 'break') { corpusInsCrossed++; ok(false, `corpus: 2 + 3 = 5 is crossed again at line ${at + 1} of ${g} ${d} ${sd}`); }
+  }
+  corpusInserted = corpusIns;
+  ok(corpusIns === corpus.insertedCrosses.length && corpusIns >= 90, `the inserted-line corpus was read whole (${corpusIns})`);
+  ok(corpusFalse === corpus.falseTicks.length && corpusCross === corpus.trueCrosses.length, 'the corpus was read whole');
+  ok(corpusFalse >= 300 && corpusCross >= 20, `the corpus is not trivial (${corpusFalse} false ticks, ${corpusCross} crossed true lines)`);
+}
+
 // ── the harness over the authored pages ──────────────────────────────────────────────────────────────────────────────────────
 {
-  const res = await run({ seeds: [1, 2], maxPerLine: 8 });
+  const res = await run({ seeds: SEEDS, maxPerLine: 8 });
   const t = res.totals;
-  console.log(`harness: ${t.pages} pages, ${t.lines} authored lines, ${t.mutants} provably wrong mutants (${t.echoes || 0} true restatements and ${t.nameDefinitions || 0} name definitions set aside); ticks on authored lines ${t.trueTicks}`);
+  const aside = Object.entries(res.setAside).sort().map(([k, v]) => `${k} ${v}`).join(', ');
+  console.log(`MARKING MUTATION COUNTS: seeds ${SEEDS[0]}-${SEEDS[SEEDS.length - 1]}, ${t.pages} pages, ${t.lines} authored lines, ${t.mutants} mutants, false ticks ${t.falseTicks}, true crosses ${t.trueCrosses}, inserted true lines ${t.insertedTrue || 0} (crossed ${t.insertedTrueCrosses || 0}), authored ticks ${t.trueTicks}, margin-number ticks ${t.marginNumberTicks || 0} (owner rule, own class), name definitions ${t.nameDefinitions || 0}, set aside as true statements ${t.echoes || 0} (${aside}), corpus ${corpusFalse} false ticks, ${corpusCross} crossed true lines and ${corpusInserted} crossed inserted true lines (ticked again ${corpusFalseTicked}, crossed again ${corpusCrossed})`);
   ok(t.pages >= 200 && t.mutants >= 2500, `the sample is not trivial (${t.pages} pages, ${t.mutants} mutants)`);
   ok(t.trueCrosses === 0, `no authored true line is crossed (${t.trueCrosses}: ${JSON.stringify(res.failures.trueCrosses.slice(0, 3))})`);
   ok(t.falseTicks === 0, `no provably wrong mutant is ticked (${t.falseTicks}: ${JSON.stringify(res.failures.falseTicks.slice(0, 3))})`);
-  ok(t.trueTicks >= 600, `authored true lines are still ticked (${t.trueTicks})`);
+  ok(t.trueTicks >= 600 * SEEDS.length / 2, `authored true lines are still ticked (${t.trueTicks})`);
   // the probes of the new tick classes (solution lists, ± pairs, rounded values, labelled substitutions): built here, mutated one edit at a time
   ok(res.probe.mutants >= 500 && res.probe.trueLines >= 150, `the probes are not trivial (${res.probe.trueLines} true lines, ${res.probe.mutants} mutants)`);
   ok(res.probe.falseTicks === 0, `no probe mutant is ticked (${res.probe.falseTicks})`);

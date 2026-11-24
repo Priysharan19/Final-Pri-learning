@@ -91,7 +91,9 @@ export const milestoneNote = m => `Matches step ${m.step + 1} of the method${m.h
 export function isWorkedSum(plain) {
   try {
     const count = n => (!n || typeof n !== 'object' || n.t === 'call' ? 0 : n.t === 'num' ? 1 : ['l', 'r', 'v', 'arg'].reduce((a, k) => a + count(n[k]), 0));
-    return count(parse(normalize(String(plain)))) >= 4;
+    const ast = parse(normalize(String(plain)));
+    // numbers worked out in place: a side with a letter in it (`(3x + 4)^3 / 9`) is an expression, not a value being worked out
+    return !variablesOf(ast).size && count(ast) >= 4;
   } catch { return false; }
 }
 

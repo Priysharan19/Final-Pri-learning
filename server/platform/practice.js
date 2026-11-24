@@ -1604,7 +1604,10 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         ? schemePay({ q, report: evidence.stepReport || null, topic: evidence.topicTicks ?? null, correct: result.correct === true, marksPossible, env }) : null;
       const counted = resolved && (finalAnswerOnly || schemeQuestion)
         ? { stepReport: evidence.stepReport || null, partial: scheme?.paid && !result.correct ? scheme.partial : null, ...(schemeQuestion && evidence.topicTicks !== undefined ? { topicTicks: evidence.topicTicks } : {}) } : evidence;
-      const { stepReport, partial, markingReport } = resolved ? counted : { stepReport: null, partial: null };
+      const { stepReport: engineReport, partial, markingReport } = resolved ? counted : { stepReport: null, partial: null };
+      // What the page draws is the engine's report with the lines Pri can prove true ticked (markerOps `shownReport`, engine/provedLines.js): feedback only.
+      // Every mark, the scheme pay (above, from evidence.stepReport) and the generic rule read the engine's report, which has none of those ticks.
+      const stepReport = resolved && !workingNotRead && evidence && evidence.shownReport && engineReport === (evidence.stepReport || null) ? evidence.shownReport : engineReport;
       const notRead = resolved && workingNotRead && working.trim() !== '';
       // After the engine's step check, never before it, and rules only (the model arm is unreachable here).
       const lineInterpretation = resolved && !invalid && !notRead

@@ -15,12 +15,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as G from '../client/src/engine/generators/index.js';
-import { stepMetaFor, stepEvidence } from '../server/platform/markerOps.js';
+import { stepMetaFor, stepEvidence, marksPossibleFor } from '../server/platform/markerOps.js';
 import { checkAnswer } from '../client/src/engine/checker.js';
 import { publicDescription } from '../server/platform/lineInterpreter/givens.js';
 import { makeFn, polynomial, extremes } from '../server/platform/lineInterpreter/truth.js';
 import { SCHEMES, UNAVAILABLE, schemeDigest, awardScheme } from '../server/platform/schemeAward.js';
 import { transcriptsFor } from './understanding-audit/corpus.mjs';
+import { parse, normalize } from '../client/src/engine/expr.js';
+import { differentiateAst } from '../client/src/engine/reason-v2.js';
+import { evaluate } from '../client/src/engine/expr.js';
+import { prettyText } from '../client/src/engine/schemePlans.js';
+import { genericPacket } from './generic-steps-packet.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const OUT_DIR = path.join(ROOT, 'owner-review', 'method-marks');
@@ -275,13 +280,116 @@ const EQUATION_CANNOT = [
 EXTRAS['y12-trig-extreme-2'] = { ...EXTRAS['y12-trig-extreme'], form: 'A model such as h(t) = 14 + 11 sin(pi t / 6) is given. The student finds its greatest or least value. This version is for questions worth two marks.', cannot: [...EXTRAS['y12-trig-extreme'].cannot, 'It does not require both the amplitude and the midline: either one, correctly stated, earns the working mark.'] };
 for (const id of ['y7-equation-solve-2', 'y7-equation-solve-3', 'y10-quadratic-solve-2', 'y10-quadratic-solve-3']) EXTRAS[id] = { form: '' + (id.startsWith('y10') ? 'A quadratic equation is given and the student finds all its solutions.' : 'An equation in one letter is given, or arises from a short word problem, and the student finds the value of the letter.') + ' This version is for ' + (id.endsWith('2') ? 'two' : 'three') + '-mark questions.', cannot: EQUATION_CANNOT, build: equationBuild };
 
+
+// ── Years 11-12 coverage pass (24 Nov 2026): product and quotient rule as an expression; the gradient at a point ───────────────────────────
+const diffText = src => prettyText(differentiateAst(parse(normalize(src)), 'x'));
+const at = (text, x0) => text.replace(/(?<![A-Za-z])x(?![A-Za-z])/g, `(${x0})`);
+EXTRAS['y12-diff-rules-3'] = {
+  marksMatch: true,
+  form: 'A function of x is given and the student is asked to differentiate it, using the product rule or the quotient rule, and give the answer in a stated form. This version is for questions worth three marks.',
+  cannot: [
+    'It cannot tell which rule the student used. A correct derivative earns the first criterion however it was found.',
+    'It cannot tell a worthwhile rewrite from a reordering. A second correct line earns the second criterion if its right-hand side is not the same as an earlier line\'s once spaces are ignored, so the same derivative written in two forms earns both.',
+    'It reads a derivative only when the line is labelled dy/dx, y\' or f\'(x).'
+  ],
+  async build(q) {
+    const key = String(q.answer.expr);
+    const rule = diffText(descOf(q).functions[0].rhs);
+    const w = await firstWrong(q, c => `dy/dx = ${c}`, bumpedExprs(key));
+    if (!rule || !w) return null;
+    return { full: [`dy/dx = ${rule}`, `dy/dx = ${key}`], partial: [`dy/dx = ${rule}`, `dy/dx = ${w.text}`], zero: [`dy/dx = ${w.text}`, `dy/dx = ${w.text} + 1`], slip: [`dy/dx = ${w.text}`, `= ${w.text}`] };
+  }
+};
+const GRADIENT_CANNOT = [
+  'It reads a derivative only when the line is labelled dy/dx, y\' or f\'(x); a line that only restates the function earns nothing.',
+  'It cannot tell which rule the student used, or judge a long written reason.',
+  'The substitution line must be the derivative the student wrote, with the value put in, term by term. A sum that merely comes to the same value, or the value alone, is a true line but does not show the substitution, so it earns nothing for it.',
+  'The gradient is read from the final answer only (the answer checker); a rounded decimal on a working line is not matched.'
+];
+const gradientBuild = three => async function build(q) {
+  const st = q.stepcheck.stages; const x0 = st[1].substitutions.x; const D = diffText(st[0].source); const S = at(D, x0);
+  const final = num(q.answer.value); const wrongFinal = num(q.answer.value + 1);
+  const w = await firstWrong(q, c => `dy/dx = ${c}`, bumpedExprs(D));
+  if (!D || !w) return null;
+  return three
+    ? { full: [`dy/dx = ${D}`, `dy/dx = ${S}`, `dy/dx = ${final}`], partial: [`dy/dx = ${D}`, `dy/dx = ${S}`, `dy/dx = ${wrongFinal}`], zero: [`dy/dx = ${w.text}`, `dy/dx = ${wrongFinal}`], slip: [`dy/dx = ${w.text}`, `dy/dx = ${at(w.text, x0)}`, `dy/dx = ${wrongFinal}`] }
+    : { full: [`dy/dx = ${D}`, `dy/dx = ${final}`], partial: [`dy/dx = ${D}`, `dy/dx = ${wrongFinal}`], zero: [`dy/dx = ${w.text}`, `dy/dx = ${wrongFinal}`], slip: [`dy/dx = ${w.text}`, `= ${w.text}`] };
+};
+EXTRAS['y12-diff-gradient-2'] = { marksMatch: true, form: 'A function of x is given and the student finds its gradient at a stated value of x (two marks).', cannot: GRADIENT_CANNOT, build: gradientBuild(false) };
+EXTRAS['y12-diff-gradient-3'] = { marksMatch: true, form: 'A function of x is given and the student finds its gradient at a stated value of x (three marks): differentiate, put the value in, evaluate.', cannot: GRADIENT_CANNOT, build: gradientBuild(true) };
+
+// ── definite integrals (24 Nov 2026) ─────────────────────────────────────────────────────────────────────────────────────────
+const gcd = (a, b) => (b ? gcd(b, a % b) : Math.abs(a));
+const fracText = (n, d) => { const g = gcd(n, d) || 1; const [a, b] = [n / g, d / g]; return b === 1 ? (a < 0 ? `(${a})` : String(a)) : `(${a}/${b})`; };
+// An antiderivative of the integrand as text, only for a polynomial with whole-number coefficients over small denominators (anything else: null).
+function primitiveText(f) {
+  const ast = parse(normalize(f));
+  const ys = Array.from({ length: 8 }, (_, i) => evaluate(ast, { x: i }));
+  // finite differences give the polynomial's coefficients in the Newton basis; solve for the monomial coefficients by Vandermonde elimination
+  const n = 7; const A = ys.slice(0, n).map((_, r) => Array.from({ length: n }, (_, c) => r ** c)); const b = ys.slice(0, n).slice();
+  for (let c = 0; c < n; c++) { let p = c; for (let r = c + 1; r < n; r++) if (Math.abs(A[r][c]) > Math.abs(A[p][c])) p = r; [A[c], A[p]] = [A[p], A[c]]; [b[c], b[p]] = [b[p], b[c]];
+    for (let r = 0; r < n; r++) if (r !== c) { const m = A[r][c] / A[c][c]; for (let k = c; k < n; k++) A[r][k] -= m * A[c][k]; b[r] -= m * b[c]; } }
+  const co = b.map((v, i) => v / A[i][i]);
+  if (!co.every(c => Math.abs(c * 12 - Math.round(c * 12)) < 1e-6)) return null;
+  const x7 = evaluate(ast, { x: 7.5 }); if (Math.abs(co.reduce((s, c, i) => s + c * 7.5 ** i, 0) - x7) > 1e-6 * Math.max(1, Math.abs(x7))) return null;
+  const terms = co.map((c, i) => [Math.round(c * 12), i]).filter(([c]) => c !== 0).map(([c12, i]) => `${i === 0 ? 'x' : `x^${i + 1}`}*${fracText(c12, 12 * (i + 1))}`);
+  return terms.length ? terms.join(' + ') : null;
+}
+const integralBuild = three => async function build(q) {
+  const st = q.stepcheck.stages; const lo = st[0].lower, hi = st[0].upper;
+  if (!Number.isInteger(lo) || !Number.isInteger(hi)) return null;
+  const F = primitiveText(st[0].integrand);
+  if (!F) return null;
+  const atX = (t, v) => t.replace(/(?<![A-Za-z])x(?![A-Za-z])/g, `(${v})`);
+  const finalText = num(q.answer.value); const wrongFinal = num(q.answer.value + 1);
+  const wrongF = await firstWrong(q, c => `F(x) = ${c}`, bumpedExprs(F));
+  if (!wrongF) return null;
+  // A zero limit is written 0: a bumped number inside a term whose base is 0 would leave the line true.
+  const sideOf = (t, v) => (v === 0 ? '0' : `(${atX(t, v)})`);
+  const sub = `= ${sideOf(F, hi)} - ${sideOf(F, lo)}`;
+  const wrongSub = `= ${sideOf(wrongF.text, hi)} - ${sideOf(wrongF.text, lo)}`;
+  return three
+    ? { full: [`F(x) = ${F}`, sub, `= ${finalText}`], partial: [`F(x) = ${F}`, sub, `= ${wrongFinal}`], zero: [`F(x) = ${wrongF.text}`, `= ${wrongFinal}`], slip: [`F(x) = ${wrongF.text}`, wrongSub, `= ${wrongFinal}`] }
+    : { full: [`F(x) = ${F}`, `= ${finalText}`], partial: [`F(x) = ${F}`, `= ${wrongFinal}`], zero: [`F(x) = ${wrongF.text}`, `= ${wrongFinal}`], slip: [`F(x) = ${wrongF.text}`, `= ${wrongF.text}`] };
+};
+const INTEGRAL_CANNOT = [
+  'It cannot tell which method the student used. Any function on a line whose derivative is the integrand earns the first criterion, however it was found, and in any form or constant.',
+  'It reads an antiderivative written as F(x) = ..., after the integral sign, or inside a bracket with its limits. A line that is not an antiderivative of this integrand is left without a verdict, never marked wrong.',
+  'The limits criterion needs the antiderivative to be written on its own earlier line, and the substitution to be a difference of two numbers, each exact (a fraction, a surd or a whole-number sum), that are that antiderivative at the upper and at the lower limit. A rounded decimal, or a difference that merely comes to the value, earns nothing.',
+  'Integration by substitution, an area between two curves, an area that crosses the axis and a question about an unknown limit are not read: those questions stay on the final answer.'
+];
+EXTRAS['y12-integral-2'] = { marksMatch: true, form: 'A definite integral is given, or the area under a curve between two values of x, and the student finds its value (two marks).', cannot: INTEGRAL_CANNOT, build: integralBuild(false) };
+EXTRAS['y12-integral-3'] = { marksMatch: true, form: 'A definite integral is given, or the area under a curve between two values of x, and the student finds its value (three marks): integrate, put the limits in, subtract.', cannot: INTEGRAL_CANNOT, build: integralBuild(true) };
+
+// ── tangent and normal (24 Nov 2026) ───────────────────────────────────────────────────────────────────────────────────────
+EXTRAS['y12-tangent-3'] = {
+  marksMatch: true,
+  form: 'The equation of the tangent, or of the normal, to a curve at a stated value of x is asked for, in the form y = mx + c (three marks).',
+  cannot: [
+    'It reads the derivative only when the line is labelled dy/dx, y\' or f\'(x), and the gradient only when it is labelled m, m_T, gradient or dy/dx with the value at the point. The point of contact, the point-gradient line and the normal\'s own gradient are not marked as criteria.',
+    'A normal question is paid for the tangent\'s gradient (the method both share); the normal\'s gradient is not a criterion.',
+    'The equation is read from the final answer only (the answer checker), in the form the question asks.'
+  ],
+  async build(q) {
+    const st = q.stepcheck.stages; const x0 = st[1].substitutions.x; const D = diffText(st[0].source); const S = at(D, x0);
+    const key = String(q.answer.expr); const slope = num(st[1].expected);
+    const w = await firstWrong(q, c => `dy/dx = ${c}`, bumpedExprs(D));
+    const wrongKey = bumpedExprs(key).find(c => c !== key);
+    if (!D || !w || !wrongKey) return null;
+    return {
+      full: [`dy/dx = ${D}`, `m = ${S} = ${slope}`, `y = ${key}`],
+      partial: [`dy/dx = ${D}`, `m = ${S} = ${slope}`, `y = ${wrongKey}`],
+      zero: [`dy/dx = ${w.text}`, `y = ${wrongKey}`],
+      slip: [`dy/dx = ${w.text}`, `= ${w.text}`]
+    };
+  }
+};
+
 export const TYPES = SCHEMES.map(s => ({ ...s, ...EXTRAS[s.id] }));
 
 // ── types the marked page cannot verify line by line (server/platform/schemeAward.js UNAVAILABLE) ─
 const UNAVAILABLE_PROBES = {
-  'y12-diff-gradient': { family: 'y12-diff', d: 1, seed: 29, lines: ['dy/dx = 24x^2 + 72x + 54', 'dy/dx = 150'], unverified: [1] },
-  'y12-stationary-x': { family: 'y12-appdiff', d: 1, seed: 7, lines: ['dy/dx = 6x^2 - 294', 'Let dy/dx = 0', '6x^2 - 294 = 0', 'x = -7 or x = 7'], unverified: [1, 2] },
-  'y12-tangent': { family: 'y12-appdiff', d: 3, seed: 7, lines: ['dy/dx = 2x - 5', 'y(1) = 2', 'y = -3x + 5'], unverified: [1] }
+  'y12-stationary-x': { family: 'y12-appdiff', d: 1, seed: 7, lines: ['dy/dx = 6x^2 - 294', 'Let dy/dx = 0', '6x^2 - 294 = 0', 'x = -7 or x = 7'], unverified: [1, 2] }
 };
 const UNAVAILABLE_PROBED = UNAVAILABLE.map(u => ({ ...u, probe: UNAVAILABLE_PROBES[u.id] }));
 
@@ -290,12 +398,9 @@ const UNAVAILABLE_PROBED = UNAVAILABLE.map(u => ({ ...u, probe: UNAVAILABLE_PROB
 // criterion in question. The tool runs it and fails loudly if any of those lines turns out to be
 // verified, so a reason on this list can never go out of date unnoticed.
 const UNPROVABLE = [
-  { id: 'y12-integrals', title: 'Definite integrals and areas under a curve', course: 'Year 12 Mathematics Advanced', level: 1, families: ['y12-integration', 'y12-integral-calc'],
-    reason: 'The engine cannot read an antiderivative or an integral line, so "integrates correctly" and "substitutes the limits" cannot be decided; only the final value is checked.',
-    probe: { family: 'y12-integration', d: 2, seed: 11, lines: ['∫ = x^3 + x^2', '[2x^3/3 + x^2] from 0 to 2', '9.333'], unverified: [1, 2] } },
-  { id: 'y12-integrals-indefinite', title: 'Indefinite integrals and the reverse chain rule', course: 'Year 12 Mathematics Advanced', level: 1, families: ['y12-integration', 'y12-integral-calc', 'y12-trigcalc'],
-    reason: 'The engine cannot read an antiderivative line, so no stage of the method can be decided apart from the final expression.',
-    probe: { family: 'y12-integral-calc', d: 2, seed: 23, lines: ['∫(3x^2+6)dx = x^3+6x', '(2)^3 + 6(2) - 0', '20'], unverified: [1] } },
+  { id: 'y12-integrals-indefinite', title: 'The reverse chain rule: find the constant that makes an antiderivative true', course: 'Year 12 Mathematics Advanced', level: 1, families: ['y12-integration'],
+    reason: 'The question gives the form of the antiderivative and asks for one constant, and a line such as "u = x^2 + 7" is a choice of notation, so no stage of the method can be decided from the lines; only the final value is checked. (A definite integral, or the area under a curve, now has a scheme: its antiderivative line is checked by differentiating it. A question that asks for the antiderivative itself is answered in one line, so a second criterion would pay that line twice.)',
+    probe: { family: 'y12-integration', d: 1, seed: 1, lines: ['u = x^2 + 7', 'du = 2x dx'], unverified: [1, 2] } },
   { id: 'y12-stationary-nature', title: 'Nature of a stationary point', course: 'Year 12 Mathematics Advanced', level: 1, families: ['y12-appdiff'],
     reason: 'The nature question is multiple choice, and the second derivative is not a line the page can check, so "determines the nature" cannot be decided from the lines.',
     probe: { family: 'y12-appdiff', d: 2, seed: 23, lines: ["y' = -2(x + 3)", "y'' = -2", 'maximum'], unverified: [2] } },
@@ -334,6 +439,8 @@ async function findSamples(type) {
         let q; try { q = G.generateQuestion(fam, d, seed); } catch { continue; }
         if (!q || seen.has(q.prompt)) continue;
         let ok = false; try { ok = !!type.pick(q); } catch { ok = false; }
+        // A type added in the Years 11-12 pass is shown on questions worth the marks of its scheme (the older packets are unchanged).
+        if (ok && type.marksMatch && marksPossibleFor(q) !== type.criteria.reduce((n, c) => n + c.marks, 0)) ok = false;
         if (ok) { seen.add(q.prompt); out.push(q); }
       }
     }
@@ -466,13 +573,15 @@ export async function build() {
     `- Criteria in all: ${crit}. Earned by a ticked line of the marked page: ${by('line')}. Earned by a correct final answer (the answer checker): ${by('final')}.`,
     `- Size of the review job: ${done.length} types, about ${awardsToRead} worked awards to read (one full, one partial, one zero and one earlier-slip award for each type), and ${crit} criteria whose marks to set.`, '',
     '## Not available yet', '',
-    'These three question types had a draft in an earlier version of this packet. They are NOT available now: the marked page the student sees cannot verify one of their criteria line by line, and the server pays only from that page, so nothing about them can be approved or paid. Each reason was checked by running a plausible correct transcript.', '',
+    'These question types had a draft in an earlier version of this packet. They are NOT available now: the marked page the student sees cannot verify one of their criteria line by line, and the server pays only from that page, so nothing about them can be approved or paid. Each reason was checked by running a plausible correct transcript.', '',
     ...notProvable.filter(n => n.unavailable).map(n => `- ${plain(n.title)} (${n.course}; families ${n.families.map(f => `\`${f}\``).join(', ')}): ${plain(n.reason)}`),
     '', '## Could not be given a provable scheme', '',
     'These types were tried. A scheme is not offered because at least one criterion cannot be decided by the engine from the student\'s lines. Each reason was checked by running a plausible correct transcript.', '');
   notProvable.filter(n => !n.unavailable).sort((a, b) => a.level - b.level).forEach(n => I.push(`- ${plain(n.title)} (${n.course}; families ${n.families.map(f => `\`${f}\``).join(', ')}): ${plain(n.reason)}`));
-  I.push('');
+  I.push('', '## One rule for every multi-mark written question', '',
+    'Besides the per-type schemes above, one generic rule can pay step marks for a wrong or missing final answer on most multi-mark written Year 11 and Year 12 questions, from each question\'s own authored worked solution. It is a separate approval, not one of the types above, and it is not approved. Read [generic-solution-steps.md](generic-solution-steps.md).', '');
   files.set('INDEX.md', plain(I.join('\n')));
+  files.set('generic-solution-steps.md', plain(await genericPacket({ banner: BANNER })));
   const json = {
     status: 'draft: not approved',
     types: sorted.map(d => ({

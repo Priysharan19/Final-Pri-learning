@@ -56,7 +56,7 @@ const CBSE_POLICY_ITEMS = [
   { id: 'cbse-call:class-xi-least-value-d3', text: 'Class XI least-value D3 three-mark scheme is final-answer-only (dossier §5).' }
 ];
 // The dossier's own fixed seeds; the first one on which the bank issues a step check.
-const CBSE_SEEDS = Array.from({ length: 24 }, (_, i) => 1009 + i * 7919);
+const CBSE_SEEDS = Array.from({ length: 48 }, (_, i) => 1009 + i * 7919);
 const cbseCases = cbseBanks.map(b => {
   const seed = CBSE_SEEDS.find(s => { try { return !!generateQuestion(b.generator, b.difficulty, s)?.stepcheck; } catch { return false; } });
   if (seed === undefined) fail(`${b.id} issues no step check on the dossier's seeds`);

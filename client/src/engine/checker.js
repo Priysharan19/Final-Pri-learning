@@ -1107,6 +1107,30 @@ function restatesQuestionSide(ast, meta, prompt) {
   } catch { /* nothing restated */ }
   return false;
 }
+/**
+ * One side of the line IS a side of the question's own equation (as a function) and the other side is NOT the question's other side, and the two
+ * sides are not equal: `3x^3 - 24x^2 + 27x + 54 = 2(x-6)(x-3)(x+1)` under `... = 0`. It is an equation with the same roots only by accident of
+ * the constant, and as a statement (a factorisation) it is false: sharing roots makes it neither true nor a step. Never a tick; a note.
+ */
+function changesOneSideOfTheQuestion(ast, meta, prompt) {
+  try {
+    if (!ast || ast.t !== 'equation') return false;
+    if (exprEquivalent(ast.l, ast.r) === true) return false;   // a true identity is decided elsewhere
+    let changes = false;
+    for (const claim of questionClaims(meta, prompt)) {
+      if (claim.kind !== 'equation') continue;
+      for (const [gl, gr] of [[claim.ast.l, claim.ast.r], [claim.ast.r, claim.ast.l]]) {
+        for (const [ml, mr] of [[ast.l, ast.r], [ast.r, ast.l]]) {
+          if (!variablesOf(gl).size || exprEquivalent(ml, gl) !== true) continue;
+          if (exprEquivalent(mr, gr) === true) return false;     // the question's equation, restated
+          if (variablesOf(mr).size) changes = true;     // `S = 0` for a constant other side is an equation to solve, not a claim that two expressions are equal
+        }
+      }
+    }
+    return changes;
+  } catch { /* undecided: leave it to the checks below */ }
+  return false;
+}
 const SIDE_DEFINITION = /^(?:d?[uvw]'?|d\/d[uvw].*)=|^d[uvw]\/d[xyt]=|^[uvw]'\(?[xyt]?\)?=/i;
 // A line about a method step (an integral of another integrand, an arrow, a differentiation check, an
 // intermediate with another letter) is not the answer's own chain, so it is never crossed.
@@ -1296,7 +1320,18 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
       // Authored derivative metadata lets Pri verify the mathematical operation,
       // not merely whether the student's final expression happens to match.
       if (meta?.kind === 'derivative') {
-        const assessed = namesAValue(proseClean, meta)
+        // A self-contained numeric statement that is TRUE (`2 + 3 = 5`) says nothing about the derivative: never crossed for not being one.
+        const arithmeticOnly = (() => {
+          try {
+            const sides = normalize(proseClean).split('=').map(x => x.trim());
+            if (sides.length < 2 || sides.some(x => !x)) return false;
+            const vals = sides.map(x => { const a = parse(x); return variablesOf(a).size ? NaN : evaluate(a, {}); });
+            return vals.every(v => Number.isFinite(v) && Math.abs(v - vals[0]) <= 1e-9 * Math.max(1, Math.abs(v)));
+          } catch { return false; }
+        })();
+        const assessed = arithmeticOnly
+          ? { status: 'note', note: 'This is a true statement of arithmetic, not a claim about the derivative, so it is not checked as one.' }
+          : namesAValue(proseClean, meta)
           ? { status: 'note', note: 'This gives a value, not a derivative, so it is not checked as one.' }
           : (named
             // Named slips only for a whole question's own working. A stage of a proof plan keeps
@@ -1373,6 +1408,10 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
             lineDiagnosis = assessed.diagnosis || null;
             if (status === 'break' && firstBreak === -1) firstBreak = i;
             out.push({ text: line, status, note, otherUnknown: true, ...(lineDiagnosis ? { diagnosis: lineDiagnosis } : {}) });
+            return;
+          }
+          if (ast.t === 'equation' && changesOneSideOfTheQuestion(ast, meta, prompt) && solutionsSatisfying(ast, meta).length === uniqueNumeric(meta.solutions).length) {   // (a line that fails at a root is crossed below, as it always was)
+            out.push({ text: line, status: 'note', note: 'Not checked: this keeps one side of the question\u2019s equation and changes the other, so it is not the same equation and Pri does not mark it as a step.' });
             return;
           }
           if (ast.t === 'equation') {
@@ -2079,6 +2118,18 @@ function assessEvaluationStage(stage, line, ctx) {
   // The line as the assessor reads it: label first, even when the student
   // wrote it last (`9 + 8 × 3 = T_9`).
   const clause = chain?.reversed ? chain.clause : ctx ? cleanLine(raw, { letters: ctx.read.letters }) : raw;
+  // A derived plan (engine/schemePlans.js) judges a chain of equals as the evaluation only when it is labelled (`y'(0) = ...`, `m = ...`): the
+  // numerator `2 - 1 = 1` of an authored true page is a true line on the way, never the value of the gradient. A lone value is still judged.
+  // A chain of equals is the value asked for only when it is labelled with one of the stage's labels (`y'(0) = ...`, `m = ...`); a lone value is
+  // judged as before. Any other chain (`(x + 4) = 5`, `= 3`, `2 - 1 = 1`) is a true or false line of its own, left to the general line checks
+  // (a note here, ticked or crossed by the arithmetic check on its own truth), never the gradient's value.
+  if (stage.requireLabel === true && raw.includes('=')) {
+    const key = t => String(t).toLowerCase().replace(/^(?:∴|so|hence|then|therefore)\s+/, '').replace(/\s+/g, '').replace(/\([^()]*\)$/, '').replace(/[′’‘]/g, "'");
+    const first = key(raw.split('=')[0]);
+    if (!(stage.labels || []).some(l => key(l) === first)) {
+      return { status: 'note', trusted: false, note: 'This line is not labelled as the value asked for (m, gradient or y′(x)), so it is not checked as that value.' };
+    }
+  }
   let verdict = null;
   for (const variant of evaluationVariants(stage, ctx)) {
     const v = assessEvaluationLine({ text: clause, meta: variant.stage });
@@ -2105,6 +2156,7 @@ function assessEvaluationStage(stage, line, ctx) {
   return chained !== verdict ? chained : refineWithTraps(verdict, chain, stage, ctx);
 }
 
+const DERIVATIVE_LABEL = /^(?:d\s*[a-z]\s*\/\s*d\s*[a-z]|dydx|d\s*\/\s*d\s*[a-z]\s*\(.*\)|[a-z]\s*['′’‘°]\s*(?:\(\s*[a-z]\s*\))?|[a-z]\s*\(\s*[a-z]\s*\)\s*['′’‘°])$/i;
 function assessPlanStage(stage, line, ctx = null) {
   if (!stage || typeof stage !== 'object') {
     return { status: 'note', note: 'This proof stage is not configured safely.', trusted: false };
@@ -2128,6 +2180,11 @@ function assessPlanStage(stage, line, ctx = null) {
   }
   if (derivativeSourceLine(stage, line)) {
     return { status: 'note', trusted: false, note: 'Starting function recognised: differentiate it on the next line.' };
+  }
+  // A derived plan (engine/schemePlans.js) judges a line as a derivative only when it says it is one: `y - 2 = -3(x - 1)` is a true line of a tangent
+  // question, not a wrong derivative. An unlabelled line is a note.
+  if (stage.kind === 'derivative' && stage.requireLabel === true && !DERIVATIVE_LABEL.test(String(planClause(line)).split('=')[0].replace(/\s+/g, ' ').trim())) {
+    return { status: 'note', trusted: false, note: 'This line is not labelled as a derivative (dy/dx, y′ or f′(x)), so it is not checked as one.' };
   }
   // `0, 0` lists values; a derivative is one expression. Not judged, never a
   // mistake — as the evaluation stage abstains on a list (reason-v3.js).

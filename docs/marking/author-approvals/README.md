@@ -33,3 +33,12 @@ server also has `PRI_METHOD_MARKS=on`, so no student sees a per-criterion mark y
   method rubric still pays nothing in Australia, and every other Australian question stays on the final answer.
   The examiner rule (`markingPolicy.js`, `PRI_METHOD_MARKS_EXAMINER_RESULT`, `docs/marking/certifications/`) is
   unchanged and still governs India.
+
+## The generic rule (one more approval id)
+
+Besides the question types, the author may approve ONE generic rule that pays step marks drawn from each question's own authored worked solution
+(`server/platform/genericSteps.js`, packet `owner-review/method-marks/generic-solution-steps.md`). Its approval id is `generic-solution-steps`; a record
+for it is the same kind of file, `generic-solution-steps.json`, written by the author himself, naming the rule's digest. Its digest is computed over the
+rule's own code and wording (not from `types.json`), so any edit to the rule revokes an approval, and the seven type digests do not depend on it.
+There is no record for it today: it is a draft and pays nothing. Everything above about gates, labelling and `PRI_METHOD_MARKS=on` applies to it unchanged.
+

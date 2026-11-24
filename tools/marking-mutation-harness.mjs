@@ -20,13 +20,18 @@
 //   --root points the engine at another checkout (the same harness measured against an older tree gives the "before" rate);
 //   --dump writes every authored line's verdict, --compare lists the ticks a tree lost or gained against such a dump.
 //
-// What is NOT held against the marker (counted in the totals, never silently dropped):
+// What is NOT held against the marker (each counted in the totals, by class, never silently dropped):
 //   echoes             a mutant that says something TRUE the page, the question or its solution says elsewhere (another authored line, a root of an
-//                      authored equation, a value the solution reaches, a true identity, a statement true at the question's given point);
+//                      authored equation, a value the solution reaches, a true identity, a statement true at the question's given point). An
+//                      equation between two expressions that both carry the letter is NEVER set aside because it shares roots with another equation:
+//                      it claims its sides are equal, so `P = 2(x-6)(x-3)(x+1)` for a P that is 3(x-6)(x-3)(x+1) is a false line and is held against the
+//                      marker. Only an `expression = number` equation is read by its roots. The totals print the classes (`setAside`);
 //   nameDefinitions   `b = 3 - (-1) = 4` where the page never said what b is: no line can be shown false;
 //   marginNumberTicks the owner's rule of 19 November 2026 (a number from the margin read into the front of a true line is not the line's claim; pinned
-//                      by client/test/arithmetic-lines-check.mjs): such a tick says in words what it left out;
+//                      by client/test/arithmetic-lines-check.mjs): such a tick says in words that the front "was not read". It is its own named class
+//                      and is reported, not counted as a false tick;
 //   undecided         a mutant the harness's own evaluator cannot read: never asserted either way.
+// Also checked: a self-contained TRUE arithmetic line (`2 + 3 = 5`) inserted after the first line and at the end of every authored page is never crossed.
 // ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 import fs from 'node:fs';
 import path from 'node:path';
@@ -353,6 +358,35 @@ export function roundedTrue(line) {
   return Math.round(sc) === d || Math.floor(sc) === d;
 }
 
+/**
+ * `(1.06)^(20) = 3.207` (a value written to some places beside an expression that has none): the value to p places with its last digit one off, both
+ * ways, for the places written and one more. Wrong unless it is the correct rounding or the truncation of the exact value to those places (3.2070 for
+ * 3.20713547 is wrong at four places even though it equals the authored 3.207 as a number, which is why this class has its own oracle).
+ */
+export function roundingMutants(line) {
+  const sides = sidesOf(line);
+  if (sides.length !== 2) return [];
+  const lit = sides.findIndex(x => /^\(?-?\d+\.\d+\)?$/.test(x.replace(/\s+/g, '')));
+  if (lit < 0) return [];
+  const other = sides[1 - lit];
+  if (/^\(?-?\d+(?:\.\d+)?\)?$/.test(other.replace(/\s+/g, ''))) return [];
+  const ev = sideValues(other, []);
+  if (!ev || ev[0] === null || !Number.isFinite(ev[0])) return [];
+  const exact = ev[0], k = sides[lit].replace(/[()\s]/g, '').split('.')[1].length;
+  const out = [];
+  for (const p of [k, k + 1]) {
+    const unit = 10 ** p, r = Math.round(exact * unit) / unit, t = Math.trunc(exact * unit) / unit;
+    for (const d of [-1, 1]) {
+      const v = r + d / unit;
+      if (Math.abs(v - r) < 1e-12 || Math.abs(v - t) < 1e-12 / unit) continue;   // a correct truncation is a correct rounded value
+      const shown = (v < 0 ? '-' : '') + Math.abs(v).toFixed(p);
+      const text = lit === 0 ? `${shown} = ${other}` : `${other} = ${shown}`;
+      if (text.replace(/\s+/g, '') !== line.replace(/\s+/g, '')) out.push({ kind: 'rounding-off-by-one', text });
+    }
+  }
+  return out;
+}
+
 // ── the authored page of a question ───────────────────────────────────────────────────────────────────────────────────────
 const TEX_SPAN = /\$([^$]+)\$/g;
 /** The lines of the question's authored worked solution, as plain text, in order (what a student's true working looks like). */
@@ -452,39 +486,54 @@ function trueAtGivenPoint(mutant, env) {
     return vals.every(v => Number.isFinite(v) && Math.abs(v - vals[0]) <= 1e-7 * Math.max(1, Math.abs(v)));
   } catch { return false; }
 }
-function echoesPage(lines, i, original, mutant, given = [], solutionNumbers = []) {
+/** True when some side of the line has no letter in it: an `expression = 0` (or `= 7`) equation, whose meaning IS its root set. */
+function hasConstantSide(line) { return sidesOf(line).some(x => x && lettersIn(x).length === 0); }
+/**
+ * The class under which a mutant says something TRUE the page, the question or its solution says elsewhere, or null. An equation between two
+ * expressions that both carry the letter is never an echo because it merely shares roots with another equation: it is a claim that the two sides are
+ * EQUAL, and the harness proved they are not (`P = 2(x-6)(x-3)(x+1)` when P = 3(x-6)(x-3)(x+1)).
+ */
+function echoClass(lines, i, original, mutant, given = [], solutionNumbers = []) {
   const others = [...lines.filter((_, j) => j !== i), ...given];
   // a true statement whatever the page says: an identity (`5·1^x - 3 = 2`, `0 = 0`), a root of an equation the page states, or the original equation under another constant factor
-  if (isIdentity(mutant) && !isIdentity(original)) return true;
-  if (satisfiesAPageEquation(mutant, others)) return true;
-  if (trueAtGivenPoint(mutant, givenPoint(given))) return true;
-  { const a = rootsOf(original), b = rootsOf(mutant); if (a && b && a.v === b.v && a.roots.length && a.roots.length === b.roots.length && b.roots.every(r => a.roots.some(q => Math.abs(q - r) < 1e-4))) return true; }
+  if (isIdentity(mutant) && !isIdentity(original)) return 'true-identity';
+  if (satisfiesAPageEquation(mutant, others)) return 'root-of-a-page-equation';
+  if (trueAtGivenPoint(mutant, givenPoint(given))) return 'true-at-the-given-point';
+  if (hasConstantSide(mutant)) { const a = rootsOf(original), b = rootsOf(mutant); if (a && b && a.v === b.v && a.roots.length && a.roots.length === b.roots.length && b.roots.every(r => a.roots.some(q => Math.abs(q - r) < 1e-4))) return 'same-roots-as-the-authored-equation'; }
+  // a sub-chain of another authored line that is itself a true chain (`y = 2` under `y = (1)^2 + 1 = 2`): every side of the mutant is a side of that line
+  { const ms = sidesOf(mutant);
+    if (ms.length >= 2 && others.some(o => {
+      const os = sidesOf(o);
+      if (os.length < ms.length || /,/.test(o) || /,/.test(mutant)) return false;   // (an authored line is a true chain: any of its sides equal each other)
+      const same = (a, b) => { const vars = [...new Set([...lettersIn(a), ...lettersIn(b)])].sort(), x = sideValues(a, vars), y = sideValues(b, vars); return !!x && !!y && x.every((v, k) => (v === null) === (y[k] === null) && (v === null || Math.abs(v - y[k]) <= 1e-9 * Math.max(1, Math.abs(v)))); };
+      return ms.every(m => os.some(t => t === m || same(t, m)));
+    })) return 'a-sub-chain-of-another-line'; }
   const squash = t => String(t).replace(/\s+/g, '');
-  if (others.some(o => squash(o) === squash(mutant) || judgeMutant(o, mutant) === 'same')) return true;
+  if (others.some(o => squash(o) === squash(mutant) || judgeMutant(o, mutant) === 'same')) return 'another-authored-line';
   const sides = sidesOf(mutant);
   // a bare value (one side, no letters) that another line has as a side
   if (sides.length === 1) {
     const vars = lettersIn(sides[0]), mine = sideValues(sides[0], vars);
-    if (mine && others.some(o => sidesOf(o).some(side => { const v = sideValues(side, vars); return v && lettersIn(side).join() === vars.join() && v.every((x, k) => (x === null) === (mine[k] === null) && (x === null || Math.abs(x - mine[k]) <= 1e-9 * Math.max(1, Math.abs(x)))); }))) return true;
+    if (mine && others.some(o => sidesOf(o).some(side => { const v = sideValues(side, vars); return v && lettersIn(side).join() === vars.join() && v.every((x, k) => (x === null) === (mine[k] === null) && (x === null || Math.abs(x - mine[k]) <= 1e-9 * Math.max(1, Math.abs(x)))); }))) return 'a-value-another-line-has';
   }
   // a bare value the page or the solution's own text states (a rounded value counts: 1.571 is π/2 to 3 places)
   if (sides.length === 1) {
     const mv = valuesOf(mutant);
     const near = v => Math.abs(v - mv[0]) <= 5e-4 * Math.max(1, Math.abs(v));
-    if (mv.length === 1 && (others.some(o => valuesOf(o).some(near)) || solutionNumbers.some(near))) return true;
+    if (mv.length === 1 && (others.some(o => valuesOf(o).some(near)) || solutionNumbers.some(near))) return 'a-value-the-page-or-solution-states';
   }
   // a list that keeps only values the original list had
   if (/,/.test(original) && /,/.test(mutant)) {
     const nums = t => [...String(t).matchAll(/-?\d+(?:\.\d+)?/g)].map(x => Number(x[0]));
     const had = nums(original), has = nums(mutant);
-    if (has.length && has.every(v => had.includes(v))) return true;
+    if (has.length && has.every(v => had.includes(v))) return 'a-sub-list-of-the-original';
   }
-  // an equation in one letter whose roots are all roots of another authored equation in that letter
-  const mr = rootsOf(mutant);
+  // an equation in one letter whose roots are all roots of another authored equation in that letter (only where it has a constant side: `expr = 0`)
+  const mr = hasConstantSide(mutant) ? rootsOf(mutant) : null;
   if (mr && mr.roots.length) {
-    for (const o of others) { const orr = rootsOf(o); if (orr && orr.v === mr.v && mr.roots.every(r => orr.roots.some(q => Math.abs(q - r) < 1e-4))) return true; }
+    for (const o of others) { const orr = rootsOf(o); if (orr && orr.v === mr.v && mr.roots.every(r => orr.roots.some(q => Math.abs(q - r) < 1e-4))) return 'roots-of-another-authored-equation'; }
   }
-  return false;
+  return null;
 }
 // A line that gives a bare name (`b = …`) a value the original line's first side did not: the page never says what the name is, so no line can be shown false.
 function definesAName(original, mutant) {
@@ -498,7 +547,7 @@ function pick(list, n) {
   const out = []; for (let k = 0; k < n; k++) out.push(list[Math.floor((k * list.length) / n)]);
   return out;
 }
-function typedAnswer(q, mode, lines) {
+export function typedAnswer(q, mode, lines) {
   // a proof or a piece of working is typed as its last line; any other question gets a wrong number (the repro's) or, in 'right' mode, its key
   if (q.answerType === 'working') return String(lines[lines.length - 1] || '');
   if (mode !== 'right') return '99991';
@@ -509,14 +558,28 @@ function typedAnswer(q, mode, lines) {
   return '99991';
 }
 
-export async function run({ root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), seeds = [1], maxPerLine = 12, generators = null, typed = 'wrong', limitPages = Infinity, verbose = false } = {}) {
+/** The engine of one checkout: the generators, the real marker and the reader of the authored solution. */
+export async function loadEngine(root) {
   const G = await import(path.join(root, 'client/src/engine/generators/index.js'));
   const { NSW_BANK_LEDGER } = await import(path.join(root, 'server/platform/nswBanks.js'));
   const { stepEvidence } = await import(path.join(root, 'server/platform/markerOps.js'));
   const { checkAnswer } = await import(path.join(root, 'client/src/engine/checker.js'));
   const SM = await import(path.join(root, 'client/src/engine/solutionMatch.js'));
   await G.loadAllBanks();
-  const spanToPlain = SM._internals.spanToPlain;
+  return { G, NSW_BANK_LEDGER, stepEvidence, checkAnswer, spanToPlain: SM._internals.spanToPlain };
+}
+/** The real marker's report lines for a page, or null. */
+export function markPage(E, q, answer, page) {
+  const qq = { ...q };
+  let ev; try { ev = E.stepEvidence(qq, answer, page.join('\n'), E.checkAnswer(qq, answer), { slipWarnings: true }); } catch { return null; }
+  return ev && (ev.shownReport || ev.stepReport) && Array.isArray((ev.shownReport || ev.stepReport).lines) ? (ev.shownReport || ev.stepReport).lines : null;
+}
+/** The report's line for page line i: by position when it judged every line, otherwise by the line's text (a proof is judged line by line from its own plan). */
+export const lineAt = (rep, page, i) => (rep && rep.length === page.length ? rep[i] : rep ? rep.find(l => String(l.text ?? '').trim() === page[i].trim()) : undefined);
+
+export async function run({ root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), seeds = [1], maxPerLine = 12, generators = null, typed = 'wrong', limitPages = Infinity, verbose = false } = {}) {
+  const E = await loadEngine(root);
+  const { G, NSW_BANK_LEDGER, spanToPlain, stepEvidence, checkAnswer } = E;
   const cells = [];
   for (const e of NSW_BANK_LEDGER) {
     if (!SCOPE.test(e.generator) || (generators && !generators.includes(e.generator))) continue;
@@ -524,6 +587,7 @@ export async function run({ root = path.resolve(path.dirname(fileURLToPath(impor
   }
   const totals = { pages: 0, lines: 0, trueTicks: 0, trueCrosses: 0, mutants: 0, falseTicks: 0, falseCrosses: 0, notes: 0, undecided: 0, coincidentallyTrue: 0 };
   const byKind = {};
+  const setAside = {};
   const failures = { falseTicks: [], trueCrosses: [] };
   const trueDetail = {};   // `${key}` → [{text,status,note}] per authored line (for the note-class table)
   const trueStatus = {};   // `${generator}|${difficulty}|${seed}` → [status per line]
@@ -540,13 +604,8 @@ export async function run({ root = path.resolve(path.dirname(fileURLToPath(impor
     setDefinitions([...given, ...lines]);
     const solutionNumbers = [...String((q.steps || []).map(x => x && x.d).join(' ')).matchAll(/-?\d+(?:\.\d+)?/g)].map(x => Number(x[0]));
     const answer = typedAnswer(q, typed, lines);
-    const mark = page => {
-      const qq = { ...q };
-      let ev; try { ev = stepEvidence(qq, answer, page.join('\n'), checkAnswer(qq, answer), { slipWarnings: true }); } catch { return null; }
-      return ev && ev.stepReport && Array.isArray(ev.stepReport.lines) ? ev.stepReport.lines : null;
-    };
-    // The report's line for page line i: by position when it judged every line, otherwise by the line's text (a proof is judged line by line from its own plan).
-    const at = (rep, page, i) => (rep && rep.length === page.length ? rep[i] : rep ? rep.find(l => String(l.text ?? '').trim() === page[i].trim()) : undefined);
+    const mark = page => markPage(E, q, answer, page);
+    const at = lineAt;
     const base = mark(lines);
     const key = `${cell.generator}|${cell.difficulty}|${cell.seed}`;
     trueStatus[key] = base ? lines.map((_, i) => { const l = at(base, lines, i); return l ? l.status : 'none'; }) : null;
@@ -559,16 +618,28 @@ export async function run({ root = path.resolve(path.dirname(fileURLToPath(impor
         if (l.status === 'break') { totals.trueCrosses++; failures.trueCrosses.push({ ...cell, line: i, text: lines[i], note: l.note }); }
       });
     }
+    // A self-contained TRUE arithmetic line (`2 + 3 = 5`) put into the page, after the first authored line and at its end, is never crossed.
+    if (base) {
+      for (const at0 of [1, lines.length]) {
+        const page = lines.slice(0, at0).concat(['2 + 3 = 5'], lines.slice(at0));
+        const rep = mark(page);
+        const rl = rep ? lineAt(rep, page, at0) : null;
+        if (!rl) continue;
+        totals.insertedTrue = (totals.insertedTrue || 0) + 1;
+        if (rl.status === 'break') { totals.trueCrosses++; totals.insertedTrueCrosses = (totals.insertedTrueCrosses || 0) + 1; failures.trueCrosses.push({ ...cell, line: at0, text: '2 + 3 = 5 (inserted)', inserted: true, note: rl.note }); }
+      }
+    }
     lines.forEach((line, i) => {
       const wrong = [];
-      for (const m of mutationsOf(line)) {
-        const verdict = judgeMutant(line, m.text);
+      for (const m of [...mutationsOf(line), ...roundingMutants(line)]) {
+        const verdict = m.kind === 'rounding-off-by-one' ? 'wrong' : judgeMutant(line, m.text);
         // A mutant that says what ANOTHER authored line of the page says (x = 2 in place of x = 0 when x = 2 is a root too) is a true
         // statement in the wrong place, not a false line: it is not held against the marker.
-        const rounded = verdict === 'wrong' && roundedTrue(m.text);
-        const echoes = verdict === 'wrong' && !rounded && echoesPage(lines, i, line, m.text, given, solutionNumbers);
+        // a mutant that is still correct to the places it shows (a rounding or a truncation of the exact value) is a true approximation, counted apart
+        const rounded = verdict === 'wrong' && m.kind !== 'rounding-off-by-one' && roundedTrue(m.text);
+        const echo = verdict === 'wrong' && !rounded ? echoClass(lines, i, line, m.text, given, solutionNumbers) : null;
         if (rounded) totals.roundingEchoes = (totals.roundingEchoes || 0) + 1;
-        else if (echoes) totals.echoes = (totals.echoes || 0) + 1;
+        else if (echo) { totals.echoes = (totals.echoes || 0) + 1; setAside[echo] = (setAside[echo] || 0) + 1; }
         else if (verdict === 'wrong' && definesAName(line, m.text)) totals.nameDefinitions = (totals.nameDefinitions || 0) + 1;
         else if (verdict === 'wrong') wrong.push(m); else if (verdict === 'same') totals.undecided += 0; else totals.undecided++;
       }
@@ -599,7 +670,7 @@ export async function run({ root = path.resolve(path.dirname(fileURLToPath(impor
   const { stepMetaFor } = await import(path.join(root, 'server/platform/markerOps.js'));
   const probeMark = (q, page, extra = {}) => {
     let ev; try { ev = stepEvidence({ ...q }, '99991', page.join('\n'), checkAnswer({ ...q }, '99991'), { slipWarnings: true, ...extra }); } catch { return []; }
-    return ev && ev.stepReport && Array.isArray(ev.stepReport.lines) ? ev.stepReport.lines : [];
+    return ev && (ev.shownReport || ev.stepReport) && Array.isArray((ev.shownReport || ev.stepReport).lines) ? (ev.shownReport || ev.stepReport).lines : [];
   };
   const asStatus = (q, page, k) => { const r = probeMark(q, page); const l = r.length === page.length ? r[k] : r.find(x => String(x.text ?? '').trim() === page[k].trim()); return l ? l.status : 'none'; };
   const asTick = (q, page, k) => asStatus(q, page, k) === 'ok';
@@ -698,7 +769,7 @@ export async function run({ root = path.resolve(path.dirname(fileURLToPath(impor
   }
   totals.probeTrueLines = probe.trueLines; totals.probeTrueTicked = probe.trueTicked; totals.probeMutants = probe.mutants; totals.probeFalseTicks = probe.falseTicks; totals.probeRoundingTrue = probe.roundingTrue; totals.probeTrueCrossedByTopicCheck = probe.trueCrossed || 0; totals.probePreexistingTicks = probe.preexisting || 0;
   totals.falseTicks += probe.falseTicks;
-  return { totals, byKind, failures, trueStatus, trueDetail, probe };
+  return { totals, byKind, setAside, failures, trueStatus, trueDetail, probe };
 }
 
 // ── true ticks lost between two runs of the same cells ──────────────────────────────────────────────────────────────────

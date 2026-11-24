@@ -105,6 +105,11 @@ export function assessEvaluationLine({ text, meta = null } = {}) {
   }
   const got = finiteValue(candidateAst, {});
   if (got === null) return { status: 'note', trusted: false, note: 'Skipped: I couldn’t evaluate this line safely.' };
+  // A stage may declare `roundTo` (decimal places, as the question asks for them): a value rounded to that many places is the value. Absent, the match is exact, as before.
+  const places = Number.isInteger(meta.roundTo) && meta.roundTo >= 0 && meta.roundTo <= 6 ? meta.roundTo : null;
+  // Only a number WRITTEN with at most that many places is read as rounded: an expression that happens to come near the value is not.
+  const literal = a => { const n = a && a.t === 'neg' ? a.v : a; return !!n && n.t === 'num' && (String(n.s ?? n.v).split('.')[1] || '').length <= places; };
+  const reached = (v, a) => numsClose(v, expected, 1e-9) || (places !== null && literal(a) && Math.abs(v - expected) <= 0.5 * 10 ** -places + 1e-9);
 
   // If an equality chain contains readable arithmetic before the final value,
   // each readable segment must agree. An unreadable prefix is only allowed when
@@ -120,13 +125,20 @@ export function assessEvaluationLine({ text, meta = null } = {}) {
     if (value === null) {
       return { status: 'note', trusted: false, note: 'Pri could not prove every part of this substitution chain, so it is not marked correct.' };
     }
-    if (!numsClose(value, expected, 1e-9)) {
+    if (!reached(value, ast)) {
+      // A chain that is TRUE arithmetic from end to end (`2 + 3 = 5`) says nothing about the expression it does not mention: a note, never a cross.
+      const selfConsistent = parts.every((p, k) => {
+        if (k === parts.length - 1) return true;
+        const a = astFor(p), v = a && a.t !== 'equation' ? finiteValue(a, meta.substitutions) : null;
+        return v !== null && numsClose(v, got, 1e-9);
+      });
+      if (selfConsistent) return { status: 'note', trusted: false, value: got, note: 'This is true arithmetic as written, but Pri cannot tie it to the substitution it is checking, so it is not marked as that step.' };
       const diagnosis = substitutionDiagnosis(expected, value);
       return { status: 'break', trusted: false, value: got, note: diagnosis.message, diagnosis };
     }
   }
 
-  if (numsClose(got, expected, 1e-9)) return { status: 'ok', trusted: true, value: got };
+  if (reached(got, candidateAst)) return { status: 'ok', trusted: true, value: got };
   const diagnosis = substitutionDiagnosis(expected, got);
   return { status: 'break', trusted: false, value: got, note: diagnosis.message, diagnosis };
 }
