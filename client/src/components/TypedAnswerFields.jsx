@@ -14,7 +14,7 @@ import Icon from './Icon.jsx';
 import { workingAreaMode } from './typedAnswerGuide.js';
 
 export default function TypedAnswerFields({
-  question, totalMarks = 1, answer, working, onAnswer, onWorking, onSubmit,
+  question, totalMarks = 1, stepMarks = false, answer, working, onAnswer, onWorking, onSubmit,
   previewTex = null, resolved = false, inputRef = null,
   showWorking = false, onToggleWorking, guidance = null, onMoveToWorking, offerWorking = true
 }) {
@@ -77,7 +77,7 @@ export default function TypedAnswerFields({
       {area === 'open' && (
         <div style={{ marginTop: 18 }} data-working-area="open">
           <label className="sc-label" style={{ display: 'block', marginBottom: 6 }} htmlFor={workingId}>{t('verdict.workingLabel')}</label>
-          <div id={hintId} className="muted" style={{ fontSize: 13.5 }}>{t('verdict.workingMethodMarks', { marks: totalMarks })}</div>
+          <div id={hintId} className="muted" style={{ fontSize: 13.5 }}>{t(stepMarks ? 'verdict.workingStepMarks' : 'verdict.workingMethodMarks', { marks: totalMarks })}</div>
           {workingField}
         </div>
       )}

@@ -26,6 +26,7 @@ import { differentiateAst } from '../client/src/engine/reason-v2.js';
 import { evaluate } from '../client/src/engine/expr.js';
 import { prettyText } from '../client/src/engine/schemePlans.js';
 import { genericPacket } from './generic-steps-packet.mjs';
+import { GENERIC_ID, genericDigest } from '../server/platform/genericSteps.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const OUT_DIR = path.join(ROOT, 'owner-review', 'method-marks');
@@ -33,6 +34,16 @@ export const OUT_DIR = path.join(ROOT, 'owner-review', 'method-marks');
 export const OWNER_DIR = path.join(ROOT, 'docs', 'marking', 'method-marks-signoff', 'method-marks');
 export const ownerFiles = files => new Map([...files].filter(([name]) => name.endsWith('.md')));
 export const BANNER = "DRAFT for the author's review: not approved. Nothing in this file is switched on.";
+// The author's own records (docs/marking/author-approvals) decide what a packet says about itself. This tool only reads them and never writes one.
+const RECORD_DIR = path.join(ROOT, 'docs', 'marking', 'author-approvals');
+export const readApprovals = () => (fs.existsSync(RECORD_DIR) ? fs.readdirSync(RECORD_DIR).filter(f => f.endsWith('.json') && f !== 'schema.json').map(f => JSON.parse(fs.readFileSync(path.join(RECORD_DIR, f), 'utf8'))) : []);
+/** The approval record for this id at THIS digest, or null (a record at another digest is no approval). */
+export const approvalOf = (id, digest, recs = readApprovals()) => recs.find(r => r.typeId === id && r.digest === digest && r.verdict === 'approved') ?? null;
+/** The first line of a packet: the DRAFT banner, or, when the author's record names this digest, a plain statement of his approval. */
+export const bannerFor = (id, digest, recs = readApprovals()) => {
+  const r = approvalOf(id, digest, recs);
+  return r ? `APPROVED by the author, ${r.approvedBy} (tutor), on ${r.date}, at the digest named in this file. It pays on Prithagoras only while the server has PRI_METHOD_MARKS=on. Not an official NESA guideline.` : BANNER;
+};
 const SAMPLES_PER_TYPE = 3;
 const SEED_LIMIT = 80;
 
@@ -492,11 +503,11 @@ function awardTable(type, c) {
   return `${head}\n${body}\n\nAward: **${c.award.total} of ${total}**. Criteria earned: ${earned}.${answerLine}`;
 }
 
-function typeMarkdown(type, built, digest) {
+function typeMarkdown(type, built, digest, recs) {
   const total = built.total;
   const s0 = built.samples[0];
   const L = [];
-  L.push(BANNER, '', `# ${type.title}`, '', `Course: ${type.course}. Type id: \`${type.id}\`. Total: ${total} marks.`, '');
+  L.push(bannerFor(type.id, digest, recs), '', `# ${type.title}`, '', `Course: ${type.course}. Type id: \`${type.id}\`. Total: ${total} marks.`, '');
   L.push('## Question form', '', plain(type.form), '', `Generator families: ${type.families.map(f => `\`${f}\``).join(', ')}.`, '');
   L.push('## Sample questions', '');
   built.samples.forEach((s, i) => L.push(`${i + 1}. ${cell(s.q.prompt)}`, `   Key: ${cell(summariseKey(s.q))}`, ''));
@@ -547,7 +558,7 @@ export async function build() {
     const built = await buildType(type);
     if (!built.ok) { notProvable.push({ id: type.id, title: type.title, course: type.course, level: type.level, families: type.families, reason: built.reason }); continue; }
     const digest = digestOf(type);
-    files.set(`${type.id}.md`, typeMarkdown(type, built, digest));
+    files.set(`${type.id}.md`, typeMarkdown(type, built, digest, readApprovals()));
     done.push({ type, built, digest });
   }
   for (const u of [...UNAVAILABLE_PROBED, ...UNPROVABLE]) { await checkProbe(u); notProvable.push({ id: u.id, title: u.title, course: u.course, level: u.level, families: u.families, reason: u.reason, ...(UNAVAILABLE_PROBES[u.id] ? { unavailable: true } : {}) }); }
@@ -558,14 +569,17 @@ export async function build() {
   const awardsToRead = done.reduce((s, d) => s + 4, 0);
   const crit = done.reduce((s, d) => s + d.type.criteria.length, 0);
   const by = k => done.reduce((s, d) => s + d.type.criteria.filter(c => c.by === k).length, 0);
-  const I = [BANNER, '', '# Draft method-mark schemes for NSW question types', '',
-    'These are drafts for the author (the tutor who writes the papers) to read, correct and decide on. Nothing here is approved, signed or switched on. Prithagoras still marks the final answer only.', '',
-    '## Types given a draft scheme, in review order', '', 'Year 12 Advanced and Extension 1 first, then Year 11.', '',
+  const recs = readApprovals();
+  const approvedCount = done.filter(d => approvalOf(d.type.id, d.digest, recs)).length;
+  const genericApproval = approvalOf(GENERIC_ID, genericDigest(), recs);
+  const I = [approvedCount || genericApproval ? `Author's review packets. ${approvedCount} of ${done.length} types${genericApproval ? ' and the generic rule are' : ' are'} approved by the author, each at the digest named in its file; the rest are drafts, not approved.` : BANNER, '', '# Method-mark schemes for NSW question types', '',
+    approvedCount || genericApproval
+      ? `These are the schemes for the author (the tutor who writes the papers) to read, correct and decide on. The Status column and the first line of each file report his own records in docs/marking/author-approvals: ${approvedCount} of ${done.length} types${genericApproval ? ' and the generic rule' : ''} are approved, at the digests shown, and are paid on Prithagoras only while the server has PRI_METHOD_MARKS=on. A type that says "new draft, not approved" is not approved and pays nothing. This is the author's own practice marking: it is not an examiner's certification and not an official NESA guideline.`
+      : 'These are drafts for the author (the tutor who writes the papers) to read, correct and decide on. Nothing here is approved, signed or switched on. Prithagoras still marks the final answer only.', '',
+    '## Types given a scheme, in review order', '', 'Year 12 Advanced and Extension 1 first, then Year 11.', '',
     'The Status column reads the author\'s own records (docs/marking/author-approvals) and only reports them: a type is "approved" only while its record names the digest in its packet. This tool never writes a record.', '',
     '| # | Type | Course | Criteria | Marks | Status | File |', '|---:|---|---|---:|---:|---|---|'];
-  const recDir = path.join(ROOT, 'docs', 'marking', 'author-approvals');
-  const recs = fs.existsSync(recDir) ? fs.readdirSync(recDir).filter(f => f.endsWith('.json') && f !== 'schema.json').map(f => JSON.parse(fs.readFileSync(path.join(recDir, f), 'utf8'))) : [];
-  const status = d => (recs.some(r => r.typeId === d.type.id && r.digest === d.digest && r.verdict === 'approved') ? 'approved by the author' : 'new draft, not approved');
+  const status = d => (approvalOf(d.type.id, d.digest, recs) ? 'approved by the author' : 'new draft, not approved');
   sorted.forEach((d, n) => I.push(`| ${n + 1} | ${cell(d.type.title)} | ${d.type.course} | ${d.type.criteria.length} | ${totalMarks(d)} | ${status(d)} | [${d.type.id}.md](${d.type.id}.md) |`));
   I.push('', '## Counts', '',
     `- Types given a scheme: ${done.length}.`,
@@ -579,11 +593,11 @@ export async function build() {
     'These types were tried. A scheme is not offered because at least one criterion cannot be decided by the engine from the student\'s lines. Each reason was checked by running a plausible correct transcript.', '');
   notProvable.filter(n => !n.unavailable).sort((a, b) => a.level - b.level).forEach(n => I.push(`- ${plain(n.title)} (${n.course}; families ${n.families.map(f => `\`${f}\``).join(', ')}): ${plain(n.reason)}`));
   I.push('', '## One rule for every multi-mark written question', '',
-    'Besides the per-type schemes above, one generic rule can pay step marks for a wrong or missing final answer on most multi-mark written Year 11 and Year 12 questions, from each question\'s own authored worked solution. It is a separate approval, not one of the types above, and it is not approved. Read [generic-solution-steps.md](generic-solution-steps.md).', '');
+    `Besides the per-type schemes above, one generic rule can pay step marks for a wrong or missing final answer on most multi-mark written Year 11 and Year 12 questions, from each question\'s own authored worked solution. It is a separate approval, not one of the types above, and ${genericApproval ? `the author approved it on ${genericApproval.date}, at the digest named in its packet` : 'it is not approved'}. Read [generic-solution-steps.md](generic-solution-steps.md).`, '');
   files.set('INDEX.md', plain(I.join('\n')));
-  files.set('generic-solution-steps.md', plain(await genericPacket({ banner: BANNER })));
+  files.set('generic-solution-steps.md', plain(await genericPacket({ banner: bannerFor(GENERIC_ID, genericDigest(), recs), approval: genericApproval })));
   const json = {
-    status: 'draft: not approved',
+    status: approvedCount || genericApproval ? `${approvedCount} of ${done.length} types${genericApproval ? ' and the generic rule' : ''} approved by the author's own records; the rest are drafts: not approved` : 'draft: not approved',
     types: sorted.map(d => ({
       id: d.type.id, title: d.type.title, course: d.type.course, year: d.type.year, families: d.type.families, file: `${d.type.id}.md`,
       totalMarks: totalMarks(d),

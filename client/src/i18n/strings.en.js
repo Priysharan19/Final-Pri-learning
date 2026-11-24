@@ -699,6 +699,7 @@ export default {
   'verdict.moveToWorking': 'Move this to Working',
   'verdict.workingLabel': 'Working',
   'verdict.workingMethodMarks': 'This question carries {marks} marks, all for the final answer. Write one step per line and Pri checks each step it can. Method marks for working are not given yet.',
+  'verdict.workingStepMarks': 'This question carries {marks} marks. Write one step per line and Pri checks each step it can. If your final answer is wrong, the steps Pri can check may still earn marks, and the marking shows which.',
   'verdict.workingAreaPlaceholder': 'One step per line',
   'verdict.inkNeedsDownloadTitle': 'Handwriting needs a one-off download.',
   'verdict.inkNeedsDownloadBody': 'The writing surface is a separate file, kept out of the first install so that a phone that never writes by hand never pays for it. This device is offline, so it cannot be fetched. Connect for a moment and it is fetched and kept on this device. Nothing you have done is lost, and you can keep working by typing; reading handwriting and checking answers both need a connection.',

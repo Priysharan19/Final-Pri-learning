@@ -1,8 +1,8 @@
 # In plain words: what switching on step marks changes, and what you are approving
 
-**What changes for a student.** Today a student gets the marks for the final answer only. For the seven question types below, once you approve a type and the marking switch is turned on, a wrong final answer can still earn a mark for each step the marked page ticks (for example "differentiates correctly"). A right final answer is still the full mark, exactly as now. A wrong final answer can never be full marks. Nothing is paid for a line the page crosses, or for any line after the first crossed line. The marked page shows a short table: each step, earned, not earned or not verified, and which lines earned it. The table adds up to the mark.
+**What changes for a student.** While the marking switch is off a student gets the marks for the final answer only. On the Australian server with the switch on, for each question type you have approved (fourteen of the eighteen below) and for the generic solution-step rule you approved, a wrong final answer can still earn a mark for each step the marked page ticks (for example "differentiates correctly"). A right final answer is still the full mark, exactly as now. A wrong final answer can never be full marks. Nothing is paid for a line the page crosses, or for any line after the first crossed line. The marked page shows a short table: each step, earned, not earned or not verified, and which lines earned it. The table adds up to the mark.
 
-**Which types.** The seven in the table below (Year 12 Advanced: chain/product/quotient rule, trigonometric maximum or minimum, trigonometric value at a time, exponential and logarithmic derivatives; Year 11 Advanced: polynomial by substitution, gradient of a tangent, power rule). Three types that had a draft earlier are NOT available now, because the marked page cannot check one of their steps line by line: the gradient at a point, the stationary points, and the tangent (reasons in INDEX.md). A question is paid by the scheme only when the scheme's marks equal the marks the question is worth; otherwise it stays on the final answer.
+**Which types.** You approved fourteen of the eighteen types in the table in INDEX.md, and the generic rule, in records filed on 24 November 2026: the first seven (Year 12 Advanced: chain/product/quotient rule, trigonometric maximum or minimum, trigonometric value at a time, exponential and logarithmic derivatives; Year 11 Advanced: polynomial by substitution, gradient of a tangent, power rule) and seven more (the two-mark trigonometric maximum or minimum, the three-mark product or quotient rule, the gradient at a point in two and three marks, the definite integral in two and three marks, the tangent or normal). The four Year 7 and Year 10 equation schemes are still drafts, not approved, and pay nothing. One type is NOT available, because the marked page cannot check one of its steps line by line: the stationary points (reason in INDEX.md). A question is paid by the scheme only when the scheme's marks equal the marks the question is worth; otherwise it stays on the final answer.
 
 **Worked example (your product-rule question).** Differentiate y = x^2(x - 1), a 2-mark question, with the working on your page but the last line wrong (3x^2 - x instead of 3x^2 - 2x). The page ticks the working down to line 8 and crosses line 9. Step 1, "writes a correct derivative (any equivalent form)", is earned by the first ticked line that is the derivative, line 6. Step 2, "gives the final answer correctly", is not earned, because 3x^2 - x is wrong. Result: **1 of 2**. Line 9, the crossed line, earns nothing, and neither would any line after it.
 
@@ -10,7 +10,7 @@
 
 Australia (Prithagoras), the author-approved tier (your decision of 24 Nov 2026). All four, for that type, and nothing pays until every one is in place:
 
-1. Your approval record for the type in `docs/marking/author-approvals/<type>.json`, for the digest printed in the packet. Running `node tools/author-approvals.mjs` then writes the type and digest into the server's list (`server/platform/authorApproved.generated.js`) and into the page's list. Nobody types that list by hand. It lists the seven types you approved on 24 November 2026.
+1. Your approval record for the type in `docs/marking/author-approvals/<type>.json`, for the digest printed in the packet. Running `node tools/author-approvals.mjs` then writes the type and digest into the server's list (`server/platform/authorApproved.generated.js`) and into the page's list. Nobody types that list by hand. It lists the fourteen types and the generic rule you approved on 24 November 2026.
 2. `PRI_METHOD_MARKS=on` in the server's environment. Unset, off or misspelt means the final answer only. No examiner variable is needed or read.
 3. A question stamped with the scheme when it is issued, so only questions issued after the record is committed are paid by it.
 4. The scheme's marks equal the question's marks.
@@ -21,15 +21,15 @@ India (Priyabhata), the examiner tier, unchanged: `PRI_METHOD_MARKS=on` and, in 
 
 Approving in your own name (the reply line below) writes nothing by itself: the record for each type is written by you.
 
-**To approve.** Reply with exactly: `I approve the seven step-mark schemes in INDEX.md as drafted. Priysharan Tripathi`. Approving does not switch anything on: the approved list stays empty until your records are committed, and the marking switch stays off until you decide. As before, the approval record for each type is written by you, in your own name (steps below).
+**Status, 24 November 2026.** Your fifteen records (fourteen types and the generic rule) are committed, so the approved list is not empty: with `PRI_METHOD_MARKS=on` on the Australian server these pay by their scheme on questions issued after the merge. Approving a type is still your own act, in your own name: the record for each type is written by you, never by a tool (steps below). To approve one of the four drafts, or to change an approved one, read its packet and file a record as below.
 
 ---
 
 # Signing off the step marks, one question type at a time
 
-This note is for you, the author. You filed your seven approval records on 24 November 2026, and nothing is switched on:
-`PRI_METHOD_MARKS` is not set, so students still get marks for the final answer only. Step marks pay only while that
-switch is on, and then only for an approved type.
+This note is for you, the author. You filed your first seven approval records, and then eight more (seven types and the generic rule), on 24 November 2026. The
+switch decides whether they pay: while `PRI_METHOD_MARKS` is not set on the Australian server, students get marks for the final answer only. Step marks pay
+only while that switch is on, and then only for an approved type or the approved generic rule.
 
 ## What you are being asked to do
 
@@ -59,7 +59,7 @@ Each packet gives you:
 | 7 | Differentiate a polynomial by the power rule | [y11-diff-power-rule.md](method-marks/y11-diff-power-rule.md) |
 
 That is 7 types with a scheme, 15 criteria in all, and about 28 worked examples to read. The full list, with
-the three types that are not available yet and the eleven that could not be given a scheme, and why, is in [method-marks/INDEX.md](method-marks/INDEX.md).
+the type that is not available yet and the eleven that could not be given a scheme, and why, is in [method-marks/INDEX.md](method-marks/INDEX.md).
 None is missing by accident. For each one at least one criterion cannot be decided from the lines the marked page shows, so offering a scheme would promise something Pri cannot do.
 
 ## How to record a decision

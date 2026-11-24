@@ -41,7 +41,7 @@ import { readBankFigure, FIGURE_HEADERS } from './qbankFigures.js';
 import { stepMetaFor, marksPossibleFor, practiceMarksEarned, lineLevelFeedback } from './markerOps.js';
 import { LINE_CHECKS_PER_QUESTION, LINE_CHECK_WINDOW_MS, lineCheckFeatureEnabled, tutorDailyLimit } from './tutor.js';
 import { markRowsFor } from './markRows.js';
-import { schemePay } from './schemeAward.js';
+import { schemePay, stepMarksOpen } from './schemeAward.js';
 import {
   markerPool, markerCooldownUntil, recordMarkerKills, sendMarkerCooldown, sendMarkerBusy,
   MARKING_TOO_COMPLEX, MARKING_BUSY, TOO_COMPLEX_MESSAGE, WORKING_NOT_READ_NOTE
@@ -240,9 +240,11 @@ function finalAnswerRows(q, rows, schemePaid = false) {
   return rest;
 }
 
-function safeQuestion(id, q) {
+function safeQuestion(id, q, env = process.env) {
   const publicQ = { id, supportsSteps: !!stepMetaFor(q),
     criteriaCount: marksPossibleFor(q) };
+  // Only when the server will actually pay step marks on this question (stamped, a paying mode, the switch on): the device says so before the answer.
+  if (stepMarksOpen({ q, env })) publicQ.stepMarks = true;
   for (const k of PUBLIC_Q) if (Object.hasOwn(q, k)) publicQ[k] = q[k];
   // An author-bank question carries the rungs its importer chose and none else: with none, the device is told no hint is offered (no control, no panel).
   if (q.ladder && typeof q.ladder === 'object' && !ladderAvailable(q)) publicQ.hintsOffered = false;
@@ -638,7 +640,7 @@ export function createPracticePrepareRoute(db, { banks = bankPolicy(), env = pro
         ...(request.dotpoint ? { p: request.dotpoint } : {}), ...(qbankServes(request.generator) ? { k: qbankVersion() } : {}), x: now + PREPARED_TTL, n: randomUUID(), c: CONTENT_VERSION
       }), PREPARED_CONTEXT);
     } catch { return reject(res, 503, 'PRACTICE_PREPARE_UNAVAILABLE', 'Questions cannot be prepared right now.'); }
-    const question = safeQuestion(null, chosen.q);
+    const question = safeQuestion(null, chosen.q, env);
     delete question.id;
     res.set('Cache-Control', 'no-store');
     return res.status(200).json({ question, prepared, expiresAt: now + PREPARED_TTL, repeat: chosen.repeat });
@@ -797,7 +799,10 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     // What this edition requires of every question it issues, sealed with it:
     // its curriculum identity and its marking limit (editionBanks.js). A
     // question that cannot carry them is not issued. Priyabhata seals nothing.
-    if (!sealForEdition(q, banks)) return reject(res, 422, 'PRACTICE_CONTENT_UNSUPPORTED', 'The requested question form is unavailable.');
+    // The one-try modes (Rush, Match, the placement check) stay final-answer only: sealed without the approved step-mark list, and any scheme
+    // stamp a prepared question already carries is dropped, so they are never stamped, whatever the repository's list holds.
+    if (ONE_TRY_MODES.includes(practiceMode)) delete q._methodScheme;
+    if (!sealForEdition(q, ONE_TRY_MODES.includes(practiceMode) ? { ...banks, methodSchemeTypes: [] } : banks)) return reject(res, 422, 'PRACTICE_CONTENT_UNSUPPORTED', 'The requested question form is unavailable.');
     // Optional issue idempotency: normal practice may request a fresh question;
     // network retries can opt into the same server question with a stable key.
     const idem = String(req.get('idempotency-key') || '');
@@ -820,7 +825,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     // Serialize once: nothing client-provided can replace the stored answer.
     const payload = JSON.stringify(q);
     const id = randomUUID();
-    const publicResponse = { question: safeQuestion(id, q), ...(repeat ? { repeat: true } : {}), ...(q._repeatEvidence ? { repeatEvidence: q._repeatEvidence } : {}), ...(trySpent ? { triesLeft: 1 } : {}), ...(trapDelivered ? { trapDelivered: true } : {}) };
+    const publicResponse = { question: safeQuestion(id, q, env), ...(repeat ? { repeat: true } : {}), ...(q._repeatEvidence ? { repeatEvidence: q._repeatEvidence } : {}), ...(trySpent ? { triesLeft: 1 } : {}), ...(trapDelivered ? { trapDelivered: true } : {}) };
     // The free plan's daily cap counts the Practice surface's own modes; Rush,
     // Match and the placement check are "everything else", unlimited.
     const counted = practiceModeCounted(practiceMode);
@@ -919,7 +924,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     }, { accountScope: accountId, lock: 'practice-issue:' + accountId });
     if (outcome.premium) return refusePremiumContent(res, outcome.premium);
     if (outcome.capped) return refusePracticeCap(res, outcome.capped, now);
-    return res.status(201).json({ question: safeQuestion(id, q), repeat: true, accountId: String(accountId) });
+    return res.status(201).json({ question: safeQuestion(id, q, env), repeat: true, accountId: String(accountId) });
   });
 
   // Recognition is issued by this server only after a live provider response.
@@ -1646,11 +1651,13 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // A question sealed final-answer-only (editionBanks.js) earns nothing
       // from its working HERE, where the mark commits, whatever the process's
       // method-mark switch says: its lines are still reported, as feedback.
-      const finalAnswerOnly = q._marking === FINAL_ANSWER_MARKING;
+      // (A question stamped before the mode was known, in a one-try mode, is final-answer only too.)
+      const oneTryStamp = typeof q._methodScheme === 'string' && ONE_TRY_MODES.includes(q._practiceMode);
+      const finalAnswerOnly = q._marking === FINAL_ANSWER_MARKING || oneTryStamp;
       // A scheme question never reaches the generic method rubric: the scheme pays it or it stays on the final answer. The scheme is paid
       // from the DETERMINISTIC step report of the evidence (the engine's own, before the interpreter's reading is folded in for display):
       // a line only the interpreter ticks can never earn a criterion. Why a scheme did not pay stays on the server (`scheme.reason`).
-      const schemeQuestion = typeof q._methodScheme === 'string';
+      const schemeQuestion = typeof q._methodScheme === 'string' && !oneTryStamp;
       const scheme = resolved && !invalid && !finalAnswerOnly && schemeQuestion
         ? schemePay({ q, report: evidence.stepReport || null, topic: evidence.topicTicks ?? null, correct: result.correct === true, marksPossible, env }) : null;
       const counted = resolved && (finalAnswerOnly || schemeQuestion)
@@ -2147,7 +2154,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       return {};
     }, { accountScope: accountId, lock: 'practice-issue:' + accountId });
     if (outcome.capped) return refusePracticeCap(res, outcome.capped, now);
-    return res.status(201).json({ question: safeQuestion(id, q), accountId: String(accountId),
+    return res.status(201).json({ question: safeQuestion(id, q, env), accountId: String(accountId),
       twin: { of: attemptId, misconception: attempt.misconception || null, trapDelivered: chosen.trapDelivered === true,
         sameDotpoint: !original.dotpoint || q.dotpoint === original.dotpoint || (q.dotpoints || []).includes(original.dotpoint) },
       ...(repeat ? { repeat: true } : {}), ...(q._repeatEvidence ? { repeatEvidence: q._repeatEvidence } : {}), ...(trySpent ? { triesLeft: 1 } : {}) });

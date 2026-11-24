@@ -167,6 +167,7 @@ const MistakeGraph = React.lazy(() => import('./MistakeGraph.jsx').catch(() => (
 // and the evaluation built from the receipt. Engine-only, feedback only, and
 // its own chunk; a chunk that cannot load shows the plain step report instead.
 const MarkedPage = React.lazy(() => import('./MarkedPage.jsx').catch(() => ({ default: () => null })));
+const SchemeTable = React.lazy(() => import('./SchemeTable.jsx').catch(() => ({ default: () => null })));
 const AnnotatedWorkingPart = React.lazy(() => import('./AnnotatedWorking.jsx').catch(() => ({ default: () => null })));
 
 class TutorBoundary extends React.Component {
@@ -2997,7 +2998,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               )}
               {photoPageOn && (
                 <React.Suspense fallback={null}>
-                  <MarkedPage input={awInput} howRead={`${String(photoOCR.engine || '').startsWith('cloud') ? t('photo.how.server') : t('verdict.decodedOnDevice')} ${t('verdict.photoReadOnServerNotice')}`} source={{ kind: 'photo', src: photo, lines: photoPageLines }} texOf={texOf} scoreShown={instrumentScore} criteria={res?.methodCriteria} reading={pageReading} onCorrect={onRedo ? correctReadLine : null} />
+                  <MarkedPage input={awInput} howRead={`${String(photoOCR.engine || '').startsWith('cloud') ? t('photo.how.server') : t('verdict.decodedOnDevice')} ${t('verdict.photoReadOnServerNotice')}`} source={{ kind: 'photo', src: photo, lines: photoPageLines }} texOf={texOf} scoreShown={instrumentScore} stepMarks={res?.methodScheme?.paid === true} reading={pageReading} onCorrect={onRedo ? correctReadLine : null} />
                 </React.Suspense>
               )}
               {photoSignInOpen && photoOCR.blockedKey === 'verdict.photoReadingSignIn' && (
@@ -3025,7 +3026,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   <p className="photo-lines-note" role="status" data-final-answer-sentence data-final-answer-unreadable="true">{t('mark.finalUnreadable')}</p>
                 )}
                 <TypedAnswerFields
-                  question={question} totalMarks={totalMarks} inputRef={inputRef}
+                  question={question} totalMarks={totalMarks} inputRef={inputRef} stepMarks={question.stepMarks === true}
                   answer={answer} working={working} onAnswer={photoInUse ? editPhotoAnswer : editAnswer} onWorking={editWorking} onSubmit={submit}
                   previewTex={typedPreview} resolved={resolved} offerWorking={mode === 'type'}
                   showWorking={showWorking} onToggleWorking={() => setShowWorking(v => !v)}
@@ -3048,7 +3049,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           <>
           {inkPageOn && (
             <React.Suspense fallback={null}>
-              <MarkedPage input={awInput} source={{ kind: 'ink', strokes: latestInk.current || restoredInk || [] }} texOf={texOf} scoreShown={instrumentScore} criteria={res?.methodCriteria} reading={pageReading} onCorrect={onRedo ? correctReadLine : null} />
+              <MarkedPage input={awInput} source={{ kind: 'ink', strokes: latestInk.current || restoredInk || [] }} texOf={texOf} scoreShown={instrumentScore} stepMarks={res?.methodScheme?.paid === true} reading={pageReading} onCorrect={onRedo ? correctReadLine : null} />
             </React.Suspense>
           )}
           <div className={`ink-row${awModel && !inkPageOn ? ' aw-row' : ''}`} hidden={inkPageOn || undefined}>
@@ -3482,6 +3483,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 {awInput && (
                   <React.Suspense fallback={null}>
                     <AnnotatedWorkingPart part={writeMode || photoPageOn ? 'evaluation' : 'both'} input={awInput} onModel={setAwModel} />
+                  </React.Suspense>
+                )}
+                {/* A scheme-paid reply (the author-approved scheme or the generic rule) always shows its criteria table and label, whatever the working's shape:
+                    typed, ink or photo. The table is drawn only if it is approved at its digest and adds up to the server's mark (criteriaTableModel.js). */}
+                {res.methodScheme?.paid === true && res.methodCriteria && !res.revealed && (
+                  <React.Suspense fallback={null}>
+                    <SchemeTable criteria={res.methodCriteria} mark={{ awarded: res.marksEarned, possible: res.marksPossible }} report={res.stepReport} />
                   </React.Suspense>
                 )}
                 {res.stepReport && !awModel && <StepReport report={res.stepReport} instrument={INSTRUMENT} correctAnswer={!verdictGood && !res.revealed ? res.solution?.answerText : null} />}

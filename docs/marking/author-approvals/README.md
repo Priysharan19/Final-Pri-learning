@@ -10,9 +10,14 @@ examiners, while `PRI_METHOD_MARKS=on` is set on the server. India (Priyabhata) 
 rule. This tier is never called examiner-certified, and the examiner folder and variable are not used for it.
 
 This folder holds **one record per question type the author has actually reviewed**, and nothing else. Today it
-holds seven, filed by the author himself on 24 November 2026, one for each of the seven question types in
-`owner-review/method-marks/types.json`, each at the digest he read. No criterion is paid or shown until the Australian
-server also has `PRI_METHOD_MARKS=on`, so no student sees a per-criterion mark yet.
+holds fifteen, all filed by the author himself on 24 November 2026: fourteen question types from
+`owner-review/method-marks/types.json` (the first seven, then seven more: `y12-trig-extreme-2`, `y12-diff-rules-3`,
+`y12-diff-gradient-2`, `y12-diff-gradient-3`, `y12-integral-2`, `y12-integral-3`, `y12-tangent-3`) and the generic rule
+`generic-solution-steps`, each at the digest he read. The four Year 7 and Year 10 equation schemes
+(`y7-equation-solve-2`, `y7-equation-solve-3`, `y10-quadratic-solve-2`, `y10-quadratic-solve-3`) have no record: they are
+drafts, not approved, and pay nothing. No criterion is paid or shown until the Australian server also has
+`PRI_METHOD_MARKS=on`; once it has, an approved type pays by its scheme, and the generic rule pays the other eligible
+questions, on questions issued after the records were merged.
 
 - `schema.json` is the record format.
 - A record is written by the author, after reading the packet for that type in `owner-review/method-marks/`.
@@ -40,5 +45,8 @@ Besides the question types, the author may approve ONE generic rule that pays st
 (`server/platform/genericSteps.js`, packet `owner-review/method-marks/generic-solution-steps.md`). Its approval id is `generic-solution-steps`; a record
 for it is the same kind of file, `generic-solution-steps.json`, written by the author himself, naming the rule's digest. Its digest is computed over the
 rule's own code and wording (not from `types.json`), so any edit to the rule revokes an approval, and the seven type digests do not depend on it.
-There is no record for it today: it is a draft and pays nothing. Everything above about gates, labelling and `PRI_METHOD_MARKS=on` applies to it unchanged.
+The author filed that record on 24 November 2026, at the digest the code computes today, so the rule is approved and pays while `PRI_METHOD_MARKS=on`
+on the Australian server. A question whose type has an approved per-type scheme (at its marks) keeps that scheme; the rule pays only the other eligible
+questions, and a question issued before the record was merged, which was not stamped at issue, stays on the final answer. Everything above about gates,
+labelling and `PRI_METHOD_MARKS=on` applies to it unchanged. Editing `server/platform/genericSteps.js`, even a comment, changes the digest and revokes the approval.
 

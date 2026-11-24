@@ -1080,6 +1080,8 @@ jobs:
             # A Prithagoras NSW student's practice is issued and marked by the
             # server: the device names the profile's own course, never 'in'.
             node client/test/tour-nsw-practice-marked.js 2>&1 | tee -a browser.log
+            # Step marks on the answer card: a scheme-paid reply draws its criteria table and the author's label (switch on in the tour's own server, the repository's approved list).
+            node client/test/tour-step-marks.mjs 2>&1 | tee -a browser.log
             # The author's questions inside a dot point's ordinary practice: dealt, marked for his marks, his hints, his trap reason and
             # worked solution, no source shown, nothing sideways at 360 px.
             node client/test/tour-nsw-practice-bank.js 2>&1 | tee -a browser.log
