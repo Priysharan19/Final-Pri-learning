@@ -16,6 +16,7 @@
 // must never import a server module: the worker has no store and no secrets.
 import { derivedMetaOff } from '../../client/src/engine/derivedMetaOff.js';
 import { checkAnswer, stepCheck, methodMarks, claimFreeReport } from '../../client/src/engine/checker.js';
+import { checkBankAnswer } from './qbankMarking.js';
 import { markObjective, markMultiCorrect } from '../../client/src/engine/indiaExams.js';
 import { markMatrixMatch } from '../../client/src/engine/matrixMatch.js';
 import { markGraphSketch, readFeatureSet, sketchMethodCredit, sketchVerdicts } from '../../client/src/engine/graphFeatures.js';
@@ -38,7 +39,16 @@ import { answerForm, effectiveSymbols, firstFinalAttempt, planGivens, readClaimF
 
 // Mirrors the shared deterministic checker input used by local practice;
 // questions, answer keys and stage meta remain server-private.
+/**
+ * What the marker is shown of an author-bank question (qbankPack.js): its subtopic is its bank family's, not the product subtopic it is
+ * practised in. The bank was audited against the engine under its family id (tools/qbank-import.mjs), and every rule the engine keys on a
+ * subtopic (derived step checks that are switched off, a calculus line rule) was written for that subtopic's generators, never for these
+ * questions. Marking, the step report and `supportsSteps` therefore see the family; progress, identity and the device see the subtopic.
+ */
+export const markerView = q => (q && typeof q._bank === 'string' && typeof q._family === 'string' && q.subtopic !== q._family ? { ...q, subtopic: q._family } : q);
+
 export function stepMetaFor(q) {
+  q = markerView(q);
   if (q.stepcheck) return q.stepcheck;
   if (derivedMetaOff(q)) return null;   // answer only until the family has a structured meta
   const a = q.answer;
@@ -81,6 +91,8 @@ export function isSchemeStep(step) {
 }
 
 export function marksPossibleFor(q) {
+  // An author-bank question is worth the marks its author set (server/platform/qbankPack.js seals it; no generator sets this field).
+  if (Number.isInteger(q.authoredMarks) && q.authoredMarks >= 1 && q.authoredMarks <= 6) return q.authoredMarks;
   // A past-paper question carrying the Board's transcribed scheme is worth the
   // marks the Board printed (boardScheme.js), not a number guessed from steps.
   if (Array.isArray(q.boardScheme) && Number.isInteger(q.marks)) return q.marks;
@@ -620,7 +632,7 @@ function sketchReport(q, answer, result) {
 // examWorkingStage above stay the method rubric as written, so the rubric the
 // examiner is asked to sign (#499, tools/examiner-dossier.mjs) and its suites
 // are unchanged; only the operations the server runs apply the switch.
-export const MARKER_OPS = Object.freeze({
+const RAW_MARKER_OPS = Object.freeze({
   /**
    * A practice submission: the answer, then (only when the reply could need
    * it) the working. `evidenceIfWrong` is the request thread's reading of
@@ -629,7 +641,7 @@ export const MARKER_OPS = Object.freeze({
    * was not computed. Blank working costs nothing, so it is always "computed".
    */
   practice({ q, answer, working, workingLatex, workingGaps, evidenceIfWrong, policy }, emit) {
-    const result = sketchReport(q, answer, checkAnswer(q, answer));
+    const result = sketchReport(q, answer, checkBankAnswer(q, answer));   // an author-bank question is read as qbankMarking.js says; every other question is checkAnswer
     emit({ result });
     const wanted = result.correct || evidenceIfWrong || !String(working || '').trim();
     if (!wanted) return { result, evidence: null };
@@ -669,6 +681,9 @@ export const MARKER_OPS = Object.freeze({
     return stepCoachEvidence(q, lines, answerText);
   }
 });
+
+/** The operations the marker pool runs: each is handed the marker's view of the question (markerView). */
+export const MARKER_OPS = Object.freeze(Object.fromEntries(Object.entries(RAW_MARKER_OPS).map(([name, run]) => [name, (args, emit) => run(args && args.q ? { ...args, q: markerView(args.q) } : args, emit)])));
 
 /**
  * The live step coach's evidence (F1): one row per line, in order.
