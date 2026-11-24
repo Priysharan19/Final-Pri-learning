@@ -227,7 +227,7 @@
         {"has":"LINE SYSTEM REGRESSION: PASS — 8000 prompts over 4000 seeds","note":"Examiner pre-review regression: no simultaneous pair is a single line; no line prints without its x term."},
         {"has":"QBANK IMPORT: PASS 172/172 checks","note":"89 -> 129, as printed after the second review round: the rung rule (the seven reviewer cases, plain-prose arithmetic, sealed texts, 0 to 3 rungs, nothing derived from a step) on a fixture written in the test."},
         {"re":"QBANK DIAGRAMS: PASS (90/90|108/108) checks","note":"New pin: the TikZ-to-SVG renderer on three tiny figures (90 on CI, which has no TeX and skips the compile group by name; 108 where latex and dvisvgm are installed), the untrusted-input filter, the sanitiser, the alt text and answer-leak rules, and the committed figures against their manifest hashes."},
-        {"has":"QBANK ISOLATION: PASS — 6/6 checks (1946 questions protected)","note":"1794 -> 1804 questions, as printed: the pack now keeps the questions whose leaking hint is dropped instead of rejecting them. Static isolation of the committed bank from the client (the built-client half runs after the build, with --require-dist, over every file of client/dist whatever its extension)."},
+        {"has":"QBANK ISOLATION: PASS — 6/6 checks (1944 questions protected)","note":"1794 -> 1804 questions, as printed: the pack now keeps the questions whose leaking hint is dropped instead of rejecting them. Static isolation of the committed bank from the client (the built-client half runs after the build, with --require-dist, over every file of client/dist whatever its extension)."},
         {"has":"QBANK ISOLATION TEST: PASS 31/31 checks","note":"15 -> 23, as printed: the pack in a non-text extension, gzipped, brotli-compressed, answers alone, and a script of short numeric answers (in order and shuffled) all fail the scan; a table of whole numbers does not."}
       ]
     },
@@ -857,7 +857,7 @@
       "job": "platform-contracts",
       "log": "qbank-real-pack.log",
       "pins": [
-        {"has":"QBANK REAL PACK: PASS — 619/619 checks over 1946 questions","note":"217 -> 620 over 1804, as printed: the rung rule re-run over every hint and rung of every packed question, and a sweep of 300 questions through the real routes (issue reply, hint route, no-rung refusal)."}
+        {"has":"QBANK REAL PACK: PASS — 648/648 checks over 1944 questions","note":"217 -> 620 over 1804, as printed: the rung rule re-run over every hint and rung of every packed question, and a sweep of 300 questions through the real routes (issue reply, hint route, no-rung refusal)."}
       ]
     },
     "platform/qbank-mix.log": {
@@ -871,21 +871,21 @@
       "job": "platform-contracts",
       "log": "qbank-marking.log",
       "pins": [
-        {"has":"QBANK MARKING: PASS — 105/105 checks over 1946 questions","note":"30 -> 55 over 1804, as printed: the rounding reading applies to 0 of 1226 numeric questions and never where an exact form is asked, and yy' and dy/dx are one left side."}
+        {"has":"QBANK MARKING: PASS — 105/105 checks over 1944 questions","note":"30 -> 55 over 1804, as printed: the rounding reading applies to 0 of 1226 numeric questions and never where an exact form is asked, and yy' and dy/dx are one left side."}
       ]
     },
     "platform/qbank-sealed.log": {
       "job": "platform-contracts",
       "log": "qbank-sealed.log",
       "pins": [
-        {"has":"QBANK SEALED: PASS — 11/11 checks over 1946 questions","note":"1794 -> 1804 questions, as printed."}
+        {"has":"QBANK SEALED: PASS — 11/11 checks over 1944 questions","note":"1794 -> 1804 questions, as printed."}
       ]
     },
     "platform/qbank-figures.log": {
       "job": "platform-contracts",
       "log": "qbank-figures.log",
       "pins": [
-        {"has":"QBANK FIGURES: PASS — 42/42 checks over 142 parts with a figure","note":"New pin, as printed: the committed figures against the pack and the sanitiser, no text alternative that states an answer, the figure route (signed out refused; never issued, malformed and no-diagram all one 404; another account's question 404; bytes, headers, ETag, the JSON twin) and a figure file that is not the one the pack names is never sent."}
+        {"has":"QBANK FIGURES: PASS — 42/42 checks over 136 parts with a figure","note":"142 -> 136 parts as printed after six more figures were held for the owner (the floor follows the smaller pack). New pin, as printed: the committed figures against the pack and the sanitiser, no text alternative that states an answer, the figure route (signed out refused; never issued, malformed and no-diagram all one 404; another account's question 404; bytes, headers, ETag, the JSON twin) and a figure file that is not the one the pack names is never sent."}
       ]
     }
   },
