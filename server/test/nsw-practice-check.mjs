@@ -58,6 +58,9 @@ delete process.env.PRI_PUBLIC_ORIGIN;
 const { startApp, checks, registerAccount, verifyEmail } = await import('./support/app-harness.mjs');
 const { requestedEngine } = await import('./support/engine.mjs');
 const { bankPolicy, FINAL_ANSWER_MARKING } = await import('../platform/editionBanks.js');
+const { genericEligible } = await import('../platform/genericSteps.js');
+const { schemeTypeOf, schemeMarks, schemeById } = await import('../platform/schemeAward.js');
+const { marksPossibleFor } = await import('../platform/markerOps.js');
 const { nswBank, nswCell, NSW_BANK_LEDGER, NSW_BANK_COUNT, NSW_CELL_COUNT, nswCurriculumResponse } = await import('../platform/nswBanks.js');
 const { FINAL_ANSWER_ONLY } = await import('../platform/markingPolicy.js');
 const { editionMarkingPolicy: markingPolicy, editionMethodMarksRefusal: methodMarksRefusal } = await import('../platform/editionMarking.js');
@@ -186,7 +189,11 @@ try {
     c.ok(validIdentity(sealed._curriculum, sample.generator), `${tag}: the sealed question carries a valid curriculum identity`);
     c.deq([sealed._curriculum.syllabus, sealed._curriculum.syllabusVersion], [sample.syllabus, sample.version], `${tag}: syllabus ${sample.syllabus} version ${sample.version}`);
     c.ok(sealed._curriculum.outcomes.some(o => o.code === sample.code), `${tag}: outcome ${sample.code}`);
-    c.eq(sealed._marking, FINAL_ANSWER_MARKING, `${tag}: sealed final-answer-only`);
+    // Since the author's record of 24 Nov 2026 an eligible written question worth 2+ marks is stamped with the generic rule (or its type's scheme) at issue instead
+    // of the final-answer seal; every other question (one mark, objective, no authored steps) keeps the final-answer seal. Never both, never neither.
+    const stamped = typeof sealed._methodScheme === 'string';
+    c.ok(stamped !== (sealed._marking === FINAL_ANSWER_MARKING), `${tag}: sealed final-answer-only, or stamped with the author-approved scheme, never both`);
+    c.eq(stamped, genericEligible(sealed) || schemeTypeOf(sealed, sample.generator) != null && marksPossibleFor(sealed) === schemeMarks(schemeById(schemeTypeOf(sealed, sample.generator))), `${tag}: it is stamped exactly when it is eligible for the approved rule or scheme`);
     // The right answer, as the server holds it, is credited in full.
     const key = sealed.answerType === 'mcq' ? String(sealed.answer.correctIndex)
       : sealed.answerType === 'numeric' ? (sealed.answer.canonicalInput || String(sealed.answer.value))
@@ -195,8 +202,13 @@ try {
             : sealed.answerType === 'set' ? sealed.answer.values.join(', ') : `${sealed.answer.a}:${sealed.answer.b}`;
     const g = await submit(r.data.question.id, `nsw-right-${sample.generator}`, key);
     c.deq([g.status, g.data?.correct, g.data?.resolved, g.data?.marksEarned], [200, true, true, g.data?.marksPossible], `${tag}: the stored answer is marked correct for full marks`);
-    c.deq(g.data.solution.criteria, [{ mark: g.data.marksPossible, text: 'Correct final answer' }], `${tag}: the solution states one criterion, the final answer`);
-    c.ok(!g.data.markRows?.method && g.data.partial == null, `${tag}: and no method evidence`);
+    if (!stamped) {
+      c.deq(g.data.solution.criteria, [{ mark: g.data.marksPossible, text: 'Correct final answer' }], `${tag}: the solution states one criterion, the final answer`);
+      c.ok(!g.data.markRows?.method && g.data.partial == null, `${tag}: and no method evidence`);
+    } else {
+      // a stamped question with the switch unset: the same full marks for the right answer, and nothing paid for working (the criteria are the scheme's, summing to the marks)
+      c.ok(g.data.solution.criteria.reduce((n, x) => n + x.mark, 0) === g.data.marksPossible && g.data.partial == null && !g.data.methodScheme, `${tag}: stamped, the switch is off: criteria sum to the marks, nothing is paid by a scheme`);
+    }
     const [event] = await eventsOf(r.data.question.id);
     c.deq(event.curriculum, sealed._curriculum, `${tag}: the graded attempt records the same identity`);
     c.eq(event.marksEarned, g.data.marksPossible, `${tag}: and the mark`);
@@ -277,9 +289,10 @@ try {
     const bound = await issue({ prepared: p.data.prepared, account: String(a.account.id) });
     c.eq(bound.status, 201, 'and one account binds it');
     const sealed = await sealedOf(a.account.id, bound.data.question.id);
-    c.ok(validIdentity(sealed._curriculum, 'y9-trig') && sealed._marking === FINAL_ANSWER_MARKING, 'the bound question is sealed like any other');
+    c.ok(validIdentity(sealed._curriculum, 'y9-trig') && (sealed._marking === FINAL_ANSWER_MARKING) !== (typeof sealed._methodScheme === 'string'), 'the bound question is sealed like any other (final-answer seal or the approved scheme stamp, never both)');
     const reveal = await h.request(`/v1/practice/${bound.data.question.id}/reveal`, { method: 'POST', jar: a.jar, body: {} });
-    c.deq([reveal.status, reveal.data.solution.criteria.length], [200, 1], 'revealing it shows one criterion');
+    c.deq([reveal.status, reveal.data.solution.criteria.length], [200, typeof sealed._methodScheme === 'string' ? reveal.data.solution.criteria.length : 1], 'revealing it shows one criterion (the scheme\'s criteria when it carries a stamp)');
+    c.ok(reveal.data.solution.criteria.length >= 1, 'and at least one criterion');
     c.deq((await eventsOf(bound.data.question.id))[0].curriculum, sealed._curriculum, 'and the revealed attempt records the identity');
     const repeat = await h.request(`/v1/practice/${bound.data.question.id}/repeat`, { method: 'POST', jar: a.jar });
     c.deq([repeat.status, repeat.data.repeat], [201, true], 'the same question again is issued as a repeat');
@@ -291,7 +304,7 @@ try {
     const twin = await h.request(`/v1/practice/notebook/${resolved.data.attemptId}/twin`, { method: 'POST', jar: a.jar });
     c.eq(twin.status, 201, 'a twin of a wrong NSW answer is issued');
     const twinSealed = await sealedOf(a.account.id, twin.data.question.id);
-    c.ok(validIdentity(twinSealed._curriculum, 'y7-equations') && twinSealed._marking === FINAL_ANSWER_MARKING, 'and sealed');
+    c.ok(validIdentity(twinSealed._curriculum, 'y7-equations') && (twinSealed._marking === FINAL_ANSWER_MARKING) !== (typeof twinSealed._methodScheme === 'string'), 'and sealed (final-answer seal or the approved scheme stamp, never both)');
     // Another account cannot touch any of it.
     c.eq((await submit(bound.data.question.id, 'nsw-foreign', '1', undefined, b.jar)).status, 404, 'another account cannot mark this account\'s NSW question');
   }
