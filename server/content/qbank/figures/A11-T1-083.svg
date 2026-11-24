@@ -1,0 +1,35 @@
+<svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' width='79.15' height='79.15' viewBox='-66.022 -66.022 59.359 59.359'>
+<g id='page1'>
+<g stroke-miterlimit='10' transform='matrix(.996 0 0 -.996 -36.343 -36.343)' fill='#000' stroke='#000' stroke-width='0.4' stroke-linecap='round' stroke-linejoin='round'>
+<path d='M29.591 0C29.591 16.343 16.343 29.591 0 29.591S-29.591 16.343-29.591 0S-16.343-29.591 0-29.591S29.591-16.343 29.591 0ZM0 0' fill='none'/>
+<path d='M26.176 0H29.591' fill='none'/>
+<path d='M22.67 13.088L25.626 14.795' fill='none'/>
+<path d='M13.088 22.67L14.795 25.626' fill='none'/>
+<path d='M0 26.176V29.591' fill='none'/>
+<path d='M-13.088 22.67L-14.795 25.626' fill='none'/>
+<path d='M-22.67 13.088L-25.626 14.795' fill='none'/>
+<path d='M-26.176 0H-29.591' fill='none'/>
+<path d='M-22.67-13.088L-25.626-14.795' fill='none'/>
+<path d='M-13.088-22.67L-14.795-25.626' fill='none'/>
+<path d='M0-26.176V-29.591' fill='none'/>
+<path d='M13.088-22.67L14.795-25.626' fill='none'/>
+<path d='M22.67-13.088L25.626-14.795' fill='none'/>
+<g stroke-width='0.8'>
+<path d='M0 0V23.1' fill='none'/>
+<g transform='matrix(0 1 -1 0 0 23.5)' stroke-dasharray='none' stroke-dashoffset='0.0' stroke-linecap='round' stroke-linejoin='round'>
+ <path d='M-2.56 3.123C-2.092 1.249-1.05 .364 0 0C-1.05-.364-2.092-1.249-2.56-3.123' fill='none'/>
+ </g>
+</g>
+<g stroke-width='0.8' fill='#808080' stroke='#808080'>
+<path d='M0 0L20.005-11.55' fill='none'/>
+<g transform='matrix(.866 -.5 .5 .866 20.352 -11.75)' stroke-dasharray='none' stroke-dashoffset='0.0' stroke-linecap='round' stroke-linejoin='round'>
+ <path d='M-2.56 3.123C-2.092 1.249-1.05 .364 0 0C-1.05-.364-2.092-1.249-2.56-3.123' fill='none'/>
+ </g>
+</g>
+<path d='M7.967 0C7.967 4.4 4.4 7.967 0 7.967' fill='none'/>
+<g stroke-dasharray='3.0,3.0' stroke-dashoffset='0.0'>
+<path d='M0 11.381C6.286 11.381 11.381 6.286 11.381 0C11.381-1.997 10.855-3.961 9.856-5.691' fill='none'/>
+</g>
+</g>
+</g>
+</svg>

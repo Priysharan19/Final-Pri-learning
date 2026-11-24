@@ -1,0 +1,18 @@
+<svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' width='125.79' height='125.79' viewBox='-66.022 -66.022 94.341 94.341'>
+<g id='page1'>
+<g stroke-miterlimit='10' transform='matrix(.996 0 0 -.996 -65.624 27.92)' fill='#000' stroke='#000' stroke-width='0.4' stroke-linecap='round' stroke-linejoin='round'>
+<g stroke-width='0.8'>
+<path d='M0 0H68.287V68.287H0ZM68.287 0L93.895 25.608V93.895L68.287 68.287M0 68.287L25.608 93.895H93.895' fill='none'/>
+</g>
+<g stroke-dasharray='3.0,3.0' stroke-dashoffset='0.0'>
+<path d='M0 0L25.608 25.608H93.895M25.608 25.608V93.895' fill='none'/>
+</g>
+<g fill='#f00' stroke='#f00' stroke-width='0.8'>
+<path d='M0 0L93.895 93.895' fill='none'/>
+</g>
+<g fill='#f00' stroke='#f00' stroke-dasharray='3.0,3.0' stroke-dashoffset='0.0'>
+<path d='M0 0L93.895 25.608' fill='none'/>
+</g>
+</g>
+</g>
+</svg>
