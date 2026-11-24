@@ -216,7 +216,16 @@ function readSolution(q) {
     }
   });
   // A question with several solutions: a line true of only some of them is a step only when it is plainly a branch (see matchEquation).
-  const multiRoot = (Array.isArray(q?.stepcheck?.solutions) && q.stepcheck.solutions.length > 1) || (Array.isArray(q?.answer?.values) && q.answer.values.length > 1);
+  // Read from the worked steps ALONE (never an answer field): the solution states `x = a` and `x = b` for two different values of one letter.
+  const stated = new Map();
+  for (const l of labelled) {
+    const v = l.info && (l.info.vars || []).length === 0 && Number.isFinite(l.info.value) ? l.info.value : null;
+    if (v === null || l.label.arg !== null) continue;
+    const set = stated.get(l.label.name) || new Set();
+    set.add(Math.round(v * 1e9));
+    stated.set(l.label.name, set);
+  }
+  const multiRoot = [...stated.values()].some(set => set.size > 1);
   return { steps, labelled, conditions, numeric, values, multiRoot, final: values.length ? values[values.length - 1] : null };
 }
 

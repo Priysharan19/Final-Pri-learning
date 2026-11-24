@@ -526,7 +526,7 @@ function isPlainBranch(ast, variable, prev, prevTrusted) {
   if (namesValue(ast, variable)) return true;
   const zero = side => { const n = unwrapGroup(side); return !!n && n.t === 'num' && Math.abs(n.v) < 1e-12; };
   if (zero(ast.l) !== zero(ast.r)) return true;
-  // A multiple of the unknown alone beside a constant (x ln 2 = ln 1, 3x = 12): the value, one step from `x = ...`. An added constant (x - 5 = 1) is not.
+  // A multiple of the unknown alone beside a constant (x ln 2 = ln 1, 3x = 12) is the value one step from `x = ...`. An added constant (x - 5 = 1) is not. (Tried requiring a trusted line above: it lost true exponential and logarithmic branch lines written side by side, so it stays as is.)
   try {
     const constant = n => !variablesOf(n).size || [...variablesOf(n)].every(v => v === 'e');
     const multiple = (side, other) => {
