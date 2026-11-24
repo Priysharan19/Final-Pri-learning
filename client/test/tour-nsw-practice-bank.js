@@ -200,7 +200,7 @@ try {
   const bare = await reach(q => q.hints.length === 0);
   if (bare) {
     await typeTab();
-    check('a question with no rung offers no hint control and no empty hints panel', await page.locator('[data-hint-ladder], [data-hint-rung-open], [data-hint-rung], .hints-block').count() === 0, String(await page.locator('[data-hint-ladder], [data-hint-rung-open], .hints-block').count()));
+    check('a question with no rung offers no hint control and no empty hints panel', await page.locator('[data-hint-ladder], [data-hint-rung-open], [data-hint-rung], .hints-block').count() === 0, (await page.locator('[data-hint-ladder], [data-hint-rung-open], [data-hint-rung], .hints-block').evaluateAll(els => els.map(e => e.outerHTML.slice(0, 160)))).join(' | '));
     check('and no sideways scroll', await sideways() <= 0);
     const hintCalls = (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/hint$/)).length;
     check('and the page asked the server for no hint on it', hintCalls >= 0);
