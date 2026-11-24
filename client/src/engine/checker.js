@@ -809,6 +809,12 @@ function checkLinesAfterBreakAgainstPrevious(out, firstBreak, meta) {
  * value that is not one) becomes an "incomplete" note naming what is missing. No credit is given for
  * the missing part and the final answer is still marked by the answer check.
  */
+/** How many times the unknown is written in an expression. */
+function variableLeaves(node, variable) {
+  if (!node || typeof node !== 'object') return 0;
+  if (node.t === 'var') return node.v === variable ? 1 : 0;
+  return ['l', 'r', 'v', 'arg', 'base', 'exp'].reduce((n, k) => n + variableLeaves(node[k], variable), 0) + (Array.isArray(node.args) ? node.args.reduce((n, a) => n + variableLeaves(a, variable), 0) : 0);
+}
 function incompleteNote(variable, wanted, held) {
   const missing = wanted.filter(w => !held.some(h => numsClose(h, w)));
   if (!missing.length) return null;
@@ -842,12 +848,20 @@ function downgradeLostRoots(out, meta) {
   });
 }
 
-function flagUnfinishedFinalLine(out, meta) {
+function flagUnfinishedFinalLine(out, meta, lists = false) {
   if (meta?.kind !== 'equation' || !out.length) return;
   const row = out[out.length - 1];
   if (!row || row.unread || row.check || row.status === 'break') return;
   let incomplete = /would also allow another value|not finished|still to find/.test(String(row.note || ''));
-  if (!incomplete) {
+  // A list (`x = 1, 4`, `x = 1 or x = 4`) is read as the solutions it names, never as one number (normalize reads the comma as a thousands
+  // separator, so `x = 1, 4` became x = 14 and a complete answer was called unfinished). Prithagoras only (options.candidates).
+  let listed = null;
+  if (lists && !incomplete) { try { listed = readSolutionList(row.text, meta); } catch { listed = null; } }
+  if (listed) {
+    if (listed.invalid || !listed.values.length) return;
+    const wantedAll = uniqueNumeric(meta.solutions);
+    incomplete = listed.values.length !== wantedAll.length || !wantedAll.every(w => listed.values.some(v => numsClose(v, w)));
+  } else if (!incomplete) {
     try {
       const wanted = uniqueNumeric(meta.solutions);
       const cleaned = normalize(String(row.text).trim().replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore)\s+/i, ''));
@@ -991,6 +1005,8 @@ function isPartOf(text, whole) {
 
 // ── the unit of an angle written as a plain number ───────────────────────────────────────────────────────────────────
 let PAGE_TRIG_UNIT = 'rad';
+// The Australian marker's reading of a page (options.candidates, set for the length of one stepCheck: it is synchronous, like PAGE_TRIG_UNIT).
+let AU_READING = false;
 /** 'deg' when the question or the page works in degrees, 'rad' when it works in radians (or writes π in an angle), null when it does not say. */
 export function trigUnitOf(text) {
   const t = String(text ?? '');
@@ -1005,7 +1021,33 @@ export function degreeForm(text) {
     .replace(/(?<![a-z])(sin|cos|tan|sec|cosec|csc|cot)(\s*\^\s*-?\d+)?\s+([-+]?\d+(?:\.\d+)?)(?![\d.])/gi, (_, f, pw, n) => `${f}${pw || ''}((${n})*pi/180)`);
 }
 
-function judgeExpressionLine(cleaned, meta, { reference = null, promptSpans = [], knownLetters = null, earlier = [] } = {}) {
+/** `f(x) = x e^(-x)` as the question defines it: { f: { param, ast } }. */
+function functionDefinitions(prompt) {
+  const out = {};
+  for (const m of String(prompt || '').matchAll(/\$([^$]+)\$/g)) {
+    let plain = ''; try { plain = plainTex(m[1]) || ''; } catch { plain = ''; }
+    const d = /^\s*([A-Za-z])\(\s*([a-z])\s*\)\s*=\s*(.+?)\s*$/.exec(plain);
+    const ast = d ? parseExpr(d[3]) : null;
+    if (d && ast && !out[d[1]]) out[d[1]] = { param: d[2], ast };
+  }
+  return out;
+}
+const NUMBER_ARGUMENT_LABEL = /^([A-Za-z])\(\s*(-?\d+(?:\.\d+)?)\s*\)$/;
+/** `f(2)` against the value a line gives it: 'true', 'false', or null when the question does not define f (or the line is not a number). */
+function functionValueVerdict(label, tail, functions) {
+  const m = NUMBER_ARGUMENT_LABEL.exec(label);
+  const def = m && functions ? functions[m[1]] : null;
+  if (!def) return null;
+  try {
+    const have = evaluate(def.ast, { [def.param]: Number(m[2]) });
+    const ast = parseExpr(tail);
+    if (!ast || variablesOf(ast).size > ([...variablesOf(ast)].includes('e') ? 1 : 0)) return null;
+    const want = evaluate(ast, {});
+    if (!Number.isFinite(have) || !Number.isFinite(want)) return null;
+    return Math.abs(have - want) <= 1e-9 * Math.max(1, Math.abs(have)) ? 'true' : 'false';
+  } catch { return null; }
+}
+function judgeExpressionLine(cleaned, meta, { reference = null, promptSpans = [], knownLetters = null, earlier = [], functions = null } = {}) {
   const text = bareExpressionLine(cleaned);
   // A trig function of a plain number is worked out in the unit the page states; with none stated, a pair is the same when it is the same in either unit
   const eq = (a, b) => exprEquivalent(a, b, { positiveOnly: meta.positiveOnly }) === true;
@@ -1029,8 +1071,16 @@ function judgeExpressionLine(cleaned, meta, { reference = null, promptSpans = []
   const tail = parts[parts.length - 1];
   const rest = parts.slice(0, -1);
   if (same(tail, meta.canonical)) {
+    // A function of a NUMBER on the left (`f(2) = e^(-1)`) is a claim about that value, not a label: it is ticked when the question's own
+    // function gives it, crossed when it provably does not, and a note when the question does not say what f is (Prithagoras).
+    const valued = AU_READING ? rest.filter(x => NUMBER_ARGUMENT_LABEL.test(x)) : [];
+    for (const x of valued) {
+      const verdict = functionValueVerdict(x, tail, functions);
+      if (verdict === 'false') return { status: 'break', note: `Put the number into the function: ${x} does not come to this value, so this line is false.` };
+      if (verdict !== 'true') return unread;
+    }
     // Ticked only when the written chain agrees with itself.
-    return rest.every(x => LABEL_PART.test(x) || same(x, tail)) ? { status: 'ok' } : unread;
+    return rest.every(x => valued.includes(x) || LABEL_PART.test(x) || same(x, tail)) ? { status: 'ok' } : unread;
   }
   // A statement between numbers that is false (1 = 2) is a mistake wherever it stands; a rounded
   // decimal (22/7 = 3.14) is not provably false and is left as a note.
@@ -1142,7 +1192,7 @@ const proseCleanOf = line => String(line).trim().replace(/^∴\s*/, '').replace(
 
 // "the least integer k for which …": a search over whole numbers, so a smaller number tried on the way is a trial
 const EXTREMUM_PROMPT = /(?=[^]*\b(?:inequality|inequalities|holds?)\b)\b(?:least|greatest|smallest|largest)\s+(?:positive\s+|natural\s+|whole\s+)?(?:integer|whole number|natural number)/i;
-function stepCheckSingle(meta, workingText, system = null, { loneBranches = false, calculus = null, named = false, prompt = '' } = {}) {
+function stepCheckSingle(meta, workingText, system = null, { loneBranches = false, calculus = null, named = false, prompt = '', candidates = false } = {}) {
   PAGE_TRIG_UNIT = trigUnitOf(`${prompt}\n${workingText}`);
   const calculusStage = { claimed: false };   // calculusSteps.js: has a line made a claim yet?
   const rawLines = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
@@ -1531,8 +1581,12 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
             // proved to be a root of the question names that root, like
             // `x − 3 = 0` does. A product (`(2^x − 1)(2^x + 3) = 0`) never does:
             // it is held to every root, as a polynomial product is.
+            // (Prithagoras: and the unknown stands once in the line. `e^(1x) − 3e^x + 2 = 0`, a line that merely collects to a linear
+            // factor, is a different equation whose one root happens to be a root of the question, not the branch `e^x = 1`: it falls to the
+            // lost-root note below, never a tick.)
             const expLogNames = expLogLine && !!expLog && !expLog.hidden && Array.isArray(expLog.poly) && expLog.poly.length === 2
-              && expLog.roots.length === 1 && wantedRoots.some(w => sameRoot(expLog.roots[0], w));
+              && expLog.roots.length === 1 && wantedRoots.some(w => sameRoot(expLog.roots[0], w))
+              && (!candidates || variableLeaves(ast, meta.variable) <= 1);
             // (Only where the whole working is read at once: a stage of a plan
             // is checked a line at a time, and one limit is not the pair.)
             const lone = loneBranches && !branchesOpen && wantedRoots.length > 1 && (valued || expLogNames || !!linearState({ kind: 'equation', ast }, meta.variable));
@@ -1806,6 +1860,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
             reference: expressionReference(meta, prompt, out, { lineAbove: /^\s*=/.test(bareExpressionLine(cleaned)) }),
             promptSpans: [...String(prompt || '').matchAll(/\$([^$]+)\$/g)].map(m => { try { return plainTex(m[1]); } catch { return ''; } }).filter(t => t && !/[=<>≤≥,]/.test(t) && parseExpr(t)),
             earlier: rawLines.slice(0, i),
+            functions: AU_READING ? functionDefinitions(prompt) : null,
             knownLetters: prompt ? new Set((`${[...String(prompt).matchAll(/\$([^$]+)\$/g)].map(m => m[1]).join(' ')} ${meta.canonical || ''} ${meta.source || ''} ${out.map(l => l.text).join(' ')}`.replace(/\\[a-zA-Z]+/g, ' ').match(/[A-Za-z]/g) || [])) : null
           });
           status = judged.status;
@@ -1900,7 +1955,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
 
   downgradeLostRoots(out, meta);
   if (firstBreak !== -1 && out[firstBreak]?.status !== 'break') firstBreak = out.findIndex(l => l.status === 'break');
-  flagUnfinishedFinalLine(out, meta);
+  flagUnfinishedFinalLine(out, meta, candidates);
   if (firstBreak === -1) return { lines: out, firstBreak, diagnosis: null };
   for (let i = firstBreak + 1; i < out.length; i++) {
     if (out[i].status === 'break' || out[i].branch) {
@@ -2660,7 +2715,7 @@ function stepCheckPlan(meta, workingText) {
  * equations the question gives; without it, such a line is a note.
  */
 export function stepCheck(meta, workingText, options = null) {
-  return withEvaluationBudget(EVALUATION_BUDGET, () => nameChangedTerm(stepCheckWithinBudget(meta, workingText, options)));
+  return withEvaluationBudget(EVALUATION_BUDGET, () => nameChangedTerm(withCandidates(meta, workingText, options, text => stepCheckWithinBudget(meta, text, options))));
 }
 
 // ── A definition, a label or a margin number is not a claim (owner, 20 November 2026) ────────────────────────────
@@ -2718,7 +2773,7 @@ function notAClaim(text, names, words) {
 /** The displayed report: the topic report with its crossed definitions, labels and bare numbers as notes. One evaluation budget. */
 export function claimFreeReport(meta, workingText, options, report) {
   try {
-    return withEvaluationBudget(EVALUATION_BUDGET, () => notClaims(meta, workingText, options, report, text => nameChangedTerm(stepCheckWithinBudget(meta, text, options))));
+    return withEvaluationBudget(EVALUATION_BUDGET, () => notClaims(meta, workingText, options, report, text => nameChangedTerm(withCandidates(meta, text, options, t => stepCheckWithinBudget(meta, t, options)))));
   } catch { return report; }
 }
 function notClaims(meta, workingText, options, report, run) {
@@ -2758,6 +2813,157 @@ function notClaims(meta, workingText, options, report, run) {
   }
   return out;
 }
+
+// ── A candidate root is not a wrong line (Prithagoras, 25 November 2026) ──────────────────────────────────────────
+// Live: on `Solve √(x+5) = x − 1` the page `x² − 3x − 4 = 0`, `x = −1`, `x = 4` had its second line crossed ("this line reads
+// 4 = −1, which is false"). Squaring both sides is not reversible: x = −1 is a root of the line above and not of the original,
+// the candidate the student must write down and then reject. A line stating such a value is TRUE of the derived equation, so it
+// is never crossed; it is a note that the value is only a candidate (checked in the original it may fail), and the line that
+// rejects it (`reject x = −1`, `x = −1 does not satisfy`, `x ≠ −1`) is ticked. A value that is a root of nothing on the page is
+// still crossed, and a rejection of a value that is no candidate is never ticked. The final answer is decided by the answer check
+// alone (giving both roots as the answer is still wrong): this pass only reads the lines. Only when `options.candidates` is set
+// (the Prithagoras marker); every other caller reads the page exactly as before.
+const CANDIDATE_NOTE = (text, several) => `${several ? 'A value on this line' : text} solves the line above without solving the original equation: squaring, clearing a fraction or taking a logarithm can add a value the original does not have. It is only a candidate: put it in the original equation, and reject it if it fails.`;
+const REJECT_WORDS = /\b(?:rejected?|rejecting|discard(?:ed)?|ignored?|extraneous|invalid|inadmissible|excluded?|not\s+(?:a\s+)?(?:valid\s+)?(?:solution|root|allowed)|no\s+good|(?:does(?:\s*n[o']t|\s+not)|do(?:\s*n[o']t|\s+not)|is(?:\s*n[o']t|\s+not))\s+(?:satisfy|work|solve|hold|fit)|fails?|failed|false|wrong|✗|×)/i;
+function candidateValue(text) {
+  try { const v = parseNumericInput(String(text).trim().replace(/^[(\[]|[)\]]$/g, '').trim()).value; return Number.isFinite(v) ? v : null; } catch { return null; }
+}
+/** The values a line names as roots of the variable: `x = r`, `x = r1 or x = r2`, `x = r1, r2`; null when it is not only that. */
+function namedRoots(line, meta) {
+  const src = String(line || '').trim().replace(/[−–—]/g, '-').replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore)\s+/i, '').replace(/[.;]$/, '');
+  if (!src || /[<>≤≥≠]|!=/.test(src)) return null;
+  const variable = String(meta.variable).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const lead = new RegExp(`^${variable}\\s*=\\s*`, 'i');
+  if (!lead.test(src)) return null;
+  const parts = src.split(/\bor\b|\band\b|,|;/i).map(t => t.trim()).filter(Boolean);
+  const values = [];
+  for (const part of parts) {
+    let body = part.replace(lead, '').trim();
+    const both = body.startsWith('±');   // `x = ±3` names 3 and -3
+    if (both) body = body.slice(1).trim();
+    else if (body.includes('±')) return null;
+    if (!body || /[a-z]{2,}|=/i.test(body.replace(/sqrt|pi|π|e/gi, ''))) return null;
+    const v = candidateValue(body);
+    if (v === null) return null;
+    values.push(v);
+    if (both) values.push(-v);
+  }
+  return values.length ? { values, parts: parts.length } : null;
+}
+function holdsAtRoot(ast, variable, r) {
+  try {
+    const L = evaluate(ast.l, { [variable]: r }), R = evaluate(ast.r, { [variable]: r });
+    return Number.isFinite(L) && Number.isFinite(R) && Math.abs(L - R) <= Math.max(1e-6, Math.abs(L), Math.abs(R)) * 1e-6;
+  } catch { return false; }
+}
+/** Is r a root of an earlier, uncrossed line of the page that also holds at every solution of the question (a line derived from it)? */
+function derivedRootSupport(meta, rows, before, r) {
+  const wanted = uniqueNumeric(meta.solutions);
+  for (let k = 0; k < before; k++) {
+    const row = rows[k];
+    if (!row || row.status === 'break' || row.candidate === true) continue;
+    let ast;
+    try { ast = parse(normalize(String(row.text).replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore)\s+/i, ''))); } catch { continue; }
+    if (!ast || ast.t !== 'equation' || ![...variablesOf(ast)].includes(meta.variable)) continue;
+    if (!wanted.every(w => holdsAtRoot(ast, meta.variable, w))) continue;
+    // an identity (`3x³ + … = 3(x+6)²(x−6)`, true for every value) has every number as a root and supports none
+    try { if (exprEquivalent(ast.l, ast.r) === true) continue; } catch { /* not decided: the probes below */ }
+    if ([0.37, -1.3, 2.9, 5.1, -4.7].filter(p => holdsAtRoot(ast, meta.variable, p)).length >= 3) continue;
+    if (holdsAtRoot(ast, meta.variable, r)) return true;
+  }
+  return false;
+}
+const isSolution = (meta, r) => uniqueNumeric(meta.solutions).some(w => numsClose(r, w, Math.max(1e-7, Number(meta.tol) > 0 ? Number(meta.tol) : 0)));
+/** The candidate this crossed line is, or null: every value it names is a solution or a root of a derived line above, and one is not a solution. */
+function candidateLine(meta, rows, at) {
+  const named = namedRoots(rows[at].text, meta);
+  if (!named) return null;
+  let candidate = false;
+  for (const r of named.values) {
+    if (isSolution(meta, r)) continue;
+    if (!derivedRootSupport(meta, rows, at, r)) return null;
+    candidate = true;
+  }
+  return candidate ? named : null;
+}
+/** The value a line REJECTS (`reject x = -1`, `x = -1 does not satisfy`, `x ≠ -1`, `-1 is extraneous`), or null. */
+function rejectedValue(line, meta) {
+  const src = String(line || '').trim().replace(/[−–—]/g, '-').replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore)\s+/i, '').replace(/[.;]$/, '').trim();
+  if (!src || src.length > 90) return null;
+  const variable = String(meta.variable).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const num = '(-?\\s*[0-9][0-9./]*|-?\\s*\\(\\s*-?[0-9./]+\\s*\\)|-?\\s*\\(\\s*-?[0-9]+\\s*/\\s*[0-9]+\\s*\\))';
+  let m;
+  if ((m = new RegExp(`^${variable}\\s*(?:≠|!=|=/=|\\\\ne)\\s*${num}$`, 'i').exec(src))) return candidateValue(m[1].replace(/\s+/g, ''));
+  if ((m = new RegExp(`^(?:reject(?:ing)?|discard|ignore|exclude|cross\\s+out|not)\\s+(?:${variable}\\s*=\\s*)?${num}$`, 'i').exec(src))) return candidateValue(m[1].replace(/\s+/g, ''));
+  if ((m = new RegExp(`^(?:${variable}\\s*=\\s*)?${num}\\s*(?:\\(|,|:|-)?\\s*(?:is\\s+|are\\s+)?([a-z'’ ✗×]+)\\)?$`, 'i').exec(src)) && REJECT_WORDS.test(m[2]) && !/\b(?:true|correct|valid\s+solution|satisf(?:ies|y))\b/i.test(m[2].replace(/does\s*n[o']t\s+satisfy|do\s*n[o']t\s+satisfy|not\s+satisfy/gi, ''))) return candidateValue(m[1].replace(/\s+/g, ''));
+  return null;
+}
+/**
+ * The DISPLAYED report with the lines that reject a candidate ticked (`reject x = -1`, `x = -1 does not satisfy`, `x ≠ -1`): a true line, and
+ * feedback only: it is added to the page after every mark is computed, so no mark or step of a scheme reads it. A rejection of a value that is a
+ * solution, or that no line above has as a root, is left exactly as it was.
+ */
+export function tickRejections(meta, report) {
+  try {
+    if (meta?.kind !== 'equation' || !Array.isArray(meta.solutions) || !meta.solutions.length || !report || !Array.isArray(report.lines)) return report;
+    let changed = false;
+    const rows = report.lines.map((row, i) => {
+      if (!row || row.status === 'break' || row.status === 'ok') return row;
+      // a question with no unknown named by its step check: the letter the rejecting line names
+      const named = meta.variable ? meta : (() => { const m = /^(?:so\s+|hence\s+)?(?:reject(?:ing)?\s+|discard\s+|not\s+)?([a-z])\s*(?:=|≠)/i.exec(String(row.text || '').trim()); return m ? { ...meta, variable: m[1] } : null; })();
+      if (!named) return row;
+      const r = rejectedValue(row.text, named);
+      if (r === null || isSolution(named, r) || !derivedRootSupport(named, report.lines, i, r)) return row;
+      changed = true;
+      const { unverified: _u, unread: _r, incomplete: _i, ...rest } = row;
+      return { ...rest, status: 'ok', state: 'verified', note: `Correct: ${named.variable} = ${fmtRootText(r)} solves the line above but not the original equation, so it is rejected.`, rejection: true };
+    });
+    return changed ? { ...report, lines: rows } : report;
+  } catch { return report; }
+}
+function withCandidates(meta, workingText, options, run) {
+  const report = run(workingText);
+  if (!options || options.candidates !== true || meta?.kind !== 'equation' || !meta.variable || !Array.isArray(meta.solutions) || !meta.solutions.length) return report;
+  if (!report || !Array.isArray(report.lines) || !report.lines.length) return report;
+  try {
+    const original = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
+    const same = (rep, texts) => rep && Array.isArray(rep.lines) && rep.lines.length === texts.length && rep.lines.every((l, i) => String(l?.text ?? '').trim() === texts[i]);
+    if (!same(report, original)) return report;
+    const removed = new Map();   // original index → { text }
+    let keep = original.map((_, i) => i), current = report;
+    for (let round = 0; round < 6; round++) {
+      const at = current.lines.findIndex(l => l?.status === 'break');
+      if (at < 0) break;
+      const named = candidateLine(meta, current.lines, at);
+      if (!named) break;
+      removed.set(keep[at], named);
+      keep = keep.filter((_, k) => k !== at);
+      const next = run(keep.map(i => original[i]).join('\n'));
+      if (!same(next, keep.map(i => original[i]))) return report;
+      current = next;
+    }
+    if (!removed.size) return report;
+    const rows = original.map((text, i) => {
+      if (removed.has(i)) {
+        const named = removed.get(i);
+        return { text, status: 'note', note: CANDIDATE_NOTE(text.replace(/^∴\s*/, ''), named.parts > 1), state: 'unverified', unverified: true, candidate: true };
+      }
+      return current.lines[keep.indexOf(i)];
+    });
+    const firstBreak = rows.findIndex(l => l?.status === 'break');
+    const out = { ...current, lines: rows, firstBreak };
+    if (current.summary && typeof current.summary === 'object') {
+      const remap = arr => (Array.isArray(arr) ? arr.map(n => (Number.isInteger(n) && keep[n - 1] !== undefined ? keep[n - 1] + 1 : n)) : arr);
+      const sm = { ...current.summary };
+      for (const k of ['given', 'verified', 'arithmetic', 'conditions', 'wrong', 'unverified', 'unread']) if (k in sm) sm[k] = remap(sm[k]);
+      if ('total' in sm) sm.total = rows.length;
+      if (Array.isArray(sm.unverified)) sm.unverified = [...new Set([...sm.unverified, ...[...removed.keys()].map(n => n + 1)])].sort((a, b) => a - b);
+      out.summary = sm;
+    }
+    return out;
+  } catch { return report; }
+}
+const fmtRootText = r => (Number.isInteger(r) ? String(r) : String(Number(r.toPrecision(10))));
 
 /**
  * A break the diagnoser could not name gets the one term that changed since
@@ -2801,6 +3007,11 @@ function numericSolutions(meta) {
 }
 
 function stepCheckWithinBudget(meta, workingText, options = null) {
+  const before = AU_READING;
+  AU_READING = options?.candidates === true;
+  try { return stepCheckRead(meta, workingText, options); } finally { AU_READING = before; }
+}
+function stepCheckRead(meta, workingText, options) {
   meta = numericSolutions(meta);
   if (meta?.kind === 'plan') return stepCheckPlan(meta, workingText);
   // A function and one number asked of it (valueChain.js): its own verdicts, no equation to solve.
@@ -2810,7 +3021,7 @@ function stepCheckWithinBudget(meta, workingText, options = null) {
   const prompt = typeof options?.prompt === 'string' ? options.prompt : '';
   let calculus = null;
   try { calculus = calculusContext(meta, prompt); } catch { calculus = null; }
-  return stepCheckSingle(meta, workingText, pinnedSystem(meta, prompt), { loneBranches: true, calculus, named: true, prompt });
+  return stepCheckSingle(meta, workingText, pinnedSystem(meta, prompt), { loneBranches: true, calculus, named: true, prompt, candidates: options?.candidates === true });
 }
 
 // ── Method marks (marking-11) ────────────────────────────────────────────────

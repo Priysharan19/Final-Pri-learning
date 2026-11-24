@@ -15,7 +15,7 @@
 //
 // Deterministic: fixed seeds, no model, no network. A measurement; it sets and changes nothing.
 //
-//   node tools/marking-mutation-harness.mjs [--root <repo>] [--seeds 1] [--seed-from 0] [--max-per-line 12] [--generators y12-diff,me11-poly]
+//   node tools/marking-mutation-harness.mjs [--bank] [--ids A11-F1-172,...] [--root <repo>] [--seeds 1] [--seed-from 0] [--max-per-line 12] [--generators y12-diff,me11-poly]
 //        [--typed wrong|right] [--dump out.json] [--compare base.json] [--limit-pages N] [--verbose]
 //   --root points the engine at another checkout (the same harness measured against an older tree gives the "before" rate);
 //   --dump writes every authored line's verdict, --compare lists the ticks a tree lost or gained against such a dump.
@@ -36,6 +36,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import * as VARIANTS from './qbank-variants.mjs';
 
 export const SCOPE = /^(y11|y12|me11|me12)-/;
 
@@ -256,7 +257,7 @@ export function sideValues(text, vars) {
   }
   return out;
 }
-const lettersIn = text => [...new Set(tokenize(text).filter(t => t.t === 'v').map(t => t.v))].sort();
+export const lettersIn = text => [...new Set(tokenize(text).filter(t => t.t === 'v').map(t => t.v))].sort();
 
 /** Split a line into its sides (at top-level `=` and `,`). */
 export function sidesOf(line) {
@@ -397,7 +398,7 @@ function valuesOf(text) {
   for (const side of sidesOf(text)) { const v = sideValues(side, lettersIn(side)); if (v && lettersIn(side).length === 0 && v[0] !== null) out.push(v[0]); }
   return out;
 }
-function rootsOf(line) {
+export function rootsOf(line) {
   const sides = sidesOf(line);
   if (sides.length !== 2 || /[,]/.test(line)) return null;
   const vars = [...new Set(sides.flatMap(lettersIn))];
@@ -545,39 +546,99 @@ export function typedAnswer(q, mode, lines) {
 export async function loadEngine(root) {
   const G = await import(path.join(root, 'client/src/engine/generators/index.js'));
   const { NSW_BANK_LEDGER } = await import(path.join(root, 'server/platform/nswBanks.js'));
-  const { stepEvidence } = await import(path.join(root, 'server/platform/markerOps.js'));
+  const { stepEvidence, stepMetaFor } = await import(path.join(root, 'server/platform/markerOps.js'));
   const { checkAnswer } = await import(path.join(root, 'client/src/engine/checker.js'));
   const SM = await import(path.join(root, 'client/src/engine/solutionMatch.js'));
   await G.loadAllBanks();
-  return { G, NSW_BANK_LEDGER, stepEvidence, checkAnswer, spanToPlain: SM._internals.spanToPlain };
+  return { G, NSW_BANK_LEDGER, stepEvidence, stepMetaFor, checkAnswer, spanToPlain: SM._internals.spanToPlain };
 }
-/** The real marker's report lines for a page, or null. */
+/**
+ * The engine over the AUTHOR BANK (server/platform/qbankPack.js, the pack committed under server/content/qbank): the questions as the marker is
+ * handed them (markerOps.markerView over the served question), their answers read as server/platform/qbankMarking.js reads them, and the same
+ * real marker. `ids` are the pack's question ids.
+ */
+export async function loadBankEngine(root) {
+  const E = await loadEngine(root);
+  const pack = await import(path.join(root, 'server/platform/qbankPack.js'));
+  const { checkBankAnswer } = await import(path.join(root, 'server/platform/qbankMarking.js'));
+  const { markerView } = await import(path.join(root, 'server/platform/markerOps.js'));
+  await pack.ensureQbank({ ...process.env, PRI_EDITION: 'prithagoras' }, { strict: true });
+  const ids = pack.qbankEntries().map(e => e.entry.id);
+  return { ...E, G: { generateQuestion: id => markerView(pack.qbankEntryQuestion(id, 17)) }, checkAnswer: checkBankAnswer, ids, bank: true };
+}
+/** The real marker's report lines for a page, or null. A generator question is marked as the server marks one it has sealed (the Australian edition's). */
 export function markPage(E, q, answer, page) {
-  const qq = { ...q };
+  const qq = E.bank ? { ...q } : { ...q, _marking: 'final-answer-only' };
   let ev; try { ev = E.stepEvidence(qq, answer, page.join('\n'), E.checkAnswer(qq, answer), { slipWarnings: true }); } catch { return null; }
   return ev && ev.stepReport && Array.isArray(ev.stepReport.lines) ? ev.stepReport.lines : null;
 }
 /** The report's line for page line i: by position when it judged every line, otherwise by the line's text (a proof is judged line by line from its own plan). */
 export const lineAt = (rep, page, i) => (rep && rep.length === page.length ? rep[i] : rep ? rep.find(l => String(l.text ?? '').trim() === page[i].trim()) : undefined);
 
-export async function run({ root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), seeds = [1], maxPerLine = 12, generators = null, typed = 'wrong', limitPages = Infinity, verbose = false } = {}) {
-  const E = await loadEngine(root);
+export async function run({ root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), seeds = [1], maxPerLine = 12, generators = null, typed = 'wrong', limitPages = Infinity, verbose = false, bank = false, ids = null } = {}) {
+  const E = bank ? await loadBankEngine(root) : await loadEngine(root);
   const { G, NSW_BANK_LEDGER, spanToPlain } = E;
   const cells = [];
-  for (const e of NSW_BANK_LEDGER) {
+  if (bank) for (const id of E.ids) { if (!ids || ids.includes(id)) cells.push({ generator: id, difficulty: 0, seed: 17 }); }
+  else for (const e of NSW_BANK_LEDGER) {
     if (!SCOPE.test(e.generator) || (generators && !generators.includes(e.generator))) continue;
     for (const c of e.cells) if (c.issued) for (const seed of seeds) cells.push({ generator: e.generator, difficulty: c.difficulty, seed });
   }
-  const totals = { pages: 0, lines: 0, trueTicks: 0, trueCrosses: 0, mutants: 0, falseTicks: 0, falseCrosses: 0, notes: 0, undecided: 0, coincidentallyTrue: 0 };
+  const totals = { pages: 0, lines: 0, trueTicks: 0, trueCrosses: 0, mutants: 0, falseTicks: 0, falseCrosses: 0, notes: 0, undecided: 0, coincidentallyTrue: 0, variantPages: 0, variantLines: 0, variantCrosses: 0, rejectLines: 0, rejectTicked: 0, variantMutants: 0, variantFalseTicks: 0 };
   const byKind = {};
   const setAside = {};
-  const failures = { falseTicks: [], trueCrosses: [] };
+  const failures = { falseTicks: [], trueCrosses: [], rejectUnticked: [] };
   const trueStatus = {};   // `${generator}|${difficulty}|${seed}` → [status per line]
   for (const cell of cells) {
     if (totals.pages >= limitPages) break;
     let q; try { q = G.generateQuestion(cell.generator, cell.difficulty, cell.seed); } catch { continue; }
     if (!q || typeof q.prompt !== 'string') continue;
     const lines = authoredPage(q, spanToPlain);
+    // The natural student pages of an equation solved by a step that is not reversible (squaring, clearing a fraction, taking logs): the
+    // candidate roots listed one per line, then rejected. Every line of them is true: none may be crossed. A rejection of a candidate is ticked.
+    // The false mutants: a value that is a root of nothing, written as a root or as a rejection, and the rejection of a real solution: none ticked.
+    if (VARIANTS) {
+      let facts = null;
+      try { facts = VARIANTS.equationFacts(E.stepMetaFor(q), lines, q); } catch { facts = null; }
+      for (const pg of VARIANTS.variantPages(facts)) {
+        const answer = typedAnswer(q, 'right', pg.lines);
+        const rep = markPage(E, q, answer, pg.lines);
+        if (!rep) continue;
+        totals.variantPages++;
+        pg.lines.forEach((text, i) => {
+          const l = lineAt(rep, pg.lines, i);
+          if (!l || !pg.kinds[i]) return;
+          totals.variantLines++;
+          if (l.status === 'break') { totals.variantCrosses++; totals.trueCrosses++; failures.trueCrosses.push({ ...cell, line: i, text, page: pg.name, variant: true, note: l.note }); }
+          if (pg.kinds[i] === 'reject') { totals.rejectLines++; if (l.status === 'ok') totals.rejectTicked++; else if (failures.rejectUnticked.length < 60) failures.rejectUnticked.push({ ...cell, text, page: pg.name, status: l.status, note: l.note }); }
+        });
+      }
+      if (facts && facts.E.length) {
+        const known = [...facts.S, ...facts.E];
+        const wrongValue = e => [e + 7, e - 7, e * 3 + 11, e + 0.5 * 9].find(v => known.every(k => Math.abs(k - v) > 0.01) && Number.isInteger(v)) ?? null;
+        const mutantPages = [];
+        for (const e of facts.E) {
+          const w = wrongValue(e); if (w === null) continue;
+          const head = facts.prefix.slice(0, 8);
+          mutantPages.push({ kind: 'root-of-nothing', at: head.length, lines: [...head, `${facts.v} = ${w}`] });
+          mutantPages.push({ kind: 'reject-of-nothing', at: head.length, lines: [...head, `reject ${facts.v} = ${w}`] });
+          mutantPages.push({ kind: 'neq-of-nothing', at: head.length, lines: [...head, `${facts.v} ≠ ${w}`] });
+          mutantPages.push({ kind: 'root-of-nothing-after-candidate', at: head.length + 1, lines: [...head, `${facts.v} = ${VARIANTS.asText(VARIANTS.cleanOf(e))}`, `${facts.v} = ${w}`] });
+        }
+        for (const sv of facts.S) {
+          const head = facts.prefix.slice(0, 8);
+          mutantPages.push({ kind: 'reject-of-a-solution', at: head.length, lines: [...head, `reject ${facts.v} = ${VARIANTS.asText(VARIANTS.cleanOf(sv))}`] });
+          mutantPages.push({ kind: 'neq-of-a-solution', at: head.length, lines: [...head, `${facts.v} ≠ ${VARIANTS.asText(VARIANTS.cleanOf(sv))}`] });
+        }
+        for (const m of mutantPages) {
+          const rep = markPage(E, q, typedAnswer(q, 'right', m.lines), m.lines);
+          if (!rep) continue;
+          totals.variantMutants++;
+          const l = lineAt(rep, m.lines, m.at);
+          if (l && l.status === 'ok') { totals.variantFalseTicks++; totals.falseTicks++; failures.falseTicks.push({ ...cell, line: m.at, kind: m.kind, authored: '(variant)', mutant: m.lines[m.at], note: l.note }); }
+        }
+      }
+    }
     if (lines.length < 2) continue;
     // what the question itself states (a mutant that restates it is a true line)
     const given = [];
@@ -663,11 +724,14 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
     generators: arg('generators', null) ? arg('generators').split(',') : null,
     typed: arg('typed', 'wrong'),
     limitPages: Number(arg('limit-pages', Infinity)),
+    bank: process.argv.includes('--bank'),
+    ids: arg('ids', null) ? arg('ids').split(',') : null,
     verbose: process.argv.includes('--verbose')
   });
   console.log(JSON.stringify({ totals: res.totals, byKind: res.byKind }, null, 1));
   console.log('false ticks:', res.failures.falseTicks.length, 'true crosses:', res.failures.trueCrosses.length);
   for (const f of res.failures.falseTicks.slice(0, 40)) console.log('  FALSE TICK', f.generator, f.difficulty, f.seed, 'L' + f.line, f.kind, '|', f.authored, '->', f.mutant, '|', (f.note || '').slice(0, 70));
+  for (const f of res.failures.rejectUnticked.slice(0, 12)) console.log('  REJECT NOT TICKED', f.generator, f.difficulty, f.seed, f.page, '|', f.text, '|', f.status, (f.note || '').slice(0, 60));
   for (const f of res.failures.trueCrosses.slice(0, 40)) console.log('  TRUE CROSS', f.generator, f.difficulty, f.seed, 'L' + f.line, '|', f.text, '|', (f.note || '').slice(0, 70));
   const dump = arg('dump', null);
   if (dump) fs.writeFileSync(dump, JSON.stringify({ trueStatus: res.trueStatus, failures: res.failures, totals: res.totals, byKind: res.byKind }));
