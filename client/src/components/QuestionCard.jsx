@@ -166,7 +166,7 @@ const MistakeGraph = React.lazy(() => import('./MistakeGraph.jsx').catch(() => (
 // and the evaluation built from the receipt. Engine-only, feedback only, and
 // its own chunk; a chunk that cannot load shows the plain step report instead.
 const MarkedPage = React.lazy(() => import('./MarkedPage.jsx').catch(() => ({ default: () => null })));
-const CriteriaTable = React.lazy(() => import('./CriteriaTable.jsx').catch(() => ({ default: () => null })));
+const SchemeTable = React.lazy(() => import('./SchemeTable.jsx').catch(() => ({ default: () => null })));
 const AnnotatedWorkingPart = React.lazy(() => import('./AnnotatedWorking.jsx').catch(() => ({ default: () => null })));
 
 class TutorBoundary extends React.Component {
@@ -3487,7 +3487,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                     typed, ink or photo. The table is drawn only if it is approved at its digest and adds up to the server's mark (criteriaTableModel.js). */}
                 {res.methodScheme?.paid === true && res.methodCriteria && !res.revealed && (
                   <React.Suspense fallback={null}>
-                    <CriteriaTable criteria={res.methodCriteria} mark={{ awarded: res.marksEarned, possible: res.marksPossible }} report={res.stepReport} />
+                    <SchemeTable criteria={res.methodCriteria} mark={{ awarded: res.marksEarned, possible: res.marksPossible }} report={res.stepReport} />
                   </React.Suspense>
                 )}
                 {res.stepReport && !awModel && <StepReport report={res.stepReport} instrument={INSTRUMENT} correctAnswer={!verdictGood && !res.revealed ? res.solution?.answerText : null} />}

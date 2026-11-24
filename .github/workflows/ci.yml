@@ -1056,7 +1056,7 @@ jobs:
             # A Prithagoras NSW student's practice is issued and marked by the
             # server: the device names the profile's own course, never 'in'.
             node client/test/tour-nsw-practice-marked.js 2>&1 | tee -a browser.log
-            # Step marks on the answer card: a scheme-paid reply draws its criteria table and the author's label (PRI_METHOD_MARKS=on, the repository's approved list).
+            # Step marks on the answer card: a scheme-paid reply draws its criteria table and the author's label (switch on in the tour's own server, the repository's approved list).
             node client/test/tour-step-marks.mjs 2>&1 | tee -a browser.log
             # ADR-0003: a visitor with no account meets the question picker first, in both
             # editions, has up to five typed or multiple-choice questions marked by the

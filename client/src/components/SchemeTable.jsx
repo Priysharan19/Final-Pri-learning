@@ -11,7 +11,7 @@ import { criteriaView, cardsOfReport } from './criteriaTableModel.js';
 import './MarkedPage.css';
 
 // Either a ready `view`, or the server's reply fields: `criteria` (res.methodCriteria), `mark` ({ awarded, possible }) and `report` (res.stepReport).
-export default function CriteriaTable({ view: given = null, criteria = null, mark = null, report = null }) {
+export default function SchemeTable({ view: given = null, criteria = null, mark = null, report = null }) {
   const t = useT();
   const view = given ?? (criteria ? criteriaView({ criteria, mark, cards: cardsOfReport(report) }) : null);
   if (!view) return null;

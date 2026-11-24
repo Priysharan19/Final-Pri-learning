@@ -23,7 +23,7 @@ import { dollarsBalanced, lineTex } from '../engine/commentTex.js';
 import { strokePath } from './originalWorkModel.js';
 import { STATE, STATE_WORD, boxesFromInk, boxesFromPhoto, buildMarkedPage, defaultLine, listOf, markerOf, stateOf } from './markedPageModel.js';
 import { criteriaView } from './criteriaTableModel.js';
-import CriteriaTable from './CriteriaTable.jsx';
+import SchemeTable from './SchemeTable.jsx';
 import { firstSentence } from './lineReportText.js';
 import { typesetProse } from './typesetProse.js';
 import './MarkedPage.css';
@@ -347,7 +347,7 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
           </ol>
         </div>
       </div>
-      {table && <CriteriaTable view={table} />}
+      {table && <SchemeTable view={table} />}
     </section>
   );
 }
