@@ -28,7 +28,7 @@ const MAX_SKIPS = 30;
 // (server/platform/nswBanks.js), so the tour never depends on which chapter the
 // device draws. y10-compound is not banked yet: a student there still gets drafts.
 // owner decision, 19 Nov 2026: Prithagoras offers Years 11 and 12 only, so this walk is a Year 11 student on a Year 11 subtopic.
-const CHAPTER = 'y11-explog';
+const CHAPTER = 'y12-appdiff';
 const LABEL = 'Pri practice marking, approved by the author (Priysharan Tripathi, tutor). Not an official NESA guideline.';
 
 let pass = 0;
