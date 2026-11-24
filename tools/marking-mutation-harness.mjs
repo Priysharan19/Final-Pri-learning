@@ -378,7 +378,7 @@ export function roundingMutants(line) {
     const unit = 10 ** p, r = Math.round(exact * unit) / unit, t = Math.trunc(exact * unit) / unit;
     for (const d of [-1, 1]) {
       const v = r + d / unit;
-      if (Math.abs(v - r) < 1e-12 || Math.abs(v - t) < 1e-12 / unit) continue;   // a correct truncation is a correct rounded value
+      if (Math.abs((v - r) * unit) < 1e-6 || Math.abs((v - t) * unit) < 1e-6) continue;   // compared in units of the last place: a float difference of 1e-16 is not a different value   // a correct truncation is a correct rounded value
       const shown = (v < 0 ? '-' : '') + Math.abs(v).toFixed(p);
       const text = lit === 0 ? `${shown} = ${other}` : `${other} = ${shown}`;
       if (text.replace(/\s+/g, '') !== line.replace(/\s+/g, '')) out.push({ kind: 'rounding-off-by-one', text });
