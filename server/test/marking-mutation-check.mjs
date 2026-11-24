@@ -85,6 +85,46 @@ ok(sidesOf('a = b = c').length === 3, 'oracle: splits a chain');
   t(gen('me12-further-calc', 3, 5), ['3[sin^(-1)((x)/(4))]', '((x)/4)', '((sqrt(2))/2)', '((sqrt(3))/2)'], 2, 'a limit value (5)');
 }
 
+
+// ── the tick classes of engine/provedLines.js (24 November 2026): each true line is ticked, each one-edit mutant is not ──────────
+{
+  // a solution list: a set, in any order, with ± and degrees; a wrong element, a wrong sign in a ± pair, an extra or a foreign unit is not ticked
+  const q = gen('y11-trig-ident', 2, 11);
+  for (const good of ['θ = 45°, -45°', '∴ θ = -45°, 45°', 'θ = 45° or θ = -45°', 'θ = ±45°']) ok(statusOf(q, ['cosθ = √2/2', good], 1) === 'ok', `solution list: ${good} is ticked`);
+  for (const bad of ['θ = 45°, -35°', 'θ = 45°, 45°', 'θ = 45°, -135°', 'θ = 45°, 315°', 'θ = ±135°', 'θ = 45°', 'θ = 45, -45 rad', 'θ = ±45° (cos is positive)']) ok(statusOf(q, ['cosθ = √2/2', bad], 1) !== 'ok', `solution list: ${bad} is not ticked`);
+  ok(statusOf(q, ['cosθ = √2/2', 'θ = 45°, -45°'], 0) === 'ok', 'restated equation: the question\'s own equation is ticked');
+  ok(statusOf(q, ['cosθ = √2/3', 'θ = 45°, -45°'], 0) !== 'ok', 'restated equation: a changed equation is not ticked');
+  ok(statusOf(q, ['cosθ = -√2/2', 'θ = 45°, -45°'], 0) !== 'ok', 'restated equation: a changed sign is not ticked');
+}
+{
+  // a rounded value: to the places shown, rounded or truncated; one digit out is not ticked
+  const q = gen('y12-financial', 2, 5);
+  for (const good of ['(1.06)^5 = 1.338226', '(1.06)^5 = 1.33823', '(1.06)^5 = 1.3382']) ok(statusOf(q, [good], 0) === 'ok', `rounded value: ${good} is ticked`);
+  for (const bad of ['(1.06)^5 = 1.338227', '(1.06)^5 = 1.338216', '(1.06)^5 = 1.33824', '(1.06)^5 = 1.3383', '(1.06)^5 = 1.338326', '(1.06)^6 = 1.338226', '(1.07)^5 = 1.338226']) ok(statusOf(q, [bad], 0) !== 'ok', `rounded value: ${bad} is not ticked`);
+}
+{
+  // a labelled substitution, true as an identity in the unknown coefficients and giving a value the question gives
+  const q = gen('me11-poly', 2, 5);
+  const page = l => ['P(x) = x^3 + ax^2 + bx - 1', l];
+  for (const good of ['P(1) = 0: 1 + a + b - 1 = 0', 'P(-3) = 20: -27 + 9a - 3b - 1 = 20']) ok(statusOf(q, page(good), 1) === 'ok', `substitution: ${good} is ticked`);
+  for (const bad of ['P(1) = 0: 1 + a + b + 1 = 0', 'P(1) = 0: 1 + 2a + b - 1 = 0', 'P(1) = 0: 1 + a - b - 1 = 0', 'P(1) = 1: 1 + a + b - 1 = 1', 'P(-3) = 20: -27 + 9a + 3b - 1 = 20', 'P(-3) = 20: -27 + 9a - 3b - 2 = 20', 'P(-3) = 21: -27 + 9a - 3b - 1 = 21', 'P(2) = 0: 8 + 4a + 2b - 1 = 0']) ok(statusOf(q, page(bad), 1) !== 'ok', `substitution: ${bad} is not ticked`);
+}
+{
+  // a derivative statement: the operator reaches one unit, so `d/dx (ax^n) + 1 = …` is not the derivative
+  const q = gen('y12-diff', 1, 7);
+  for (const good of ['((d)/(du))*sin u=cos u', '((d)/(dx))(ax^n) = anx^(n-1)']) ok(statusOf(q, [good], 0) === 'ok', `derivative statement: ${good} is ticked`);
+  for (const bad of ['((d)/(du))*sin u=-cos u', '((d)/(du))*sin u=cos u+1', '((d)/(dx))(ax^n) + 1 = anx^(n-1)', '((d)/(dx))(ax^n) = anx^(n-2)', '((d)/(dx))(ax^n) = ax^(n-1)']) ok(statusOf(q, [bad], 0) !== 'ok', `derivative statement: ${bad} is not ticked`);
+  ok(statusOf(q, ['((d)/(dx))cos(u) = -sin(u) * u\''], 0) === 'ok', 'chain rule statement is ticked');
+  ok(statusOf(q, ['((d)/(dx))cos(u) = sin(u) * u\''], 0) !== 'ok', 'chain rule statement with the wrong sign is not ticked');
+}
+{
+  // an identity, and an equation with exactly the question's solutions; one letter changed is neither
+  const q = gen('y12-diff', 1, 7);
+  ok(statusOf(q, ['cos(A - B) = cos(A)cos(B) + sin(A)sin(B)'], 0) === 'ok', 'identity: a true compound-angle line is ticked');
+  ok(statusOf(q, ['cos(A - B) = cos(A)cos(B) - sin(A)sin(B)'], 0) !== 'ok', 'identity: a wrong sign is not ticked');
+  ok(statusOf(q, ['f(0) = 1(1)^2 + 3(1) - 4'], 0) !== 'ok', 'identity: a function value written f(0) is never read as a product');
+}
+
 // ── the harness over the authored pages ──────────────────────────────────────────────────────────────────────────────────────
 {
   const res = await run({ seeds: [1, 2], maxPerLine: 8 });
@@ -94,6 +134,11 @@ ok(sidesOf('a = b = c').length === 3, 'oracle: splits a chain');
   ok(t.trueCrosses === 0, `no authored true line is crossed (${t.trueCrosses}: ${JSON.stringify(res.failures.trueCrosses.slice(0, 3))})`);
   ok(t.falseTicks === 0, `no provably wrong mutant is ticked (${t.falseTicks}: ${JSON.stringify(res.failures.falseTicks.slice(0, 3))})`);
   ok(t.trueTicks >= 600, `authored true lines are still ticked (${t.trueTicks})`);
+  // the probes of the new tick classes (solution lists, ± pairs, rounded values, labelled substitutions): built here, mutated one edit at a time
+  ok(res.probe.mutants >= 500 && res.probe.trueLines >= 150, `the probes are not trivial (${res.probe.trueLines} true lines, ${res.probe.mutants} mutants)`);
+  ok(res.probe.falseTicks === 0, `no probe mutant is ticked (${res.probe.falseTicks})`);
+  for (const k of ['solution-list', 'plus-minus', 'rounded', 'substitution']) ok(res.probe.byClass[k] && res.probe.byClass[k].falseTicks === 0 && res.probe.byClass[k].mutants > 0, `probe class ${k}: mutants ran and none was ticked`);
+  ok(res.probe.trueTicked >= 0.9 * (res.probe.trueLines - (res.probe.trueCrossed || 0)), `probe true lines are ticked (${res.probe.trueTicked} of ${res.probe.trueLines}, ${res.probe.trueCrossed || 0} crossed by the topic check before this pass)`);
 }
 
 console.log(failed ? `MARKING MUTATION: FAIL: ${failed} of ${checks} checks` : `MARKING MUTATION: PASS: ${checks} checks`);

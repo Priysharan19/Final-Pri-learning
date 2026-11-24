@@ -31,6 +31,7 @@ import { infoOf as arithmeticInfo, cleanStatement } from '../../client/src/engin
 import { annotateMilestones } from '../../client/src/engine/milestones.js';
 import { solutionMatch, _internals as SOLUTION_INTERNALS } from '../../client/src/engine/solutionMatch.js';
 import { lineChains } from '../../client/src/engine/lineChains.js';
+import { provedLines } from '../../client/src/engine/provedLines.js';
 import { awardBoardScheme, matchBoardPoints } from '../../client/src/engine/boardScheme.js';
 import { constrainToShown, unsupportedCredit } from '../../client/src/engine/markExplanation.js';
 import { answerForm, effectiveSymbols, firstFinalAttempt, planGivens, readClaimForm } from './finalAttempt.js';
@@ -326,6 +327,17 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
     const unsupported = unsupportedCredit(partial.lines, report?.lines, decided.lines);
     const { report: bounded, clipped } = unsupported.length ? constrainToShown(decided, report?.lines, unsupported) : { report: decided, clipped: 0 };
     if (clipped) { try { partial = partialOf(bounded); decided = bounded; } catch { /* the marks stand */ } }
+  }
+  // Feedback only, after EVERY mark and after the reconcile above (it reads the shown ticks, so this pass comes after the reconcile and before the stored record of what decided the marks, which then covers it): a note line
+  // that Pri can prove true (a solution list, a rounded value, a labelled substitution, a restated equation: engine/provedLines.js)
+  // is ticked, with the proof in its sentence. Never a cross, never a changed verdict, never a mark. `opts.proved === false` is the
+  // measurement's "before" switch, and `solutionMatch: false` (the switch that turns the display ticks off) turns it off too. Prithagoras (NSW Years 11-12) content only: the India banks are not touched.
+  if (typeof steps === 'string' && steps.trim() && !OBJECTIVE.has(q.answerType) && q.answerType !== 'graph-sketch' && !Array.isArray(q.boardScheme) && !(opts && (opts.proved === false || opts.solutionMatch === false)) && /^gen:(?:y11|y12|me11|me12)-/.test(String(q.contentId ?? ''))) {
+    try {
+      const base = report || trueAsWritten(q, steps, opts);
+      const more = base ? provedLines(q, meta, base) : null;
+      if (more && more !== base) report = more;
+    } catch { /* the report stands */ }
   }
   let markingReport = null;
   if (decided && decided !== report) {
