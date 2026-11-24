@@ -304,13 +304,21 @@ const ticked = l => l?.status === 'ok' && l.ecf !== true && l.given !== true && 
  */
 const RELATION = /[=<>\u2264\u2265\u2260\u2248\u221d\u2208]|\b(?:equals?|is equal to|is greater than|is less than|greater than|less than|is more than|more than)\b/i;
 /**
- * Does a line claim anything mathematical? Yes if it has a relation (= < > <= >= != ~ in, or the words equals / is equal to / is greater than / is less
- * than), a digit, an operator between tokens (+ * / ^), or a function or letter applied to an argument (g(3), sin(2x)). `x equals seven` and `x > y` do.
- * Pure prose ("so the answer is clear", "by the formula") and a lone symbol (y', theta) claim nothing.
+ * Does a line claim anything mathematical? Everything does, except PURE PROSE: ordinary words and sentence punctuation only. A relation
+ * (= < > and the words for them), a digit, any operator or mathematical sign (+ - * / ^ and the typeset ones: a minus, a root, a superscript,
+ * an arrow, a tilde), a function name (sin, cos, tan, ln, log, exp, sqrt), a single-letter name (x, y, k: every letter but the words "a" and
+ * "I") and a short run of letters that is no common word (xy, dy, dx) all count: `x - y`, `x is seven`, `x is bigger than y`, `xy`, `sin x`
+ * and `x squared` stop the paying. "so the answer is clear" and "by the formula" do not. The choice is deliberately strict: a line the page
+ * could not verify and that mentions any mathematics leaves open whether the working has gone wrong.
  */
+const SHORT_WORDS = new Set(['a', 'i', 'an', 'as', 'at', 'be', 'by', 'do', 'go', 'he', 'if', 'in', 'is', 'it', 'me', 'my', 'no', 'of', 'on', 'or', 'so', 'to', 'up', 'us', 'we']);
+const MATHS_WORDS = /^(?:sin|cos|tan|sec|cot|csc|cosec|ln|log|exp|sqrt|lim|max|min|pi|theta|alpha|beta|gamma|delta|sigma|mu)$/i;
 function claimsMaths(text) {
   const t = String(text ?? '');
-  return RELATION.test(t) || /\d/.test(t) || /[+*/^]/.test(t) || /\b(?:[A-Za-z]|sin|cos|tan|ln|log|sqrt)\s*\(/.test(t);
+  if (RELATION.test(t) || /\d/.test(t)) return true;
+  if (/[^A-Za-z\s.,;:!?'"()]/.test(t)) return true;         // any sign that is not a letter or sentence punctuation (- + ^ a root, an arrow, a Greek letter)
+  const words = t.match(/[A-Za-z]+/g) ?? [];
+  return words.some(w => MATHS_WORDS.test(w) || (w.length <= 2 && !SHORT_WORDS.has(w.toLowerCase())));
 }
 
 function barrierOf(lines, limit, ctx) {
@@ -320,7 +328,7 @@ function barrierOf(lines, limit, ctx) {
     const text = String(l.text ?? '').trim();
     const s = readStudent(text);
     if (s && !s.multi && s.parts.every(p => ctx.pc.has(canon(p)))) continue;   // the question restated
-    if (!claimsMaths(text)) continue;                       // pure prose, or a lone label: nothing is claimed
+    if (!claimsMaths(text)) continue;                       // plain words only: nothing is claimed
     // a definition the page itself reads (u = 2x + 1, du = ...) stops nothing only if it IS the authored definition; a different one (u = 3x + 1) stops
     if (/defines or labels something/.test(String(l.note ?? '')) && ctx.authored.has(canon(text))) continue;
     return j;

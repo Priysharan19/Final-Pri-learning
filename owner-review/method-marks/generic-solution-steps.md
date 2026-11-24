@@ -44,7 +44,7 @@ A step is real progress only if its result is not the question's own statement o
 - a line that comes at or after a line the page could not verify (THE STOP RULE below);
 - a bare value or bare condition with nothing derived behind it (THE BARE-LINE TEST below).
 
-THE STOP RULE. The page leaves some lines as notes: it cannot tell whether they are true. A student whose middle line is wrong, and which the page can only note, can then write the right lines again and collect marks. So no line at or after the first NOTE THAT CLAIMS SOMETHING may earn a key step. A note claims something if it has a relation in it (= < > <= >= != ~, or the words equals, is equal to, is greater than, is less than), or a digit, or an operator between tokens (+ * / ^), or a letter or function applied to an argument such as g(3) or sin(2x). So "x > y" and "x equals seven" stop it, as does "g(3) = 4". WHAT DOES NOT STOP IT: a line the page ticks; a note that restates the question; pure prose with none of those in it ("so the answer is clear", "by the formula"); a lone symbol such as y' or theta; and a definition the page itself reads (u = 2x + 1) when it is exactly the line the authored solution has. A DIFFERENT definition (u = 3x + 1 where the authored one is u = 2x + 1) stops it, whether or not later lines use u. Lines are not rescued by being true: there is no exception for a later line that happens to match the solution.
+THE STOP RULE. The page leaves some lines as notes: it cannot tell whether they are true. A student whose middle line is wrong, and which the page can only note, can then write the right lines again and collect marks. So no line at or after the first NOTE THAT CLAIMS SOMETHING may earn a key step. A note claims something unless it is plain words and nothing else. Any relation (= < > and the words for them), any digit, any operator or mathematical sign (+ - * / ^, a root, a power, an arrow), any function name (sin, cos, ln), any single-letter name (x, y, k) and any short run of letters that is not a common word (xy, dx) makes it a claim. So "x > y", "x - y", "x is seven", "sin x" and "g(3) = 4" all stop it. This is deliberately strict. WHAT DOES NOT STOP IT: a line the page ticks; a note that restates the question; plain words ("so the answer is clear", "by the formula"); and a definition the page itself reads (u = 2x + 1) when it is exactly the line the authored solution has. A DIFFERENT definition (u = 3x + 1 where the authored one is u = 2x + 1) stops it, whether or not later lines use u. Lines are not rescued by being true: there is no exception for a later line that happens to match the solution.
 
 THE BARE-LINE TEST. A bare line is a letter equal to a number (t = 1, x = -6) or a number alone. It can earn a key step only if ALL hold: the authored step is itself only values; the step does not list several values of that one letter (t = 9 or t = 10 is a guess at one candidate, and never earns); the value is not zero (v = 0, tan(theta) = 0 and sin(5x) = 0, with any letter or Greek letter, are the set-up of solving, never a result); the value is not a number the question gives; the step is not the first step of the solution (which is set-up); and EITHER the step has that one result alone, OR a line that is not bare and reached a key step stands before it. So x = -6 alone earns nothing on a step whose result is the equation x + 6 = 0, and v = 0 alone earns nothing.
 
@@ -69,14 +69,14 @@ Measured on the generated Year 11 and 12 Advanced and Extension 1 written questi
 | Advanced · Functions | 780 | 0 | 415 | 53.2% | 285 |
 | Advanced · Statistics & Probability | 342 | 0 | 87 | 25.4% | 77 |
 | Advanced · Trigonometry | 362 | 2 | 76 | 21.0% | 52 |
-| Extension 1 · Algebra | 590 | 0 | 207 | 35.1% | 112 |
+| Extension 1 · Algebra | 590 | 0 | 204 | 34.6% | 112 |
 | Extension 1 · Calculus | 518 | 0 | 191 | 36.9% | 119 |
 | Extension 1 · Functions | 109 | 0 | 75 | 68.8% | 24 |
 | Extension 1 · Statistics & Probability | 307 | 0 | 96 | 31.3% | 72 |
 | Extension 1 · Trigonometry | 330 | 0 | 204 | 61.8% | 59 |
-| ALL | 4599 | 65 | 2063 | 44.9% | 1204 |
+| ALL | 4599 | 65 | 2060 | 44.8% | 1204 |
 
-Before this rule only 1.4% of these questions could earn a step mark. With it, 44.9% can. On the 2063 questions it can pay, it can pay 2381 of the 3311 marks below full (71.9%).
+Before this rule only 1.4% of these questions could earn a step mark. With it, 44.8% can. On the 2060 questions it can pay, it can pay 2378 of the 3302 marks below full (72.0%).
 
 ## The sweep: does it pay anything it should not
 
@@ -467,4 +467,4 @@ To be filled in by the author (the tutor). Leave blank until reviewed.
 - Note: 
 - Name: 
 - Date: 
-- Scheme digest: `e345fda60d762b911e52656c989144e74220bf856aed726d20462e0e050dd6a4`
+- Scheme digest: `d8f1119ae311c778679bebfa49b836e73a67838e3e4a35d7054dfa2c81f5c329`
