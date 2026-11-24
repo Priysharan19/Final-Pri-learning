@@ -1,4 +1,4 @@
-DRAFT for the author's review: not approved. Nothing in this file is switched on.
+APPROVED by the author, Priysharan Tripathi (tutor), on 2026-11-24, at the digest named in this file. It pays on Prithagoras only while the server has PRI_METHOD_MARKS=on. Not an official NESA guideline.
 
 # Differentiate, substitute, then find the gradient at a point (3 marks)
 

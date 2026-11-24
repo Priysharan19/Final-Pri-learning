@@ -1,10 +1,10 @@
-DRAFT for the author's review: not approved. Nothing in this file is switched on.
+Author's review packets. 14 of 18 types and the generic rule are approved by the author, each at the digest named in its file; the rest are drafts, not approved.
 
-# Draft method-mark schemes for NSW question types
+# Method-mark schemes for NSW question types
 
-These are drafts for the author (the tutor who writes the papers) to read, correct and decide on. Nothing here is approved, signed or switched on. Prithagoras still marks the final answer only.
+These are the schemes for the author (the tutor who writes the papers) to read, correct and decide on. The Status column and the first line of each file report his own records in docs/marking/author-approvals: 14 of 18 types and the generic rule are approved, at the digests shown, and are paid on Prithagoras only while the server has PRI_METHOD_MARKS=on. A type that says "new draft, not approved" is not approved and pays nothing. This is the author's own practice marking: it is not an examiner's certification and not an official NESA guideline.
 
-## Types given a draft scheme, in review order
+## Types given a scheme, in review order
 
 Year 12 Advanced and Extension 1 first, then Year 11.
 
@@ -16,13 +16,13 @@ The Status column reads the author's own records (docs/marking/author-approvals)
 | 2 | Maximum or minimum of a sine or cosine model | Year 12 Mathematics Advanced | 3 | 3 | approved by the author | [y12-trig-extreme.md](y12-trig-extreme.md) |
 | 3 | Find the value of a sine or cosine model at a time | Year 12 Mathematics Advanced | 2 | 2 | approved by the author | [y12-trig-evaluate.md](y12-trig-evaluate.md) |
 | 4 | Differentiate an exponential or logarithmic function | Year 12 Mathematics Advanced | 2 | 2 | approved by the author | [y12-diff-explog.md](y12-diff-explog.md) |
-| 5 | Maximum or minimum of a sine or cosine model (2 marks) | Year 12 Mathematics Advanced | 2 | 2 | new draft, not approved | [y12-trig-extreme-2.md](y12-trig-extreme-2.md) |
-| 6 | Differentiate using the product or quotient rule (3 marks) | Year 12 Mathematics Advanced | 3 | 3 | new draft, not approved | [y12-diff-rules-3.md](y12-diff-rules-3.md) |
-| 7 | Differentiate, then find the gradient at a point (2 marks) | Year 12 Mathematics Advanced | 2 | 2 | new draft, not approved | [y12-diff-gradient-2.md](y12-diff-gradient-2.md) |
-| 8 | Differentiate, substitute, then find the gradient at a point (3 marks) | Year 12 Mathematics Advanced | 3 | 3 | new draft, not approved | [y12-diff-gradient-3.md](y12-diff-gradient-3.md) |
-| 9 | Evaluate a definite integral or an area (2 marks) | Year 12 Mathematics Advanced | 2 | 2 | new draft, not approved | [y12-integral-2.md](y12-integral-2.md) |
-| 10 | Evaluate a definite integral or an area (3 marks) | Year 12 Mathematics Advanced | 3 | 3 | new draft, not approved | [y12-integral-3.md](y12-integral-3.md) |
-| 11 | Find the equation of a tangent or a normal | Year 12 Mathematics Advanced | 3 | 3 | new draft, not approved | [y12-tangent-3.md](y12-tangent-3.md) |
+| 5 | Maximum or minimum of a sine or cosine model (2 marks) | Year 12 Mathematics Advanced | 2 | 2 | approved by the author | [y12-trig-extreme-2.md](y12-trig-extreme-2.md) |
+| 6 | Differentiate using the product or quotient rule (3 marks) | Year 12 Mathematics Advanced | 3 | 3 | approved by the author | [y12-diff-rules-3.md](y12-diff-rules-3.md) |
+| 7 | Differentiate, then find the gradient at a point (2 marks) | Year 12 Mathematics Advanced | 2 | 2 | approved by the author | [y12-diff-gradient-2.md](y12-diff-gradient-2.md) |
+| 8 | Differentiate, substitute, then find the gradient at a point (3 marks) | Year 12 Mathematics Advanced | 3 | 3 | approved by the author | [y12-diff-gradient-3.md](y12-diff-gradient-3.md) |
+| 9 | Evaluate a definite integral or an area (2 marks) | Year 12 Mathematics Advanced | 2 | 2 | approved by the author | [y12-integral-2.md](y12-integral-2.md) |
+| 10 | Evaluate a definite integral or an area (3 marks) | Year 12 Mathematics Advanced | 3 | 3 | approved by the author | [y12-integral-3.md](y12-integral-3.md) |
+| 11 | Find the equation of a tangent or a normal | Year 12 Mathematics Advanced | 3 | 3 | approved by the author | [y12-tangent-3.md](y12-tangent-3.md) |
 | 12 | Evaluate a polynomial or find a remainder by substitution | Year 11 Mathematics Advanced | 2 | 2 | approved by the author | [y11-poly-evaluate.md](y11-poly-evaluate.md) |
 | 13 | Gradient of a tangent: differentiate, then substitute | Year 11 Mathematics Advanced | 2 | 2 | approved by the author | [y11-diff-gradient-plan.md](y11-diff-gradient-plan.md) |
 | 14 | Differentiate a polynomial by the power rule | Year 11 Mathematics Advanced | 2 | 2 | approved by the author | [y11-diff-power-rule.md](y11-diff-power-rule.md) |
@@ -61,4 +61,4 @@ These types were tried. A scheme is not offered because at least one criterion c
 
 ## One rule for every multi-mark written question
 
-Besides the per-type schemes above, one generic rule can pay step marks for a wrong or missing final answer on most multi-mark written Year 11 and Year 12 questions, from each question's own authored worked solution. It is a separate approval, not one of the types above, and it is not approved. Read [generic-solution-steps.md](generic-solution-steps.md).
+Besides the per-type schemes above, one generic rule can pay step marks for a wrong or missing final answer on most multi-mark written Year 11 and Year 12 questions, from each question's own authored worked solution. It is a separate approval, not one of the types above, and the author approved it on 2026-11-24, at the digest named in its packet. Read [generic-solution-steps.md](generic-solution-steps.md).

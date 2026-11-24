@@ -1,13 +1,14 @@
 // ───────────────────────────────────────────────────────────────────────────────
 // Pri Learning · the generic step-mark rule over the real submit path (R4)
 //
-// Boots the shipped /v1 app as Prithagoras and approves the generic rule IN THIS TEST PROCESS ONLY (approveSchemeTypesForTests; the repository's
-// list stays empty and no author record is written). Issues, submits and reads real replies:
+// Boots the shipped /v1 app as Prithagoras with the repository's OWN approved list, which carries the generic rule since the author's record of
+// 24 Nov 2026 (no test hook is used for phases 1 to 3; no author record is written here). Only the last phase narrows the list, to show a question
+// issued while the rule is not approved. Issues, submits and reads real replies:
 //
 //   PHASE 1  switch OFF: the question is stamped with the rule at issue and nothing is paid: main's reply, no criteria, no method row, no scheme field
 //   PHASE 2  switch ON (author-approved tier, no examiner variable): correct method and a wrong final answer is paid 2 of 3 from the lines the page
 //            ticks, the reply carries the criteria table and says the rule paid; a right answer is 3 of 3; the same question issued while the rule is
-//            NOT approved is sealed final-answer-only and earns 0
+//            NOT approved (a list without the rule, narrowed in this process only) is sealed final-answer-only and earns 0
 //
 //   node server/test/generic-solution-steps-http-check.mjs
 // SYNTHETIC: generated questions and a scripted client. Not evidence about real students.
@@ -40,7 +41,7 @@ await G.loadAllBanks();
 
 const c = checks();
 const REPO_LIST = APPROVED_SCHEME_TYPES;
-c.ok(!REPO_LIST.some(a => a.typeId === GENERIC_ID), 'the repository\'s own list does not contain the generic rule');
+c.ok(REPO_LIST.some(a => a.typeId === GENERIC_ID && a.digest === genericDigest()), 'the repository\'s own list contains the generic rule at its current digest');
 const GEN = 'y12-appdiff', D = 3, SEED = 1;
 const q0 = G.generateQuestion(GEN, D, SEED);
 const texts = authoredLines(q0).map(l => l.text);
@@ -65,9 +66,7 @@ try {
   };
   const clean = reply => !reply.methodCriteria && !reply.methodScheme && !JSON.stringify(reply).includes('criteria-count') && !JSON.stringify(reply).includes('type-not-approved') && !JSON.stringify(reply).includes('generic-');
 
-  // the rule approved in this process only
-  approveSchemeTypesForTests([{ typeId: GENERIC_ID, digest: genericDigest() }]);
-
+  // the rule is approved by the repository's own list: nothing is set up here
   // PHASE 1: switch off
   const p1 = await run(wrongLines, '1042', 'phase1');
   c.eq(p1.sealed._methodScheme, GENERIC_ID, 'phase 1: the question is stamped with the rule at issue');
@@ -93,7 +92,7 @@ try {
   c.eq(p4.reply.marksEarned, 0, 'phase 2: a wrong answer with no working is 0');
 
   // the same question while the rule is NOT approved: sealed final-answer-only, earns nothing for working
-  approveSchemeTypesForTests(REPO_LIST);
+  approveSchemeTypesForTests(REPO_LIST.filter(a => a.typeId !== GENERIC_ID));
   const p5 = await run(wrongLines, '1042', 'phase2-unapproved');
   c.eq(p5.sealed._marking, FINAL_ANSWER_MARKING, 'unapproved: the question is sealed final-answer-only at issue');
   c.ok(p5.sealed._methodScheme === undefined && p5.reply.marksEarned === 0 && clean(p5.reply), 'unapproved: it carries no scheme, earns 0 and shows main\'s reply');

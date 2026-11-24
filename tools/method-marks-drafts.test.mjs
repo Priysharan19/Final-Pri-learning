@@ -3,7 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { build, diffFiles, BANNER, OUT_DIR } from './method-marks-drafts.mjs';
+import { build, diffFiles, BANNER, OUT_DIR, readApprovals, bannerFor } from './method-marks-drafts.mjs';
+import { GENERIC_ID, genericDigest } from '../server/platform/genericSteps.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 let pass = 0; const failures = [];
@@ -16,10 +17,17 @@ ok(diffFiles(first.files).length === 0, `committed files match the generated one
 
 const json = JSON.parse(first.files.get('types.json'));
 ok(Array.isArray(json.types) && json.types.length >= 5, 'at least five types have a scheme');
-ok(json.status === 'draft: not approved' && !/approved"\s*:\s*true|signed|certified/i.test(first.files.get('types.json').replace('draft: not approved', '')), 'types.json carries no approval');
+const approvedHere = json.types.filter(t => readApprovals().some(r => r.typeId === t.id && r.digest === t.digest && r.verdict === 'approved')).length;
+ok(json.status.startsWith(`${approvedHere} of ${json.types.length} types`) && /the rest are drafts: not approved/.test(json.status) && !/approved"\s*:\s*true|signed|certified/i.test(first.files.get('types.json').replace(json.status, '')), 'types.json says how many types the author\'s records approve and that the rest are drafts, and carries no approval flag');
+ok(json.types.every(t => !('approved' in t)), 'no type in types.json carries an approval flag of its own (the author\'s records are the only source)');
 
 for (const [name, text] of first.files) {
-  if (name.endsWith('.md')) ok(text.split('\n')[0] === BANNER, `${name} starts with the DRAFT banner`);
+  // a packet starts with the DRAFT banner, or with the plain statement of approval only when the author's own record names that packet's digest
+  if (name.endsWith('.md') && name !== 'INDEX.md') {
+    const id = name.replace(/\.md$/, ''), digest = id === GENERIC_ID ? genericDigest() : json.types.find(t => t.id === id)?.digest;
+    const rec = readApprovals().find(r => r.typeId === id && r.digest === digest && r.verdict === 'approved');
+    ok(text.split('\n')[0] === (rec ? bannerFor(id, digest) : BANNER) && (rec ? /^APPROVED by the author, Priysharan Tripathi \(tutor\), on 2026-11-24/.test(text) : text.startsWith('DRAFT')), `${name} starts with the banner its record decides (${rec ? 'approved at this digest' : 'draft, not approved'})`);
+  } else if (name === 'INDEX.md') ok(/approved by the author|^DRAFT/.test(text.split('\n')[0]), 'INDEX.md states its status on the first line');
   ok(!/—/.test(text), `${name} has no em dash`);
   ok(!/examiner-certified|NESA approved/i.test(text), `${name} avoids the forbidden claims`);
 }

@@ -1,11 +1,12 @@
 // ───────────────────────────────────────────────────────────────────────────────
 // Pri Learning · method marks paid by a signed scheme (server/platform/schemeAward.js)
 //
-// R4 (marking authority). Nothing here switches anything on. The allow-list in the repository is EMPTY; this suite approves types in
-// its own process only, by passing a list to the functions that take one, and it never sets PRI_METHOD_MARKS (the policy is passed
-// as a plain object). What it holds:
+// R4 (marking authority). Nothing here switches anything on. The allow-list in the repository carries the author's fourteen types and the
+// generic rule (his records of 24 Nov 2026); the Year 7 and Year 10 drafts are not on it. Most sections pass an explicit list to the functions that
+// take one, and the suite never sets PRI_METHOD_MARKS (the policy is passed as a plain object). Sections 1(f), 2b2 and 2b4 check the repository's own
+// list: what is approved is stamped, what is not is never stamped and never paid. What it holds:
 //
-//   1. the gates: empty list = every question sealed as before and nothing paid (a differential against the seal of main);
+//   1. the gates: an empty list = every question sealed as before and nothing paid (a differential against the seal of main);
 //      unapproved or stale-digest types stay sealed; the production gate; India untouched
 //   2. the sweep, the seven payable types, every difficulty, seeds 1..60, draft + corpus + falsified pages, each worth the scheme's
 //      marks: every earned criterion points at ticked lines before the first crossed line; marks equal the table; never above the
@@ -24,6 +25,7 @@ import * as G from '../../client/src/engine/generators/index.js';
 import * as R from '../../tools/method-marks-ready.mjs';
 import { TYPES } from '../../tools/method-marks-drafts.mjs';
 import { SCHEMES, UNAVAILABLE, APPROVED_SCHEME_TYPES, schemeDigest, schemeMarks, schemePay, schemeTypeOf, isApproved, awardScheme } from '../platform/schemeAward.js';
+import { genericDigest } from '../platform/genericSteps.js';
 import { stepEvidence, marksPossibleFor, practiceMarksEarned, MARKER_OPS } from '../platform/markerOps.js';
 import { FINAL_ANSWER_ONLY } from '../platform/markingPolicy.js';
 import { UNCERTIFIED_EDITIONS, editionMarkingPolicy } from '../platform/editionMarking.js';
@@ -110,9 +112,11 @@ ok(typed.every(([s, q]) => schemePay({ q, report: { lines: [] }, correct: false,
   const AA = await import('../../tools/author-approvals.mjs');
   const { AUTHOR_APPROVED_SERVER } = await import('../platform/authorApproved.generated.js');
   const typesJson = JSON.parse(fs.readFileSync(new URL('../../owner-review/method-marks/types.json', import.meta.url), 'utf8')).types;
-  const derived = AA.approvedTypes(AA.readRecords(), typesJson).map(a => ({ typeId: a.typeId, digest: a.digest }));
+  // the approvable ids are the per-type schemes in types.json plus the generic solution-step rule (its digest is over the rule's own code)
+  const allTypes = AA.allTypes();
+  const derived = AA.approvedTypes(AA.readRecords(), allTypes).map(a => ({ typeId: a.typeId, digest: a.digest }));
   ok(Object.isFrozen(AUTHOR_APPROVED_SERVER) && APPROVED_SCHEME_TYPES === AUTHOR_APPROVED_SERVER && JSON.stringify(AUTHOR_APPROVED_SERVER) === JSON.stringify(derived), 'the generated server list equals exactly what the tool derives from the committed records and types.json');
-  ok(AA.readRecords().flatMap(r => AA.recordProblems(r, typesJson)).length === 0 && derived.every(d => typesJson.find(t => t.id === d.typeId)?.digest === d.digest && SCHEMES.some(x => x.id === d.typeId && schemeDigest(x) === d.digest)), 'every committed record is valid and its digest is the type\'s current digest');
+  ok(AA.readRecords().flatMap(r => AA.recordProblems(r, allTypes)).length === 0 && derived.every(d => allTypes.find(t => t.id === d.typeId)?.digest === d.digest && (d.typeId === 'generic-solution-steps' ? genericDigest() === d.digest : SCHEMES.some(x => x.id === d.typeId && schemeDigest(x) === d.digest))), 'every committed record is valid and its digest is the type\'s current digest');
   // fixtures in a temporary directory: valid + approved + current digest is listed; stale digest, changes-needed, automation names are not
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pri-approvals-'));
   const rec = (typeId, o = {}) => ({ schemaVersion: 1, typeId, digest: typesJson.find(t => t.id === typeId).digest, verdict: 'approved', role: 'author (tutor)', approvedBy: 'Priysharan Tripathi', date: '2026-11-24', note: 'ok', ...o });
@@ -245,9 +249,10 @@ for (const s of SCHEMES) ok(R.questionsOfType(s, { limit: 3 }).length === 3, `${
   }
 }
 
-// ── 2b2. the draft schemes of the coverage pass (24 Nov 2026): unapproved in the repository, gamed lines earn nothing ──────────────
+// ── 2b2. the draft schemes the author has NOT approved (Years 7 and 10 equations, 24 Nov 2026): never stamped, never pay; gamed lines earn nothing ──────────────
 {
-  const DRAFT_IDS = ['y12-trig-extreme-2', 'y7-equation-solve-2', 'y7-equation-solve-3'];
+  // y12-trig-extreme-2 was a draft here until the author approved it on 24 Nov 2026 (asserted below, in 2b4); these four are still unapproved
+  const DRAFT_IDS = ['y7-equation-solve-2', 'y7-equation-solve-3', 'y10-quadratic-solve-2', 'y10-quadratic-solve-3'];
   ok(DRAFT_IDS.every(id => SCHEMES.some(s => s.id === id) && !APPROVED_SCHEME_TYPES.some(a => a.typeId === id) && !isApproved(id)), 'the draft schemes exist and none is on the repository\'s approved list');
   // with the repository's own list, a draft type is never stamped and never pays
   {
@@ -327,17 +332,31 @@ for (const s of SCHEMES) ok(R.questionsOfType(s, { limit: 3 }).length === 3, `${
   ok(fromShown.awarded === 1, 'control: paid from the folded report it WOULD pay, which is why practice.js never reads it');
 }
 
-// ── 2b4. the Years 11-12 draft schemes (24 Nov 2026): unapproved in the repository; approved here in the TEST PROCESS only; gamed lines earn nothing ──
+// ── 2b4. the seven Years 11-12 schemes the author approved on 24 Nov 2026: stamped from the repository's list; gamed lines earn nothing ──
 {
   const NEW = ['y12-diff-rules-3', 'y12-diff-gradient-2', 'y12-diff-gradient-3', 'y12-integral-2', 'y12-integral-3', 'y12-tangent-3'];
-  ok(NEW.every(id => SCHEMES.some(s => s.id === id) && !APPROVED_SCHEME_TYPES.some(a => a.typeId === id) && !isApproved(id)), 'the Years 11-12 draft schemes exist and none is on the repository\'s approved list');
+  // The author approved these six, and y12-trig-extreme-2, on 24 Nov 2026 (docs/marking/author-approvals). With the repository's own list a question of each
+  // is stamped with its scheme at issue; with a stale digest it is not.
+  const APPROVED_NOW = [...NEW, 'y12-trig-extreme-2'];
+  ok(APPROVED_NOW.every(id => SCHEMES.some(s => s.id === id) && APPROVED_SCHEME_TYPES.some(a => a.typeId === id && a.digest === schemeDigest(SCHEMES.find(s => s.id === id))) && isApproved(id)), 'the seven newly approved schemes are on the repository\'s approved list at their current digests');
   {
-    let stamped = 0, tried = 0;
-    for (const id of NEW) { const s = SCHEMES.find(x => x.id === id); for (const q of R.questionsOfType(s, { limit: 15 })) {
-      const copy = JSON.parse(JSON.stringify({ ...q, _generator: s.families[0] })); tried++;
-      if (sealForEdition(copy, bankPolicy('prithagoras'), s.families[0]) && copy._methodScheme === id) stamped++;
-    } }
-    ok(tried >= 30 && stamped === 0, `an unapproved Years 11-12 draft is never stamped (${tried} questions)`);
+    let eligible = 0, stamped = 0, staleStamped = 0, wrongTyped = 0;
+    for (const id of APPROVED_NOW) {
+      const s = SCHEMES.find(x => x.id === id); let own = 0;
+      for (const q of R.questionsOfType(s, { limit: 80 })) {
+        // a type with two generator families (y12-integral-2): the question comes from one of them, so seal it as that one
+        let copy = null, sealed = false;
+        const fam = s.families.find(f => schemeTypeOf(q, f) === id) ?? s.families[0];
+        copy = JSON.parse(JSON.stringify({ ...q, _generator: fam })); sealed = sealForEdition(copy, bankPolicy('prithagoras'), fam);
+        // a question of another mark count (a 1-mark integral beside the 2-mark scheme) is rightly left on the final answer, and is not counted
+        // (a question the edition does not admit under its generator is never issued, so it is not counted either)
+        if (sealed && schemeTypeOf(q, fam) === id && marksPossibleFor(q) === schemeMarks(s)) { own++; eligible++; if (sealed && copy._methodScheme === id) stamped++; } else if (copy._methodScheme === id) wrongTyped++;
+        const stale = JSON.parse(JSON.stringify({ ...q, _generator: s.families[0] }));
+        if (sealForEdition(stale, { ...bankPolicy('prithagoras'), methodSchemeTypes: [{ typeId: id, digest: 'f'.repeat(64) }] }, s.families[0]) && stale._methodScheme === id) staleStamped++;
+      }
+      ok(own >= 3, `${id}: at least three questions of its marks were issued to test (${own})`);
+    }
+    ok(eligible >= 30 && stamped === eligible && wrongTyped === 0 && staleStamped === 0, `every question of an approved type at the scheme's marks is stamped with it from the repository's list (${stamped} of ${eligible}), a question of another mark count is never stamped with it (${wrongTyped}), a stale digest stamps nothing (${staleStamped})`);
   }
   // a question is typed to the variant whose marks are its marks
   {
@@ -481,7 +500,7 @@ for (const s of SCHEMES) ok(R.questionsOfType(s, { limit: 3 }).length === 3, `${
   const index = fs.readFileSync(new URL('../../docs/marking/method-marks-signoff/method-marks/INDEX.md', import.meta.url), 'utf8');
   ok(/## Not available yet/.test(index) && UNAVAILABLE.every(u => index.includes(u.reason.slice(0, 40))), 'INDEX.md says "not available yet", with the reason for each');
   const readme = fs.readFileSync(new URL('../../docs/marking/method-marks-signoff/READ-ME-method-marks-signoff.md', import.meta.url), 'utf8');
-  ok(/1 of 2/.test(readme.slice(0, 5200)) && /I approve the seven step-mark schemes/.test(readme.slice(0, 5200)) && !/[—–]/.test(readme.slice(0, 5200)), 'the owner note opens with the plain summary, the worked example (1 of 2) and one line to approve, no dashes');
+  ok(/1 of 2/.test(readme.slice(0, 5200)) && /Status, 24 November 2026/.test(readme.slice(0, 5200)) && /fourteen of the eighteen/.test(readme.slice(0, 5200)) && !/the approved list stays empty/.test(readme) && !/[—–]/.test(readme.slice(0, 5200)), 'the owner note opens with the plain summary, the worked example (1 of 2) and the status of the author's records (fourteen types and the generic rule), no dashes');
   // unavailable types are never typed as a scheme question
   let leaked = 0;
   for (const u of UNAVAILABLE) for (const fam of u.families) for (let d = 1; d <= 4; d++) for (let seed = 1; seed <= 20; seed++) { let q; try { q = G.generateQuestion(fam, d, seed); } catch { continue; } const id = schemeTypeOf(q, fam); if (id && (/stationary|tangent/.test(id) || id.endsWith('gradient')) && !SCHEMES.some(s => s.id === id)) leaked++; }

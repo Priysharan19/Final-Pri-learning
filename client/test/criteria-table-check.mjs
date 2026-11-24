@@ -2,7 +2,7 @@
 import { criteriaView } from '../src/components/criteriaTableModel.js';
 import { AUTHOR_APPROVED } from '../src/engine/authorApprovals.js';
 import fs from 'node:fs';
-import { approvedTypes, recordProblems, readRecords } from '../../tools/author-approvals.mjs';
+import { approvedTypes, recordProblems, readRecords, allTypes } from '../../tools/author-approvals.mjs';
 
 let pass = 0; const fail = [];
 const ok = (c, l) => { if (c) pass++; else fail.push(l); };
@@ -15,12 +15,26 @@ const crit = (over = {}) => ({ typeId: 'y12-stationary-x', digest: D, items: [
 const mark = { awarded: 1, possible: 2 };
 
 {
-  const typesJson = JSON.parse(fs.readFileSync(new URL('../../owner-review/method-marks/types.json', import.meta.url), 'utf8')).types;
-  const derived = approvedTypes(readRecords(), typesJson);
-  ok(JSON.stringify(AUTHOR_APPROVED) === JSON.stringify(derived), 'the build list equals exactly what the tool derives from the committed records and types.json');
+  // the approvable ids: the per-type schemes in types.json and the generic solution-step rule
+  const derived = approvedTypes(readRecords(), allTypes());
+  ok(JSON.stringify(AUTHOR_APPROVED) === JSON.stringify(derived), 'the build list equals exactly what the tool derives from the committed records, types.json and the generic rule\'s digest');
   ok(!AUTHOR_APPROVED.some(a => a.typeId === 'y12-stationary-x'), 'a type the page cannot verify is not approved in the build');
 }
 ok(criteriaView({ criteria: crit(), mark, cards }) === null, 'an unapproved type shows no criteria table at all');
+{
+  // the generic solution-step rule has its own approval id: the table is drawn for it from the build's OWN list (no test list), at its current digest only,
+  // with the long step descriptions the rule writes, and not at a stale digest
+  const gd = allTypes().find(t => t.id === 'generic-solution-steps').digest;
+  const gcrit = (over = {}) => ({ typeId: 'generic-solution-steps', digest: gd, items: [
+    { key: 'step1', text: 'Differentiates h(t) = -3t^2 + 36t + 39 to get h\'(t) = -6t + 36 and sets it to zero, the working that leads to the next line of the authored solution', marks: 1, awarded: true, basis: 'lines', lines: [2], reason: 'Line 2 is true.' },
+    { key: 'step2', text: 'Solves for t', marks: 1, awarded: false, verified: false, basis: 'lines', lines: [], reason: 'No line for this step was found true.' },
+    { key: 'answer', text: 'The final answer', marks: 1, awarded: false, basis: 'answer', lines: [], reason: '' }], ...over });
+  ok(AUTHOR_APPROVED.some(a => a.typeId === 'generic-solution-steps' && a.digest === gd), 'the build list carries the generic rule at its current digest');
+  const gv = criteriaView({ criteria: gcrit(), mark: { awarded: 1, possible: 3 }, cards });
+  ok(gv && gv.typeId === 'generic-solution-steps' && gv.rows.length === 3 && gv.earned === 1 && gv.possible === 3 && gv.rows[0].text.includes('Differentiates h(t)') && gv.rows[1].verified === false, 'the generic rule\'s table is drawn from the build\'s own list, with its step descriptions, and sums to the server mark');
+  ok(criteriaView({ criteria: gcrit({ digest: 'c'.repeat(64) }), mark: { awarded: 1, possible: 3 }, cards }) === null, 'the generic rule at a stale digest draws no table');
+  ok(criteriaView({ criteria: gcrit(), mark: { awarded: 2, possible: 3 }, cards }) === null, 'the generic rule\'s table that does not equal the server mark is not drawn');
+}
 const v = criteriaView({ criteria: crit(), mark, cards, approved: FIX });
 ok(v && v.rows.length === 2 && v.earned === 1 && v.possible === 2, 'an approved type shows each criterion with its marks and the total');
 ok(v.rows[0].awarded && v.rows[0].lines[0] === 2 && !v.rows[1].awarded, 'awarded or not, tied to the line that earned it');

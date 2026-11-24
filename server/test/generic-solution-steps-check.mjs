@@ -1,12 +1,13 @@
 // ───────────────────────────────────────────────────────────────────────────────
 // Pri Learning · the GENERIC step-mark rule (server/platform/genericSteps.js)
 //
-// R4 (marking authority). The rule is a DRAFT: nothing here approves it in the repository, and it never creates an author record. It is approved
-// in THIS TEST PROCESS only, by passing an approved list to the functions that take one (the environment is a plain object).
+// R4 (marking authority). The author approved the rule on 24 Nov 2026 (docs/marking/author-approvals/generic-solution-steps.json, at the digest
+// asserted below). This suite never creates an author record. The pay and sweep sections below pass an approved list explicitly (the environment is a
+// plain object); the gates and the sealing section also check the repository's own generated list.
 //
-//   1. the gates: not approved in the repository; the seven approved per-type digests are unchanged; its own digest over the rule's code and
-//      wording; the author-approval machinery lists it only for a record at the current digest; no record exists in docs/marking/author-approvals
-//   2. sealing at issue: nothing changes with the repository's list; an approved per-type scheme keeps its question; the rule stamps only an
+//   1. the gates: approved in the repository at its current digest; the fourteen approved per-type digests are the ones he read; its own digest over the
+//      rule's code and wording; the machinery lists it only for a record at the current digest; the committed records are exactly the fifteen
+//   2. sealing at issue: with the repository's list an eligible question without an approved type is stamped by the rule; an approved per-type scheme keeps its question; the rule stamps only an
 //      eligible written question worth 2+ marks; a stale digest or an unapproved rule stamps nothing; India is never touched
 //   3. paying: the switch, the Prithagoras tier, a stale digest; a wrong or missing final answer never earns N; a correct one is N
 //   4. the sweep (tools/generic-steps-sweep.mjs) over every Years 11-12 topic: the invariants (e), the gaming classes (d), the wrong-step pages (c)
@@ -38,7 +39,7 @@ const LIST = [{ typeId: GENERIC_ID, digest: genericDigest() }];
 const ON_AU = { PRI_METHOD_MARKS: 'on', PRI_EDITION: 'prithagoras' };
 
 // ── 1. the gates ───────────────────────────────────────────────────────────────────────────────────────────────────
-ok(!isApproved(GENERIC_ID) && !APPROVED_SCHEME_TYPES.some(a => a.typeId === GENERIC_ID), 'the generic rule is NOT approved in the repository');
+ok(isApproved(GENERIC_ID) && APPROVED_SCHEME_TYPES.some(a => a.typeId === GENERIC_ID && a.digest === genericDigest()), 'the generic rule is approved in the repository, at its current digest (the author\'s record of 24 Nov 2026)');
 const SEVEN = {
   'y11-diff-gradient-plan': 'c9d8465b12841281dec30c8bb4b9bdebef94bb375c47c06e7e4f32838d86865b',
   'y11-diff-power-rule': '892c8bdbf9df8c287f9ed2ed4da9ad244170f0ed27085970c527ba4a6a491a94',
@@ -49,7 +50,18 @@ const SEVEN = {
   'y12-trig-extreme': '9e37098253118df9b4ee3f6835251440577c093ade8f29c652106809f6fda786'
 };
 ok(Object.entries(SEVEN).every(([id, d]) => APPROVED_SCHEME_TYPES.some(a => a.typeId === id && a.digest === d) && schemeDigest(SCHEMES.find(s => s.id === id)) === d), 'the approved per-type digests are the digests the author read (unchanged)');
-ok(APPROVED_SCHEME_TYPES.length === 7 && SCHEMES.filter(s => isApproved(s.id)).length === 7, 'exactly the seven approved types are approved');
+const SEVEN_MORE = {   // the seven schemes the author approved on 24 Nov 2026, at the digests in his records
+  'y12-diff-gradient-2': '321087896ff2c26b5cd961ccd9ff2b269c2374ecaadc8fca2df01d1d85c79647',
+  'y12-diff-gradient-3': '617054ccf2d5ea4c0bc74f4bf2c0c0657b871f8914a5ac414f93de9f24c57efe',
+  'y12-diff-rules-3': '045e2cfe6ac1a701d921b62097a289eede04181acf32f226034ec6b475ead35b',
+  'y12-integral-2': '906b842a32463f9b581bdb0260153f5e3c5d2b63fa5df630c0230c76400beda8',
+  'y12-integral-3': '51055d287d31ce88cf90d971e2ee694faa3b213e639265636fad21d5660142e6',
+  'y12-tangent-3': '8e0013beecf267d0a84b39636c15d8d6255732d0f652e0d065684e82c0004269',
+  'y12-trig-extreme-2': '073ae29c731218a52d39a7ceabae69c62115c92a080c8107954e1c92a1907af4'
+};
+ok(Object.entries(SEVEN_MORE).every(([id, d]) => APPROVED_SCHEME_TYPES.some(a => a.typeId === id && a.digest === d) && schemeDigest(SCHEMES.find(s => s.id === id)) === d), 'the seven further approved digests are the digests in the author\'s records');
+ok(APPROVED_SCHEME_TYPES.length === 15 && SCHEMES.filter(s => isApproved(s.id)).length === 14, 'exactly fourteen per-type schemes and the generic rule are approved');
+ok(SCHEMES.filter(s => !isApproved(s.id)).map(s => s.id).sort().join() === 'y10-quadratic-solve-2,y10-quadratic-solve-3,y7-equation-solve-2,y7-equation-solve-3', 'the four Year 7 and Year 10 draft schemes are still not approved');
 ok(!SCHEMES.some(s => s.id === GENERIC_ID), 'the generic rule is not one of the per-type schemes');
 ok(/^[0-9a-f]{64}$/.test(genericDigest()) && Object.isFrozen(PARAMETERS) && Object.isFrozen(GENERIC_WORDING), 'the digest is a sha256 and the parameters and wording are frozen');
 {
@@ -63,7 +75,7 @@ ok(/^[0-9a-f]{64}$/.test(genericDigest()) && Object.isFrozen(PARAMETERS) && Obje
 {
   const dir = new URL('docs/marking/author-approvals/', ROOT);
   const files = fs.readdirSync(dir).filter(f => f.endsWith('.json') && f !== 'schema.json');
-  ok(files.length === 7 && !files.includes(`${GENERIC_ID}.json`), 'no author record exists for the generic rule in docs/marking/author-approvals (only the seven type records)');
+  ok(files.length === 15 && files.includes(`${GENERIC_ID}.json`) && files.every(f => APPROVED_SCHEME_TYPES.some(a => `${a.typeId}.json` === f)), 'docs/marking/author-approvals holds exactly the fifteen records (fourteen types and the generic rule), each on the generated list');
   // the author-approval machinery lists it for a valid record at the current digest, and for nothing else
   const types = AA.allTypes();
   ok(types.some(t => t.id === GENERIC_ID && t.digest === genericDigest()), 'the approval machinery knows the rule\'s id and its current digest');
@@ -89,15 +101,18 @@ for (const [gen, d, seed] of [['y12-appdiff', 3, 1], ['y12-appdiff', 3, 2], ['y1
 const seal = (item, list) => { const c = JSON.parse(JSON.stringify(item.q)); const accepted = sealForEdition(c, { ...bankPolicy('prithagoras'), methodSchemeTypes: list }, item.gen); return { accepted, c }; };
 {
   // the repository's own list: no question is stamped by the generic rule (a differential against main's seal)
-  const stamped = issuable.filter(i => { const c = JSON.parse(JSON.stringify(i.q)); return sealForEdition(c, bankPolicy('prithagoras'), i.gen) && c._methodScheme === GENERIC_ID; });
-  ok(stamped.length === 0, 'with the repository\'s list nothing is stamped by the generic rule');
+  // the repository's own list now carries the rule: an eligible question is stamped by it unless an approved per-type scheme (at its marks) keeps it
+  const repoSeal = i => { const c = JSON.parse(JSON.stringify(i.q)); const accepted = sealForEdition(c, bankPolicy('prithagoras'), i.gen); return { accepted, c }; };
+  const eligibleRepo = issuable.filter(i => genericEligible(i.q));
+  ok(eligibleRepo.length >= 8 && eligibleRepo.every(i => { const { accepted, c } = repoSeal(i); return accepted && (c._methodScheme === GENERIC_ID || SCHEMES.some(s => s.id === c._methodScheme && isApproved(s.id))) && !('_marking' in c); }), 'with the repository\'s list every eligible question is stamped, by the rule or by its approved type, and none is left final-answer-only');
+  ok(issuable.filter(i => !genericEligible(i.q) && !SCHEMES.some(s => s.id === repoSeal(i).c._methodScheme)).every(i => { const { c } = repoSeal(i); return c._methodScheme === undefined && c._marking === FINAL_ANSWER_MARKING; }), 'with the repository\'s list a question that is not eligible (one mark, objective) stays final-answer-only');
   const emptied = issuable.every(i => { const { accepted, c } = seal(i, []); return accepted && c._marking === FINAL_ANSWER_MARKING && !('_methodScheme' in c); });
   ok(emptied, 'an empty list seals every question final-answer-only, as main does');
   const eligible = issuable.filter(i => genericEligible(i.q));
   ok(eligible.length >= 8, `${eligible.length} of ${issuable.length} sample questions are eligible (written, worth 2 or more marks)`);
   ok(eligible.every(i => { const { accepted, c } = seal(i, LIST); return accepted && c._methodScheme === GENERIC_ID && !('_marking' in c); }), 'with the rule approved every eligible question is stamped with it and not sealed final-answer-only');
   ok(issuable.every(i => { const { accepted, c } = seal(i, [{ typeId: GENERIC_ID, digest: 'f'.repeat(64) }]); return accepted && c._marking === FINAL_ANSWER_MARKING && !('_methodScheme' in c); }), 'a stale digest stamps nothing');
-  ok(issuable.every(i => { const { c } = seal(i, SCHEMES.filter(s => isApproved(s.id)).map(s => ({ typeId: s.id, digest: schemeDigest(s) })).filter(a => a.typeId !== GENERIC_ID)); return c._methodScheme !== GENERIC_ID; }), 'the seven approved types without the rule never stamp it');
+  ok(issuable.every(i => { const { c } = seal(i, SCHEMES.filter(s => isApproved(s.id)).map(s => ({ typeId: s.id, digest: schemeDigest(s) })).filter(a => a.typeId !== GENERIC_ID)); return c._methodScheme !== GENERIC_ID; }), 'the fourteen approved types without the rule never stamp it');
   // a one-mark question and an objective question are never stamped
   const one = JSON.parse(JSON.stringify({ ...G.generateQuestion('y11-diff', 1, 1), _generator: 'y11-diff' }));
   ok(marksPossibleFor(one) === 1 && !genericEligible(one), 'a one-mark question is not eligible');
