@@ -103,6 +103,7 @@ try {
   check('a typed question stamped with the generic rule was reached', !!sealed, 'none within the bounded search');
   if (sealed) {
     stage = 'before the answer';
+    console.log('  areas:', await page.locator('[data-working-area]').evaluateAll(es => es.map(e => e.getAttribute('data-working-area'))), 'marks', sealed.difficulty, JSON.stringify(sealed.steps?.length));
     const hint = await page.locator('[data-working-area="open"] .muted').first().innerText();
     check('before answering, the working hint says checked steps may earn marks', /may still earn marks/.test(hint) && !/not given yet/.test(hint), hint);
     const lines = authoredLines(sealed).map(l => l.text);
