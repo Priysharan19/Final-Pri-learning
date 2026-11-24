@@ -50,7 +50,7 @@ const all = qb.qbankEntries();
 
 // ── THE TABLE ────────────────────────────────────────────────────────────────
 const packDots = new Set(all.map(x => `${x.family}.${x.entry.dp}`));
-c.eq(packDots.size, 112, 'the committed pack holds 112 author dot points');
+c.eq(packDots.size, 113, 'the committed pack holds 113 author dot points');
 c.deq([...packDots].filter(id => { const i = id.lastIndexOf('.', id.lastIndexOf('.') - 1); return !productPlaceOf(id.slice(0, i), id.slice(i + 1)); }), [], 'every one is placed in a product subtopic');
 c.deq(Object.entries(QBANK_DOTPOINTS).flatMap(([family, row]) => Object.keys(row).map(code => `${family}.${code}`)).filter(id => !packDots.has(id)), [], 'and the table holds no dot point the pack does not');
 // Where the author's topic code is not the subtopic's: his questions practised in the nearest product subtopic of the same skill.
@@ -72,7 +72,7 @@ for (const [family, row] of Object.entries(QBANK_DOTPOINTS)) {
   }
 }
 c.deq(problems, [], 'every subtopic exists, is issued, is the author\'s course and carries his topic code (three named exceptions), and every numbered dot point exists');
-c.eq(numbered + topicOnly, 112, `${numbered} author dot points are numbered to a product dot point and ${topicOnly} are practised through their subtopic only`);
+c.eq(numbered + topicOnly, 113, `${numbered} author dot points are numbered to a product dot point and ${topicOnly} are practised through their subtopic only`);
 c.ok(all.every(x => policy.admits && qb.qbankServes(x.place.subtopic)), 'every question is served from a subtopic Prithagoras issues');
 console.log(`  numbered ${numbered}, subtopic only ${topicOnly}: ${topicOnlyList.join(' ')}`);
 

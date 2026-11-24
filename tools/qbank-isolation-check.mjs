@@ -48,7 +48,7 @@ const serverText = walk(path.join(ROOT, 'server', 'platform')).filter(f => f.end
 const serving = serverText.filter(f => /express\.static|sendFile/.test(fs.readFileSync(f, 'utf8')) && /content\/qbank|DEFAULT_PACK_DIR/.test(fs.readFileSync(f, 'utf8')));
 ok(serving.length === 0, 'no server module that serves files names the pack');
 const importers = serverText.filter(f => /from '\.\/qbankPack\.js'/.test(fs.readFileSync(f, 'utf8'))).map(f => path.basename(f)).sort();
-ok(importers.every(n => ['editionBanks.js', 'nswBanks.js', 'practice.js', 'qbankPack.js'].includes(n)), `only the issuing path imports the pack module (${importers.join(', ')})`);
+ok(importers.every(n => ['editionBanks.js', 'nswBanks.js', 'practice.js', 'qbankFigures.js', 'qbankPack.js'].includes(n)), `only the issuing path imports the pack module (${importers.join(', ')})`);
 
 const staticPass = pass;
 // ── built client ─────────────────────────────────────────────────────────────

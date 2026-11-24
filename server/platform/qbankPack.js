@@ -65,6 +65,9 @@ function keyShapeOk(type, a) {
   }
 }
 
+// A question with a figure (qbankFigures.js): its text alternative, its size, and the hash and length of the SVG the server will send.
+const diagramShapeOk = d => !!d && typeof d === 'object' && isStr(d.alt) && d.alt.length <= 500 && isNum(d.w) && d.w > 0 && isNum(d.h) && d.h > 0 && SHA.test(d.sha256 ?? '') && Number.isInteger(d.bytes) && d.bytes > 0;
+
 /** Why one pack question is not well formed, or null. The loader refuses the whole pack on the first. */
 export function questionProblem(q, family) {
   if (!q || typeof q !== 'object') return 'not an object';
@@ -81,6 +84,7 @@ export function questionProblem(q, family) {
   if (!Array.isArray(q.criteria) || !q.criteria.every(c => Number.isInteger(c?.marks) && isStr(c?.point))) return `${q.id}: criteria`;
   if (q.criteria.reduce((s, c) => s + c.marks, 0) !== q.marks) return `${q.id}: criteria do not add up to the marks`;
   if (q.stepcheck !== undefined && (!q.stepcheck || typeof q.stepcheck !== 'object')) return `${q.id}: stepcheck`;
+  if (q.diagram !== undefined && !diagramShapeOk(q.diagram)) return `${q.id}: diagram`;
   return null;
 }
 
@@ -298,6 +302,8 @@ function productQuestion(entry, generator, seed, requestedId) {
     ...(entry.inputHint ? { inputHint: entry.inputHint } : {}),
     ...(entry.traps.length ? { traps: entry.traps } : {}),
     hints: entry.hints, steps: entry.steps,
+    // Public: the text alternative and the size. The figure itself is fetched by the account it was issued to (practice.js GET /:id/figure).
+    ...(entry.diagram ? { diagram: { alt: entry.diagram.alt, w: entry.diagram.w, h: entry.diagram.h } } : {}),
     ...(entry.stepcheck ? { stepcheck: entry.stepcheck } : {}),
     dotpoints: ids, dotpoint: ids.length === 1 ? ids[0] : null, dotpointSource: 'qbank',
     contentId: `qbank:${entry.id}`, contentVersion: `qb.${installed.version}`, contentHash,

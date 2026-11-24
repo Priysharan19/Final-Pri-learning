@@ -32,6 +32,7 @@ import { CONTENT_VERSION, UNVERSIONED_TOKEN_CONTENT_VERSION } from '../../client
 import { consentState, consentBlockerCode } from './guardianConsent.js';
 import { loadAllBanks, loadBanksFor, generateQuestion as generateGeneratorQuestion } from '../../client/src/engine/generators/index.js';
 import { ensureQbank, qbankDraw, qbankServes, qbankVersion } from './qbankPack.js';
+import { readBankFigure, FIGURE_HEADERS } from './qbankFigures.js';
 // The marker itself (checkAnswer, stepCheck, methodMarks) is never called on
 // this thread: markerOps.js holds the operations and markerPool.js runs them in
 // worker threads under a hard deadline. Only the two pure rubric helpers
@@ -1126,6 +1127,29 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     if (result.status) return reject(res, result.status, result.code, 'The question is unavailable or already resolved.');
     return res.status(200).json(result.response);
   });
+
+  // ── A bank question's diagram (qbankFigures.js) ───────────────────────────
+  // Only to the account the question was issued to: the escrow row is this account's own, so another account's question id, an id that was
+  // never issued, and a question with no diagram are all the same 404. The SVG is a file of the committed pack, checked against the hash the
+  // pack names; it shows no answer (the importer leaves out any figure that does). `/figure` streams the image (a browser); `/figure/data`
+  // is the same bytes as JSON for the native app, whose bridge carries JSON only.
+  const sendFigure = asJson => async (req, res) => {
+    const qid = String(req.params.id || '');
+    if (!UUID.test(qid)) return reject(res, 404, 'QUESTION_NOT_FOUND', 'No such diagram.');
+    const accountId = req.platformSession.account_id;
+    const escrow = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=? AND expires_at>?", [accountId, qid, Date.now()]);
+    let q = null;
+    try { q = escrow ? JSON.parse(escrow.response_json) : null; } catch { q = null; }
+    const figure = q && q.diagram && typeof q._bank === 'string' ? await readBankFigure(q._bank, env) : null;
+    if (!figure) return reject(res, 404, 'QUESTION_NOT_FOUND', 'No such diagram.');
+    res.set(FIGURE_HEADERS);
+    res.set('ETag', `"${figure.sha256}"`);
+    if (req.get('if-none-match') === `"${figure.sha256}"`) return res.status(304).end();
+    if (asJson) { res.set({ 'Content-Type': 'application/json; charset=utf-8', 'Content-Security-Policy': "default-src 'none'; sandbox" }); return res.json({ sha256: figure.sha256, svg: figure.bytes.toString('utf8') }); }
+    return res.send(figure.bytes);
+  };
+  router.get('/:id/figure', rateLimit(db, 'practice-figure', { limit: 1200, windowMs: 3600000 }), sendFigure(false));
+  router.get('/:id/figure/data', rateLimit(db, 'practice-figure', { limit: 1200, windowMs: 3600000 }), sendFigure(true));
 
   // ── The hint ladder (engine/hintLadder.js) ───────────────────────────────
   // nudge → method → worked step → full solution, strictly in order, served

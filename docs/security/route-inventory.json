@@ -3292,6 +3292,52 @@
     },
     {
       "method": "GET",
+      "path": "/v1/practice/:id/figure",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "read-only; the question is one of this account's own live server-issued rows (another account's id, an id never issued and a question with no diagram are one 404 QUESTION_NOT_FOUND); Prithagoras bank questions only; the file is one of the committed pack's figures, checked against the sha256 the pack entry names, and its name comes from the pack, never the request; streams one diagram (image/svg+xml, nosniff, locked-down CSP, private cache, ETag)",
+      "rateLimits": [
+        {
+          "key": "practice-figure",
+          "limit": 1200,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/practice/:id/figure/data",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "read-only; the question is one of this account's own live server-issued rows (another account's id, an id never issued and a question with no diagram are one 404 QUESTION_NOT_FOUND); Prithagoras bank questions only; the file is one of the committed pack's figures, checked against the sha256 the pack entry names, and its name comes from the pack, never the request; the same bytes as JSON { sha256, svg } for the native bridge (locked-down CSP, private cache, ETag)",
+      "rateLimits": [
+        {
+          "key": "practice-figure",
+          "limit": 1200,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
       "path": "/v1/exams/targets",
       "auth": "session",
       "roles": [
