@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `c8330c2dd388e9fa3d9e75b940301d1073f0b2e233b160ca236a224c2d92a1ed` (`docs/marking/order14-examiner-certification-dossier.md`).
+Dossier digest: `91d423c10bf3fd5546c1583e1f2fd127acd8ff5978243b40ca899778dba78c91` (`docs/marking/order14-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -1300,6 +1300,66 @@ partial:
 ```text
 (working with the right method, ending in a wrong value)
 Final answer: 8
+```
+</details>
+
+## `cbse-bank:y12-diff/D2` — seed 72280
+
+> Use the product rule to find the gradient of $y = (6x - 8)(4x - 5)$ at the point where $x = -4$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `-254` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `-254.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `-253` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `-253` | no | 0/2 | 0/2 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: -253
+```
+</details>
+
+## `cbse-bank:y12-diff/D3` — seed 32685
+
+> If $y = \\dfrac{3x - 3}{2x + 2}$, find the gradient $\\dfrac{dy}{dx}$ at $x = 0$, correct to 3 decimal places where needed.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `3` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `3.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `4` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `4` | no | 0/3 | 0/3 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: 4
+```
+</details>
+
+## `cbse-bank:y12-diff/D4` — seed 24766
+
+> Find the gradient of $y = x(x^2 - 3)^{2}$ at the point where $x = 3$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `252` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `252.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `253` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `253` | no | 0/3 | 0/3 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: 253
 ```
 </details>
 

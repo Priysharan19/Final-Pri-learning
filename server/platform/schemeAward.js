@@ -71,17 +71,29 @@ const labelled = word => l => new RegExp(`^\\s*${word}\\b`, 'i').test(String(l.t
 // the asked value are the slots, and with those slots replaced by u the line must equal the model at u for several different u. A line
 // with no slot (an evaluated sum), or whose constants are not the model's, fails: its criterion is then "not verified", never earned.
 const SLOT_TESTS = [0, 1.5, -2];
-const slotted = (rhs, a, f) => {
+const SLOT_TESTS_ROBUST = [0.37, 1.13, -0.71, 2.9, -1.9, 0.02];
+const slotted = (rhs, a, f, robust = false) => {
   const lit = Number.isInteger(a) ? String(Math.abs(a)) : String(Math.abs(a)).replace('.', '\\.');
   const re = a < 0 ? new RegExp(`\\(\\s*-\\s*${lit}\\s*\\)`, 'g') : new RegExp(`(?<![\\d.])${lit}(?![\\d.])`, 'g');
   const at = [...rhs.matchAll(re)].map(m => [m.index, m[0].length]);
-  if (!at.length || at.length > 10) return false;
+  if (!at.length || at.length > (robust ? 14 : 10)) return false;
   for (let mask = 1; mask < (1 << at.length); mask++) {
     let out = ''; let from = 0;
     at.forEach(([i, n], k) => { out += rhs.slice(from, i) + ((mask >> k) & 1 ? '(u)' : rhs.slice(i, i + n)); from = i + n; });
     out += rhs.slice(from);
     try {
-      if (SLOT_TESTS.every(d => { const u = a + d; const want = evalNumeric(f.rhs, { [f.variable]: u }); const got = evalNumeric(out, { u }); return Math.abs(got - want) <= 1e-9 * (1 + Math.abs(want)); })) return true;
+      if (!robust && SLOT_TESTS.every(d => { const u = a + d; const want = evalNumeric(f.rhs, { [f.variable]: u }); const got = evalNumeric(out, { u }); return Math.abs(got - want) <= 1e-9 * (1 + Math.abs(want)); })) return true;
+      // A derivative with a denominator has poles: probe where the model is defined, and need at least four such points, all in agreement.
+      if (robust) {
+        let seen = 0, bad = 0;
+        for (const d of SLOT_TESTS_ROBUST) {
+          const u = a + d; let want; try { want = evalNumeric(f.rhs, { [f.variable]: u }); } catch { continue; }
+          if (!Number.isFinite(want)) continue;
+          const got = evalNumeric(out, { u }); seen++;
+          if (!(Math.abs(got - want) <= 1e-9 * (1 + Math.abs(want)))) { bad++; break; }
+        }
+        if (seen >= 4 && !bad) return true;
+      }
     } catch { /* this reading is not an expression */ }
   }
   return false;
@@ -105,6 +117,29 @@ const restates = (l, q) => {
   const side = String(l.text ?? '').split('=').pop().replace(/\s+/g, '');
   return !!f && side === String(f.rhs).replace(/\s+/g, '');
 };
+
+// ── Lines of a derived step plan (client/src/engine/schemePlans.js) ────────────────────────────────────────────────────────
+// The plan ticks a line at a stage; these helpers add the one structural fact a tick cannot say: that a line really is the substitution of the
+// point into the derivative the student wrote above it (the same slot test as "substitutes the value", never an expression that merely comes
+// to the same number).
+const planOf = q => (q?.stepcheck?.kind === 'plan' ? q.stepcheck : null);
+const segmentsOf = text => String(text ?? '').replace(/[−–—]/g, '-').split('=').map(t => t.trim()).filter(Boolean);
+const labelOnly = t => /^(?:d\s*[a-z]\s*\/\s*d\s*[a-z]|[a-z]'?(?:\(\s*-?[\d.]+\s*\))?|gradient|m)$/i.test(t);
+const rhsOf = text => { const seg = segmentsOf(text); return seg.length > 1 ? seg[seg.length - 1] : seg[0] ?? ''; };
+const substitutesDerivative = (l, k, lines, q) => {
+  const plan = planOf(q);
+  const x0 = plan?.stages?.[1]?.substitutions?.x;
+  if (!Number.isFinite(x0) || l.stage !== 1) return false;
+  const written = segmentsOf(l.text).filter(t => !labelOnly(t));
+  for (let j = 0; j < k; j++) {
+    const e = lines[j];
+    if (!e || e.status !== 'ok' || e.stage !== 0 || e.ecf === true) continue;
+    const f = { rhs: rhsOf(e.text), variable: 'x' };
+    try { if (written.some(t => slotted(t, x0, f, true))) return true; } catch { /* this line is not an expression */ }
+  }
+  return false;
+};
+const gradientPick = q => q.answerType === 'numeric' && planOf(q)?.scheme === 'gradient-at-point';
 
 // ── draft schemes for solving an equation ─────────────────────────────────────────────────────────────────────────────────
 // The step check ticks a line of a solved equation when it is an equation with the same solutions as the question's. That alone is not a
@@ -244,6 +279,36 @@ export const SCHEMES = Object.freeze([
       { key: 'step1', by: 'line', marks: 1, text: 'Writes a correct first step towards the solutions.', how: REWRITE_HOW, line: rewrite },
       { key: 'step2', by: 'line', marks: 1, text: 'Writes a second correct step, on a different line.', how: REWRITE_HOW + '; the first such line earns the first step and the next one earns this', line: rewrite },
       { ...ANSWER, key: 'solutions', marks: 1, text: 'Gives all the solutions correctly.' }
+    ]
+  },
+  // ── DRAFTS added 24 Nov 2026 (Years 11-12 coverage pass). Not approved: nothing is paid until the author files a record for the digest. ──
+  {
+    id: 'y12-diff-rules-3', title: 'Differentiate using the product or quotient rule (3 marks)', course: 'Year 12 Mathematics Advanced', year: 12, level: 1,
+    families: ['y12-diff'],
+    pick: q => q.answerType === 'expression' && !!fnOf(q) && fnOf(q).name === 'y' && /differentiate/i.test(q.prompt),
+    criteria: [
+      { key: 'derivative', by: 'line', marks: 1, text: 'Writes a correct derivative of the given function (any equivalent form).', how: 'a line the step check ticks as equal to the derivative of the given function, in any form (a line that only restates the function does not count)', line: (l, k, lines, q) => !restates(l, q) },
+      { key: 'second', by: 'line', marks: 1, text: 'Writes a second correct derivative, on a different line (the rule applied, then simplified).', how: 'a second line the step check ticks as equal to the derivative, whose right-hand side is not the same as an earlier line\'s once spaces are ignored; the first such line earns the first criterion and the next one earns this', line: (l, k, lines, q) => !restates(l, q) && !lines.slice(0, k).some(e => e?.status === 'ok' && rhsOf(e.text).replace(/\s+/g, '') === rhsOf(l.text).replace(/\s+/g, '')) },
+      { ...ANSWER, marks: 1, text: 'Gives the final answer correctly, in the form the question asks.' }
+    ]
+  },
+  {
+    id: 'y12-diff-gradient-2', title: 'Differentiate, then find the gradient at a point (2 marks)', course: 'Year 12 Mathematics Advanced', year: 12, level: 1,
+    families: ['y12-diff'],
+    pick: gradientPick,
+    criteria: [
+      { key: 'derivative', by: 'line', marks: 1, text: 'Differentiates the function correctly.', how: 'a line the step check ticks as equal to the derivative of the given function (the plan\'s first stage), in any form; a line that only restates the function does not count', line: (l, k, lines, q) => l.stage === 0 && !restates(l, q) },
+      { ...ANSWER, key: 'gradient', marks: 1, text: 'Finds the gradient at the point correctly (the final answer).' }
+    ]
+  },
+  {
+    id: 'y12-diff-gradient-3', title: 'Differentiate, substitute, then find the gradient at a point (3 marks)', course: 'Year 12 Mathematics Advanced', year: 12, level: 1,
+    families: ['y12-diff'],
+    pick: gradientPick,
+    criteria: [
+      { key: 'derivative', by: 'line', marks: 1, text: 'Differentiates the function correctly.', how: 'a line the step check ticks as equal to the derivative of the given function (the plan\'s first stage), in any form; a line that only restates the function does not count', line: (l, k, lines, q) => l.stage === 0 && !restates(l, q) },
+      { key: 'substitute', by: 'line', marks: 1, text: 'Substitutes the value of x into the derivative correctly.', how: 'a line the step check ticks at the plan\'s second stage (its value is the derivative\'s value at the point) that is the derivative the student wrote above, with the value put in, term by term (not an expression that merely comes to the same value)', line: substitutesDerivative },
+      { ...ANSWER, key: 'gradient', marks: 1, text: 'Finds the gradient at the point correctly (the final answer).' }
     ]
   }
 ]);

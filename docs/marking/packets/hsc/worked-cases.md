@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `4b3d6b18dc3b7faeb46aa119891ff64cdf198fd992fa98854c80353dbfbec5b4` (`docs/marking/hsc-examiner-certification-dossier.md`).
+Dossier digest: `1b20ca208c0382adc594c77dd1ac2fbc7e80a43bdba18841530d07c6c09572e7` (`docs/marking/hsc-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -2789,25 +2789,25 @@ Final answer: -6, 7
 
 ## `nsw-final:y12-diff/D2` — seed 1009
 
-> A rectangular pond is being enlarged. At time $t$ days its length is $(4t + 4)$ m and its width is $(3t + 7)$ m. Find the rate at which its area is increasing after 2 days.
+> Which expression is $\\dfrac{dy}{dx}$ for $y = x^{4}(4x - 1)$?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `88` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `88.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `89` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `89` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `2` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. Option 2 is “$4x^{3}(4x - 1) + 4x^{4}$”. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. Option 0 is “$4x^{3}(4x - 1) - 4x^{4}$”. |
+| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-diff/D3` — seed 1009
 
-> The concentration of a drug in the blood is $C = \\dfrac{7t + 3}{2t + 1}$ mg/L, $t$ hours after it is given. Find the rate of change of the concentration after 2 hours, as a decimal. (A negative answer means the concentration is falling.)
+> A student differentiates $y = \\dfrac{5x - 1}{4x + 3}$ using the quotient rule.  **Line 1:** $u = 5x - 1,\\; v = 4x + 3 \\;\\Rightarrow\\; u' = 5,\\; v' = 3$  **Line 2:** $y' = \\dfrac{u'v - uv'}{v^2} = \\dfrac{5(4x + 3) - 3(5x - 1)}{(4x + 3)^2}$  **Line 3:** $y' = \\dfrac{5x + 18}{(4x + 3)^2}$  Which line contains the first error?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `1/25` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `1/25` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `26/25` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `26/25` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `1` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. Option 1 is “Line 1”. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. Option 0 is “There is no error”. |
+| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-diff/D4` — seed 1009
 

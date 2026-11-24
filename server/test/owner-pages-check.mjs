@@ -213,7 +213,9 @@ ok(!acode(STAT).includes('X'), `the page itself, as written, is never crossed by
 
 // ── the slip warning on the tan page, and the slash column page (22 November 2026) ─────────────────────────────────────────────────
 {
-  const q = gen('y12-diff', 3, 7);
+  // The carrier is a question with no Step Check of its own (the pages below are another question's handwriting). Seed 7 drew a gradient-at-a-point
+  // question until the Years 11-12 coverage pass gave those a derived step plan; seed 6 is a question with none, as seed 7 was.
+  const q = gen('y12-diff', 3, 6);
   const W = page => (stepEvidence(q, '', page.join('\n'), { correct: false }, { slipWarnings: true }).stepReport?.lines || []);
   const L = W(TAN8);
   // line 3 is unchanged (a note: it may be a derivative of the definition or of the equation 8y = 3/tan x).

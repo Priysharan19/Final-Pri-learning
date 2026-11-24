@@ -327,6 +327,66 @@ for (const s of SCHEMES) ok(R.questionsOfType(s, { limit: 3 }).length === 3, `${
   ok(fromShown.awarded === 1, 'control: paid from the folded report it WOULD pay, which is why practice.js never reads it');
 }
 
+// ── 2b4. the Years 11-12 draft schemes (24 Nov 2026): unapproved in the repository; approved here in the TEST PROCESS only; gamed lines earn nothing ──
+{
+  const NEW = ['y12-diff-rules-3', 'y12-diff-gradient-2', 'y12-diff-gradient-3'];
+  ok(NEW.every(id => SCHEMES.some(s => s.id === id) && !APPROVED_SCHEME_TYPES.some(a => a.typeId === id) && !isApproved(id)), 'the Years 11-12 draft schemes exist and none is on the repository\'s approved list');
+  {
+    let stamped = 0, tried = 0;
+    for (const id of NEW) { const s = SCHEMES.find(x => x.id === id); for (const q of R.questionsOfType(s, { limit: 15 })) {
+      const copy = JSON.parse(JSON.stringify({ ...q, _generator: s.families[0] })); tried++;
+      if (sealForEdition(copy, bankPolicy('prithagoras'), s.families[0]) && copy._methodScheme === id) stamped++;
+    } }
+    ok(tried >= 30 && stamped === 0, `an unapproved Years 11-12 draft is never stamped (${tried} questions)`);
+  }
+  // a question is typed to the variant whose marks are its marks
+  {
+    let n2 = 0, n3 = 0, bad = 0;
+    for (const s of SCHEMES.filter(x => x.id === 'y12-diff-gradient-2')) for (const q of R.questionsOfType(s)) { const m = marksPossibleFor(q); const id = schemeTypeOf(q); if (m === 2) { n2++; if (id !== 'y12-diff-gradient-2') bad++; } if (m === 3) { n3++; if (id !== 'y12-diff-gradient-3') bad++; } }
+    ok(n2 >= 10 && n3 >= 20 && bad === 0, `gradient questions: ${n2} two-mark ones typed to the two-mark scheme, ${n3} three-mark ones to the three-mark scheme, ${bad} wrongly typed`);
+  }
+  const g = { tried: 0, earned: 0, controls: 0, controlEarned: 0 };
+  const run = (s, q, lines) => { const q2 = asMarks(q, schemeMarks(s), s.id); const result = checkAnswer(q2, '999'); const ev = stepEvidence(q2, '999', lines.join('\n'), result, { slipWarnings: true }); return schemePay({ q: q2, report: ev.stepReport, topic: ev.topicTicks ?? null, correct: false, marksPossible: marksPossibleFor(q2), env: ON, list: LIST }); };
+  const earnedKeys = p => p.items.filter(i => i.basis === 'lines' && i.awarded).map(i => i.key);
+  for (const id of NEW) {
+    const s = SCHEMES.find(x => x.id === id); const type = TYPES.find(t => t.id === id);
+    for (const q of R.questionsOfType(s, { limit: 60 })) {
+      const built = await type.build(q); if (!built) continue;
+      const f = publicDescription(q).functions[0];
+      const lists = [['0 = 0'], ['x = x'], ['999'], [`dy/dx = ${f.rhs}`], [`y' = ${f.rhs}`], [`f'(x) = ${f.rhs}`]];
+      if (id === 'y12-diff-rules-3') {
+        const key = String(q.answer.expr);
+        lists.push([`dy/dx = ${key}`, `dy/dx = ${key}`], [`dy/dx = ${key}`, `= ${key}`], [`dy/dx = ${key}`, `dy/dx = ${key.replace(/\s+/g, '')}`], [`dy/dx = ${key}`, `dy/dx = ${key.replace(/\s+/g, '')} `]);
+        // a first correct line earns the first criterion; the same derivative written again earns no second one
+        for (const ls of lists.slice(6)) { g.tried++; const k = earnedKeys(run(s, q, ls)); if (k.includes('second')) g.earned++; }
+        lists.length = 6;
+        // a crossed line, then right lines: nothing after the cross
+        const wrong = built.zero[0];
+        g.tried++; if (earnedKeys(run(s, q, [wrong, built.full[0], built.full[1]])).length) g.earned++;
+        g.controls++; if (earnedKeys(run(s, q, built.full.slice(0, 2))).join() === 'derivative,second') g.controlEarned++; else if (process.env.DEBUG_CONTROL) console.log('control', id, q.prompt.slice(0, 90), JSON.stringify(built.full), earnedKeys(run(s, q, built.full.slice(0, 2))));
+      } else {
+        const st = q.stepcheck.stages; const val = st[1].expected; const D = built.full[0]; const S = built.full[1];
+        const wrongD = built.zero[0];
+        // the value alone is a true line at the second stage, and shows no substitution; a sum that merely comes to the value shows none either
+        lists.push([`dy/dx = ${num(val)}`], [D, `dy/dx = ${num(val - 3)} + 1 + 1 + 1`], [D, `dy/dx = ${num(val)}`], [D, `dy/dx = ${num(val)} + 0`], [`dy/dx = ${num(val - 3)} + 1 + 1 + 1`, D]);
+        for (const ls of lists) { g.tried++; const k = earnedKeys(run(s, q, ls)); if (k.includes('substitute') && !ls.includes(S)) g.earned++; if (!ls.includes(D) && k.includes('derivative')) g.earned++; }
+        // nothing is earned by a crossed line, nor by the lines after it
+        g.tried++; if (earnedKeys(run(s, q, [wrongD, D, ...(id.endsWith('3') ? [S] : [])])).length) g.earned++;
+        // the real lines earn their criteria, even with a wrong final answer
+        const want = id.endsWith('3') ? 'derivative,substitute' : 'derivative';
+        g.controls++; if (earnedKeys(run(s, q, built.partial)).join() === want) g.controlEarned++; else if (process.env.DEBUG_CONTROL) console.log('control', id, q.prompt.slice(0, 90), JSON.stringify(built.partial), earnedKeys(run(s, q, built.partial)));
+        // a line that restates the function is never the derivative
+        g.tried++; if (earnedKeys(run(s, q, [`dy/dx = ${f.rhs}`])).includes('derivative')) g.earned++;
+        continue;
+      }
+      for (const ls of lists) { g.tried++; if (earnedKeys(run(s, q, ls)).length) g.earned++; }
+    }
+  }
+  console.log(`  Years 11-12 drafts, adversarial: ${g.tried} gamed pages, ${g.earned} earned a criterion they should not; the real lines earned their criteria on ${g.controlEarned} of ${g.controls}`);
+  ok(g.tried >= 600 && g.earned === 0, `no gamed page earns a criterion on a Years 11-12 draft (${g.earned} of ${g.tried})`);
+  ok(g.controls >= 100 && g.controlEarned === g.controls, `the genuine lines earn their criteria (${g.controlEarned} of ${g.controls})`);
+}
+
 // ── 3. criteria not the question's marks ───────────────────────────────────────────────────────────────────────────
 {
   const [s, q] = typed.find(([x]) => x.id === 'y12-diff-rules');

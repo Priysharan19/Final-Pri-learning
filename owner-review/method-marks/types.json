@@ -138,6 +138,96 @@
       "digest": "073ae29c731218a52d39a7ceabae69c62115c92a080c8107954e1c92a1907af4"
     },
     {
+      "id": "y12-diff-rules-3",
+      "title": "Differentiate using the product or quotient rule (3 marks)",
+      "course": "Year 12 Mathematics Advanced",
+      "year": 12,
+      "families": [
+        "y12-diff"
+      ],
+      "file": "y12-diff-rules-3.md",
+      "totalMarks": 3,
+      "criteria": [
+        {
+          "key": "derivative",
+          "text": "Writes a correct derivative of the given function (any equivalent form).",
+          "marks": 1,
+          "by": "line"
+        },
+        {
+          "key": "second",
+          "text": "Writes a second correct derivative, on a different line (the rule applied, then simplified).",
+          "marks": 1,
+          "by": "line"
+        },
+        {
+          "key": "answer",
+          "text": "Gives the final answer correctly, in the form the question asks.",
+          "marks": 1,
+          "by": "final"
+        }
+      ],
+      "digest": "045e2cfe6ac1a701d921b62097a289eede04181acf32f226034ec6b475ead35b"
+    },
+    {
+      "id": "y12-diff-gradient-2",
+      "title": "Differentiate, then find the gradient at a point (2 marks)",
+      "course": "Year 12 Mathematics Advanced",
+      "year": 12,
+      "families": [
+        "y12-diff"
+      ],
+      "file": "y12-diff-gradient-2.md",
+      "totalMarks": 2,
+      "criteria": [
+        {
+          "key": "derivative",
+          "text": "Differentiates the function correctly.",
+          "marks": 1,
+          "by": "line"
+        },
+        {
+          "key": "gradient",
+          "text": "Finds the gradient at the point correctly (the final answer).",
+          "marks": 1,
+          "by": "final"
+        }
+      ],
+      "digest": "321087896ff2c26b5cd961ccd9ff2b269c2374ecaadc8fca2df01d1d85c79647"
+    },
+    {
+      "id": "y12-diff-gradient-3",
+      "title": "Differentiate, substitute, then find the gradient at a point (3 marks)",
+      "course": "Year 12 Mathematics Advanced",
+      "year": 12,
+      "families": [
+        "y12-diff"
+      ],
+      "file": "y12-diff-gradient-3.md",
+      "totalMarks": 3,
+      "criteria": [
+        {
+          "key": "derivative",
+          "text": "Differentiates the function correctly.",
+          "marks": 1,
+          "by": "line"
+        },
+        {
+          "key": "substitute",
+          "text": "Substitutes the value of x into the derivative correctly.",
+          "marks": 1,
+          "by": "line"
+        },
+        {
+          "key": "gradient",
+          "text": "Finds the gradient at the point correctly (the final answer).",
+          "marks": 1,
+          "by": "final"
+        }
+      ],
+      "digest": "617054ccf2d5ea4c0bc74f4bf2c0c0657b871f8914a5ac414f93de9f24c57efe"
+    },
+    {
       "id": "y11-poly-evaluate",
       "title": "Evaluate a polynomial or find a remainder by substitution",
       "course": "Year 11 Mathematics Advanced",

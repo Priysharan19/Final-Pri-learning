@@ -15,12 +15,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as G from '../client/src/engine/generators/index.js';
-import { stepMetaFor, stepEvidence } from '../server/platform/markerOps.js';
+import { stepMetaFor, stepEvidence, marksPossibleFor } from '../server/platform/markerOps.js';
 import { checkAnswer } from '../client/src/engine/checker.js';
 import { publicDescription } from '../server/platform/lineInterpreter/givens.js';
 import { makeFn, polynomial, extremes } from '../server/platform/lineInterpreter/truth.js';
 import { SCHEMES, UNAVAILABLE, schemeDigest, awardScheme } from '../server/platform/schemeAward.js';
 import { transcriptsFor } from './understanding-audit/corpus.mjs';
+import { parse, normalize } from '../client/src/engine/expr.js';
+import { differentiateAst } from '../client/src/engine/reason-v2.js';
+import { prettyText } from '../client/src/engine/schemePlans.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const OUT_DIR = path.join(ROOT, 'owner-review', 'method-marks');
@@ -275,6 +278,44 @@ const EQUATION_CANNOT = [
 EXTRAS['y12-trig-extreme-2'] = { ...EXTRAS['y12-trig-extreme'], form: 'A model such as h(t) = 14 + 11 sin(pi t / 6) is given. The student finds its greatest or least value. This version is for questions worth two marks.', cannot: [...EXTRAS['y12-trig-extreme'].cannot, 'It does not require both the amplitude and the midline: either one, correctly stated, earns the working mark.'] };
 for (const id of ['y7-equation-solve-2', 'y7-equation-solve-3', 'y10-quadratic-solve-2', 'y10-quadratic-solve-3']) EXTRAS[id] = { form: '' + (id.startsWith('y10') ? 'A quadratic equation is given and the student finds all its solutions.' : 'An equation in one letter is given, or arises from a short word problem, and the student finds the value of the letter.') + ' This version is for ' + (id.endsWith('2') ? 'two' : 'three') + '-mark questions.', cannot: EQUATION_CANNOT, build: equationBuild };
 
+
+// ── Years 11-12 coverage pass (24 Nov 2026): product and quotient rule as an expression; the gradient at a point ───────────────────────────
+const diffText = src => prettyText(differentiateAst(parse(normalize(src)), 'x'));
+const at = (text, x0) => text.replace(/(?<![A-Za-z])x(?![A-Za-z])/g, `(${x0})`);
+EXTRAS['y12-diff-rules-3'] = {
+  marksMatch: true,
+  form: 'A function of x is given and the student is asked to differentiate it, using the product rule or the quotient rule, and give the answer in a stated form. This version is for questions worth three marks.',
+  cannot: [
+    'It cannot tell which rule the student used. A correct derivative earns the first criterion however it was found.',
+    'It cannot tell a worthwhile rewrite from a reordering. A second correct line earns the second criterion if its right-hand side is not the same as an earlier line\'s once spaces are ignored, so the same derivative written in two forms earns both.',
+    'It reads a derivative only when the line is labelled dy/dx, y\' or f\'(x).'
+  ],
+  async build(q) {
+    const key = String(q.answer.expr);
+    const rule = diffText(descOf(q).functions[0].rhs);
+    const w = await firstWrong(q, c => `dy/dx = ${c}`, bumpedExprs(key));
+    if (!rule || !w) return null;
+    return { full: [`dy/dx = ${rule}`, `dy/dx = ${key}`], partial: [`dy/dx = ${rule}`, `dy/dx = ${w.text}`], zero: [`dy/dx = ${w.text}`, `dy/dx = ${w.text} + 1`], slip: [`dy/dx = ${w.text}`, `= ${w.text}`] };
+  }
+};
+const GRADIENT_CANNOT = [
+  'It reads a derivative only when the line is labelled dy/dx, y\' or f\'(x); a line that only restates the function earns nothing.',
+  'It cannot tell which rule the student used, or judge a long written reason.',
+  'The substitution line must be the derivative the student wrote, with the value put in, term by term. A sum that merely comes to the same value, or the value alone, is a true line but does not show the substitution, so it earns nothing for it.',
+  'The gradient is read from the final answer only (the answer checker); a rounded decimal on a working line is not matched.'
+];
+const gradientBuild = three => async function build(q) {
+  const st = q.stepcheck.stages; const x0 = st[1].substitutions.x; const D = diffText(st[0].source); const S = at(D, x0);
+  const final = num(q.answer.value); const wrongFinal = num(q.answer.value + 1);
+  const w = await firstWrong(q, c => `dy/dx = ${c}`, bumpedExprs(D));
+  if (!D || !w) return null;
+  return three
+    ? { full: [`dy/dx = ${D}`, `dy/dx = ${S}`, `dy/dx = ${final}`], partial: [`dy/dx = ${D}`, `dy/dx = ${S}`, `dy/dx = ${wrongFinal}`], zero: [`dy/dx = ${w.text}`, `dy/dx = ${wrongFinal}`], slip: [`dy/dx = ${w.text}`, `dy/dx = ${at(w.text, x0)}`, `dy/dx = ${wrongFinal}`] }
+    : { full: [`dy/dx = ${D}`, `dy/dx = ${final}`], partial: [`dy/dx = ${D}`, `dy/dx = ${wrongFinal}`], zero: [`dy/dx = ${w.text}`, `dy/dx = ${wrongFinal}`], slip: [`dy/dx = ${w.text}`, `= ${w.text}`] };
+};
+EXTRAS['y12-diff-gradient-2'] = { marksMatch: true, form: 'A function of x is given and the student finds its gradient at a stated value of x (two marks).', cannot: GRADIENT_CANNOT, build: gradientBuild(false) };
+EXTRAS['y12-diff-gradient-3'] = { marksMatch: true, form: 'A function of x is given and the student finds its gradient at a stated value of x (three marks): differentiate, put the value in, evaluate.', cannot: GRADIENT_CANNOT, build: gradientBuild(true) };
+
 export const TYPES = SCHEMES.map(s => ({ ...s, ...EXTRAS[s.id] }));
 
 // ── types the marked page cannot verify line by line (server/platform/schemeAward.js UNAVAILABLE) ─
@@ -334,6 +375,8 @@ async function findSamples(type) {
         let q; try { q = G.generateQuestion(fam, d, seed); } catch { continue; }
         if (!q || seen.has(q.prompt)) continue;
         let ok = false; try { ok = !!type.pick(q); } catch { ok = false; }
+        // A type added in the Years 11-12 pass is shown on questions worth the marks of its scheme (the older packets are unchanged).
+        if (ok && type.marksMatch && marksPossibleFor(q) !== type.criteria.reduce((n, c) => n + c.marks, 0)) ok = false;
         if (ok) { seen.add(q.prompt); out.push(q); }
       }
     }

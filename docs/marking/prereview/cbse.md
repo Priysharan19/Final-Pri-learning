@@ -6,9 +6,9 @@ This file is written by an AI model. It is **not** an examiner's review, it sign
 
 Legend: **AI-A** nothing found wrong · **AI-C** a change is suggested (wording, mark weight, missing alternative form) · **AI-R** an apparent defect that should not be served until fixed. Each reason was reached by working the item independently of the key; a row with a defect names the fix. Defects judged genuine are fixed through the normal R4 path in the same change as this file, and their rows describe the state of the packet **before** that fix.
 
-Items: 56 of 56 · AI-A 18 · AI-C 38 · AI-R 0
+Items: 59 of 59 · AI-A 18 · AI-C 41 · AI-R 0
 
-> **Not pre-reviewed (6 items).** These cells joined the packet on train 25 (and, for the last two, in the 19 November 2026 content-gap work), after this file was written. The rows at the end of the table carry AI-C only because the table needs a verdict; none was formed. No pre-review has looked at them, and nothing here says they are right or wrong. A human examiner reviews them like every other item.
+> **Not pre-reviewed (9 items).** These cells joined the packet on train 25 (and, for the last two, in the 19 November 2026 content-gap work), after this file was written; the last three joined on 24 November 2026 (Years 11-12 step-mark pass: y12-diff gradient-at-a-point questions now carry a derived step plan, so the cells are rubric banks). The rows at the end of the table carry AI-C only because the table needs a verdict; none was formed. No pre-review has looked at them, and nothing here says they are right or wrong. A human examiner reviews them like every other item.
 
 | Item | AI verdict | Reason | Defect to fix |
 |---|---|---|---|
@@ -75,3 +75,6 @@ Items: 56 of 56 · AI-A 18 · AI-C 38 · AI-R 0
 | cbse-bank:me11-functions/D2 | AI-C | Not pre-reviewed: this cell joined the packet after this file was written (19 November 2026 content-gap work: the printed-answer format of the cell was repaired). No verdict was formed. | Run the pre-review over this cell before the packet is issued. |
 | cbse-bank:me11-poly/D4 | AI-C | Not pre-reviewed: this cell joined the packet after this file was written (19 November 2026 content-gap work: the printed-answer format of the cell was repaired). No verdict was formed. | Run the pre-review over this cell before the packet is issued. |
 | cbse-bank:me12-vectors/D1 | AI-C | Not pre-reviewed: this cell joined the packet after this file was written (19 November 2026: column-vector working is now judged line by line, engine/vectorChain.js). No verdict was formed. | Run the pre-review over this cell before the packet is issued. |
+| cbse-bank:y12-diff/D2 | AI-C | Not pre-reviewed: this cell joined the packet on 24 November 2026 (the gradient-at-a-point questions of y12-diff now carry a derived step plan: derivative, then its value at the point), after this file was written. No verdict was formed. | Run the pre-review over this cell before the packet is issued. |
+| cbse-bank:y12-diff/D3 | AI-C | Not pre-reviewed: this cell joined the packet on 24 November 2026 (the gradient-at-a-point questions of y12-diff now carry a derived step plan: derivative, then its value at the point), after this file was written. No verdict was formed. | Run the pre-review over this cell before the packet is issued. |
+| cbse-bank:y12-diff/D4 | AI-C | Not pre-reviewed: this cell joined the packet on 24 November 2026 (the gradient-at-a-point questions of y12-diff now carry a derived step plan: derivative, then its value at the point), after this file was written. No verdict was formed. | Run the pre-review over this cell before the packet is issued. |

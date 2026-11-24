@@ -17,20 +17,23 @@ The Status column reads the author's own records (docs/marking/author-approvals)
 | 3 | Find the value of a sine or cosine model at a time | Year 12 Mathematics Advanced | 2 | 2 | approved by the author | [y12-trig-evaluate.md](y12-trig-evaluate.md) |
 | 4 | Differentiate an exponential or logarithmic function | Year 12 Mathematics Advanced | 2 | 2 | approved by the author | [y12-diff-explog.md](y12-diff-explog.md) |
 | 5 | Maximum or minimum of a sine or cosine model (2 marks) | Year 12 Mathematics Advanced | 2 | 2 | new draft, not approved | [y12-trig-extreme-2.md](y12-trig-extreme-2.md) |
-| 6 | Evaluate a polynomial or find a remainder by substitution | Year 11 Mathematics Advanced | 2 | 2 | approved by the author | [y11-poly-evaluate.md](y11-poly-evaluate.md) |
-| 7 | Gradient of a tangent: differentiate, then substitute | Year 11 Mathematics Advanced | 2 | 2 | approved by the author | [y11-diff-gradient-plan.md](y11-diff-gradient-plan.md) |
-| 8 | Differentiate a polynomial by the power rule | Year 11 Mathematics Advanced | 2 | 2 | approved by the author | [y11-diff-power-rule.md](y11-diff-power-rule.md) |
-| 9 | Solve an equation, two marks | Mathematics Stage 4 (Years 7 and 8) | 2 | 2 | new draft, not approved | [y7-equation-solve-2.md](y7-equation-solve-2.md) |
-| 10 | Solve an equation, three marks | Mathematics Stage 4 (Years 7 and 8) | 3 | 3 | new draft, not approved | [y7-equation-solve-3.md](y7-equation-solve-3.md) |
-| 11 | Solve a quadratic equation, two marks | Mathematics Stage 5 (Year 10) | 2 | 2 | new draft, not approved | [y10-quadratic-solve-2.md](y10-quadratic-solve-2.md) |
-| 12 | Solve a quadratic equation, three marks | Mathematics Stage 5 (Year 10) | 3 | 3 | new draft, not approved | [y10-quadratic-solve-3.md](y10-quadratic-solve-3.md) |
+| 6 | Differentiate using the product or quotient rule (3 marks) | Year 12 Mathematics Advanced | 3 | 3 | new draft, not approved | [y12-diff-rules-3.md](y12-diff-rules-3.md) |
+| 7 | Differentiate, then find the gradient at a point (2 marks) | Year 12 Mathematics Advanced | 2 | 2 | new draft, not approved | [y12-diff-gradient-2.md](y12-diff-gradient-2.md) |
+| 8 | Differentiate, substitute, then find the gradient at a point (3 marks) | Year 12 Mathematics Advanced | 3 | 3 | new draft, not approved | [y12-diff-gradient-3.md](y12-diff-gradient-3.md) |
+| 9 | Evaluate a polynomial or find a remainder by substitution | Year 11 Mathematics Advanced | 2 | 2 | approved by the author | [y11-poly-evaluate.md](y11-poly-evaluate.md) |
+| 10 | Gradient of a tangent: differentiate, then substitute | Year 11 Mathematics Advanced | 2 | 2 | approved by the author | [y11-diff-gradient-plan.md](y11-diff-gradient-plan.md) |
+| 11 | Differentiate a polynomial by the power rule | Year 11 Mathematics Advanced | 2 | 2 | approved by the author | [y11-diff-power-rule.md](y11-diff-power-rule.md) |
+| 12 | Solve an equation, two marks | Mathematics Stage 4 (Years 7 and 8) | 2 | 2 | new draft, not approved | [y7-equation-solve-2.md](y7-equation-solve-2.md) |
+| 13 | Solve an equation, three marks | Mathematics Stage 4 (Years 7 and 8) | 3 | 3 | new draft, not approved | [y7-equation-solve-3.md](y7-equation-solve-3.md) |
+| 14 | Solve a quadratic equation, two marks | Mathematics Stage 5 (Year 10) | 2 | 2 | new draft, not approved | [y10-quadratic-solve-2.md](y10-quadratic-solve-2.md) |
+| 15 | Solve a quadratic equation, three marks | Mathematics Stage 5 (Year 10) | 3 | 3 | new draft, not approved | [y10-quadratic-solve-3.md](y10-quadratic-solve-3.md) |
 
 ## Counts
 
-- Types given a scheme: 12.
-- Types where the engine awards every criterion deterministically: 12 of 12. Each was run on 3 sample questions with a full, a partial, a zero and an earlier-slip transcript, and every run gave the expected award.
-- Criteria in all: 27. Earned by a ticked line of the marked page: 15. Earned by a correct final answer (the answer checker): 12.
-- Size of the review job: 12 types, about 48 worked awards to read (one full, one partial, one zero and one earlier-slip award for each type), and 27 criteria whose marks to set.
+- Types given a scheme: 15.
+- Types where the engine awards every criterion deterministically: 15 of 15. Each was run on 3 sample questions with a full, a partial, a zero and an earlier-slip transcript, and every run gave the expected award.
+- Criteria in all: 35. Earned by a ticked line of the marked page: 20. Earned by a correct final answer (the answer checker): 15.
+- Size of the review job: 15 types, about 60 worked awards to read (one full, one partial, one zero and one earlier-slip award for each type), and 35 criteria whose marks to set.
 
 ## Not available yet
 

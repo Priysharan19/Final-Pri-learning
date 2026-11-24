@@ -7,7 +7,7 @@ Complete one form per examiner. Return the signed original as the README says; t
 ```text
 Jurisdiction:                    cbse
 Syllabus version(s):             cbse-mathematics-2026-27
-Dossier digest reviewed:         c8330c2dd388e9fa3d9e75b940301d1073f0b2e233b160ca236a224c2d92a1ed
+Dossier digest reviewed:         91d423c10bf3fd5546c1583e1f2fd127acd8ff5978243b40ca899778dba78c91
 Repository commit reviewed:      ________________________________________
 Examiner full name:              ________________________________________
 Qualification:                   ________________________________________
@@ -73,16 +73,19 @@ Verdict per item: **A** approved as the engine behaves · **C** approved with ch
 | 50 | `cbse-bank:y11-diff/D3` | 2 marks · plan: derivative → evaluation · ECF n/a |  |  |
 | 51 | `cbse-bank:y11-diff/D4` | 3 marks · plan: derivative → equation → evaluation → point · ECF n/a |  |  |
 | 52 | `cbse-bank:y11-explog/D3` | 3 marks · equation step check · ECF n/a |  |  |
-| 53 | `cbse-bank:y7-angles/D1` | 1 marks · equation step check · ECF n/a |  |  |
-| 54 | `cbse-bank:y7-angles/D2` | 2 marks · equation step check · ECF n/a |  |  |
-| 55 | `cbse-bank:y7-angles/D3` | 2 marks · equation step check · ECF n/a |  |  |
-| 56 | `cbse-bank:y7-angles/D4` | 2 marks · equation step check · ECF n/a |  |  |
-| 57 | `cbse-bank:y7-equations/D1` | 1 marks · equation step check · ECF n/a |  |  |
-| 58 | `cbse-bank:y7-equations/D2` | 2 marks · equation step check · ECF n/a |  |  |
-| 59 | `cbse-bank:y7-equations/D3` | 2 marks · equation step check · ECF n/a |  |  |
-| 60 | `cbse-bank:y7-equations/D4` | 2 marks · equation step check · ECF n/a |  |  |
-| 61 | `cbse-bank:y8-equations/D1` | 1 marks · equation step check · ECF n/a |  |  |
-| 62 | `cbse-bank:y8-equations/D2` | 2 marks · equation step check · ECF n/a |  |  |
-| 63 | `cbse-bank:y8-equations/D3` | 3 marks · equation step check · ECF n/a |  |  |
+| 53 | `cbse-bank:y12-diff/D2` | 2 marks · plan: derivative → evaluation · ECF n/a |  |  |
+| 54 | `cbse-bank:y12-diff/D3` | 3 marks · plan: derivative → evaluation · ECF n/a |  |  |
+| 55 | `cbse-bank:y12-diff/D4` | 3 marks · plan: derivative → evaluation · ECF n/a |  |  |
+| 56 | `cbse-bank:y7-angles/D1` | 1 marks · equation step check · ECF n/a |  |  |
+| 57 | `cbse-bank:y7-angles/D2` | 2 marks · equation step check · ECF n/a |  |  |
+| 58 | `cbse-bank:y7-angles/D3` | 2 marks · equation step check · ECF n/a |  |  |
+| 59 | `cbse-bank:y7-angles/D4` | 2 marks · equation step check · ECF n/a |  |  |
+| 60 | `cbse-bank:y7-equations/D1` | 1 marks · equation step check · ECF n/a |  |  |
+| 61 | `cbse-bank:y7-equations/D2` | 2 marks · equation step check · ECF n/a |  |  |
+| 62 | `cbse-bank:y7-equations/D3` | 2 marks · equation step check · ECF n/a |  |  |
+| 63 | `cbse-bank:y7-equations/D4` | 2 marks · equation step check · ECF n/a |  |  |
+| 64 | `cbse-bank:y8-equations/D1` | 1 marks · equation step check · ECF n/a |  |  |
+| 65 | `cbse-bank:y8-equations/D2` | 2 marks · equation step check · ECF n/a |  |  |
+| 66 | `cbse-bank:y8-equations/D3` | 3 marks · equation step check · ECF n/a |  |  |
 
-Items: 63.
+Items: 66.
