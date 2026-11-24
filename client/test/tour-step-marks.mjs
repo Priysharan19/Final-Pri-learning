@@ -125,6 +125,7 @@ try {
     await online.settled();
     const grades = await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/);
     const last = grades.at(-1)?.json;
+    if (process.env.DBG) console.log('  SENT', JSON.stringify(grades.at(-1)?.body ?? grades.at(-1)?.postData ?? Object.keys(grades.at(-1) || {})).slice(0, 500), '\n  REPLY', JSON.stringify({ lines: last?.stepReport?.lines?.map(l => [l.text, l.status]), ms: last?.methodScheme, partial: last?.partial }).slice(0, 900), '\n  WORKING', JSON.stringify(wrongLast));
     check('the server paid a step mark on a wrong final answer', last?.methodScheme?.paid === true && last.marksEarned >= 1 && last.marksEarned < last.marksPossible && last.correct === false, JSON.stringify({ paid: last?.methodScheme, earned: last?.marksEarned, possible: last?.marksPossible }));
     stage = 'the table';
     await page.waitForSelector('[data-mp-criteria]', { timeout: 15000 }).catch(() => {});
