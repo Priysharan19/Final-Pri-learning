@@ -2829,12 +2829,19 @@ const CANDIDATE_NOTE = (text, several) => `${several ? 'A value on this line' : 
 const REJECT_PHRASES = /does\s*n[o'’]t\s+satisfy|do\s*n[o'’]t\s+satisfy|not\s+a\s+(?:valid\s+)?(?:solution|root)|not\s+valid/gi;
 const REJECT_WORDS = /\b(?:rejected?|rejecting|extraneous|invalid|fails?)\b/i;
 const REJECT_BLOCK = /\b(?:not|no|never|neither|nor|but|however|although|though|yet|still|works?|valid|correct|true|right|satisf\w*|solutions?|roots?|actually|unless|if)\b|n[’']t/i;
+const REJECT_WORDS_ALL = /\b(?:rejected?|rejecting|extraneous|invalid|fails?)\b/gi;
+const REJECT_FILLER = new Set(['so', 'hence', 'therefore', 'thus', 'is', 'it', 'this', 'that', 'value', 'the', 'a', 'an', 'as', 'since', 'because', 'in', 'on', 'original', 'equation', 'when', 'substituted', 'checked', 'checking', 'check', 'by', 'substitution', 'x', 'y', 't', 'we']);
 function plainRejection(tail) {
   const t = String(tail).toLowerCase();
   const phrases = t.match(REJECT_PHRASES);
   const rest = t.replace(REJECT_PHRASES, ' ');
   if (!phrases && !REJECT_WORDS.test(rest)) return false;
-  return !REJECT_BLOCK.test(rest);
+  if (REJECT_BLOCK.test(rest)) return false;
+  // Closed form: once the rejection itself is taken out, only plain filler may remain. A question mark, or any other word ("or is it",
+  // "and accepted", "maybe"), means the line may be hedging or saying the opposite, so it is a note.
+  if (/[?]/.test(rest)) return false;
+  const left = rest.replace(REJECT_WORDS_ALL, ' ').match(/[a-z]+/g) ?? [];
+  return left.every(w => REJECT_FILLER.has(w));
 }
 function candidateValue(text) {
   try { const v = parseNumericInput(String(text).trim().replace(/^[(\[]|[)\]]$/g, '').trim()).value; return Number.isFinite(v) ? v : null; } catch { return null; }

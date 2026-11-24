@@ -296,7 +296,7 @@ let corpusFalse = 0, corpusCross = 0, corpusFalseTicked = 0, corpusCrossed = 0, 
     }
   }
   // a rejection that says the opposite is never ticked
-  for (const neg of ['x=-1 is not rejected', 'x=-1 is not extraneous', 'x=-1 does not fail', 'x=-1 is not wrong', 'x=-1 is not false', 'x=-1 is NOT rejected', 'x=-1 does not satisfy but works', 'x=-1 is rejected but it works', 'x=-1 is valid']) {
+  for (const neg of ['x=-1 rejected or is it', 'x=-1 rejected and accepted', 'x=-1 rejected?', 'x=-1 rejected maybe', 'x=-1 is not rejected', 'x=-1 is not extraneous', 'x=-1 does not fail', 'x=-1 is not wrong', 'x=-1 is not false', 'x=-1 is NOT rejected', 'x=-1 does not satisfy but works', 'x=-1 is rejected but it works', 'x=-1 is valid']) {
     ok(rows(`x^2-3x-4=0\nx=-1\n${neg}\nx=4`)[2].status !== 'ok', `"${neg}" is not ticked`);
   }
   ok(rows('x^2-3x-4=0\nx ≠ -1')[1].status !== 'ok', 'the symbol alone is not read as a rejection unless it directly follows the candidate');
