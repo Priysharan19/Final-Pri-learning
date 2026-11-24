@@ -105,7 +105,7 @@ function trueAsWritten(q, steps, opts) {
   try {
     const facts = opts && Object.hasOwn(opts, 'facts') ? opts.facts : questionFacts(q);
     const solutionValues = solutionNumbers(q);
-    return stepCheckArithmetic(steps, { latex: opts && Array.isArray(opts.latex) ? opts.latex : null, facts, solutionValues });
+    return stepCheckArithmetic(steps, { latex: opts && Array.isArray(opts.latex) ? opts.latex : null, facts, solutionValues, answerValue: typeof q?.answer?.value === 'number' ? q.answer.value : null });
   } catch { return null; }
 }
 

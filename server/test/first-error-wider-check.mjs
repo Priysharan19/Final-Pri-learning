@@ -18,7 +18,7 @@ import './support/hermetic.mjs';
 import { stepEvidence, lineLevelFeedback } from '../platform/markerOps.js';
 import { checkAnswer } from '../../client/src/engine/checker.js';
 import * as G from '../../client/src/engine/generators/index.js';
-import { ERROR_TYPES, stepHow, stepHowWide } from '../../client/src/engine/falseStep.js';
+import { ERROR_TYPES, stepHow, stepHowWide, readPoly } from '../../client/src/engine/falseStep.js';
 import { explainWide, sameEverywhere, valueAtText } from '../../client/src/engine/wideFalseStep.js';
 import { FAMILY_KEYS, SLIP_KINDS, buildPage } from '../../tools/first-error-corpus.mjs';
 import { SEEDS as AUDIT_SEEDS, EXTRA_SEEDS, loadFamilies, editionOf, questionsFor, transcriptsFor } from '../../tools/understanding-audit/corpus.mjs';
@@ -163,7 +163,7 @@ ok(stepHowWide('12 + 10', '22')?.kind === 'evaluated' && stepHowWide('12 + 10', 
 // ── 7: the authored true pages of every Australian family: the rule adds NO cross that the page did not already have without it ────
 {
   const fams = (await loadFamilies()).filter(id => editionOf(id) === 'NSW');
-  let pages = 0, added = 0, withDiagnosis = 0, crossedAll = 0; const bad = [], badAll = [];
+  let pages = 0, added = 0, withDiagnosis = 0, crossedAll = 0, mutated = 0, mutatedCrossed = 0; const bad = [], badAll = [];
   for (const id of fams) for (const q of questionsFor(id, [...AUDIT_SEEDS, ...EXTRA_SEEDS])) {
     let ts; try { ts = transcriptsFor(q); } catch { continue; }
     for (const t of ts) {
@@ -176,9 +176,20 @@ ok(stepHowWide('12 + 10', '22')?.kind === 'evaluated' && stepHowWide('12 + 10', 
       if (a.some(Boolean)) { crossedAll++; if (badAll.length < 5) badAll.push(`${id} ${JSON.stringify(t.lines.map(l => l.text))}`); }
       if (JSON.stringify(a) !== JSON.stringify(b)) { added++; if (bad.length < 3) bad.push(`${id} ${JSON.stringify(t.lines.map(l => l.text))}`); }
       if (on.lines.some(l => l.diagnosis?.code === 'false-continuation')) withDiagnosis++;
+      // the mutation: the last number of the page changed to a wrong value must be crossed on the last line, as often as main crossed it (1414)
+      {
+        const lines = t.lines.map(l => l.text), last = lines[lines.length - 1];
+        const mm = [...last.matchAll(/-?\d+(?:\.\d+)?/g)].pop();
+        if (mm) {
+          const v = Number(mm[0]), w = String(Number.isInteger(v) ? v + 7 : +(v + 0.7).toFixed(3));
+          const mut = [...lines.slice(0, -1), last.slice(0, mm.index) + w + last.slice(mm.index + mm[0].length)];
+          try { const r = stepEvidence(q, '', mut.join('\n'), { correct: false }, { slipWarnings: true }).stepReport; if (r?.lines) { mutated++; if (r.lines[r.lines.length - 1].status === 'break') mutatedCrossed++; } } catch { /* a page the marker could not read */ }
+        }
+      }
     }
   }
   ok(pages >= 8000, `the sweep covers the authored true pages: ${pages}`);
+  ok(mutatedCrossed >= 1414, `a wrong last value is crossed on the last line at least as often as main crossed it: ${mutatedCrossed} of ${mutated} (main: 1414)`);
   ok(crossedAll === 0, `a true authored page is crossed: ${crossedAll} of ${pages} ${badAll.join(' ')}`);
   ok(added === 0, `true authored pages given a new cross by the slip rule: ${added} of ${pages} ${bad.join(' ')}`);
   console.log(`authored true pages: ${pages} swept, ${added} newly crossed, ${withDiagnosis} carry a false-continuation diagnosis on a cross some other check made`);
@@ -222,8 +233,35 @@ const sideOf = line => String(line).split('=').pop().trim();
       const near = (x, y) => x !== null && Math.abs(x - Number(y)) <= 6e-4 * Math.max(1, Math.abs(Number(y)));
       if (!near(a, m[3]) || !near(b, m[4])) bad.push(`${why}: check "${d.check}" is not true of ${above} and ${written}`);
     }
-    // what the diagnosis quotes of the student's line is in the student's line
-    for (const q of d.quoted || []) if (!page.slipLine.replace(/\s+/g, '').includes(String(q).replace(/\s+/g, ''))) bad.push(`${why}: quoted "${q}" is not in "${page.slipLine}"`);
+    // what the diagnosis quotes of the student's line is in the line the engine was given (the raw text of the marked line)
+    for (const q of d.quoted || []) if (!String(l.text).replace(/\s+/g, '').includes(String(q).replace(/\s+/g, ''))) bad.push(`${why}: quoted "${q}" is not in "${l.text}"`);
+    // every number in the sentences is a number of the student's line, of the line above, of the corrected line, or a value the engine computes for them
+    {
+      const numsIn = t => (String(t).match(/\d+(?:\.\d+)?/g) || []).map(Number);
+      const ok = new Set([...numsIn(l.text), ...numsIn(page.aboveLine), ...numsIn(d.corrected || '')]);
+      const extra = [];
+      for (const v of [valueAtText(above, '', 0), valueAtText(written, '', 0), d.correctedValue]) if (typeof v === 'number') extra.push(v);
+      if (m) { for (const x of [m[2], m[3], m[4]]) ok.add(Number(x)); }
+      // the exact coefficients of the two sides, where both are polynomials (the collected forms a polynomial diagnosis quotes)
+      for (const side of [above, written]) { const pp = readPoly(side); if (pp) { for (const c of pp.c.values()) extra.push(Number(c.n < 0n ? -c.n : c.n) / Number(c.d)); for (const dg of pp.c.keys()) extra.push(dg); } }
+      for (const sentence0 of [d.whatChanged, d.whyWrong]) {
+        let sentence = sentence0 || '';
+        // an exact fraction (17/20) is checked as the value it says, not as two numbers
+        for (const fm of sentence.matchAll(/(?<![\d./])(\d+)\/(\d+)(?![\d/]|\.\d)/g)) {
+          const val = Number(fm[1]) / Number(fm[2]);
+          if (!extra.some(v => Math.abs(Math.abs(v) - val) <= 1e-6 * Math.max(1, val)) && !ok.has(Number(fm[1]) / Number(fm[2]))) { /* a fraction written in the page is covered by its own digits below */ }
+          else sentence = sentence.replace(fm[0], '');
+        }
+        // a stated product (48 = 16 × 3) is checked by multiplying
+        for (const pm of sentence.matchAll(/(\d+) = (\d+) \u00d7 (\d+)/g)) if (Number(pm[1]) === Number(pm[2]) * Number(pm[3])) sentence = sentence.replace(pm[0], '');
+        // a surd (6√2) is checked as the value it says
+        for (const sm of sentence.matchAll(/(\d*)\u221a(\d+)/g)) { const val = (sm[1] === '' ? 1 : Number(sm[1])) * Math.sqrt(Number(sm[2])); if (extra.some(v => Math.abs(Math.abs(v) - val) <= 1e-6 * Math.max(1, val))) sentence = sentence.replace(sm[0], ''); }
+        for (const n of numsIn(sentence)) {
+        const near = extra.some(v => Math.abs(Math.abs(v) - n) <= 6e-4 * Math.max(1, n)) || [...ok].some(x => Math.abs(x - n) <= 1e-9 * Math.max(1, n));
+        if (!near) bad.push(`${why}: the number ${n} in "${sentence0}" is not a number of the page or a value the engine computes for it`);
+        }
+      }
+    }
     if (DASH.test(JSON.stringify(d))) bad.push(`${why}: a dash`);
   };
   for (const fam of FAMILY_KEYS) for (let seed = 1; seed <= 30; seed++) for (const kind of SLIP_KINDS) {
@@ -250,6 +288,28 @@ const sideOf = line => String(line).split('=').pop().trim();
   ok(sq.corrected === '= 6√6' && /This line says 36sqrt\(6\), which is about 88\.18\./.test(sq.whatChanged) && !/88\.1816/.test(JSON.stringify(sq)) && sq.whyWrong === '216 = 36 × 6, so √216 = 6√6.' && !/Working out sqrt\(216\) gives/.test(JSON.stringify(sq)), `the student's line is quoted as written and the step is explained: ${JSON.stringify(sq)}`);
   const tw = explainWide('2sin(x)cos(x)', '2sin(x)sin(x)');
   ok(tw.type === 'function-wrong' && /One of the sin factors in the term 2sin\(x\)sin\(x\) should be cos/.test(tw.whatChanged) && !/not one number or sign/.test(JSON.stringify(tw)), `one swapped factor is named: ${tw.whatChanged}`);
+}
+
+// ── 11: a false line is not excused because its number appears somewhere in the solution (review 25 November 2026) ───────────────
+{
+  const mk = (steps, value) => ({ id: 'few-sol', answerType: 'numeric', difficulty: 3, prompt: 'Find the value of the expression.', answer: { value }, steps: steps.map(d => ({ h: '', d })) });
+  const run = (q, lines) => stepEvidence(q, '', lines.join('\n'), { correct: false }, { slipWarnings: true }).stepReport.lines.map(l => l.status);
+  ok(run(mk(['$1(-27)+1(9)+4(-3)+1 = -29$', '$-27$', '$-29$'], -29), ['1(-27)+1(9)+4(-3)+1', '= -27'])[1] === 'break', '= -27 after an expression that comes to -29 stays crossed although -27 is in the solution');
+  ok(run(mk(['$3(9)/2 = 27/2$', '$3(11)/2 = 33/2$', '$16$ and $7$'], 7), ['3(9)/2 = 27/2', '3(11)/2 = 33/2', '= 16'])[2] === 'break', '= 16 after 33/2 stays crossed although 16 is in the solution');
+  let done = false;
+  for (let seed = 1; seed < 80 && !done; seed++) { const qq = G.generateQuestion('y7-ratio', 3, seed); if (!/91/.test(qq.prompt)) continue; done = true; ok(run(qq, ['2 + 4 + 7 = 13', '91 ÷ 13 = 9', '= 7 - 2 = 5', '5 × 7 = 35']).includes('break'), 'the authored y7-ratio slip (91 ÷ 13 = 9 then = 7 - 2 = 5) is crossed'); }
+  ok(done, 'the y7-ratio question was found');
+}
+
+// ── 12: trig of a plain number: the page's own units, and false in both units is false ──────────────────────────────
+{
+  const deg = (p, e, l) => mark(p, l, e);
+  for (const [p, e, l] of [['Find the exact value of $\\sin 30^\\circ$.', '1/2', ['sin(30)', '= 1/2']], ['Find the exact value of $\\cos 60^\\circ$.', '1/2', ['cos(60)', '= 1/2']], ['Find the exact value of $\\tan 45^\\circ$.', '1', ['tan(45)', '= 1']]]) {
+    const r = deg(p, e, l);
+    ok(r.lines.every(x => x.status === 'ok'), `${l.join(' ; ')} on a degrees question: both lines ticked (${r.lines.map(x => x.status + ':' + (x.note || '').slice(0, 40))})`);
+  }
+  for (const p of ['Find the exact value of $\\sin 30^\\circ$.', 'Find the exact value of $\\sin 30$.']) ok(crossAt(deg(p, '1/2', ['sin(30) = 5'])) === 0, `sin(30) = 5 is false in both units and crossed (${p})`);
+  ok(crossAt(deg('Find the exact value of $\\sin 30$.', '1/2', ['sin(30) = 1/2'])) === -1, 'true in degrees, unit not stated: not crossed');
 }
 
 console.log(failures.length ? `FIRST ERROR WIDER: FAIL (${failures.length})\n${failures.map(f => '  ' + f).join('\n')}` : `FIRST ERROR WIDER: PASS: ${pass} checks`);

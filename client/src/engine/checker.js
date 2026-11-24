@@ -935,7 +935,15 @@ export function degreeForm(text) {
 
 function judgeExpressionLine(cleaned, meta, { reference = null, promptSpans = [], knownLetters = null } = {}) {
   const text = bareExpressionLine(cleaned);
-  const same = (a, b) => exprEquivalent(a, b, { positiveOnly: meta.positiveOnly }) === true;
+  // A trig function of a plain number is worked out in the unit the page states; with none stated, a pair is the same when it is the same in either unit
+  const eq = (a, b) => exprEquivalent(a, b, { positiveOnly: meta.positiveOnly }) === true;
+  const hasTrigNumber = t => /(?<![a-z])(?:sin|cos|tan|sec|cosec|csc|cot)\s*(?:\^\s*-?\d+\s*)?\(?\s*[-+]?\d/i.test(String(t)) && !/arc/i.test(String(t));
+  const same = (a, b) => {
+    if (!(hasTrigNumber(a) || hasTrigNumber(b))) return eq(a, b);
+    if (PAGE_TRIG_UNIT === 'deg') return eq(degreeForm(a), degreeForm(b));
+    if (PAGE_TRIG_UNIT === 'rad') return eq(a, b);
+    return eq(a, b) || eq(degreeForm(a), degreeForm(b));
+  };
   const parts = text.split('=').map(x => x.trim());
   // A leading "=" continues the line above: `= -12` means `<reference> = -12`.
   const continued = parts[0] === '' && parts.length > 1;
@@ -958,7 +966,12 @@ function judgeExpressionLine(cleaned, meta, { reference = null, promptSpans = []
   // radian mark, π), and the line is worked out in THAT unit. Where it does not say, the line is never judged (tan(45) is 1 in degrees).
   const TRIG_OF_NUMBER = /(?<![a-z])(?:sin|cos|tan|sec|cosec|csc|cot)\s*(?:\^\s*-?\d+\s*)?\(?\s*[-+]?\d/i;
   const trigNumber = parts.some(x => TRIG_OF_NUMBER.test(x) && !/arc/i.test(x));
-  if (trigNumber && PAGE_TRIG_UNIT === null) return unread;
+  const valuesIn = unit => parts.map(x => { const a = parseExpr(trigNumber && unit === 'deg' ? degreeForm(x) : x); if (!a || variablesOf(a).size > ([...variablesOf(a)].includes('e') ? 1 : 0)) return null; try { const v = evaluate(a, {}); return Number.isFinite(v) ? v : null; } catch { return null; } });
+  // No unit stated: a line true in EITHER unit is not judged; one false in both is false whatever the unit is.
+  if (trigNumber && PAGE_TRIG_UNIT === null) {
+    const agree = vs => vs.every(v => v !== null) && vs.every(v => Math.abs(v - vs[0]) <= 1e-9 * Math.max(1, Math.abs(vs[0])));
+    if (agree(valuesIn('rad')) || agree(valuesIn('deg'))) return unread;
+  }
   const constants = parts.map(x => { const a = parseExpr(trigNumber && PAGE_TRIG_UNIT === 'deg' ? degreeForm(x) : x); if (!a || variablesOf(a).size > ([...variablesOf(a)].includes('e') ? 1 : 0)) return null; try { const v = evaluate(a, {}); return Number.isFinite(v) ? v : null; } catch { return null; } });
   if (parts.length > 1 && constants.every(v => v !== null)) {
     const inexact = parts.some(x => /[.%]|pi|sqrt|√|π|e\b|ln|log|sin|cos|tan/i.test(x));
