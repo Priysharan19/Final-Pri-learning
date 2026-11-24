@@ -45,7 +45,7 @@ import { checkBankAnswer } from '../server/platform/qbankMarking.js';
 import { rungDropReason, bankLadder } from './qbank-leak.mjs';
 import { PACK_FORMAT, DEFAULT_PACK_DIR, buildFamily, indexOf, loadPack, sha256 } from '../server/platform/qbankPack.js';
 import { loadFigureResults, packableFigure, figureRef, figureFiles, figureLeaks, figureAlt } from './qbank-diagrams.mjs';
-import { classifyManual, deriveKey, asDerivedPart, plausibleWrongs, stepResultLeak, stepResults } from './qbank-manual.mjs';
+import { classifyManual, deriveKey, asDerivedPart, plausibleWrongs, naturalForms, stepResultLeak, stepResults } from './qbank-manual.mjs';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const katex = createRequire(path.join(ROOT, 'client', 'package.json'))('katex');
@@ -598,15 +598,22 @@ function evaluateAuto(part, question, archive, opts) {
 }
 
 /**
- * Is a derived key one the pack may carry: the engine accepts it (evaluateAuto, above), and at least two plausible WRONG values are refused.
- * Returns { ok, why }.
+ * Is a derived key one the pack may carry. The engine accepts it (evaluateAuto, above) and the part passes every pack check; then, with the
+ * answer type the question will have:
+ *   his form    each natural way of typing his printed answer (as read, brackets taken out, pi and π, one rearrangement, a plain decimal where it is
+ *               one) is marked CORRECT by the real marker. A numeric box that says "work it out first" to his own `e^2+5` fails this.
+ *   wrongs      at least three plausible WRONG values (the negative, the double, one more, a swap, a dropped or added element) are refused.
+ * Returns { ok, why, forms, wrongs } (forms and wrongs: how many were tried).
  */
-export function derivedKeyRefusals(dpart, q) {
-  const wrongs = plausibleWrongs({ answerType: dpart.answerType, answer: dpart.answer });
-  const tested = wrongs.slice(0, 5);
-  if (tested.length < 2) return { ok: false, why: 'fewer-than-two-wrong-values' };
+export function derivedKeyRefusals(dpart, q, key = {}) {
+  const forms = naturalForms({ answerType: dpart.answerType, answer: dpart.answer, answerPrefix: dpart.answerPrefix, shown: key.shown });
+  if (forms.length < 1) return { ok: false, why: 'no-typed-form' };
+  const refused = forms.find(f => safe(() => checkBankAnswer(q, f), { correct: false }).correct !== true);
+  if (refused !== undefined) return { ok: false, why: 'his-form-is-not-accepted' };
+  const tested = plausibleWrongs({ answerType: dpart.answerType, answer: dpart.answer }).slice(0, 6);
+  if (tested.length < 3) return { ok: false, why: 'fewer-than-three-wrong-values' };
   const accepted = tested.filter(w => safe(() => checkBankAnswer(q, w), { correct: true }).correct === true);
-  return accepted.length ? { ok: false, why: 'a-wrong-value-is-accepted' } : { ok: true, tested: tested.length };
+  return accepted.length ? { ok: false, why: 'a-wrong-value-is-accepted' } : { ok: true, forms: forms.length, wrongs: tested.length };
 }
 
 /**
@@ -646,7 +653,7 @@ export function compilePack(archive, opts = {}) {
   const printed = printedAnswers(archive);
   const shards = new Map();
   const rejects = [];
-  const derived = { converted: [], byType: {}, held: {}, manualKinds: {}, manualServed: {}, manualRejected: {} };
+  const derived = { converted: [], byType: {}, held: {}, heldIds: {}, manualKinds: {}, manualServed: {}, manualRejected: {} };
   const ladderStats = { questions: 0, authoredHints: 0, rungsKept: 0, rungsDropped: 0, withRungs: { 0: 0, 1: 0, 2: 0, 3: 0 }, dropReasons: {} };
   const shardOf = part => shards.get(familyOf(part)) || shards.set(familyOf(part), { family: familyOf(part), course: part.course, year: part.year, topic: part.topic, questions: [], manual: [] }).get(familyOf(part));
   const stats = (lad, part) => {
@@ -670,13 +677,24 @@ export function compilePack(archive, opts = {}) {
       let converted = false;
       if (kind === 'find' && opts.derive !== false) {
         const key = deriveKey(original, printed.get(original));
-        if (key.no) derived.held[key.no] = (derived.held[key.no] || 0) + 1;
+        if (key.no) { derived.held[key.no] = (derived.held[key.no] || 0) + 1; derived.heldIds[`${original.question}${original.label || ''}`] = key.no; }
         else {
-          const dpart = asDerivedPart(original, key);
-          const dev = evaluateAuto(dpart, question, archive, opts);
-          const refusals = dev.reasons.length ? { ok: false, why: `pack-check:${dev.reasons[0]}` } : derivedKeyRefusals(dpart, dev.q);
-          if (refusals.ok && archive.tags?.[dpart.question]) { part = dpart; ev = dev; converted = true; derived.converted.push({ id: dev.rec.id, answerType: dpart.answerType, shown: key.shown, prompt: String(original.prompt).replace(/\s+/g, ' ').slice(0, 140), key: dpart.answer }); derived.byType[dpart.answerType] = (derived.byType[dpart.answerType] || 0) + 1; }
-          else derived.held[refusals.why] = (derived.held[refusals.why] || 0) + 1;
+          // The key as read, then (a numeric key whose own form is not a bare number) the same value as an exact-form expression:
+          // the first the real marker accepts in his natural typed forms. Neither: the part stays a worked-solution question.
+          let firstWhy = null;
+          for (const cfg of [key, ...(key.alt ? [key.alt] : [])]) {
+            const dpart = asDerivedPart(original, cfg);
+            const dev = evaluateAuto(dpart, question, archive, opts);
+            const refusals = dev.reasons.length ? { ok: false, why: `pack-check:${dev.reasons[0]}` } : derivedKeyRefusals(dpart, dev.q, cfg);
+            if (refusals.ok && archive.tags?.[dpart.question]) {
+              part = dpart; ev = dev; converted = true;
+              derived.converted.push({ id: dev.rec.id, answerType: dpart.answerType, shown: cfg.shown, prompt: String(original.prompt).replace(/\s+/g, ' ').slice(0, 140), key: dpart.answer, forms: refusals.forms, wrongs: refusals.wrongs, exactForm: cfg !== key });
+              derived.byType[dpart.answerType] = (derived.byType[dpart.answerType] || 0) + 1;
+              break;
+            }
+            firstWhy ||= refusals.why;
+          }
+          if (!converted) { derived.held[firstWhy] = (derived.held[firstWhy] || 0) + 1; derived.heldIds[`${original.question}${original.label || ''}`] = firstWhy; }
         }
       }
       if (!converted) manual = evaluateManual(original, question, archive, opts);

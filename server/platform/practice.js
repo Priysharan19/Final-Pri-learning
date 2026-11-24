@@ -173,6 +173,8 @@ const ensureQbankFromEnv = () => ensureQbank();
 // Rush and Match are one-line, timed rounds: an authored question (up to six marks, a working to show) is not dealt in them, nor in a timed paper.
 // The placement check is a diagnostic of what the student knows: it is composed from the generators alone, as a timed paper is.
 const bankAllowed = request => request.bank !== false && request.mode !== 'rush' && request.mode !== 'match' && request.mode !== 'placement';
+// A worked-solution question (no key, no mark) is dealt only in plain practice (by topic or dot point): not in review, task, Rush, Match, the placement check or a timed paper.
+export const manualAllowed = request => request.allowManual === true && request.mode === 'practice' && bankAllowed(request);
 
 // ── What an open question may be told about its working ─────────────────────
 // A practice question allows two tries. Until it resolves, the reply to a
@@ -526,7 +528,7 @@ function* seekQuestion(request, { draw, tries, batches, admits = null }) {
   for (let round = 0; drawn < budget(); round++) {
     const size = Math.min(batches[Math.min(round, batches.length - 1)], budget() - drawn);
     const batch = [];
-    for (let i = 0; i < size; i++, drawn++) batch.push(generateQuestion(generator, difficulty, draw(), dotpoint, pick, bankAllowed(request) && staleBank, request.allowManual === true));
+    for (let i = 0; i < size; i++, drawn++) batch.push(generateQuestion(generator, difficulty, draw(), dotpoint, pick, bankAllowed(request) && staleBank, manualAllowed(request)));
     const resolved = yield batch;
     for (const [i, q] of batch.entries()) {
       // A form this edition does not issue (editionBanks.js `admits`) is never
@@ -571,7 +573,7 @@ function chooseQuestion(request, seed = null, { draw = () => randomInt(0x8000000
   // A bank outside this edition's is never drawn from, by any route (a twin included; D15 for India).
   if (!banks.issues(generator)) throw Object.assign(new Error(banks.outside.message), { code: banks.outside.code });
   if (seed !== null) {
-    const q = generateQuestion(generator, difficulty, seed, dotpoint, bandPick(request), bankAllowed(request), request.allowManual === true);
+    const q = generateQuestion(generator, difficulty, seed, dotpoint, bandPick(request), bankAllowed(request), manualAllowed(request));
     if (banks.admits && !banks.admits(q, generator)) throw Object.assign(new Error('This form may not be issued.'), { code: 'PRACTICE_CONTENT_UNSUPPORTED' });
     return { q, repeat: false, trapDelivered: !!(trap && carriesTrap(trap.owner, q, trap.key)) };
   }
@@ -931,11 +933,15 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // once it has lapsed (D19): the repeat is a new issue.
       const premiumGap = await premiumContentRefusal(db, { accountId, generator: typeof q._generator === 'string' ? q._generator : q.subtopic, now });
       if (premiumGap) return { premium: premiumGap };
-      const allowance = await practiceAllowanceVerdict(db, { accountId, now, env, edition });
-      if (!allowance.allowed) return { capped: allowance };
+      // A worked-solution question is not marked and calls no model: it neither uses nor needs the free day's allowance, on any issuing path.
+      const counted = q.answerType !== 'manual';
+      if (counted) {
+        const allowance = await practiceAllowanceVerdict(db, { accountId, now, env, edition });
+        if (!allowance.allowed) return { capped: allowance };
+      }
       await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-question',?,?,?,?,?)",
         [accountId, id, payload, digest(payload), now, now + MAX_AGE]);
-      await recordPracticeIssue(db, { accountId, now, edition });
+      if (counted) await recordPracticeIssue(db, { accountId, now, edition });
       return {};
     }, { accountScope: accountId, lock: 'practice-issue:' + accountId });
     if (outcome.premium) return refusePremiumContent(res, outcome.premium);
@@ -2233,11 +2239,15 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     // questions a day) and is refused at the cap; before this it was issued
     // uncounted, so a wrong answer's twins were an unlimited free supply.
     const outcome = await db.transaction(async () => {
-      const allowance = await practiceAllowanceVerdict(db, { accountId, now, env, edition });
-      if (!allowance.allowed) return { capped: allowance };
+      // (A twin is never dealt a worked-solution question: manualAllowed is false for review. Were one ever, it would use none of the allowance.)
+      const counted = q.answerType !== 'manual';
+      if (counted) {
+        const allowance = await practiceAllowanceVerdict(db, { accountId, now, env, edition });
+        if (!allowance.allowed) return { capped: allowance };
+      }
       await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-question',?,?,?,?,?)",
         [accountId, id, payload, digest(payload), now, now + MAX_AGE]);
-      await recordPracticeIssue(db, { accountId, now, edition });
+      if (counted) await recordPracticeIssue(db, { accountId, now, edition });
       return {};
     }, { accountScope: accountId, lock: 'practice-issue:' + accountId });
     if (outcome.capped) return refusePracticeCap(res, outcome.capped, now);

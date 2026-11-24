@@ -191,6 +191,61 @@ try {
     c.eq(await used(), markedCount, `the free day's allowance counts the ${markedCount} marked questions issued and not the worked-solution one`);
     const shownOne = await post(acct, `${workedId}/solution`);
     c.ok(shownOne.status === 200 && await used() === markedCount, 'and its solution uses none either');
+    // Every issuing path: issue (above), repeat, twin and review use none of the allowance for a worked-solution question.
+    {
+      const before = await used();
+      const rep = await post(acct, `${workedId}/repeat`);
+      c.ok(rep.status === 201 && rep.data.repeat === true, 'a repeat of a completed worked-solution question is dealt');
+      c.eq((await sealedOf(acct, rep.data.question.id)).answerType, 'manual', 'and it is a worked-solution question');
+      c.eq(await used(), before, 'REPEAT: it uses none of the free day\'s allowance');
+      // the control: a repeat of a marked question does count one
+      let markedId = null;
+      for (let seed = 1; seed < 40000 && !markedId; seed += 7) {
+        const r = await issue(acct, { generator: t.place.subtopic, difficulty: t.entry.level, seed });
+        if (r.status === 201 && (await sealedOf(acct, r.data.question.id)).answerType !== 'manual') markedId = r.data.question.id;
+      }
+      c.ok(!!markedId, 'a marked question was issued (the control)');
+      await post(acct, `${markedId}/reveal`);
+      const afterIssue = await used();
+      c.eq((await post(acct, `${markedId}/repeat`)).status, 201, 'its repeat is dealt');
+      c.eq(await used(), afterIssue + 1, 'and a marked question\'s repeat does use one (the control)');
+      // REVIEW and TASK modes never deal a worked-solution question, on the very seeds where plain practice does.
+      const seeds = [];
+      for (let seed = 1; seed < 4000 && seeds.length < 8; seed += 7) {
+        const r = await issue(acct, { generator: t.place.subtopic, difficulty: t.entry.level, seed, worked: true });
+        if (r.status === 201 && (await sealedOf(acct, r.data.question.id))._worked) seeds.push(seed);
+      }
+      c.ok(seeds.length >= 3, `plain practice deals a worked-solution question on ${seeds.length} of the seeds tried`);
+      const other = { review: 0, task: 0 };
+      for (const mode of Object.keys(other)) for (const seed of seeds) {
+        const r = await issue(acct, { generator: t.place.subtopic, difficulty: t.entry.level, seed, worked: true, mode });
+        c.eq(r.status, 201, `${mode} mode issues a question on those seeds`);
+        if ((await sealedOf(acct, r.data.question.id))._worked) other[mode]++;
+      }
+      c.deq(other, { review: 0, task: 0 }, 'REVIEW: review and task mode never deal a worked-solution question, on the seeds where plain practice does');
+      // the lead-in the server uses for a seeked (unseeded) draw: manualAllowed is false outside plain practice.
+      const { manualAllowed } = await import('../platform/practice.js');
+      c.deq(['practice', 'review', 'task', 'rush', 'match', 'placement'].map(mode => manualAllowed({ mode, allowManual: true })), [true, false, false, false, false, false], 'only plain practice allows one');
+      c.eq(manualAllowed({ mode: 'practice', allowManual: true, bank: false }), false, 'and not a timed paper');
+      // TWIN: a wrong answer's twin is a marked question (a twin is review mode, never worked) and counts one.
+      let twinChecked = false;
+      for (let seed = 5; seed < 40000 && !twinChecked; seed += 11) {
+        const r = await issue(acct, { generator: t.place.subtopic, difficulty: t.entry.level, seed });
+        if (r.status !== 201) continue;
+        const sq = await sealedOf(acct, r.data.question.id);
+        if (sq.answerType === 'manual') continue;
+        for (const sid of ['twin-wrong-a-' + seed, 'twin-wrong-b-' + seed]) await post(acct, `${r.data.question.id}/submit`, { submissionId: sid, answer: '987654321', mode: 'typed' }, { 'Idempotency-Key': sid });
+        const ev = await h.db.get("SELECT id FROM learning_events WHERE account_id=? AND device_id='server-grader' AND kind='graded-attempt' ORDER BY rowid DESC LIMIT 1", [acct.account.id]);
+        if (!ev) continue;
+        const usedBefore = await used();
+        const tw = await post(acct, `notebook/${ev.id}/twin`);
+        if (tw.status !== 201) continue;
+        c.eq((await sealedOf(acct, tw.data.question.id)).answerType === 'manual', false, 'TWIN: a twin is never a worked-solution question');
+        c.eq(await used(), usedBefore + 1, 'and, being marked, it counts one');
+        twinChecked = true;
+      }
+      c.ok(twinChecked, 'a twin was drawn and checked');
+    }
   }
   // Accounting: completed, seen, nothing else.
   c.eq(await events(a), eventsBefore, 'no learning event, no graded attempt, no mastery, readiness or streak input is recorded');

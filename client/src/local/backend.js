@@ -1437,6 +1437,12 @@ function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint
 }
 
 /**
+ * A worked-solution row (answerType 'manual': the question was shown, never marked). Its row is closed (`answered`) only so it is not resumed; it is
+ * not a question answered, so no history list, report series, total or streak counts it.
+ */
+const isWorkedRow = r => r?.payload?.answerType === 'manual' || !!r?.workedReceipt;
+
+/**
  * A profile's attempt rows in the order they were answered.
  *
  * The attempts store is keyed by `${pid}:resolved:<digest>` — an exactly-once
@@ -5200,7 +5206,8 @@ const routes = {
     if (!Object.hasOwn(HISTORY_FILTERS, filter)) throw Object.assign(new Error('Unknown history filter'), { status: 400 });
     if (!Object.hasOwn(HISTORY_SORTS, sort)) throw Object.assign(new Error('sort must be newest, oldest or marks'), { status: 400 });
     const allRows = await byIndex('questions', 'pid', p.id);
-    const rows = allRows.filter(r => r.answered);
+    // A worked-solution question that was shown is not a question answered: it has no correctness, so History does not list it.
+    const rows = allRows.filter(r => r.answered && !isWorkedRow(r));
     // Historic exam questions can name NSW generators no longer issued as
     // markable Practice. Do not advertise an impossible Retry action; a
     // server-issued question can still be replayed by its source id.
@@ -5215,7 +5222,7 @@ const routes = {
     const marked = new Set(marks.map(b => b.key.split(':').slice(1).join(':')));
     const inkRows = await byIndex('inks', 'pid', p.id);
     const inkById = Object.fromEntries(inkRows.map(r => [r.id, r]));
-    const needsLook = needsAnotherLookIds(allRows.map(r => ({
+    const needsLook = needsAnotherLookIds(allRows.filter(r => !isWorkedRow(r)).map(r => ({
       id: r.id, answered: !!r.answered, retryOf: r.retryOf, repeatOf: r.repeatOf,
       correct: attemptByQ[r.id] ? !!attemptByQ[r.id].correct : null, marks: certifiedMarksOfRow(r)
     })));
@@ -5308,7 +5315,7 @@ const routes = {
     const tz = timezoneOf(p);
     const since = body?.since == null ? null : String(body.since);
     if (since != null && !/^\d{4}-\d{2}-\d{2}$/.test(since)) throw Object.assign(new Error('since must be a date, YYYY-MM-DD'), { status: 400 });
-    const rows = (await byIndex('questions', 'pid', p.id)).filter(r => r.answered);
+    const rows = (await byIndex('questions', 'pid', p.id)).filter(r => r.answered && !isWorkedRow(r));
     const answeredAt = {};
     for (const a of await attemptsInOrder(p.id)) answeredAt[a.questionId] = a.createdAt;
     const chapters = {};
@@ -5343,7 +5350,7 @@ const routes = {
   'GET /report/series': async (body) => {
     const p = await requireProfile();
     const period = String(body?.period || 'week');
-    const rows = (await byIndex('questions', 'pid', p.id)).filter(r => r.answered);
+    const rows = (await byIndex('questions', 'pid', p.id)).filter(r => r.answered && !isWorkedRow(r));
     const answeredAt = {};
     for (const a of await attemptsInOrder(p.id)) answeredAt[a.questionId] = a.createdAt;
     const activity = await byIndex('activity', 'pid', p.id);
