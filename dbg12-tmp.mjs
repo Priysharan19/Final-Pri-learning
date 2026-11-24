@@ -1,0 +1,16 @@
+const H = await import('./tools/marking-mutation-harness.mjs');
+const G = await import('./client/src/engine/generators/index.js');
+const SM = await import('./client/src/engine/solutionMatch.js');
+const { stepEvidence } = await import('./server/platform/markerOps.js');
+const { checkAnswer } = await import('./client/src/engine/checker.js');
+await G.loadAllBanks();
+const [g,d,s]=[process.argv[2],+process.argv[3],+process.argv[4]];
+const q=G.generateQuestion(g,d,s);
+const lines=H.authoredPage(q,SM._internals.spanToPlain);
+console.log(lines);
+const idx=+process.argv[5], mut=process.argv[6];
+const page=lines.slice(); if(mut) page[idx]=mut;
+const ans=q.answerType==='working'?String(lines[lines.length-1]):'99991';
+const ev=stepEvidence({...q},ans,page.join('\n'),checkAnswer(q,ans),{slipWarnings:true});
+console.log(q.answerType);
+ev.stepReport.lines.forEach(l=>console.log(l.status,l.state||'','|',l.text,'|',(l.note||'').slice(0,90)));

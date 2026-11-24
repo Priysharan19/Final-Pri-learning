@@ -1,3 +1,3 @@
 const A = await import('./client/src/engine/arithmeticLines.js');
-const i=A.infoOf('(π/4) - π/4'); console.log(i&&i.value);
-const j=A.infoOf('(4/2)*((1/3) - (1/3))'); console.log(j&&JSON.stringify(j.ast));
+const a=A.infoOf(A.cleanStatement('(3) - (x^(2) + 4x + 6)')), b=A.infoOf(A.cleanStatement('-x^(2) - 4x - 6'));
+console.log(a&&a.vars, b&&b.vars, A.sameAsWritten(a,b));

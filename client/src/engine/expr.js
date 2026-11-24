@@ -1331,36 +1331,60 @@ function exprEquivalentUncached(a, b, opts) {
  * half a unit of its last place, and any longer decimal (π, √2, 1/3) is never
  * forgiven more than rounding to one decimal place.
  */
+/** The same equation with every inverse trig value read in degrees: arcsin(0.446) is 26.49°, not 0.4623 rad. */
+function inverseTrigInDegrees(node) {
+  if (!node || typeof node !== 'object') return node;
+  const out = Array.isArray(node) ? node.slice() : { ...node };
+  for (const key of Object.keys(out)) if (out[key] && typeof out[key] === 'object') out[key] = inverseTrigInDegrees(out[key]);
+  if (out.t === 'call' && ['arcsin', 'arccos', 'arctan'].includes(out.fn)) return { t: 'bin', op: '*', l: out, r: { t: 'bin', op: '/', l: { t: 'num', v: 180 }, r: { t: 'num', v: Math.PI } } };
+  return out;
+}
+export function containsInverseTrig(node) {
+  if (!node || typeof node !== 'object') return false;
+  if (node.t === 'call' && ['arcsin', 'arccos', 'arctan'].includes(node.fn)) return true;
+  return Object.values(node).some(v => v && typeof v === 'object' && containsInverseTrig(v));
+}
+
 /**
- * A root the question states ROUNDED (`k ≈ 0.036`, answer tolerance `tol`) is not the exact root, so putting it into a line that
- * the exact root satisfies leaves a small difference (e^(-19·0.036) = 0.5046, not 0.5). `ast` (an equation) holds near `sol` when
- * the difference of its sides is zero somewhere within `tol` of it: the exact root is such a point. False when it is not provable.
+ * Does the equation `ast` hold at `sol`, read the way a student may mean it? Two things the engine's one strict reading gets wrong:
+ *   · a root the question states ROUNDED (`k ≈ 0.036`, answer tolerance `tol`) is not the exact root, so putting it into a line the exact root
+ *     satisfies leaves a small difference (e^(-19·0.036) = 0.5046, not 0.5): the line holds when the difference of its sides is zero somewhere
+ *     within `tol` of `sol`, which the exact root is;
+ *   · an inverse trig value is an angle: `B = sin⁻¹(0.446)` is 26.49 when the page works in degrees and 0.4623 when it works in radians, and a line
+ *     true in either unit is not false.
+ * False when neither is provable.
  */
 export function equationHoldsNear(ast, variable, sol, tol) {
-  if (!(tol > 0) || !ast || ast.t !== 'equation' || !Number.isFinite(sol)) return false;
-  const diff = x => {
-    try {
-      const L = evaluate(ast.l, { [variable]: x }), R = evaluate(ast.r, { [variable]: x });
-      return Number.isFinite(L) && Number.isFinite(R) ? { d: L - R, scale: Math.max(1e-6, Math.abs(L), Math.abs(R)) } : null;
-    } catch { return null; }
-  };
-  const N = 24;
-  let prev = null, prevX = null;
-  for (let i = 0; i <= N; i++) {
-    const x = sol - tol + (2 * tol * i) / N, cur = diff(x);
-    if (!cur) { prev = null; continue; }
-    if (Math.abs(cur.d) <= 1e-9 * cur.scale) return true;
-    if (prev && prev.d * cur.d < 0) {
-      let lo = prevX, hi = x, flo = prev.d;
-      for (let k = 0; k < 60; k++) {
-        const mid = (lo + hi) / 2, m = diff(mid);
-        if (!m) return false;
-        if (flo * m.d <= 0) hi = mid; else { lo = mid; flo = m.d; }
+  if (!ast || ast.t !== 'equation' || !Number.isFinite(sol)) return false;
+  const readings = containsInverseTrig(ast) ? [ast, inverseTrigInDegrees(ast)] : [ast];
+  for (const reading of readings) {
+    const diff = x => {
+      try {
+        const L = evaluate(reading.l, { [variable]: x }), R = evaluate(reading.r, { [variable]: x });
+        return Number.isFinite(L) && Number.isFinite(R) ? { d: L - R, scale: Math.max(1e-6, Math.abs(L), Math.abs(R)) } : null;
+      } catch { return null; }
+    };
+    const at = diff(sol);
+    if (reading !== ast && at && Math.abs(at.d) <= 1e-6 * at.scale) return true;
+    if (!(tol > 0)) continue;
+    const N = 24;
+    let prev = null, prevX = null;
+    for (let i = 0; i <= N; i++) {
+      const x = sol - tol + (2 * tol * i) / N, cur = diff(x);
+      if (!cur) { prev = null; continue; }
+      if (Math.abs(cur.d) <= 1e-9 * cur.scale) return true;
+      if (prev && prev.d * cur.d < 0) {
+        let lo = prevX, hi = x, flo = prev.d;
+        for (let k = 0; k < 60; k++) {
+          const mid = (lo + hi) / 2, m = diff(mid);
+          if (!m) return false;
+          if (flo * m.d <= 0) hi = mid; else { lo = mid; flo = m.d; }
+        }
+        const e = diff((lo + hi) / 2);
+        if (e && Math.abs(e.d) <= 1e-6 * e.scale) return true;   // a crossing, not a pole
       }
-      const e = diff((lo + hi) / 2);
-      if (e && Math.abs(e.d) <= 1e-6 * e.scale) return true;   // a crossing, not a pole
+      prev = cur; prevX = x;
     }
-    prev = cur; prevX = x;
   }
   return false;
 }

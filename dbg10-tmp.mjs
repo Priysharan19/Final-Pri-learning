@@ -1,0 +1,11 @@
+const G = await import('./client/src/engine/generators/index.js');
+const SM = await import('./client/src/engine/solutionMatch.js');
+await G.loadAllBanks();
+const q=G.generateQuestion('y11-explog',3,28);
+SM._setFunctionsUnused(q);
+const sol=SM._internals.readSolution(q);
+const parts=['(4^(2))^(3x - 6)','(3^(3))^(3x + 5)'];
+console.log(JSON.stringify(SM._internals.matchEquation(parts,sol,null)));
+const c=SM._internals.conditionOf(parts); const c0=sol.conditions[0].cond;
+console.log(!!c, c&&c.vars, sol.conditions.length, c0.rawL, c0.rawR);
+for (const x of [0.61,1.37,2.23,0.83]) console.log(x, c.f({x}), c0.f({x}));

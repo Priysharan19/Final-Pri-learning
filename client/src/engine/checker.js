@@ -264,9 +264,18 @@ function proofLine(text, cleaned, previousText, meta) {
     const side = /^\s*l/i.test(segments[segments.length - 1]) ? 'left' : 'right';
     return { status: 'break', note: `This line says it has reached the ${side}-hand side, but the expression before it is not yet the ${side}-hand side.` };
   }
+  let ambiguous = false;
+  // a line the engine cannot read is not a line it can call false
+  if (segments.some(seg => !parseExpr(statedSide(seg, meta)))) return { status: 'note', note: 'Not checked: Pri cannot read this line, so it is not marked right or wrong.' };
   for (const seg of segments) {
-    if (!exprEquivalent(statedSide(seg, meta), meta.canonical, { positiveOnly: meta.positiveOnly })) return { status: 'break', note: PROOF_SLIP };
+    if (!exprEquivalent(statedSide(seg, meta), meta.canonical, { positiveOnly: meta.positiveOnly })) {
+      // `cos2θ` is cos(2θ) or cos(2)·θ: a line false under one reading and true under the other is not crossed (the every-reading rule)
+      const readings = unbracketedReadings(seg);
+      if (readings && readings.some(r => exprEquivalent(statedSide(r, meta), meta.canonical, { positiveOnly: meta.positiveOnly }))) { ambiguous = true; continue; }
+      return { status: 'break', note: PROOF_SLIP };
+    }
   }
+  if (ambiguous) return { status: 'note', note: 'This function argument can be read two ways (cos 2θ is cos(2θ) or cos(2)·θ), so it is not marked right or wrong. Put the argument in brackets.' };
   return { status: 'ok' };
 }
 const PROOF_SHAPE_NOTE = {
@@ -1106,6 +1115,7 @@ const AUXILIARY_CALCULUS = /[∫→]|d\/d[a-z]\s*[(\[a-z0-9]|\b[uvw]\b|\bd[uvw]\
 const DERIVATIVE_CLAIM = /^(?:d[a-z]\/d[a-z]|[a-z]'(?:\([a-z]\))?|[a-z]\([a-z]\)')=/i;
 const proseCleanOf = line => String(line).trim().replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore)\s+/i, '').replace(ANSWER_LABEL, '');
 
+const EXTREMUM_PROMPT = /\b(?:least|greatest|smallest|largest|minimum|maximum|lowest|highest)\b/i;
 function stepCheckSingle(meta, workingText, system = null, { loneBranches = false, calculus = null, named = false, prompt = '' } = {}) {
   PAGE_TRIG_UNIT = trigUnitOf(`${prompt}\n${workingText}`);
   const calculusStage = { claimed: false };   // calculusSteps.js: has a line made a claim yet?
@@ -1693,6 +1703,11 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
             status = 'note';
             note = incompleteNote(meta.variable, wanted, [v]);
             incomplete = true;
+          } else if (i < rawLines.length - 1) {
+            // a bare number that is not the last line and happens to equal the answer is a value in the working (a limit, a substituted number),
+            // not the answer: it is not ticked for it
+            status = 'note';
+            note = 'This is a number in the working, not a claim about the answer, so it is not marked right or wrong.';
           } else {
             status = 'ok';
             pendingExtraneous = []; expLogChain = false;
@@ -1760,6 +1775,13 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
       note = 'Not checked: this question’s check covers the lines that lead to the answer.';
     }
 
+    // "Find the least k for which …": the answer is the one value that meets the condition, and a value tried on the way (`k = 1`: it fails) is no
+    // claim that k = 1. The derived equation would cross it for differing from the answer; it is a trial, so a note.
+    if (status === 'break' && meta.kind === 'equation' && EXTREMUM_PROMPT.test(String(prompt || '').replace(/\$[^$]*\$/g, ' ')) && /^\s*(?:∴\s*)?[A-Za-z]\s*=\s*-?\d+(?:\.\d+)?\s*$/.test(String(line))) {
+      status = 'note';
+      note = 'A value tried on the way to the least or greatest one is not a claim that it is the answer, so it is not marked right or wrong.';
+      lineDiagnosis = null;
+    }
     // `a!=b` is `a ≠ b` or `(a!) = b`: the engine reads a factorial, so a verdict on it says nothing about the inequality the student wrote.
     if ((status === 'break' || status === 'ok') && /!\s*=(?!=)/.test(String(line).replace(/!\s+=/g, ''))) {
       status = 'note';

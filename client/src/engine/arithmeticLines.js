@@ -650,6 +650,9 @@ function putIn(side, defs, free) {
     if (KEEP.test(word)) { if (prime) bad = true; return tok; }
     return [...word].map((c, k) => {
       const key = c + (prime && k === word.length - 1 ? "'" : '');
+      // the letter the line is a function OF stays a letter, even when the question gives it a value (x = -2): putting it in would make a
+      // function of x a number, and a derivative of a number is 0 (so any claim that is 0 at that point would agree)
+      if (free && c === free && !prime && defs[key] && !defs[key].variable) return c;
       const d = defs[key];
       if (d && !d.variable) { used.add(key); return `(${d.expr})`; }
       if (d && d.variable && free === d.variable) { used.add(key); return `(${d.expr})`; }
@@ -872,7 +875,8 @@ function pageDefinitionsOnce(raw, out, firstBreak, prep, degreePrimed, tickOnly,
     zeroed = null;
     // A new part of the question may give a letter a new value on the paper, not on the page: what was defined is dropped.
     if (/^\(?(?:[a-h]|i{1,3}|iv|v|vi{0,3})[.)]\s|^\([a-h]\)|^(?:part|question|q)\s*\(?[a-h0-9]/i.test(raw[i])) { for (const k of Object.keys(defs)) delete defs[k]; equation = null; carry = null; afterPart = true; }
-    const src = raw[i].replace(/^\(?[a-h1-9ivx]{1,3}[.)]\s+/i, '').replace(/^[A-Za-z][A-Za-z ]{1,24}:\s*(?=\S)/, '');
+    // (a line number `(3) 2 + 3 = 5` is dropped; `(3) - (x^2 + 4x + 6) = …` is the number 3 in brackets, then a minus)
+    const src = raw[i].replace(/^\(?[a-h1-9ivx]{1,3}[.)]\s+(?![-+*/×÷=^])/i, '').replace(/^[A-Za-z][A-Za-z ]{1,24}:\s*(?=\S)/, '');
     // A question number glued to a definition (`8 y = 3/tan x`): when the same letter is used primed or evaluated on a later line, the line is
     // the definition y = … for those lines. The line itself stays a note (the number in front means it is not read as y = … on its own).
     { const g = /^(\d{1,2})\s+([A-Za-z])\s*=\s*(\S.*)$/.exec(src.replace(/\s*\.\s*$/, ''));
@@ -951,6 +955,7 @@ function pageDefinitionsOnce(raw, out, firstBreak, prep, degreePrimed, tickOnly,
     const decimal = /\d\.\d|(?:^|[^\d])\.\d/.test(src);
     const ticks = [], facts = [];
     let cross = null;
+    let contradicts = false;
     const carried = carry;
     carry = null;
     if (prep && out[i].status === 'note' && !/^=/.test(src.trim())) {
@@ -1057,7 +1062,18 @@ function pageDefinitionsOnce(raw, out, firstBreak, prep, degreePrimed, tickOnly,
             // Both sides reaching one value is a check only where every part of the line was tested. A product with a factor that comes to
             // exactly 0 (`(4/2)(x - 1/3)` with x = 1/3, the point-slope line through the point) is 0 for any other factor: the gradient was
             // never tested, so the line stays a note.
-            if (same && used.length && put.some(x => { try { return hasVanishingFactor(parse(normalize(x.text))); } catch { return false; } })) { /* vacuous: not ticked */ }
+            // `b = 3 - (-1) = 4` after `b = 3`: the sides agree with each other, but the line gives a name a value the page has already given a different one.
+            // `((dy)/(dx)) = …` is the derivative, not d·y over d·x; and a line with the letter on BOTH sides is an identity in it, which a value put in
+            // for the letter does not prove (`(-3x) - (x^3 - 3x - 1) = -x^2 + 1` is true at x = 1 only).
+            const differential = /(?<![A-Za-z])d[a-z]?\s*\)?\s*\/\s*\(?\s*d[a-z]\b/.test(src);
+            const ownInfos = sides.map(x => infoOf(cleanStatement(x)));
+            const identityFalse = ownInfos.every(x => x && x.vars && x.vars.length) && !ownInfos.every(x => sameAsWritten(x, ownInfos[0]));
+            const redefined = !!(m && defs[m[1]] && !defs[m[1]].variable && numbers && (() => { const old = numberOf(defs[m[1]].expr); return old !== null && !close(old, infos[0].value); })());
+            if (redefined) { contradicts = true; }
+            else if (same && used.length && (differential || identityFalse)) { /* not a check of this line */ }
+            // a value set several lines up (`x = 0`, then other work) is not still the value of x here: the line may be a new equation in x that the old value happens to satisfy
+            else if (same && used.length && !used.every(k => defs[k].given || defs[k].variable || defs[k].line >= i - 2)) { /* stale definition: not a check */ }
+            else if (same && used.length && put.some(x => { try { return hasVanishingFactor(parse(normalize(x.text))); } catch { return false; } })) { /* vacuous: not ticked */ }
             else if (same && used.length) ticks.push(numbers ? `With ${from} ${where}, each side comes to ${shown(infos[0].value)}.` : `With ${from} ${where}, the sides are the same expression.`);
             // Crossed only in a worked chain under a name (A = 12e^(4k) = 12e^(ln(3)/4)): there the two sides are stated
             // equal. Two sides on their own (x^2 = 9 after x = 2) may be a new equation to solve, so that is a note.
@@ -1082,7 +1098,7 @@ function pageDefinitionsOnce(raw, out, firstBreak, prep, degreePrimed, tickOnly,
           }
         }
       } else if (!m && sides.length === 1) { /* nothing stated */ }
-      if (m && !cross) {
+      if (m && !cross && !contradicts) {
         const last = sides[sides.length - 1];
         if (!new RegExp(`(?<![A-Za-z])${m[1]}(?![A-Za-z])`).test(last.replace(/[A-Za-z]+/g, w => (KEEP.test(w) ? ' ' : w)))) {
           const variable = m[2] || null;
@@ -1597,12 +1613,29 @@ function stepCheckArithmeticWithinBudget(workingText, prep = null, tickOnly = fa
     //   · a value of a function in front of a worked chain (`a(2) = … = …`) is a label for the chain;
     //   · words after the chain are set aside; `> 0` or `< 0` after it is kept as a claim about the chain's value,
     //     and a tick needs that claim to be true as well.
+    let labelFalse = false;
     let src = src0.replace(/^\(?[a-h]\)(?:\s*\((?:i{1,3}|iv|v)\))?\s+(?=\S)|^\((?:i{1,3}|iv|v)\)\s+(?=\S)/i, ''), signClaim = null;
     { const tail = src.match(/^(.*=.*?)\s*([<>])\s*0\s*(?:(?:so|hence|therefore|thus|which)\b[^=<>]*)?$/i);
       if (tail) { src = tail[1]; signClaim = tail[2]; }
       else { const words = src.match(/^(.*=.*?[\d)])\s+(?:so|hence|therefore|thus)\s+[A-Za-z][^=<>\d]*$/i); if (words) src = words[1]; }
+      // …but the label is set aside only so far as it is true: a function the question defines (`g(x) = 2x + 4`) fixes what `g(4)` is, and a chain
+      // that comes to another value is not `g(4)`'s (the label's argument was changed, not the chain's).
+      const lab = /^([A-Za-z])'{0,2}\(\s*(-?\d+(?:\.\d+)?)\s*\)\s*=\s*(?=[^=]+=)/.exec(src);
+      if (lab) {
+        const def = prep && prep.byName && prep.byName.get(lab[1]) && prep.byName.get(lab[1]).length === 1 ? prep.byName.get(lab[1])[0] : null;
+        const fn = def && !/'/.test(lab[0]) && def.variable ? fnOf(def.expr, def.variable) : null;
+        if (fn) {
+          const at = fn(Number(lab[2])), chainEnd = valueOf(src.slice(lab[0].length).split('=').pop());
+          if (at === null || chainEnd === null || !closeLoose(at, chainEnd)) labelFalse = true;
+        } else if (!/'/.test(lab[0])) {
+          // a function this page does not define here: the chain may be true, but what it is the value OF cannot be said (`f(4) = … = -7` and
+          // `f(3) = … = -7` are the same chain). The question's own worked solution, or a definition above, ticks the line where it states it.
+          labelFalse = true;
+        }
+      }
       src = src.replace(/^[A-Za-z]'{0,2}\(\s*-?\d+(?:\.\d+)?\s*\)\s*=\s*(?=[^=]+=)/, ''); }
     const afterLabel = labelled; labelled = src !== line;
+    if (labelFalse) { prev = null; return note(line, NOT_PROVED); }
     const beforeComma = src;
     src = commaVectorsAsColumns(src, carried);
     const commaForm = src !== beforeComma;

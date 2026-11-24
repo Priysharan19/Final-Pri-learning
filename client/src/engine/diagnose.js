@@ -811,7 +811,7 @@ function scanRoots(ast, name, LO, HI, STEP) {
 /** The question states its root rounded (meta.tol): the line holds at the exact root within that rounding. */
 function roundedRootHolds(B, variable, sol, meta) {
   const tol = Number(meta?.tol);
-  return tol > 0 && equationHoldsNear(B, variable, sol, Math.min(tol, 0.05 * Math.max(1, Math.abs(sol))));
+  return equationHoldsNear(B, variable, sol, tol > 0 ? Math.min(tol, 0.05 * Math.max(1, Math.abs(sol))) : 0);
 }
 
 function rootAnalysis(B, meta) {

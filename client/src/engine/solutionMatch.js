@@ -122,11 +122,14 @@ const braces = s => s.replace(/\^\{([^{}]*)\}/g, '^($1)').replace(/_\{([^{}]*)\}
 // A letter the question or its solution uses as a function name (f(x), S(n)): `f(x + 1)` there is an application, which the
 // engine would read as the product f·(x + 1). A side that applies one is not read at all.
 let FUNCS = new Set();
+const DIFFERENTIAL = /(?<![A-Za-z])d[a-z]?\s*\)?\s*\/\s*\(?\s*d[a-z]\b/;
 const readSide = side => {
   try {
     const t = braces(tidy(side));
     // a comma or semicolon list (a point, a vector, an interval) is never one number: it is compared component by component or not at all
     if (/[,;]/.test(t)) return null;
+    // d/dx, dy/dx, ((d)/(dx)): an operator, not the letters d and x divided
+    if (DIFFERENTIAL.test(t)) return null;
     // `f^(-1)(-2)` is the inverse applied to -2, not the product f^(-1)·(-2): a power sits between the name and its argument.
     for (const f of FUNCS) if (new RegExp(`(?<![A-Za-z])${f}(?:\\s*\\^\\s*(?:\\([^()]*\\)|-?\\d+))?'*\\s*\\(`).test(t)) return null;
     return infoOf(cleanStatement(t));
@@ -197,8 +200,11 @@ function proportional(f, g) {
       c = fit;
     }
     const k = c[0] / c[1];
-    const scale = Math.abs(valAt(f.l, env) ?? 0) + Math.abs(valAt(f.r, env) ?? 0) + Math.abs(k) * (Math.abs(valAt(g.l, env) ?? 0) + Math.abs(valAt(g.r, env) ?? 0));
+    const terms = [valAt(f.l, env) ?? 0, valAt(f.r, env) ?? 0, valAt(g.l, env) ?? 0, valAt(g.r, env) ?? 0].map(Math.abs);
+    const scale = terms[0] + terms[1] + Math.abs(k) * (terms[2] + terms[3]);
     if (Math.abs(a - k * b) > 1e-10 * scale + 1e-12) return false;
+    // A point where one side of an equation is lost beside the other (16^(3x-6) beside 27^(3x+5)) tests only the large side: it proves nothing about the rest.
+    if (terms.some(t => t !== 0 && t < 1e-6 * Math.max(...terms))) continue;
     used++;
   }
   if (used < 5 || c === null) return false;
@@ -208,7 +214,7 @@ function proportional(f, g) {
 // ── the worked solution, read once ───────────────────────────────────────────
 function readSolution(q) {
   const steps = Array.isArray(q?.steps) ? q.steps : [];
-  const labelled = [], conditions = [], values = [], numeric = [], verbatim = [], limits = new Set();
+  const labelled = [], conditions = [], values = [], numeric = [], verbatim = [], every = [], limits = new Set();
   for (const t of [String(q?.prompt ?? ''), ...steps.map(x => String(x?.d ?? ''))]) for (const m of t.replace(/\\\$/g, '\u0001').matchAll(TEX_SPAN)) { const pl = spanToPlain(m[1]); if (pl) for (const k of limitKeys(braces(pl))) limits.add(k); }
   steps.forEach((st, i) => {
     const heading = String(st?.h ?? '').trim();
@@ -218,6 +224,7 @@ function readSolution(q) {
       if (s.parts.length < 2) continue;
       // a statement with a side the engine cannot evaluate (`f^(-1)(-1)`) is recognised only as the very same text
       if (s.parts.some(p => readSide(p) === null)) verbatim.push({ step: i, heading, parts: s.parts });
+      every.push({ step: i, heading, parts: s.parts });
       if (s.parts.length === 2 && s.parts.every(p => numericOf(p) !== null)) numeric.push({ step: i, heading, parts: s.parts });
       const lab = labelOf(s.parts[0]);
       const last = s.parts[s.parts.length - 1];
@@ -242,7 +249,7 @@ function readSolution(q) {
     stated.set(l.label.name, set);
   }
   const multiRoot = [...stated.values()].some(set => set.size > 1);
-  return { steps, labelled, conditions, numeric, verbatim, limits, values, multiRoot, final: values.length ? values[values.length - 1] : null };
+  return { steps, labelled, conditions, numeric, verbatim, every, limits, values, multiRoot, final: values.length ? values[values.length - 1] : null };
 }
 
 function readPrompt(q) {
@@ -255,6 +262,9 @@ function readPrompt(q) {
   }
   return list;
 }
+
+// a function applied to a bare argument that is then raised to a power: `ln e^3`, `sin x^2`, `cos 2^x`
+const AMBIGUOUS_FUNCTION_POWER = /(?<![A-Za-z])(?:sin|cos|tan|sec|csc|cosec|cot|ln|log|exp)\s*[A-Za-z0-9]+\s*\^/;
 
 // ── a student line ───────────────────────────────────────────────────────────
 const FN_WORDS = /(?<![A-Za-z])(?:arcsin|arccos|arctan|cosec|sin|cos|tan|sec|csc|cot|ln|log|sqrt|exp|pi|e)(?![A-Za-z])/gi;
@@ -307,6 +317,12 @@ function sameAsPromptStatement(parts, prompt) {
 function matchEquation(parts, sol, ctx) {
   // a limit pair the question and its solution never use: not a step of this working, whatever value it reaches
   if (!limitsKnown(parts, sol)) return null;
+  // `ln e^3` is ln(e^3) or (ln e)^3: the engine reads one, so a value it reaches says nothing about the other. Such a line is the solution's own statement
+  // (the same text) or it is not matched.
+  if (parts.some(p => AMBIGUOUS_FUNCTION_POWER.test(p))) {
+    for (const st of sol.every) if (st.parts.length === parts.length && parts.every((p, k) => canon(p) === canon(st.parts[k]))) return st;
+    return null;
+  }
   // The very same statement as one of the solution (canon: spaces, bracket style and `*` only), where a side cannot be evaluated.
   if (!ctx && parts.some(p => readSide(p) === null)) {
     for (const st of sol.verbatim) if (st.parts.length === parts.length && parts.every((p, k) => canon(p) === canon(st.parts[k]))) return st;
