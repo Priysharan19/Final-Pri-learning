@@ -3,6 +3,12 @@
 // the digest he read. Lists only the types he has reviewed and approved. Approval here never turns method marks on by itself.
 export const AUTHOR_APPROVED = Object.freeze([
   {
+    "typeId": "generic-solution-steps",
+    "digest": "d8f1119ae311c778679bebfa49b836e73a67838e3e4a35d7054dfa2c81f5c329",
+    "approvedBy": "Priysharan Tripathi",
+    "date": "2026-11-24"
+  },
+  {
     "typeId": "y11-diff-gradient-plan",
     "digest": "c9d8465b12841281dec30c8bb4b9bdebef94bb375c47c06e7e4f32838d86865b",
     "approvedBy": "Priysharan Tripathi",
@@ -27,14 +33,56 @@ export const AUTHOR_APPROVED = Object.freeze([
     "date": "2026-11-24"
   },
   {
+    "typeId": "y12-diff-gradient-2",
+    "digest": "321087896ff2c26b5cd961ccd9ff2b269c2374ecaadc8fca2df01d1d85c79647",
+    "approvedBy": "Priysharan Tripathi",
+    "date": "2026-11-24"
+  },
+  {
+    "typeId": "y12-diff-gradient-3",
+    "digest": "617054ccf2d5ea4c0bc74f4bf2c0c0657b871f8914a5ac414f93de9f24c57efe",
+    "approvedBy": "Priysharan Tripathi",
+    "date": "2026-11-24"
+  },
+  {
+    "typeId": "y12-diff-rules-3",
+    "digest": "045e2cfe6ac1a701d921b62097a289eede04181acf32f226034ec6b475ead35b",
+    "approvedBy": "Priysharan Tripathi",
+    "date": "2026-11-24"
+  },
+  {
     "typeId": "y12-diff-rules",
     "digest": "1ad1b2e438c55f503fd39357e4d7f17981edee6820dbdfbadc7638caf33cfeca",
     "approvedBy": "Priysharan Tripathi",
     "date": "2026-11-24"
   },
   {
+    "typeId": "y12-integral-2",
+    "digest": "906b842a32463f9b581bdb0260153f5e3c5d2b63fa5df630c0230c76400beda8",
+    "approvedBy": "Priysharan Tripathi",
+    "date": "2026-11-24"
+  },
+  {
+    "typeId": "y12-integral-3",
+    "digest": "51055d287d31ce88cf90d971e2ee694faa3b213e639265636fad21d5660142e6",
+    "approvedBy": "Priysharan Tripathi",
+    "date": "2026-11-24"
+  },
+  {
+    "typeId": "y12-tangent-3",
+    "digest": "8e0013beecf267d0a84b39636c15d8d6255732d0f652e0d065684e82c0004269",
+    "approvedBy": "Priysharan Tripathi",
+    "date": "2026-11-24"
+  },
+  {
     "typeId": "y12-trig-evaluate",
     "digest": "8575a4d493aa7c7367da17544e73cf82676b79029ce67e7f45a5185f0986e6a1",
+    "approvedBy": "Priysharan Tripathi",
+    "date": "2026-11-24"
+  },
+  {
+    "typeId": "y12-trig-extreme-2",
+    "digest": "073ae29c731218a52d39a7ceabae69c62115c92a080c8107954e1c92a1907af4",
     "approvedBy": "Priysharan Tripathi",
     "date": "2026-11-24"
   },
