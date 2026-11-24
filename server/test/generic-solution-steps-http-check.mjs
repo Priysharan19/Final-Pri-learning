@@ -66,7 +66,7 @@ try {
     }
     const one = await submit(qid, `${tag}-1`, answer, lines.join('\n'));
     const two = one.data.resolved ? one : await submit(qid, `${tag}-2`, answer, lines.join('\n'));
-    return { sealed, reply: two.data };
+    return { sealed, reply: two.data, issued: r.data.question };
   };
   const clean = reply => !reply.methodCriteria && !reply.methodScheme && !JSON.stringify(reply).includes('criteria-count') && !JSON.stringify(reply).includes('type-not-approved') && !JSON.stringify(reply).includes('generic-');
 
@@ -76,6 +76,7 @@ try {
   c.eq(p1.sealed._methodScheme, GENERIC_ID, 'phase 1: the question is stamped with the rule at issue');
   c.ok(p1.sealed._marking === undefined, 'phase 1: and not sealed final-answer-only');
   c.deq([p1.reply.resolved, p1.reply.marksEarned], [true, 0], 'phase 1: with the switch off nothing is paid');
+  c.ok(p1.issued.stepMarks === undefined, 'phase 1: the issued question does not claim step marks while the switch is off');
   c.ok(clean(p1.reply) && !p1.reply.markRows?.method, 'phase 1: no criteria, no method row, no scheme field, no reason code');
 
   // PHASE 2: switch on
@@ -90,6 +91,7 @@ try {
   c.deq(p2.reply.methodScheme, { typeId: GENERIC_ID, paid: true }, 'phase 2: the reply says the rule paid, and nothing more');
   c.deq(p2.reply.solution.criteria, cr.items.map(i => ({ mark: i.marks, text: i.text })), 'phase 2: the solution shows the criteria, because the rule paid');
   c.ok(!JSON.stringify(p2.reply).includes('reason":"criteria-count') && !JSON.stringify(p2.reply).includes('generic-no-usable'), 'phase 2: no reason code reaches the client');
+  c.ok(p2.issued.stepMarks === true, 'phase 2: the issued question says step marks can be earned on it (stamped, practice mode, switch on)');
   const p3 = await run(rightLines, '147', 'phase2-right');
   c.eq(p3.reply.marksEarned, 3, 'phase 2: a right answer is 3 of 3');
   const p4 = await run([], '1042', 'phase2-none');
@@ -98,6 +100,7 @@ try {
   // The one-try modes stay final-answer only, whatever the repository's list holds (real list here, switch on): not stamped at issue, nothing paid, no table.
   for (const mode of ['rush', 'match', 'placement']) {
     const m = await run(wrongLines, '1042', `mode-${mode}`, { mode });
+    c.ok(m.issued.stepMarks === undefined, `${mode}: the issued question does not claim step marks`);
     c.ok(m.sealed._methodScheme === undefined && m.sealed._marking === FINAL_ANSWER_MARKING && m.sealed._practiceMode === mode, `${mode}: sealed final-answer-only at issue, with no scheme stamp`);
     c.ok(m.reply.marksEarned === 0 && clean(m.reply), `${mode}: correct method with a wrong last line earns 0, with no criteria table, scheme field or reason code`);
     const right = await run(rightLines, '147', `mode-${mode}-right`, { mode });

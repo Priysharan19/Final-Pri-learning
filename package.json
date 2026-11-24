@@ -298,6 +298,7 @@
     "test:consent:signup": "node client/test/signup-consent-check.mjs",
     "test:practice:course": "node client/test/practice-course-request-check.mjs && node server/test/free-practice-uncapped-check.mjs",
     "test:nsw:practice:tour": "node client/test/tour-nsw-practice-marked.js",
+    "test:step-marks:tour": "node client/test/tour-step-marks.mjs",
     "test:guest": "node server/test/guest-trial-check.mjs && node server/test/guest-menu-issuable-check.mjs && node server/test/guest-steps-leak-check.mjs && npm run test:guest:boundary",
     "test:guest:boundary": "node client/test/guest-trial-boundary-check.mjs",
     "test:guest:tour": "node client/test/tour-guest-trial.js",
