@@ -3,7 +3,7 @@
 // The figure is the author's TikZ compiled to a plain SVG at authoring time (tools/qbank-diagrams.mjs) and held by the server; the question
 // the account is issued carries only its text alternative and size, and the page fetches the file with its session
 // (components/BankFigure.jsx, GET /v1/practice/:id/figure). In Chromium, on a Prithagoras build and a Prithagoras server, this tour proves:
-//   · a question with a diagram is dealt inside ordinary practice (y12-appdiff), the figure loads through the authenticated route
+//   · a question with a diagram is dealt inside ordinary practice (y12-integration, third dot point), the figure loads through the authenticated route
 //     (200, image/svg+xml), is drawn (an <img> of a blob, nothing inline), and is named for a screen reader by the server's text alternative;
 //   · nothing on the page names where it came from, and the figure's file is refused to a request with no session;
 //   · the figure fits its column and the page does not scroll sideways at 1180 px and at 360 px;
@@ -23,7 +23,8 @@ import { createVerifiedProfile, switchSyllabus } from './support/verified-onboar
 
 const CLIENT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const EDITION = 'prithagoras';
-const CHAPTER = 'y12-appdiff';
+const CHAPTER = 'y12-integration';
+const ORDINAL = 2;                       // y12-integration.3: most of its authored questions have a diagram
 const MAX_SKIPS = 60;
 const SHOTS = process.env.PRI_BANK_SHOTS || '';
 if (SHOTS) mkdirSync(SHOTS, { recursive: true });
@@ -88,7 +89,7 @@ try {
   const shot = async name => { if (SHOTS) await page.screenshot({ path: join(SHOTS, name), fullPage: true }); };
 
   stage = 'reach a question with a diagram';
-  await page.goto(`${platform.origin}/practice?subtopic=${CHAPTER}`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`${platform.origin}/practice?subtopic=${CHAPTER}&dotpoint=${ORDINAL}`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
   await online.settled();
   await skipTour();
