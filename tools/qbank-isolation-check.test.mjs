@@ -76,6 +76,17 @@ ok(scanDist(plantFile('shuffled', 'a.js', `${stock}var n=[${shuffled.map(v => JS
 // false positives: ordinary code that holds numbers is not the pack
 ok(scanDist(plantFile('tables', 'tables.js', `${stock}var w=[${Array.from({ length: 400 }, (_, i) => (i * 37) % 1000).join(',')}];var f=[${Array.from({ length: 300 }, (_, i) => i).join(',')}];\n`), questions, manifest.packVersion).length === 0, 'tables of whole numbers in a script are not reported');
 
+// A figure of the pack in the dist fails the scan: as a file (same hash), and as a string inside a bundle.
+{
+  const figDir = path.join(path.resolve(path.dirname(new URL(import.meta.url).pathname), '..'), 'server', 'content', 'qbank', 'figures');
+  const svgs = fs.readdirSync(figDir).filter(f => f.endsWith('.svg')).slice(0, 3);
+  ok(svgs.length > 0, 'the pack has figures to plant');
+  const bytes = fs.readFileSync(path.join(figDir, svgs[0]));
+  ok(scanDist(plantFile('fig-file', 'figure.svg', bytes), questions, manifest.packVersion).some(h => /figure of/.test(h)), 'a pack figure as a file of the dist fails the scan (by hash)');
+  ok(scanDist(plantFile('fig-renamed', 'a1b2.png', bytes), questions, manifest.packVersion).some(h => /figure of/.test(h)), 'a pack figure renamed to another extension still fails the scan');
+  ok(scanDist(plant('fig-string', bytes.toString('utf8')), questions, manifest.packVersion).some(h => /figure of/.test(h)), 'a pack figure as a string in a bundle fails the scan (by content)');
+  ok(scanDist(clean, questions, manifest.packVersion).length === 0, 'and a clean dist still passes');
+}
 // The scan is bounded: a cap that has passed is a FAILURE (never a pass), and adversarial input (the pack's answers as one long unshuffled list,
 // repeated to tens of megabytes) ends within the cap, found or timed out, never an unbounded run.
 {

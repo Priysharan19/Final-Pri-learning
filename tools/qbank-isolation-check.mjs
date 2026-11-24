@@ -12,6 +12,10 @@
 // or more of a worked step (so a truncated step is found as surely as a whole one). tools/qbank-isolation-check.test.mjs plants each
 // kind in a copy of a dist and requires this scan to fail on it.
 //
+// FIGURES. A figure of the pack (any SVG of server/content/qbank/figures, which is served only to the account a question was issued to) must not
+// be in the built client either: no dist file has the SHA-256 of a figure file, and no text of the dist (a file, or a string inside a bundle,
+// in any of the readings above) contains a long slice of a figure's SVG.
+//
 // WHAT THIS IS NOT. It is a tripwire for the ways the pack is likely to get into a build by accident or by a careless change, not a proof
 // that the pack is absent. It CANNOT detect: a list of small whole-number answers on its own (the numbers 0 to 99 are in every bundle, and
 // a shuffled list of them is indistinguishable from a table); text that has been re-encoded beyond gzip, zlib and brotli (base64, hex,
@@ -23,10 +27,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PACK = path.join(ROOT, 'server', 'content', 'qbank');
+const FIGURES = path.join(PACK, 'figures');
 const failures = [];
 let pass = 0;
 const ok = (cond, message) => { if (cond) pass++; else failures.push(message); };
@@ -201,9 +207,23 @@ export function readingsOf(buf, depth = 0, out = []) {
 /** The strings to read a buffer as: UTF-8, and Latin-1 when it is not text (so a compressed or binary file's ASCII runs are still read). */
 const stringsOf = buf => { const u = buf.toString('utf8'); return u.includes('�') ? [u, buf.toString('latin1')] : [u]; };
 
+/** The pack's figures: their hashes, and a slice of the middle of each (long enough that nothing but that figure holds it). */
+export function figureSignatures(dir = FIGURES) {
+  const hashes = new Map(), slices = [];
+  if (!fs.existsSync(dir)) return { hashes, slices };
+  for (const f of fs.readdirSync(dir).filter(x => x.endsWith('.svg')).sort()) {
+    const buf = fs.readFileSync(path.join(dir, f)), text = buf.toString('utf8'), id = f.replace(/\.svg$/, '');
+    hashes.set(crypto.createHash('sha256').update(buf).digest('hex'), id);
+    const at = Math.max(0, Math.floor(text.length / 2) - 60);
+    slices.push([text.slice(at, at + 120), id]);
+  }
+  return { hashes, slices };
+}
+
 /** Scan a directory (a built client). EVERY file is read, whatever its extension. Returns the findings, empty when it is clean. */
-export function scanDist(dist, questions, version, { capMs = SCAN_CAP_MS } = {}) {
+export function scanDist(dist, questions, version, { capMs = SCAN_CAP_MS, figuresDir = FIGURES } = {}) {
   const files = walk(dist);
+  const figs = figureSignatures(figuresDir);
   const rel = f => path.relative(dist, f).split(path.sep).join('/');
   const hits = [];
   if (files.some(f => /(^|\/)qbank(\/|$)|qb-[ax]1[12]-m[ae]-/.test(rel(f)))) hits.push('a file of the dist is, or is named for, a pack file');
@@ -230,9 +250,11 @@ export function scanDist(dist, questions, version, { capMs = SCAN_CAP_MS } = {})
     readings.forEach((reading, layer) => {
       if (capped()) return;
       const where = layer ? `${rel(file)} (decoded, layer ${layer})` : rel(file);
+      { const h = crypto.createHash('sha256').update(reading).digest('hex'); if (figs.hashes.has(h)) hits.push(`${where} is the figure of ${figs.hashes.get(h)} (same SHA-256)`); }
       for (const text of stringsOf(reading)) {
         if (capped()) break;
         if (NAMES.test(text) || (version && text.includes(version))) hits.push(`${where} names the pack`);
+        for (const [slice, fid] of figs.slices) if (slice.length >= 80 && text.includes(slice)) { hits.push(`${where} holds the SVG of the figure of ${fid}`); break; }
         const idHit = text.length >= 10 ? (text.match(PACK_ID) || []).find(id => ids.has(id)) : null;
         if (idHit) hits.push(`${where} names the question ${idHit}`);
         for (const f of structural(text, tokens, ids)) hits.push(`${where}: ${f}`);

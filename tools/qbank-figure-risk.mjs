@@ -65,7 +65,7 @@ export function evalMath(src, vars = {}, { deg = false } = {}) {
   try { const v = expr(); return i === tok.length && Number.isFinite(v) ? v : null; } catch { return null; }
 }
 
-const near = (a, b, rel = 2e-3) => Math.abs(a - b) <= Math.max(1e-6, Math.abs(b) * rel);
+export const near = (a, b, rel = 2e-3) => Math.abs(a - b) <= Math.max(1e-6, Math.abs(b) * rel);
 const trivial = v => [0, 1, -1].some(t => Math.abs(v - t) < 1e-9);
 
 // ── reading the TikZ ─────────────────────────────────────────────────────────
@@ -223,7 +223,7 @@ const sameCurve = (f, g) => {
   for (const x of [-3.1, -2, -1.3, -0.4, 0.3, 0.7, 1.5, 2.2, 3.4, 4.6]) {
     const a = f.f(x), b = g(x);
     if (a === null || b === null || !Number.isFinite(a) || !Number.isFinite(b)) continue;
-    if (Math.abs(a - b) > 1e-6 * Math.max(1, Math.abs(a), Math.abs(b))) return false;
+    if (Math.abs(a - b) > 1e-4 * Math.max(1, Math.abs(a), Math.abs(b))) return false;      // a plot may use a rounded constant (2.71828 for e)
     hits++;
   }
   return hits >= 3;
@@ -273,7 +273,26 @@ const standaloneNumbers = text => {
   for (const m of t.matchAll(/(-?\d+)\s*\/\s*(\d+)/g)) out.push(Number(m[1]) / Number(m[2]));
   return out;
 };
-const promptStates = (part, v) => standaloneNumbers(part.prompt).some(n => near(n, v));
+export const promptStates = (part, v) => standaloneNumbers(part.prompt).some(n => near(n, v));
+
+const NUMBER_WORDS = { zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12 };
+const STOP = new Set(['the', 'and', 'are', 'for', 'with', 'from', 'that', 'this', 'each', 'its', 'has', 'have', 'was', 'were', 'make', 'makes']);
+const wordSet = t => new Set(String(t ?? '').toLowerCase().replace(/\\[a-zA-Z]+/g, ' ').replace(/[^a-z0-9.\s]/g, ' ').split(/\s+/).filter(Boolean).map(w => (w in NUMBER_WORDS ? String(NUMBER_WORDS[w]) : w)).filter(w => w.length >= 3 || /^\d+$/.test(w)).filter(w => !STOP.has(w)));
+/**
+ * Is this printed text (a label, an annotation, an alt text) the author's own marking text, a step heading or a step: most of its words are the words
+ * of one criterion point, step heading or step? Short labels of one word are not tested here (the number rules cover them).
+ */
+export function matchesMarking(text, part) {
+  const mine = wordSet(text);
+  if (mine.size < 2) return false;
+  const sources = [...(part.criteria || []).map(c => c?.point), ...(part.steps || []).flatMap(st => [st?.h, st?.d])].filter(Boolean);
+  for (const src of sources) {
+    const theirs = wordSet(src);
+    let hit = 0; for (const w of mine) if (theirs.has(w)) hit++;
+    if (hit >= 2 && hit / mine.size >= 0.7) return true;
+  }
+  return false;
+}
 
 /** The values that are, or are one step from, the answer and the results of every worked step: [{ v, kind: 'answer' | 'step', why }]. */
 export function decisiveValues(part) {
@@ -284,7 +303,7 @@ export function decisiveValues(part) {
   // the author's own marking points ("Limits 0 and 4", "roots 1 and 3") and the limits of integrals and the values assigned in the working
   for (const c of part.criteria || []) {
     const t = String(c?.point ?? '').replace(/\\(?:text|mathrm)\{[^{}]*\}/g, ' ');
-    if (/\b(?:limits?|roots?|intersections?|intercepts?|boundaries|turning|stationary|crosses|meets|bounds?)\b/i.test(t) || /^\s*[-\d.(]/.test(t)) for (const n of numbersIn(t)) out.push({ v: n, kind: 'step', why: `a value the marking names ("${t.trim().slice(0, 24)}")` });
+    for (const n of numbersIn(t)) out.push({ v: n, kind: 'step', why: `a number in the marking ("${t.trim().slice(0, 28)}")` });
   }
   for (const st of part.steps || []) {
     const d = String(st?.d ?? '');
@@ -360,6 +379,25 @@ export const HELD_BY_EYE = Object.freeze({
   'X12-C3-028': 'the x-axis tick 2 is where the curve meets the line y = 8, a value the working finds',
   'X12-T3-031': 'the y-axis ticks 5 and -5 are the amplitude R that step 1 finds',
   'X12-T3-048': 'the y-axis tick root 5 is the amplitude R that step 1 finds',
+  'X12-C3-013': 'the plotted curve is the accepted answer function, with a dot at (0, 1)',
+  'X11-A1-017': 'the figure prints "six unchosen numbers, seven gaps", which is step 1 (and so does its alt text)',
+  'A11-S1-024': 'the labels 10 and 7 give step 1 of the working',
+  'X11-F1-097': 'the x-axis tick -2 is the marking criterion "domain x >= -2"',
+  'X12-C3-100': 'the label y = 1 is the marking criterion "the solution approaches 1"',
+  'X11-F2-017': 'the cubic is plotted with its roots, which gives the sign pattern the answer states',
+  'A12-T3-146': 'the figure is the sketch the question asks for, with the line dashed, so the count is visible',
+  'A11-T2-144': 'the figure is the sketch the question asks for, with the line dashed, so the count is visible',
+  'X11-F1-148': 'the figure is the sketch the question asks for, with the line dashed, so the count is visible',
+  'A12-T3-101': 'the figure draws the curve and the dashed line, so the count of crossings is visible',
+  'A12-S3-004': 'the x-axis ticks are at every standard deviation, which is step 1 of the empirical rule',
+  'X11-F2-099': 'seen by the reviewer: the figure shows a step of the working',
+  'X12-V1-105': 'seen by the reviewer: the figure shows the landing point the question asks for',
+  'X12-V1-016': 'seen by the reviewer: the figure shows both possible paths and so the two angles',
+  'A12-M1-068': 'legibility: the axis label 5 is overprinted, and the alt text says 50000 where the figure shows 5',
+  'A12-S2-072': 'legibility: a bar and its labels are clipped',
+  'X12-S1-138': 'legibility: the labels overlap',
+  'X12-S1-062': 'mismatch: the alt text claims an x-label 0 that is not drawn',
+  'X11-A1-003': 'mismatch: A and B are drawn next to each other, and the question asks for arrangements where they are not',
   'X12-C3-099': 'the x-axis tick e squared is the upper limit of the working (the value of x at y = 2)',
   'X11-F1-015': 'the point asked for is marked on the curve',
   'X11-F1-017': 'the turning points asked for are marked on the curve',
@@ -385,6 +423,10 @@ export function structuralLeaks(tikz, part, parsed) {
     }
     if (geo.unreadable.length && !out.length) out.push(`a coordinate could not be read (${geo.unreadable[0]}): held`);
   }
+  // the figure is the very sketch a "sketch" or "draw the graph" question asks for
+  if (/\b(?:sketch|draw the graph|draw a graph)\b/i.test(String(part.prompt)) && geo.functions.length) out.push('answer: the figure is the very sketch the question asks for');
+  // a question that counts crossings ("how many solutions") whose figure draws the graphs and the line: the count is visible
+  if (/\bhow many (?:solutions|roots|intersections|crossings|points|zeros)\b/i.test(String(part.prompt)) && geo.functions.length >= 1 && (geo.functions.length >= 2 || /dashed|dotted/.test(String(tikz)))) out.push('answer: the figure draws the graphs whose crossings are counted, so the count is visible');
   // (b) a plotted function or a line is the answer
   const curve = answerCurve(part);
   if (curve) {
@@ -411,6 +453,8 @@ export function structuralLeaks(tikz, part, parsed) {
   // as an axis tick, tick label, label, annotation, marked point or coordinate. The main curve the question gives is allowed; a plotted
   // auxiliary line that is a step's result is not. A value the question itself states is not a finding.
   const { labels, tickNums } = printedNumbers(tikz, parsed);
+  // (b) text printed on the figure that is the author's own marking text or a step, put into words
+  for (const l of labels) if (matchesMarking(l.text, part)) out.push(`step result: the text "${l.text.replace(/\s+/g, ' ').slice(0, 40)}" printed on the figure is the marking text or a step`);
   const decisive = decisiveValues(part);
   const keys = keyValues(part);
   const shown = [
@@ -456,7 +500,7 @@ export function structuralLeaks(tikz, part, parsed) {
     const promptFns = [...String(part.prompt).matchAll(/(?:y|f\(x\)|g\(x\))\s*=\s*([^,;$]+)/g)].map(m => m[1]);
     for (const fn of geo.functions) {
       const f = x => evalMath(fn.expr, { x }, { deg: true });
-      const same = expr => { let hits = 0; for (const x of [-2.3, -1.1, 0.4, 0.9, 1.7, 2.6, 3.3]) { const a = f(x), b = evalMath(expr, { x }); if (a === null || b === null) continue; if (Math.abs(a - b) > 1e-6 * Math.max(1, Math.abs(a), Math.abs(b))) return false; hits++; } return hits >= 3; };
+      const same = expr => { let hits = 0; for (const x of [-2.3, -1.1, 0.4, 0.9, 1.7, 2.6, 3.3]) { const a = f(x), b = evalMath(expr, { x }); if (a === null || b === null) continue; if (Math.abs(a - b) > 1e-4 * Math.max(1, Math.abs(a), Math.abs(b))) return false; hits++; } return hits >= 3; };
       if (promptFns.some(same)) continue;
       const hit = stepFns.find(same);
       if (hit) out.push(`step result: a plotted line or curve (${fn.expr.slice(0, 30)}) is the result of a worked step`);

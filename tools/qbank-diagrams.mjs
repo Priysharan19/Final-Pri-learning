@@ -27,7 +27,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { checkAnswer, plainTex } from '../client/src/engine/checker.js';
-import { structuralLeaks } from './qbank-figure-risk.mjs';
+import { structuralLeaks, matchesMarking, decisiveValues, promptStates, numbersIn, near } from './qbank-figure-risk.mjs';
 
 const run = promisify(execFile);
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -435,6 +435,11 @@ function altStates(part, t) {
   const nums = answerNumbers(part);
   const texts = [...(t.labels?.words ?? []), ...(t.ticks?.values ?? []).flatMap(tk => tk.shown)];
   if (texts.some(w => statesAnswer(part, w))) return true;
+  // The alt text must not carry the author's marking text or a step either: words matching a criterion or step, or a number that is a step result
+  if (texts.some(w => matchesMarking(w, part)) || matchesMarking(texts.join(' '), part)) return true;
+  const decisive = decisiveValues(part).filter(d => Math.abs(d.v) > 1e-12 && !promptStates(part, d.v));
+  for (const w of texts) for (const n of numbersIn(w)) if (decisive.some(d => near(n, d.v, 3e-3))) return true;
+  for (const tk of t.ticks?.values ?? []) for (const x of tk.values) if (decisive.some(d => near(x, d.v, 3e-3))) return true;
   for (const tk of t.ticks?.values ?? []) for (const x of tk.values) if (nums.some(v => Math.abs(x - v) <= NEAR(v) && !statesNumber(part.prompt, v))) return true;
   return false;
 }
