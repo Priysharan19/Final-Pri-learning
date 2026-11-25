@@ -20,6 +20,13 @@ const arg = (k, d) => { const i = argv.indexOf(`--${k}`); return i >= 0 ? argv[i
 const root = path.resolve(arg('root', path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')));
 const imp = rel => import(pathToFileURL(path.join(root, rel)).href);
 const seeds = Number(arg('seeds', 12));
+// --real-lists: the approvals as the repository records them (server/platform/authorApproved.generated.js), not every scheme approved in this process
+const realLists = argv.includes('--real-lists');
+// --unbracketed conventional|ambiguous: every authored line is first written the way a student types it without brackets
+// (tools/function-argument-sweep.mjs: sin(2*x) as sin2x, or e^(2*x) as e^2x), so the same pages measure what that reading does to a LINE
+const unbracketed = arg('unbracketed', null);
+const { unbracketedForms } = await import('./function-argument-sweep.mjs');
+const unbracket = text => { const f = unbracketedForms(text).find(x => x.kind === unbracketed && x.style !== 'spaced' && x.style !== 'glued'); return f ? f.text : text; };
 
 export async function dump() {
   const G = await imp('client/src/engine/generators/index.js');
@@ -52,6 +59,7 @@ export async function dump() {
           if (rule === 'generic' && !GS.genericEligible(q0)) continue;
           const q = { ...q0, _methodScheme: id };
           let texts; try { texts = GS.authoredLines(q).map(l => l.text); } catch { continue; }
+          if (unbracketed) texts = texts.map(unbracket);
           if (texts.length < 2) continue;
           const pages = [['full', texts, finalOf(texts)], ['wrong', texts, '99991']];
           texts.forEach((t, k) => { const bad = SW.falsify(t); if (bad && bad !== t) pages.push([`f${k}`, texts.map((x, i) => (i === k ? bad : x)), '99991']); });
@@ -69,7 +77,7 @@ export async function dump() {
               const result = checkAnswer(q, answer);
               const ev = MO.stepEvidence(q, answer, lines.join('\n'), result, { slipWarnings: true });
               const correct = result.correct === true;
-              const pay = SA.schemePay({ q, report: ev.stepReport || null, topic: ev.topicTicks ?? null, correct, marksPossible: N, env: ENV, list: LIST });
+              const pay = SA.schemePay({ q, report: ev.stepReport || null, topic: ev.topicTicks ?? null, correct, marksPossible: N, env: ENV, ...(realLists ? {} : { list: LIST }) });
               const marks = pay.paid ? MO.practiceMarksEarned(q, result, { ...ev, partial: !correct ? pay.partial : null }, N) : 0;
               rec = { marks, paid: !!pay.paid, st: (ev.stepReport?.lines || []).map(l => ({ ok: 'o', break: 'b', note: 'n' }[l?.status] || '?')).join(''), lines };
             } catch (e) { rec = { err: String(e).slice(0, 80) }; }

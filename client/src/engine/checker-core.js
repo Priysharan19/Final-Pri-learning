@@ -10,7 +10,7 @@ import { diagnoseTopicLine } from './misconceptions/topics/index.js';
 import { slipFeedback } from './slips.js';
 import { checkMatrixMatch } from './matrixMatch.js';
 import { checkGraphSketch } from './graphFeatures.js';
-import { normalize, parse, evaluate, evalNumeric, exprEquivalent, numsClose, numericBand, relativeBand, variablesOf, withEvaluationBudget } from './expr.js';
+import { normalize, parse, evaluate, evalNumeric, exprEquivalent, ambiguousReadings, numsClose, numericBand, relativeBand, variablesOf, withEvaluationBudget } from './expr.js';
 
 // Every sum term and counting-loop turn spent while one answer or one page of
 // working is checked comes out of this — see "What an evaluation may cost" in expr.js.
@@ -1328,16 +1328,26 @@ function checkAnswerWithinBudget(question, rawInput) {
         // refused where the question authors `strictDomain: true`.
         const opts = { domain: ans.domain, positiveOnly: ans.positiveOnly, isolatedDomain: true, strictDomain: ans.strictDomain === true };
         const candidates = [ans.expr, ...(ans.anyOf || [])];
-        for (const cand of candidates) {
-          if (exprEquivalent(student, cand, opts)) {
-            // guard against a bare number matching an expression with variables
-            const wantVars = variablesOf(parse(cand));
-            if (wantVars.size > 0) {
-              const gotVars = variablesOf(parse(student));
-              if (gotVars.size === 0) continue;
+        const reaches = text => {
+          for (const cand of candidates) {
+            if (exprEquivalent(text, cand, opts)) {
+              // guard against a bare number matching an expression with variables
+              const wantVars = variablesOf(parse(cand));
+              if (wantVars.size > 0) {
+                const gotVars = variablesOf(parse(text));
+                if (gotVars.size === 0) continue;
+              }
+              return true;
             }
-            return { correct: true };
           }
+          return false;
+        };
+        if (reaches(student)) return { correct: true };
+        // `e^2x`, `sqrt2x`, `log2x` have two conventional readings (FUNCTION_ARGUMENT_RULE, expr.js). The literal one was tried above; the
+        // answer is also right when another reading reaches the key, unless some reading of it is a trap this question records.
+        const others = ambiguousReadings(student);
+        if (others.length && !matchTraps(question, null, rawInput) && !others.some(r => matchTraps(question, null, r)) && others.some(r => { try { return reaches(r); } catch { return false; } })) {
+          return { correct: true };
         }
         const why = matchTraps(question, null, rawInput);
         return { correct: false, feedback: why ?? undefined };

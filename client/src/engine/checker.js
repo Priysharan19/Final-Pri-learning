@@ -5,7 +5,7 @@
 // that API stable while routing mathematical working through Pri Reason.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { normalize, parse, evaluate, exprEquivalent, numsClose, variablesOf, withEvaluationBudget } from './expr.js';
+import { normalize, parse, evaluate, exprEquivalent, ambiguousReadings, numsClose, variablesOf, withEvaluationBudget } from './expr.js';
 
 // Every sum term and counting-loop turn spent while one answer or one page of
 // working is checked comes out of this — see "What an evaluation may cost" in expr.js.
@@ -268,7 +268,11 @@ function proofLine(text, cleaned, previousText, meta) {
   // a line the engine cannot read is not a line it can call false
   if (segments.some(seg => !parseExpr(statedSide(seg, meta)))) return { status: 'note', note: 'Not checked: Pri cannot read this line, so it is not marked right or wrong.' };
   for (const seg of segments) {
-    if (!exprEquivalent(statedSide(seg, meta), meta.canonical, { positiveOnly: meta.positiveOnly })) {
+    if (exprEquivalent(statedSide(seg, meta), meta.canonical, { positiveOnly: meta.positiveOnly })) {
+      // `cos2θ` is read as cos(2θ), but a side that is true only under that reading is not ticked: it abstains until every reading is true
+      const readings = COEFFICIENT_ARGUMENT.test(seg) ? unbracketedReadings(seg) : null;
+      if (readings && readings.some(r => !exprEquivalent(statedSide(r, meta), meta.canonical, { positiveOnly: meta.positiveOnly }))) ambiguous = true;
+    } else {
       // `cos2θ` is cos(2θ) or cos(2)·θ: a line false under one reading and true under the other is not crossed (the every-reading rule)
       const readings = unbracketedReadings(seg);
       if (readings && readings.some(r => exprEquivalent(statedSide(r, meta), meta.canonical, { positiveOnly: meta.positiveOnly }))) { ambiguous = true; continue; }
@@ -707,8 +711,13 @@ function namesAValue(text, meta) {
 export const WORKING_LIMITS = Object.freeze({ lineChars: 200, lines: 100, work: 600000 });
 const UNREAD = {
   long: `Not checked: this line is longer than ${WORKING_LIMITS.lineChars} characters. Write one step per line.`,
-  many: 'Not checked: this is more working than can be checked. Keep to the steps of your method.'
+  many: 'Not checked: this is more working than can be checked. Keep to the steps of your method.',
+  // FUNCTION_ARGUMENT_RULE 7 (expr.js): e^2x, sqrt2x, log2x have two conventional readings, so a line with one is never ticked or crossed.
+  brackets: 'Not checked: this can be read two ways (e^2x is e^(2x) or e^2 times x; sqrt2x is sqrt(2x) or sqrt(2) times x; log2x is log(2x) or log base 2 of x), so it is not marked right or wrong. Put the argument in brackets.'
 };
+
+// A function name straight before a number and a letter (cos2x, sin 3θ, ln 2x, sin^2 3x): the argument whose reading FUNCTION_ARGUMENT_RULE fixes.
+const COEFFICIENT_ARGUMENT = /(?<![a-z])(?:sin|cos|tan|sec|cosec|csc|cot|ln|exp|arcsin|arccos|arctan|asin|acos|atan)\s*(?:\^\s*\d+\s*)?\d+(?:\.\d+)?\s*(?:[a-zθ]|π)(?![a-z(])/i;
 
 /** For each line of working, null when it is to be read, or the note saying why it is not. */
 function unreadLines(rawLines) {
@@ -717,7 +726,7 @@ function unreadLines(rawLines) {
     if (line.length > WORKING_LIMITS.lineChars) return UNREAD.long;
     spent += line.length * line.length;
     if (closed || index >= WORKING_LIMITS.lines || spent > WORKING_LIMITS.work) { closed = true; return UNREAD.many; }
-    return null;
+    return ambiguousReadings(line).length ? UNREAD.brackets : null;
   });
 }
 const unreadNote = entry => entry;
@@ -1834,6 +1843,14 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
           const readings = unbracketedReadings(line);
           if (readings && readings.some(r => { const a = assessCalculusLine(r, calculus, meta, { ...calculusStage }); return !a || a.status !== 'break'; })) {
             assessed = { status: 'note', note: 'This function argument can be read two ways (cos 2x is cos(2x) or cos(2)·x), so it is not marked wrong. Put the argument in brackets.' };
+          }
+        }
+        // The same rule from the other side: `2cos 2x` is read as 2cos(2x) (FUNCTION_ARGUMENT_RULE, expr.js), but a line that is true only under that
+        // reading is not ticked: the unbracketed argument is the student's to settle, so it abstains until every reading of it is true.
+        if (assessed && assessed.status === 'ok' && !assessed.side && calculus && COEFFICIENT_ARGUMENT.test(String(line))) {
+          const readings = unbracketedReadings(line);
+          if (readings && readings.some(r => { const a = assessCalculusLine(r, calculus, meta, { ...calculusStage }); return !a || a.status !== 'ok'; })) {
+            assessed = { status: 'note', note: 'This function argument can be read two ways (cos 2x is cos(2x) or cos(2)·x), so it is not marked right or wrong. Put the argument in brackets.' };
           }
         }
         // Every-reading rule (CTO ruling): a bare or "= …" line, or a line "∫f dx = F", is crossed only when the engine proves it
