@@ -83,7 +83,9 @@ try {
       await signUp(page, platform, pathway);
       await page.goto(`${platform.origin}/practice?subtopic=${topic}`, { waitUntil: 'domcontentloaded' });
       let worst = 0, mcqSeen = false;
-      for (let i = 0; i < SAMPLE; i++) {
+      // At least SAMPLE questions, and on until a multiple choice question has been met (up to 40): the checks below that need one then always
+      // run, so the count of checks this tour prints is the same every time.
+      for (let i = 0; i < SAMPLE || (!mcqSeen && i < 40); i++) {
         await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
         await page.waitForTimeout(600);
         worst = Math.max(worst, await over(page));
@@ -116,6 +118,7 @@ try {
         await page.locator('.ctx-next, .ws-actions .btn-primary').first().click({ timeout: 8000 }).catch(() => {});
         await page.waitForTimeout(1200);
       }
+      check(`${label}, ${width} px: a multiple choice question was met in the sample`, mcqSeen);
       check(`${label}, ${width} px: ${SAMPLE} questions, the page never scrolls sideways`, worst <= 0, `${worst}px`);
       await ctx.close();
     }
