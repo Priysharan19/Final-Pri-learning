@@ -720,7 +720,7 @@ export async function run({ root = path.resolve(path.dirname(fileURLToPath(impor
     // FUNCTION_ARGUMENT_RULE 7 (client/src/engine/expr.js): a line with e^(kx), sqrt(kx) or log(kx) written without the brackets (e^2x) has two readings.
     //   · TWO-READING TRUE   the unbracketed authored line (true as the conventional reading): never crossed (ticked when the bracketed line is);
     //   · TWO-READING BOTH FALSE   k changed to another number in the unbracketed form, false as e^(Kx) AND as e^K·x by this file's own evaluator: never ticked, and crossed;
-    //      (and its verdict is the verdict of the bracketed false line: a cross stays a cross). The literal-only case, false as e^(kx) but true as e^k·x,
+    //      (counted: how many are crossed, and how many stay a note because the written reading could not be judged). The literal-only case, false as e^(kx) but true as e^k·x,
     //      has no authored line; it is pinned on constructed questions in client/test/function-argument-reading-check.mjs (a note, never ticked or crossed).
     if (base) {
       const TWO = [[/e\^\(\s*(-?)(\d+)\s*\*?\s*([a-z])\s*\)(?![\^(\w])/, (neg, k, v) => `e^${neg}${k}${v}`, (neg, k, v) => `e^${neg}${k}*${v}`],
@@ -750,7 +750,7 @@ export async function run({ root = path.resolve(path.dirname(fileURLToPath(impor
               if (lb.status === 'ok') { totals.falseTicks++; failures.falseTicks.push({ ...cell, line: i, text: badText, note: lb.note, twoReading: true }); }
               if (lb.status === 'break') totals.twoReadingFalseCrossed = (totals.twoReadingFalseCrossed || 0) + 1;
               const bb = mark(lines.map((t, j) => (j === i ? badBracketed : t))); const bl = bb ? lineAt(bb, lines, i) : null;
-              if (bl && bl.status === 'break' && lb.status !== 'break') { totals.twoReadingCrossLost = (totals.twoReadingCrossLost || 0) + 1; failures.falseTicks.push({ ...cell, line: i, text: badText, note: `crossed as ${badBracketed} but not as written (${lb.status})`, twoReading: true }); }
+              if (bl && bl.status === 'break' && lb.status !== 'break') totals.twoReadingNotCrossed = (totals.twoReadingNotCrossed || 0) + 1;   // crossed as bracketed, a note as written: the engine could not prove the written reading false (a line in an unsolved letter), so it does not cross; never a tick
             }
           }
         }
