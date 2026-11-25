@@ -199,7 +199,17 @@ try {
   // A question with none of his hints left has no hint control at all, and no empty panel where one would be.
   // A question with no hints is two of the 26 authored level 2 questions of this dot point, so the search runs on for longer than the others
   // (launch QA 26 Nov 2026: the dot point's generated forms are no longer dealt unless a content review vouches for them, which moved the stream).
-  const bare = await reach(q => q.hints.length === 0, 160);
+  // The server's seeds are fixed under test, so the plain request deals the same dozen questions however long it searches; ask for the levels the
+  // two (level 2) and two (level 3) questions with no hints are set at.
+  let bare = null;
+  for (const level of [2, 3]) {
+    if (bare) break;
+    await page.goto(`${platform.origin}/practice?subtopic=${CHAPTER}&dotpoint=${ORDINAL}&difficulty=${level}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
+    await online.settled();
+    await skipTour();
+    bare = await reach(q => q.hints.length === 0, 60);
+  }
   if (bare) {
     await typeTab();
     check('a question with no rung offers no hint control and no empty hints panel', await page.locator('[data-hint-ladder], [data-hint-rung-open], [data-hint-rung], .hints-block').count() === 0, (await page.locator('[data-hint-ladder], [data-hint-rung-open], [data-hint-rung], .hints-block').evaluateAll(els => els.map(e => e.outerHTML.slice(0, 160)))).join(' | '));
