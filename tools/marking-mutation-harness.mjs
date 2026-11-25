@@ -15,9 +15,11 @@
 //
 // Deterministic: fixed seeds, no model, no network. A measurement; it sets and changes nothing.
 //
-//   node tools/marking-mutation-harness.mjs [--bank] [--ids A11-F1-172,...] [--root <repo>] [--seeds 1] [--seed-from 0] [--max-per-line 12] [--generators y12-diff,me11-poly]
+//   node tools/marking-mutation-harness.mjs [--bank [--bank-unscoped]] [--ids A11-F1-172,...] [--root <repo>] [--seeds 1] [--seed-from 0] [--max-per-line 12] [--generators y12-diff,me11-poly]
 //        [--typed wrong|right] [--dump out.json] [--compare base.json] [--limit-pages N] [--verbose]
 //   --root points the engine at another checkout (the same harness measured against an older tree gives the "before" rate);
+//   --bank reads and marks his pages in the bank's own scope (solutionMatch.withBankReading, as the bank rules do); --bank-unscoped reads and marks them as a student's
+//   page is read (no scope), which is what the product does today and must equal main's tree line for line.
 //   --dump writes every authored line's verdict, --compare lists the ticks a tree lost or gained against such a dump.
 //
 // What is NOT held against the marker (each counted in the totals, by class, never silently dropped):
@@ -47,8 +49,10 @@ const FUNS = {
 };
 const WORDS = new Set([...Object.keys(FUNS), 'pi']);
 
+// whole-number counting (the bank's (5C2), (7P3)) is a number to this evaluator: 5C2 is 10, so a mutant that swaps it for 5C3 is TRUE, not wrong
+const countValue = (n, r, f) => { n = Number(n); r = Number(r); if (!(n < 171)) return NaN; if (r > n) return 0; let v = 1; for (let k = 0; k < r; k++) v = v * (n - k) / (f === 'C' ? k + 1 : 1); return Math.round(v); };
 function tokenize(src) {
-  const s = String(src).replace(/[−–—]/g, '-').replace(/[×·]/g, '*').replace(/÷/g, '/').replace(/²/g, '^2').replace(/³/g, '^3').replace(/√/g, 'sqrt').replace(/[{]/g, '(').replace(/[}]/g, ')');
+  const s = String(src).replace(/(?<![A-Za-z0-9.])(\d+)([CP])(\d+)(?![A-Za-z0-9.])/g, (_, n, f, r) => `(${countValue(n, r, f)})`).replace(/[−–—]/g, '-').replace(/[×·]/g, '*').replace(/÷/g, '/').replace(/²/g, '^2').replace(/³/g, '^3').replace(/√/g, 'sqrt').replace(/[{]/g, '(').replace(/[}]/g, ')');
   const out = [];
   let i = 0;
   while (i < s.length) {
@@ -574,26 +578,31 @@ export async function loadEngine(root) {
  * handed them (markerOps.markerView over the served question), their answers read as server/platform/qbankMarking.js reads them, and the same
  * real marker. `ids` are the pack's question ids.
  */
-export async function loadBankEngine(root) {
+export async function loadBankEngine(root, { scoped: useScope = true } = {}) {
   const E = await loadEngine(root);
   const pack = await import(path.join(root, 'server/platform/qbankPack.js'));
   const { checkBankAnswer } = await import(path.join(root, 'server/platform/qbankMarking.js'));
   const { markerView } = await import(path.join(root, 'server/platform/markerOps.js'));
   await pack.ensureQbank({ ...process.env, PRI_EDITION: 'prithagoras' }, { strict: true });
   const ids = pack.qbankEntries().map(e => e.entry.id);
-  return { ...E, G: { generateQuestion: id => markerView(pack.qbankEntryQuestion(id, 17)) }, checkAnswer: checkBankAnswer, ids, bank: true };
+  // his steps are read in the bank's own scope (solutionMatch.withBankReading), as the bank rules read them; a checkout without it reads as it always did
+  const SM = await import(path.join(root, 'client/src/engine/solutionMatch.js'));
+  const scoped = useScope && SM._internals.withBankReading ? (span => SM._internals.withBankReading(() => SM._internals.spanToPlain(span))) : E.spanToPlain;
+  // the page is MARKED in the same scope it was read in (as markBankPage does): his line and the step it is matched against are read by one reader
+  const scope = useScope && SM._internals.withBankReading ? SM._internals.withBankReading : null;
+  return { ...E, spanToPlain: scoped, scope, G: { generateQuestion: id => markerView(pack.qbankEntryQuestion(id, 17)) }, checkAnswer: checkBankAnswer, ids, bank: true };
 }
 /** The real marker's report lines for a page, or null. A generator question is marked as the server marks one it has sealed (the Australian edition's). */
 export function markPage(E, q, answer, page) {
   const qq = E.bank ? { ...q } : { ...q, _marking: 'final-answer-only' };
-  let ev; try { ev = E.stepEvidence(qq, answer, page.join('\n'), E.checkAnswer(qq, answer), { slipWarnings: true }); } catch { return null; }
+  let ev; try { const go = () => E.stepEvidence(qq, answer, page.join('\n'), E.checkAnswer(qq, answer), { slipWarnings: true }); ev = E.bank && E.scope ? E.scope(go) : go(); } catch { return null; }
   return ev && (ev.shownReport || ev.stepReport) && Array.isArray((ev.shownReport || ev.stepReport).lines) ? (ev.shownReport || ev.stepReport).lines : null;
 }
 /** The report's line for page line i: by position when it judged every line, otherwise by the line's text (a proof is judged line by line from its own plan). */
 export const lineAt = (rep, page, i) => (rep && rep.length === page.length ? rep[i] : rep ? rep.find(l => String(l.text ?? '').trim() === page[i].trim()) : undefined);
 
-export async function run({ root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), seeds = [1], maxPerLine = 12, generators = null, typed = 'wrong', limitPages = Infinity, verbose = false, bank = false, ids = null } = {}) {
-  const E = bank ? await loadBankEngine(root) : await loadEngine(root);
+export async function run({ root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), seeds = [1], maxPerLine = 12, generators = null, typed = 'wrong', limitPages = Infinity, verbose = false, bank = false, ids = null, bankScope = true } = {}) {
+  const E = bank ? await loadBankEngine(root, { scoped: bankScope }) : await loadEngine(root);
   const { G, NSW_BANK_LEDGER, spanToPlain, stepEvidence, checkAnswer } = E;
   const cells = [];
   if (bank) for (const id of E.ids) { if (!ids || ids.includes(id)) cells.push({ generator: id, difficulty: 0, seed: 17 }); }
@@ -954,6 +963,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
     typed: arg('typed', 'wrong'),
     limitPages: Number(arg('limit-pages', Infinity)),
     bank: process.argv.includes('--bank'),
+    bankScope: !process.argv.includes('--bank-unscoped'),
     ids: arg('ids', null) ? arg('ids').split(',') : null,
     verbose: process.argv.includes('--verbose')
   });

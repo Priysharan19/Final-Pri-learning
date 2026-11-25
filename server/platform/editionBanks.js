@@ -22,6 +22,8 @@ import { indiaBank, BANK_OUTSIDE_INDIA } from './indiaBanks.js';
 import { indiaQuestionIdentity } from './indiaIdentity.js';
 import { approvedSchemeTypes, schemeTypeOf, schemeById, schemeMarks, isApproved } from './schemeAward.js';
 import { GENERIC_ID, genericEligible } from './genericSteps.js';
+import { BANK_ID, bankEligible } from './bankSteps.js';
+import { BANK_GENERIC_ID, bankGenericEligible } from './bankGenericSteps.js';
 import { marksPossibleFor } from './markerOps.js';
 import { nswBank, nswIssuable, nswQuestionIdentity, BANK_OUTSIDE_NSW, NSW_COURSE } from './nswBanks.js';
 
@@ -65,9 +67,15 @@ export function sealForEdition(q, banks, generator = q?._generator ?? q?.subtopi
     q._curriculum = identity;
   }
   if (banks.marking && typeof q?._bank === 'string') {
-    // An author-bank question (qbankPack.js) is final-answer-only in this phase, whatever the scheme lists say: no scheme or generic step
-    // rule is ever stamped on it, so no step mark is paid on it.
-    q._marking = banks.marking;
+    // An author-bank question (qbankPack.js) is final-answer-only, whatever the scheme lists say: no per-type scheme or generic step rule is
+    // ever stamped on it. ONE rule may pay it, the bank rule (bankSteps.js, approval id `bank-author-criteria`), only while the author's record
+    // for it is at its current digest and the part passed the rule's own import-time proof. Unapproved (the repository default), it is stamped
+    // exactly as before.
+    // Two draft rules may pay a bank part, each under its own approval: his criteria where they are verifiable (BANK_ID), else the approved generic
+    // rule applied to his worked steps (BANK_GENERIC_ID). Neither is approved in the repository.
+    if (banks.methodSchemeTypes?.length && isApproved(BANK_ID, banks.methodSchemeTypes) && bankEligible(q)) q._methodScheme = BANK_ID;
+    else if (banks.methodSchemeTypes?.length && isApproved(BANK_GENERIC_ID, banks.methodSchemeTypes) && bankGenericEligible(q)) q._methodScheme = BANK_GENERIC_ID;
+    else q._marking = banks.marking;
   } else if (banks.marking) {
     // An allow-listed type, at the digest the author read, is stamped with its scheme instead of the final-answer seal.
     // With the list empty (the repository default) this never looks at the question: every question is sealed as before.
