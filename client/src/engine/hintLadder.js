@@ -36,6 +36,7 @@
 // the worked step and the step headings are not public before resolution.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { rungStatesAnswer } from './rungStatements.js';
 import { evalNumeric, normalize } from './expr.js';
 
 export const HINT_RUNGS = Object.freeze(['nudge', 'method', 'worked', 'solution']);
@@ -157,6 +158,8 @@ function keySlack(q, v) {
 export function rungGivesAnswer(q, rung) {
   const body = String(rung ?? '');
   if (!body.trim()) return false;
+  // The marker's own reading first: a point, pair, complex number, set, interval or expression the rung states, and a number the prompt also prints.
+  if (rungStatesAnswer(q, body)) return true;
   const prompt = String(q?.prompt || '').replace(/\$/g, ' ');
   const quoted = n => new RegExp(`(?<![\\d.])${String(n).replace(/[.*+?^${}()|[\]\\-]/g, '\\$&')}(?!\\d|\\.\\d)`).test(prompt);
   const values = answerNumbers(q).filter(v => !quoted(v));

@@ -48,7 +48,7 @@ export function ladderLeakSelfTest() {
   if (ladderLeaks(q).length) errors.push(`the built ladder still leaks: ${ladderLeaks(q).join(' | ')}`);
   // The server's hint route is the only place a rung is served; it must ask for the guard on the Prithagoras edition.
   const route = readFileSync(new URL('../../server/platform/practice.js', import.meta.url), 'utf8');
-  if (!/buildHintLadder\(q, \{ withholdAnswer: serverEdition\(env\) === 'prithagoras' \}\)/.test(route)) errors.push('the hint route does not withhold the answer on the Prithagoras edition');
+  if (!/guarded = serverEdition\(env\) === 'prithagoras';\s*const ladder = buildHintLadder\(q, \{ withholdAnswer: guarded \}\)/.test(route)) errors.push('the hint route does not withhold the answer on the Prithagoras edition');
   return errors;
 }
 

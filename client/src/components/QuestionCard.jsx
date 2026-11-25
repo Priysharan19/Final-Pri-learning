@@ -1861,6 +1861,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     try {
       const r = await api.post(`/practice/${question.id}/hint`, { rung: nextRung });
       if (!mountedRef.current) return;
+      // A rung the server emptied (it would have stated the answer) is shown as passed over, with nothing to read and nothing charged.
+      if (r.charged === false) { setHintLevel(l => Math.max(l, HINT_RUNGS.indexOf(r.rung || nextRung) + 1)); return; }
       setHints(h => (h.some(x => x.rung === r.rung) ? h : [...h, { rung: r.rung || nextRung, text: r.hint || null }]));
       setHintLevel(l => Math.max(l, Number(r.level) || 0));
     } catch (e) { refuseCheck(e, 'hint'); }

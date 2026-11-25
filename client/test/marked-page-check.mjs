@@ -106,7 +106,6 @@ eq([typesetProse('The term -2x became -x.'), typesetProse('At x = 1 the line abo
   const bare = buildAnnotatedWorking({ lines: ['a', 'b'], stepReport: { source: 'value-chain', lines: [{ text: 'a', status: 'ok', state: 'verified' }, { text: 'b', status: 'break', state: 'wrong' }] } });
   eq([bare.cards[1].facts, bare.cards[1].corrected, bare.firstBreakIndex], [{ whatChanged: null, whyWrong: null, fromLine: null, check: null, kept: null }, null, null], 'without the optional fields every one is null');
 }
-if (fail.length) { console.error(fail.map(f => `  · ${f}`).join('\n')); console.error(`MARKED PAGE MODEL: FAIL (${fail.length} of ${pass + fail.length})`); process.exit(1); }
 // ── a fully correct page that states equations is still a marked page (launch QA 26 Nov 2026) ───────────────────
 {
   const lines = ['y = (7x - 1)^(-2)', '((dy)/(dx)) = -2(7x - 1)^(-3)* 7', '= -((14)/((7x - 1)^(3)))'];
@@ -118,4 +117,5 @@ if (fail.length) { console.error(fail.map(f => `  · ${f}`).join('\n')); console
   ok(pg && pg.header.everyLine === true && pg.header.counts.right === 3 && pg.firstError === null, 'the marked page for a fully correct answer says every line was checked');
 }
 
+if (fail.length) { console.error(fail.map(f => `  · ${f}`).join('\n')); console.error(`MARKED PAGE MODEL: FAIL (${fail.length} of ${pass + fail.length})`); process.exit(1); }
 console.log(`MARKED PAGE MODEL: PASS — ${pass}/${pass} checks — line geometry for ink and photo, level comments, the one collapsed card, an honest header, no mark unless the server gave one`);

@@ -61,5 +61,8 @@ for (const [generator, issued] of Object.entries(NSW_ISSUED_CELLS)) {
     }
   }
 }
-assert.ok(dotpoints >= 138 && offered >= 300 && served > 3000, `reached the catalogue (${dotpoints} dot points, ${offered} offered levels)`); n++;
+assert.ok(dotpoints >= 138 && offered >= 263 && served > 3000, `reached the catalogue (${dotpoints} dot points, ${offered} offered levels)`); n++;
+// 300 -> 263 offered levels (the count a real run printed on the merged tree, 26 Nov 2026): the registry table is no longer trusted. A generated
+// question counts for a dot point only at a level whose questions a content review READ and found on that dot point (tools/nsw-dotpoint-content.mjs:
+// 132 of the 263), or where the author's bank numbers the question to it (131). Cells that mix dot points are not offered.
 console.log(`PRACTICE DOT POINT EXACT: PASS, ${n} checks. ${dotpoints} dot points, ${offered} offered levels answered only by exact questions (${served} issues), ${refused} shared levels never offered, no topic substitution.`);

@@ -102,8 +102,8 @@ const noneOfIt = { ...banks, admits: (q, g) => banks.admits(q, g) && !credited(q
 assert.throws(() => chooseQuestion(req('y12-diff', 3, { dotpoint: 'y12-diff.2' }), null, { draw: lcg(5), banks: noneOfIt }),
   e => e.code === 'PRACTICE_CONTENT_UNSUPPORTED', 'refused');
 n++;
-ok(chooseQuestion(req('y12-diff', 3), null, { draw: lcg(5), banks: noneOfIt }).q, 'the topic itself is still issued');
-ok(chooseQuestion(req('y12-diff', 2, { dotpoint: 'y12-diff.1' }), null, { draw: lcg(5), banks: noneOfIt }).q, 'and a sibling dot point is still issued');
+ok(chooseQuestion(req('y12-diff', 1), null, { draw: lcg(5), banks: noneOfIt }).q, 'the topic itself is still issued');
+ok(chooseQuestion(req('y12-diff', 1, { dotpoint: 'y12-diff.3' }), null, { draw: lcg(5), banks: noneOfIt }).q, 'and a sibling dot point is still issued');
 // Everything of the dot point seen: a flagged repeat of the dot point, not a fresh question of a sibling.
 {
   const [generator, dotpoint, level] = ['y12-financial', 'y12-financial.2', 1];

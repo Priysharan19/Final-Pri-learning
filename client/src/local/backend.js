@@ -394,7 +394,7 @@ const dpStateOf = (ratingRow, dotpointId) =>
 
 /** Dot-point rows in the shape the picker ranks, restricted to what can be generated. */
 function generatableDotpointStates(subtopicId, ratingRow, nsw = false) {
-  // On NSW only the levels at which a dot point's own questions are provably its own can be aimed at (nswOffer.js nswExactLevels);
+  // On NSW only the levels at which a dot point's own questions are its own (content-reviewed or author-numbered) can be aimed at (nswOffer.js nswExactLevels);
   // the server refuses a dot point request nothing exact answers, so a pick must never land on a shared cell.
   const dps = nsw
     ? generatableDotpoints(subtopicId).map(dp => ({ ...dp, forms: nswIssuedForms(subtopicId, nswExactLevels(subtopicId, dp.id)) })).filter(dotpointIsGeneratable)
@@ -3718,7 +3718,7 @@ const routes = {
       const sub = SUBTOPIC_BY_ID[subtopic];
       const st = await getRating(p.id, subtopic);
       const asked = dotpointOf(subtopic, dotpoint);
-      // The levels this dot point is served at: on NSW only those where its own questions are provably its own
+      // The levels this dot point is served at: on NSW only those where its own questions are its own (content-reviewed or author-numbered)
       // (engine/nswOffer.js nswExactLevels). A dot point with none is not answered with the topic's questions.
       const askedForms = !asked ? [] : practiceCurriculumOf(p) === 'nsw' ? nswIssuedForms(subtopic, nswExactLevels(subtopic, asked.id)) : asked.forms;
       if (asked && practiceCurriculumOf(p) === 'nsw' && !askedForms.length) throw practiceNotOffered();
@@ -3862,7 +3862,7 @@ const routes = {
         solution: r.solution, ...meta, ...certifiedPracticeMarks(r), syncQueued: true };
     }
     await put('questions', row);
-    return { hint: typeof r?.hint === 'string' ? r.hint : null, rung: r?.rung || asked, level, thin: r?.thin === true,
+    return { hint: typeof r?.hint === 'string' ? r.hint : null, rung: r?.rung || asked, level, thin: r?.thin === true, ...(r?.charged === false ? { charged: false } : {}),
       remaining: Math.max(0, HINT_RUNGS.length - level), markWeight: markWeightAfter(level, hintsFree()), next: nextRungAfter(level) };
   },
 
@@ -6542,7 +6542,7 @@ async function serveQuestion(pid, asked, localDraft) {
   const nsw = curriculum === 'nsw' && generator !== 'custom';
   if (nsw) {
     const cell = nswOfferedCell({ generator, difficulty, dotpoint });
-    // A dot point none of whose questions is provably its own is never answered with the topic's (launch QA 26 Nov 2026).
+    // A dot point none of whose questions is its own is never answered with the topic's (launch QA 26 Nov 2026).
     if (!cell || cell.refused) throw practiceNotOffered();
     ({ difficulty, dotpoint } = cell);
   }

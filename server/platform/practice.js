@@ -23,6 +23,7 @@ import { misconceptionIdForTrap, misconceptionIdForDiagnosis, misconceptionById 
 import { slipHint } from '../../client/src/engine/slipHint.js';
 import { cleanLatex, safeLatexLines } from '../../client/src/engine/texSafe.js';
 import { slipPatterns } from '../../client/src/engine/slipPattern.js';
+import { nswContentTrusted } from '../../client/src/engine/nswOffer.js';
 import { misconceptionLabel } from '../../client/src/engine/adaptive.js';
 import { HINT_RUNGS, buildHintLadder, ladderAvailable, ladderEvidence, markWeightAfter, nextRungAfter, rungLevelOf } from '../../client/src/engine/hintLadder.js';
 import { dueDotpoints, reviewStateFromAttempts } from '../../client/src/engine/reviewQueue.js';
@@ -544,7 +545,7 @@ function* seekQuestion(request, { draw, tries, batches, admits = null }) {
       // ... and at the level asked for: the engine snaps a level a dot point has no form at to its nearest one, which would be a silent change
       // of level (the device offers a dot point only at the levels it is served at, nswDotpointExact.js).
       // Prithagoras only (`admits` is null on Priyabhata, whose dot point requests are served and refused exactly as before):
-      if (dotpoint != null && (admits ? (q.dotpointExact !== true || Number(q.difficulty) !== Number(difficulty)) : !(q.dotpoints || []).includes(q.dotpointRequested))) continue;
+      if (dotpoint != null && (admits ? (q.dotpointExact !== true || Number(q.difficulty) !== Number(difficulty) || !nswContentTrusted(q, generator, difficulty, dotpoint)) : !(q.dotpoints || []).includes(q.dotpointRequested))) continue;
       // Rush and Match answer in one line of their own: a sketch is a form of features, so neither is ever dealt one.
       if (q.answerType === 'graph-sketch' && (request.mode === 'rush' || request.mode === 'match')) continue;
       const hash = opaqueContentHash(q.contentHash);
@@ -1311,7 +1312,18 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // A worked-solution question offers its hints only: its solution is not a rung (it ends nothing and marks nothing; it has its own route).
       if (q.answerType === 'manual' && body.rung === 'solution') return { status: 409, code: 'HINT_NOT_AVAILABLE' };
       const level = await hintLevelOf(accountId, qid);
-      if (want > level + 1) return { status: 409, code: 'HINT_RUNG_ORDER', next: nextRungAfter(level) };
+      // Prithagoras: a rung the answer guard emptied (it would have stated the answer) is `thin`. Nothing was shown, so nothing is charged:
+      // the level the account has reached, the help recorded against the question and the mark weight stay as they were, and the student may
+      // go on to the next rung without it (launch QA 26 Nov 2026, review of #1122). The other edition's ladders are served and charged as before.
+      const guarded = serverEdition(env) === 'prithagoras';
+      const ladder = buildHintLadder(q, { withholdAnswer: guarded });
+      const emptied = r => guarded && r.rung !== 'solution' && r.thin;
+      if (want > level + 1 && !ladder.slice(level, want - 1).every(emptied)) return { status: 409, code: 'HINT_RUNG_ORDER', next: nextRungAfter(level) };
+      if (body.rung !== 'solution' && emptied(ladder[want - 1])) {
+        const rung = ladder[want - 1];
+        return { response: { authoritative: true, questionId: qid, rung: rung.rung, level, hint: null, thin: true, charged: false,
+          remaining: HINT_RUNGS.length - level, markWeight: markWeightAfter(level, hintsAreFree(env)), next: nextRungAfter(level) } };
+      }
       const reached = Math.max(level, want);
       if (reached > level) {
         await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-hints',?,?,?,?,?) ON CONFLICT(account_id,scope,key) DO UPDATE SET response_json=excluded.response_json",
@@ -1325,7 +1337,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         if (revealed.status) return revealed;
         return { response: { ...revealed.response, rung: 'solution', level: HINT_RUNGS.length, remaining: 0, endsQuestion: true } };
       }
-      const rung = buildHintLadder(q, { withholdAnswer: serverEdition(env) === 'prithagoras' })[want - 1];
+      const rung = ladder[want - 1];
       return { response: { authoritative: true, questionId: qid, rung: rung.rung, level: reached,
         hint: rung.text, thin: rung.thin, remaining: HINT_RUNGS.length - reached,
         markWeight: markWeightAfter(reached, hintsAreFree(env)), next: nextRungAfter(reached) } };
