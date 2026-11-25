@@ -182,8 +182,8 @@ const nearestForm = (forms, want) => (forms || []).length
  * difficulty, because a dot point that cannot be reached there is not a choice,
  * it is a promise that would be broken on the next line.
  */
-function chooseDotpoint(subtopicId, ratingRow, { fixed = null, want = 2, prefer = null, trapKey = null, nowMs = Date.now(), nsw = false } = {}) {
-  let pool = generatableDotpointStates(subtopicId, ratingRow, nsw);
+function chooseDotpoint(subtopicId, ratingRow, { fixed = null, want = 2, prefer = null, trapKey = null, nowMs = Date.now() } = {}) {
+  let pool = generatableDotpointStates(subtopicId, ratingRow);
   // A dot point is only reachable through the difficulties whose authored form
   // exercises it, and some are reachable at one rung only. That constraint is
   // not allowed to overrule the success target: a dot point whose only form is
@@ -393,13 +393,8 @@ const dpStateOf = (ratingRow, dotpointId) =>
   (ratingRow?.dp && ratingRow.dp[dotpointId]) || EMPTY_DP();
 
 /** Dot-point rows in the shape the picker ranks, restricted to what can be generated. */
-function generatableDotpointStates(subtopicId, ratingRow, nsw = false) {
-  // On NSW only the levels at which a dot point's own questions are its own (content-reviewed or author-numbered) can be aimed at (nswOffer.js nswExactLevels);
-  // the server refuses a dot point request nothing exact answers, so a pick must never land on a shared cell.
-  const dps = nsw
-    ? generatableDotpoints(subtopicId).map(dp => ({ ...dp, forms: nswIssuedForms(subtopicId, nswExactLevels(subtopicId, dp.id)) })).filter(dotpointIsGeneratable)
-    : generatableDotpoints(subtopicId);
-  return dps
+function generatableDotpointStates(subtopicId, ratingRow) {
+  return generatableDotpoints(subtopicId)
     .map(dp => ({
       id: dp.id, index: dp.ordinal, text: dp.text, forms: dp.forms,
       ...dpStateOf(ratingRow, dp.id), traps: trapsForDotpoint(ratingRow?.traps, dp.id)
@@ -3660,8 +3655,10 @@ const routes = {
       const sub = task.subtopics[done % task.subtopics.length];
       const st = await getRating(p.id, sub);
       const aim = pickDifficulty(st?.rating ?? START_RATING, st?.attempts ?? 0, { state: st || {}, nowMs: Date.now() });
-      const { dp, difficulty: d } = chooseDotpoint(sub, st, { want: aim, nsw: practiceCurriculumOf(p) === 'nsw' });
-      const { row, payload } = await createQuestion(p.id, sub, d, 'task', null, taskId, null, { dotpointId: dp?.id || null });
+      const { dp, difficulty: d } = chooseDotpoint(sub, st, { want: aim });
+      // On Prithagoras the dot point this aims at is a private preference, not a request: a request narrows the server to questions a content review
+      // vouches for (nswDotpointExact.js), which is right when the student chose the dot point and wrong for "the next question of this topic".
+      const { row, payload } = await createQuestion(p.id, sub, d, 'task', null, taskId, null, { dotpointId: practiceCurriculumOf(p) === 'nsw' ? null : (dp?.id || null) });
       return { question: sanitize(payload, row), reason: 'task', why: translate('msg.task.why', { title: task.title, n: done + 1, total: task.count }) };
     }
     const now = Date.now();
@@ -3747,10 +3744,11 @@ const routes = {
       let auto = null;
       if (!asked) {
         const chosen = chooseDotpoint(subtopic, st, {
-          nsw: practiceCurriculumOf(p) === 'nsw', fixed: difficulty ? d : null, want: d, prefer: seekableTraps(st?.traps, now)[0]?.dotpoint || null,
+          fixed: difficulty ? d : null, want: d, prefer: seekableTraps(st?.traps, now)[0]?.dotpoint || null,
           trapKey: seekableTraps(st?.traps, now)[0]?.key || null, nowMs: now
         });
-        auto = chosen.dp;
+        // Prithagoras: aimed at, never asked for (see the task branch): the server deals any question of the topic, as for a topic with no dot point.
+        auto = practiceCurriculumOf(p) === 'nsw' ? null : chosen.dp;
         d = chosen.difficulty;
       }
       // Two explanations, and which one is sent is decided after the question
@@ -3784,14 +3782,14 @@ const routes = {
       // Within the chosen subtopic, aim at the dot point that needs it most —
       // but only ever at one the bank can really produce.
       const chosen = chooseDotpoint(choice.subtopic, ratings[choice.subtopic], {
-        nsw: practiceCurriculumOf(p) === 'nsw', fixed: difficulty ? choice.difficulty : null, want: choice.difficulty,
+        fixed: difficulty ? choice.difficulty : null, want: choice.difficulty,
         prefer: choice.trap?.dotpoint || null, trapKey: choice.trap?.key || null, nowMs: now
       });
       choice.whyPlain = choice.why;
       // A cell chosen for the trap may sit at subtopic level; its difficulty
       // still applies (otherwise this is the difficulty already chosen).
       choice.difficulty = chosen.difficulty;
-      if (chosen.dp) {
+      if (chosen.dp && practiceCurriculumOf(p) !== 'nsw') {
         choice = { ...choice, dotpoint: chosen.dp.id, difficulty: chosen.difficulty, why: `${choice.why} Dot point: ${chosen.dp.text}` };
       }
       noteServed(p.id, choice.subtopic);
