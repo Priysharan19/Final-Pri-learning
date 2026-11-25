@@ -22,6 +22,11 @@ ok(list, 'App.jsx declares APP_PATHS behind NOT_FOUND_PAGE');
 const known = new Set([...list[1].matchAll(/'([^']+)'/g)].map(m => m[1]));
 const declared = [...app.matchAll(/<Route path="([^"]+)"/g)].map(m => m[1]).filter(p => p !== '*');
 ok(declared.length > 30, `the router declares routes (${declared.length})`);
+// The server answers 404 for any other address (server/platform/appPaths.js); its list must be this one.
+const serverList = read('../../server/platform/appPaths.js').match(/AU_APP_PATHS = Object\.freeze\(\[([\s\S]*?)\]\);/);
+ok(serverList, 'server/platform/appPaths.js declares AU_APP_PATHS');
+const serverKnown = new Set([...serverList[1].matchAll(/'([^']+)'/g)].map(m => m[1]));
+ok(serverKnown.size === known.size && [...known].every(p => serverKnown.has(p)), 'the server\'s 404 list equals App.jsx APP_PATHS');
 for (const p of declared) ok(known.has(p), `${p} is declared by a route and listed in APP_PATHS`);
 for (const p of known) ok(declared.includes(p) || main.includes(`'${p}'`) || p === '/index.html', `${p} is listed in APP_PATHS and is a route or a main.jsx page`);
 
