@@ -22,7 +22,7 @@ const keyNumbers = q => {
   if (typeof a.canonicalInput === 'string') { try { out.push(evalNumeric(normalize(a.canonicalInput))); } catch { /* not numeric */ } }
   return out.filter(Number.isFinite);
 };
-const quoted = (q, n) => new RegExp(`(?<![\\d.])${String(n).replace(/[.\-]/g, '\\$&')}(?!\\d|\\.\\d)`).test(String(q.prompt).replace(/\$/g, ' '));
+const quoted = (q, n) => new RegExp(`(?<![\\d.])${String(n).replace(/[.*+?^${}()|[\]\\-]/g, '\\$&')}(?!\\d|\\.\\d)`).test(String(q.prompt).replace(/\$/g, ' '));
 
 /** Three independent readings of "this rung states the answer": the engine's own rule, the form checks' phrase rule, and the numeric-value rule. */
 export function ladderLeaks(q) {
@@ -33,7 +33,7 @@ export function ladderLeaks(q) {
   for (const r of buildHintLadder(q, { withholdAnswer: true })) {
     if (r.rung === 'solution' || !r.text) continue;
     if (rungGivesAnswer(q, r.text)) out.push(`${r.rung}: ${r.text}`);
-    else if (finals.some(f => new RegExp(`(?:=|\\bis\\b|\\bgives\\b|\\bequals\\b|\\bso\\b|\\banswer\\b)\\s*\\$?\\s*${f.replace(/[.\-]/g, '\\$&')}(?!\\d|\\.\\d)\\s*\\$?\\s*(?:[.,;]|$)`).test(r.text.replace(/\\(?:left|right|,)/g, '')))) out.push(`${r.rung}: (phrase) ${r.text}`);
+    else if (finals.some(f => new RegExp(`(?:=|\\bis\\b|\\bgives\\b|\\bequals\\b|\\bso\\b|\\banswer\\b)\\s*\\$?\\s*${f.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&')}(?!\\d|\\.\\d)\\s*\\$?\\s*(?:[.,;]|$)`).test(r.text.replace(/\\(?:left|right|,)/g, '')))) out.push(`${r.rung}: (phrase) ${r.text}`);
   }
   return out;
 }

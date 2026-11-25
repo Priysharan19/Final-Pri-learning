@@ -183,7 +183,7 @@ export function rungGivesAnswer(q, rung) {
     const prose = body.replace(/\$[^$]*\$/g, ' ');
     const spoken = body.replace(/\$/g, ' ').replace(/\\(?:left|right|,|;|!|quad|displaystyle)/g, '');
     for (const v of values) {
-      const word = new RegExp(`(?:\\b(?:answer|result|gives|equals|therefore|hence|so|is)\\b[^.\\n=]{0,24}?|(?:^|\\s)=\\s*)(?<![\\d.])${String(v).replace(/[.\-]/g, '\\$&')}(?!\\d|\\.\\d)(?!\\s*[+\\-*/^×(\\\\=])`, 'i');
+      const word = new RegExp(`(?:\\b(?:answer|result|gives|equals|therefore|hence|so|is)\\b[^.\\n=]{0,24}?|(?:^|\\s)=\\s*)(?<![\\d.])${String(v).replace(/[.*+?^${}()|[\]\\-]/g, '\\$&')}(?!\\d|\\.\\d)(?!\\s*[+\\-*/^×(\\\\=])`, 'i');
       if (word.test(spoken)) return true;
     }
     if (!values.every(small) && statesAnswerValue(prose, values.filter(v => !small(v)))) return true;
