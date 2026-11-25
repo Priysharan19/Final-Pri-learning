@@ -608,7 +608,12 @@ export function stepResultLeak(part, hint, results = stepResults(part)) {
   // Prose maths ("56/8", "x = 3") is read as well: the words around it are dropped.
   for (const m of proseOf(t).matchAll(/[A-Za-z0-9().^*/+\-\s]*[0-9][A-Za-z0-9().^*/+\-\s]*(?:=[A-Za-z0-9().^*/+\-\s]+)?/g)) for (const side of m[0].split('=')) { const s = side.trim(); if (/\d/.test(s) && s.length >= 2) sides.push(s); }
   // What the question itself says is not a result, even when it equals one (the target of a show-that is in the prompt).
-  const stated = new Set(stepCandidates(part.prompt).map(fold));
+  // a hint that writes the prompt's own expression with its function arguments unbracketed ("cos 4x" for the prompt's cos(4x)) states what the question says
+  const bare = x => fold(x).replace(/(sin|cos|tan|sec|csc|cot|ln|log|exp|sqrt)\(([^()]*)\)/g, '$1$2');
+  const statedList = stepCandidates(part.prompt);
+  const stated = new Set(statedList.map(fold));
+  const statedBare = new Set(statedList.map(bare));
+  const statedAgain = s => statedBare.has(bare(s));
   // Every number (and a function of a number: ln 0.4, sqrt(7), 56/8) the hint states, wherever it is written, against every result of the worked
   // steps that the prompt does not itself give: "n = 300 or 360" and "take ln 0.4" state set-up values the student is to find.
   const given = numberValuesIn(part.prompt);
@@ -617,7 +622,7 @@ export function stepResultLeak(part, hint, results = stepResults(part)) {
     for (const r of results) if (r.value !== null && near(Math.abs(tok.value), Math.abs(r.value)) && (r.last || !smallWhole(r.value))) return `it states ${tok.text.slice(0, 30)}, a result of the worked steps that the question does not give`;
   }
   for (const s of sides) {
-    if (stated.has(fold(s))) continue;
+    if (stated.has(fold(s)) || statedAgain(s)) continue;
     const sv = numberOf(s);
     for (const r of results) {
       if (fold(s) === fold(r.plain) && fold(s).length >= 2) return `it states "${r.plain.slice(0, 30)}", a result of the worked steps`;

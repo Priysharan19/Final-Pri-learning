@@ -228,6 +228,12 @@ eq(evalTeX('\\tfrac12(\\cos2x-\\cos4x)', { x: 0.7 }), 0.5 * (Math.cos(1.4) - Mat
   ok(checkBankAnswer(q, '(1/2)(cos2x-cos4x)').correct === true, 'and the conventional unbracketed typing is marked right (cos2x is cos(2x))');
   ok(checkBankAnswer(q, '(1/2)(cos(2)*x-cos(4)*x)').correct !== true && checkBankAnswer(q, '(cos(2x)-cos(4x))').correct !== true && checkBankAnswer(q, '(1/2)(cos(2x)+cos(4x))').correct !== true, 'and wrong ones, including the old misreading written out, are not');
 }
+{
+  // cos 4x now reads as cos(4x): a hint that restates the prompt's own cos(4x) in the unbracketed form is the question, not a result of the steps
+  const part = { prompt: 'Express $\\cos4x$ as a polynomial in $\\cos x$.', steps: [{ h: 'Double twice', d: '$2\\cos^{2}2x-1=2(2\\cos^{2}x-1)^{2}-1$' }, { h: 'Expand', d: '$8c^{4}-8c^{2}+1$' }] };
+  eq(stepResultLeak(part, 'cos 4x = 2cos²2x − 1.', stepResults(part)), null, 'a hint that restates the prompt\'s own cos 4x unbracketed is not a leak');
+  ok(stepResultLeak(part, 'It is $8c^{4}-8c^{2}+1$.', stepResults(part)) !== null, 'and a hint that states the worked result still is');
+}
 // A prompt that asks for more than a value is never converted.
 for (const prompt of ['Every point of a data set lies on the line $y=2x+1$. State the value of Pearson\'s correlation coefficient, with a reason.', 'State the value of $r$ and interpret it.', 'Find $x$ and justify your answer.', 'State the gradient and the intercept of $y=2x+1$.']) eq(deriveKey(base('FD-014', { prompt, steps: [{ h: 'r', d: '$r=1$' }] }), '$r=1$').no !== undefined, true, `not converted: ${prompt.slice(0, 40)}`);
 // The natural typed forms of his answer.
