@@ -1,4 +1,5 @@
 import { featureEnabled, INTERFACE_SKIN_UI } from './platform/features.js';
+import { FREE_LAUNCH } from './platform/launchPolicy.js';
 import Aurora from './instrument/Aurora.jsx';
 import Working from './instrument/Working.jsx';
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from 'react';
@@ -798,7 +799,7 @@ export default function App() {
                     <Route path="/plan" element={studentOnly(<PlanPage />)} />
                     <Route path="/today" element={studentOnly(<Today />)} />
                     <Route path="/error-log" element={studentOnly(<ErrorLog />)} />
-                    <Route path="/premium" element={studentOnly(<Paywall />)} />
+                    <Route path="/premium" element={studentOnly(FREE_LAUNCH ? <Navigate to="/" replace /> : <Paywall />)} />
                     <Route path="/insights" element={studentOnly(<Insights />)} />
                     {PARENT_REPORT_ON && <Route path="/parent-report" element={studentOnly(<ParentReport />)} />}
                     {PLACEMENT_ON && <Route path="/placement" element={studentOnly(<Placement />)} />}

@@ -49,6 +49,22 @@ jobs:
         run: |
           set -o pipefail
           node tools/ci-suite-shard.mjs --of=4 --shard=${{ matrix.shard }} --manifest=suite-shard.json 2>&1 | tee suites.log
+      # Temporary B3 evidence transfer: canonical generator output is collected
+      # from GitHub's checked-out exact PR head, without touching academic rules.
+      - name: Regenerate examiner dossier for independent comparison (B3)
+        if: always() && matrix.shard == 4
+        run: |
+          node tools/examiner-dossier.mjs
+          echo 'B3_DOSSIER_BASE64_BEGIN'
+          base64 -w 180 docs/marking/order14-examiner-certification-dossier.md
+          echo 'B3_DOSSIER_BASE64_END'
+      - name: Upload canonical examiner dossier (B3)
+        if: always() && matrix.shard == 4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: b3-canonical-examiner-dossier
+          path: docs/marking/order14-examiner-certification-dossier.md
+          if-no-files-found: error
       - name: Shard log
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

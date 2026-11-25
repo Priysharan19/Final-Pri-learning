@@ -46,6 +46,15 @@ Where this file and an older release document disagree, this file wins until the
 
 ## Commercial
 
+**Owner launch amendment (17 November 2026, #1012; reaffirmed 20 November):**
+India-only initial Railway V1, no paid Premium sales, upgrades or new referral trials.
+The paid-mode plans remain dormant for a later reviewed release. Retain the current
+approved fair-use packaging: uncapped generated practice, five handwriting and five
+question-photo reads per day, one timed exam per 30 days. Eligible generated JEE
+Advanced study is included without a paid entitlement; content and rights gates
+still apply. Existing verified subscription lifecycle and cancellation are retained.
+D19 and D22 below record historical paid-mode policy, not launch requirements.
+
 | # | Question | Default taken | Owner to confirm |
 |---|---|---|---|
 | D19 | Free and Premium | Prices stay ₹199 a month and ₹1,499 a year. Free: 20 questions a day, one timed paper in 30 days. Premium: unlimited questions and papers, plus JEE Advanced, which the server enforces. | Yes |

@@ -31,6 +31,7 @@
 //     (the friend, and the inviter it names). The same append-only pattern the
 //     guardian confirmation uses (childErasure.js); no schema change.
 // ─────────────────────────────────────────────────────────────────────────────
+import { freeLaunchActive } from './launchPolicy.js';
 import { randomInt } from 'node:crypto';
 import { asyncRouter } from './asyncRouter.js';
 import { asStore } from './store.js';
@@ -101,6 +102,7 @@ export async function referralTrialState(db, accountId, now = Date.now()) {
 
 /** Grant the 7-day trial once, ever. False when this account already had a trial. */
 export async function grantReferralTrial(db, accountId, now = Date.now()) {
+  if (freeLaunchActive()) return false;
   db = asStore(db);
   const claimed = await db.run(`INSERT INTO billing_trial_claims(account_id,provider,provider_subscription_id,claimed_at)
     VALUES (?,'web',?,?) ON CONFLICT(account_id) DO NOTHING`, [accountId, `referral:${accountId}`, now]);
@@ -123,6 +125,7 @@ async function sharesDevice(db, a, b) {
  * { status, code?, granted?, endsAt? }. Every refusal is coded.
  */
 export async function claimReferral(db, { inviteeId, code, now = Date.now() }) {
+  if (freeLaunchActive()) return { status: 404, code: 'REFERRAL_NOT_AVAILABLE' };
   db = asStore(db);
   // One claim at a time, all or nothing: the friend's record, both grants and
   // the checks before them commit together (a failure leaves no half-spent
@@ -188,11 +191,12 @@ export function createReferralRouter(db) {
     const trial = await referralTrialState(db, accountId);
     // A store build is offered nothing about the referral (store rules); it
     // still learns the trial's dates, so its reminder can say when it ends.
-    if (declaredNativeClient(req)) return res.json({ available: false, trial });
+    if (freeLaunchActive() || declaredNativeClient(req)) return res.json({ available: false, trial });
     res.json({ available: true, code: await inviteCodeFor(db, accountId), path: '/', param: 'invite', trialDays: REFERRAL.trialDays, trial });
   });
 
   router.post('/claim', requireSession(db), requireVerifiedEmail, rateLimit(db, 'referral-claim', { limit: 5, windowMs: 60 * 60 * 1000 }), async (req, res) => {
+    if (freeLaunchActive()) return refuse(res, 404, 'REFERRAL_NOT_AVAILABLE', 'Invitations are not available for the initial release.');
     if (declaredNativeClient(req)) return refuse(res, 409, 'REFERRAL_WEB_ONLY', NOT_ON_STORE_APPS);
     const result = await claimReferral(db, { inviteeId: req.platformSession.account_id, code: req.body?.code });
     res.set('Cache-Control', 'no-store');

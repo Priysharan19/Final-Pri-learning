@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import { indiaFreeLaunch } from './src/engine/launchPolicy.js';
 import react from '@vitejs/plugin-react';
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -783,7 +784,8 @@ export function featureDefines(command, env = process.env) {
     __PRI_GAMES__: JSON.stringify(editionOf(states.edition).games !== false),
     // Plan E5: false in a build of an edition with no payment provider, so its
     // bundle holds no purchase flow at all (client/src/platform/nativeBilling.js).
-    __PRI_PREMIUM_ON_SALE__: JSON.stringify(editionOf(states.edition).billing.providers.length > 0),
+    __PRI_FREE_LAUNCH__: JSON.stringify(indiaFreeLaunch(states.edition, env)),
+    __PRI_PREMIUM_ON_SALE__: JSON.stringify(!indiaFreeLaunch(states.edition, env) && editionOf(states.edition).billing.providers.length > 0),
     // True where the edition lists the App Store or Google Play (Prithagoras sells on the web through Stripe only).
     __PRI_STORE_BILLING__: JSON.stringify(editionOf(states.edition).billing.providers.some(p => p === 'apple' || p === 'google'))
   };

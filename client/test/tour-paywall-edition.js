@@ -51,11 +51,11 @@ const check = (name, condition, detail = '') => {
   console.log(`  ${condition ? '✓' : '✗'} ${name}${condition || !detail ? '' : ` — ${detail}`}`);
 };
 
-function build(edition = EDITION) {
+function build(edition = EDITION, paidFixture = false) {
   const out = mkdtempSync(join(tmpdir(), `pri-paywall-${edition}-`));
   const vite = join(CLIENT, 'node_modules', 'vite', 'bin', 'vite.js');
   const result = spawnSync(process.execPath, [vite, 'build', '--outDir', out, '--emptyOutDir', '--logLevel', 'error'],
-    { cwd: CLIENT, encoding: 'utf8', env: { ...process.env, PRI_EDITION: edition } });
+    { cwd: CLIENT, encoding: 'utf8', env: { ...process.env, PRI_EDITION: edition, ...(paidFixture ? { NODE_ENV: 'test', PRI_TEST_PAID_MODE: '1' } : {}) } });
   if (result.status !== 0 || !existsSync(join(out, 'index.html'))) throw new Error(`the ${edition} build failed:\n${result.stdout || ''}${result.stderr || ''}`);
   return out;
 }
@@ -180,8 +180,8 @@ try {
   platform = null;
 
   // ── CONTROL: the same shell where Premium is on sale ───────────────────────
-  control = build('priyabhata');
-  platform = await startOnlinePlatform({ dist: control, env: { PRI_EDITION: null } });
+  control = build('priyabhata', true);
+  platform = await startOnlinePlatform({ dist: control, allowSeededPractice: true, env: { PRI_EDITION: null, PRI_TEST_PAID_MODE: '1' } });
   const india = await announcedShell(browser, platform, 'Control Student');
   await india.tablet.waitForFunction(() => document.querySelector('[data-paywall-not-on-sale], [data-paywall-plans] p, [data-paywall-plan]'), null, { timeout: 15000 }).catch(() => {});
   check('CONTROL: on a Priyabhata build the same shell selects the App Store', await india.tablet.locator('[data-paywall]').getAttribute('data-paywall-store') === 'app-store' && await shown(india.tablet, '[data-paywall-in-app]') === 0);

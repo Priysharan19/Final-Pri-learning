@@ -155,6 +155,7 @@
 //   exam-result   examId → the result                written once; only a line
 //                                                    pending on handwriting is
 //                                                    ever replaced (see above)
+import { freeLaunchActive } from './launchPolicy.js';
 import { createHash, randomInt, randomUUID } from 'node:crypto';
 import { asyncRouter } from './asyncRouter.js';
 import { asStore, isDatabaseOverload } from './store.js';
@@ -1447,17 +1448,17 @@ export async function entitlementRefusal(db, accountId, spec, now) {
   const capabilities = serverEntitlementCapabilities(snapshot, now);
   // JEE Advanced is Premium content: the track's own gate comes first, so a
   // free account is told the track is the reason, not that it used a simulation.
-  if (spec.blueprint?.track === 'jee-advanced' && !capabilities.includes('jee-advanced-content')) {
+  if (!freeLaunchActive() && spec.blueprint?.track === 'jee-advanced' && !capabilities.includes('jee-advanced-content')) {
     return { status: 402, code: 'PREMIUM_REQUIRED', capability: 'jee-advanced-content',
       message: 'The JEE Advanced track is part of Pri Learning Premium. JEE Main and the CBSE / NCERT chapters stay on the free plan.' };
   }
   if (spec.generated?.weak && !capabilities.includes('premium-exams')) {
     return { status: 402, code: 'PREMIUM_REQUIRED', capability: 'premium-exams',
-      message: 'Focusing a paper on your weak topics is part of Pri Learning Premium. Every other generated paper stays on the free plan.' };
+      message: freeLaunchActive() ? 'Weak-topic papers are not available in the initial release.' : 'Focusing a paper on your weak topics is part of Pri Learning Premium. Every other generated paper stays on the free plan.' };
   }
   if (spec.targeted && !capabilities.includes('premium-exams')) {
     return { status: 402, code: 'PREMIUM_REQUIRED', capability: 'premium-exams',
-      message: 'Targeted papers are part of Pri Learning Premium. Board mocks in the usual pattern stay on the free plan.' };
+      message: freeLaunchActive() ? 'Targeted papers are not available in the initial release.' : 'Targeted papers are part of Pri Learning Premium. Board mocks in the usual pattern stay on the free plan.' };
   }
   if (capabilities.includes('premium-exams')) return null;
   const recent = await db.all("SELECT created_at FROM idempotency_keys WHERE account_id=? AND scope='exam-paper' AND created_at>? ORDER BY created_at",
@@ -1466,7 +1467,7 @@ export async function entitlementRefusal(db, accountId, spec, now) {
   const nextAt = Number(recent[0].created_at) + EXAM_WINDOW_MS;
   return { status: 402, code: 'FREE_CAP_REACHED', capability: 'premium-exams', used: recent.length,
     limit: FREE_EXAM_ALLOWANCE.examsPerWindow, windowDays: FREE_EXAM_ALLOWANCE.examWindowDays, nextAt,
-    message: `The free plan includes ${FREE_EXAM_ALLOWANCE.examsPerWindow === 1 ? 'one exam simulation' : `${FREE_EXAM_ALLOWANCE.examsPerWindow} exam simulations`} every ${FREE_EXAM_ALLOWANCE.examWindowDays} days. Premium includes unlimited simulations.` };
+    message: `The free plan includes ${FREE_EXAM_ALLOWANCE.examsPerWindow === 1 ? 'one exam simulation' : `${FREE_EXAM_ALLOWANCE.examsPerWindow} exam simulations`} every ${FREE_EXAM_ALLOWANCE.examWindowDays} days.${freeLaunchActive() ? '' : ' Premium includes unlimited simulations.'}` };
 }
 
 /**
@@ -2101,7 +2102,7 @@ export function createExamRouter(db, { transcribe = transcribeHandwriting, env =
     const snapshot = await db.get('SELECT plan,status,current_period_end,grace_until FROM entitlement_snapshots WHERE account_id=?', [accountId]);
     if (!serverEntitlementCapabilities(snapshot, now).includes('premium-exams')) {
       return refuseEntitlement(res, { status: 402, code: 'PREMIUM_REQUIRED', capability: 'premium-exams',
-        message: 'Targeted papers are part of Pri Learning Premium. Board mocks in the usual pattern stay on the free plan.' });
+        message: freeLaunchActive() ? 'Targeted papers are not available in the initial release.' : 'Targeted papers are part of Pri Learning Premium. Board mocks in the usual pattern stay on the free plan.' });
     }
     const targets = await accountTargets(db, accountId, now);
     res.set('Cache-Control', 'no-store');

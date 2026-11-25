@@ -16,6 +16,8 @@
 // SQLite by default; --engine=postgres runs it on a migrated Postgres.
 
 import './support/hermetic.mjs';
+process.env.NODE_ENV = 'test';
+process.env.PRI_TEST_PAID_MODE = '1'; // Exercise all legacy route limiters; free launch independently denies new sales.
 delete process.env.PRI_HANDWRITING_API_KEY;
 // The AI tutor ships dark (PRI_FEATURE_TUTOR); its declared limit is measured with it on.
 process.env.PRI_FEATURE_TUTOR = '1';

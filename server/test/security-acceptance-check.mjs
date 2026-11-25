@@ -33,6 +33,8 @@
 // Secret-shaped values are assembled at runtime so the repository secret scan
 // (tools/secret-scan.mjs) never sees one committed.
 import './support/hermetic.mjs';
+process.env.NODE_ENV = 'test';
+process.env.PRI_TEST_PAID_MODE = '1'; // Keep active-route auth/CSRF sweeps in the paid-mode fixture; free-launch rejects are separately tested.
 import { pngDataUrl } from './support/test-image.mjs';
 const shaped = (prefix, body) => `${prefix}${body}`;
 const SECRETS = {

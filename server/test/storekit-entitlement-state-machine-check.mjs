@@ -37,6 +37,8 @@ const BUNDLE = 'com.prilearning.app';
 const APP_ID = 1234567890;
 const DAY = 24 * 60 * 60 * 1000;
 
+process.env.NODE_ENV = 'test';
+process.env.PRI_TEST_PAID_MODE = '1'; // Isolated StoreKit paid lifecycle fixture; production launch still rejects new purchases.
 const signer = createAppleSigner();
 const APPLE_ENV = {
   PRI_APPLE_ROOT_CA_PEM: signer.rootPem,

@@ -12,6 +12,7 @@
 // the ceiling protects the deployment, the allowance stops one account (or one
 // tampered device) from spending everyone's capacity.
 // ─────────────────────────────────────────────────────────────────────────────
+import { freeLaunchActive } from './launchPolicy.js';
 import { serverEntitlementCapabilities } from './entitlements.js';
 import { consumeRateLimit, sha256 } from './security.js';
 import { asStore } from './store.js';
@@ -139,7 +140,7 @@ export function refuseAiAllowance(res, verdict) {
   const what = WHAT[verdict.kind] || 'cloud readings';
   // Honest copy: there is no on-device reader on the shipped path (D16), so
   // the alternative named is typing the answer, which is never limited.
-  const more = verdict.plan === 'free' && Number(verdict.premiumLimit) > Number(verdict.limit)
+  const more = !freeLaunchActive() && verdict.plan === 'free' && Number(verdict.premiumLimit) > Number(verdict.limit)
     ? ` Premium includes ${verdict.premiumLimit} a day.` : '';
   return res.status(429).json({
     error: {

@@ -2,6 +2,7 @@
 // sign-in a student can complete without leaving the question, and the words
 // and next step for each reason a check was refused. Presentation only —
 // account linking, eligibility and marking stay with the platform modules.
+import { FREE_LAUNCH } from '../platform/launchPolicy.js';
 import React, { useEffect, useRef, useState } from 'react';
 import { useInRouterContext } from 'react-router-dom';
 import PageLink from './PageLink.jsx';
@@ -115,7 +116,7 @@ export function CheckRefusal({
   return (
     <>
       <div className="verdict-title" data-check-refusal={kind}>{t(copy.titleKey)}</div>
-      <div className="verdict-body">{t(copy.contextKey)} <span className="muted">{t(sessionEnded ? 'check.sessionEnded' : copy.hintKey)}</span></div>
+      <div className="verdict-body">{t(copy.contextKey)} <span className="muted">{t(sessionEnded ? 'check.sessionEnded' : FREE_LAUNCH && copy.action === 'premium' ? 'check.freeLaunchCapHint' : copy.hintKey)}</span></div>
       {copy.action === 'sign-in' && (
         <div style={{ marginTop: 10 }} data-check-session-ended={sessionEnded ? '' : undefined}>
           <CheckSignIn user={user} refreshUser={refreshUser} ready={signInReady} waitText={signInWaitText}
@@ -126,7 +127,7 @@ export function CheckRefusal({
         {copy.action === 'account' && (inRouter
           ? <PageLink to="/settings" {...settings}>{t('app.accountSettings')}</PageLink>
           : <a href="/settings" {...settings}>{t('app.accountSettings')}</a>)}
-        {copy.action === 'premium' && (inRouter
+        {!FREE_LAUNCH && copy.action === 'premium' && (inRouter
           ? <PageLink to="/settings#cloud-account-title" {...settings}>{t('freeCap.seePremium')}</PageLink>
           : <a href="/settings#cloud-account-title" {...settings}>{t('freeCap.seePremium')}</a>)}
         {onRetry && (copy.action === 'retry' || copy.action === 'account') && (

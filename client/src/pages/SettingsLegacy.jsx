@@ -502,7 +502,7 @@ export default function Settings() {
       <div className="settings-grid">
         <div className="set-menu no-print">
           {SECTIONS.map(([k, , key]) => (
-            <button key={k} className={`set-menu-item ${active === k ? 'on' : ''}`} onClick={() => goto(k)}>
+            <button key={k} className={`set-menu-item ${active === k ? 'on' : ''}`} data-settings-target={k} onClick={() => goto(k)}>
               {INSTRUMENT && <Glyph name={SECTION_GLYPH[k]} />}
               {t(key)}
             </button>
@@ -512,7 +512,7 @@ export default function Settings() {
         <div className="grid" style={{ gap: 18 }}>
           {/* ── Plan ── */}
           {sells && (
-          <div className="card" ref={el => secRefs.current.plan = el}>
+          <div className="card" data-settings-section="plan" ref={el => secRefs.current.plan = el}>
             <h2>{t('settings.localPlan')}</h2>
             <p className="muted" style={{ margin: '4px 0 14px' }}>{t(FREE_TIER.practicePerDay === null ? 'settings.localPlanSubUncapped' : 'settings.localPlanSub', { limit: FREE_TIER.practicePerDay, exams: FREE_TIER.examsPerWindow, days: FREE_TIER.examWindowDays })}</p>
             <div className="spread" style={{ fontSize: 14 }}>
@@ -544,7 +544,7 @@ export default function Settings() {
           </div>
 
           {/* ── Profile ── */}
-          <div className="card" ref={el => secRefs.current.profile = el}>
+          <div className="card" data-settings-section="profile" ref={el => secRefs.current.profile = el}>
             <div className="spread">
               <h2>{t('settings.profileInfo')}</h2>
               {!editing && <button className="btn btn-ghost btn-sm" onClick={() => setEditing(true)}><Icon name="pen" size={15} />{t('common.edit')}</button>}

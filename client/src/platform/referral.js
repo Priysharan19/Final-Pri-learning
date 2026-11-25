@@ -8,6 +8,7 @@
 // Nothing about a friend is ever collected here: the code is all there is.
 // The store apps neither capture nor claim an invite (web only, store rules).
 // ─────────────────────────────────────────────────────────────────────────────
+import { FREE_LAUNCH } from './launchPolicy.js';
 import { cloud, cloudAvailable } from './cloudTransport.js';
 import { priNative } from './native/index.js';
 
@@ -28,7 +29,7 @@ export function captureInvite(loc = typeof window !== 'undefined' ? window.locat
   if (!url.searchParams.has(INVITE_PARAM)) return null;
   url.searchParams.delete(INVITE_PARAM);
   try { window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`); } catch { /* keep going */ }
-  if (!INVITE_CODE.test(code)) return null;
+  if (FREE_LAUNCH || !INVITE_CODE.test(code)) return null;
   try { storage()?.setItem(KEY, JSON.stringify({ code, at: Date.now() })); } catch { /* private mode: no invite */ }
   return code;
 }
@@ -49,6 +50,7 @@ const forget = () => { try { storage()?.removeItem(KEY); } catch { /* nothing ke
  * network failure keeps it for the next admission.
  */
 export async function claimPendingInvite() {
+  if (FREE_LAUNCH) return null;
   if (!web() || !cloudAvailable()) return null;
   const code = pendingInvite();
   if (!code) return null;

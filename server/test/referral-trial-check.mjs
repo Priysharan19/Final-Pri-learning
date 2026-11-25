@@ -23,6 +23,7 @@ const keys = ['NODE_ENV', 'PRI_PLATFORM_DB', 'PRI_AUTH_DELIVERY_KEY', 'PRI_PUBLI
 const before = Object.fromEntries(keys.map(k => [k, process.env[k]]));
 const scratch = mkdtempSync(join(tmpdir(), 'pri-referral-'));
 process.env.NODE_ENV = 'test';
+process.env.PRI_TEST_PAID_MODE = '1'; // Retain the original paid-mode regression; free-launch is tested separately.
 process.env.PRI_PLATFORM_DB = join(scratch, 'platform.db');
 process.env.PRI_AUTH_DELIVERY_KEY = 'd5'.repeat(32);
 delete process.env.PRI_PUBLIC_ORIGIN;

@@ -173,8 +173,8 @@ export const capScreen = {
       JSON.stringify(text.slice(0, 240)));
     await check('it says when they come back — midnight, with the server\'s calendar named',
       /come back at midnight/.test(text) && /\(Asia\/Kolkata\)/.test(text) && /\d{1,2}:\d{2}\s*(am|pm)/i.test(text), JSON.stringify(text.slice(0, 240)));
-    await check('and what Premium changes, with the way there and the way back to finished work',
-      await notice.getByRole('link', { name: 'See Premium' }).count() === 1 && await notice.getByRole('link', { name: 'Review what I have done' }).count() === 1, text.slice(0, 200));
+    await check('free launch offers no Premium purchase; finished work remains reachable',
+      await notice.getByRole('link', { name: 'See Premium' }).count() === 0 && await notice.getByRole('link', { name: 'Review what I have done' }).count() === 1, text.slice(0, 200));
     await check('no question is on screen and nothing reads as a fault', await page.locator('.q-prompt').count() === 0 && !/something went wrong|error/i.test(text), text.slice(0, 200));
     await check('nothing claims a mark made on this device', !/marked on this device|checked on this device/i.test(await visibleText(page, 'main, .shell')));
 
@@ -251,9 +251,9 @@ export const capAtCheck = {
     await page.locator('[data-check-refusal="free-cap"]').waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
     const shown = await resultOnCard(page);
     const verdict = await visibleText(page, '.verdict');
-    await check('Submit is refused as the free cap, in the card: what ran out, that nothing was checked, and the way through',
+    await check('Submit is refused by the configured cap with no fabricated marking or Premium upsell',
       shown.refusal.join() === 'free-cap' && /Today.s free questions are used up/.test(verdict) && /has not been checked/.test(verdict) &&
-        /free plan.s daily allowance/.test(verdict) && /midnight/.test(verdict) && await page.locator('.verdict').getByRole('link', { name: 'See Premium' }).count() === 1,
+        /current usage allowance/.test(verdict) && await page.locator('.verdict').getByRole('link', { name: 'See Premium' }).count() === 0,
       `${JSON.stringify(shown)} ${JSON.stringify(verdict.slice(0, 240))}`);
     await check('and with NO verdict, marks, XP or solution', nothingMarked(shown), JSON.stringify(shown));
     await check('the refusal is in the card on the same question, without leaving the page',

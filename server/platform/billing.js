@@ -1,4 +1,5 @@
 import { asyncRouter } from './asyncRouter.js';
+import { freeLaunchActive } from './launchPolicy.js';
 import { asStore } from './store.js';
 import { applyVerifiedEntitlement } from './entitlements.js';
 import { declaredNativeClient, rateLimit, requireSession, requireVerifiedEmail, sha256 } from './security.js';
@@ -131,8 +132,11 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
   // account awaiting its guardian is refused there with the consent code.)
   // Resolved once, when the router is built; on an edition that lists the
   // provider it is a pass-through and the route is what it always was.
-  const sold = Object.freeze(Object.fromEntries(Object.keys(ROUTE_FAMILY_PROVIDER).map(family => [family, providerAllowed(edition, family) && (family !== 'web' || saleLive(edition))])));
+  const sold = Object.freeze(Object.fromEntries(Object.keys(ROUTE_FAMILY_PROVIDER).map(family => [family, providerAllowed(edition, family) && (family !== 'web' || saleLive(edition) || freeLaunchActive(edition))])));
   const soldHere = family => (req, res, next) => (sold[family] ? next() : billingNotAvailable(res));
+  // Starting a sale is distinct from servicing a verified existing purchase,
+  // renewal, refund, or cancellation. Retain all existing provider validation.
+  const saleHere = family => (req, res, next) => (sold[family] && saleLive(edition) ? next() : billingNotAvailable(res));
   // /restore/:provider and /webhook/:provider name the family in the path. An
   // unknown name falls through to the route's own BILLING_PROVIDER_UNSUPPORTED.
   const pathFamilySoldHere = (req, res, next) => {
@@ -214,7 +218,7 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
   // random UUID rather than a Pri account id/email. StoreKit echoes it inside
   // the Apple-signed transaction so the server can bind purchases to accounts
   // without trusting anything the web view says after checkout.
-  router.get('/apple/bootstrap', soldHere('apple'), requireSession(db), rateLimit(db, 'billing-apple-bootstrap', { limit: 60, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
+  router.get('/apple/bootstrap', saleHere('apple'), requireSession(db), rateLimit(db, 'billing-apple-bootstrap', { limit: 60, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
     const bootstrap = native.apple?.bootstrap;
     if (typeof bootstrap !== 'function') return res.status(503).json({ error: { code: 'BILLING_PROVIDER_NOT_CONFIGURED', message: 'App Store billing is not configured on this deployment.' } });
     try {
@@ -246,7 +250,7 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
   // Google Play: the server issues an opaque obfuscatedAccountId per account;
   // the Android shell passes it to Play Billing, and Google echoes it back in
   // the purchase the server re-fetches. Nothing the device says is trusted.
-  router.get('/google/bootstrap', soldHere('google'), requireSession(db), rateLimit(db, 'billing-google-bootstrap', { limit: 60, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
+  router.get('/google/bootstrap', saleHere('google'), requireSession(db), rateLimit(db, 'billing-google-bootstrap', { limit: 60, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
     const bootstrap = native.google?.bootstrap;
     if (typeof bootstrap !== 'function') return res.status(503).json({ error: { code: 'BILLING_PROVIDER_NOT_CONFIGURED', message: 'Google Play billing is not configured on this deployment.' } });
     try {
@@ -280,7 +284,7 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
   // enter the browser. The returned URL is a provider-hosted authorization page;
   // Premium still unlocks only after a verified webhook/restore updates the
   // server entitlement snapshot.
-  router.post('/checkout/web', soldHere('web'), requireSession(db), requireVerifiedEmail, rateLimit(db, 'billing-checkout-web', { limit: 8, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
+  router.post('/checkout/web', saleHere('web'), requireSession(db), requireVerifiedEmail, rateLimit(db, 'billing-checkout-web', { limit: 8, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
     // Web (Razorpay) checkout is never reachable from a native app. The
     // client hides it there too; this is the server half of the same rule, so
     // an old or modified bundle cannot open a web purchase inside the iPad app.

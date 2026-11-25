@@ -65,6 +65,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { startOnlinePlatform } from './support/online-session.mjs';
+import { indiaFreeLaunch } from '../src/engine/launchPolicy.js';
 import { createVerifiedProfile, freshEmail, signInOnCard } from './support/verified-onboarding.mjs';
 import { acceptReaderPermissionOnSight } from './fakeServerReader.js';
 import { resolveEdition, EDITIONS } from '../edition.config.mjs';
@@ -1244,7 +1245,16 @@ async function run() {
 
     // The Premium screen (D22): the plans, the store's own prices, Restore,
     // the renewal disclosure and the legal links, with a working close button.
-    await step('premium · plans, renewal terms and close', '/premium', async () => {
+    if (indiaFreeLaunch(EDITION, { NODE_ENV: 'production' })) {
+      notApplicableRoutes.add('/premium');
+      notApplicable.push('premium · sales route deliberately redirects during India free launch');
+      await step('free launch · premium route cannot expose checkout', null, async () => {
+        await goTo(page, BASE, '/premium');
+        await page.waitForURL(url => new URL(url).pathname !== '/premium', { timeout: 20000 });
+        const exposed = await page.locator('[data-paywall], [data-paywall-close]').count();
+        if (exposed) throw new Error('Premium sale controls are exposed in India free launch');
+      });
+    } else await step('premium · plans, renewal terms and close', '/premium', async () => {
       await goTo(page, BASE, '/premium');
       await page.waitForSelector('[data-paywall] [data-paywall-close]', { timeout: 20000 });
       await wait(page, 600);
