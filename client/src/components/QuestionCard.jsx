@@ -2305,11 +2305,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       readStates = stepReport.lines.map((_, i) => (excluded.includes(i) ? 'cant' : 'read'));
     }
     return {
-      lines, stepReport, ...(readStates ? { readStates } : {}), solution: res.solution || null, source: writeMode ? 'handwriting' : 'typed',
+      lines, stepReport, ...(readStates ? { readStates } : {}), solution: res.solution || null, source: writeMode ? 'handwriting' : 'typed', page: writeMode || mode === 'photo',
       receipt: shownGrade ? { awarded: shownGrade.awarded, possible: shownGrade.possible, id: typeof res.submissionId === 'string' ? res.submissionId : null } : null,
       attempt: markedCount
     };
-  }, [resolved, previousAttempt, res, writeMode, judged, inkResult, working, shownGrade, markedCount]);
+  }, [resolved, previousAttempt, res, writeMode, mode, judged, inkResult, working, shownGrade, markedCount]);
   const [awModel, setAwModel] = useState(null);
   useEffect(() => { if (!awInput) setAwModel(null); }, [awInput]);
   // The marked page: the student's own page with each judged line outlined and one comment per
