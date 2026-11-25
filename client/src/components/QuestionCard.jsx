@@ -466,7 +466,6 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // A PDF that has been attached and not yet read (it has no thumbnail until
   // its pages are rendered, which happens when the student asks for the read).
   const [heldPdf, setHeldPdf] = useState(false);
-  const photoReadStarting = useRef(false);
   // A read is asked for THIS issued question: the server binds its receipt to it.
   useEffect(() => {
     setReadingQuestion(question.serverQuestionId || null);
@@ -1862,6 +1861,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     try {
       const r = await api.post(`/practice/${question.id}/hint`, { rung: nextRung });
       if (!mountedRef.current) return;
+      // A rung the server emptied (it would have stated the answer) is shown as passed over, with nothing to read and nothing charged.
+      if (r.charged === false) { setHintLevel(l => Math.max(l, HINT_RUNGS.indexOf(r.rung || nextRung) + 1)); return; }
       setHints(h => (h.some(x => x.rung === r.rung) ? h : [...h, { rung: r.rung || nextRung, text: r.hint || null }]));
       setHintLevel(l => Math.max(l, Number(r.level) || 0));
     } catch (e) { refuseCheck(e, 'hint'); }
@@ -2245,11 +2246,6 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     });
     return cards.length ? cards : null;
   }, [writeMode, lineVerdicts, inkResult, t]);
-  // Photo mode is never a back door for submitting an old typed transcript.
-  // Switch explicitly to Type when there is no fully recognised attachment.
-  const photoAwaitingValidReading = !photoEligibleForGrading({ mode, photo,
-    ocrPhase: photoOCR.phase, unreadPages: pdfUnread, pdfPageCount,
-    reattachRequired: photoReattachRequired });
   // Handwriting or a photo is marked on one press, as soon as there is ink or a photo (owner decision, 19 Nov 2026): the
   // reading happens silently, and a press made before it has finished waits for it under "Marking...".
   const hasPageToMark = writeMode ? inkHasStrokes : mode === 'photo' ? (!!photo || heldPdf) : false;
@@ -2305,11 +2301,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       readStates = stepReport.lines.map((_, i) => (excluded.includes(i) ? 'cant' : 'read'));
     }
     return {
-      lines, stepReport, ...(readStates ? { readStates } : {}), solution: res.solution || null, source: writeMode ? 'handwriting' : 'typed',
+      lines, stepReport, ...(readStates ? { readStates } : {}), solution: res.solution || null, source: writeMode ? 'handwriting' : 'typed', page: (writeMode || mode === 'photo') && walkthroughFixes(),
       receipt: shownGrade ? { awarded: shownGrade.awarded, possible: shownGrade.possible, id: typeof res.submissionId === 'string' ? res.submissionId : null } : null,
       attempt: markedCount
     };
-  }, [resolved, previousAttempt, res, writeMode, judged, inkResult, working, shownGrade, markedCount]);
+  }, [resolved, previousAttempt, res, writeMode, mode, judged, inkResult, working, shownGrade, markedCount]);
   const [awModel, setAwModel] = useState(null);
   useEffect(() => { if (!awInput) setAwModel(null); }, [awInput]);
   // The marked page: the student's own page with each judged line outlined and one comment per
@@ -2384,6 +2380,16 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     const id = requestAnimationFrame(() => document.querySelector('.qpage.ws .verdict')?.scrollIntoView({ block: 'nearest' }));
     return () => cancelAnimationFrame(id);
   }, [state.phase, state.res, resolved]);
+
+  // A new question opens at its top: after a marked card was scrolled to, "Next question" left the page part-way down, the first line
+  // under the sticky header (launch QA 26 Nov 2026). Prithagoras only, like the fix above; the first question of a page is not scrolled.
+  const openedQuestion = useRef(null);
+  useEffect(() => {
+    const was = openedQuestion.current;
+    openedQuestion.current = question?.id ?? null;
+    if (!walkthroughFixes() || was === null || was === openedQuestion.current || typeof window === 'undefined') return;
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [question?.id]);
 
   const answerLines = isMcq ? [] : writeMode
     ? (inkResult?.lines || [])
@@ -2900,7 +2906,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               return (
                 <button key={i} className={cls} disabled={resolved} aria-pressed={!resolved ? mcqSel === i : undefined} onClick={() => chooseOption(i)}>
                   <span className="mcq-key">{'ABCD'[i]}</span>
-                  <span lang="en"><MathText text={opt} /></span>
+                  <span lang="en" className="mcq-text"><MathText text={opt} /></span>
                   {mark && <span className="mcq-mark">{mark}</span>}
                 </button>
               );

@@ -96,6 +96,8 @@ export function answerToTex(text) {
   // Words, units and lists are not one expression: leave them.
   const words = raw.replace(/sqrt|cbrt|sin|cos|tan|ln|log|exp|arcsin|arccos|arctan|asin|acos|atan|pi|theta/g, '');
   if (/[A-Za-z]{4,}/.test(words) || /[=<>≤≥≠:,;%]/.test(raw)) return raw;
+  // A short plain word ("Two", "Odd", "No") is a word, not the product of its letters (launch QA 26 Nov 2026: "Correct answer: 𝑇𝑤𝑜 Two").
+  if (/(^|\s)(?:[A-Z][a-z]+|zero|one|two|six|ten|odd|yes|no|all|any|not|and|or|nor|both|none|true|false)(\s|$)/.test(raw.trim())) return raw;
   if (/\d\s+[A-Za-z]{2,}\b/.test(raw)) return raw;   // a number and its unit: "1.5 cm"
   const out = expressionTex(raw);
   return out === null ? raw : `$${out}$`;

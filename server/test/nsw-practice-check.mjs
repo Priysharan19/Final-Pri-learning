@@ -275,11 +275,11 @@ try {
 
   // ── A dot point may be asked for; the identity follows the question ───────
   {
-    const r = await issue({ generator: 'y8-linear', difficulty: 2, dotpoint: 'y8-linear.2', curriculum: 'nsw' });
+    const r = await issue({ generator: 'y11-lines', difficulty: 1, dotpoint: 'y11-lines.1', curriculum: 'nsw' });
     c.eq(r.status, 201, 'a dot point of an NSW bank can be asked for');
     const sealed = await sealedOf(a.account.id, r.data.question.id);
-    c.deq([sealed._curriculum.dotpoints, sealed._curriculum.outcomes.map(o => o.code), sealed._curriculum.exact], [['y8-linear.2'], ['MA5-LIN-C-01'], true],
-      'and the outcome is where the crosswalk located THAT dot point (Stage 5, though Pri labels the subtopic Year 8)');
+    c.deq([sealed._curriculum.dotpoints, sealed._curriculum.outcomes.map(o => o.code), sealed._curriculum.exact], [['y11-lines.1'], ['MAV-11-02'], true],
+      'and the outcome is where the crosswalk located THAT dot point ("Parallel and perpendicular gradients", Advanced Working with functions; a Year 11 dot point, because Years 7 to 10 are not offered a dot point request: nothing there is content-reviewed)');
     const shared = await issue({ generator: 'y8-circles', difficulty: 4, seed: 7, curriculum: 'nsw' });
     const s2 = await sealedOf(a.account.id, shared.data.question.id);
     c.ok(s2._curriculum.exact === false && s2._curriculum.dotpoints.length === 2 && s2._curriculum.outcomes.length === 2, 'a cell that spans two dot points names both outcomes and says it is not exact');
@@ -340,13 +340,15 @@ try {
     // An outcome reached only through a partial bank is not advertised.
     c.ok(all.filter(dp => dp.generated).every(dp => dp.practice.every(t => nswCell(t.generator, t.difficulties[0]) && t.difficulties.every(d => nswCell(t.generator, d)))), 'every advertised target is an issued cell');
     // The shape curriculumAvailability.js reads.
-    const full = r.data.syllabuses[0].subtopics.find(t => t.dotpoints.every(dp => dp.generated));
+    // (Any syllabus: after the dot point content review, 26 Nov 2026, the first syllabus has no focus area whose every outcome is offered.)
+    const full = r.data.syllabuses.flatMap(s => s.subtopics).find(t => t.dotpoints.every(dp => dp.generated));
+    c.ok(!!full, 'some focus area has every outcome offered');
     const empty = r.data.syllabuses.flatMap(s => s.subtopics).find(t => t.dotpoints.every(dp => !dp.generated));
     c.deq([topicAvailability(full).complete, topicAvailability(empty).selectable, practiceTargetAvailable(empty, 0), practiceTargetAvailable(full, 0)], [true, false, false, true],
       'curriculumAvailability reads it: a focus area with no issued question is not selectable');
     c.ok(!/outcome wording|students? (?:develop|select|appl)/i.test(JSON.stringify(r.data)) && all.every(dp => !('text' in dp)), 'it carries codes and Pri\'s focus-area names, no NESA wording');
     // What it advertises can be issued, and lands on the outcome it was advertised for.
-    const sample = all.filter(dp => dp.generated).filter((_, i) => i % 3 === 0);
+    const sample = all.filter(dp => dp.generated).filter((_, i) => i % 2 === 0);   // every second one (every third before the dot point content review, when more outcomes were offered): the bar below stays 20
     for (const dp of sample) {
       const target = dp.practice[0];
       const got = await issue({ generator: target.generator, difficulty: target.difficulties[0], dotpoint: target.dotpoint, curriculum: 'nsw' }, b.jar);

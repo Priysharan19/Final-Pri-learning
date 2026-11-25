@@ -67,6 +67,7 @@ export const EDITION_SUITES = [
   'server/test/nsw-practice-check.mjs',
   'server/test/nsw-offering-check.mjs',
   'server/test/hint-charge-edition-check.mjs',
+  'server/test/hint-thin-uncharged-check.mjs',
   'server/test/in-outcome-identity-check.mjs',
   'server/test/nsw-exam-check.mjs',
   'server/test/desk-check.mjs',

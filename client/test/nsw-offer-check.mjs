@@ -48,7 +48,7 @@ const { dispatch } = await import('../src/local/backend.js');
 const idb = await import('../src/local/idb.js');
 const { loadAllBanks } = await import('../src/engine/generators/index.js');
 const { NSW_ISSUED_CELLS } = await import('../src/engine/nswIssuedCells.js');
-const { nswIssuedLevels, nswCellIssued, nswOfferedCell } = await import('../src/engine/nswOffer.js');
+const { nswIssuedLevels, nswCellIssued, nswOfferedCell, nswExactLevels } = await import('../src/engine/nswOffer.js');
 // A `-forms` companion is listed under its base: a topic row is an ENTRY whose levels, dot points and questions come
 // from every generator behind it (engine/curriculum.js); the cells below are still asked for generator by generator.
 const { sidesOf, entryIssuedLevels } = await import('../src/engine/curriculum.js');
@@ -96,8 +96,8 @@ try {
   same('the server publishes exactly those levels as each subtopic\'s requestable', Object.fromEntries(Object.entries(served).map(([id, s]) => [id, s.requestable])), ledger);
   const allNsw = SUBTOPICS.map(s => s.id);
   ok('every NSW subtopic and level agrees between device and server', allNsw.every(id => LEVELS.every(d => nswCellIssued(id, d) === nswCell(id, d))));
-  ok('and every dot point\'s requestable is its own forms the server issues',
-    Object.entries(served).every(([id, s]) => dotpointsFor(id).every(dp => JSON.stringify(s.dotpoints[dp.id].requestable) === JSON.stringify(dp.forms.filter(d => nswCell(id, d))))));
+  ok('and every dot point\'s requestable is the issued levels at which only its own questions are served (nswDotpointExact.js)',
+    Object.entries(served).every(([id, s]) => dotpointsFor(id).every(dp => JSON.stringify(s.dotpoints[dp.id].requestable) === JSON.stringify(nswExactLevels(id, dp.id).filter(d => nswCell(id, d))))));
   const unissued = allNsw.flatMap(id => LEVELS.filter(d => !nswCell(id, d)).map(d => ({ id, d })));
   // 69 chapter cells were held back when this was written (> 30); fixing the tolerance and wording defects behind
   // the quality-gate exclusions issued most of them, so the bar is the count that remains plus a margin, not a
@@ -107,7 +107,7 @@ try {
 
   // ── The cell a request may name (pure) ─────────────────────────────────────
   ok('a request never names an unissued cell', allNsw.every(id => LEVELS.every(d => { const c = nswOfferedCell({ generator: id, difficulty: d }); return c === null ? nswIssuedLevels(id).length === 0 : nswCell(id, c.difficulty); })));
-  ok('with a dot point either', allNsw.every(id => dotpointsFor(id).every(dp => LEVELS.every(d => { const c = nswOfferedCell({ generator: id, difficulty: d, dotpoint: dp.id, dotpointForms: dp.forms }); return c === null || (nswCell(id, c.difficulty) && (c.dotpoint === null || dp.forms.includes(c.difficulty))); }))));
+  ok('with a dot point either', allNsw.every(id => dotpointsFor(id).every(dp => LEVELS.every(d => { const c = nswOfferedCell({ generator: id, difficulty: d, dotpoint: dp.id }); return c === null || (c.refused === 'dotpoint' ? nswExactLevels(id, dp.id).filter(l => nswCell(id, l)).length === 0 : nswCell(id, c.difficulty) && nswExactLevels(id, dp.id).includes(c.difficulty) && c.dotpoint === dp.id); }))));
   same('an issued cell is left as asked', nswOfferedCell({ generator: 'y8-linear', difficulty: 2 }), { difficulty: 2, dotpoint: null, moved: false });
   same('an unissued level moves to the nearest issued one', nswOfferedCell({ generator: 'y8-linear', difficulty: 4 }), { difficulty: 3, dotpoint: null, moved: true });
   same('a generator the server issues nothing from has no cell', nswOfferedCell({ generator: 'y8-not-a-chapter', difficulty: 2 }), null);

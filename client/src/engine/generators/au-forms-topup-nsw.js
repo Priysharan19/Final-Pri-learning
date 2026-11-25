@@ -642,7 +642,7 @@ const nonlinear = [
       prefix: 'y =',
       traps: [{ value: k + c, why: '$' + (k + c) + '$ is where the curve crosses the $y$-axis ($x = 0$); the asymptote is the level it approaches but never reaches.' }, { value: 0, why: 'The term with $x$ in the index approaches $0$, but the constant added on shifts the asymptote to $y = ' + c + '$.' }],
       hints: ['As $x$ moves far in the direction where the power becomes tiny, that term approaches $0$.', `What is left is the constant ${c}.`, 'The asymptote is the horizontal line at that value.'],
-      steps: [{ h: 'Exponential term', d: `${k === 1 ? '' : `${k} \\times `}$${base}^{x}$ approaches $0$ on one side` }, { h: 'Asymptote', d: `$y = ${c}$` }]
+      steps: [{ h: 'Exponential term', d: `$${k === 1 ? '' : `${k} \\times `}${base}^{x}$ approaches $0$ on one side` }, { h: 'Asymptote', d: `$y = ${c}$` }]
     });
   }),
   V([4], rng => {

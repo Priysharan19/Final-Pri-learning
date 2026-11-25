@@ -56,6 +56,8 @@ function expectHardened(headers, label, { hsts = true } = {}) {
   c.eq(headers.get('x-content-type-options'), 'nosniff', `${label}: nosniff`);
   c.eq(headers.get('referrer-policy'), 'no-referrer', `${label}: Referrer-Policy`);
   c.match(headers.get('permissions-policy'), /microphone=\(\)/, `${label}: Permissions-Policy`);
+  // Launch QA 26 Nov 2026: `interest-cohort` (FLoC) was withdrawn by the browsers; naming it logged a console warning on every page.
+  c.eq(/interest-cohort/.test(headers.get('permissions-policy') || ''), false, `${label}: Permissions-Policy names no withdrawn feature`);
   c.eq(headers.get('x-frame-options'), 'DENY', `${label}: X-Frame-Options`);
   if (hsts) c.match(headers.get('strict-transport-security'), /^max-age=\d{7,}; includeSubDomains$/, `${label}: HSTS`);
   c.eq(headers.get('x-powered-by'), null, `${label}: no X-Powered-By`);

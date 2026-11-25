@@ -33,7 +33,7 @@ const { dispatch } = await import('../src/local/backend.js');
 const idb = await import('../src/local/idb.js');
 const { loadAllBanks } = await import('../src/engine/generators/index.js');
 const { SUBTOPICS, SUBTOPIC_BY_ID, scopeForYear, dotpointsFor } = await import('../src/engine/curriculum.js');
-const { nswIssuedLevels } = await import('../src/engine/nswOffer.js');
+const { nswIssuedLevels, nswExactLevels } = await import('../src/engine/nswOffer.js');
 const T = await import('../src/engine/curriculum.js');
 const { editionOf } = await import('../edition.config.mjs');
 const { subtopicOfferedIn } = await import('../src/engine/offeringRules.js');
@@ -202,7 +202,7 @@ try {
 
     // A named dot point is issued by its own generator, whichever side holds it.
     for (const [i, dp] of T.entryDotpoints(base).entries()) {
-      const levels = dp.forms.filter(d => nswIssuedLevels(dp.subtopic).includes(d));
+      const levels = nswExactLevels(dp.subtopic, dp.id).filter(d => nswIssuedLevels(dp.subtopic).includes(d));
       if (!levels.length) continue;
       authority.resetRateLimits?.();
       const got = await POST('/practice/next', { mode: 'topic', subtopic: base, dotpoint: i, difficulty: levels[0] });
@@ -213,10 +213,14 @@ try {
 
     // An old link naming the companion, with the companion's own ordinal, lands on the same dot point.
     authority.resetRateLimits?.();
-    const dpC = dotpointsFor(companion).find(dp => dp.forms.some(d => nswIssuedLevels(companion).includes(d)));
-    const viaOld = await POST('/practice/next', { mode: 'topic', subtopic: companion, dotpoint: dpC.ordinal, difficulty: dpC.forms.find(d => nswIssuedLevels(companion).includes(d)) });
-    ok(`${companion}: an old link (dot point ${dpC.ordinal}) is issued by the companion and shown under ${base}`, await generatorOf(viaOld) === companion && viaOld.question.subtopic === base);
-    await finish(viaOld);
+    const dpC0 = dotpointsFor(companion).find(dp => nswExactLevels(companion, dp.id).some(d => nswIssuedLevels(companion).includes(d)));
+    // (A companion none of whose dot points has a level of its own questions has no dot point to link to: nothing to check.)
+    if (dpC0) {
+      const dpC = dotpointsFor(companion).find(dp => nswExactLevels(companion, dp.id).some(d => nswIssuedLevels(companion).includes(d)));
+      const viaOld = await POST('/practice/next', { mode: 'topic', subtopic: companion, dotpoint: dpC.ordinal, difficulty: nswExactLevels(companion, dpC.id).find(d => nswIssuedLevels(companion).includes(d)) });
+      ok(`${companion}: an old link (dot point ${dpC.ordinal}) is issued by the companion and shown under ${base}`, await generatorOf(viaOld) === companion && viaOld.question.subtopic === base);
+      await finish(viaOld);
+    }
   }
 
   // ── OLD ROWS: attempts recorded under the companion count under the entry ───────

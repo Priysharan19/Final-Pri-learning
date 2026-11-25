@@ -392,7 +392,7 @@ const TRIG = [
       return num(`Find the angle $\\theta$, in degrees, with $${QRANGE[Q]}$ and $\\${fn}\\theta = ${exTex(ex)}$.`, t, {
         suffix: '°',
         traps: [{ value: a, why: `That is the reference angle. Place it in quadrant ${Q}: $\\theta = ${Q === 1 ? 'reference angle' : Q === 2 ? '180° − reference' : Q === 3 ? '180° + reference' : '360° − reference'}$.` }],
-        hints: [`Ignore the sign for a moment: which of $30°, 45°, 60°$ has $\\${fn} = ${exTex({ ...ex, n: Math.abs(ex.n) })}$?`, `That reference angle is $${a}°$.`, `Place it in quadrant ${Q} (${QRANGE[Q]}).`],
+        hints: [`Ignore the sign for a moment: which of $30°, 45°, 60°$ has $\\${fn} = ${exTex({ ...ex, n: Math.abs(ex.n) })}$?`, `That reference angle is $${a}°$.`, `Place it in quadrant ${Q} ($${QRANGE[Q]}$).`],
         steps: [{ h: 'Reference angle', d: `$\\${fn}(${a}°) = ${exTex({ ...ex, n: Math.abs(ex.n) })}$` }, { h: `Quadrant ${Q}`, d: `$\\theta = ${t}°$` }]
       });
     })

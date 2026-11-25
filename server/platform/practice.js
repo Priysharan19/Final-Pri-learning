@@ -23,6 +23,7 @@ import { misconceptionIdForTrap, misconceptionIdForDiagnosis, misconceptionById 
 import { slipHint } from '../../client/src/engine/slipHint.js';
 import { cleanLatex, safeLatexLines } from '../../client/src/engine/texSafe.js';
 import { slipPatterns } from '../../client/src/engine/slipPattern.js';
+import { nswContentTrusted } from '../../client/src/engine/nswOffer.js';
 import { misconceptionLabel } from '../../client/src/engine/adaptive.js';
 import { HINT_RUNGS, buildHintLadder, ladderAvailable, ladderEvidence, markWeightAfter, nextRungAfter, rungLevelOf } from '../../client/src/engine/hintLadder.js';
 import { dueDotpoints, reviewStateFromAttempts } from '../../client/src/engine/reviewQueue.js';
@@ -81,7 +82,7 @@ const UUID = /^[0-9a-f-]{36}$/i;
 // grading a question the server refuses to issue could never be checked. The
 // name is only a lookup key; an unknown one fails generation with 422.
 const AUTHORED_BANK = /^[a-z][a-z0-9]{0,11}-[a-z0-9][a-z0-9-]{1,95}$/;
-const ISSUE_FIELDS = new Set(['generator', 'difficulty', 'seed', 'curriculum', 'mode', 'prepared', 'avoid', 'trap', 'dotpoint', 'written', 'account', 'band', 'worked']);
+const ISSUE_FIELDS = new Set(['generator', 'difficulty', 'seed', 'curriculum', 'mode', 'prepared', 'avoid', 'trap', 'dotpoint', 'aimed', 'written', 'account', 'band', 'worked']);
 // F7: practice of official JEE questions by length-of-working band (jeeBands.js).
 // Premium, decided by the server's entitlement record before anything is drawn.
 export const JEE_BAND_CAPABILITY = 'premium-exams';
@@ -93,7 +94,7 @@ function bandPick(request) {
   const rows = jeeBandRecords(PYQ_RECORDS, request.generator, request.band);
   return rng => pyqPayload(rows[Math.floor(Math.max(0, Math.min(0.999999999, Number(rng()))) * rows.length)]);
 }
-const PREPARE_FIELDS = new Set(['generator', 'difficulty', 'curriculum', 'mode', 'avoid', 'dotpoint']);
+const PREPARE_FIELDS = new Set(['generator', 'difficulty', 'curriculum', 'mode', 'avoid', 'dotpoint', 'aimed']);
 const PRACTICE_MODES = ['practice', 'review', 'task', 'rush', 'match', 'placement'];
 // One answer settles the question in these modes.
 const ONE_TRY_MODES = ['rush', 'match', 'placement'];
@@ -477,6 +478,12 @@ function readQuestionRequest(body, fields, banks = bankPolicy()) {
   if (body.dotpoint !== undefined && (typeof body.dotpoint !== 'string' || !DOTPOINT.test(body.dotpoint))) {
     return { error: [400, 'PRACTICE_ISSUE_INVALID', 'Invalid dot point.'] };
   }
+  // `aimed`: the device's own aim at a dot point for "the next question of this topic" (the student did not ask for it). Such a request is
+  // answered as before (any question that credits the dot point), not held to exact questions: only a dot point the student chose is
+  // (launch QA 26 Nov 2026).
+  if (body.aimed !== undefined && (typeof body.aimed !== 'boolean' || body.dotpoint === undefined)) {
+    return { error: [400, 'PRACTICE_ISSUE_INVALID', 'Invalid dot point aim.'] };
+  }
   let trap = null;
   if (body.trap !== undefined) {
     const t = body.trap;
@@ -498,7 +505,7 @@ function readQuestionRequest(body, fields, banks = bankPolicy()) {
     }
     band = body.band;
   }
-  return { generator, difficulty, mode, avoid: new Set(avoid), dotpoint: body.dotpoint, trap, written: body.written === true, band };
+  return { generator, difficulty, mode, avoid: new Set(avoid), dotpoint: body.dotpoint, aimed: body.aimed === true, trap, written: body.written === true, band };
 }
 
 /**
@@ -516,7 +523,7 @@ function readQuestionRequest(body, fields, banks = bankPolicy()) {
  * as an avoided one does, since it rules out one more item of the pool.
  */
 function* seekQuestion(request, { draw, tries, batches, admits = null }) {
-  const { generator, difficulty, dotpoint, avoid = new Set(), trap, written = false } = request;
+  const { generator, difficulty, dotpoint, aimed = false, avoid = new Set(), trap, written = false } = request;
   const pick = bandPick(request);
   // `written` asks for a form the student writes out; a multiple-choice
   // item can be guessed, which a diagnostic must avoid where it can.
@@ -538,7 +545,13 @@ function* seekQuestion(request, { draw, tries, batches, admits = null }) {
       // A dot point that was asked for is never answered with another one, fresh or as a fallback: a cell's other
       // forms (a sibling dot point's) are passed over, as a form the edition does not issue is. When the whole
       // seek finds none, the request is refused below (PRACTICE_CONTENT_UNSUPPORTED), never substituted.
-      if (dotpoint != null && !(q.dotpoints || []).includes(q.dotpointRequested)) continue;
+      // Launch QA 26 Nov 2026: "credits the dot point" was not enough. A cell that names two dot points cannot say which one a
+      // question is, so a request for either was answered by a sibling's question. Only a question the engine can prove is on the
+      // dot point (`dotpointExact`) answers it; a request nothing exact answers is refused, and the device says so.
+      // ... and at the level asked for: the engine snaps a level a dot point has no form at to its nearest one, which would be a silent change
+      // of level (the device offers a dot point only at the levels it is served at, nswDotpointExact.js).
+      // Prithagoras only (`admits` is null on Priyabhata, whose dot point requests are served and refused exactly as before):
+      if (dotpoint != null && (admits && !aimed ? (q.dotpointExact !== true || Number(q.difficulty) !== Number(difficulty) || !nswContentTrusted(q, generator, difficulty, dotpoint)) : !(q.dotpoints || []).includes(q.dotpointRequested))) continue;
       // Rush and Match answer in one line of their own: a sketch is a form of features, so neither is ever dealt one.
       if (q.answerType === 'graph-sketch' && (request.mode === 'rush' || request.mode === 'match')) continue;
       const hash = opaqueContentHash(q.contentHash);
@@ -1305,7 +1318,18 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // A worked-solution question offers its hints only: its solution is not a rung (it ends nothing and marks nothing; it has its own route).
       if (q.answerType === 'manual' && body.rung === 'solution') return { status: 409, code: 'HINT_NOT_AVAILABLE' };
       const level = await hintLevelOf(accountId, qid);
-      if (want > level + 1) return { status: 409, code: 'HINT_RUNG_ORDER', next: nextRungAfter(level) };
+      // Prithagoras: a rung the answer guard emptied (it would have stated the answer) is `thin`. Nothing was shown, so nothing is charged:
+      // the level the account has reached, the help recorded against the question and the mark weight stay as they were, and the student may
+      // go on to the next rung without it (launch QA 26 Nov 2026, review of #1122). The other edition's ladders are served and charged as before.
+      const guarded = serverEdition(env) === 'prithagoras';
+      const ladder = buildHintLadder(q, { withholdAnswer: guarded });
+      const emptied = r => guarded && r.rung !== 'solution' && r.thin;
+      if (want > level + 1 && !ladder.slice(level, want - 1).every(emptied)) return { status: 409, code: 'HINT_RUNG_ORDER', next: nextRungAfter(level) };
+      if (body.rung !== 'solution' && emptied(ladder[want - 1])) {
+        const rung = ladder[want - 1];
+        return { response: { authoritative: true, questionId: qid, rung: rung.rung, level, hint: null, thin: true, charged: false,
+          remaining: HINT_RUNGS.length - level, markWeight: markWeightAfter(level, hintsAreFree(env)), next: nextRungAfter(level) } };
+      }
       const reached = Math.max(level, want);
       if (reached > level) {
         await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-hints',?,?,?,?,?) ON CONFLICT(account_id,scope,key) DO UPDATE SET response_json=excluded.response_json",
@@ -1319,7 +1343,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         if (revealed.status) return revealed;
         return { response: { ...revealed.response, rung: 'solution', level: HINT_RUNGS.length, remaining: 0, endsQuestion: true } };
       }
-      const rung = buildHintLadder(q)[want - 1];
+      const rung = ladder[want - 1];
       return { response: { authoritative: true, questionId: qid, rung: rung.rung, level: reached,
         hint: rung.text, thin: rung.thin, remaining: HINT_RUNGS.length - reached,
         markWeight: markWeightAfter(reached, hintsAreFree(env)), next: nextRungAfter(reached) } };

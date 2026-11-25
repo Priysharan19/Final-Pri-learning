@@ -880,7 +880,7 @@ export default {
   'settings.themeDark': 'Night',
   'settings.themeLight': 'Paper',
   'settings.themeSystem': 'Match device',
-  'settings.themeNote': 'Paper is the default: dark ink on a light page is easiest to read for long sessions. Night is the same notebook with the lamp turned down.',
+  'settings.themeNote': 'Dark ink on a light page is easiest to read for long sessions. Night is the same notebook with the lamp turned down.',
   'settings.themeSystemNote': 'Pri follows this device: paper when the device is in light mode, night when it is in dark mode.',
 
   'settings.courses': 'Courses',
