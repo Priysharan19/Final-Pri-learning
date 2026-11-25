@@ -543,7 +543,8 @@ function* seekQuestion(request, { draw, tries, batches, admits = null }) {
       // dot point (`dotpointExact`) answers it; a request nothing exact answers is refused, and the device says so.
       // ... and at the level asked for: the engine snaps a level a dot point has no form at to its nearest one, which would be a silent change
       // of level (the device offers a dot point only at the levels it is served at, nswDotpointExact.js).
-      if (dotpoint != null && (q.dotpointExact !== true || Number(q.difficulty) !== Number(difficulty))) continue;
+      // Prithagoras only (`admits` is null on Priyabhata, whose dot point requests are served and refused exactly as before):
+      if (dotpoint != null && (admits ? (q.dotpointExact !== true || Number(q.difficulty) !== Number(difficulty)) : !(q.dotpoints || []).includes(q.dotpointRequested))) continue;
       // Rush and Match answer in one line of their own: a sketch is a form of features, so neither is ever dealt one.
       if (q.answerType === 'graph-sketch' && (request.mode === 'rush' || request.mode === 'match')) continue;
       const hash = opaqueContentHash(q.contentHash);

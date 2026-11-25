@@ -45,7 +45,7 @@ import OtpInput, { OTP_LENGTH } from './OtpInput.jsx';
 import { priNative } from '../platform/native/index.js';
 import { isNetworkFailure, signInErrorCopy } from './signInErrors.js';
 import { readOnboardingAuthority } from './onboardingAuthority.js';
-import { parentFeaturesOffered, defaultCourse, phoneDialCode, smsOffered } from '../platform/edition.js';
+import { parentFeaturesOffered, defaultCourse, phoneDialCode, smsOffered, walkthroughFixes } from '../platform/edition.js';
 import { planStoredProfile } from '../platform/accountProfileRestore.js';
 import { EDITION_ID } from '../brand/edition.js';
 import { offeredYears, pathwayOffered, defaultOffering } from '../platform/edition.js';
@@ -152,14 +152,14 @@ export default function SignUpFlow({
   // Whether the account's stored profile has been asked for in this sign-in (a guardian-pending child cannot be asked yet).
   const storedAsked = useRef(false);
   const [readRetry, setReadRetry] = useState(null);
-  // Pri's server is found by asking the page's own origin once at boot. Signed out and offline nothing answers, and that is a
+  // Prithagoras only (walkthroughFixes), as the other fixes of that pass: Pri's server is found by asking the page's own origin once at boot. Signed out and offline nothing answers, and that is a
   // device that cannot reach the server, not a build without accounts: it says so and offers Try again (launch QA 26 Nov 2026).
   const [, setProbeTick] = useState(0);
   const available = cloudAvailable();
-  const unreachable = !available && (lastCloudProbe().answered === false || (typeof navigator !== 'undefined' && navigator.onLine === false));
+  const unreachable = walkthroughFixes() && !available && (lastCloudProbe().answered === false || (typeof navigator !== 'undefined' && navigator.onLine === false));
   const askAgain = useCallback(() => { void discoverCloudOrigin({ timeoutMs: 4000 }).finally(() => setProbeTick(n => n + 1)); }, []);
   useEffect(() => {
-    if (available || typeof window === 'undefined') return undefined;
+    if (available || !walkthroughFixes() || typeof window === 'undefined') return undefined;
     window.addEventListener('online', askAgain);
     return () => window.removeEventListener('online', askAgain);
   }, [available, askAgain]);

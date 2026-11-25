@@ -1749,13 +1749,14 @@ html[data-edition=prithagoras] .hero-kicker { text-wrap: balance; }
 
 /* The one dominant next move */
 /* An option that is a table or a long formula scrolls inside its own box; it never widens the page (360 px, Year 12 Random Variables). */
-.mcq { grid-template-columns: minmax(0, 1fr); }
-.mcq-opt .mcq-text { min-width: 0; max-width: 100%; overflow-x: auto; overflow-y: hidden; padding-block: 6px; }
+/* Prithagoras only: the Priyabhata layout is untouched. */
+html[data-edition=prithagoras] .mcq { grid-template-columns: minmax(0, 1fr); }
+html[data-edition=prithagoras] .mcq-opt .mcq-text { min-width: 0; max-width: 100%; overflow-x: auto; overflow-y: hidden; padding-block: 6px; }
 /* The same after marking: a worked-solution step or the correct answer that is a table scrolls in its own box. */
-.step-d, .final-answer { min-width: 0; max-width: 100%; overflow-x: auto; overflow-y: hidden; }
-.step-d { padding-block: 4px; }
-.steps { grid-template-columns: minmax(0, 1fr); }
-.step > :not(.step-n) { min-width: 0; }
+html[data-edition=prithagoras] .step-d, html[data-edition=prithagoras] .final-answer { min-width: 0; max-width: 100%; overflow-x: auto; overflow-y: hidden; }
+html[data-edition=prithagoras] .step-d { padding-block: 4px; }
+html[data-edition=prithagoras] .steps { grid-template-columns: minmax(0, 1fr); }
+html[data-edition=prithagoras] .step > :not(.step-n) { min-width: 0; }
 .ws-actions {
   position: sticky; bottom: 0; z-index: 25; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   margin: 6px calc(-1 * var(--ws-pad)) 0; padding: 12px var(--ws-pad) calc(12px + var(--pri-inset-bottom));

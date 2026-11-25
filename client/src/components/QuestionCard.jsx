@@ -2305,7 +2305,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       readStates = stepReport.lines.map((_, i) => (excluded.includes(i) ? 'cant' : 'read'));
     }
     return {
-      lines, stepReport, ...(readStates ? { readStates } : {}), solution: res.solution || null, source: writeMode ? 'handwriting' : 'typed', page: writeMode || mode === 'photo',
+      lines, stepReport, ...(readStates ? { readStates } : {}), solution: res.solution || null, source: writeMode ? 'handwriting' : 'typed', page: (writeMode || mode === 'photo') && walkthroughFixes(),
       receipt: shownGrade ? { awarded: shownGrade.awarded, possible: shownGrade.possible, id: typeof res.submissionId === 'string' ? res.submissionId : null } : null,
       attempt: markedCount
     };
