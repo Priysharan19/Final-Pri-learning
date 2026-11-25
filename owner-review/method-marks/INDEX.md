@@ -62,3 +62,8 @@ These types were tried. A scheme is not offered because at least one criterion c
 ## One rule for every multi-mark written question
 
 Besides the per-type schemes above, one generic rule can pay step marks for a wrong or missing final answer on most multi-mark written Year 11 and Year 12 questions, from each question's own authored worked solution. It is a separate approval, not one of the types above, and the author approved it on 2026-11-24, at the digest named in its packet. Read [generic-solution-steps.md](generic-solution-steps.md).
+
+
+## The same generic rule, for your own question bank
+
+The generic rule above, unchanged, can also pay step marks on the questions of your own bank, with your worked steps as the authored solution and your marks as N. It is a separate approval with its own id, and it is not approved: nothing pays on your bank until you file your own record for it. Read [generic-solution-steps-bank.md](generic-solution-steps-bank.md).

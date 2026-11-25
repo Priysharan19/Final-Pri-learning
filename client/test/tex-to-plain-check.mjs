@@ -3,7 +3,7 @@
 // Part 1  The converter: what it reads, and that anything it does not fully understand is null.
 // Part 2  The rule in the checker: a TeX reading may tick or leave a note, never cross.
 // Part 3  The server path (markerOps.stepEvidence), and that the reader is still handed no answer.
-import { texToPlain } from '../src/engine/texToPlain.js';
+import { texToPlain, texToPlainWhy, EXTENDED_TEX } from '../src/engine/texToPlain.js';
 import { stepCheckArithmetic } from '../src/engine/arithmeticLines.js';
 import { stepEvidence } from '../../server/platform/markerOps.js';
 import { parse, normalize } from '../src/engine/expr.js';
@@ -37,6 +37,31 @@ for (const tex of ['e^{x}(2x-4)', '\\frac{x+1}{x-1}', '\\sqrt[3]{x}', '\\sin\\th
   let readable = true; try { parse(normalize(texToPlain(tex))); } catch { readable = false; }
   ok(readable, `the engine parses ${texToPlain(tex)}`);
 }
+
+// ── Part 1b · the EXTENDED reading (texToPlain(tex, EXTENDED_TEX)) ────────────────────────────────────────────────────────
+// The base reading above is unchanged, byte for byte: every caller that does not ask for more gets it. The extended reading is asked for by a student's
+// reader TeX on an Australian question, and by the author's bank. tex-faithful-check.mjs proves each of these by VALUE against an independent evaluator.
+const EXT_CASES = [
+  // the constructs of the author's bank (read in November 2026; each proved by value in tex-faithful-check.mjs)
+  ['\\sin^{2}x', 'sin(x)^(2)'], ['\\sin^2\\theta+\\cos^2\\theta=1', 'sin(θ)^(2)+cos(θ)^(2)=1'], ['\\sin^{-1}\\tfrac12', 'arcsin((1/2))'], ['\\tan^{-1}\\dfrac{30}{40}', 'arctan((30/40))'],
+  ['\\log_2 8', '(log(8)/log(2))'], ['\\log_{2}(x+1)', '(log((x+1))/log(2))'], ['\\log_a b', '(log(b)/log(a))'], ['\\log_2\\sqrt8=\\tfrac32', '(log(sqrt(8))/log(2))=(3/2)'],
+  ['\\binom52=10', '(5C2)=10'], ['\\binom{n}{2}', 'ncr(n;2)'], ['{}^{7}P_{2}', '(7P2)'], ['^5C_2', '(5C2)'], ['2\\binom{4}{2}', '2*(4C2)'],
+  ['90^\\circ', '90°'], ['36.9^{\\circ}', '36.9°'], ['\\sin 120^\\circ', 'sin(120°)'], ['\\sin(30^\\circ)=\\tfrac12', 'sin(30°)=(1/2)'], ['\\sin x\\cos x', 'sin(x)*cos(x)'],
+  ['\\alpha+\\beta', 'alpha+beta'], ['2\\alpha\\beta', '2alpha*beta'], ['\\cos\\alpha', 'cos(alpha)'], ['\\sqrt[4]{x}', '(x)^(1/4)'], ['\\sqrt[5]{32}', '(32)^(1/5)'], ['\\left|x-3\\right|', 'abs(x-3)'],
+  ["y'", "y'"], ["f'(x)", "f'(x)"], ["f''(x)", "f''(x)"], ['\\dot A=2\\pi r\\dot r', '(dotA)=2π r*(dotr)'], ['\\dot y^{2}', '(doty)^(2)'], ['16\\%', '16%'],
+  ['\\int_0^{\\pi}\\sin x\\,dx=2', '∫_{0}^{π}sin(x)dx=2'], ['\\int e^{-x}dx', '∫e^(-x)dx'], ['\\int x\\,dx', '∫x dx'], ['x=\\pm4', 'x=4, x=-4'], ['x=\\dfrac{1\\pm\\sqrt5}{2}', 'x=((1+sqrt(5))/2), x=((1-sqrt(5))/2)'],
+  ['2x+3=7', '2x+3=7'], ['\\frac{a}{b}', '((a)/(b))'], ['e^{x}(2x-4)', 'e^(x)*(2x-4)'], ['\\sin x', 'sin(x)'], ['2\\pi r', '2π r'], ['\\int_{0}^{2} 3x^{2}\\,dx', '∫_{0}^{2}3x^(2)dx'], ['\\left[ 6x^{2} \\right]_{-2}^{4}', '[6x^(2)]_{-2}^{4}'],
+  // review of PR #1121: a letter before a function is a coefficient; e next to a number is the constant; a function's product argument; ln of a power of e (placed last: the base reading misreads these, so they are not in the agrees-with-base slice)
+  ['a\\tan\\tfrac{\\pi}{4}=2', 'a*tan(((π)/4))=2'], ['y=a\\sin x', 'y=a*sin(x)'], ['a\\cos 2x', 'a*cos(2x)'], ['2e-3', '2*e-3'], ['3e-2x', '3*e-2x'], ['\\cos\\pi t', 'cos(π*t)'], ['\\sin 2\\pi t', 'sin(2*π*t)'], ['\\ln e^{5}', 'ln(e^(5))'], ['\\sin 3!', 'sin(3)!'],
+];
+for (const [tex, want] of EXT_CASES) ok(texToPlain(tex, EXTENDED_TEX) === want, `extended: ${tex} -> ${want} (got ${JSON.stringify(texToPlain(tex, EXTENDED_TEX))})`);
+// what the base reading refuses, the extended reading reads, and what the base reading reads the extended reading reads the same
+for (const [tex] of EXT_CASES.slice(0, 40)) ok(texToPlain(tex) === null || texToPlain(tex) === texToPlain(tex, EXTENDED_TEX), `extended agrees with base where base reads: ${tex}`);
+for (const [tex] of CASES) ok(texToPlain(tex, EXTENDED_TEX) === texToPlain(tex) || tex === '\\sqrt[3]{x}', `extended reads every base case the same: ${tex} (${texToPlain(tex)} vs ${texToPlain(tex, EXTENDED_TEX)})`);
+const EXT_NULLS = ['\\sin x\\sin(2m+1)x', '\\sin(2m+1)x', '\\sin x!', 'x^\\frac{1}{2}', '3\\frac{1}{2}', '\\foo', '\\href{a}{b}', '{x}', 'x_{1}', 'x_1', '\\sin xy', '\\sqrt[n]{x}', '2\\frac{1}{2}', '\\frac{1}{}', '\\int_{0}^{2} 3x', '\\pm 3', '\\sum_{i=1}^{3} i', '\\lim x', '\\infty', '\\left.x', '\\text{ cm}', '2 3', '^{2}', 'x^{', '\\sin', '', '   ', 'a|b', 'x\\\\y',
+'\\phi', '\\lambda', '\\sin^{3.5}x', '\\ln^{-1}x', '\\log_{1}x', '\\log_{x+1}2', 'x^\\circ', '(x+1)^\\circ', '\\sin 2 3', '\\sin x y', "x'''", '\\dot x=3t', '\\dot x t=x\\dot t', '\\int x', '\\int_0^1 x=3', '\\sqrt[13]{x}', '\\left|x'];
+for (const tex of EXT_NULLS) ok(texToPlain(tex, EXTENDED_TEX) === null, `extended: not understood -> null: ${JSON.stringify(tex)} (got ${JSON.stringify(texToPlain(tex, EXTENDED_TEX))})`);
+ok(texToPlainWhy('\\binom52').why === '\\binom' && texToPlainWhy('\\binom52', EXTENDED_TEX).plain === '(5C2)', 'the base reading still refuses \\binom (and says which command), the extended reads it');
 
 // ── Part 2 · the rule in the checker ────────────────────────────────────────
 const statuses = r => r.lines.map(l => l.status).join();
@@ -133,6 +158,35 @@ const L = (text, latex) => ({ text, latex });
   ok(tick('2+2=4 so', '2+2=4') === 'note' && tick('2+2=4', '2+2=4') === 'ok', 'the same content is ticked only when the plain check already could');
 }
 
+// ── Part 2b · the extended reading in the checker (opts.extendedTex, set for an Australian question only) ───────────────────
+// A reading of the reader's TeX may tick or leave a note, never cross. With the extended reading: no line is ever crossed BY the TeX, a false TeX never ticks a
+// line the text did not already tick, the statuses are never worse than the base reading's, and without the option the report is exactly what it was.
+{
+  const PAIRS = [
+    ['sin 30° = 1/2', '\\sin 30^\\circ = \\frac{1}{2}', '\\sin 30^\\circ = \\frac{1}{3}'],
+    ['sin2x + cos2x = 1', '\\sin^{2}x+\\cos^{2}x=1', '\\sin^{2}x+\\cos^{2}x=2'],
+    ['5C2 = 10', '\\binom{5}{2}=10', '\\binom{5}{2}=11'], ['5 2 = 10', '\\binom52=10', '\\binom52=12'],
+    ['log2 8 = 3', '\\log_2 8=3', '\\log_2 8=4'], ['2 3 = 8', '2^{3}=8', '2^{3}=9'], ['x = 4 or -4', 'x=\\pm4', 'x=\\pm5'],
+    ['∫(0 to 2) 3x^2 dx = 8', '\\int_{0}^{2}3x^{2}\\,dx=8', '\\int_{0}^{2}3x^{2}\\,dx=9'], ['180° = π', '180^\\circ = \\pi', '180^\\circ = 2\\pi'],
+    ['tan^-1 1 = π/4', '\\tan^{-1}1=\\frac{\\pi}{4}', '\\tan^{-1}1=\\frac{\\pi}{3}'], ["y' = 2x", "y'=2x", "y'=3x"],
+    ['1 2 + 1 3 = 5 6', '\\frac{1}{2}+\\frac{1}{3}=\\frac{5}{6}', '\\frac{1}{2}+\\frac{1}{3}=\\frac{2}{5}'], ['4! = 24', '4!=24', '4!=25'], ['16% of 50 = 8', '16\\%\\cdot50=8', '16\\%\\cdot50=9'],
+    ['alpha beta = 3', '\\alpha\\beta=3', '\\alpha\\beta=4'], ['dotx = 2', '\\dot x=2', '\\dot x=3'], ['3 + 4 = 8', '3+4=7', '3+4=9'], ['2 3 = 8 so', '2^{3}=8', '2^{3}=9']
+  ];
+  const stat = (text, latex, extended) => stepCheckArithmetic(text, { latex: [{ text, latex }], ...(extended ? { extendedTex: true } : {}) }).lines.map(l => l.status);
+  for (const [text, good, bad] of PAIRS) {
+    const plain = stepCheckArithmetic(text).lines.map(l => l.status);
+    for (const latex of [good, bad]) {
+      const base = stat(text, latex, false), ext = stat(text, latex, true);
+      const rank = { ok: 2, note: 1, break: 0 };
+      ok(ext.every((st, i) => rank[st] >= rank[base[i]] || (plain[i] === 'break' && st === 'note')), `extended is never worse than base: ${text} / ${latex} (${base} -> ${ext})`);
+      ok(ext.every((st, i) => st !== 'break' || plain[i] === 'break'), `the TeX never crosses a line the text did not cross: ${text} / ${latex} (${ext})`);
+    }
+    ok(stat(text, bad, true).every((st, i) => st !== 'ok' || plain[i] === 'ok'), `a false TeX ticks nothing the text did not tick: ${text} / ${bad} (${stat(text, bad, true)})`);
+  }
+  // no option: the report is exactly what it was
+  for (const [text, good] of PAIRS) ok(JSON.stringify(stepCheckArithmetic(text, { latex: [{ text, latex: good }] })) === JSON.stringify(stepCheckArithmetic(text, { latex: [{ text, latex: good }], extendedTex: false })), `without extendedTex the report is unchanged: ${text}`);
+}
+
 // ── Part 3 · the server path ────────────────────────────────────────────────
 {
   const q = { id: 'q', form: 'x', answerType: 'number', answer: { value: 7 }, prompt: 'Find $x$.' };   // no Step Check: the arithmetic check runs
@@ -146,6 +200,13 @@ const L = (text, latex) => ({ text, latex });
   const stays = stepEvidence(q, '7', '3 + 4 = 7', { correct: true }, { latex: [L('3 + 4 = 7', '3+4=8')] });
   ok(stays.stepReport?.lines?.[0]?.status === 'ok', 'stepEvidence: a true line stays true');
   ok(JSON.stringify(stepEvidence(q, '7', line, { correct: false }, null)) === JSON.stringify(flat), 'stepEvidence: no TeX, same reply');
+}
+// The extended reading reaches the checker for an Australian question only (India's reading is exactly what it was).
+{
+  const ops = readFileSync(new URL('../../server/platform/markerOps.js', import.meta.url), 'utf8');
+  ok(/\.\.\.\(usesExtendedTex\(q\) \? \{ extendedTex: true \} : \{\}\)/.test(ops), 'markerOps passes extendedTex only for an author-bank question (usesExtendedTex), never for a generator or paper question');
+  const solution = readFileSync(new URL('../src/engine/solutionMatch.js', import.meta.url), 'utf8');
+  ok(/if \(!bankReading\) return spanToPlainBraced\(span, false\);/.test(solution), 'solutionMatch reads a generated question exactly as it did; the bank has its own scope');
 }
 // 0^0 is never read (no tick can come from it); 10^0 and 0^1 are ordinary.
 ok(texToPlain('0^0 = 1') === null && texToPlain('0^{0} = 1') === null && texToPlain('2 + 0^{0} = 3') === null, '0^0 converts to null');

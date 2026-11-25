@@ -27,6 +27,8 @@ import { evaluate } from '../client/src/engine/expr.js';
 import { prettyText } from '../client/src/engine/schemePlans.js';
 import { genericPacket } from './generic-steps-packet.mjs';
 import { GENERIC_ID, genericDigest } from '../server/platform/genericSteps.js';
+import { BANK_GENERIC_ID, bankGenericDigest } from '../server/platform/bankGenericSteps.js';
+import { bankGenericPacket } from './bank-generic-packet.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const OUT_DIR = path.join(ROOT, 'owner-review', 'method-marks');
@@ -594,7 +596,11 @@ export async function build() {
   notProvable.filter(n => !n.unavailable).sort((a, b) => a.level - b.level).forEach(n => I.push(`- ${plain(n.title)} (${n.course}; families ${n.families.map(f => `\`${f}\``).join(', ')}): ${plain(n.reason)}`));
   I.push('', '## One rule for every multi-mark written question', '',
     `Besides the per-type schemes above, one generic rule can pay step marks for a wrong or missing final answer on most multi-mark written Year 11 and Year 12 questions, from each question\'s own authored worked solution. It is a separate approval, not one of the types above, and ${genericApproval ? `the author approved it on ${genericApproval.date}, at the digest named in its packet` : 'it is not approved'}. Read [generic-solution-steps.md](generic-solution-steps.md).`, '');
+  const bankApproval = approvalOf(BANK_GENERIC_ID, bankGenericDigest(), recs);
+  I.push('', '## The same generic rule, for your own question bank', '',
+    `The generic rule above, unchanged, can also pay step marks on the questions of your own bank, with your worked steps as the authored solution and your marks as N. It is a separate approval with its own id, ${bankApproval ? `and the author approved it on ${bankApproval.date}, at the digest named in its packet` : 'and it is not approved: nothing pays on your bank until you file your own record for it'}. Read [generic-solution-steps-bank.md](generic-solution-steps-bank.md).`, '');
   files.set('INDEX.md', plain(I.join('\n')));
+  files.set('generic-solution-steps-bank.md', plain(await bankGenericPacket({ banner: bannerFor(BANK_GENERIC_ID, bankGenericDigest(), recs), approval: bankApproval })));
   files.set('generic-solution-steps.md', plain(await genericPacket({ banner: bannerFor(GENERIC_ID, genericDigest(), recs), approval: genericApproval })));
   const json = {
     status: approvedCount || genericApproval ? `${approvedCount} of ${done.length} types${genericApproval ? ' and the generic rule' : ''} approved by the author's own records; the rest are drafts: not approved` : 'draft: not approved',

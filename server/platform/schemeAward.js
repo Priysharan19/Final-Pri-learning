@@ -45,6 +45,8 @@ import { editionMarkingPolicy, editionMethodMarksRefusal } from './editionMarkin
 import { AUTHOR_APPROVED_SERVER } from './authorApproved.generated.js';
 import { marksPossibleFor } from './markerOps.js';
 import { GENERIC_ID, genericDigest, awardGeneric, GENERIC_WORDING } from './genericSteps.js';
+import { BANK_ID, bankDigest, awardBank, BANK_WORDING } from './bankSteps.js';
+import { BANK_GENERIC_ID, bankGenericDigest, awardBankGeneric } from './bankGenericSteps.js';
 
 /** Editions on the author-approved tier: schemes only, on the author's approval and PRI_METHOD_MARKS=on. */
 export const AUTHOR_APPROVED_EDITIONS = Object.freeze(['prithagoras']);
@@ -427,6 +429,9 @@ export function schemeTypeOf(q, generator = q?._generator ?? q?.subtopic) {
 export const isApproved = (typeId, list = approved) => {
   // The generic rule (genericSteps.js) is not one of SCHEMES: its own approval id, its own digest over the rule's code and wording.
   if (typeId === GENERIC_ID) return Array.isArray(list) && list.some(a => a?.typeId === GENERIC_ID && a.digest === genericDigest());
+  // The bank rule (bankSteps.js) likewise: its own approval id, its own digest over its code and wording. Never approved in the repository until the author files it.
+  if (typeId === BANK_GENERIC_ID) return Array.isArray(list) && list.some(a => a?.typeId === BANK_GENERIC_ID && a.digest === bankGenericDigest());
+  if (typeId === BANK_ID) return Array.isArray(list) && list.some(a => a?.typeId === BANK_ID && a.digest === bankDigest());
   const s = byId.get(typeId);
   return !!s && list.some(a => a?.typeId === typeId && a.digest === schemeDigest(s));
 };
@@ -488,14 +493,18 @@ export const SCHEME_MODES = Object.freeze(['practice', 'review', 'task']);
 export function schemePay({ q, report, topic = null, correct, marksPossible, env = process.env, list = approved }) {
   const typeId = typeof q?._methodScheme === 'string' ? q._methodScheme : null;
   const generic = typeId === GENERIC_ID;
+  const bank = typeId === BANK_ID;
+  const bankGeneric = typeId === BANK_GENERIC_ID;
   const scheme = typeId ? byId.get(typeId) : null;
-  if (!scheme && !generic) return { paid: false, reason: 'not-a-scheme-question' };
+  if (!scheme && !generic && !bank && !bankGeneric) return { paid: false, reason: 'not-a-scheme-question' };
   // Step marks are for practice, review and task questions only. The one-try modes (Rush, Match, the placement check) and anything else with a
   // mode of its own stay on the final answer, whatever the question carries: a stamp is not enough.
   if (q?._practiceMode !== undefined && !SCHEME_MODES.includes(q._practiceMode)) return { paid: false, typeId, reason: 'mode-final-answer-only' };
   if (!isApproved(typeId, list)) return { paid: false, typeId, reason: 'type-not-approved' };
   // The generic rule is the author-approved tier only: never under the examiner tier, whatever else is set.
   if (generic && !authorTier(env)) return { paid: false, typeId, reason: 'generic-author-tier-only' };
+  if (bank && !authorTier(env)) return { paid: false, typeId, reason: 'bank-author-tier-only' };
+  if (bankGeneric && !authorTier(env)) return { paid: false, typeId, reason: 'bank-generic-author-tier-only' };
   if (authorTier(env)) {
     // Author-approved tier: the listed type above plus the explicit switch. The examiner result is neither needed nor read.
     const why = authorTierRefusal(env);
@@ -503,6 +512,38 @@ export function schemePay({ q, report, topic = null, correct, marksPossible, env
   } else if (editionMarkingPolicy(env).methodMarks !== true) {
     // Examiner tier, every existing gate unchanged: the switch, the production examiner result, and the edition's certification.
     return { paid: false, typeId, reason: editionMethodMarksRefusal(env)?.code ?? 'method-marks-off' };
+  }
+  if (bankGeneric) {
+    // The approved generic rule, applied unchanged to a bank part (bankGenericSteps.js). Same gates, same reply shape as the generic rule.
+    const award = awardBankGeneric(q, report, correct === true);
+    if (!award) return { paid: false, typeId, reason: 'bank-generic-no-usable-steps' };
+    if (award.possible !== marksPossible) return { paid: false, typeId, reason: `criteria-count: the rule has ${award.possible} marks and this question is worth ${marksPossible}, so it stays on the final answer` };
+    const awarded = correct === true ? award.possible : Math.min(award.total, award.possible - 1);
+    const earnedLines = award.items.filter(i => i.awarded && i.basis === 'lines').length;
+    return {
+      paid: true, typeId, digest: bankGenericDigest(), items: award.items, awarded,
+      partial: {
+        okLines: earnedLines, awarded,
+        note: awarded > 0 ? GENERIC_WORDING.note.replace('{n}', String(awarded)).replace('{N}', String(award.possible)) : GENERIC_WORDING.none,
+        lines: [], lost: [], scheme: typeId
+      }
+    };
+  }
+  if (bank) {
+    // The bank rule: HIS criteria for his own bank question (bankSteps.js). Same gates, same reply shape; the table lists his criteria in his words.
+    const award = awardBank(q, report, correct === true);
+    if (!award) return { paid: false, typeId, reason: 'bank-not-eligible' };
+    if (award.possible !== marksPossible) return { paid: false, typeId, reason: `criteria-count: the rule has ${award.possible} marks and this question is worth ${marksPossible}, so it stays on the final answer` };
+    const awarded = correct === true ? award.possible : Math.min(award.total, award.possible - 1);
+    const earnedLines = award.items.filter(i => i.awarded && i.basis === 'lines').length;
+    return {
+      paid: true, typeId, digest: bankDigest(), items: award.items, awarded,
+      partial: {
+        okLines: earnedLines, awarded,
+        note: awarded > 0 ? BANK_WORDING.note.replace('{n}', String(awarded)).replace('{N}', String(award.possible)) : BANK_WORDING.none,
+        lines: [], lost: [], scheme: typeId
+      }
+    };
   }
   if (generic) {
     // The generic rule: criteria are drawn from this question's own authored solution (genericSteps.js). Same gates as above, same reply shape.

@@ -28,7 +28,7 @@ const COMMANDS = new Set((
   'rightarrow Rightarrow Leftrightarrow implies therefore because ldots cdots dots ' +
   'text mathrm mathbf operatorname displaystyle quad qquad ' +
   'lvert rvert vert angle triangle circ degree bar hat vec overline binom partial perp parallel ' +
-  'in cap cup subset prime lbrace rbrace'
+  'in cap cup subset prime lbrace rbrace dot ddot'
 ).split(/\s+/));
 
 /** The reader's lines with each `latex` run through the gate: a TeX that fails is null, nothing else about a line changes. */

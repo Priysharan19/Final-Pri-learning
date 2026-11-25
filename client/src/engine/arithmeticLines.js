@@ -30,7 +30,7 @@ import { parse, normalize, evaluate, variablesOf, exprEquivalent, withEvaluation
 import { mathSpan, assignSpan } from './commentTex.js';
 import { justifyStep } from './stepJustify.js';
 import { cleanLatex } from './texSafe.js';
-import { texToPlain } from './texToPlain.js';
+import { texToPlain, EXTENDED_TEX } from './texToPlain.js';
 
 // Everything this module evaluates for one page of working is charged to ONE budget (expr.js, "What an evaluation may
 // cost"): what a page costs to check must not depend on what is written on it. When the budget is spent the rest
@@ -1152,6 +1152,8 @@ function pageDefinitionsOnce(raw, out, firstBreak, prep, degreePrimed, tickOnly,
 
 /**
  * `opts.latex`: the reader's TeX for lines of the working, as [{ text, latex }] (a line is matched by its trimmed text).
+ * `opts.extendedTex`: read that TeX with the extended reading of engine/texToPlain.js (degrees, counting, powered and inverse trig, logs to a base, integrals, primes…).
+ *   Set only for an Australian question (markerOps.stepEvidence); without it the reading is exactly what it was.
  * It is a second reading of a line and is used ONLY to tick or to leave a note, never to cross:
  *   · the working is checked as written, exactly as without it;
  *   · a line that came back a note, whose TeX reading is judged true by this same checker, is ticked (its text stays
@@ -1181,7 +1183,7 @@ function stepCheckArithmeticBudgeted(workingText, opts) {
     let base = stepCheckArithmeticWithinBudget(workingText, prep);
     try { base = readTwice(workingText, base, prep); } catch { /* the page as written stands */ }
     if (!opts || !Array.isArray(opts.latex) || !opts.latex.length) return base;
-    try { return withTexReading(workingText, base, opts.latex, prep); } catch { return base; }
+    try { return withTexReading(workingText, base, opts.latex, prep, opts.extendedTex === true); } catch { return base; }
   });
 }
 
@@ -1230,7 +1232,7 @@ function notOneStatement(text) {
   return false;
 }
 
-function withTexReading(workingText, base, pairs, prep = null) {
+function withTexReading(workingText, base, pairs, prep = null, extended = false) {
   const raw = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
   if (base.lines.length !== raw.length) return base;
   const byText = new Map();
@@ -1242,7 +1244,7 @@ function withTexReading(workingText, base, pairs, prep = null) {
   }
   const alt = raw.map(line => {
     const tex = byText.get(line);
-    const plain = tex ? texToPlain(tex) : null;
+    const plain = tex ? texToPlain(tex, extended ? EXTENDED_TEX : undefined) : null;
     return plain && plain.replace(/\s+/g, '') !== line.replace(/\s+/g, '') ? plain : null;
   });
   if (!alt.some(Boolean)) return base;
