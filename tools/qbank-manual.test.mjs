@@ -85,6 +85,7 @@ const NOT = [
   ['a named precision', find('Find $x$, correct to 2 decimal places.', '$3.14$', [{ h: 'a', d: '$x=3.14$' }]), 'names-a-precision'],
   ['a mandated method', find('Use the substitution $u=x^{2}$ to find $\\int 2x\\,dx$.', '$x^{2}$', [{ h: 'a', d: '$x^{2}$' }]), 'asks-a-method'],
   ['a particular form (expression)', find('Factorise $x^{2}-1$.', '$(x-1)(x+1)$', [{ h: 'a', d: '$(x-1)(x+1)$' }]), 'asks-a-form'],
+  ['a form as a difference (the prompt\'s own product would be accepted)', find('Express $\\sin x\\sin3x$ as a difference of cosines.', '$\\tfrac12(\\cos2x-\\cos4x)$', [{ h: 'a', d: '$\\tfrac12(\\cos2x-\\cos4x)$' }]), 'asks-a-form'],
   ['a particular form (number)', find('Simplify $\\sqrt{8}$.', '$2\\sqrt2$', [{ h: 'a', d: '$2\\sqrt2$' }]), 'asks-a-form'],
   ['no steps', find('Find $x$.', '$3$', []), 'no-steps']
 ];
@@ -220,7 +221,7 @@ eq(evalTeX('\\tfrac12(\\cos2x-\\cos4x)', { x: 0.7 }), 0.5 * (Math.cos(1.4) - Mat
   eq(keyAgreesWithTeX(good, '$\\tfrac12(\\cos2x-\\cos4x)$'), null, 'the bracketed key agrees with his TeX at every sample point');
   eq(keyAgreesWithTeX({ answerType: 'numeric', answer: { value: 5 } }, '$e^{2}+5$'), 'key-disagrees-with-his-tex', 'a numeric key that is not his value is refused');
   eq(keyAgreesWithTeX({ answerType: 'set', answer: { values: [1, 2] } }, '$x=1$ or $x=2$'), null, 'a set agrees item by item');
-  const k = deriveKey(base('FD-013', { prompt: 'Express $\\sin x\\sin3x$ as a difference of cosines.', steps: [{ h: 'Product to sum', d: '$\\sin x\\sin3x=\\tfrac12(\\cos2x-\\cos4x)$' }] }), '$\\tfrac12(\\cos2x-\\cos4x)$');
+  const k = deriveKey(base('FD-013', { prompt: 'Find $\\sin x\\sin3x$ written with cosines only.', steps: [{ h: 'Product to sum', d: '$\\sin x\\sin3x=\\tfrac12(\\cos2x-\\cos4x)$' }] }), '$\\tfrac12(\\cos2x-\\cos4x)$');
   eq(k.answer?.expr, '((1)/(2))(cos(2x)-cos(4x))', 'the derived key has explicit function arguments');
   const dp = asDerivedPart(base('FD-013', { prompt: 'Express $\\sin x\\sin3x$ as a difference of cosines.' }), k);
   const q = engineQuestion(dp);

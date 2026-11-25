@@ -395,7 +395,7 @@ const binomial = {
           formTag: 'representation', prompt: `$X \\sim \\text{Bin}(${n}, ${pTex(pr)})$. Which value of $X$ is the most likely? (The mode is the whole number just below $(n+1)p$.)`,
           answerType: 'numeric', answer: { value: mode },
           traps: [{ value: Math.round(dec(n * pa, pd)), why: 'The mean need not be the mode; use the whole number just below $(n+1)p$.' }].filter(t => t.value !== mode),
-          hints: ['Compute $(n+1)p$.', `$(${n}+1)\\times ${pTex(pr)} = ${dec((n + 1) * pa, pd)}$.`, 'Take the whole number just below it.'],
+          hints: ['Compute $(n+1)p$.', `Here $n+1 = ${n + 1}$ and $p = ${pTex(pr)}$: multiply them.`, 'Take the whole number just below it.'],
           steps: [{ h: 'Compute', d: `$(n+1)p = ${dec((n + 1) * pa, pd)}$` }, { h: 'Mode', d: `$${mode}$` }]
         };
       }
