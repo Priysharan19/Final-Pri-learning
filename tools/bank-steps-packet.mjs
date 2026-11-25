@@ -94,6 +94,33 @@ export async function bankPacket({ banner, approval = null }) {
       `Violations: ${R.violations.length}. Gamed pages that earned a mark: ${R.exceptions.length}. Another question's working that earned a mark by coincidence: ${R.coincidences.length}.`, '');
     // examples
     L.push('## Twelve worked examples', '', 'Each is a real run of the rule on one of your own bank questions. "Not checked" means the page could not judge the line, which is not the same as wrong.', '');
+    const picks = pickExamples(parts);
+    picks.forEach((ex, i) => L.push(...example(i + 1, ex)));
+    // weaknesses
+    const eligRows = rows.filter(r => r.eligible);
+    const dist = R.a.dist; const aPages = R.a.pages; const aMarks = [...dist].reduce((n, [k, v]) => n + k * v, 0);
+    const cap = eligRows.reduce((n, r) => n + (r.marks - 1), 0);
+    const ver = eligRows.reduce((n, r) => n + r.criteria.filter(k => k.live).reduce((m, k) => m + k.marks, 0), 0);
+    L.push('## What the rule cannot see, and its known weaknesses', '',
+      'These are measured, in the same run, and rewritten each time the packet is generated.', '',
+      `- **It pays few parts.** ${summary.eligible} of ${summary.parts} parts (${pct(summary.eligible, summary.parts)}). Most of your criteria are flagged manual, state the final answer, or name a step the page cannot tick. On the eligible parts the rule can pay ${ver} of the ${cap} marks below full (${pct(ver, cap)}).`,
+      `- **A different valid method earns less.** Your steps with only the last line wrong earn on average ${(aMarks / Math.max(1, aPages)).toFixed(2)} marks (${aPages} pages; ${dist.get(0) || 0} earn 0). A student who solves it another way, or writes an equivalent line in another shape, is paid less than they deserve and sometimes nothing. Two expressions are compared as functions, so an unsimplified and a simplified form are the same; an equation must have your form (a number, a letter or something longer on each side).`,
+      '- **The page decides which lines count.** Only a line the marked page ticks can earn. The page does not tick every true line (a derivative written with y\' or a fraction it cannot read is often "not checked"), so a true line can earn nothing. It also means a wrong tick by the page could be paid; the sweep cannot prove none remains.',
+      '- **The stop rule is stricter than the generic rule.** Any line the page could not verify, even a few plain words, stops the paying for every later line. A student who writes "so" or a heading between lines loses the marks after it. This costs marks to honest students, on purpose.',
+      '- **A bare value needs working before it.** A criterion that is only a value (m = 3) is met only if an earlier ticked line reached something of your solution, or an earlier ticked equation of the page (not the question\'s own) is solved by that value. So the first thing a student writes can never be a bare value.',
+      '- **Only criteria your own steps earn.** If your worked steps are written in words, or the page cannot tick them, the criterion is not verified and a good student gets nothing for it. Your criteria lines are often the model answer, not a line your steps contain.',
+      '- **A step in words is reached by any one of its results.** A criterion with no line is met when a ticked line reaches the step it names, the way the generic rule you approved defines reaching. A step with several results (a gradient and then a tangent line) is reached by one of them, so a criterion called "Tangent" can be earned by the gradient alone. Your wording of the point, not the rule, decides how much that is.',
+      '- **The mark split is yours, not mine.** Each criterion carries the marks you gave it. A wrong final answer can never reach N, and where you gave no answer criterion the last working mark is held back.',
+      '- **Coincidence.** Another question\'s correct working can earn a mark only if one of its lines is provably equal to one of your criterion lines; in the sweep that happened ' + `${R.coincidences.length} times.`,
+      '- It never pays a question worth one mark, a worked-solution question, and never for a model\'s reading: only the engine\'s own tick.', '',
+      'Nothing here is an official NESA marking guideline.', '');
+    L.push('## Review record', '', 'To be filled in by the author (the tutor). Leave blank until reviewed.', '', '- Decision (approved by the author / changes needed): ', '- Note: ', '- Name: ', '- Date: ', `- Rule digest: \`${digest}\``, '');
+    memo = L.join('\n');
+    return memo;
+  } finally { resetQbank(); }
+}
+
+export function pickExamples(parts) {
     const used = new Set();
     const picks = [];
     const byFamily = new Map();
@@ -127,32 +154,10 @@ export async function bankPacket({ banner, approval = null }) {
     attempt('claim', p => { const texts = bankAuthoredLines(p.q).map(l => l.text); const lines = ['the gradient is clearly negative here', ...texts]; const m = markPage(p.q, lines, '99991'); return m.marks === 0 ? { lines, typed: '99991', m, say: 'A student starts with a plain-word claim the page cannot verify, then writes your lines. Nothing after the claim can earn.' } : null; });
     attempt('bare', p => { const texts = bankAuthoredLines(p.q).map(l => l.text); const v = texts.slice(0, -1).map(t => t.split('=').pop().trim()).find(x => /^-?\d+(?:\.\d+)?$/.test(x)); if (!v) return null; const m = markPage(p.q, [v], '99991'); return m.marks === 0 ? { lines: [v], typed: '99991', m, say: 'A student writes one correct intermediate value and nothing else. A value with no working is nothing.' } : null; });
     attempt('right', p => { const typed = acceptedInput({ answerType: p.q.answerType, answer: p.q.answer }); const m = markPage(p.q, [], typed); return m.correct ? { lines: [], typed, m, say: 'A student types only the correct final answer. This was always full marks, and still is.' } : null; });
-    picks.forEach((ex, i) => L.push(...example(i + 1, ex)));
-    // weaknesses
-    const eligRows = rows.filter(r => r.eligible);
-    const dist = R.a.dist; const aPages = R.a.pages; const aMarks = [...dist].reduce((n, [k, v]) => n + k * v, 0);
-    const cap = eligRows.reduce((n, r) => n + (r.marks - 1), 0);
-    const ver = eligRows.reduce((n, r) => n + r.criteria.filter(k => k.live).reduce((m, k) => m + k.marks, 0), 0);
-    L.push('## What the rule cannot see, and its known weaknesses', '',
-      'These are measured, in the same run, and rewritten each time the packet is generated.', '',
-      `- **It pays few parts.** ${summary.eligible} of ${summary.parts} parts (${pct(summary.eligible, summary.parts)}). Most of your criteria are flagged manual, state the final answer, or name a step the page cannot tick. On the eligible parts the rule can pay ${ver} of the ${cap} marks below full (${pct(ver, cap)}).`,
-      `- **A different valid method earns less.** Your steps with only the last line wrong earn on average ${(aMarks / Math.max(1, aPages)).toFixed(2)} marks (${aPages} pages; ${dist.get(0) || 0} earn 0). A student who solves it another way, or writes an equivalent line in another shape, is paid less than they deserve and sometimes nothing. Two expressions are compared as functions, so an unsimplified and a simplified form are the same; an equation must have your form (a number, a letter or something longer on each side).`,
-      '- **The page decides which lines count.** Only a line the marked page ticks can earn. The page does not tick every true line (a derivative written with y\' or a fraction it cannot read is often "not checked"), so a true line can earn nothing. It also means a wrong tick by the page could be paid; the sweep cannot prove none remains.',
-      '- **The stop rule is stricter than the generic rule.** Any line the page could not verify, even a few plain words, stops the paying for every later line. A student who writes "so" or a heading between lines loses the marks after it. This costs marks to honest students, on purpose.',
-      '- **A bare value needs working before it.** A criterion that is only a value (m = 3) is met only if an earlier ticked line reached something of your solution, or an earlier ticked equation of the page (not the question\'s own) is solved by that value. So the first thing a student writes can never be a bare value.',
-      '- **Only criteria your own steps earn.** If your worked steps are written in words, or the page cannot tick them, the criterion is not verified and a good student gets nothing for it. Your criteria lines are often the model answer, not a line your steps contain.',
-      '- **A step in words is reached by any one of its results.** A criterion with no line is met when a ticked line reaches the step it names, the way the generic rule you approved defines reaching. A step with several results (a gradient and then a tangent line) is reached by one of them, so a criterion called "Tangent" can be earned by the gradient alone. Your wording of the point, not the rule, decides how much that is.',
-      '- **The mark split is yours, not mine.** Each criterion carries the marks you gave it. A wrong final answer can never reach N, and where you gave no answer criterion the last working mark is held back.',
-      '- **Coincidence.** Another question\'s correct working can earn a mark only if one of its lines is provably equal to one of your criterion lines; in the sweep that happened ' + `${R.coincidences.length} times.`,
-      '- It never pays a question worth one mark, a worked-solution question, and never for a model\'s reading: only the engine\'s own tick.', '',
-      'Nothing here is an official NESA marking guideline.', '');
-    L.push('## Review record', '', 'To be filled in by the author (the tutor). Leave blank until reviewed.', '', '- Decision (approved by the author / changes needed): ', '- Note: ', '- Name: ', '- Date: ', `- Rule digest: \`${digest}\``, '');
-    memo = L.join('\n');
-    return memo;
-  } finally { resetQbank(); }
+  return picks;
 }
 
-function example(n, ex) {
+export function example(n, ex) {
   const { p, lines, typed, m, say } = ex;
   const q = p.q, N = marksPossibleFor(q);
   const L = [`### Example ${n}: ${p.id}`, '', say, '', `Question (${N} marks, ${p.id}): ${plainText(q.prompt)}`, '', 'Your worked solution, step by step:', ''];

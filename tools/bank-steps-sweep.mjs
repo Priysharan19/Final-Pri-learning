@@ -18,13 +18,14 @@
 import { stepEvidence, marksPossibleFor, practiceMarksEarned } from '../server/platform/markerOps.js';
 import { schemePay } from '../server/platform/schemeAward.js';
 import { BANK_ID, bankDigest, bankPlan, bankAuthoredLines } from '../server/platform/bankSteps.js';
+import { BANK_GENERIC_ID, bankGenericDigest, bankGenericEligible } from '../server/platform/bankGenericSteps.js';
 import { checkBankAnswer } from '../server/platform/qbankMarking.js';
 import { qbankEntries, qbankEntryQuestion } from '../server/platform/qbankPack.js';
 import { falsify, stillTrue } from './generic-steps-sweep.mjs';
 import { acceptedInput, trapInput } from './qbank-import.mjs';
 import { _internals } from '../client/src/engine/solutionMatch.js';
 
-export const LIST = [{ typeId: BANK_ID, digest: bankDigest() }];
+export const LIST = [{ typeId: BANK_ID, digest: bankDigest() }, { typeId: BANK_GENERIC_ID, digest: bankGenericDigest() }];
 export const ENV = { PRI_METHOD_MARKS: 'on', PRI_EDITION: 'prithagoras' };
 const WRONG = '99991';
 
@@ -40,13 +41,13 @@ export function markPage(q, lines, typed) {
 }
 
 /** Every eligible bank part of the INSTALLED pack, as the practice path issues it and stamped with the rule: [{ q, id, family }]. */
-export function eligibleParts({ limit = 0 } = {}) {
+export function eligibleParts({ limit = 0, rule = 'criteria' } = {}) {
   const out = [];
   for (const { entry, family } of qbankEntries()) {
     if (entry.marks < 2) continue;
     const q = qbankEntryQuestion(entry.id, 17);
-    if (!bankPlan(q).eligible) continue;
-    out.push({ q: { ...q, _methodScheme: BANK_ID }, id: entry.id, family });
+    if (rule === 'generic' ? !bankGenericEligible(q) : !bankPlan(q).eligible) continue;
+    out.push({ q: { ...q, _methodScheme: rule === 'generic' ? BANK_GENERIC_ID : BANK_ID }, id: entry.id, family });
     if (limit && out.length >= limit) break;
   }
   return out;
@@ -57,8 +58,8 @@ const promptLines = q => [...String(q.prompt).replace(/\\\$/g, '\u0001').matchAl
 const DIGIT_FREE_CLAIMS = ['x > y', 'x equals seven', 'a is greater than b', 'x ≈ y'];
 const PLAIN_WORD_CLAIMS = ['the gradient is clearly negative here', 'the function is increasing everywhere', 'both roots are positive'];
 
-export function runSweep({ limit = 0 } = {}) {
-  const items = eligibleParts({ limit });
+export function runSweep({ limit = 0, rule = 'criteria' } = {}) {
+  const items = eligibleParts({ limit, rule });
   const R = {
     parts: 0, pages: 0, byClass: new Map(), a: { pages: 0, dist: new Map() }, b: { full: 0, fullPages: 0, wrongAtN: 0, wrongPages: 0 },
     c: { pages: 0, marks: 0, ideal: 0, afterWrong: 0 }, f: { pages: 0, marks: 0, atN: 0 }, e: { alone: 0, aloneEarned: 0, after: 0, afterEarned: 0, afterOwn: 0, afterOther: 0 },
@@ -85,8 +86,8 @@ export function runSweep({ limit = 0 } = {}) {
         if (cross >= 0 && n - 1 >= cross) { R.g.afterCross++; viol('earned-at-or-after-cross', q, { label, n, cross: cross + 1 }); }
       }
     }
-    const answerItem = pay.items.find((it, i) => bankPlan(q).specs[i]?.kind === 'answer');
-    if (!correct && answerItem && answerItem.awarded) { R.g.answerByWorking++; viol('answer-criterion-by-working', q, { label }); }
+    const answerItem = pay.items.find(it => it.basis === 'answer' && it.awarded);
+    if (!correct && answerItem) { R.g.answerByWorking++; viol('answer-criterion-by-working', q, { label }); }
     if (!correct && sum !== marks) { R.g.tableNotMark++; viol('table-not-mark', q, { label, sum, marks }); }
   };
 
@@ -117,35 +118,36 @@ export function runSweep({ limit = 0 } = {}) {
     }
 
     // c: one middle line made wrong, then his lines. Nothing at or after it. `ideal`: the criteria whose own line stands before it in his working.
-    const plan = bankPlan(q);
-    const ownLine = new Map();   // criterion index -> the index of his line that earns it, from the page of his full working
-    for (const [i, j] of markPage(q, texts, WRONG).pay.items.map((x, i) => [i, x.lines[0] ? x.lines[0] - 1 : -1])) if (j >= 0) ownLine.set(i, j);
+    const ownLine = new Map();   // item index -> the index of his line that earns it, from the page of his full working
+    const ownItems = markPage(q, texts, WRONG).pay.items;
+    ownItems.forEach((x, i) => { if (x.awarded && x.lines[0]) ownLine.set(i, x.lines[0] - 1); });
     for (let idx = 0; idx < lastIdx; idx++) {
       const bad = falsify(texts[idx]);
       if (!bad || bad === texts[idx] || stillTrue(texts[idx], bad)) continue;
       const lines = texts.map((t, i) => (i === idx ? bad : t));
       const c = markPage(q, lines, WRONG); check(q, c, `c-wrong-middle-line-${idx + 1}`);
-      const ideal = [...ownLine].filter(([i, j]) => j < idx).reduce((n, [i]) => n + plan.specs[i].marks, 0);
+      const ideal = [...ownLine].filter(([i, j]) => j < idx).reduce((n, [i]) => n + ownItems[i].marks, 0);
       R.c.pages++; R.c.marks += c.marks; R.c.ideal += Math.min(ideal, N - 1);
       const late = c.pay.paid ? c.pay.items.filter(x => x.awarded && x.basis === 'lines' && x.lines.some(n => n - 1 >= idx)) : [];
       if (late.length) { R.c.afterWrong++; viol('earned-at-or-after-the-wrong-line', q, { idx: idx + 1, earned: late.map(x => [x.text, x.lines]) }); }
     }
 
     // d: gaming. Every page has a wrong typed answer, so every mark must be by lines.
-    const gaming = (name, lines, { coincidence = false } = {}) => {
+    const gaming = (name, lines, { coincidence = false, prose = false } = {}) => {
       if (!lines.length) return;
       const g = markPage(q, lines, WRONG); check(q, g, `d-${name}`);
       const kc = klass(name); kc.pages++;
       if (g.marks > 0) {
         kc.earned++;
         const row = { class: name, id: q._bank, prompt: q.prompt, lines, earned: g.pay.items.filter(x => x.awarded).map(x => [x.text, x.lines]), marks: g.marks };
-        if (coincidence) { R.coincidences.push(row); kc.coincidences = (kc.coincidences || 0) + 1; }
+        if (prose) { kc.proseThrough = (kc.proseThrough || 0) + 1; }   // pure prose is no claim to the approved generic rule: his true lines after it are paid, as approved
+        else if (coincidence) { R.coincidences.push(row); kc.coincidences = (kc.coincidences || 0) + 1; }
         else { kc.exceptions++; R.exceptions.push(row); viol(`gaming-${name}-earned`, q, { lines, marks: g.marks }); }
       }
     };
     gaming('restate-the-question', promptLines(q));
     gaming('given-numbers', numerals(String(q.prompt)).filter((v, i, a) => a.indexOf(v) === i));
-    for (const claim of PLAIN_WORD_CLAIMS) gaming('plain-word-false-claim-then-his-lines', [claim, ...texts]);
+    for (const claim of PLAIN_WORD_CLAIMS) gaming('plain-word-false-claim-then-his-lines', [claim, ...texts], { prose: rule === 'generic' });
     for (const claim of DIGIT_FREE_CLAIMS) gaming('digit-free-claim-then-his-lines', [claim, ...texts]);
     {
       const other = nextOf.get(it);
@@ -189,7 +191,7 @@ export function report(R) {
   L.push(`(a) final line wrong, ${R.a.pages} pages: marks ${mapStr(R.a.dist)}`);
   L.push(`(b) his lines in full: the right answer earned N on ${R.b.full} of ${R.b.fullPages}; a wrong typed answer at N on ${R.b.wrongAtN} of ${R.b.wrongPages}`);
   L.push(`(c) one middle line made wrong then his lines: ${R.c.pages} pages, marks ${R.c.marks} against an ideal of ${R.c.ideal}; earned by a line at or after the wrong one ${R.c.afterWrong}`);
-  for (const [k, v] of R.byClass) L.push(`(d) ${k}: ${v.pages} pages, earned a mark on ${v.earned}, exceptions ${v.exceptions}${v.coincidences ? `, coincidences (his criterion line is also true for this question) ${v.coincidences}` : ''}`);
+  for (const [k, v] of R.byClass) L.push(`(d) ${k}: ${v.pages} pages, earned a mark on ${v.earned}, exceptions ${v.exceptions}${v.coincidences ? `, coincidences (his criterion line is also true for this question) ${v.coincidences}` : ''}${v.proseThrough ? `, of which his true lines after pure prose paid (the approved generic rule does not treat prose as a claim) ${v.proseThrough}` : ''}`);
   L.push(`(e) bare intermediate values: alone ${R.e.alone} pages, earned ${R.e.aloneEarned}; after his lines before them ${R.e.after} pages, earned ${R.e.afterEarned} (the bare line itself earned a criterion on ${R.e.afterOwn}; on ${R.e.afterOther} only the true lines before it earned)`);
   L.push(`(f) a trap answer with his working up to it: ${R.f.pages} pages, marks ${R.f.marks}, at N on ${R.f.atN}`);
   L.push(`(g) ${R.g.pages} pages: wrong answer at full ${R.g.wrongFull}, over N ${R.g.overN}, correct not full ${R.g.correctNotFull}, earned on an unticked line ${R.g.unticked}, at or after a cross ${R.g.afterCross}, answer criterion by working ${R.g.answerByWorking}, table not the mark ${R.g.tableNotMark}, not paid ${R.g.notPaid}`);
@@ -200,7 +202,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   process.env.PRI_EDITION = 'prithagoras';
   const qb = await import('../server/platform/qbankPack.js');
   await qb.ensureQbank(process.env, { strict: true });
-  const R = runSweep({ limit: Number(process.env.BANK_LIMIT || 0) });
+  const R = runSweep({ limit: Number(process.env.BANK_LIMIT || 0), rule: process.env.BANK_RULE === 'generic' ? 'generic' : 'criteria' });
   console.log(report(R));
   console.log(`violations: ${R.violations.length}`);
   for (const v of R.violations.slice(0, 20)) console.log('  VIOLATION', JSON.stringify(v).slice(0, 400));

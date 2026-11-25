@@ -30,6 +30,7 @@ const { bankPolicy, sealForEdition, FINAL_ANSWER_MARKING } = await import('../pl
 const { SCHEMES, schemeDigest, approvedSchemeTypes, approveSchemeTypesForTests } = await import('../platform/schemeAward.js');
 const { GENERIC_ID, genericDigest } = await import('../platform/genericSteps.js');
 const { BANK_ID, bankDigest, bankEligible, bankAuthoredLines } = await import('../platform/bankSteps.js');
+const { BANK_GENERIC_ID, bankGenericDigest, bankGenericEligible } = await import('../platform/bankGenericSteps.js');
 const { productPlaceOf } = await import('../platform/qbankDotpoints.js');
 const { dotpointById } = await import('../../client/src/engine/curriculum.js');
 const { acceptedInput, trapInput, authoredPage } = await import('../../tools/qbank-import.mjs');
@@ -81,6 +82,20 @@ for (const [name, list] of lists) {
   let staleStamped = 0;
   for (const e of entries) { const q = JSON.parse(JSON.stringify(qb.qbankEntryQuestion(e.id, 17))); q._generator = q.subtopic; sealForEdition(q, { ...bankPolicy('prithagoras'), methodSchemeTypes: stale }); if (q._methodScheme !== undefined) staleStamped++; }
   c.eq(staleStamped, 0, 'the bank rule at a stale digest stamps nothing');
+}
+
+// The approved generic rule applied to the bank (bankGenericSteps.js, id `generic-solution-steps-bank`): the same, under its own id. Approved in the test list
+// alone it stamps exactly the parts whose worked steps it can pay, and nothing else; at a stale digest, nothing.
+{
+  let stamped = 0, wrongStamp = 0, otherStamp = 0, refused = 0, stale = 0;
+  for (const e of entries) {
+    const mk = list => { const q = JSON.parse(JSON.stringify(qb.qbankEntryQuestion(e.id, 17))); q._generator = q.subtopic; if (!sealForEdition(q, { ...bankPolicy('prithagoras'), methodSchemeTypes: list })) refused++; return q; };
+    const q = mk([{ typeId: BANK_GENERIC_ID, digest: bankGenericDigest() }]);
+    if (q._methodScheme === BANK_GENERIC_ID) { stamped++; if (!bankGenericEligible(q)) wrongStamp++; } else if (q._methodScheme !== undefined || (q._marking !== FINAL_ANSWER_MARKING)) otherStamp++;
+    if (mk([{ typeId: BANK_GENERIC_ID, digest: '0'.repeat(64) }])._methodScheme !== undefined) stale++;
+  }
+  c.eq(refused + wrongStamp + otherStamp + stale, 0, 'the bank-scoped generic rule stamps only a part it can pay, seals the rest, and at a stale digest stamps nothing');
+  c.ok(stamped > 100, `approved alone it stamps ${stamped} of ${entries.length}`);
 }
 
 // Over the real routes, every scheme approved: a wrong answer, with the author's own worked lines as the working, earns nothing.

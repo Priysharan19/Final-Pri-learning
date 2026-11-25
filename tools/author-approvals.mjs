@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { GENERIC_ID, genericDigest } from '../server/platform/genericSteps.js';
 import { BANK_ID, bankDigest } from '../server/platform/bankSteps.js';
+import { BANK_GENERIC_ID, bankGenericDigest } from '../server/platform/bankGenericSteps.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const RECORDS_DIR = path.join(ROOT, 'docs/marking/author-approvals');
@@ -76,7 +77,7 @@ export const AUTHOR_APPROVED_SERVER = Object.freeze(${JSON.stringify(approved.ma
 // The per-type schemes come from types.json. The generic rule (server/platform/genericSteps.js) is one more approvable id, `generic-solution-steps`,
 // whose digest is computed over the rule's own code and wording: the author's record for it is the same kind of file (generic-solution-steps.json),
 // valid only while its digest is the rule's current one. This tool never writes a record.
-export const allTypes = () => [...JSON.parse(readFileSync(TYPES, 'utf8')).types, { id: GENERIC_ID, digest: genericDigest() }, { id: BANK_ID, digest: bankDigest() }];
+export const allTypes = () => [...JSON.parse(readFileSync(TYPES, 'utf8')).types, { id: GENERIC_ID, digest: genericDigest() }, { id: BANK_ID, digest: bankDigest() }, { id: BANK_GENERIC_ID, digest: bankGenericDigest() }];
 const types = allTypes();
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const records = readRecords();
