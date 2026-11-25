@@ -24,7 +24,12 @@ import { markPage } from '../../tools/generic-steps-sweep.mjs';
 
 const CLIENT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const EDITION = 'prithagoras';
-const MAX_SKIPS = 30;
+// 30 -> 80 (launch QA 26 Nov 2026). The device used to aim every topic request at one of its dot points, which on Prithagoras made the server deal
+// that dot point's questions: 9 of 60 dealt were the author's, 29 stamped with a scheme, 11 usable here (a typed question the server pays a step mark on).
+// It now aims privately and asks for the topic, as a student asking for the topic does, and the server's own turn rule for a large pool deals the author's
+// questions more often: 33 of 60, 11 stamped, 5 usable (measured over 60 questions on origin/main and on this tree, same tour, the loop not stopping at the
+// first). The usable share fell from about 1 in 6 to about 1 in 12, so the bound that failed once in 500 now needs about 80.
+const MAX_SKIPS = 80;
 // A Year 10 chapter whose every cell the Prithagoras server issues
 // (server/platform/nswBanks.js), so the tour never depends on which chapter the
 // device draws. y10-compound is not banked yet: a student there still gets drafts.
