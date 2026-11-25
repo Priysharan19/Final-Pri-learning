@@ -82,7 +82,7 @@ const UUID = /^[0-9a-f-]{36}$/i;
 // grading a question the server refuses to issue could never be checked. The
 // name is only a lookup key; an unknown one fails generation with 422.
 const AUTHORED_BANK = /^[a-z][a-z0-9]{0,11}-[a-z0-9][a-z0-9-]{1,95}$/;
-const ISSUE_FIELDS = new Set(['generator', 'difficulty', 'seed', 'curriculum', 'mode', 'prepared', 'avoid', 'trap', 'dotpoint', 'written', 'account', 'band', 'worked']);
+const ISSUE_FIELDS = new Set(['generator', 'difficulty', 'seed', 'curriculum', 'mode', 'prepared', 'avoid', 'trap', 'dotpoint', 'aimed', 'written', 'account', 'band', 'worked']);
 // F7: practice of official JEE questions by length-of-working band (jeeBands.js).
 // Premium, decided by the server's entitlement record before anything is drawn.
 export const JEE_BAND_CAPABILITY = 'premium-exams';
@@ -94,7 +94,7 @@ function bandPick(request) {
   const rows = jeeBandRecords(PYQ_RECORDS, request.generator, request.band);
   return rng => pyqPayload(rows[Math.floor(Math.max(0, Math.min(0.999999999, Number(rng()))) * rows.length)]);
 }
-const PREPARE_FIELDS = new Set(['generator', 'difficulty', 'curriculum', 'mode', 'avoid', 'dotpoint']);
+const PREPARE_FIELDS = new Set(['generator', 'difficulty', 'curriculum', 'mode', 'avoid', 'dotpoint', 'aimed']);
 const PRACTICE_MODES = ['practice', 'review', 'task', 'rush', 'match', 'placement'];
 // One answer settles the question in these modes.
 const ONE_TRY_MODES = ['rush', 'match', 'placement'];
@@ -478,6 +478,12 @@ function readQuestionRequest(body, fields, banks = bankPolicy()) {
   if (body.dotpoint !== undefined && (typeof body.dotpoint !== 'string' || !DOTPOINT.test(body.dotpoint))) {
     return { error: [400, 'PRACTICE_ISSUE_INVALID', 'Invalid dot point.'] };
   }
+  // `aimed`: the device's own aim at a dot point for "the next question of this topic" (the student did not ask for it). Such a request is
+  // answered as before (any question that credits the dot point), not held to exact questions: only a dot point the student chose is
+  // (launch QA 26 Nov 2026).
+  if (body.aimed !== undefined && (typeof body.aimed !== 'boolean' || body.dotpoint === undefined)) {
+    return { error: [400, 'PRACTICE_ISSUE_INVALID', 'Invalid dot point aim.'] };
+  }
   let trap = null;
   if (body.trap !== undefined) {
     const t = body.trap;
@@ -499,7 +505,7 @@ function readQuestionRequest(body, fields, banks = bankPolicy()) {
     }
     band = body.band;
   }
-  return { generator, difficulty, mode, avoid: new Set(avoid), dotpoint: body.dotpoint, trap, written: body.written === true, band };
+  return { generator, difficulty, mode, avoid: new Set(avoid), dotpoint: body.dotpoint, aimed: body.aimed === true, trap, written: body.written === true, band };
 }
 
 /**
@@ -517,7 +523,7 @@ function readQuestionRequest(body, fields, banks = bankPolicy()) {
  * as an avoided one does, since it rules out one more item of the pool.
  */
 function* seekQuestion(request, { draw, tries, batches, admits = null }) {
-  const { generator, difficulty, dotpoint, avoid = new Set(), trap, written = false } = request;
+  const { generator, difficulty, dotpoint, aimed = false, avoid = new Set(), trap, written = false } = request;
   const pick = bandPick(request);
   // `written` asks for a form the student writes out; a multiple-choice
   // item can be guessed, which a diagnostic must avoid where it can.
@@ -545,7 +551,7 @@ function* seekQuestion(request, { draw, tries, batches, admits = null }) {
       // ... and at the level asked for: the engine snaps a level a dot point has no form at to its nearest one, which would be a silent change
       // of level (the device offers a dot point only at the levels it is served at, nswDotpointExact.js).
       // Prithagoras only (`admits` is null on Priyabhata, whose dot point requests are served and refused exactly as before):
-      if (dotpoint != null && (admits ? (q.dotpointExact !== true || Number(q.difficulty) !== Number(difficulty) || !nswContentTrusted(q, generator, difficulty, dotpoint)) : !(q.dotpoints || []).includes(q.dotpointRequested))) continue;
+      if (dotpoint != null && (admits && !aimed ? (q.dotpointExact !== true || Number(q.difficulty) !== Number(difficulty) || !nswContentTrusted(q, generator, difficulty, dotpoint)) : !(q.dotpoints || []).includes(q.dotpointRequested))) continue;
       // Rush and Match answer in one line of their own: a sketch is a form of features, so neither is ever dealt one.
       if (q.answerType === 'graph-sketch' && (request.mode === 'rush' || request.mode === 'match')) continue;
       const hash = opaqueContentHash(q.contentHash);

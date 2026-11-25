@@ -31,7 +31,7 @@ import { reportSeries, needsAnotherLookIds, HISTORY_FILTERS, HISTORY_SORTS } fro
 import { attemptTotals, evidenceByKey, isCreditedCorrect, isRepeat as isRepeatAttempt, quotedTotals } from '../engine/progressTruth.js';
 import { indiaExamBlueprint } from '../engine/indiaExams.js';
 import { predictExamMark } from '../engine/markPredictor.js';
-import { nswIssuedLevels, nswIssuedForms, nswExactLevels, nswOfferedCell } from '../engine/nswOffer.js';
+import { nswIssuedLevels, nswIssuedForms, nswExactLevels, nswOfferedCell, nearestLevel } from '../engine/nswOffer.js';
 import {
   entryIdOf, entryIssuedLevels, dotpointOfEntry, requestOnEntry, resolveSide, groupBy, mergeRows
 } from '../engine/curriculum.js';
@@ -2080,7 +2080,7 @@ async function createQuestion(pid, subtopic, difficulty, mode, examId = null, ta
   }
   const want = dotpointIsGeneratable(dotpointOf(subtopic, focus?.dotpointId)) ? focus.dotpointId : null;
   const out = await serveQuestion(pid, {
-    generator: subtopic, difficulty, mode, dotpoint: want,
+    generator: subtopic, difficulty, mode, dotpoint: want, aimed: focus?.aimed === true && !!want,
     trap: focus?.trapKey ? { owner: subtopic, key: focus.trapKey } : null
   }, cell => generateFocused(subtopic, cell?.difficulty ?? difficulty, { ...(focus || {}), ...(cell ? { dotpointId: cell.dotpoint } : {}), recent: recentlyServedContent(pid) }));
   const q = out.q;
@@ -3656,9 +3656,8 @@ const routes = {
       const st = await getRating(p.id, sub);
       const aim = pickDifficulty(st?.rating ?? START_RATING, st?.attempts ?? 0, { state: st || {}, nowMs: Date.now() });
       const { dp, difficulty: d } = chooseDotpoint(sub, st, { want: aim });
-      // On Prithagoras the dot point this aims at is a private preference, not a request: a request narrows the server to questions a content review
-      // vouches for (nswDotpointExact.js), which is right when the student chose the dot point and wrong for "the next question of this topic".
-      const { row, payload } = await createQuestion(p.id, sub, d, 'task', null, taskId, null, { dotpointId: practiceCurriculumOf(p) === 'nsw' ? null : (dp?.id || null) });
+      // `aimed`: the device's own aim, not a dot point the student chose; the server does not hold it to exact questions (practice.js seekQuestion).
+      const { row, payload } = await createQuestion(p.id, sub, d, 'task', null, taskId, null, { dotpointId: dp?.id || null, aimed: true });
       return { question: sanitize(payload, row), reason: 'task', why: translate('msg.task.why', { title: task.title, n: done + 1, total: task.count }) };
     }
     const now = Date.now();
@@ -3747,8 +3746,7 @@ const routes = {
           fixed: difficulty ? d : null, want: d, prefer: seekableTraps(st?.traps, now)[0]?.dotpoint || null,
           trapKey: seekableTraps(st?.traps, now)[0]?.key || null, nowMs: now
         });
-        // Prithagoras: aimed at, never asked for (see the task branch): the server deals any question of the topic, as for a topic with no dot point.
-        auto = practiceCurriculumOf(p) === 'nsw' ? null : chosen.dp;
+        auto = chosen.dp;
         d = chosen.difficulty;
       }
       // Two explanations, and which one is sent is decided after the question
@@ -3760,7 +3758,7 @@ const routes = {
         ? translate('msg.focus.noForm', { name: sub.name })
         : translate('msg.focus.plain', { name: sub.name });
       choice = {
-        subtopic, difficulty: d, reason: 'topic', dotpoint: real ? asked.id : (auto?.id || null),
+        subtopic, difficulty: d, reason: 'topic', dotpoint: real ? asked.id : (auto?.id || null), aimed: !real && !!auto,
         trap: seekableTraps(st?.traps, now)[0] || null,
         whyPlain,
         why: real ? translate('msg.focus.real', { text: asked.text })
@@ -3789,12 +3787,12 @@ const routes = {
       // A cell chosen for the trap may sit at subtopic level; its difficulty
       // still applies (otherwise this is the difficulty already chosen).
       choice.difficulty = chosen.difficulty;
-      if (chosen.dp && practiceCurriculumOf(p) !== 'nsw') {
-        choice = { ...choice, dotpoint: chosen.dp.id, difficulty: chosen.difficulty, why: `${choice.why} Dot point: ${chosen.dp.text}` };
+      if (chosen.dp) {
+        choice = { ...choice, aimed: true, dotpoint: chosen.dp.id, difficulty: chosen.difficulty, why: `${choice.why} Dot point: ${chosen.dp.text}` };
       }
       noteServed(p.id, choice.subtopic);
     }
-    const focus = { dotpointId: choice.dotpoint || null, trapKey: choice.trap?.key || null };
+    const focus = { dotpointId: choice.dotpoint || null, trapKey: choice.trap?.key || null, aimed: choice.aimed === true };
     const { row, payload, dotpoint: served, trapKey, repeat } = await createQuestion(
       p.id, choice.subtopic, choice.difficulty, choice.reason === 'review' ? 'review' : 'practice', null, null, null, focus
     );
@@ -6531,7 +6529,7 @@ const SERVER_BANK_REFUSALS = new Set(['PRACTICE_BANK_OUTSIDE_CURRICULUM', 'PRACT
 
 async function serveQuestion(pid, asked, localDraft) {
   const curriculum = practiceCurriculumOf(await get('profiles', pid).catch(() => null));
-  let { generator, difficulty, mode, dotpoint = null, trap = null } = asked;
+  let { generator, difficulty, mode, dotpoint = null, trap = null, aimed = false } = asked;
   // NSW: the request names only a cell the server issues (engine/nswOffer.js).
   // A level the server does not issue is moved to the nearest it does; a
   // generator it issues nothing from is refused here — and so is anything the
@@ -6539,15 +6537,25 @@ async function serveQuestion(pid, asked, localDraft) {
   // a draft of a question the server will never issue can never be marked.
   const nsw = curriculum === 'nsw' && generator !== 'custom';
   if (nsw) {
-    const cell = nswOfferedCell({ generator, difficulty, dotpoint });
-    // A dot point none of whose questions is its own is never answered with the topic's (launch QA 26 Nov 2026).
-    if (!cell || cell.refused) throw practiceNotOffered();
-    ({ difficulty, dotpoint } = cell);
+    if (aimed && dotpoint) {
+      // The device's own aim: the level the dot point's forms name, as before. A dot point with none is dropped (the topic is asked for).
+      const own = nswIssuedForms(generator, dotpointOf(generator, dotpoint)?.forms);
+      const base = nswOfferedCell({ generator, difficulty });
+      if (!base) throw practiceNotOffered();
+      difficulty = own.length ? nearestLevel(own, difficulty) : base.difficulty;
+      if (!own.length) dotpoint = null;
+    } else {
+      const cell = nswOfferedCell({ generator, difficulty, dotpoint });
+      // A dot point none of whose questions is its own is never answered with the topic's (launch QA 26 Nov 2026).
+      if (!cell || cell.refused) throw practiceNotOffered();
+      ({ difficulty, dotpoint } = cell);
+    }
   }
   const body = {
     generator, difficulty, curriculum, mode: SERVER_MODES.includes(mode) ? mode : 'practice',
     avoid: recentlyServedContent(pid).filter(h => typeof h === 'string' && /^[a-zA-Z0-9:_-]{6,96}$/.test(h)).slice(0, 40),
-    ...(dotpoint ? { dotpoint: String(dotpoint) } : {})
+    ...(dotpoint ? { dotpoint: String(dotpoint) } : {}),
+    ...(dotpoint && aimed ? { aimed: true } : {})
   };
   const usable = q => q && typeof q.prompt === 'string' && q.prompt && typeof q.answerType === 'string';
   const linkedAccount = await profileCloudAccountId(pid).catch(() => null);
