@@ -2,7 +2,7 @@
 // Pri Learning · Year 12 generators (HSC Advanced)
 // ─────────────────────────────────────────────────────────────────────────────
 import { year12Nsw } from './year12-nsw.js';
-import { ri, rc, rs, nz, gcd, Frac, mcq, term, poly, sgn, moneyPlain, r1, r2, r3, NAMES } from '../qhelpers.js';
+import { ri, rc, nz, gcd, Frac, mcq, term, poly, sgn, moneyPlain, r1, r2, r3 } from '../qhelpers.js';
 
 // ── Motion graph ─────────────────────────────────────────────────────────────
 // engine/figures.js has no time-series builder, so the piecewise-linear graph

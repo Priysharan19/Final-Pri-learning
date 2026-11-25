@@ -466,7 +466,6 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // A PDF that has been attached and not yet read (it has no thumbnail until
   // its pages are rendered, which happens when the student asks for the read).
   const [heldPdf, setHeldPdf] = useState(false);
-  const photoReadStarting = useRef(false);
   // A read is asked for THIS issued question: the server binds its receipt to it.
   useEffect(() => {
     setReadingQuestion(question.serverQuestionId || null);
@@ -1119,27 +1118,6 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const editAnswer = (v) => { setAnswer(v); stash(v, working); if (!writeMode) noteEdited(typedContentKey(v, working)); };
   const editWorking = (v) => { setWorking(v); stash(answer, v); if (!writeMode) noteEdited(typedContentKey(answer, v)); };
   const chooseOption = (i) => { setMcqSel(i); noteEdited(submissionContentKey(i, undefined)); };
-  // Photo mode: a change to the lines (an edit, a line left out or brought
-  // back) is a change to the working that would be submitted. The answer
-  // follows the lines only while it is still the proposal; once the student
-  // has typed their own it is theirs.
-  const changePhotoLines = (next) => {
-    if (resolved || !next) return;
-    const wk = workingOf(next);
-    let ans = answer;
-    setPhotoLines(next);
-    setWorking(wk);
-    setPhotoRestored(false);
-    if (!isWorking && photoAnswerSource !== 'student') {
-      const proposal = proposeFrom(next);
-      ans = proposal.status === 'proposed' ? proposal.answer : '';
-      setAnswer(ans);
-      setPhotoAnswerSource(proposal.status === 'proposed' ? 'proposed' : null);
-      setPhotoNote(proposal);
-    }
-    setPhotoOCR(v => ({ ...v, text: wk }));
-    noteEdited(typedContentKey(ans, wk));
-  };
   const editPhotoAnswer = (v) => {
     setAnswer(v);
     setPhotoAnswerSource(String(v).trim() ? 'student' : null);
@@ -2245,11 +2223,6 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     });
     return cards.length ? cards : null;
   }, [writeMode, lineVerdicts, inkResult, t]);
-  // Photo mode is never a back door for submitting an old typed transcript.
-  // Switch explicitly to Type when there is no fully recognised attachment.
-  const photoAwaitingValidReading = !photoEligibleForGrading({ mode, photo,
-    ocrPhase: photoOCR.phase, unreadPages: pdfUnread, pdfPageCount,
-    reattachRequired: photoReattachRequired });
   // Handwriting or a photo is marked on one press, as soon as there is ink or a photo (owner decision, 19 Nov 2026): the
   // reading happens silently, and a press made before it has finished waits for it under "Marking...".
   const hasPageToMark = writeMode ? inkHasStrokes : mode === 'photo' ? (!!photo || heldPdf) : false;

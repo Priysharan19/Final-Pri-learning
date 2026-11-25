@@ -23,7 +23,6 @@ const FUNCTIONS = {
 };
 
 const numText = n => (n.s !== undefined && /^[0-9.]+$/.test(String(n.s)) ? String(n.s) : String(Number(n.v.toPrecision(12))));
-const isNegative = node => node && (node.t === 'neg' || (node.t === 'num' && node.v < 0));
 const unwrap = node => (node && node.t === 'group' ? node.v : node);
 // What reads as one unit next to a coefficient: 2x, 3(x + 1), 5\sin(x), 2e^{x}.
 const tight = node => node.t === 'var' || node.t === 'group' || node.t === 'call' || (node.t === 'bin' && node.op === '^');
