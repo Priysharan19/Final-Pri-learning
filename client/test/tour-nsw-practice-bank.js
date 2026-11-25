@@ -94,8 +94,8 @@ try {
     if (await skip.count()) { await skip.first().click().catch(() => {}); await page.waitForTimeout(300); }
   };
   /** Press Next until the question on the desk is one of the author's for which `wanted(sealed)` holds. */
-  const reach = async wanted => {
-    for (let i = 0; i <= MAX_SKIPS; i++) {
+  const reach = async (wanted, skips = MAX_SKIPS) => {
+    for (let i = 0; i <= skips; i++) {
       const s = await sealedShown();
       if (s && typeof s.q._bank === 'string' && wanted(s.q)) return s;
       await next();
@@ -197,7 +197,9 @@ try {
   await page.waitForTimeout(900);
   check('360 px: the dot point practice does not scroll sideways', await sideways() <= 0, String(await sideways()));
   // A question with none of his hints left has no hint control at all, and no empty panel where one would be.
-  const bare = await reach(q => q.hints.length === 0);
+  // A question with no hints is two of the 26 authored level 2 questions of this dot point, so the search runs on for longer than the others
+  // (launch QA 26 Nov 2026: the dot point's generated forms are no longer dealt unless a content review vouches for them, which moved the stream).
+  const bare = await reach(q => q.hints.length === 0, 160);
   if (bare) {
     await typeTab();
     check('a question with no rung offers no hint control and no empty hints panel', await page.locator('[data-hint-ladder], [data-hint-rung-open], [data-hint-rung], .hints-block').count() === 0, (await page.locator('[data-hint-ladder], [data-hint-rung-open], [data-hint-rung], .hints-block').evaluateAll(els => els.map(e => e.outerHTML.slice(0, 160)))).join(' | '));
