@@ -47,8 +47,9 @@ function build() {
 
 const SRC = pathToFileURL(join(CLIENT, 'src')).href + '/';
 const { dotpointsFor } = await import(`${SRC}engine/curriculum.js`);
-const { nswIssuedForms } = await import(`${SRC}engine/nswOffer.js`);
-const expected = dotpointsFor(CHAPTER).filter(d => nswIssuedForms(CHAPTER, d.forms).length > 0);
+const { nswIssuedForms, nswExactLevels } = await import(`${SRC}engine/nswOffer.js`);
+// A dot point is offered only at the levels where its own questions are served (nswDotpointExact.js).
+const expected = dotpointsFor(CHAPTER).filter(d => nswIssuedForms(CHAPTER, nswExactLevels(CHAPTER, d.id)).length > 0);
 
 let dist = null, platform = null, browser = null, stage = 'build';
 const STALL_MS = 300000;
@@ -157,6 +158,19 @@ try {
     await page.locator('[data-dotpoint-none] [data-dotpoint-all]').click();
     await page.waitForFunction(() => !new URL(location.href).searchParams.has('dotpoint'));
     check(`${label}: All dot points clears the link's dot point`, !new URL(page.url()).searchParams.has('dotpoint'));
+
+    // Launch QA 26 Nov 2026: a dot point whose own questions do not exist is never answered with the topic's questions. Year 12
+    // Applications of Differentiation: dot point 2 has none at any level; dot point 3 has none at D1 (shared with its siblings).
+    stage = `${label}: a dot point with no questions of its own, and a level it shares`;
+    await page.goto(`${platform.origin}/practice?subtopic=y12-appdiff&dotpoint=1`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('[data-dotpoint-none], .qpage[data-question-id] .q-prompt, [data-practice-empty]', { timeout: 30000 });
+    check(`${label}: a dot point with no questions of its own says so and offers All dot points, and deals no question`,
+      await page.locator('[data-dotpoint-none] [data-dotpoint-all]').count() === 1 && await page.locator('.qpage[data-question-id] .q-prompt').count() === 0);
+    await page.goto(`${platform.origin}/practice?subtopic=y12-appdiff&dotpoint=2&difficulty=1`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('[data-difficulty-unavailable], .qpage[data-question-id] .q-prompt', { timeout: 30000 });
+    check(`${label}: a level the dot point shares with a sibling is refused in plain words, with the levels that do have its questions`,
+      await page.locator('[data-difficulty-unavailable]').count() === 1 && await page.locator('[data-difficulty-choice]').count() >= 2 && await page.locator('.qpage[data-question-id] .q-prompt').count() === 0,
+      await page.locator('.notice').allInnerTexts().then(x => x.join('|').slice(0, 200)));
   }
 
   stage = 'keyboard';

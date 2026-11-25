@@ -27,7 +27,7 @@ const { chapterRowOf, dotpointChoices, readDotpointParam, withDotpoint } = await
 const { practiceRequestFromQuery, practiceHref } = await import(`${SRC}lib/practiceLinks.js`);
 const { generateQuestion, loadAllBanks } = await import(`${SRC}engine/generators/index.js`);
 const { SUBTOPICS, dotpointsFor } = await import(`${SRC}engine/curriculum.js`);
-const { nswIssuedForms, nswIssuedLevels } = await import(`${SRC}engine/nswOffer.js`);
+const { nswIssuedForms, nswIssuedLevels, nswExactLevels } = await import(`${SRC}engine/nswOffer.js`);
 await loadAllBanks();
 
 // ── LIST ────────────────────────────────────────────────────────────────────
@@ -134,17 +134,23 @@ ok(exact > total / 2, `${exact}/${total} are pinned to the dot point by the bank
 // What a student is actually dealt is chooseQuestion's seek, not a bare generateQuestion: it draws seeds until one
 // carries the requested dot point. Every cell above (the seven generator leaks included) must come back entirely on
 // the dot point. A new leak in the picker fails here.
+// The author's question bank is part of what a dot point request is answered with on this edition (and some offered levels are the bank's alone).
+process.env.PRI_EDITION = 'prithagoras';
+const { ensureQbank } = await import('../../server/platform/qbankPack.js');
 const { chooseQuestion, ensureBanks } = await import('../../server/platform/practice.js');
 const { bankPolicy } = await import('../../server/platform/editionBanks.js');
 await ensureBanks();
+await ensureQbank(process.env, { strict: true });
 const banks = bankPolicy('prithagoras'); // the edition that issues these cells
 const lcg = a => () => { a = (Math.imul(a, 1664525) + 1013904223) >>> 0; return a; };
 const issuedLeaks = {};
 let issuedCells = 0, issuedTotal = 0, issuedOn = 0;
 for (const s of SUBTOPICS) {
   if (s.year < 11 || !nswIssuedLevels(s.id).length) continue;
-  for (const d of dotpointsFor(s.id).filter(x => nswIssuedForms(s.id, x.forms).length > 0)) {
-    for (const level of nswIssuedForms(s.id, d.forms)) {
+  // Only the levels at which a dot point's own questions are served are offered for it (nswDotpointExact.js; the exhaustive check is
+  // server/test/practice-dotpoint-exact-check.mjs). A level it shares with a sibling is refused, never answered with the sibling.
+  for (const d of dotpointsFor(s.id).filter(x => nswIssuedForms(s.id, nswExactLevels(s.id, x.id)).length > 0)) {
+    for (const level of nswIssuedForms(s.id, nswExactLevels(s.id, d.id))) {
       const next = lcg(level * 7919 + 13);
       let on = 0;
       for (let i = 0; i < DRAWS; i++) {
@@ -157,14 +163,14 @@ for (const s of SUBTOPICS) {
     }
   }
 }
-eq(issuedCells, cells, 'the issued section covers the same cells');
+ok(issuedCells > 100, `the issued section covers the offered cells (${issuedCells}; the engine's own forms are ${cells}, and the author's questions add levels of their own)`);
 eq(issuedLeaks, {}, 'issued through the server, a requested dot point never returns another one in any cell');
 eq(issuedOn, issuedTotal, `${issuedOn}/${issuedTotal} issued questions belong to the dot point asked for`);
 console.log(`  issued through the server: ${issuedOn}/${issuedTotal} on the dot point across ${issuedCells} cells; leaks ${JSON.stringify(issuedLeaks)}`);
 
-const diff = dotpointsFor('y12-diff').filter(d => nswIssuedForms('y12-diff', d.forms).length);
+const diff = dotpointsFor('y12-diff').filter(d => nswIssuedForms('y12-diff', nswExactLevels('y12-diff', d.id)).length);
 ok(diff.length >= 2, 'y12-diff offers more than one dot point');
-const seen = new Set(diff.map(d => draw('y12-diff', nswIssuedForms('y12-diff', d.forms)[0], d.id).map(q => q.dotpoint).join('|')));
+const seen = new Set(diff.map(d => draw('y12-diff', nswIssuedForms('y12-diff', nswExactLevels('y12-diff', d.id))[0], d.id).map(q => q.dotpoint).join('|')));
 eq(seen.size, diff.length, 'each dot point of y12-diff issues questions of its own, never another one');
 console.log(`  40-draw comparison (y12-diff): ${sample.join(' · ')}`);
 console.log(`  all offered topics: ${belongs}/${total} draws belong to the dot point across every issued level (${exact} pinned, ${shared} of ${cells} cells shared); leaks ${JSON.stringify(leaks)}`);

@@ -11,6 +11,7 @@
 // NSW_ISSUED_CELLS is a generated copy of the server's ledger, held equal to
 // it by client/test/nsw-offer-check.mjs. Pure: no I/O.
 import { NSW_ISSUED_CELLS } from './nswIssuedCells.js';
+import { NSW_DOTPOINT_EXACT } from './nswDotpointExact.js';
 
 const NONE = Object.freeze([]);
 
@@ -30,6 +31,16 @@ export function nswIssuedForms(generator, forms) {
   return (Array.isArray(forms) ? forms : []).filter(d => issued.includes(d));
 }
 
+/**
+ * The levels at which a request for this dot point is answered only by questions provably on it (nswDotpointExact.js,
+ * generated from the server's own picker). A level a dot point shares with a sibling in one cell is not among them: it is
+ * not offered for the dot point, and the server refuses it rather than serve the sibling's question.
+ */
+export function nswExactLevels(generator, dotpointId) {
+  const row = Object.hasOwn(NSW_DOTPOINT_EXACT, generator) ? NSW_DOTPOINT_EXACT[generator] : null;
+  return row && Object.hasOwn(row, dotpointId) ? row[dotpointId] : NONE;
+}
+
 /** The nearest of `levels` to `want` (ties go to the easier), or null when there is none. */
 export function nearestLevel(levels, want) {
   if (!levels.length) return null;
@@ -42,19 +53,23 @@ export function nearestLevel(levels, want) {
 
 /**
  * The cell an NSW request may name: the difficulty asked for when it is
- * issued, otherwise the nearest issued one — within the dot point's own issued
- * levels when a dot point is asked for and has any, else across the
- * generator's (the dot point is then dropped: no issued form exercises it).
+ * issued, otherwise the nearest issued one. When a dot point is asked for the
+ * cell is one of the dot point's own exact levels (nswExactLevels); a dot point
+ * with none is never answered with the topic: the result says so (`refused`).
  * Null when the server issues nothing from this generator.
  *
- * @param {{ generator: string, difficulty: number, dotpoint?: string|null, dotpointForms?: number[]|null }} ask
- * @returns {{ difficulty: number, dotpoint: string|null, moved: boolean }|null}
+ * @param {{ generator: string, difficulty: number, dotpoint?: string|null }} ask
+ * @returns {{ difficulty: number|null, dotpoint: string|null, moved: boolean, refused?: 'dotpoint' }|null}
  */
-export function nswOfferedCell({ generator, difficulty, dotpoint = null, dotpointForms = null }) {
+export function nswOfferedCell({ generator, difficulty, dotpoint = null }) {
   const all = nswIssuedLevels(generator);
   if (!all.length) return null;
-  const own = dotpoint ? nswIssuedForms(generator, dotpointForms) : NONE;
-  const levels = own.length ? own : all;
-  const d = nearestLevel(levels, difficulty);
-  return { difficulty: d, dotpoint: own.length ? dotpoint : null, moved: d !== Number(difficulty) || (!!dotpoint && !own.length) };
+  if (dotpoint) {
+    const own = nswIssuedForms(generator, nswExactLevels(generator, dotpoint));
+    if (!own.length) return { difficulty: null, dotpoint, moved: true, refused: 'dotpoint' };
+    const d = nearestLevel(own, difficulty);
+    return { difficulty: d, dotpoint, moved: d !== Number(difficulty) };
+  }
+  const d = nearestLevel(all, difficulty);
+  return { difficulty: d, dotpoint: null, moved: d !== Number(difficulty) };
 }

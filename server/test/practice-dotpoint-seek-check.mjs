@@ -83,12 +83,15 @@ const credited = q => (q.dotpoints?.length ? q.dotpoints : q.dotpoint ? [q.dotpo
 for (const [generator, dotpoint, level] of LEAK_CELLS) {
   const avoid = new Set();
   let off = 0;
+  let refusedHere = 0;
   for (let i = 0; i < 300; i++) {
-    const { q } = chooseQuestion(req(generator, level, { dotpoint, avoid }), null, { draw: lcg(level * 31 + i), banks });
-    if (!credited(q).includes(dotpoint)) off++;
+    // A level the dot point shares with a sibling in one cell is refused (nothing exact answers it), never answered with the sibling.
+    let q;
+    try { ({ q } = chooseQuestion(req(generator, level, { dotpoint, avoid }), null, { draw: lcg(level * 31 + i), banks })); } catch (e) { if (e.code !== 'PRACTICE_CONTENT_UNSUPPORTED') throw e; refusedHere++; continue; }
+    if (!credited(q).includes(dotpoint) || q.dotpointExact !== true) off++;
     if (i % 3 === 0) avoid.add(opaqueContentHash(q.contentHash));
   }
-  eq(off, 0, `${dotpoint}@D${level}: 300 issues, none off the dot point`);
+  eq(off, 0, `${dotpoint}@D${level}: 300 requests, none answered by another dot point's question (${refusedHere} refused)`);
 }
 
 // ── REFUSES ──────────────────────────────────────────────────────────────────
@@ -96,11 +99,11 @@ for (const [generator, dotpoint, level] of LEAK_CELLS) {
 // admits() refuses every question carrying y12-diff.2. The topic is still issued; the dot point is refused, where
 // the seek used to hand back a y12-diff question of another dot point.
 const noneOfIt = { ...banks, admits: (q, g) => banks.admits(q, g) && !credited(q).includes('y12-diff.2') };
-assert.throws(() => chooseQuestion(req('y12-diff', 1, { dotpoint: 'y12-diff.2' }), null, { draw: lcg(5), banks: noneOfIt }),
+assert.throws(() => chooseQuestion(req('y12-diff', 3, { dotpoint: 'y12-diff.2' }), null, { draw: lcg(5), banks: noneOfIt }),
   e => e.code === 'PRACTICE_CONTENT_UNSUPPORTED', 'refused');
 n++;
-ok(chooseQuestion(req('y12-diff', 1), null, { draw: lcg(5), banks: noneOfIt }).q, 'the topic itself is still issued');
-ok(chooseQuestion(req('y12-diff', 1, { dotpoint: 'y12-diff.1' }), null, { draw: lcg(5), banks: noneOfIt }).q, 'and a sibling dot point is still issued');
+ok(chooseQuestion(req('y12-diff', 3), null, { draw: lcg(5), banks: noneOfIt }).q, 'the topic itself is still issued');
+ok(chooseQuestion(req('y12-diff', 2, { dotpoint: 'y12-diff.1' }), null, { draw: lcg(5), banks: noneOfIt }).q, 'and a sibling dot point is still issued');
 // Everything of the dot point seen: a flagged repeat of the dot point, not a fresh question of a sibling.
 {
   const [generator, dotpoint, level] = ['y12-financial', 'y12-financial.2', 1];

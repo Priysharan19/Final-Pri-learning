@@ -538,7 +538,12 @@ function* seekQuestion(request, { draw, tries, batches, admits = null }) {
       // A dot point that was asked for is never answered with another one, fresh or as a fallback: a cell's other
       // forms (a sibling dot point's) are passed over, as a form the edition does not issue is. When the whole
       // seek finds none, the request is refused below (PRACTICE_CONTENT_UNSUPPORTED), never substituted.
-      if (dotpoint != null && !(q.dotpoints || []).includes(q.dotpointRequested)) continue;
+      // Launch QA 26 Nov 2026: "credits the dot point" was not enough. A cell that names two dot points cannot say which one a
+      // question is, so a request for either was answered by a sibling's question. Only a question the engine can prove is on the
+      // dot point (`dotpointExact`) answers it; a request nothing exact answers is refused, and the device says so.
+      // ... and at the level asked for: the engine snaps a level a dot point has no form at to its nearest one, which would be a silent change
+      // of level (the device offers a dot point only at the levels it is served at, nswDotpointExact.js).
+      if (dotpoint != null && (q.dotpointExact !== true || Number(q.difficulty) !== Number(difficulty))) continue;
       // Rush and Match answer in one line of their own: a sketch is a form of features, so neither is ever dealt one.
       if (q.answerType === 'graph-sketch' && (request.mode === 'rush' || request.mode === 'match')) continue;
       const hash = opaqueContentHash(q.contentHash);
