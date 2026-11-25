@@ -2385,6 +2385,16 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     return () => cancelAnimationFrame(id);
   }, [state.phase, state.res, resolved]);
 
+  // A new question opens at its top: after a marked card was scrolled to, "Next question" left the page part-way down, the first line
+  // under the sticky header (launch QA 26 Nov 2026). Prithagoras only, like the fix above; the first question of a page is not scrolled.
+  const openedQuestion = useRef(null);
+  useEffect(() => {
+    const was = openedQuestion.current;
+    openedQuestion.current = question?.id ?? null;
+    if (!walkthroughFixes() || was === null || was === openedQuestion.current || typeof window === 'undefined') return;
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [question?.id]);
+
   const answerLines = isMcq ? [] : writeMode
     ? (inkResult?.lines || [])
     : isWorking ? working.split('\n').filter(Boolean)

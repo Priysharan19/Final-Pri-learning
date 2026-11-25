@@ -49,7 +49,7 @@ export function contentSecurityPolicy({ connectSources = extraConnectSources() }
 // The app itself may open the camera for photo capture of a printed question
 // (QuestionCard's <input type="file" capture>), so camera stays available to the
 // document and is denied only to embedded frames; nothing else is ever used.
-export const PERMISSIONS_POLICY = 'camera=(self), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()';
+export const PERMISSIONS_POLICY = 'camera=(self), microphone=(), geolocation=(), payment=(), usb=()';
 export const HSTS = 'max-age=31536000; includeSubDomains';
 
 export function securityHeaderValues({ production = process.env.NODE_ENV === 'production', csp = contentSecurityPolicy() } = {}) {
