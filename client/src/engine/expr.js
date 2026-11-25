@@ -235,7 +235,8 @@ export function normalize(raw) {
   // Superscript digits are a power: a⁷, x¹², 10⁻³. The counting notations
   // (⁵C₂) were rewritten above, so what is left is an exponent.
   s = s.replace(/⁻([⁰¹²³⁴⁵⁶⁷⁸⁹]+)/g, (_, d) => `^(-${[...d].map(ch => SUPER[ch]).join('')})`)
-    .replace(/([⁰¹²³⁴⁵⁶⁷⁸⁹]+)/g, (_, d) => { const n = [...d].map(ch => SUPER[ch]).join(''); return n.length === 1 ? `^${n}` : `^(${n})`; })
+    // (a function's power followed by a digit, sin²3x, is (sin 3x)²: the superscript ends the exponent, it is not the digits 23)
+    .replace(/([⁰¹²³⁴⁵⁶⁷⁸⁹]+)/g, (_, d, at, whole) => { const n = [...d].map(ch => SUPER[ch]).join(''); return n.length === 1 && !(/^\s*[\d.]/.test(whole.slice(at + d.length)) && FUNCTION_POWER_BASE.test(whole.slice(0, at))) ? `^${n}` : `^(${n})`; })
     .replace(/,/g, '')                             // thousands separators (points use parse pair first)
     .replace(/\$/g, '')
     .replace(/\s+/g, ' ')
@@ -243,10 +244,79 @@ export function normalize(raw) {
   return s;
 }
 
+// ── The reading of a function's bare argument ───────────────────────────────────────────────────────────────────────
+// FUNCTION_ARGUMENT_RULE (26 November 2026). Students write and type `sin2x`, `cos 3x`, `tan2θ`, `ln2x`, `sin^2 x`, `sin²x`, `sin^2 3x`.
+//   1. Explicit brackets always win: `cos(2)x` is cos(2)·x, `sin(2x)` is sin(2x).
+//   2. (A number, π and one letter, `sin2πx`, is one product too.) A trigonometric, inverse trigonometric, ln or exp name followed (directly or after a space) by a number and ONE variable or
+//      Greek letter takes that product as its argument: `cos2x` = cos(2x), `sin 3θ` = sin(3θ), `ln2x` = ln(2x), `exp2x` = exp(2x).
+//   3. A power written on the name is the power of the value: `sin^2 x` and `sin²x` = (sin x)², `sin^2 3x` = (sin(3x))².
+//   4. The argument stops at the first + or −, at a closing bracket, at * or /, and at another function name:
+//      `sin2x cos3x` = sin(2x)·cos(3x), `sin2x+1` = sin(2x)+1.
+//   5. A bare number is still a number: `cos2` is cos(2).
+//   6. Where the product is followed by a power, a factorial or a further factor that is not a function name (`sin2x^2`, `sin2xy`,
+//      `sin2x(x+1)`) there is no one conventional reading, and the argument is read as it always was (one atom: sin(2)·x^2). The same for
+//      the inverse function written as a power, `tan^-1 3x`: unchanged.
+//   7. `e^2x`, `xe^-3x`, `sqrt2x`, `cbrt2x`, `log2x` (the 2 may be a base), a number and a letter JUXTAPOSED (an explicit * · × means what it says),
+//      have two readings that both parse, so the parser keeps the literal one (sqrt(2)·x, log(2)·x, e^2·x) and `ambiguousReadings` lists the
+//      others. A typed FINAL ANSWER is accepted when the literal reading or another reading equals the key and no reading is a recorded trap of
+//      the question (checker-core.js). A working LINE is judged as written and as the conventional reading (checker.js stepCheckAmbiguity): the same
+//      verdict under both stands, true as the conventional reading only is ticked with a comment on how it was read, anything else is a held note.
+const CONVENTIONAL_ARGUMENT = new Set(['sin', 'cos', 'tan', 'sec', 'cosec', 'csc', 'cot', 'asin', 'acos', 'atan', 'arcsin', 'arccos', 'arctan', 'ln', 'exp']);
+const FUNCTION_NAMES_RE = Object.keys(FUNCTIONS).sort((a, b) => b.length - a.length).join('|');
+const FUNCTION_POWER_BASE = new RegExp(`(?<![A-Za-z])(?:${FUNCTION_NAMES_RE})\\s*$`, 'i');
+const FUNCTION_POWER_THEN_SPACE = new RegExp(`((?<![A-Za-z])(?:${FUNCTION_NAMES_RE})\\s*\\^\\s*)(\\d+) +(?=[\\d.])`, 'gi');
+const GREEK_OR_LETTER = '(pi|theta|alpha|beta|[A-Za-z])';
+const BARE_END = '(?![A-Za-z0-9(^!.])';
+const ROOT_FORM = new RegExp(`(?<![A-Za-z])(sqrt|cbrt)\\s*(\\d+(?:\\.\\d+)?)\\s*${GREEK_OR_LETTER}${BARE_END}`, 'gi');
+const LOG_FORM = new RegExp(`(?<![A-Za-z])(log)\\s*(\\d+(?:\\.\\d+)?)\\s*${GREEK_OR_LETTER}${BARE_END}`, 'gi');
+const E_POWER_FORM = new RegExp(`(?<![A-Za-z]{2})(?<!\\.)e\\s*\\^\\s*(-?)\\s*(\\d+(?:\\.\\d+)?)\\s*${GREEK_OR_LETTER}${BARE_END}`, 'g');
+
+/** The input in the engine's plain notation with its commas kept: a line rewritten under another reading must still say what it said. */
+function readable(input) { return normalize(String(input ?? '').replace(/,/g, '\u0001')).replace(/\u0001/g, ','); }
+
+/** Each juxtaposed two-reading form in the input: { form: 'e^2x', reading: 'e^(2x)', literal: 'e^2 times x' }, in the order written. */
+export function ambiguousForms(input) {
+  let s;
+  try { s = readable(input); } catch { return []; }
+  if (!s || s.length > 400) return [];
+  const out = [];
+  const take = (re, make) => { const r = new RegExp(re.source, re.flags.includes('i') ? 'gi' : 'g'); for (const m of s.matchAll(r)) out.push({ at: m.index, ...make(...m) }); };
+  take(ROOT_FORM, (w, f, k, v) => ({ form: w.replace(/\s+/g, ''), reading: `${f}(${k}${v})`, literal: `${f}(${k}) times ${v}` }));
+  take(LOG_FORM, (w, f, k, v) => ({ form: w.replace(/\s+/g, ''), reading: `${f}(${k}${v})`, literal: `${f}(${k}) times ${v}` }));
+  take(E_POWER_FORM, (w, neg, k, v) => ({ form: w.replace(/\s+/g, '').replace(/^.*?(e\^)/, '$1'), reading: `e^(${neg}${k}${v})`, literal: `e^${neg}${k} times ${v}` }));
+  return out.sort((a, b) => a.at - b.at).map(({ at, ...rest }) => rest);
+}
+
+/**
+ * The other conventional readings of the forms that have two (rule 7): `sqrt2x` as sqrt(2x), `log2x` as log(2x) and as log base 2
+ * of x, `e^2x` as e^(2x). Each string is the input rewritten with every such form bracketed (the log base reading separately);
+ * empty when the input has none. Never used to judge a line.
+ */
+export function ambiguousReadings(input) {
+  let s;
+  try { s = readable(input); } catch { return []; }
+  if (!s || s.length > 400) return [];
+  const bracketed = s
+    .replace(ROOT_FORM, (_, f, k, v) => `${f}(${k}${v})`)
+    .replace(LOG_FORM, (_, f, k, v) => `${f}(${k}${v})`)
+    .replace(E_POWER_FORM, (_, neg, k, v) => `e^(${neg}${k}${v})`);
+  const out = [];
+  if (bracketed !== s) out.push(bracketed);
+  if (new RegExp(LOG_FORM.source, 'i').test(s)) {
+    const base = s
+      .replace(ROOT_FORM, (_, f, k, v) => `${f}(${k}${v})`)
+      .replace(LOG_FORM, (m, f, k, v) => (Number(k) > 1 && Number.isInteger(Number(k)) ? `(ln(${v})/ln(${k}))` : `log(${k}${v})`))
+      .replace(E_POWER_FORM, (_, neg, k, v) => `e^(${neg}${k}${v})`);
+    if (base !== s && !out.includes(base)) out.push(base);
+  }
+  return out;
+}
+
 // ── Tokeniser ────────────────────────────────────────────────────────────────
 
 function tokenize(input) {
-  const src = normalize(input).replace(/ /g, '');
+  // `sin^2 3x`: the space ends the exponent of a function's power (sin^(2) 3x), it does not make the exponent 23.
+  const src = normalize(input).replace(FUNCTION_POWER_THEN_SPACE, '$1($2)').replace(/ /g, '');
   const tokens = [];
   let i = 0;
   while (i < src.length) {
@@ -404,7 +474,9 @@ class Parser {
           this.expect('rp');
           bareArg = false;
         } else {
-          arg = this.parseUnary();
+          // (not for sin^-1 2x: the inverse function written as a power is left as it was, FUNCTION_ARGUMENT_RULE 6)
+          const inverse = (() => { let pw = power; while (pw && pw.t === 'group') pw = pw.v; return !!pw && ((pw.t === 'num' && pw.v === -1) || (pw.t === 'neg' && pw.v && pw.v.t === 'num' && pw.v.v === 1)); })();
+          arg = (inverse ? null : this.conventionalArgument(tok.v)) ?? this.parseUnary();
         }
         // sin^(-1) x, cos^-1 x, tan^{-1} x: in Australian courses the INVERSE function (arcsin), never the reciprocal (1/sin, written cosec)
         { let pw = power; while (pw && pw.t === 'group') pw = pw.v;
@@ -437,11 +509,39 @@ class Parser {
         arg = this.parseUnary();
         // keep only the tight atom: since parseUnary parses a postfix atom with powers, fine
       } else {
-        arg = this.parseUnary();
+        arg = this.conventionalArgument(tok.v) ?? this.parseUnary();
       }
       return this.maybePower({ t: 'call', fn: tok.v, arg });
     }
     throw new Error(`Unexpected token ${tok.t}`);
+  }
+
+  /**
+   * The conventional reading of a bare argument (see FUNCTION_ARGUMENT_RULE): a number and ONE variable or Greek letter
+   * straight after the function name, `cos2x`, `sin 3θ`, `ln2x`, is that product, cos(2x). Null, and the argument is read
+   * as it always was (one atom: cos(2)·x), when the product is followed by a power, a factorial, a percent sign or a
+   * further factor that is not a function name (`sin2x^2`, `sin2xy`, `sin2x(x+1)`): those have no one conventional reading.
+   */
+  conventionalArgument(fn) {
+    if (!CONVENTIONAL_ARGUMENT.has(fn)) return null;
+    const at = k => this.toks[this.pos + k];
+    const num = at(0), times = at(1), letter = at(2);
+    if (!num || num.t !== 'num' || !times || times.t !== 'op' || times.v !== '*' || !times.implicit) return null;
+    if (!letter || (letter.t !== 'var' && letter.t !== 'const')) return null;
+    // `sin2πx`: a number, π and ONE letter are one product, the same as `sin2x`
+    let used = 3, arg = { t: 'bin', op: '*', l: { t: 'num', v: num.v, ...(num.s !== undefined ? { s: num.s } : {}) }, r: { t: letter.t, v: letter.v } };
+    if (letter.t === 'const' && letter.v === 'pi') {
+      const t2 = at(3), l2 = at(4);
+      if (t2 && t2.t === 'op' && t2.v === '*' && t2.implicit && l2 && (l2.t === 'var' || l2.t === 'const')) { arg = { t: 'bin', op: '*', l: arg, r: { t: l2.t, v: l2.v } }; used = 5; }
+    }
+    const after = at(used), afterNext = at(used + 1);
+    if (after) {
+      if (after.t === 'fact' || after.t === 'pct') return null;
+      if (after.t === 'op' && after.v === '^') return null;
+      if (after.t === 'op' && after.v === '*' && after.implicit && !(afterNext && afterNext.t === 'fn')) return null;
+    }
+    this.pos += used;
+    return arg;
   }
 
   /** allow x^2 style exponent directly after an atom (handled by climb too, kept for fn results) */

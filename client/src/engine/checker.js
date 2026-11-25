@@ -5,7 +5,8 @@
 // that API stable while routing mathematical working through Pri Reason.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { normalize, parse, evaluate, exprEquivalent, numsClose, variablesOf, withEvaluationBudget } from './expr.js';
+import en from '../i18n/strings.en.js';
+import { normalize, parse, evaluate, exprEquivalent, ambiguousReadings, ambiguousForms, numsClose, variablesOf, withEvaluationBudget } from './expr.js';
 
 // Every sum term and counting-loop turn spent while one answer or one page of
 // working is checked comes out of this — see "What an evaluation may cost" in expr.js.
@@ -268,7 +269,11 @@ function proofLine(text, cleaned, previousText, meta) {
   // a line the engine cannot read is not a line it can call false
   if (segments.some(seg => !parseExpr(statedSide(seg, meta)))) return { status: 'note', note: 'Not checked: Pri cannot read this line, so it is not marked right or wrong.' };
   for (const seg of segments) {
-    if (!exprEquivalent(statedSide(seg, meta), meta.canonical, { positiveOnly: meta.positiveOnly })) {
+    if (exprEquivalent(statedSide(seg, meta), meta.canonical, { positiveOnly: meta.positiveOnly })) {
+      // `cos2θ` is read as cos(2θ), but a side that is true only under that reading is not ticked: it abstains until every reading is true
+      const readings = COEFFICIENT_ARGUMENT.test(seg) ? unbracketedReadings(seg) : null;
+      if (readings && readings.some(r => !exprEquivalent(statedSide(r, meta), meta.canonical, { positiveOnly: meta.positiveOnly }))) ambiguous = true;
+    } else {
       // `cos2θ` is cos(2θ) or cos(2)·θ: a line false under one reading and true under the other is not crossed (the every-reading rule)
       const readings = unbracketedReadings(seg);
       if (readings && readings.some(r => exprEquivalent(statedSide(r, meta), meta.canonical, { positiveOnly: meta.positiveOnly }))) { ambiguous = true; continue; }
@@ -707,8 +712,20 @@ function namesAValue(text, meta) {
 export const WORKING_LIMITS = Object.freeze({ lineChars: 200, lines: 100, work: 600000 });
 const UNREAD = {
   long: `Not checked: this line is longer than ${WORKING_LIMITS.lineChars} characters. Write one step per line.`,
-  many: 'Not checked: this is more working than can be checked. Keep to the steps of your method.'
+  many: 'Not checked: this is more working than can be checked. Keep to the steps of your method.',
+  // FUNCTION_ARGUMENT_RULE 7 (expr.js): e^2x, sqrt2x, log2x have two conventional readings, so a line with one is never ticked or crossed.
+  brackets: 'Not checked: this can be read two ways (e^2x is e^(2x) or e^2 times x; sqrt2x is sqrt(2x) or sqrt(2) times x; log2x is log(2x) or log base 2 of x), so it is not marked right or wrong. Put the argument in brackets.'
 };
+
+// A function name straight before a number and a letter (cos2x, sin 3θ, ln 2x, sin^2 3x): the argument whose reading FUNCTION_ARGUMENT_RULE fixes.
+const COEFFICIENT_ARGUMENT = /(?<![a-z])(?:sin|cos|tan|sec|cosec|csc|cot|ln|exp|arcsin|arccos|arctan|asin|acos|atan)\s*(?:\^\s*\d+\s*)?\d+(?:\.\d+)?\s*(?:[a-zθ]|π)(?![a-z(])/i;
+
+// The lines of the page now being read whose two readings (`e^-3x`: e^(-3x) or e^-3 times x) disagree about whether the line is true; set by
+// stepCheckWithinBudget, which has judged the page under each reading first. A line the readings agree on is judged as it is written.
+let HELD_AMBIGUOUS = null;
+
+/** The note on a line held for its two readings. */
+export const AMBIGUOUS_FORM_NOTE = UNREAD.brackets;
 
 /** For each line of working, null when it is to be read, or the note saying why it is not. */
 function unreadLines(rawLines) {
@@ -717,7 +734,7 @@ function unreadLines(rawLines) {
     if (line.length > WORKING_LIMITS.lineChars) return UNREAD.long;
     spent += line.length * line.length;
     if (closed || index >= WORKING_LIMITS.lines || spent > WORKING_LIMITS.work) { closed = true; return UNREAD.many; }
-    return null;
+    return HELD_AMBIGUOUS !== null && HELD_AMBIGUOUS.has(index) ? UNREAD.brackets : null;
   });
 }
 const unreadNote = entry => entry;
@@ -1275,7 +1292,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
     const before = out[out.length - 1];
     if (expLogOpen.length && before && before.status === 'note' && !before.check && String(before.text).includes('=')) expLogUncertain = true;
     const skipped = unreadNote(unread[i]);
-    if (skipped) { out.push({ text: line, status: 'note', note: skipped, unread: true }); return; }
+    if (skipped) { out.push({ text: line, status: 'note', note: skipped, unread: true, ...(skipped === UNREAD.brackets ? { ambiguous: true } : {}) }); return; }
     let status = 'note';
     let note;
     let lineDiagnosis = null;
@@ -1836,6 +1853,14 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
             assessed = { status: 'note', note: 'This function argument can be read two ways (cos 2x is cos(2x) or cos(2)·x), so it is not marked wrong. Put the argument in brackets.' };
           }
         }
+        // The same rule from the other side: `2cos 2x` is read as 2cos(2x) (FUNCTION_ARGUMENT_RULE, expr.js), but a line that is true only under that
+        // reading is not ticked: the unbracketed argument is the student's to settle, so it abstains until every reading of it is true.
+        if (assessed && assessed.status === 'ok' && !assessed.side && calculus && COEFFICIENT_ARGUMENT.test(String(line))) {
+          const readings = unbracketedReadings(line);
+          if (readings && readings.some(r => { const a = assessCalculusLine(r, calculus, meta, { ...calculusStage }); return !a || a.status !== 'ok'; })) {
+            assessed = { status: 'note', note: 'This function argument can be read two ways (cos 2x is cos(2x) or cos(2)·x), so it is not marked right or wrong. Put the argument in brackets.' };
+          }
+        }
         // Every-reading rule (CTO ruling): a bare or "= …" line, or a line "∫f dx = F", is crossed only when the engine proves it
         // false under every plausible reading; otherwise it abstains below. A definition of the method (u = …, du = …) never is.
         const squashed = proseClean.replace(/\s+/g, '');
@@ -1886,7 +1911,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
       lineDiagnosis = null;
     }
     // `e^2x` is e^(2x) or (e^2)x: a mismatch under one reading is not a mistake under the other.
-    if (status === 'break' && /\^\s*\d+\s*[a-zA-Z]/.test(line)) {
+    if (status === 'break' && /\^\s*\d+\s*[a-zA-Z]/.test(line) && !ambiguousReadings(line).length) {   // (e^2x itself: stepCheckAmbiguity judged it under both readings)
       status = 'note';
       note = 'This power can be read two ways (e^2x is e^(2x) or (e^2)x), so it is not marked wrong. Put the exponent in brackets.';
       lineDiagnosis = null;
@@ -2442,7 +2467,7 @@ function stepCheckPlan(meta, workingText) {
   for (let i = 0; i < rawLines.length; i++) {
     const line = rawLines[i];
     const skipped = unreadNote(unread[i]);
-    if (skipped) { out.push({ text: line, status: 'note', note: skipped, unread: true, stage: active }); chain = null; continue; }
+    if (skipped) { out.push({ text: line, status: 'note', note: skipped, unread: true, stage: active, ...(skipped === UNREAD.brackets ? { ambiguous: true } : {}) }); chain = null; continue; }
     if (firstBreak !== -1 && !chainMode) {
       out.push({ text: line, status: 'note', note: FOLLOWS, stage: active });
       continue;
@@ -3083,7 +3108,42 @@ function numericSolutions(meta) {
 function stepCheckWithinBudget(meta, workingText, options = null) {
   const before = AU_READING;
   AU_READING = options?.candidates === true;
-  try { return stepCheckRead(meta, workingText, options); } finally { AU_READING = before; }
+  try { return stepCheckAmbiguity(meta, workingText, options); } finally { AU_READING = before; }
+}
+/**
+ * FUNCTION_ARGUMENT_RULE 7 for working. A line with `e^2x`, `sqrt2x` or `log2x` is judged as written and again with each such line rewritten as the
+ * conventional reading (e^(2x), sqrt(2x), log(2x)):
+ *   the same verdict under both ......... that verdict stands (ticked, crossed, or a note);
+ *   true as the conventional reading, not as written ... ticked exactly as the bracketed line would be, and its comment says how it was read;
+ *   anything else (true as written only, or the readings otherwise disagree) ... held: a note that asks for brackets, which no path ticks or crosses.
+ * The page is then judged once more with those changes, so what follows is built on the right lines. An explicit sign (e^2*x) is not ambiguous.
+ */
+function stepCheckAmbiguity(meta, workingText, options) {
+  if (HELD_AMBIGUOUS !== null) return stepCheckRead(meta, workingText, options);
+  const lines = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
+  const reads = lines.map(l => (l.length > WORKING_LIMITS.lineChars ? [] : ambiguousReadings(l)));
+  const at = reads.map((r, i) => (r.length ? i : -1)).filter(i => i >= 0);
+  const run = (text, held) => { HELD_AMBIGUOUS = held; try { return stepCheckRead(meta, text, options); } finally { HELD_AMBIGUOUS = null; } };
+  if (!at.length || at.length > 12) return run(workingText, new Set());
+  const literal = run(workingText, new Set());
+  const conventional = run(lines.map((l, i) => (reads[i].length ? reads[i][0] : l)).join('\n'), new Set());
+  const read = new Set(), held = new Set();
+  for (const i of at) {
+    const a = literal.lines?.[i]?.status, c = conventional.lines?.[i]?.status;
+    if (a === c) continue;
+    if (c === 'ok') read.add(i); else held.add(i);
+  }
+  if (!read.size && !held.size) return literal;
+  const text = lines.map((l, i) => (read.has(i) ? reads[i][0] : l)).join('\n');
+  const report = run(text, held);
+  if (!read.size || !Array.isArray(report.lines)) return report;
+  const out = report.lines.map((l, i) => {
+    if (!read.has(i) || !l) return l;
+    const f = ambiguousForms(lines[i])[0];
+    const why = f ? en['mark.readAsBrackets'].replace('{reading}', f.reading).replace('{literal}', f.literal) : '';
+    return { ...l, text: lines[i], read: 'conventional', note: [l.note, why].filter(Boolean).join(' ') };
+  });
+  return { ...report, lines: out };
 }
 function stepCheckRead(meta, workingText, options) {
   meta = numericSolutions(meta);

@@ -557,6 +557,7 @@ export default {
   'verdict.yourAnswer': 'Your answer',
   'verdict.attachedWorking': 'Attached working',
   'verdict.marksOutOf': '{earned} / {total} marks',
+  'mark.readAsBrackets': 'Read as {reading}. Write the brackets so it cannot be read as {literal}.',
   'verdict.markedOnDevice': 'Marked on-device by the Pri engine. If your working differs from the sample, check it with your teacher.',
   'verdict.correct': 'Correct.',
   'verdict.revealed': 'Solution revealed.',
