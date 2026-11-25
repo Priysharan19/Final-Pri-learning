@@ -110,6 +110,32 @@ eq('a question this device holds is listed once', history.items.filter(item => i
 ok('as this device\'s own row, with its prompt', history.items.find(item => item.id === 'q-first-1')?.prompt === 'Solve 2x + 3 = 7'
   && history.items.find(item => item.id === 'q-first-1')?.fromAnotherDevice === undefined);
 
+// A worked-solution question that was SHOWN (answerType 'manual': never marked) is not a question answered. Its row is closed so it is not resumed,
+// and that is all: no History row, no "questions" in any report series, no chapter total, no streak day.
+{
+  const now = Date.now();
+  await put('questions', { id: 'q-marked-today', pid: 'p2', subtopic: 'linear', difficulty: 2, mode: 'practice', answered: true, createdAt: now,
+    payload: { prompt: 'Solve 3x = 9', answer: '3' } });
+  const baseline = await dispatch('GET', '/report/series', { period: 'week' });
+  const daysBefore = (await byIndex('activity', 'pid', 'p2')).length;
+  await put('questions', { id: 'q-worked-today', pid: 'p2', subtopic: 'linear', difficulty: 2, mode: 'practice', answered: true, createdAt: now, workedAt: now,
+    workedReceipt: { authoritative: true, worked: true, resolved: true, questionId: 'srv-worked', serverAcknowledgedAt: now, solution: { steps: [], criteria: [], marksAvailable: 2 } },
+    payload: { prompt: 'Show that x + x = 2x.', answerType: 'manual' } });
+  const before = await dispatch('GET', '/report/series', { period: 'week' });
+  const hist = await dispatch('POST', '/history/list', { pageSize: 50 });
+  eq('History lists the marked question and not the worked-solution one', [hist.items.some(i => i.id === 'q-marked-today'), hist.items.some(i => i.id === 'q-worked-today')], [true, false]);
+  eq('and no filter or count includes it (every row has a verdict or a bookmark state of its own)', hist.items.filter(i => i.correct === null && !i.fromAnotherDevice).map(i => i.id), ['q-marked-today']);
+  eq('the week\'s report counts the worked-solution question as none', before.current.questions, baseline.current.questions);
+  await put('questions', { id: 'q-worked-today-2', pid: 'p2', subtopic: 'quadratic', difficulty: 3, mode: 'practice', answered: true, createdAt: now, workedAt: now,
+    workedReceipt: { authoritative: true, worked: true, resolved: true, questionId: 'srv-worked-2', serverAcknowledgedAt: now, solution: { steps: [], criteria: [], marksAvailable: 3 } },
+    payload: { prompt: 'Prove that the sum of two even numbers is even.', answerType: 'manual' } });
+  const after = await dispatch('GET', '/report/series', { period: 'week' });
+  eq('a second worked-solution question moves no total, series point or day', [after.current.questions, after.current.daysPractised, after.series.map(x => x.questions)], [before.current.questions, before.current.daysPractised, before.series.map(x => x.questions)]);
+  const byChapter = await dispatch('GET', '/marks/by-chapter', {});
+  eq('no chapter counts a worked-solution question', Object.values(byChapter.chapters).reduce((n, c) => n + c.questions + c.repeats, 0), 0);
+  eq('the profile\'s streak days are unchanged (a worked solution does not record a day)', (await byIndex('activity', 'pid', 'p2')).length, daysBefore);
+}
+
 console.log(failures.length
   ? `HISTORY SECOND DEVICE: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
   : `HISTORY SECOND DEVICE: PASS — ${pass}/${pass} checks — History on a second device lists the account's answers from every device, with their verdict, certified marks, chapter and date, and invents nothing.`);

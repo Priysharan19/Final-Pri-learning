@@ -37,7 +37,7 @@ export const QBANK_DOTPOINTS = Object.freeze({
   'qb-a12-ma-c4': { 'C4.1a': ['y12-integration', 1], 'C4.2a': ['y12-integration', 2], 'C4.2b': ['y12-integration', 3], 'C4.2c': ['y12-integration'], 'C4.2d': ['y12-integral-calc', 3] },
   'qb-a12-ma-f2': { 'F2.1a': ['y11-transform', 1], 'F2.1b': ['y11-transform', 3], 'F2.1c': ['y11-transform', 2], 'F2.1d': ['y11-transform', 3], 'F2.1e': ['y11-transform'] },
   'qb-a12-ma-m1': { 'M1.1a': ['y12-fin-exact', 1], 'M1.2a': ['y12-series', 1], 'M1.3a': ['y12-series'], 'M1.4a': ['y12-financial'] },
-  'qb-a12-ma-s2': { 'S2.1a': ['y11-data-sets'], 'S2.1b': ['y11-data-sets'], 'S2.2b': ['y11-data-sets'] },
+  'qb-a12-ma-s2': { 'S2.1a': ['y11-data-sets'], 'S2.1b': ['y11-data-sets'], 'S2.2a': ['y11-data-sets'], 'S2.2b': ['y11-data-sets'] },
   'qb-a12-ma-s3': { 'S3.1a': ['y12-stats'], 'S3.1b': ['y12-stats'], 'S3.1c': ['y12-stats'], 'S3.2a': ['y12-stats', 2], 'S3.2b': ['y12-stats'] },
   'qb-a12-ma-t3': { 'T3.1a': ['y12-trig-model'], 'T3.1b': ['y12-trig-model'], 'T3.1c': ['y12-trig-model'], 'T3.1d': ['y12-trig-model', 3] },
   // Extension 1, Year 11
@@ -50,6 +50,9 @@ export const QBANK_DOTPOINTS = Object.freeze({
   // Extension 1, Year 12
   'qb-x12-me-c2': { 'C2.1a': ['me12-further-calc'], 'C2.2a': ['me12-calc', 1], 'C2.2b': ['me12-calc'], 'C2.2c': ['me12-further-calc', 3] },
   'qb-x12-me-c3': { 'C3.1a': ['me12-calc', 2], 'C3.2a': ['me12-calc'], 'C3.2b': ['me12-calc'], 'C3.2c': ['me12-calc'] },
+  // Induction (Extension 1, Year 12): proof questions only, so every one is a worked-solution question. Series and sums is the first product dot point,
+  // divisibility the second; "inequalities and other results" is wider than either, so it is topic-level.
+  'qb-x12-me-p1': { 'P1.1a': ['me12-induction', 1], 'P1.1b': ['me12-induction', 2], 'P1.1c': ['me12-induction'] },
   'qb-x12-me-s1': { 'S1.1a': ['me12-binomial', 1], 'S1.2a': ['me12-binomial'] },
   'qb-x12-me-t3': { 'T3.1a': ['me12-trigeq'], 'T3.1b': ['me12-trigeq'], 'T3.1c': ['me12-trigeq'] },
   'qb-x12-me-v1': { 'V1.1a': ['me12-vectors', 1], 'V1.1b': ['me12-vectors', 2], 'V1.1c': ['me12-vectors'], 'V1.2a': ['me12-projectile'] }

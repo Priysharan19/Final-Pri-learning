@@ -56,6 +56,18 @@ const cases = [
 ];
 for (const [kind, text] of cases) ok(scanDist(plant(kind.replace(/\W+/g, '-'), text), questions, manifest.packVersion).length > 0, `a dist holding ${kind} fails the scan`);
 
+// Escaping: a bundle holds a string with its backslashes doubled and its quotes escaped, and one inside a JSON string is escaped a second time. Each level
+// is undone exactly once, so a prompt that holds both backslashes and quotes is still found as written, escaped once, and escaped twice.
+const withBoth = questions.find(q => /\\/.test(q.prompt) && q.prompt.length >= 30) || withExprAnswer;
+const quoted = (questions.find(q => /\\/.test(q.prompt) && /["']/.test(q.prompt) && q.prompt.length >= 30) || withBoth).prompt;
+ok(/["']/.test(quoted), 'the pack has a prompt with a quote to plant');
+for (const [kind, text] of [['a prompt with a backslash, written once-escaped', JSON.stringify(withBoth.prompt)], ['a prompt with a backslash, escaped twice', JSON.stringify(JSON.stringify(withBoth.prompt))],
+  ['a prompt with a backslash and a quote, escaped once', JSON.stringify(quoted)], ['a prompt with a backslash and a quote, escaped twice', JSON.stringify(JSON.stringify(quoted))]]) {
+  const dir = dist(`esc-${kind.replace(/\W+/g, '-')}`);
+  fs.writeFileSync(path.join(dir, 'assets', 'app.js'), `${stock}var x=${text};\n`);
+  ok(scanDist(dir, questions, manifest.packVersion).length > 0, `${kind} fails the scan`);
+}
+
 // every answer, trap reason, prompt and truncated step in one file, as the reviewer's counter-example had them
 const everything = questions.flatMap(q => [q.prompt, ...(q.traps || []).map(t => t.why), ...q.steps.map(s => s.d.slice(0, 39)), JSON.stringify(q.answer)]).join('\n');
 ok(scanDist(plant('everything', everything), questions, manifest.packVersion).length > 0, 'a dist holding every prompt, trap reason, answer and a worked step cut to 39 characters fails the scan');

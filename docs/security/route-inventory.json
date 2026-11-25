@@ -2716,6 +2716,29 @@
       "bodyLimit": "1mb"
     },
     {
+      "method": "POST",
+      "path": "/v1/practice/:id/solution",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "student owns the live server-issued worked-solution question (answerType manual: never marked, no key); sends his steps and criteria once; records it completed and seen only, no attempt, no learning event, no mark; idempotent; another account's id is a 404; a marked question is refused (409)",
+      "rateLimits": [
+        {
+          "key": "practice-solution",
+          "limit": 120,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
       "method": "GET",
       "path": "/v1/practice/review-queue",
       "auth": "session",

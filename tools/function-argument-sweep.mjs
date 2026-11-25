@@ -39,9 +39,9 @@ export function explicitMultiplications(key) {
   const out = [];
   for (const sign of ['*', '·', '×']) {
     for (const [re, f] of EXPLICIT) {
-      let meaning = key, text = key; let hit = false;
-      text = key.replace(new RegExp(re.source, 'g'), (...m) => { hit = true; return f(...m.slice(0, -2), sign)[0]; });
-      meaning = key.replace(new RegExp(re.source, 'g'), (...m) => f(...m.slice(0, -2), sign)[1]);
+      let hit = false;
+      const text = key.replace(new RegExp(re.source, 'g'), (...m) => { hit = true; return f(...m.slice(0, -2), sign)[0]; });
+      const meaning = key.replace(new RegExp(re.source, 'g'), (...m) => f(...m.slice(0, -2), sign)[1]);
       if (hit && text !== key) out.push({ text, meaning });
     }
   }

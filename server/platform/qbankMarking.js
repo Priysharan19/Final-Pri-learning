@@ -21,6 +21,7 @@
 //
 // Pure and deterministic.
 import { checkAnswer } from '../../client/src/engine/checker.js';
+import { parse, normalize, evaluate, variablesOf } from '../../client/src/engine/expr.js';
 import { namedDecimalPlaces, asksForExactValue } from '../../client/src/engine/checker-core.js';
 
 export const isBankQuestion = q => !!q && typeof q._bank === 'string';
@@ -121,14 +122,28 @@ export function asksForExact(q) {
   return false;
 }
 
-/** Does this numeric question accept a correctly rounded answer to at least 3 significant figures? */
-export function acceptsRoundedFigures(q) {
+/**
+ * The number a key is, for the rounding rule: a numeric key's value, or an expression key with no unknown in it (a constant such as e^2/4 or
+ * -pi^2, an exact-form key), evaluated. Null for any other key. One rule serves both.
+ */
+function roundingValueOf(q) {
   const a = q?.answer;
-  if (q?.answerType !== 'numeric' || !a || !Number.isFinite(a.value) || a.tol !== undefined || a.surdForm || a.simplestFraction) return false;
+  if (!a) return null;
+  if (q.answerType === 'numeric') return Number.isFinite(a.value) && a.tol === undefined && !a.surdForm && !a.simplestFraction ? a.value : null;
+  if (q.answerType === 'expression' && typeof a.expr === 'string' && a.tol === undefined) {
+    try { const ast = parse(normalize(a.expr)); if ([...variablesOf(ast)].some(v => v !== 'e')) return null; /* e is the constant */ const v = evaluate(ast, {}); return Number.isFinite(v) ? v : null; } catch { return null; }
+  }
+  return null;
+}
+
+/** Does this question (a numeric key, or a constant exact-form expression key) accept a correctly rounded answer to at least 3 significant figures? */
+export function acceptsRoundedFigures(q) {
+  const value = roundingValueOf(q);
+  if (value === null) return false;
   // Only a key whose exact value is not the authored decimal: an irrational or a recurring value written out to float length (10 or more
   // significant figures). A whole number or a terminating decimal as authored (22315.5, 0.3413, 4.375) is its own answer.
-  if (Number.isInteger(a.value) || digitsOf(a.value).digits.length < 10) return false;
-  if (isRational(a.value)) return false;      // a rational key (11/36, 2/3 for log base 8 of 4) is an exact value: only exact forms are accepted
+  if (Number.isInteger(value) || digitsOf(value).digits.length < 10) return false;
+  if (isRational(value)) return false;      // a rational key (11/36, 2/3 for log base 8 of 4) is an exact value: only exact forms are accepted
   // Money, counts and whole things take the authored value under the existing tolerance and nothing else.
   if (WHOLE_THINGS.test(`${q.prompt ?? ''} ${q.answerSuffix ?? ''}`)) return false;
   if (ASKS_FOR_PRECISION.test(`${q.prompt ?? ''} ${q.answerSuffix ?? ''}`)) return false;
@@ -142,7 +157,7 @@ export function isRoundedKey(q, typed) {
   if (!acceptsRoundedFigures(q)) return false;
   const t = typedDecimal(typed);
   if (!t || t[1] < 3) return false;
-  return t[0] === roundSignificant(q.answer.value, t[1]);
+  return t[0] === roundSignificant(roundingValueOf(q), t[1]);
 }
 
 // ── 2. a named precision on an interval ──────────────────────────────────────
@@ -175,6 +190,6 @@ export function checkBankAnswer(q, raw) {
       }
     }
   }
-  if (q.answerType === 'numeric' && typeof input === 'string' && isRoundedKey(q, input)) return { correct: true };
+  if ((q.answerType === 'numeric' || q.answerType === 'expression') && typeof input === 'string' && isRoundedKey(q, input)) return { correct: true };
   return first;
 }

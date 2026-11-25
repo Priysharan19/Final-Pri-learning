@@ -1,0 +1,24 @@
+<svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' width='64.56' height='143.93' viewBox='-66.022 -66.022 48.419 107.946'>
+<g id='page1'>
+<g stroke-miterlimit='10' transform='matrix(.996 0 0 -.996 -65.624 41.525)' fill='#000' stroke='#000' stroke-width='0.4' stroke-linecap='round' stroke-linejoin='round'>
+<g stroke-width='0.8'>
+<path d='M0 0H31.867V95.601H0Z' fill='none'/>
+</g>
+<g stroke-width='0.8'>
+<path d='M31.867 0L47.8 11.95V107.551L31.867 95.601' fill='none'/>
+</g>
+<g stroke-width='0.8'>
+<path d='M0 95.601L15.933 107.551H47.8' fill='none'/>
+</g>
+<g stroke-dasharray='3.0,3.0' stroke-dashoffset='0.0'>
+<path d='M0 0L15.933 11.95H47.8M15.933 11.95V107.551' fill='none'/>
+</g>
+<g fill='#f00' stroke='#f00'>
+<path d='M0 0L47.8 107.551' fill='none'/>
+</g>
+<g fill='#f00' stroke='#f00' stroke-dasharray='3.0,3.0' stroke-dashoffset='0.0'>
+<path d='M0 0L47.8 11.95' fill='none'/>
+</g>
+</g>
+</g>
+</svg>

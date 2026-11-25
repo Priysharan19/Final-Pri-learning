@@ -45,8 +45,10 @@ c.ok(withFigure.length > 100, `the pack holds ${withFigure.length} parts that ha
 const dir = path.join(qb.DEFAULT_PACK_DIR, 'figures');
 const checked = checkFiguresDir(dir);
 c.deq(checked.problems, [], 'every committed figure matches the figures manifest and passes the sanitiser');
-const questionIds = new Set(withFigure.map(e => e.group));
-c.eq(checked.count, questionIds.size, 'the figures directory holds exactly the figures of the packed questions');
+// A worked-solution question (answerType manual) draws the same committed files: its figure is one of the directory's too.
+const manualWithFigure = qb.qbankManualEntries().map(e => e.entry).filter(e => e.diagram);
+const questionIds = new Set([...withFigure, ...manualWithFigure].map(e => e.group));
+c.eq(checked.count, questionIds.size, 'the figures directory holds exactly the figures of the packed questions (marked and worked-solution)');
 let hashOk = 0, altShown = 0, altLeaks = [], neutral = 0, generated = 0;
 for (const e of withFigure) {
   const buf = fs.readFileSync(path.join(dir, `${e.group}.svg`));

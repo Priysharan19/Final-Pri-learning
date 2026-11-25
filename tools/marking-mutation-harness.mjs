@@ -831,7 +831,7 @@ export async function run({ root = path.resolve(path.dirname(fileURLToPath(impor
       if (sym) lines.push(`${L} = ±${fmt(Math.abs(sols[0]))}${u}`);
       if (sols.length >= 2 || sym) for (const t of lines) if (same && (sols.length >= 2 || sym)) tryTrue(q, 'solution-list', [t], 0);
       const wrongSets = [];
-      sols.forEach((v, i) => { const withEl = n => sols.map((x, j) => (j === i ? n : x)); wrongSets.push(withEl(v + 1), withEl(-v === v ? v + 2 : -v), withEl(v + 360 === v ? v : v + 90)); });
+      sols.forEach((v, i) => { const withEl = n => sols.map((x, j) => (j === i ? n : x)); wrongSets.push(withEl(v + 1), withEl(-v === v ? v + 2 : -v), withEl(v + 90)); });
       wrongSets.push([...sols, (Math.max(...sols) || 0) + 7]);
       const key = x => x.slice().sort((a, b) => a - b).join();
       const trueKey = key([...new Set(sols)]);

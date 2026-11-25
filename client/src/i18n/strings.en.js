@@ -561,6 +561,21 @@ export default {
   'verdict.markedOnDevice': 'Marked on-device by the Pri engine. If your working differs from the sample, check it with your teacher.',
   'verdict.correct': 'Correct.',
   'verdict.revealed': 'Solution revealed.',
+  // A worked-solution question (his show-that, prove, explain, sketch and unkeyed "find" questions): Pri shows the solution and marks nothing.
+  'worked.notice': 'Worked solution question: Pri shows the solution, it does not mark this one.',
+  'worked.show': 'Show the worked solution',
+  'worked.showing': 'Opening the solution...',
+  'worked.solutionTitle': 'Worked solution',
+  'worked.criteriaTitle': 'What a marker looks for',
+  'worked.criteriaNote': 'These marks are for information. Pri has not marked your working.',
+  'worked.marksOne': '1 mark',
+  'worked.marksMany': '{n} marks',
+  'worked.yourWorking': 'Your working',
+  'worked.lineHolds': 'This line holds.',
+  'worked.lookAgain': 'Look again at this line.',
+  'worked.noteOne': 'Your line holds.',
+  'worked.noteSome': '{verified} of your {lines} lines hold.',
+  'worked.noteNone': 'Pri could not tick any of your lines.',
   'verdict.notThisTime': 'Not this time.',
   // Said only from the server's step report of the lines that were submitted
   // (components/attemptEvidence.js). A right final answer is never presented

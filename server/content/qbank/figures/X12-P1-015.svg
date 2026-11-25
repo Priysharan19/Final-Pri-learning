@@ -1,0 +1,27 @@
+<svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' width='116.49' height='116.49' viewBox='-66.022 -66.022 87.37 87.37'>
+<g id='page1'>
+<g stroke-miterlimit='10' transform='matrix(.996 0 0 -.996 -65.425 20.75)' fill='#000' stroke='#000' stroke-width='0.4' stroke-linecap='round' stroke-linejoin='round'>
+<g stroke-width='0.3' fill='#8c8c8c' stroke='#8c8c8c'>
+<path d='M0 0H86.497M0 10.812H86.497M0 21.624H86.497M0 32.437H86.497M0 43.249H86.497M0 54.061H86.497M0 64.873H86.497M0 75.685H86.497M0 86.494H86.497M0 0V86.497M10.812 0V86.497M21.624 0V86.497M32.437 0V86.497M43.249 0V86.497M54.061 0V86.497M64.873 0V86.497M75.685 0V86.497M86.494 0V86.497M86.497 86.497' fill='none'/>
+</g>
+<g stroke-width='1.2'>
+<path d='M0 0V86.497H86.497V0ZM43.249 0V86.497M0 43.249H86.497' fill='none'/>
+</g>
+<g fill='#191919' stroke='#191919'>
+<path d='M64.873 64.873V75.685H75.685V64.873ZM75.685 75.685' stroke='none'/>
+</g>
+<g fill='#e1e1e1' stroke='#e1e1e1'>
+<path d='M32.437 32.437V43.249H43.249V32.437ZM43.249 43.249' stroke='none'/>
+</g>
+<g fill='#e1e1e1' stroke='#e1e1e1'>
+<path d='M32.437 43.249V54.061H43.249V43.249ZM43.249 54.061' stroke='none'/>
+</g>
+<g fill='#e1e1e1' stroke='#e1e1e1'>
+<path d='M43.249 32.437V43.249H54.061V32.437ZM54.061 43.249' stroke='none'/>
+</g>
+<g stroke-width='1.0'>
+<path d='M32.437 32.437H54.061V43.249H43.249V54.061H32.437Z' fill='none'/>
+</g>
+</g>
+</g>
+</svg>

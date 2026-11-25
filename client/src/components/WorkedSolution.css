@@ -1,0 +1,16 @@
+/* The solution of a worked-solution question: his steps (the page's own step style), a read-only list of what a marker looks for, and, when the
+   server sent one, the student's own lines with a tick. Nothing here is a control. */
+.wk { padding-top: 14px; }
+.wk .sc-label { margin: 0 0 8px; }
+.wk-work, .wk-criteria { margin-top: 18px; }
+.wk-work { margin-bottom: 22px; }
+.wk-lines { list-style: none; margin: 0; padding: 0; counter-reset: wk; }
+.wk-lines li { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; padding: 3px 0; min-width: 0; }
+.wk-glyph { width: 16px; flex: none; display: inline-flex; justify-content: center; color: var(--accent, currentColor); }
+.wk-line-text { min-width: 0; overflow-wrap: anywhere; font-family: var(--font-prose-math, inherit); }
+.wk-look { font-size: 13.5px; color: var(--ink-2, var(--muted, inherit)); }
+.wk-criteria ul { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--hairline); }
+.wk-criteria li { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; padding: 9px 0; border-bottom: 1px solid var(--hairline); min-width: 0; }
+.wk-point { min-width: 0; overflow-x: auto; overflow-wrap: anywhere; }
+.wk-marks { flex: none; font-variant-numeric: tabular-nums; font-size: 13.5px; color: var(--ink-2, var(--muted, inherit)); white-space: nowrap; }
+.wk-note { margin: 8px 0 0; font-size: 13.5px; }
