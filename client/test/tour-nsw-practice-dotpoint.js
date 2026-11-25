@@ -118,13 +118,19 @@ try {
     await shot(`dotpoint-${label}-2-focused.png`);
 
     stage = `${label}: choose a dot point`;
-    // A different dot point from the question on the desk: read which one the desk's question is on (with fewer dot points offered, the desk's
-    // question is as often the second as the first), then take the first offered one that is not it.
-    const deskText = await page.locator('[data-served-dotpoint]').first().innerText().catch(() => '');
-    const target = expected.find(d => !deskText.includes(d.text.slice(0, 20))) || expected[0];
-    const ordinal = dotpointsFor(CHAPTER).findIndex(d => d.id === target.id);
+    // A different dot point from the question on the desk. Which dot point the desk's question is on is not shown until one is chosen, and
+    // with fewer dot points offered it is as often the first as the second: take the first offered one; if the app keeps the desk's question
+    // because it is already on that dot point, take the other.
     const was = await qid();
+    let target = expected[0];
+    let ordinal = dotpointsFor(CHAPTER).findIndex(d => d.id === target.id);
     await select.selectOption(String(ordinal));
+    const moved = await page.waitForFunction(id => { const el = document.querySelector('.qpage[data-question-id]'); return el && el.getAttribute('data-question-id') !== id && el.querySelector('.q-prompt'); }, was, { timeout: 6000 }).then(() => true, () => false);
+    if (!moved) {
+      target = expected[1];
+      ordinal = dotpointsFor(CHAPTER).findIndex(d => d.id === target.id);
+      await select.selectOption(String(ordinal));
+    }
     await nextQuestion(was);
     check(`${label}: the URL carries dotpoint=${ordinal}`, new URL(page.url()).searchParams.get('dotpoint') === String(ordinal) && new URL(page.url()).searchParams.get('subtopic') === CHAPTER, page.url());
     check(`${label}: the server was asked for that dot point (issue or prepare request names it)`, issued.some(b => b?.dotpoint === target.id), JSON.stringify(issued.map(b => b?.dotpoint)));
