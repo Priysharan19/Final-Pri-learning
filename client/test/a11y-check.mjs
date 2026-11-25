@@ -470,6 +470,37 @@ function plantBrokenControls() {
 
 const uprootBrokenControls = () => { document.getElementById('a11y-selftest')?.remove(); };
 
+// ── Contrast of the small coloured labels (launch QA 26 Nov 2026) ────────────
+// Chapter colours used as text (Home's plate heads, readouts and next-step labels, the map card) and the plan week's minutes label
+// failed 4.5:1 in one or both themes (day amber 3.4 to 3.9, "140 min planned" 2.9 in Paper and 2.1 in Night). Read from the rendered
+// page: the text's colour against the first opaque background behind it, in the theme the page is set to.
+const CONTRAST_TEXT = '.in-plate-head small, .in-readout b, .in-readout-hint, .in-next-label small, .in-map-card small, [data-plan-week] small';
+function contrastFaults(selector) {
+  const parse = c => { const m = String(c).match(/rgba?\(([^)]+)\)/); if (!m) return null; const p = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return { r: p[0], g: p[1], b: p[2], a: p[3] === undefined ? 1 : p[3] }; };
+  const lum = ({ r, g, b }) => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+  const blend = (fg, bg) => ({ r: fg.r * fg.a + bg.r * (1 - fg.a), g: fg.g * fg.a + bg.g * (1 - fg.a), b: fg.b * fg.a + bg.b * (1 - fg.a), a: 1 });
+  const backdrop = el => {
+    const stack = [];
+    for (let e = el; e; e = e.parentElement) { const c = parse(getComputedStyle(e).backgroundColor); if (c && c.a > 0) { stack.push(c); if (c.a >= 1) break; } }
+    let base = { r: 255, g: 255, b: 255, a: 1 };
+    for (let i = stack.length - 1; i >= 0; i--) base = blend(stack[i], base);
+    return base;
+  };
+  const out = [];
+  for (const el of document.querySelectorAll(selector)) {
+    const cs = getComputedStyle(el);
+    const box = el.getBoundingClientRect();
+    if (!(el.textContent || '').trim() || cs.visibility === 'hidden' || cs.display === 'none' || box.width < 2 || box.height < 2) continue;
+    const fg = parse(cs.color); const bg = backdrop(el);
+    if (!fg) continue;
+    const eff = fg.a < 1 ? blend(fg, bg) : fg;
+    const hi = Math.max(lum(eff), lum(bg)), lo = Math.min(lum(eff), lum(bg));
+    const ratio = (hi + 0.05) / (lo + 0.05);
+    if (ratio < 4.5) out.push({ el: `${el.tagName.toLowerCase()}.${String(el.className).split(' ')[0]}`, detail: `"${(el.textContent || '').trim().slice(0, 40)}" is ${ratio.toFixed(2)}:1 (${cs.color} on rgb(${Math.round(bg.r)}, ${Math.round(bg.g)}, ${Math.round(bg.b)}), ${cs.fontSize})` });
+  }
+  return out;
+}
+
 // ── Driving the app ──────────────────────────────────────────────────────────
 
 const SETTLE = 260;
@@ -655,6 +686,14 @@ async function run() {
       for (const f of res.colourOnly) file('colour', view, f.el, f.detail);
       for (const f of res.mathFaults) file('math', view, f.el, f.detail);
       mathSeen += res.counts.math;
+      // The small coloured labels, read in Paper and in Night (the page's own theme is put back after).
+      const was = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
+      for (const theme of ['light', 'dark']) {
+        await page.evaluate(t => document.documentElement.setAttribute('data-theme', t), theme);
+        await wait(page, 400);   // the theme's colour transition settles before anything is read
+        for (const f of await page.evaluate(contrastFaults, CONTRAST_TEXT)) file('contrast', `${view} (${theme === 'light' ? 'Paper' : 'Night'})`, `${f.el} in ${theme}`, f.detail);
+      }
+      await page.evaluate(t => { if (t === null) document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t); }, was);
       return res;
     }
 
@@ -1064,9 +1103,30 @@ async function run() {
         dealt.push(q ? `${q._generator || q.subtopic}:${q.answerType}${q._bank ? ':bank' : ''}` : `${shown.serverQuestionId ? 'unsealed' : 'unissued'}:${shown.checkState}`);
         return q && typeof q._bank === 'string' && ['numeric', 'expression'].includes(q.answerType) ? q : null;
       };
+      // Which dot point and level the practice page deals are the account's own (adaptive, and random among the topic's dot points), and the
+      // pack holds authored questions at some (dot point, level) cells only: a walk that took whatever it was dealt saw none in 80 draws on an
+      // unlucky account (launch QA, 26 Nov 2026: 43 of 44 once, 47 of 47 on the rerun). The step names the dot point and level where the pack
+      // holds the most authored questions of the kind it needs. The pack is read from the module the server dealt from, so the search is
+      // bounded by a known pool, not by luck.
+      const { qbankEntries } = await import('../../server/platform/qbankPack.js');
+      const richestCell = (subtopic, ordinal, wanted) => {
+        const cells = new Map();
+        for (const { entry, place } of qbankEntries()) {
+          if (!place || place.subtopic !== subtopic || place.ordinal === null || (ordinal !== null && place.ordinal !== ordinal)) continue;
+          const key = `${place.ordinal}:${entry.level}`;
+          const row = cells.get(key) || { ordinal: place.ordinal, level: entry.level, all: 0, wanted: 0 };
+          row.all++; if (wanted(entry)) row.wanted++;
+          cells.set(key, row);
+        }
+        const best = [...cells.values()].filter(r => r.wanted > 0).sort((a, b) => (b.wanted / b.all) - (a.wanted / a.all) || b.wanted - a.wanted || a.level - b.level || a.ordinal - b.ordinal)[0];
+        if (!best) throw new Error(`the pack holds no authored question for ${subtopic}${ordinal !== null ? `.${ordinal + 1}` : ''} of the kind this step needs`);
+        return best;
+      };
       let authored = null;
       await step('practice · an author\'s question, hints open', '/practice', async () => {
-        await goTo(page, BASE, '/practice?subtopic=y11-explog');
+        const cell = richestCell('y11-explog', null, e => ['numeric', 'expression'].includes(e.answerType));
+        const level = cell.level;
+        await goTo(page, BASE, `/practice?subtopic=y11-explog&dotpoint=${cell.ordinal}&difficulty=${level}`);
         await page.waitForSelector('.q-prompt', { timeout: 30000 });
         for (let i = 0; i < 80 && !authored; i++) {
           authored = await authoredShown();
@@ -1075,7 +1135,7 @@ async function run() {
           await page.waitForSelector('.q-prompt', { timeout: 30000 });
           await wait(page, SETTLE);
         }
-        if (!authored) throw new Error(`no authored question was dealt within the bounded search (${dealt.slice(0, 8).join(' ')})`);
+        if (!authored) { const { qbankStatus, qbankServes } = await import('../../server/platform/qbankPack.js'); throw new Error(`no authored question was dealt within the bounded search at D${level} (${dealt.slice(0, 8).join(' ')}) pack ${JSON.stringify(qbankStatus())} serves=${qbankServes('y11-explog')} edition=${process.env.PRI_EDITION}`); }
         const typeTab = page.locator('.mode-tab').first();
         if (await typeTab.count()) { await typeTab.click(); await wait(page, 250); }
         const nudge = page.locator('[data-hint-rung="nudge"], [data-hint-rung-open="nudge"]').first();
@@ -1094,7 +1154,7 @@ async function run() {
       // alternative, fetched with the session. Dealt from the subtopic whose authored questions mostly have one (the bank figure tour's).
       let withFigure = null;
       await step('practice · an author\'s question with a diagram', '/practice', async () => {
-        await goTo(page, BASE, '/practice?subtopic=y12-integration&dotpoint=2');
+        await goTo(page, BASE, `/practice?subtopic=y12-integration&dotpoint=2&difficulty=${richestCell('y12-integration', 2, e => !!e.diagram).level}`);
         await page.waitForSelector('.q-prompt', { timeout: 30000 });
         for (let i = 0; i < 80 && !withFigure; i++) {
           const q = await authoredShown();
@@ -1843,6 +1903,8 @@ async function run() {
     ok('formulas were seen, so the rule is alive', mathSeen >= 20, `only ${mathSeen} formulas were found across the views`);
     ok('every formula is a role="math" with a spoken name, announced once, never nested', findingsFor('math').length === 0, show(findingsFor('math')));
 
+    section('small coloured labels meet 4.5:1');
+    ok('the chapter colours used as text and the plan week minutes read at 4.5:1 or better, in Paper and in Night', findingsFor('contrast').length === 0, show(findingsFor('contrast')));
     section('colour is never alone');
     ok('correct / incorrect is never carried by colour alone', findingsFor('colour').length === 0, show(findingsFor('colour')));
 

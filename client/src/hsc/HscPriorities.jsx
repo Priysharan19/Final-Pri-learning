@@ -170,7 +170,7 @@ export default function HscPriorities({ user, courses, curriculum }) {
           <p style={{ fontSize: 13.5 }}>{t('hsc.method4')}</p>
           {untagged.map(u => <p key={u.year} className="muted" style={{ fontSize: 13 }}>{t('hsc.untagged', { year: u.year })}</p>)}
           <p className="tap-row" style={{ fontSize: 13.5 }}>
-            <a href={NESA_PAPERS[course]} target="_blank" rel="noopener noreferrer">{t('hsc.nesaPapers')}</a>
+            <a href={NESA_PAPERS[course]} target="_blank" rel="noopener noreferrer" aria-label={t('hsc.nesaPapers')}>{t('hsc.nesaPapers')}</a>
           </p>
         </details>
       </div>
