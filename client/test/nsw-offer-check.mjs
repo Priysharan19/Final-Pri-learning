@@ -163,11 +163,12 @@ try {
           got = await POST('/practice/next', { mode: 'topic', subtopic: s.id, difficulty: d });
           row = await idb.get('questions', got.question.id);
           sealed = await authority.sealedQuestion(row.serverQuestionId);
-          if (sealed.subtopic === g) break;
+          // (A worked-solution question is shown, never marked: it has no stored answer, so it is passed over like a draw of the other side.)
+          if (sealed.subtopic === g && sealed.answerType !== 'manual') break;
           await POST(`/practice/${got.question.id}/discard`, {}).catch(() => {});
         }
       });
-      if (failed || got.question.checkState !== 'issued' || row.draftOnly || sealed.subtopic !== g || sealed.difficulty !== d) {
+      if (failed || got.question.checkState !== 'issued' || row.draftOnly || sealed.subtopic !== g || sealed.answerType === 'manual' || sealed.difficulty !== d) {
         failures.push(`${s.id} D${d} is offered but was not issued as asked: ${failed ? `${failed.code || ''} ${failed.message}` : `${got.question.checkState} ${sealed?.subtopic} D${sealed?.difficulty}`}`);
         continue;
       }
