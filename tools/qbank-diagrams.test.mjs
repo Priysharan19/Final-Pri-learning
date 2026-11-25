@@ -74,6 +74,43 @@ const bad = {
   'no viewBox': GOOD.replace(" viewBox='0 0 30 22'", '')
 };
 for (const [name, t] of Object.entries(bad)) ok(sanitiseProblems(t).length > 0, `the sanitiser refuses: ${name}`);
+// Adversarial: the sanitiser refuses a file whole and never strips a pattern out of it, so a pattern that is built by the removal of another is still refused.
+const adversarial = {
+  'comment': GOOD.replace('<defs>', '<!-- x --><defs>'),
+  'comment with a script inside': GOOD.replace('<defs>', '<!-- <script>x</script> --><defs>'),
+  'nested script': GOOD.replace('</svg>', '<scr<script>ipt>alert(1)</scr</script>ipt></svg>'),
+  'overlapping comment openers': GOOD.replace('<defs>', '<!-<!--- --><defs>'),
+  'comment closer alone': GOOD.replace('<defs>', '--><defs>'),
+  'unterminated comment': GOOD.replace('<defs>', '<!-- <defs>'),
+  'mixed-case script': GOOD.replace('</svg>', '<ScRiPt>1</sCrIpT></svg>'),
+  'mixed-case handler': GOOD.replace('<path d=', "<path OnLoAd='x()' d="),
+  'handler after a quote': GOOD.replace("fill='none' stroke='#000'", "fill='none'onclick='x()' stroke='#000'"),
+  'handler with whitespace around the equals': GOOD.replace('<path d=', "<path onload = 'x()' d="),
+  'entity-hidden scheme': GOOD.replace("xlink:href='#g0-1'", "xlink:href='&#106;avascript:alert(1)'"),
+  'named entity': GOOD.replace('<defs>', '<defs>&lt;script&gt;'),
+  'scheme split by a tab': GOOD.replace("xlink:href='#g0-1'", "xlink:href='java\tscript:alert(1)'"),
+  'scheme split by a newline': GOOD.replace("xlink:href='#g0-1'", "xlink:href='jav\nascript:alert(1)'"),
+  'data uri': GOOD.replace("xlink:href='#g0-1'", "xlink:href='data:image/svg+xml;base64,AAAA'"),
+  'mixed-case data uri': GOOD.replace("xlink:href='#g0-1'", "xlink:href='DaTa:text/html,x'"),
+  'entity declaration': GOOD.replace('<defs>', "<!ENTITY x 'y'><defs>"),
+  'lower-case doctype': `<!doctype svg>${GOOD}`,
+  'cdata': GOOD.replace('<defs>', '<![CDATA[x]]><defs>'),
+  'processing instruction': GOOD.replace('<defs>', "<?xml-stylesheet href='x'?><defs>"),
+  'mixed-case foreignObject': GOOD.replace('</svg>', '<FOREIGNobject/></svg>'),
+  'text between tags': GOOD.replace('<defs>', 'hello<defs>'),
+  'a stray >': GOOD.replace('<defs>', '><defs>'),
+  'unquoted attribute': GOOD.replace("fill='none'", 'fill=none'),
+  'a < inside an attribute value': GOOD.replace("fill='none'", "fill='a<b'"),
+  'unbalanced tags': GOOD.replace('</defs>', ''),
+  'a second root': GOOD + GOOD,
+  'a NUL byte': GOOD.replace('<defs>', '<defs>\u0000'),
+  'external url with spaces': GOOD.replace("fill='none'", "fill='url( http://evil.example/p)'")
+};
+for (const [name, t] of Object.entries(adversarial)) ok(sanitiseProblems(t).length > 0, `the sanitiser refuses whole: ${name}`);
+// Normalising never leaves a comment behind that the removal itself built: what it cannot remove stays, and the sanitiser then refuses it.
+eq(normaliseSvg("<!-- generated --><?xml version='1.0'?>\n" + GOOD), normaliseSvg(GOOD), 'a generator comment and an XML declaration are removed and the figure is the same bytes');
+for (const wrapped of ['<!-<!--- -->-->', '<!-<!--- --->', '<!--->', '<!-->', '<!-<!-<!----->-->-->']) { const out = normaliseSvg(wrapped + GOOD); ok(!/<!--/.test(out) && (out === normaliseSvg(GOOD) || sanitiseProblems(out).length > 0), `a comment opener built by the removal of another is removed, or what is left is refused: ${wrapped}`); }
+ok(sanitiseProblems(normaliseSvg('<!-- never closed ' + GOOD)).length > 0, 'a comment that is never closed stays in, and the sanitiser refuses it');
 ok(verifyFigure(GOOD.replace(/<path d='M1 1L20 20'[^>]*>\n<use[^>]*>\n/, '')).some(p => /nothing drawn/.test(p)), 'a figure with nothing drawn is refused (the empty file is the failure to catch)');
 ok(verifyFigure(GOOD.replace("width='40'", "width='4000'")).some(p => /out of range/.test(p)), 'an absurd size is refused');
 ok(verifyFigure(GOOD.replace('</svg>', `<path d='${'M0 0L1 1'.repeat(MAX_FIGURE_BYTES / 8)}'/></svg>`)).some(p => /size/.test(p)), 'an oversize file is refused');

@@ -131,9 +131,26 @@ export async function compileFigure(id, tikz, work, tools = toolchain()) {
 
 // ── 3. normalise, sanitise, verify ───────────────────────────────────────────
 const px = pt => Math.round(pt * (4 / 3) * 100) / 100;
+/**
+ * Remove every `open ... close` span (a generator comment, the XML declaration) and the whitespace after it, until none is left. One pass is not enough: removing
+ * a span can join the text either side of it into a new opener (`<!-<!--- -->-`), so this repeats to a fixed point. An opener with no closer is left in place;
+ * the sanitiser then refuses the file, which is the safe outcome. `skip` is how far into the opener the closer may start.
+ */
+function dropWrapped(text, open, close, skip = open.length) {
+  let s = text;
+  for (;;) {
+    const a = s.indexOf(open);
+    if (a < 0) return s;
+    const b = s.indexOf(close, a + skip);
+    if (b < 0) return s;
+    let end = b + close.length;
+    while (end < s.length && /\s/.test(s[end])) end++;
+    s = s.slice(0, a) + s.slice(end);
+  }
+}
 /** The same SVG every run: no XML declaration or generator comment, width and height in px, a compact body. */
 export function normaliseSvg(raw) {
-  let s = String(raw).replace(/^﻿/, '').replace(/<\?xml[^>]*\?>\s*/g, '').replace(/<!--[\s\S]*?-->\s*/g, '');
+  let s = dropWrapped(dropWrapped(String(raw).replace(/^﻿/, ''), '<?xml', '?>'), '<!--', '-->', 2)   // an HTML parser also closes `<!-->` and `<!--->`, so the closer is looked for from the second character;
   s = s.replace(/<svg\b[^>]*>/, tag => {
     const vb = /viewBox='([^']+)'/.exec(tag)?.[1] ?? /viewBox="([^"]+)"/.exec(tag)?.[1];
     if (!vb) return tag;
@@ -152,14 +169,42 @@ export function sanitiseProblems(svg) {
   const s = String(svg);
   const out = [];
   if (!/^<svg\b[^>]*viewBox='[^']+'/.test(s) || !/<\/svg>\s*$/.test(s)) out.push('not a bare svg with a viewBox');
-  if (/<script|<foreignObject|<image|<style|<a[\s>]|<iframe|<object|<embed|<animate|<set[\s>]|<!ENTITY|<!DOCTYPE|<!\[CDATA\[|<\?/i.test(s)) out.push('forbidden element or declaration');
-  if (/\son[a-z]+\s*=/i.test(s)) out.push('event attribute');
-  if (/javascript:|data:|vbscript:|https?:|\/\//i.test(s.replace(/xmlns(?::xlink)?='http:\/\/www\.w3\.org\/[^']+'/g, ''))) out.push('external or script reference');
-  if (/url\(\s*(?!#)/i.test(s)) out.push('external url()');
-  for (const tag of s.matchAll(/<\s*(\/?)([A-Za-z][\w:-]*)((?:\s+[^<>]*?)?)\s*(\/?)>/g)) {
-    const [, close, name, attrs] = tag;
+  // Whole-file refusals, never a strip: any markup declaration, comment, processing instruction or CDATA section, any entity reference (a decoded entity could
+  // spell a scheme the checks below would not see), and any control character. After removing every space and control character and lower-casing,
+  // a scheme or handler split by whitespace is caught too.
+  if (/<[!?]|-->|&|[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\u2028\u2029]/.test(s)) out.push('comment, declaration, entity or control character');
+  const squashed = s.toLowerCase().replace(/[\s\u0000-\u001f\u007f\u00a0\u2028\u2029\ufeff]+/g, '');
+  if (/<script|<foreignObject|<image|<style|<a[\s>]|<iframe|<object|<embed|<animate|<set[\s>]/i.test(s) || /<script|<foreignobject|<style|<iframe|<object|<embed|<animate/.test(squashed)) out.push('forbidden element or declaration');
+  if (/[\s'"/]on[a-z]+\s*=/i.test(s) || /['"]on[a-z]+=/.test(squashed)) out.push('event attribute');
+  const NS = /xmlns(?::xlink)?='http:\/\/www\.w3\.org\/[^']+'/g;
+  if (/javascript:|data:|vbscript:|https?:|\/\//i.test(s.replace(NS, '')) || /javascript:|data:|vbscript:|https?:|\/\//.test(squashed.replace(NS, ''))) out.push('external or script reference');
+  if (/url\(\s*(?!#)/i.test(s) || /url\((?!#)/.test(squashed)) out.push('external url()');
+  // By construction: walk the file as a sequence of well-formed tags and whitespace; anything else (stray `<` or `>`, text, an unquoted or malformed attribute,
+  // an unbalanced tag, a second root) fails the figure.
+  const TAG = /<(\/?)([A-Za-z][\w:-]*)((?:\s+[A-Za-z_:][\w:.-]*\s*=\s*(?:'[^'<>&]*'|"[^"<>&]*"))*)\s*(\/?)>/y;
+  const stack = [];
+  let roots = 0;
+  let broken = false;
+  for (let i = 0; i < s.length && !broken;) {
+    if (s[i] !== '<') {
+      const next = s.indexOf('<', i);
+      const end = next < 0 ? s.length : next;
+      if (/\S/.test(s.slice(i, end))) { out.push('text or stray markup outside a tag'); broken = true; }
+      i = end;
+      continue;
+    }
+    TAG.lastIndex = i;
+    const tag = TAG.exec(s);
+    if (!tag) { out.push('malformed markup'); broken = true; break; }
+    i = TAG.lastIndex;
+    const [, close, name, attrs, selfClose] = tag;
     if (!ELEMENTS.has(name)) { out.push(`element ${name}`); continue; }
-    if (close) continue;
+    if (close) {
+      if (stack.pop() !== name) { out.push('unbalanced tags'); broken = true; }
+      continue;
+    }
+    if (!stack.length) { roots++; if (name !== 'svg' || roots > 1) { out.push('not a single svg root'); broken = true; break; } }
+    if (!selfClose) stack.push(name);
     for (const a of attrs.matchAll(/([A-Za-z_:][\w:.-]*)\s*=\s*(?:'([^']*)'|"([^"]*)")/g)) {
       if (!ATTRS.has(a[1])) out.push(`attribute ${a[1]}`);
       // The one inline style dvisvgm writes (a gradient fill, from `ball color`); any other style is refused.
@@ -167,6 +212,7 @@ export function sanitiseProblems(svg) {
       if (a[1] === 'xlink:href' && !/^#[\w-]+$/.test(a[2] ?? a[3] ?? '')) out.push('xlink:href that is not a local id');
     }
   }
+  if (!broken && stack.length) out.push('unbalanced tags');
   return [...new Set(out)];
 }
 
@@ -508,7 +554,7 @@ function insideRepo(p) { const rel = path.relative(ROOT, path.resolve(p)); retur
 
 async function pool(items, jobs, fn) {
   let next = 0;
-  await Promise.all(Array.from({ length: Math.min(jobs, items.length) }, async () => { for (;;) { const i = next++; if (i >= items.length) return; await fn(items[i], i); } }));
+  await Promise.all(Array.from({ length: Math.min(jobs, items.length) }, async () => { for (;;) { const i = next++; if (i >= items.length) return; await fn(items[i]); } }));
 }
 
 export async function main(argv) {

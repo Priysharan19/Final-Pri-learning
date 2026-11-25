@@ -398,6 +398,10 @@ jobs:
           # packed questions is stamped with either, and a wrong answer with the author's own worked lines earns 0.
           node server/test/qbank-sealed-check.mjs 2>&1 | tee qbank-sealed.log
           node tools/ci-check-counts.mjs verify platform/qbank-sealed.log
+          # The owner's manual parts, served honestly: a worked-solution question has no key and no mark; his steps and criteria are sealed until the solution
+          # route (which records it completed and seen and nothing else); one draw in six, never two in a row, never in a timed mode.
+          node server/test/qbank-worked-check.mjs 2>&1 | tee qbank-worked.log
+          node tools/ci-check-counts.mjs verify platform/qbank-worked.log
           # The bank's diagrams (the owner's TikZ compiled to SVG at authoring time, committed; CI has no TeX and verifies the files against their
           # manifest hashes and the sanitiser, never re-renders): the route that serves a figure to the account it was issued to, and no alt text or
           # figure that states an answer.
@@ -1088,6 +1092,8 @@ jobs:
             # A bank question with a diagram: the figure is fetched with the session, named for a screen reader, fits at 360 px and stays
             # legible in the dark theme.
             node client/test/tour-nsw-practice-bank-figure.js 2>&1 | tee -a browser.log
+            # A worked-solution question (no key, no mark): the notice before the start, his steps and what a marker looks for with no mark, nothing recorded.
+            node client/test/tour-nsw-practice-worked.js 2>&1 | tee -a browser.log
             # ADR-0003: a visitor with no account meets the question picker first, in both
             # editions, has up to five typed or multiple-choice questions marked by the
             # server, and then a calm sign-up prompt; nothing of an account is touched.

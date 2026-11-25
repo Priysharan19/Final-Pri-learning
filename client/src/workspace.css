@@ -92,6 +92,7 @@
 .q-marks { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
 .q-credit { color: var(--ink-2); font-size: 13px; }
 .q-credit .dot { color: var(--ink-3); }
+.q-worked-note { margin: 10px 0 0; max-width: var(--measure); font-size: 14.5px; color: var(--ink-2); }
 .q-why { color: var(--ink-2); font-size: 14px; margin: 14px 0 0; padding-left: 12px; border-left: 2px solid var(--hairline-strong); }
 /* Report a problem with this question: an inline form under the prompt, the same hairline as the "why" note. */
 .q-report { display: grid; gap: 10px; margin: 14px 0 0; padding: 12px; border: 1px solid var(--hairline-strong); border-radius: 6px; background: var(--paper); max-width: 520px; }

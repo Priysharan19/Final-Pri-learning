@@ -1,0 +1,25 @@
+<svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' width='144.15' height='144.15' viewBox='-66.022 -66.022 108.115 108.115'>
+<g id='page1'>
+<g stroke-miterlimit='10' transform='matrix(.996 0 0 -.996 -11.965 -11.965)' fill='#000' stroke='#000' stroke-width='0.4' stroke-linecap='round' stroke-linejoin='round'>
+<clipPath id='pgfcp1'>
+<path d='M42.679 0C42.679 23.571 23.571 42.679 0 42.679S-42.679 23.571-42.679 0S-23.571-42.679 0-42.679S42.679-23.571 42.679 0ZM0 0'/> </clipPath>
+<g clip-path='url(#pgfcp1)' fill='#e1e1e1' stroke='#e1e1e1'>
+<path d='M-56.905-56.905L56.905 56.905H-56.905Z' stroke='none'/>
+</g>
+<g stroke-width='0.8'>
+<path d='M42.679 0C42.679 23.571 23.571 42.679 0 42.679S-42.679 23.571-42.679 0S-23.571-42.679 0-42.679S42.679-23.571 42.679 0ZM0 0' fill='none'/>
+</g>
+<g stroke-width='0.8'>
+<path d='M-49.792-49.792L49.792 49.792' fill='none'/>
+</g>
+<path d='M-54.06 0H53.66' fill='none'/>
+<g transform='translate(53.86)' stroke-dasharray='none' stroke-dashoffset='0.0' stroke-linecap='round' stroke-linejoin='round'>
+ <path d='M-2.08 2.4C-1.7 .96-.853 .28 0 0C-.853-.28-1.7-.96-2.08-2.4' fill='none'/>
+ </g>
+<path d='M0-54.06V53.66' fill='none'/>
+<g transform='matrix(0 1 -1 0 0 53.86)' stroke-dasharray='none' stroke-dashoffset='0.0' stroke-linecap='round' stroke-linejoin='round'>
+ <path d='M-2.08 2.4C-1.7 .96-.853 .28 0 0C-.853-.28-1.7-.96-2.08-2.4' fill='none'/>
+ </g>
+</g>
+</g>
+</svg>

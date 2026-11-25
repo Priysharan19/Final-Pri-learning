@@ -1,0 +1,22 @@
+<svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' width='198.96' height='185.73' viewBox='-66.022 -66.022 149.22 139.298'>
+<g id='page1'>
+<g stroke-miterlimit='10' transform='matrix(.996 0 0 -.996 -6.295 13.548)' fill='#000' stroke='#000' stroke-width='0.4' stroke-linecap='round' stroke-linejoin='round'>
+<path d='M-59.752 0H89.228' fill='none'/>
+<g transform='translate(89.428)' stroke-dasharray='none' stroke-dashoffset='0.0' stroke-linecap='round' stroke-linejoin='round'>
+ <path d='M-2.08 2.4C-1.7 .96-.853 .28 0 0C-.853-.28-1.7-.96-2.08-2.4' fill='none'/>
+ </g>
+<path d='M0-59.752V79.269' fill='none'/>
+<g transform='matrix(0 1 -1 0 0 79.469)' stroke-dasharray='none' stroke-dashoffset='0.0' stroke-linecap='round' stroke-linejoin='round'>
+ <path d='M-2.08 2.4C-1.7 .96-.853 .28 0 0C-.853-.28-1.7-.96-2.08-2.4' fill='none'/>
+ </g>
+<g stroke-width='0.8'>
+<path d='M49.793 0C49.793 27.5 27.5 49.793 0 49.793S-49.793 27.5-49.793 0S-27.5-49.793 0-49.793S49.793-27.5 49.793 0ZM0 0' fill='none'/>
+</g>
+<path d='M0 0L29.876 39.835' fill='none'/>
+<g stroke-dasharray='3.0,3.0' stroke-dashoffset='0.0'>
+<path d='M-9.959 69.71L69.71 9.959' fill='none'/>
+</g>
+<path d='M30.926 39.835C30.926 40.414 30.456 40.885 29.876 40.885S28.826 40.414 28.826 39.835S29.296 38.785 29.876 38.785S30.926 39.255 30.926 39.835ZM29.876 39.835' stroke='none'/>
+</g>
+</g>
+</svg>

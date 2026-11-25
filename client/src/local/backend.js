@@ -1437,6 +1437,12 @@ function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint
 }
 
 /**
+ * A worked-solution row (answerType 'manual': the question was shown, never marked). Its row is closed (`answered`) only so it is not resumed; it is
+ * not a question answered, so no history list, report series, total or streak counts it.
+ */
+const isWorkedRow = r => r?.payload?.answerType === 'manual' || !!r?.workedReceipt;
+
+/**
  * A profile's attempt rows in the order they were answered.
  *
  * The attempts store is keyed by `${pid}:resolved:<digest>` — an exactly-once
@@ -4386,6 +4392,37 @@ const routes = {
       ...certifiedPracticeMarks(serverReveal), syncQueued: true };
   },
 
+  // A worked-solution question (answerType 'manual': his show-that, prove, explain, sketch and unkeyed "find" questions). Nothing marks it, so this is
+  // NOT a reveal and NOT a resolution: no attempt, no rating, no review, no XP, no streak, no mastery, no mark, no sync event. The server sends his
+  // steps and his criteria (and a note on the student's own lines); the row is closed so it is not resumed, and that is all.
+  'POST /practice/:id/solution': async (body, params) => {
+    const p = await requireProfile();
+    const row = await get('questions', params.id);
+    if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    assertPracticeRow(row);
+    if (row.payload?.answerType !== 'manual') throw Object.assign(new Error('This question is marked, not shown.'), { status: 409, code: 'PRACTICE_NOT_A_WORKED_SOLUTION' });
+    if (row.workedReceipt) return row.workedReceipt;
+    if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409 });
+    if (row.discardedAt) throw Object.assign(new Error('Question was skipped'), { status: 409, code: 'QUESTION_DISCARDED' });
+    await requireServerIssue(row);
+    const lines = Array.isArray(body?.lines) ? body.lines.filter(l => typeof l === 'string').map(l => l.trim().slice(0, 400)).filter(Boolean).slice(0, 40) : [];
+    const receipt = await viaServer(() => cloud.workedSolutionPractice(row.serverQuestionId, lines));
+    if (receipt?.authoritative !== true || receipt.worked !== true || receipt.resolved !== true || receipt.questionId !== row.serverQuestionId
+        || !Array.isArray(receipt.solution?.steps) || !Array.isArray(receipt.solution?.criteria) || !Number.isFinite(receipt.serverAcknowledgedAt)) {
+      throw Object.assign(new Error('The server did not acknowledge the solution.'), { status: 503, code: 'REVEAL_ACK_MISSING' });
+    }
+    const out = { authoritative: true, worked: true, resolved: true, questionId: row.serverQuestionId, serverAcknowledgedAt: receipt.serverAcknowledgedAt,
+      solution: { steps: receipt.solution.steps.map(s => ({ h: String(s.h), d: String(s.d) })),
+        criteria: receipt.solution.criteria.map(c => ({ marks: Number(c.marks), point: String(c.point) })), marksAvailable: Number(receipt.solution.marksAvailable) || 0 },
+      ...(receipt.workNote && Number.isInteger(receipt.workNote.lines) && Number.isInteger(receipt.workNote.verified)
+        ? { workNote: { lines: receipt.workNote.lines, verified: receipt.workNote.verified, ...(Number.isInteger(receipt.workNote.lookAgain) ? { lookAgain: receipt.workNote.lookAgain } : {}) } } : {}) };
+    row.answered = true;
+    row.workedReceipt = out;
+    row.workedAt = Date.now();
+    await put('questions', row);
+    return out;
+  },
+
   // ---- reviews ----
   'GET /reviews': async () => {
     const p = await requireProfile();
@@ -5169,7 +5206,8 @@ const routes = {
     if (!Object.hasOwn(HISTORY_FILTERS, filter)) throw Object.assign(new Error('Unknown history filter'), { status: 400 });
     if (!Object.hasOwn(HISTORY_SORTS, sort)) throw Object.assign(new Error('sort must be newest, oldest or marks'), { status: 400 });
     const allRows = await byIndex('questions', 'pid', p.id);
-    const rows = allRows.filter(r => r.answered);
+    // A worked-solution question that was shown is not a question answered: it has no correctness, so History does not list it.
+    const rows = allRows.filter(r => r.answered && !isWorkedRow(r));
     // Historic exam questions can name NSW generators no longer issued as
     // markable Practice. Do not advertise an impossible Retry action; a
     // server-issued question can still be replayed by its source id.
@@ -5184,7 +5222,7 @@ const routes = {
     const marked = new Set(marks.map(b => b.key.split(':').slice(1).join(':')));
     const inkRows = await byIndex('inks', 'pid', p.id);
     const inkById = Object.fromEntries(inkRows.map(r => [r.id, r]));
-    const needsLook = needsAnotherLookIds(allRows.map(r => ({
+    const needsLook = needsAnotherLookIds(allRows.filter(r => !isWorkedRow(r)).map(r => ({
       id: r.id, answered: !!r.answered, retryOf: r.retryOf, repeatOf: r.repeatOf,
       correct: attemptByQ[r.id] ? !!attemptByQ[r.id].correct : null, marks: certifiedMarksOfRow(r)
     })));
@@ -5277,7 +5315,7 @@ const routes = {
     const tz = timezoneOf(p);
     const since = body?.since == null ? null : String(body.since);
     if (since != null && !/^\d{4}-\d{2}-\d{2}$/.test(since)) throw Object.assign(new Error('since must be a date, YYYY-MM-DD'), { status: 400 });
-    const rows = (await byIndex('questions', 'pid', p.id)).filter(r => r.answered);
+    const rows = (await byIndex('questions', 'pid', p.id)).filter(r => r.answered && !isWorkedRow(r));
     const answeredAt = {};
     for (const a of await attemptsInOrder(p.id)) answeredAt[a.questionId] = a.createdAt;
     const chapters = {};
@@ -5312,7 +5350,7 @@ const routes = {
   'GET /report/series': async (body) => {
     const p = await requireProfile();
     const period = String(body?.period || 'week');
-    const rows = (await byIndex('questions', 'pid', p.id)).filter(r => r.answered);
+    const rows = (await byIndex('questions', 'pid', p.id)).filter(r => r.answered && !isWorkedRow(r));
     const answeredAt = {};
     for (const a of await attemptsInOrder(p.id)) answeredAt[a.questionId] = a.createdAt;
     const activity = await byIndex('activity', 'pid', p.id);
@@ -6351,7 +6389,8 @@ async function entitlementGate(method, pattern, body, params) {
       await requireCapability(p, ENTITLEMENTS.JEE_ADVANCED);
     }
     return async result => {
-      if (!result?.resumed) await recordPracticeServed(p);
+      // A worked-solution question is not marked, so it is not a counted practice question.
+      if (!result?.resumed && result?.question?.answerType !== 'manual') await recordPracticeServed(p);
       return { ...result, allowance: await practiceAllowance(p) };
     };
   }
@@ -6908,6 +6947,7 @@ async function runGated(method, pattern, handler, body, params) {
   if (params?.id && (
     key === 'POST /practice/:id/submit'
     || key === 'POST /practice/:id/reveal'
+    || key === 'POST /practice/:id/solution'
     || key === 'POST /practice/:id/hint'
     || key === 'POST /practice/:id/help-plan'
     || key === 'POST /practice/:id/tutor'

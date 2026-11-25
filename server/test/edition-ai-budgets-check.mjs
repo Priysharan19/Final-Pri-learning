@@ -344,7 +344,15 @@ try {
   const a = await registerAccount(h, { email: 'edition.day@example.test', deviceId: 'ipad-edition-day' });
   c.eq((await verifyEmail(h, a.account.id)).status, 200, 'a free student is verified');
   // owner decision, 19 Nov 2026: a Prithagoras server issues Years 11 and 12 only, so the free-cap clock is driven with a Year 11 subtopic.
-  const issue = () => h.request('/v1/practice/issue', { method: 'POST', jar: a.jar, body: { generator: 'y11-functions', difficulty: 3, curriculum: 'nsw' } });
+  // (A worked-solution question is dealt now and then and is not a counted question, so the clock is driven with counted ones: a worked one is passed over.)
+  const issue = async () => {
+    let r;
+    for (let tries = 0; tries < 20; tries++) {
+      r = await h.request('/v1/practice/issue', { method: 'POST', jar: a.jar, body: { generator: 'y11-functions', difficulty: 3, curriculum: 'nsw' } });
+      if (r.data?.question?.worked !== true) return r;
+    }
+    return r;
+  };
   // 23:00 AEDT on Sunday 4 October 2026, the 23-hour day.
   clockAt = Date.UTC(2026, 9, 4, 12, 0, 0);
   const counted = async key => {

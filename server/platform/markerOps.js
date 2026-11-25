@@ -728,6 +728,10 @@ const RAW_MARKER_OPS = Object.freeze({
   /** The live step coach (F1): one verdict per working line, never a value. */
   stepCoach({ q, lines, answerText }) {
     return stepCoachEvidence(q, lines, answerText);
+  },
+  /** A worked-solution question's note on the student's own lines (feedback only: the question has no key, so there is no mark to give). */
+  worked({ q, lines }) {
+    return workedEvidence(q, lines);
   }
 });
 
@@ -804,6 +808,26 @@ function constantSided(line) {
   if (!c) return true;
   if (!c.sides) return c.symbols.size === 0;
   return c.sides.some(side => { const eff = effectiveSymbols(side); return !eff || eff.size === 0; });
+}
+
+/**
+ * The deterministic step report on the lines a student wrote for a WORKED-SOLUTION question (answerType 'manual': no key, so nothing is marked and
+ * no final answer is looked for). Feedback only: how many of the first lines hold, and the first line that does not follow, if one. A report that
+ * did not run, or judged nothing, says nothing (`judged: false`): the checker's silence is not evidence.
+ */
+export function workedEvidence(q, lines) {
+  const silent = { judged: false, verified: 0, firstBreak: -1 };
+  const list = (Array.isArray(lines) ? lines : []).map(line => String(line ?? '').trim()).filter(Boolean).slice(0, 40);
+  if (!q || typeof q !== 'object' || q.answerType !== 'manual' || !list.length) return silent;
+  try {
+    const report = stepEvidence(q, '', list.join('\n'), { correct: false })?.stepReport;
+    const judged = Array.isArray(report?.lines) ? report.lines : [];
+    if (!judged.length || judged.length > list.length + 2) return silent;
+    let verified = 0;
+    while (verified < list.length && judged[verified]?.status === 'ok') verified += 1;
+    const at = judged.findIndex(line => line?.status === 'break');
+    return { judged: judged.some(line => line?.status === 'ok' || line?.status === 'break'), verified, firstBreak: at >= 0 && at < list.length ? at : -1 };
+  } catch { return silent; }
 }
 
 /** The line check's evidence: { attemptAt, firstBreak, verifiedLines, misconception }. */

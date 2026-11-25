@@ -285,7 +285,7 @@ for (const s of SCHEMES) ok(R.questionsOfType(s, { limit: 3 }).length === 3, `${
       const roots = q.answerType === 'set' ? q.answer.values.map(Number) : [Number(q.answer.value)];
       const lists = [['2 + 2 = 4'], ['9 = 9'], [`${v} = ${v}`], ['0 = 0'], [`${v} = ${num(roots[0])}`], [`${v} = ${num(roots[0])}`, `${v} = ${num(roots[0])}`]];
       // an equation that merely happens to have one of the several solutions (x - 5 = 1 when 6 is a solution) is ticked as incomplete: it is no step
-      if (q.answerType === 'set') for (const r of roots) lists.push([`${v} - ${num(r - 1)} = 1`], [`2${v} = ${num(2 * r)}`.replace(/^2/, '2')]);
+      if (q.answerType === 'set') for (const r of roots) lists.push([`${v} - ${num(r - 1)} = 1`], [`2${v} = ${num(2 * r)}`]);
       if (given) { const [l, r] = given.split('='); lists.push([given], [`${r.trim()} = ${l.trim()}`], [given, given]); }
       for (const lines of lists) { gamed.tried++; if (payLines(lines).items.some(i => i.basis === 'lines' && i.awarded)) gamed.earned++; }
       // a real first step is earned, and the same line written twice earns once only
@@ -350,7 +350,7 @@ for (const s of SCHEMES) ok(R.questionsOfType(s, { limit: 3 }).length === 3, `${
         copy = JSON.parse(JSON.stringify({ ...q, _generator: fam })); sealed = sealForEdition(copy, bankPolicy('prithagoras'), fam);
         // a question of another mark count (a 1-mark integral beside the 2-mark scheme) is rightly left on the final answer, and is not counted
         // (a question the edition does not admit under its generator is never issued, so it is not counted either)
-        if (sealed && schemeTypeOf(q, fam) === id && marksPossibleFor(q) === schemeMarks(s)) { own++; eligible++; if (sealed && copy._methodScheme === id) stamped++; } else if (copy._methodScheme === id) wrongTyped++;
+        if (sealed && schemeTypeOf(q, fam) === id && marksPossibleFor(q) === schemeMarks(s)) { own++; eligible++; if (copy._methodScheme === id) stamped++; } else if (copy._methodScheme === id) wrongTyped++;
         const stale = JSON.parse(JSON.stringify({ ...q, _generator: s.families[0] }));
         if (sealForEdition(stale, { ...bankPolicy('prithagoras'), methodSchemeTypes: [{ typeId: id, digest: 'f'.repeat(64) }] }, s.families[0]) && stale._methodScheme === id) staleStamped++;
       }
