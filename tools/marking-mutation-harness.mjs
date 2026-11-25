@@ -581,7 +581,10 @@ export async function loadBankEngine(root) {
   const { markerView } = await import(path.join(root, 'server/platform/markerOps.js'));
   await pack.ensureQbank({ ...process.env, PRI_EDITION: 'prithagoras' }, { strict: true });
   const ids = pack.qbankEntries().map(e => e.entry.id);
-  return { ...E, G: { generateQuestion: id => markerView(pack.qbankEntryQuestion(id, 17)) }, checkAnswer: checkBankAnswer, ids, bank: true };
+  // his steps are read in the bank's own scope (solutionMatch.withBankReading), as the bank rules read them; a checkout without it reads as it always did
+  const SM = await import(path.join(root, 'client/src/engine/solutionMatch.js'));
+  const scoped = SM._internals.withBankReading ? (span => SM._internals.withBankReading(() => SM._internals.spanToPlain(span))) : E.spanToPlain;
+  return { ...E, spanToPlain: scoped, G: { generateQuestion: id => markerView(pack.qbankEntryQuestion(id, 17)) }, checkAnswer: checkBankAnswer, ids, bank: true };
 }
 /** The real marker's report lines for a page, or null. A generator question is marked as the server marks one it has sealed (the Australian edition's). */
 export function markPage(E, q, answer, page) {

@@ -45,6 +45,11 @@ import { _internals, _forChains } from '../../client/src/engine/solutionMatch.js
 import { parse, normalize, evaluate, variablesOf, withEvaluationBudget } from '../../client/src/engine/expr.js';
 import { stepEvidence, marksPossibleFor, isSchemeStep } from './markerOps.js';
 import { awardGeneric, genericDigest } from './genericSteps.js';
+import { texToPlain as readTex, EXTENDED_TEX } from '../../client/src/engine/texToPlain.js';
+
+// His steps are TeX, read here with the extended reading (engine/texToPlain.js) first and, where that is not certain, the older reading below. The switch
+// that makes the generic rule read them the same way is scoped to this module's own calls (solutionMatch.withBankReading).
+const { withBankReading } = _internals;
 
 export const BANK_ID = 'bank-author-criteria';
 export const BANK_TITLE = 'Step marks drawn from the author\'s own marking criteria for his question bank';
@@ -221,6 +226,7 @@ function lineStates(spec, text) {
 // ── his steps as a student's page ───────────────────────────────────────────────────────────────────────────────────────────
 /** One TeX span as the plain line a student would type, or null when this reader cannot read it. Braces are matched, never guessed at. */
 export function texToPlain(tex) {
+  { let strict = null; try { strict = readTex(String(tex ?? '').replace(/\\(?:approx|simeq)/g, '='), EXTENDED_TEX); } catch { strict = null; } if (strict) return strict.replace(/\s+/g, ' ').trim() || null; }
   let t = String(tex ?? '').replace(/\\(?:left|right|displaystyle|,|;|!|quad|qquad)/g, ' ').replace(/\\(?:dfrac|tfrac)/g, '\\frac').replace(/\\cdot|\\times/g, '*').replace(/\\div/g, '/').replace(/\\pi\b/g, 'pi').replace(/\\(sin|cos|tan|ln|log|exp)\b/g, '$1').replace(/\\(?:approx|simeq)/g, '=').replace(/\\(?:le|leq)\b/g, '<=').replace(/\\(?:ge|geq)\b/g, '>=').replace(/\\neq?\b/g, '!=').replace(/\\%/g, '%').replace(/\\infty/g, 'inf');
   const group = (str, at) => { // the {...} starting at `at`: [inner, indexAfter] or null
     if (str[at] !== '{') return null;
@@ -250,7 +256,8 @@ export function texToPlain(tex) {
   return t || null;
 }
 /** The lines of his worked steps as a student would write them: [{ text, step }]. Each $...$ span, cut at an implication or an "or"/"and". */
-export function bankAuthoredLines(q) {
+export function bankAuthoredLines(q) { return withBankReading(() => bankAuthoredLinesRead(q)); }
+function bankAuthoredLinesRead(q) {
   const out = [];
   (q.steps || []).forEach((st, i) => {
     if (!isSchemeStep(st)) return;
@@ -491,7 +498,8 @@ function wrongLine(text) {
 const promptLines = q => [...String(q.prompt).replace(/\\\$/g, '\u0001').matchAll(/\$([^$]+)\$/g)].map(m => { try { return spanToPlain(m[1]); } catch { return null; } }).filter(Boolean);
 
 /** Mark a page the way the server does (stepEvidence's deterministic report, then the award). */
-export function markBankPage(q, specs, lines, typed, correct = false) {
+export function markBankPage(q, specs, lines, typed, correct = false) { return withBankReading(() => markBankPageRead(q,specs,lines,typed,correct)); }
+function markBankPageRead(q, specs, lines, typed, correct = false) {
   const ev = stepEvidence(q, typed, lines.join('\n'), { correct }, { slipWarnings: true });
   const report = ev?.stepReport || null;
   return { report, ...tableOf(q, specs, report, correct) };
@@ -501,7 +509,8 @@ export function markBankPage(q, specs, lines, typed, correct = false) {
  * The plan of one bank part: { eligible, why, marks, specs, proof } where specs are his criteria with their kind and (after the self-test) `live`
  * (the rule can verify it and his own steps earn it). `proof` lists what each page of the import-time proof earned. Pure of the student's work.
  */
-export function bankPlan(q) {
+export function bankPlan(q) { return withBankReading(() => bankPlanRead(q)); }
+function bankPlanRead(q) {
   if (!bankStructural(q)) return { eligible: false, why: 'not-structural', marks: 0, specs: [], proof: {} };
   const k = keyOf(q);
   if (planMemo.has(k)) return planMemo.get(k);
@@ -570,7 +579,8 @@ export const bankEligible = q => bankPlan(q).eligible === true;
  * Award the rule from the deterministic step report. Returns { items, total, possible, cross, plan } like awardScheme/awardGeneric, or null when the
  * rule cannot pay this question. items: HIS criteria, in his order, each earned / not earned / not verified with the line numbers.
  */
-export function awardBank(q, report, correct) {
+export function awardBank(q, report, correct) { return withBankReading(() => awardBankRead(q,report,correct)); }
+function awardBankRead(q, report, correct) {
   const plan = bankPlan(q);
   if (!plan.eligible) return null;
   let t = null;
@@ -579,7 +589,8 @@ export function awardBank(q, report, correct) {
 }
 
 /** The import-time proof of one part, for the importer and the real-pack check: { eligible, why, verifiable, notVerified, criteria } . */
-export function bankProof(q) {
+export function bankProof(q) { return withBankReading(() => bankProofRead(q)); }
+function bankProofRead(q) {
   const plan = bankPlan(q);
   const crit = plan.specs.filter(s => s.kind !== 'answer');
   return {

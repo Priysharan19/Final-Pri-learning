@@ -18,6 +18,11 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { genericDigest, genericEligible, genericPlan, awardGeneric } from './genericSteps.js';
 import { marksPossibleFor } from './markerOps.js';
+import { _internals } from '../../client/src/engine/solutionMatch.js';
+
+// His worked steps are TeX. They are read with the extended TeX reading (engine/texToPlain.js) and no older reading where it is known to mean something else;
+// the switch is scoped to this module's own calls, so the generic rule's reading of a generated question is exactly what it was.
+const { withBankReading } = _internals;
 
 export const BANK_GENERIC_ID = 'generic-solution-steps-bank';
 export const BANK_GENERIC_TITLE = 'Step marks drawn from the author\'s worked solution of his own bank question (the approved generic rule, applied to the bank)';
@@ -39,6 +44,9 @@ export function bankGenericDigest() {
 
 /** A marked bank part worth 2+ marks that the generic rule can pay at least one key step of. */
 export function bankGenericEligible(q) {
+  return withBankReading(() => bankGenericEligibleRead(q));
+}
+function bankGenericEligibleRead(q) {
   try {
     if (!q || typeof q._bank !== 'string' || q._worked !== undefined || !BANK_GENERIC_PARAMETERS.AUTO_TYPES.includes(q.answerType)) return false;
     if (marksPossibleFor(q) < BANK_GENERIC_PARAMETERS.MIN_MARKS || !genericEligible(q)) return false;
@@ -47,4 +55,4 @@ export function bankGenericEligible(q) {
 }
 
 /** The generic award for a bank part, unchanged ({ items, total, possible, cross, plan } or null). */
-export const awardBankGeneric = (q, report, correct) => (bankGenericEligible(q) ? awardGeneric(q, report, correct === true) : null);
+export const awardBankGeneric = (q, report, correct) => withBankReading(() => (bankGenericEligible(q) ? awardGeneric(q, report, correct === true) : null));

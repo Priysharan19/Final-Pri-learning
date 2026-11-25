@@ -9,6 +9,10 @@ const ok = (c, m) => { if (c) pass++; else { fail++; console.error('FAIL:', m); 
 for (const good of ['x^{2}+1', 'e^{x}(2x-4)', '\\frac{a}{b}', '\\sqrt[3]{x}', '\\left(x+1\\right)^{2}', '\\int_{0}^{2} 3x^{2}\\,dx', '\\sin\\theta=\\frac{1}{2}', '\\pi r^{2}', 'x \\le 3', '\\text{ cm}', '2\\cdot 3']) {
   ok(cleanLatex(good) === good, `plain maths is kept: ${good}`);
 }
+// the constructs of the extended reading (engine/texToPlain.js) pass the gate; a hostile command inside any of them does not
+for (const good of ['\\binom{5}{2}=10', '{}^{7}P_{2}', '30^\\circ=\\frac{\\pi}{6}', '\\sin^{-1}\\frac12', '\\sin^{2}x+\\cos^{2}x=1', '\\log_{2}(x+1)', '\\int_{0}^{\\pi}\\sin x\\,dx=2', '\\dot A=2\\pi r\\dot r', '\\ddot{x}=\\dot{x}', "y''=2", 'x=\\pm4', '\\left|x-3\\right|', '\\alpha\\beta=3', '\\sqrt[4]{16}=2']) ok(cleanLatex(good) === good, `extended maths is kept: ${good}`);
+for (const bad of ['\\binom{\\href{x}{y}}{2}', '\\dot{\\input{a}}', '\\dotfoo x', '\\sin^{\\write18{ls}}x', '\\int_{\\url{x}}^{1}x\\,dx', '\\left|\\htmlClass{a}{x}\\right|', '\\log_{\\def\\x{1}}2', '\\sqrt[\\includegraphics{a}]{x}']) ok(cleanLatex(bad) === null, `hostile inside an extended construct is dropped: ${bad}`);
+ok(cleanLatex('16\\%') === null, 'an escaped percent is still dropped (a % can start a TeX comment)');
 ok(cleanLatex('  x+1  ') === 'x+1', 'trimmed');
 const hostile = [
   '\\href{https://evil.example}{x}', '\\url{https://evil.example}', '\\includegraphics{a.png}', '\\input{/etc/passwd}', '\\write18{ls}',

@@ -167,7 +167,8 @@ function trueAsWritten(q, steps, opts) {
   try {
     const facts = opts && Object.hasOwn(opts, 'facts') ? opts.facts : questionFacts(q);
     const solutionValues = solutionNumbers(q);
-    return stepCheckArithmetic(steps, { latex: opts && Array.isArray(opts.latex) ? opts.latex : null, facts, solutionValues, knownLabels: functionLabels(q), answerValue: typeof q?.answer?.value === 'number' ? q.answer.value : null });
+    // the reader's TeX is read with the extended reading (engine/texToPlain.js) on an Australian question only; India's reading is unchanged
+    return stepCheckArithmetic(steps, { latex: opts && Array.isArray(opts.latex) ? opts.latex : null, ...(candidateRoots(q) ? { extendedTex: true } : {}), facts, solutionValues, knownLabels: functionLabels(q), answerValue: typeof q?.answer?.value === 'number' ? q.answer.value : null });
   } catch { return null; }
 }
 

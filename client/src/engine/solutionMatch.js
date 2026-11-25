@@ -19,7 +19,7 @@
 //      matched line, or the next), and never a bare small number unless it continues a matched line or ends the page
 //   d  a substitution (`x = 4: 6(16) + 8(4)`) whose value is the one the solution reaches
 // Anything else stays exactly as it was.
-import { texToPlain } from './texToPlain.js';
+import { texToPlain, EXTENDED_TEX } from './texToPlain.js';
 import { plainTex } from './checker.js';
 import { evaluate, exprEquivalent, withEvaluationBudget } from './expr.js';
 import { infoOf, cleanStatement, exactForm } from './arithmeticLines.js';
@@ -55,7 +55,45 @@ function argEqual(a, b) {
 const sameLabel = (a, b) => a.name === b.name && ((a.arg === null && b.arg === null) || (a.arg !== null && b.arg !== null && argEqual(a.arg, b.arg)));
 
 // ── reading maths from the worked solution ───────────────────────────────────
+// The author's own question bank is read more carefully than a generated question's worked solution: the extended TeX reading (engine/texToPlain.js), and no
+// older reading where it is known to mean something else. This is a scoped switch, on only while the bank's own code (server/platform/bankGenericSteps.js,
+// bankSteps.js and the measuring tools) reads his steps; for everything else spanToPlain is exactly what it was.
+let bankReading = false;
+function withBankReading(fn) {
+  const keep = bankReading;
+  bankReading = true;
+  try { return fn(); } finally { bankReading = keep; }
+}
 function spanToPlain(span) {
+  if (!bankReading) return spanToPlainBraced(span, false);
+  const p = bankSpanToPlain(span);
+  // a bare angle (`Add 360°`, `opposite 30°`) is a value inside a sentence, not a line of working; written alone, the checker reads it as a claimed solution
+  return p && /^-?\d+(?:\.\d+)?°$/.test(p) ? null : p;
+}
+function bankSpanToPlain(span) {
+  const src = String(span);
+  // The strict reader on the TeX as written (braces intact). Null when it is not certain.
+  const strict = () => {
+    let t = src.replace(/\\[dt]frac/g, '\\frac').replace(/\\prime/g, "'");
+    t = t.split(/\\approx|\\simeq|\\Rightarrow|\\therefore|\\text|\\mid/)[0];
+    if (!t.trim()) return null;
+    let q = null;
+    try { q = texToPlain(t, EXTENDED_TEX); } catch { q = null; }
+    return q && !/[^\x20-\x7EΔπ√θ∫′’−–²³°]/.test(q) && !/\\/.test(q) && q.length <= 200 ? q : null;
+  };
+  // A time derivative (\dot x) is read only by the strict reader: the older reading below turns it into the letters d, o, t and x (and (\dot y)^2 into d o t y^2).
+  if (/\\d?dot(?![A-Za-z])/.test(src)) return strict();
+  // The older reading below is wrong in two known ways, and where it would be, the strict reading is used, or the span is left unread:
+  //   · a function with a number-and-letter argument (\sin 2x, \sin^{2}2x): it reads sin2x, which the engine reads as sin(2)·x;
+  //   · a capital or small a before sin, cos or tan (\sin A\cos B): it reads sin Acos B, in which the engine finds the function acos.
+  const trap = /\\(?:sin|cos|tan|sec|csc|cot|ln|log|exp)(?![A-Za-z])(?:\s*\^\s*(?:\{[^{}]*\}|\d))?\s*\d+(?:\.\d+)?\s*(?:[A-Za-z]|\\(?:theta|pi|alpha|beta))/;
+  if (trap.test(src)) return strict();
+  // A reading that was already there is kept; the strict reading only fills what the older ones left unread.
+  const old = spanToPlainBraced(span, true);
+  if (old) return /(?<![A-Za-z])[aA](?:sin|cos|tan)/.test(old) ? strict() : old;
+  return strict();
+}
+function spanToPlainBraced(span, careful) {
   let t = String(span);
   for (let g = 0; g < 4 && !/\\int/.test(t) && /\^\s*\{[^{}]*\}/.test(t); g++) t = t.replace(/\^\s*\{([^{}]*)\}/g, '^($1)');
   t = t.replace(/_\{\\text\{([A-Za-z0-9]+)\}\}/g, '_$1').replace(/\\[dt]frac/g, '\\frac').replace(/\\(?:displaystyle|,|;|!|quad|qquad| )/g, ' ').replace(/\\prime/g, "'").replace(/\\Delta/g, 'Δ');
@@ -67,6 +105,8 @@ function spanToPlain(span) {
   try { p = texToPlain(t); } catch { p = null; }
   if (!p) { try { p = plainTex(t); } catch { p = null; } }
   if (!p || /[^\x20-\x7EΔπ√θ∫′’−–²³]/.test(p) || /\\/.test(p) || p.length > 200) return null;
+  // a span cut at \text (1-P(\text{same})) leaves a bracket open: that is not the line
+  if (careful) { let d = 0; for (const c of p) { if (c === '(') d++; else if (c === ')') d--; if (d < 0) return null; } if (d !== 0) return null; }
   return p;
 }
 /** The rounded value a span ends with (`… \\approx 6.8`), as plain text, or null. */
@@ -526,6 +566,6 @@ function run(q, report) {
 export const _setFunctionsUnused = q => { FUNCS = functionNames(q); };
 /** True when every limit pair written in `parts` is one the question or its solution uses (a line with no limits is true of this). */
 const limitsKnown = (parts, sol) => !parts.some(p => limitKeys(braces(tidy(p))).some(k => !sol.limits.has(k)));
-export const _internals = { limitsKnown, readSolution, readStudent, matchEquation, spanToPlain, conditionOf, readSide, sameSidePublic: sameSide };
+export const _internals = { limitsKnown, readSolution, readStudent, matchEquation, spanToPlain, withBankReading, conditionOf, readSide, sameSidePublic: sameSide };
 // For engine/lineChains.js (the pass that runs after this one).
 export const _forChains = { knownSubstitutions, statementsOfSpans, numericOf, canon, labelOf, topLevelPieces, sameLabel, setFunctions: q => { FUNCS = functionNames(q); } };

@@ -1,6 +1,8 @@
 // Pri Learning · measuring the approved generic rule applied to the author's own bank (server/platform/bankGenericSteps.js)
 //
 //   node tools/bank-generic-measure.mjs     eligibility, the two rules side by side, and the lines the deterministic report does not tick
+//   node tools/bank-generic-measure.mjs --tex [--dump out.json]   per step: is his TeX read (and if not, which construct), is the line ticked (and if not, the note),
+//                                                                  and the eligibility with its reason; the ranked tables; the before/after numbers by course
 //
 // Every figure is produced by running the rules on the committed pack. Nothing is approved in the repository; the rules are approved in this process only.
 import { qbankEntries, qbankEntryQuestion, ensureQbank } from '../server/platform/qbankPack.js';
@@ -13,12 +15,16 @@ import { BANK_ID, bankDigest } from '../server/platform/bankSteps.js';
 import { BANK_GENERIC_ID, bankGenericDigest } from '../server/platform/bankGenericSteps.js';
 import { falsify, stillTrue } from './generic-steps-sweep.mjs';
 import { trapInput } from './qbank-import.mjs';
+import { texToPlainWhy, EXTENDED_TEX } from '../client/src/engine/texToPlain.js';
+import { _internals } from '../client/src/engine/solutionMatch.js';
+import fs from 'node:fs';
 
 const WRONG = '99991';
 const groupOf = family => { const [c, t] = family.replace(/^qb-/, '').split('-'); return `${c.startsWith('a') ? 'Advanced' : 'Extension 1'} Y${c.slice(1)} ${t}`; };
 
 /** Eligibility of every served part worth 2+ marks: { rows, summary }. Pure of any student. */
-export function eligibility() {
+export function eligibility() { return inBankScope(eligibilityIn); }
+function eligibilityIn() {
   const rows = [];
   for (const { entry, family } of qbankEntries()) {
     if (entry.marks < 2) continue;
@@ -51,7 +57,8 @@ export function eligibility() {
 }
 
 /** The two rules page by page on the parts both can pay: marks under each, who pays more, and disagreements (one pays, the other does not). */
-export function compare() {
+export function compare() { return inBankScope(compareIn); }
+function compareIn() {
   const out = { parts: 0, pages: 0, criteriaMore: 0, genericMore: 0, same: 0, onlyCriteria: 0, onlyGeneric: 0, criteriaMarks: 0, genericMarks: 0, examples: [], bothOnly: 0, onlyCriteriaParts: 0, onlyGenericParts: 0 };
   for (const { entry } of qbankEntries()) {
     if (entry.marks < 2) continue;
@@ -90,7 +97,8 @@ const KINDS = [
   ['a single equation or statement', () => true]
 ];
 /** The lines of his worked steps the deterministic report does not tick, by kind: counts and examples. Also steps with no readable line. */
-export function unticked() {
+export function unticked() { return inBankScope(untickedIn); }
+function untickedIn() {
   const kinds = new Map(KINDS.map(([k]) => [k, { n: 0, ex: [] }]));
   const notes = {}, unread = {};
   let lines = 0, ticked = 0, parts = 0, stepsNoMath = 0, stepsMathUnread = 0, steps = 0;
@@ -126,6 +134,89 @@ export function unticked() {
   return { parts, lines, ticked, notTicked: lines - ticked, steps, stepsNoMath, partsWithMathNoneRead: stepsMathUnread, kinds: [...kinds].map(([k, v]) => ({ kind: k, ...v })).filter(v => v.n).sort((a, b) => b.n - a.n), unread: Object.entries(unread).sort((a, b) => b[1].n - a[1].n).slice(0, 6), notes: Object.entries(notes).sort((a, b) => b[1] - a[1]).slice(0, 6) };
 }
 
+// ── the reading of his TeX, step by step (the reader the generic rule uses: solutionMatch.spanToPlain over texToPlain, plainTex behind it) ─────────
+const spanToPlain = _internals.spanToPlain;
+// the bank is read in its own scope (solutionMatch.withBankReading); on a checkout that has none, this is a plain call
+const inBankScope = fn => (_internals.withBankReading ? _internals.withBankReading(fn) : fn());
+const WHY_OPTS = _internals.withBankReading ? EXTENDED_TEX : undefined;
+const cutLikeSpan = t => String(t).split(/\\approx|\\simeq|\\Rightarrow|\\therefore|\\text|\\mathrm|\\mid/)[0];
+/** Why a piece of his TeX was not read: the first command or layout the strict reader refused, or what else dropped it. */
+function whyUnread(piece) {
+  const r = texToPlainWhy(cutLikeSpan(piece).replace(/\\prime/g, "'"), WHY_OPTS);
+  return r.plain ? 'filtered-after-reading' : r.why;
+}
+const NOTE = n => String(n || '').replace(/\d+(?:\.\d+)?/g, 'N').slice(0, 90);
+const kindOf = text => KINDS.find(([, f]) => f(String(text)))[0];
+/**
+ * Every piece of every served bank part (all marks), as { id, step, tex, plain, by, why, status, note, kind } with the part's eligibility.
+ * `by` is 'strict' (texToPlain), 'fallback' (plainTex) or null (not read). status/note are the deterministic report's, for the page of his own lines.
+ */
+export function texReading() { return inBankScope(texReadingIn); }
+function texReadingIn() {
+  const pieces = [], parts = [], elig = {};
+  for (const r of eligibility().rows) elig[r.id] = r;
+  for (const { entry, family } of qbankEntries()) {
+    const q = qbankEntryQuestion(entry.id, 17);
+    const mine = [];
+    (q.steps || []).forEach((st, i) => {
+      if (!isSchemeStep(st)) return;
+      for (const m of String(st?.d ?? '').replace(/\\\$/g, '\u0001').matchAll(/\$([^$]+)\$/g)) {
+        const tex = m[1].replace(/\\(?:approx|simeq)/g, '=');
+        for (const piece of tex.split(/\\Rightarrow|\\implies|\\therefore|\\text\{\s*(?:or|and)\s*\}/)) {
+          let p = null; try { p = spanToPlain(piece); } catch { p = null; }
+          const strict = p ? texToPlainWhy(cutLikeSpan(piece), WHY_OPTS).plain : null;
+          mine.push({ id: q._bank, step: i, tex: piece.trim(), plain: p, by: p ? (strict ? 'strict' : 'fallback') : null, why: p ? null : whyUnread(piece) });
+        }
+      }
+    });
+    const lines = authoredLines(q);
+    const rep = lines.length ? stepEvidence(q, WRONG, lines.map(l => l.text).join('\n'), { correct: false }, { slipWarnings: true }).stepReport : null;
+    // authoredLines drops a piece that reads to nothing; align each read piece with its report line in order
+    const read = mine.filter(x => x.plain);
+    const seq = (rep?.lines || []);
+    read.forEach((x, k) => { const l = seq[k]; if (l) { x.status = l.status; x.note = l.status === 'ok' ? null : NOTE(l.note || l.status); x.kind = l.status === 'ok' ? null : kindOf(l.text); x.line = l.text; } });
+    pieces.push(...mine);
+    parts.push({ id: q._bank, family, group: groupOf(family), marks: entry.marks, pieces: mine.length, read: read.length, ticked: read.filter(x => x.status === 'ok').length, ...(elig[q._bank] || {}) });
+  }
+  return { pieces, parts };
+}
+const rank = (arr, key, ex) => { const m = new Map(); for (const x of arr) { const k = key(x); const o = m.get(k) || { k, n: 0, ex: null }; o.n++; if (!o.ex) o.ex = ex(x); m.set(k, o); } return [...m.values()].sort((a, b) => b.n - a.n); };
+/** The figures that are compared before and after, by course, and the ranked tables. */
+export function texSummary({ pieces, parts }) {
+  const read = pieces.filter(x => x.plain), ticked = read.filter(x => x.status === 'ok');
+  const byCourse = {};
+  for (const p of parts) {
+    const c = byCourse[p.group] || (byCourse[p.group] = { parts2: 0, eligible: 0, all: 0, pieces: 0, read: 0, ticked: 0 });
+    c.pieces += p.pieces; c.read += p.read; c.ticked += p.ticked;
+    if (p.marks >= 2) { c.parts2++; if (p.eligible) c.eligible++; if (p.all) c.all++; }
+  }
+  return {
+    pieces: pieces.length, read: read.length, strict: read.filter(x => x.by === 'strict').length, ticked: ticked.length,
+    readRate: +(read.length / pieces.length).toFixed(4), tickedShareOfRead: +(ticked.length / read.length).toFixed(4), tickedShareOfAll: +(ticked.length / pieces.length).toFixed(4),
+    parts2: parts.filter(p => p.marks >= 2).length, eligible: parts.filter(p => p.marks >= 2 && p.eligible).length, all: parts.filter(p => p.marks >= 2 && p.all).length,
+    byCourse,
+    unreadByConstruct: rank(pieces.filter(x => !x.plain), x => x.why, x => `${x.id}: ${x.tex.slice(0, 80)}`).slice(0, 25),
+    unreadByCommand: rank(pieces.filter(x => !x.plain).flatMap(x => (x.tex.match(/\\[A-Za-z]+/g) || ['(no command)']).filter((c, i, a) => a.indexOf(c) === i).map(c => ({ ...x, c }))), x => x.c, x => `${x.id}: ${x.tex.slice(0, 80)}`).slice(0, 25),
+    unticked: rank(read.filter(x => x.status && x.status !== 'ok'), x => x.kind, x => `${x.id}: ${x.line}`),
+    unnoted: rank(read.filter(x => x.status && x.status !== 'ok'), x => x.note, x => `${x.id}: ${x.line}`).slice(0, 12),
+    notEligible: rank(parts.filter(p => p.marks >= 2 && !p.eligible), p => p.why, p => p.id)
+  };
+}
+export function printTex(S) {
+  console.log(`READING: ${S.read} of ${S.pieces} pieces of his TeX are read (${(100 * S.readRate).toFixed(1)}%; ${S.strict} by the strict reader, ${S.read - S.strict} by the plainTex fallback); ${S.ticked} ticked = ${(100 * S.tickedShareOfRead).toFixed(1)}% of read, ${(100 * S.tickedShareOfAll).toFixed(1)}% of all`);
+  console.log(`ELIGIBILITY (parts worth 2+): ${S.eligible} of ${S.parts2} can pay a step; ${S.all} can pay all N-1`);
+  for (const [k, v] of Object.entries(S.byCourse).sort()) console.log(`    ${k}: read ${v.read}/${v.pieces}, ticked ${v.ticked}; ${v.eligible}/${v.parts2} eligible, ${v.all} all N-1`);
+  console.log('UNREAD, by reason (first construct the reader refused):');
+  for (const r of S.unreadByConstruct) console.log(`    ${String(r.n).padStart(4)}  ${r.k}  e.g. ${r.ex}`);
+  console.log('UNREAD, by every command present:');
+  for (const r of S.unreadByCommand.slice(0, 16)) console.log(`    ${String(r.n).padStart(4)}  ${r.k}  e.g. ${r.ex}`);
+  console.log('READ BUT UNTICKED, by kind:');
+  for (const r of S.unticked) console.log(`    ${String(r.n).padStart(4)}  ${r.k}  e.g. ${r.ex}`);
+  for (const r of S.unnoted) console.log(`    note ${String(r.n).padStart(4)}  ${r.k}  e.g. ${r.ex}`);
+  console.log('PARTS THAT CANNOT PAY, by reason:');
+  for (const r of S.notEligible) console.log(`    ${String(r.n).padStart(4)}  ${r.k}  e.g. ${r.ex}`);
+}
+
 export function printAll({ E, C, U }) {
   const s = E.summary;
   console.log(`(1) generic rule on the bank: ${s.eligible} of ${s.parts} parts worth 2+ marks can pay at least one step (${(100 * s.eligible / s.parts).toFixed(1)}%); ${s.all} can pay all N-1`);
@@ -142,5 +233,10 @@ export function printAll({ E, C, U }) {
 if (import.meta.url === `file://${process.argv[1]}`) {
   process.env.PRI_EDITION = 'prithagoras';
   await ensureQbank(process.env, { strict: true });
-  printAll({ E: eligibility(), C: compare(), U: unticked() });
+  if (process.argv.includes('--tex')) {
+    const R = texReading(), S = texSummary(R);
+    printTex(S);
+    const at = process.argv.indexOf('--dump');
+    if (at > 0) fs.writeFileSync(process.argv[at + 1], JSON.stringify({ S, pieces: R.pieces, parts: R.parts }));
+  } else printAll({ E: eligibility(), C: compare(), U: unticked() });
 }
