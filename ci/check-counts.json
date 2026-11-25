@@ -34,6 +34,10 @@
       "job": "suites",
       "log": "suites.log",
       "pins": [
+        {"has":"FUNCTION ARGUMENT READING: PASS 638/638 checks"},
+        {"has":"FUNCTION ARGUMENT SWEEP (prithagoras): 19 checks; 49440 questions, 1004 keys, 165 conventional + 20 two-reading forms, 104 misreadings, 442 traps"},
+        {"has":"FUNCTION ARGUMENT SWEEP (priyabhata): 19 checks; 49440 questions, 1004 keys, 165 conventional + 20 two-reading forms, 104 misreadings, 442 traps"},
+        {"has":"FUNCTION ARGUMENT SWEEP: PASS — both editions, 2 checks"},
         {"has":"3296000/3296000 self-checks passed across 412 subtopics"},
         {"has":"21000/21000 multipart part-checks passed"},
         {"has":"✔ INDIA SUITE PASSED — 2726/2726 checks"},

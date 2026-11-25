@@ -719,6 +719,13 @@ const UNREAD = {
 // A function name straight before a number and a letter (cos2x, sin 3θ, ln 2x, sin^2 3x): the argument whose reading FUNCTION_ARGUMENT_RULE fixes.
 const COEFFICIENT_ARGUMENT = /(?<![a-z])(?:sin|cos|tan|sec|cosec|csc|cot|ln|exp|arcsin|arccos|arctan|asin|acos|atan)\s*(?:\^\s*\d+\s*)?\d+(?:\.\d+)?\s*(?:[a-zθ]|π)(?![a-z(])/i;
 
+// The lines of the page now being read whose two readings (`e^-3x`: e^(-3x) or e^-3 times x) disagree about whether the line is true; set by
+// stepCheckWithinBudget, which has judged the page under each reading first. A line the readings agree on is judged as it is written.
+let HELD_AMBIGUOUS = null;
+
+/** The note on a line held for its two readings. */
+export const AMBIGUOUS_FORM_NOTE = UNREAD.brackets;
+
 /** For each line of working, null when it is to be read, or the note saying why it is not. */
 function unreadLines(rawLines) {
   let spent = 0, closed = false;
@@ -726,7 +733,7 @@ function unreadLines(rawLines) {
     if (line.length > WORKING_LIMITS.lineChars) return UNREAD.long;
     spent += line.length * line.length;
     if (closed || index >= WORKING_LIMITS.lines || spent > WORKING_LIMITS.work) { closed = true; return UNREAD.many; }
-    return ambiguousReadings(line).length ? UNREAD.brackets : null;
+    return HELD_AMBIGUOUS !== null && HELD_AMBIGUOUS.has(index) ? UNREAD.brackets : null;
   });
 }
 const unreadNote = entry => entry;
@@ -1284,7 +1291,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
     const before = out[out.length - 1];
     if (expLogOpen.length && before && before.status === 'note' && !before.check && String(before.text).includes('=')) expLogUncertain = true;
     const skipped = unreadNote(unread[i]);
-    if (skipped) { out.push({ text: line, status: 'note', note: skipped, unread: true }); return; }
+    if (skipped) { out.push({ text: line, status: 'note', note: skipped, unread: true, ...(skipped === UNREAD.brackets ? { ambiguous: true } : {}) }); return; }
     let status = 'note';
     let note;
     let lineDiagnosis = null;
@@ -1903,7 +1910,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
       lineDiagnosis = null;
     }
     // `e^2x` is e^(2x) or (e^2)x: a mismatch under one reading is not a mistake under the other.
-    if (status === 'break' && /\^\s*\d+\s*[a-zA-Z]/.test(line)) {
+    if (status === 'break' && /\^\s*\d+\s*[a-zA-Z]/.test(line) && !ambiguousReadings(line).length) {   // (e^2x itself: stepCheckAmbiguity judged it under both readings)
       status = 'note';
       note = 'This power can be read two ways (e^2x is e^(2x) or (e^2)x), so it is not marked wrong. Put the exponent in brackets.';
       lineDiagnosis = null;
@@ -2459,7 +2466,7 @@ function stepCheckPlan(meta, workingText) {
   for (let i = 0; i < rawLines.length; i++) {
     const line = rawLines[i];
     const skipped = unreadNote(unread[i]);
-    if (skipped) { out.push({ text: line, status: 'note', note: skipped, unread: true, stage: active }); chain = null; continue; }
+    if (skipped) { out.push({ text: line, status: 'note', note: skipped, unread: true, stage: active, ...(skipped === UNREAD.brackets ? { ambiguous: true } : {}) }); chain = null; continue; }
     if (firstBreak !== -1 && !chainMode) {
       out.push({ text: line, status: 'note', note: FOLLOWS, stage: active });
       continue;
@@ -3100,7 +3107,27 @@ function numericSolutions(meta) {
 function stepCheckWithinBudget(meta, workingText, options = null) {
   const before = AU_READING;
   AU_READING = options?.candidates === true;
-  try { return stepCheckRead(meta, workingText, options); } finally { AU_READING = before; }
+  try { return stepCheckAmbiguity(meta, workingText, options); } finally { AU_READING = before; }
+}
+/**
+ * FUNCTION_ARGUMENT_RULE 7 for working. A line with `e^2x`, `sqrt2x` or `log2x` is a note only when its readings DISAGREE about its truth: the
+ * page is judged as written and again with each such line rewritten under each other reading; a line every reading ticks is ticked, a line
+ * every reading crosses is crossed as before, and any other line is held (a note, `ambiguous`) and the page judged once more with it held,
+ * so nothing is built on a line that is true under one reading only. A line with an explicit sign (e^2*x) is not ambiguous.
+ */
+function stepCheckAmbiguity(meta, workingText, options) {
+  if (HELD_AMBIGUOUS !== null) return stepCheckRead(meta, workingText, options);
+  const lines = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
+  const reads = lines.map(l => (l.length > WORKING_LIMITS.lineChars ? [] : ambiguousReadings(l)));
+  const at = reads.map((r, i) => (r.length ? i : -1)).filter(i => i >= 0);
+  const run = (text, held) => { HELD_AMBIGUOUS = held; try { return stepCheckRead(meta, text, options); } finally { HELD_AMBIGUOUS = null; } };
+  if (!at.length || at.length > 12) return run(workingText, new Set());
+  const literal = run(workingText, new Set());
+  const variants = Math.max(...at.map(i => reads[i].length));
+  const others = [];
+  for (let k = 0; k < variants; k++) others.push(run(lines.map((l, i) => (reads[i].length ? reads[i][Math.min(k, reads[i].length - 1)] : l)).join('\n'), new Set()));
+  const held = new Set(at.filter(i => { const a = literal.lines?.[i]?.status; return others.some(o => o.lines?.[i]?.status !== a); }));
+  return held.size ? run(workingText, held) : literal;
 }
 function stepCheckRead(meta, workingText, options) {
   meta = numericSolutions(meta);

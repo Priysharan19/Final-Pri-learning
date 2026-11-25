@@ -28,6 +28,26 @@ const AMBIGUOUS = [
   ['sqrt', new RegExp(`(?<![A-Za-z])(sqrt|cbrt)\\(\\s*${K}\\s*\\*?\\s*${V}\\s*\\)${AFTER}`, 'g'), (m, f, k, v) => `${f}${k}${v}`],
   ['log', new RegExp(`(?<![A-Za-z])(log)\\(\\s*${K}\\s*\\*?\\s*${V}\\s*\\)${AFTER}`, 'g'), (m, f, k, v) => `${f}${k}${v}`]
 ];
+// the same keys typed with an explicit multiplication sign: that is what it says, e²·x, √2·x, log 2·x, never the two-reading form
+const EXPLICIT = [
+  [AMBIGUOUS[0][1], (m, neg, k, v, sign) => [`e^${neg}${k}${sign}${v}`, `e^(${neg}${k})*${v}`]],
+  [AMBIGUOUS[1][1], (m, f, k, v, sign) => [`${f}${k}${sign}${v}`, `${f}(${k})*${v}`]],
+  [AMBIGUOUS[2][1], (m, f, k, v, sign) => [`${f}${k}${sign}${v}`, `${f}(${k})*${v}`]]
+];
+/** Each key's e^(kx), sqrt(kx), log(kx) typed with * , · and × between the number and the letter: { text, meaning } (meaning is the same thing in brackets). */
+export function explicitMultiplications(key) {
+  const out = [];
+  for (const sign of ['*', '·', '×']) {
+    for (const [re, f] of EXPLICIT) {
+      let meaning = key, text = key; let hit = false;
+      text = key.replace(new RegExp(re.source, 'g'), (...m) => { hit = true; return f(...m.slice(0, -2), sign)[0]; });
+      meaning = key.replace(new RegExp(re.source, 'g'), (...m) => f(...m.slice(0, -2), sign)[1]);
+      if (hit && text !== key) out.push({ text, meaning });
+    }
+  }
+  return out;
+}
+
 const SUPER = { 2: '²', 3: '³' };
 
 /** The key written the way a student types it without brackets: { kind: 'conventional' | 'ambiguous', style, text }. */
@@ -72,7 +92,7 @@ export async function sweep({ root, seeds = 30, bank = true } = {}) {
   const { checkAnswer } = await imp('client/src/engine/checker.js');
   const { exprEquivalent } = await imp('client/src/engine/expr.js');
   await G.loadAllBanks();
-  const stats = { questions: 0, keyed: 0, keyAccepted: 0, conventional: 0, conventionalRefused: 0, ambiguous: 0, ambiguousRefused: 0, misreadings: 0, trapsTyped: 0, numberArgumentKeys: 0, numberArgumentAccepted: 0, trapsEquivalent: 0, bankQuestions: 0, bankKeyed: 0, bankKeyAccepted: 0 };
+  const stats = { questions: 0, keyed: 0, keyAccepted: 0, conventional: 0, conventionalRefused: 0, ambiguous: 0, ambiguousRefused: 0, misreadings: 0, trapsTyped: 0, explicit: 0, explicitAccepted: 0, numberArgumentKeys: 0, numberArgumentAccepted: 0, trapsEquivalent: 0, bankQuestions: 0, bankKeyed: 0, bankKeyAccepted: 0 };
   const refused = [], wrongAccepted = [], keyLost = [];
   const seen = new Set();
   const distinct = { conventional: new Set(), ambiguous: new Set(), conventionalRefused: new Set(), ambiguousRefused: new Set() };
@@ -83,13 +103,19 @@ export async function sweep({ root, seeds = 30, bank = true } = {}) {
       if (mark(key)) stats.keyAccepted++; else keyLost.push(`${where}: ${key}`);
       const forms = unbracketedForms(key);
       const tag = `${where}|${key}`;
-      if (!forms.length && !misreadings(key).length && !numberArgumentKeys(key).length || seen.has(tag)) continue;
+      if (!forms.length && !misreadings(key).length && !numberArgumentKeys(key).length && !explicitMultiplications(key).length || seen.has(tag)) continue;
       seen.add(tag);
       for (const f of forms) {
         const bucket = f.kind === 'conventional' ? 'conventional' : 'ambiguous';
         stats[bucket]++;
         distinct[bucket].add(`${where.startsWith('bank') ? where : 'generator'}|${key}`);
         if (!mark(f.text)) { stats[`${bucket}Refused`]++; distinct[`${bucket}Refused`].add(`${where.startsWith('bank') ? where : 'generator'}|${key}`); refused.push(`${where}: ${f.kind}/${f.style}: ${f.text}   (key ${key})`); }
+      }
+      for (const { text, meaning } of explicitMultiplications(key)) {
+        let same = false; try { same = exprEquivalent(meaning, key, {}); } catch { same = false; }
+        if (same) continue;
+        stats.explicit++;
+        if (mark(text)) { stats.explicitAccepted++; wrongAccepted.push(`${where}: ${text} accepted for key ${key} (an explicit sign means what it says)`); }
       }
       for (const text of numberArgumentKeys(key)) {
         // the key is f(k)·x: `fkx` is f(kx), a different answer, so it must not be marked right (before the rule it was read as f(k)·x and was)

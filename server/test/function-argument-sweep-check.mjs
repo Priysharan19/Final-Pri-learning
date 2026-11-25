@@ -25,14 +25,28 @@ if (edition) {
   const { sweep } = await import('../../tools/function-argument-sweep.mjs');
   const r = await sweep({ root, seeds: 30 });
   const s = r.stats;
-  ok(s.questions >= 49000, `${edition}: the sweep covers every generator at every level (${s.questions} questions)`);
-  ok(s.keyed >= 900 && s.keyAccepted === s.keyed, `${edition}: every keyed expression answer is marked correct as authored (${s.keyAccepted}/${s.keyed}): ${r.keyLost.slice(0, 3).join(' | ')}`);
-  ok(s.bankQuestions >= 1900 && s.bankKeyed >= 300 && s.bankKeyAccepted === s.bankKeyed, `${edition}: every packed bank answer is marked correct as authored (${s.bankKeyAccepted}/${s.bankKeyed} of ${s.bankQuestions} questions)`);
-  ok(s.conventional >= 150 && s.conventionalRefused === 0, `${edition}: the unbracketed conventional form of every key is marked correct (${s.conventional - s.conventionalRefused}/${s.conventional}): ${r.refused.filter(x => x.includes('conventional')).slice(0, 3).join(' | ')}`);
-  ok(s.ambiguous >= 15 && s.ambiguousRefused === 0, `${edition}: e^2x, sqrt2x and log2x are marked correct where either reading is the key (${s.ambiguous - s.ambiguousRefused}/${s.ambiguous}): ${r.refused.filter(x => x.includes('ambiguous')).slice(0, 3).join(' | ')}`);
-  ok(s.misreadings >= 100, `${edition}: the misreadings of f(kx) are typed (${s.misreadings})`);
-  ok(s.trapsTyped >= 400, `${edition}: the recorded traps are typed bracketed and unbracketed (${s.trapsTyped})`);
-  ok(r.wrongAccepted.length === 0, `${edition}: no misreading, trap or f(kx) typed for f(k)·x is marked correct: ${r.wrongAccepted.slice(0, 5).join(' | ')}`);
+  const exact = (name, got, want) => ok(got === want, `${edition}: ${name} is ${want}, got ${got}`);
+  exact('the questions swept (every generator, four levels, seeds 1-30)', s.questions, 49440);
+  exact('the expression keys', s.keyed, 1004); exact('the keys marked correct as authored', s.keyAccepted, 1004);
+  exact('the packed bank questions', s.bankQuestions, 1944); exact('the bank keys', s.bankKeyed, 333); exact('the bank keys marked correct as authored', s.bankKeyAccepted, 333);
+  exact('the unbracketed conventional forms typed', s.conventional, 165); exact('…refused', s.conventionalRefused, 0);
+  exact('the two-reading forms typed (e^2x, sqrt2x, log2x)', s.ambiguous, 20); exact('…refused', s.ambiguousRefused, 0);
+  exact('the explicit-multiplication typings (e^2*x, e^2·x, e^2×x, sqrt2*x, log2*x)', s.explicit, 60); exact('…marked correct', s.explicitAccepted, 0);
+  exact('the misreadings of f(kx) typed', s.misreadings, 104); exact('the trap typings (bracketed and unbracketed)', s.trapsTyped, 442);
+  ok(r.keyLost.length === 0 && r.refused.length === 0 && r.wrongAccepted.length === 0, `${edition}: nothing lost, nothing refused, no wrong answer accepted: ${[...r.keyLost, ...r.refused, ...r.wrongAccepted].slice(0, 4).join(' | ')}`);
+  // the reviewer's line repro (y12-diff, level 3, seed 4): e^-3x is held, e^-3*x and the both-readings-false e^-34x are crossed as on main
+  {
+    const G = await import('../../client/src/engine/generators/index.js'); await G.loadAllBanks();
+    const MO = await import('../platform/markerOps.js'); const GS = await import('../platform/genericSteps.js');
+    const { checkAnswer } = await import('../../client/src/engine/checker.js');
+    const q = { ...G.generateQuestion('y12-diff', 3, 4), _generator: 'y12-diff' }; q._methodScheme = GS.GENERIC_ID;
+    const base = GS.authoredLines(q).map(l => l.text);
+    const page = f => { const texts = base.map(t => t.replace(/e\^\(-3x\)/g, f)); const ev = MO.stepEvidence(q, '99991', texts.join('\n'), checkAnswer(q, '99991'), { slipWarnings: true }); return ev.stepReport.lines.map(l => l.status[0]).join(''); };
+    exact('the page written e^(-3x)', page('e^(-3x)'), 'oooo');
+    exact('the page written e^-3x: every line held, none ticked by any path', page('e^-3x'), 'nnnn');
+    exact('the page written e^-3*x: crossed as on origin/main', page('e^-3*x'), 'nobn');
+    exact('the page written e^-34x (false under both readings): crossed as on origin/main', page('e^-34x'), 'nnbn');
+  }
   if (failures.length) { console.error(`FUNCTION ARGUMENT SWEEP (${edition}): FAIL ${failures.length}`); for (const f of failures) console.error(`  ${f}`); process.exit(1); }
   console.log(`FUNCTION ARGUMENT SWEEP (${edition}): ${pass} checks; ${s.questions} questions, ${s.keyed} keys, ${s.conventional} conventional + ${s.ambiguous} two-reading forms, ${s.misreadings} misreadings, ${s.trapsTyped} traps`);
   process.exit(0);

@@ -15,7 +15,8 @@
 // image ships — see Dockerfile and production-runtime-image-check.mjs). It
 // must never import a server module: the worker has no store and no secrets.
 import { derivedMetaOff } from '../../client/src/engine/derivedMetaOff.js';
-import { checkAnswer, stepCheck, methodMarks, claimFreeReport, tickRejections } from '../../client/src/engine/checker.js';
+import { checkAnswer, stepCheck, methodMarks, claimFreeReport, tickRejections, AMBIGUOUS_FORM_NOTE } from '../../client/src/engine/checker.js';
+import { ambiguousReadings } from '../../client/src/engine/expr.js';
 import { checkBankAnswer } from './qbankMarking.js';
 import { markObjective, markMultiCorrect } from '../../client/src/engine/indiaExams.js';
 import { markMatrixMatch } from '../../client/src/engine/matrixMatch.js';
@@ -248,6 +249,17 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
     // Nothing judged (no line was arithmetic): the reply says nothing about the lines, as before.
     if (report && !report.lines.some(l => l.status === 'ok' || l.status === 'break')) report = null;
   }
+  // A line with two readings (`e^-3x`: e^(-3x) or e^-3 times x, FUNCTION_ARGUMENT_RULE 7, client/src/engine/expr.js) that the deciding report did not
+  // tick is never ticked by a feedback overlay below either (a textual match to the worked solution does not say which reading was meant): a tick
+  // on a line true under one reading only is not a tick to keep. A line the deciding report ticked (every reading true) stays ticked.
+  const decidedLines = new Map();
+  for (const l of report?.lines || []) if (typeof l?.text === 'string') decidedLines.set(l.text, l);
+  const holdAmbiguous = rep => {
+    if (!rep || !Array.isArray(rep.lines)) return rep;
+    const held = l => l?.status === 'ok' && typeof l.text === 'string' && decidedLines.get(l.text)?.status !== 'ok' && ambiguousReadings(l.text).length > 0;
+    if (!rep.lines.some(held)) return rep;
+    return { ...rep, lines: rep.lines.map(l => (held(l) ? (decidedLines.get(l.text)?.status === 'note' ? decidedLines.get(l.text) : { text: l.text, status: 'note', note: AMBIGUOUS_FORM_NOTE, unread: true, ambiguous: true }) : l)) };
+  };
   const blankFinal = typeof answer === 'string' && answer.trim() === '';
   // The method marks of a topic report (also run again on the displayed report to see whether it reproduces them).
   const partialOf = rep => {
@@ -367,6 +379,7 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
       if (changed) report = { ...report, lines };
     }
   } catch { /* the report stands */ }
+  report = holdAmbiguous(report);
   // Feedback only, for an answer that is not right: the steps of the worked solution whose values are nowhere on the
   // page (engine/missingSteps.js). Computed after every mark above; nothing reads it but the result card.
   try { if (report && result.correct !== true && typeof steps === 'string') { const gap = missingSteps(q, steps); if (gap) report = { ...report, missing: gap.missing, stepsFound: gap.found, stepsReadable: gap.total }; } } catch { /* the report stands */ }
@@ -394,7 +407,7 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
     try {
       const base = report || trueAsWritten(q, steps, opts);
       const more = base ? provedLines(q, meta, base) : null;
-      if (more && more !== base) shownReport = more;
+      if (more && more !== base) shownReport = holdAmbiguous(more);
     } catch { /* the report stands */ }
   }
   let markingReport = null;

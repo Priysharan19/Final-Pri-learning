@@ -12,6 +12,7 @@ import './support/hermetic.mjs';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { sweep } from '../../tools/true-pages-sweep.mjs';
+import { ambiguousReadings } from '../../client/src/engine/expr.js';
 import { assessAreaLine } from '../../client/src/engine/reason-area.js';
 import { stepEvidence } from '../platform/markerOps.js';
 import * as C from '../../tools/understanding-audit/corpus.mjs';
@@ -22,6 +23,7 @@ const ok = (c, l) => { if (c) pass++; else failures.push(l); };
 const base = JSON.parse(readFileSync(new URL('./fixtures/true-pages-main-2026-11-24.json', import.meta.url), 'utf8'));
 const head = await sweep({ withTexts: true });
 
+let lostAmbiguous = 0; const lostAmbiguousTexts = new Set();
 let both = 0, headOnly = 0, newCross = 0, lostTick = 0, gainedTick = 0, headOnlyCrossed = 0, mainCrossed = 0, headCrossed = 0;
 const bad = [];
 for (const [key, h] of Object.entries(head)) {
@@ -34,6 +36,9 @@ for (const [key, h] of Object.entries(head)) {
   mainCrossed += [...bs].filter(c => c === 'b').length;
   for (let i = 0; i < bs.length; i++) {
     if (h.statuses[i] === 'b' && bs[i] !== 'b') { newCross++; if (bad.length < 6) bad.push(`new cross: ${h.prompt.slice(0, 70)} line ${i + 1} ${JSON.stringify(h.texts[i])}`); }
+    // FUNCTION_ARGUMENT_RULE 7 (26 Nov 2026, independent review): a line with two readings (`12e^2x + C`: 12e^(2x) or 12e^2 times x) that main ticked by a
+    // textual match to the worked solution is true under ONE reading only, so it is not a tick to keep. It is counted and listed, and every other lost tick still fails.
+    if (bs[i] === 'o' && h.statuses[i] !== 'o' && ambiguousReadings(h.texts[i]).length > 0) { lostAmbiguous++; lostAmbiguousTexts.add(h.texts[i]); continue; }
     if (bs[i] === 'o' && h.statuses[i] !== 'o') {
       lostTick++; if (bad.length < 8) bad.push(`lost tick: ${h.prompt.slice(0, 70)} line ${i + 1} ${JSON.stringify(h.texts[i])} ${bs[i]}->${h.statuses[i]}`);
     }
@@ -124,5 +129,6 @@ for (const h of bareEq) ok(!h.statuses.includes('b'), `a bare "= n" page has no 
 }
 
 if (failures.length) { console.error(`TRUE PAGES VS MAIN: FAIL (${failures.length})`); for (const f of failures) console.error('  ' + String(f).slice(0, 700)); process.exit(1); }
-console.log(`true pages: ${both} pages on both sides, ${headOnly} only on this head; crossed lines ${headCrossed} (main ${mainCrossed}), new crosses ${newCross}, ticks lost ${lostTick}, ticks gained ${gainedTick}`);
+console.log(`true pages: ${both} pages on both sides, ${headOnly} only on this head; crossed lines ${headCrossed} (main ${mainCrossed}), new crosses ${newCross}, ticks lost ${lostTick}, ticks lost on a line with two readings ${lostAmbiguous} (${lostAmbiguousTexts.size} distinct lines), ticks gained ${gainedTick}`);
+if (process.env.LIST_AMBIGUOUS) console.log([...lostAmbiguousTexts].join('\n'));
 console.log(`TRUE PAGES VS MAIN: PASS: ${pass} checks`);
