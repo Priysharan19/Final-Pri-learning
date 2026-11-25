@@ -47,8 +47,10 @@ const FUNS = {
 };
 const WORDS = new Set([...Object.keys(FUNS), 'pi']);
 
+// whole-number counting (the bank's (5C2), (7P3)) is a number to this evaluator: 5C2 is 10, so a mutant that swaps it for 5C3 is TRUE, not wrong
+const countValue = (n, r, f) => { n = Number(n); r = Number(r); if (!(n < 171)) return NaN; if (r > n) return 0; let v = 1; for (let k = 0; k < r; k++) v = v * (n - k) / (f === 'C' ? k + 1 : 1); return Math.round(v); };
 function tokenize(src) {
-  const s = String(src).replace(/[−–—]/g, '-').replace(/[×·]/g, '*').replace(/÷/g, '/').replace(/²/g, '^2').replace(/³/g, '^3').replace(/√/g, 'sqrt').replace(/[{]/g, '(').replace(/[}]/g, ')');
+  const s = String(src).replace(/(?<![A-Za-z0-9.])(\d+)([CP])(\d+)(?![A-Za-z0-9.])/g, (_, n, f, r) => `(${countValue(n, r, f)})`).replace(/[−–—]/g, '-').replace(/[×·]/g, '*').replace(/÷/g, '/').replace(/²/g, '^2').replace(/³/g, '^3').replace(/√/g, 'sqrt').replace(/[{]/g, '(').replace(/[}]/g, ')');
   const out = [];
   let i = 0;
   while (i < s.length) {

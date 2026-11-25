@@ -72,6 +72,8 @@ function spanToPlain(span) {
 }
 function bankSpanToPlain(span) {
   const src = String(span);
+  // ± is two statements; as one line of working it would be a comma list, whose half (x = √k, x = √k) the matcher would tick as a step. Left unread here.
+  if (/\\(?:pm|mp)(?![A-Za-z])/.test(src)) return null;
   // The strict reader on the TeX as written (braces intact). Null when it is not certain.
   const strict = () => {
     let t = src.replace(/\\[dt]frac/g, '\\frac').replace(/\\prime/g, "'");
