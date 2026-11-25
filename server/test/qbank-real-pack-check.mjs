@@ -48,6 +48,40 @@ const entries = [];
 for (const s of manifest.shards) for (const e of JSON.parse(fs.readFileSync(path.join(qb.DEFAULT_PACK_DIR, s.name), 'utf8')).questions) entries.push({ ...e, family: s.name.replace(/^shards\/|\.json$/g, '') });
 c.eq(entries.length, pack.questionCount, 'every packed question is visited');
 const policy = bankPolicy('prithagoras');
+// An exact-form expression key that is a constant (e^2/4, -pi^2) follows the SAME rounding rule as a numeric key (qbankMarking.js): where the question
+// asks for no exact form and names no precision, a correct rounding to 3 or more significant figures is accepted as well as the exact form; where it asks
+// for an exact value, a decimal stays refused. Never 2 figures, a truncation that is not a rounding, or a value merely near.
+{
+  const { acceptsRoundedFigures, roundSignificant, typedDecimal } = await import('../platform/qbankMarking.js');
+  const { parse, normalize, evaluate, variablesOf } = await import('../../client/src/engine/expr.js');
+  const valueOfKey = expr => { try { const ast = parse(normalize(expr)); return [...variablesOf(ast)].some(v => v !== 'e') ? null : evaluate(ast, {}); } catch { return null; } };
+  const constants = entries.filter(e => e.answerType === 'expression' && Number.isFinite(valueOfKey(e.answer.expr)));
+  const covered = [], exact = [], bad = [];
+  // Only what the bank's rule ADDS is judged: a value the engine itself already accepts is the engine's own reading.
+  const added = (q, text) => checkBankAnswer(q, text)?.correct === true && checkAnswer(q, text)?.correct !== true;
+  for (const e of constants) {
+    const q = markerView(qb.qbankEntryQuestion(e.id, 17));
+    const value = valueOfKey(e.answer.expr);
+    if (!Number.isFinite(value)) continue;
+    if (acceptsRoundedFigures(q)) {
+      covered.push(e.id);
+      const r3 = roundSignificant(value, 3), r4 = roundSignificant(value, 4), r2 = roundSignificant(value, 2);
+      const trunc = Math.trunc(value * 1000) / 1000;
+      if (checkBankAnswer(q, String(r3))?.correct !== true || checkBankAnswer(q, String(r4))?.correct !== true) bad.push(`${e.id}: a correct rounding is refused`);
+      if (added(q, String(r2)) && r2 !== r3) bad.push(`${e.id}: 2 s.f. accepted`);
+      if (trunc !== roundSignificant(value, typedDecimal(String(trunc))[1]) && added(q, String(trunc))) bad.push(`${e.id}: a truncation accepted`);
+      if (added(q, String(+(value * 1.01).toPrecision(4)))) bad.push(`${e.id}: a near value accepted`);
+      if (checkBankAnswer(q, e.answer.expr)?.correct !== true) bad.push(`${e.id}: the exact form is refused`);
+    } else {
+      exact.push(e.id);
+      if (added(q, String(roundSignificant(value, 4)))) bad.push(`${e.id}: a decimal accepted where it is not covered`);
+    }
+  }
+  c.deq(bad, [], 'a constant exact-form key accepts correct roundings only where the rule covers it, and nothing else');
+  for (const id of ['A12-C2-201', 'A12-C2-207', 'X12-C2-184']) c.ok(covered.includes(id), `${id}: a prompt with no exact-form wording accepts a correct rounding as well as the exact form`);
+  for (const id of ['X12-C2-193', 'X12-C2-214', 'A12-C4-212', 'X12-C3-209']) c.ok(exact.includes(id), `${id}: a prompt asking for an exact value refuses a decimal`);
+  console.log(`  constant-valued expression keys: ${constants.length}; the rounding rule covers ${covered.length} (${covered.join(', ')}); exact only ${exact.length}`);
+}
 // A key DERIVED from his own printed answer (a "find" part with no structured key) is held to more than an authored one: his own form is marked
 // correct in every natural way of typing it (the importer's `derivedForms`: as read, brackets taken out, π, a rearrangement, a plain decimal where it
 // is one), and at least three plausible wrong values are refused, by the real marker with the question's own answer type.
