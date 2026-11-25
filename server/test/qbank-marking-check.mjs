@@ -112,7 +112,7 @@ const served = e => markerView(qb.qbankEntryQuestion(e.id, 17));
     ok(checkBankAnswer(q, e.answer.region).correct === true, `${e.id}: the key as written is the answer`);
     ok(checkBankAnswer(q, rounded).correct === true, `${e.id}: the key rounded to ${places} places is the answer (${rounded})`);
     ok(checkBankAnswer(q, bump(1)).correct === false && checkBankAnswer(q, bump(-1)).correct === false, `${e.id}: the next value up or down is not`);
-    ok(checkBankAnswer(q, rounded.replace(/>/, '<')).correct === false, `${e.id}: the other direction is not`);
+    ok(checkBankAnswer(q, rounded.replace(/>/g, '<')).correct === false, `${e.id}: the other direction is not`);
   }
   const e087 = entries.find(e => e.id === 'A11-E1-087');
   ok(e087 && checkBankAnswer(served(e087), 'x > 2.73').correct === true && checkBankAnswer(served(e087), 'x>2.73').correct === true && checkBankAnswer(served(e087), 'x > 2.7268').correct === true && checkBankAnswer(served(e087), 'x > 2.72').correct === false && checkBankAnswer(served(e087), 'x > 2.74').correct === false && checkBankAnswer(served(e087), 'x < 2.73').correct === false, 'A11-E1-087: x > 2.73 is right to two places; 2.72, 2.74 and the other direction are not');

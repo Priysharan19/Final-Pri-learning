@@ -103,7 +103,7 @@ const policy = bankPolicy('prithagoras');
   c.deq(fewWrongs, [], 'every derived key has at least three plausible wrong values to refuse');
   c.deq(wrongAccepted, [], `and the real marker refuses all ${wrongs} of them`);
 }
-let rungsShown = 0, rungsTested = 0, authoredHints = 0, withRungs = { 0: 0, 1: 0, 2: 0, 3: 0 }, noLadderNoHints = 0, noNudge = 0, displayed = 0, badDisplay = 0, hinted = 0, hintIsAnswer = 0, crossed = 0, ticked = 0, traps = 0, rungs = 0, accepted = 0, sealed = 0, marksOk = 0, leaks = 0, openers = 0;
+let rungsShown = 0, rungsTested = 0, authoredHints = 0, withRungs = { 0: 0, 1: 0, 2: 0, 3: 0 }, displayed = 0, badDisplay = 0, hinted = 0, hintIsAnswer = 0, crossed = 0, ticked = 0, traps = 0, rungs = 0, accepted = 0, sealed = 0, marksOk = 0, leaks = 0;
 const bad = { accepted: [], trap: [], marks: [], seal: [], wire: [], hint: [] };
 for (const e of entries) {
   const full = qb.qbankEntryQuestion(e.id, 17);

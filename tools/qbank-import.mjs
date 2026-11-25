@@ -174,7 +174,6 @@ export function engineQuestion(part, question = null) {
 // ── LaTeX under the client's KaTeX settings ──────────────────────────────────
 // client/src/lib/latex.jsx splits on unescaped $...$ and renders each span with { throwOnError: false, strict: false }.
 // Here the same split is used with throwOnError on, so a span the client would paint as an error is reported.
-const SPAN = /(?<!\\)\$((?:\\\$|[^$])+?)(?<!\\)\$/g;
 
 /** Problems of one text field as the client would draw it: codes only, stable. */
 export function latexProblems(text) {
@@ -774,7 +773,7 @@ export function compilePack(archive, opts = {}) {
 /** 40 of the converted parts, in the order of a hash of their ids (the same 40 on every run), as markdown rows for a reader to verify. */
 export function derivedSample(converted, n = 40) {
   const pick = [...converted].sort((a, b) => (sha256(Buffer.from(a.id)) < sha256(Buffer.from(b.id)) ? -1 : 1)).slice(0, n).sort((a, b) => (a.id < b.id ? -1 : 1));
-  const cell = t => String(t).replace(/\|/g, '\\|').replace(/\n/g, ' ');
+  const cell = t => String(t).replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\n/g, ' ');   // backslashes first, so the one added before a pipe is not itself doubled
   return ['| Question | Prompt (start) | Box | Derived key (his printed answer, read as) | His form typed in (accepted) | Wrong values refused |', '|---|---|---|---|---|---|',
     ...pick.map(c => `| ${c.id} | ${cell(c.prompt)} | ${c.answerType}${c.exactForm ? ' (exact form)' : ''} | \`${cell(JSON.stringify(c.key))}\` (\`${cell(c.shown)}\`) | ${c.forms}: ${(c.formList || []).slice(0, 4).map(f => `\`${cell(f)}\``).join(' ')} | ${c.wrongs} |`)].join('\n') + '\n';
 }

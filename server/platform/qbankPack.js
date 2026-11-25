@@ -369,7 +369,7 @@ export function qbankManualEntries() {
   return out;
 }
 export function qbankManualQuestion(id, seed = 0) {
-  for (const { entry, family, place } of qbankManualEntries()) if (entry.id === id) {
+  for (const { entry, place } of qbankManualEntries()) if (entry.id === id) {
     if (!place) throw new Error(`Worked-solution question ${id} is placed nowhere`);
     return manualQuestion(entry, place.subtopic, seed, null);
   }
