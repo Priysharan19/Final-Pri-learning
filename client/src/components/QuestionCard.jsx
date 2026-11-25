@@ -1118,6 +1118,27 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const editAnswer = (v) => { setAnswer(v); stash(v, working); if (!writeMode) noteEdited(typedContentKey(v, working)); };
   const editWorking = (v) => { setWorking(v); stash(answer, v); if (!writeMode) noteEdited(typedContentKey(answer, v)); };
   const chooseOption = (i) => { setMcqSel(i); noteEdited(submissionContentKey(i, undefined)); };
+  // Photo mode: a change to the lines (an edit, a line left out or brought
+  // back) is a change to the working that would be submitted. The answer
+  // follows the lines only while it is still the proposal; once the student
+  // has typed their own it is theirs.
+  const changePhotoLines = (next) => {
+    if (resolved || !next) return;
+    const wk = workingOf(next);
+    let ans = answer;
+    setPhotoLines(next);
+    setWorking(wk);
+    setPhotoRestored(false);
+    if (!isWorking && photoAnswerSource !== 'student') {
+      const proposal = proposeFrom(next);
+      ans = proposal.status === 'proposed' ? proposal.answer : '';
+      setAnswer(ans);
+      setPhotoAnswerSource(proposal.status === 'proposed' ? 'proposed' : null);
+      setPhotoNote(proposal);
+    }
+    setPhotoOCR(v => ({ ...v, text: wk }));
+    noteEdited(typedContentKey(ans, wk));
+  };
   const editPhotoAnswer = (v) => {
     setAnswer(v);
     setPhotoAnswerSource(String(v).trim() ? 'student' : null);

@@ -51,7 +51,11 @@ const { generateQuestion, loadAllBanks } = await import('../../client/src/engine
 const c = checks();
 const sha = text => crypto.createHash('sha256').update(text).digest('hex');
 // The curriculum response of a server with no pack, as origin/main served it (digest taken before this change).
-const MAIN_CURRICULUM_SHA = 'cfa357fe3b7337213c7225b34f0cd9914213d786e14dced8c7c0cbf242bbc378';
+// Re-derived on the merged tree of task/launch-qa-fixes (26 Nov 2026), by running this check: the previous digest was
+// 'cfa357fe3b7337213c7225b34f0cd9914213d786e14dced8c7c0cbf242bbc378'. What changed is the dot point levels the curriculum lists as
+// requestable (only the levels at which a dot point's own questions are provably its own, nswDotpointExact.js). The check still
+// proves what it is for: with or without a pack, the response is the same bytes; the bank adds no entry and no key.
+const MAIN_CURRICULUM_SHA = '32f02c013b9f54dba6c3b3e6325a24c75dff4aada9fb2928f0d7632a3c76bbda';
 
 const writePack = (dir, files) => { for (const [name, text] of files) { const f = path.join(dir, name); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, text); } };
 
