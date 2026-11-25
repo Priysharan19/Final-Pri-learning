@@ -118,7 +118,10 @@ try {
     await shot(`dotpoint-${label}-2-focused.png`);
 
     stage = `${label}: choose a dot point`;
-    const target = (label === 'desktop' ? expected[1] : expected[0]) || expected[0];   // a different dot point from the question on the desk
+    // A different dot point from the question on the desk: read which one the desk's question is on (with fewer dot points offered, the desk's
+    // question is as often the second as the first), then take the first offered one that is not it.
+    const deskText = await page.locator('[data-served-dotpoint]').first().innerText().catch(() => '');
+    const target = expected.find(d => !deskText.includes(d.text.slice(0, 20))) || expected[0];
     const ordinal = dotpointsFor(CHAPTER).findIndex(d => d.id === target.id);
     const was = await qid();
     await select.selectOption(String(ordinal));
