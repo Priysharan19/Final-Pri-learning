@@ -1094,6 +1094,10 @@ jobs:
             node client/test/tour-nsw-practice-bank-figure.js 2>&1 | tee -a browser.log
             # A worked-solution question (no key, no mark): the notice before the start, his steps and what a marker looks for with no mark, nothing recorded.
             node client/test/tour-nsw-practice-worked.js 2>&1 | tee -a browser.log
+            # Launch QA 26 Nov 2026: a 360 px phone does not scroll sideways on the two topics that did (a long chapter pill; tables in options,
+            # steps and the correct answer), and signed out and offline the card says the server cannot be reached, with Try again.
+            node client/test/tour-nsw-reflow.js 2>&1 | tee -a browser.log
+            node client/test/tour-signup-offline.js 2>&1 | tee -a browser.log
             # ADR-0003: a visitor with no account meets the question picker first, in both
             # editions, has up to five typed or multiple-choice questions marked by the
             # server, and then a calm sign-up prompt; nothing of an account is touched.
