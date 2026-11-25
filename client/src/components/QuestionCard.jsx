@@ -2900,7 +2900,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               return (
                 <button key={i} className={cls} disabled={resolved} aria-pressed={!resolved ? mcqSel === i : undefined} onClick={() => chooseOption(i)}>
                   <span className="mcq-key">{'ABCD'[i]}</span>
-                  <span lang="en"><MathText text={opt} /></span>
+                  <span lang="en" className="mcq-text"><MathText text={opt} /></span>
                   {mark && <span className="mcq-mark">{mark}</span>}
                 </button>
               );
