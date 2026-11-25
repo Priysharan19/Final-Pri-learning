@@ -408,7 +408,7 @@ function stepStates(read, stepText) {
 }
 
 // The prompt asks for a particular FORM, which an expression key (any equivalent expression is accepted) cannot police.
-const ASKS_A_FORM = /\b(?:factori[sz]e\w*|expand\w*|simplif\w*|in the form|complete the square|completing the square|partial fractions?|rationali[sz]e\w*|rational denominator|single (?:fraction|logarithm|power)|fully|as a (?:single|product|sum|fraction)|lowest terms|simplest)\b/i;
+const ASKS_A_FORM = /\b(?:factori[sz]e\w*|expand\w*|simplif\w*|in the form|complete the square|completing the square|partial fractions?|rationali[sz]e\w*|rational denominator|single (?:fraction|logarithm|power)|fully|as a (?:single|product|sum|difference|quotient|fraction)|lowest terms|simplest)\b/i;
 // A numeric key is any equal value, so only a form a number can be written in more than one way matters.
 const ASKS_A_NUMBER_FORM = /\b(?:simplif\w*|expand\w*|factori[sz]e\w*|rational denominator|rationali[sz]e\w*|simplest|lowest terms|mixed number|as a (?:single|fraction|product)|in the form|surd form)\b/i;
 // The prompt mandates a METHOD, which a final-answer key cannot police.
