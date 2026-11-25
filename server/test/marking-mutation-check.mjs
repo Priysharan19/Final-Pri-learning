@@ -335,9 +335,23 @@ let corpusFalse = 0, corpusCross = 0, corpusFalseTicked = 0, corpusCrossed = 0, 
 
 // ── the author bank ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 {
-  const B = await run({ bank: true, maxPerLine: 6 });
+  // as the product reads and marks a page today (no bank scope): the legacy pin below is origin/main's own, and this tree must print it unchanged
+  const B = await run({ bank: true, bankScope: false, maxPerLine: 6 });
   const t = B.totals;
   console.log(`MARKING MUTATION BANK COUNTS: ${t.pages} authored pages, ${t.lines} authored lines, ${t.mutants} mutants, false ticks ${t.falseTicks}, true crosses ${t.trueCrosses}, authored ticks ${t.trueTicks}, extraneous-root pages ${t.variantPages} (${t.variantLines} lines, crossed ${t.variantCrosses}), rejections ${t.rejectLines} (ticked ${t.rejectTicked}), false variants ${t.variantMutants} (ticked ${t.variantFalseTicks}), far-out roots of nothing ${t.largeRoots || 0} (crossed ${t.largeRootsCrossed || 0}, as on origin/main), inserted true lines ${t.insertedTrue || 0}`);
+  ok(t.pages >= 700 && t.mutants >= 9000, `the bank sample is not trivial (${t.pages} pages, ${t.mutants} mutants)`);
+  ok(t.trueCrosses === 0, `no authored bank line and no line of an extraneous-root page is crossed (${t.trueCrosses}: ${JSON.stringify(B.failures.trueCrosses.slice(0, 3))})`);
+  ok(t.falseTicks === 0, `no provably wrong bank mutant is ticked (${t.falseTicks}: ${JSON.stringify(B.failures.falseTicks.slice(0, 3))})`);
+  ok(t.variantPages >= 500 && t.variantMutants >= 900, `the extraneous-root sample is not trivial (${t.variantPages} pages, ${t.variantMutants} false variants)`);
+  ok(t.rejectLines >= 150 && t.rejectTicked === t.rejectLines, `every rejection of a candidate root is ticked (${t.rejectTicked} of ${t.rejectLines})`);
+  ok(t.trueTicks >= 1600, `authored bank lines are still ticked (${t.trueTicks})`);
+}
+
+{
+  // the same pages read and marked in the bank's own scope (solutionMatch.withBankReading: the extended TeX reading the draft bank rules use)
+  const B = await run({ bank: true, bankScope: true, maxPerLine: 6 });
+  const t = B.totals;
+  console.log(`MARKING MUTATION BANK SCOPED COUNTS: ${t.pages} authored pages, ${t.lines} authored lines, ${t.mutants} mutants, false ticks ${t.falseTicks}, true crosses ${t.trueCrosses}, authored ticks ${t.trueTicks}, extraneous-root pages ${t.variantPages} (${t.variantLines} lines, crossed ${t.variantCrosses}), rejections ${t.rejectLines} (ticked ${t.rejectTicked}), false variants ${t.variantMutants} (ticked ${t.variantFalseTicks}), far-out roots of nothing ${t.largeRoots || 0} (crossed ${t.largeRootsCrossed || 0}), inserted true lines ${t.insertedTrue || 0}`);
   ok(t.pages >= 700 && t.mutants >= 9000, `the bank sample is not trivial (${t.pages} pages, ${t.mutants} mutants)`);
   ok(t.trueCrosses === 0, `no authored bank line and no line of an extraneous-root page is crossed (${t.trueCrosses}: ${JSON.stringify(B.failures.trueCrosses.slice(0, 3))})`);
   ok(t.falseTicks === 0, `no provably wrong bank mutant is ticked (${t.falseTicks}: ${JSON.stringify(B.failures.falseTicks.slice(0, 3))})`);
