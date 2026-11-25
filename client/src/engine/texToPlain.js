@@ -24,7 +24,7 @@
 //   a function followed by another (\sin x\cos x); the Greek letters alpha and beta (the engine's own atoms).
 // It reads NONE of: phi, lambda, mu, sigma, gamma (the engine has no atom for them, and a run of letters would be a product), \text words,
 // aligned environments (texSafe.js refuses them), vectors, sums, limits, sets, a relation arrow (\to) or any TeX it is not sure of.
-// The extended mode is used for the author's bank (solutionMatch.withBankReading) and for a student's reader TeX on an Australian question (opts.extendedTex).
+// The extended mode is used for the author's bank (solutionMatch.withBankReading) and, through arithmeticLines opts.extendedTex, for the reader TeX of an author-bank question only (markerOps.usesExtendedTex).
 // client/test/tex-faithful-check.mjs proves each construct, and every step of the bank it reads, by VALUE against an independent evaluator.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -39,7 +39,7 @@ const PLAIN = /^[A-Za-z0-9+\-=.()\[\]\/!−×÷·≤≥≠≈πθ√²³]$/;
 const STARTS_OPERAND = /^[A-Za-z0-9(πθ√∫]/;
 const STARTS_OPERAND_BASE = /^[A-Za-z0-9(πθ√]/;
 // The reader has two modes. The BASE mode is what it has always read, byte for byte (every caller that does not ask for more gets it). The EXTENDED mode,
-// asked for with `{ extended: true }`, adds the constructs below; it is used for a student's reader TeX on an Australian question and for the author's bank.
+// asked for with `{ extended: true }`, adds the constructs below; it is used for the author's bank (and a student's reader TeX on a bank question) only.
 let EXTENDED = false;
 const GREEK = { alpha: 'alpha', beta: 'beta' };   // the engine's own two atoms besides θ and π; φ, λ, μ, σ have none, so they are not read (a run of letters would be a product)
 // a number that stands alone at the end (not an exponent, not part of a name)
@@ -194,6 +194,8 @@ function convert(src, depth = 0) {
           continue;
         }
         r.skipSpace();
+        // a letter straight before a function is a coefficient times the function (a\tan x is a*tan(x)); written together the engine would read asin, acos, atan
+        if (/[A-Za-z]$/.test(prevEnd())) { out = out.replace(/ +$/, '') + '*'; mul = false; }
         let fn = name, power = null, base = null;
         // sin^{2}x is (sin x)^2; sin^{-1}x is the inverse function (arcsin), the courses' meaning, never the reciprocal
         if (r.peek() === '^') {
@@ -215,7 +217,14 @@ function convert(src, depth = 0) {
         if (r.peek() === '^' || r.peek() === '_') stop('function-power');
         let arg = '';
         if (r.peek() === '(' || r.s.startsWith('\\left(', r.i)) {
-          if (power === null && base === null) { emit(fn); continue; }
+          if (power === null && base === null) {
+            // \sin(2m+1)x may be sin((2m+1)x) or sin(2m+1)*x: not read
+            const at = r.i; r.bracket();
+            const nx = r.s.slice(r.i).replace(/^ +/, '');
+            r.i = at;
+            if (/^[A-Za-z0-9]/.test(nx) || /^\\(?:pi|theta|alpha|beta)(?![A-Za-z])/.test(nx)) stop('function-argument');
+            emit(fn); continue;
+          }
           arg = `(${convert(r.bracket(), depth + 1).trim()})`;
           if (arg === '()') stop();
         } else if (r.peek() === '{') arg = convert(r.group(), depth + 1).trim();
@@ -227,10 +236,14 @@ function convert(src, depth = 0) {
           arg = convert(r.s.slice(at, r.i), depth + 1).trim();
         } else {
           // One bare argument, read only where the page can be read one way: a number and a letter (sin 2θ), an angle in degrees (sin 30°), a letter, a group.
-          const m = /^(?:\d+(?:\.\d+)?(?:\^\\circ|\^\{\\circ\})|(?:\d+(?:\.\d+)?)?(?:[A-Za-z]|\\theta|\\pi|\\alpha|\\beta)?)/.exec(r.s.slice(r.i));
+          const m = /^(?:e\^(?:\{[^{}]*\}|\d)|(?:\d+(?:\.\d+)?)?(?:\\pi|\\theta|\\alpha|\\beta)\s*[A-Za-z](?![A-Za-z])|\d+(?:\.\d+)?(?:\^\\circ|\^\{\\circ\})|(?:\d+(?:\.\d+)?)?(?:[A-Za-z]|\\theta|\\pi|\\alpha|\\beta)?)/.exec(r.s.slice(r.i));
           if (!m || !m[0]) return stop('function-argument');
           r.i += m[0].length;
-          arg = convert(m[0], depth + 1).trim();
+          // cos\pi t is cos(pi t): a number and a Greek letter and one letter are one product, never cos(pi) times t
+          const gm = /^(\d+(?:\.\d+)?)?(\\pi|\\theta|\\alpha|\\beta)\s*([A-Za-z])$/.exec(m[0]);
+          arg = gm ? `${gm[1] ? `${gm[1]}*` : ''}${convert(gm[2], depth + 1).trim()}*${gm[3]}` : convert(m[0], depth + 1).trim();
+          // sin x! is sin(x!) or (sin x)!: not read; only a number or a bracket can take the factorial
+          if (r.s.slice(r.i).replace(/^ +/, '')[0] === '!' && !/^\d+(?:\.\d+)?$/.test(arg)) stop('factorial');
           // what follows must not run into the argument: a letter, digit, bracket or script after it could be part of it (sin x y, sin 2 3)
           const rest = r.s.slice(r.i).replace(/^ +/, '');
           const after = rest[0];
@@ -404,6 +417,8 @@ function convert(src, depth = 0) {
     if (ch === '{' || ch === '}') stop();   // a bare group: grouping that may or may not show; not read
     if (PLAIN.test(ch)) {
       r.i += 1;
+      // 2e-3 is 2e - 3 (the constant): the engine would read it as scientific notation, so the product is written out
+      if (EXTENDED && ch === 'e' && /\d$/.test(prevEnd())) { out = out.replace(/ +$/, '') + '*'; mul = false; }
       if (/[A-Za-z0-9πθ√(]/.test(ch)) emit(ch);
       else { mul = false; out += ch; }
       continue;

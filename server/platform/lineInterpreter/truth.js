@@ -7,7 +7,7 @@
 // sampling the function against the claim of its own detected form; any doubt
 // returns null and the verifier abstains.
 // ─────────────────────────────────────────────────────────────────────────────
-import { parse, normalize, evaluate, variablesOf } from '../../../client/src/engine/expr.js';
+import { parse, normalize, evaluate, variablesOf, ambiguousReadings } from '../../../client/src/engine/expr.js';
 import { foldText } from './claims.js';
 
 export function parseSafe(text) {
@@ -21,7 +21,9 @@ export function parseSafe(text) {
 export const ambiguousCall = text => /\b(?:sin|cos|tan|sec|cosec|csc|cot|ln|log|sqrt|arcsin|arccos|arctan)\s*(?:\^|[^\s(])/i.test(text)
   // "-1^2" is -1 by the written convention and 1 as the student usually means it: two readings, no verdict
   || /\b(?:sin|cos|tan|sec|cosec|csc|cot|ln|log)\s+\([^()]*\)\s*[/÷^*×]/i.test(text)
-  || /(?:^|[=(+*/×÷^])\s*-\s*\d+(?:\.\d+)?\s*(?:\^|[²³])/.test(foldText(text));
+  || /(?:^|[=(+*/×÷^])\s*-\s*\d+(?:\.\d+)?\s*(?:\^|[²³])/.test(foldText(text))
+  // `e^2x` is e^(2x) or e^2 times x (FUNCTION_ARGUMENT_RULE 7, client/src/engine/expr.js): two readings, no verdict
+  || ambiguousReadings(text).length > 0;
 const TRIG = /(sin|cos|tan|sec|cosec|csc|cot)/i;
 const CONST_TRIG_ARG = text => TRIG.test(text) && !/π|pi/i.test(text);
 

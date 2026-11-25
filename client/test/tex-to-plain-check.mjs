@@ -50,13 +50,15 @@ const EXT_CASES = [
   ['\\alpha+\\beta', 'alpha+beta'], ['2\\alpha\\beta', '2alpha*beta'], ['\\cos\\alpha', 'cos(alpha)'], ['\\sqrt[4]{x}', '(x)^(1/4)'], ['\\sqrt[5]{32}', '(32)^(1/5)'], ['\\left|x-3\\right|', 'abs(x-3)'],
   ["y'", "y'"], ["f'(x)", "f'(x)"], ["f''(x)", "f''(x)"], ['\\dot A=2\\pi r\\dot r', '(dotA)=2π r*(dotr)'], ['\\dot y^{2}', '(doty)^(2)'], ['16\\%', '16%'],
   ['\\int_0^{\\pi}\\sin x\\,dx=2', '∫_{0}^{π}sin(x)dx=2'], ['\\int e^{-x}dx', '∫e^(-x)dx'], ['\\int x\\,dx', '∫x dx'], ['x=\\pm4', 'x=4, x=-4'], ['x=\\dfrac{1\\pm\\sqrt5}{2}', 'x=((1+sqrt(5))/2), x=((1-sqrt(5))/2)'],
-  ['2x+3=7', '2x+3=7'], ['\\frac{a}{b}', '((a)/(b))'], ['e^{x}(2x-4)', 'e^(x)*(2x-4)'], ['\\sin x', 'sin(x)'], ['2\\pi r', '2π r'], ['\\int_{0}^{2} 3x^{2}\\,dx', '∫_{0}^{2}3x^(2)dx'], ['\\left[ 6x^{2} \\right]_{-2}^{4}', '[6x^(2)]_{-2}^{4}']
+  ['2x+3=7', '2x+3=7'], ['\\frac{a}{b}', '((a)/(b))'], ['e^{x}(2x-4)', 'e^(x)*(2x-4)'], ['\\sin x', 'sin(x)'], ['2\\pi r', '2π r'], ['\\int_{0}^{2} 3x^{2}\\,dx', '∫_{0}^{2}3x^(2)dx'], ['\\left[ 6x^{2} \\right]_{-2}^{4}', '[6x^(2)]_{-2}^{4}'],
+  // review of PR #1121: a letter before a function is a coefficient; e next to a number is the constant; a function's product argument; ln of a power of e (placed last: the base reading misreads these, so they are not in the agrees-with-base slice)
+  ['a\\tan\\tfrac{\\pi}{4}=2', 'a*tan(((π)/4))=2'], ['y=a\\sin x', 'y=a*sin(x)'], ['a\\cos 2x', 'a*cos(2x)'], ['2e-3', '2*e-3'], ['3e-2x', '3*e-2x'], ['\\cos\\pi t', 'cos(π*t)'], ['\\sin 2\\pi t', 'sin(2*π*t)'], ['\\ln e^{5}', 'ln(e^(5))'], ['\\sin 3!', 'sin(3)!'],
 ];
 for (const [tex, want] of EXT_CASES) ok(texToPlain(tex, EXTENDED_TEX) === want, `extended: ${tex} -> ${want} (got ${JSON.stringify(texToPlain(tex, EXTENDED_TEX))})`);
 // what the base reading refuses, the extended reading reads, and what the base reading reads the extended reading reads the same
 for (const [tex] of EXT_CASES.slice(0, 40)) ok(texToPlain(tex) === null || texToPlain(tex) === texToPlain(tex, EXTENDED_TEX), `extended agrees with base where base reads: ${tex}`);
 for (const [tex] of CASES) ok(texToPlain(tex, EXTENDED_TEX) === texToPlain(tex) || tex === '\\sqrt[3]{x}', `extended reads every base case the same: ${tex} (${texToPlain(tex)} vs ${texToPlain(tex, EXTENDED_TEX)})`);
-const EXT_NULLS = ['x^\\frac{1}{2}', '3\\frac{1}{2}', '\\foo', '\\href{a}{b}', '{x}', 'x_{1}', 'x_1', '\\sin xy', '\\sqrt[n]{x}', '2\\frac{1}{2}', '\\frac{1}{}', '\\int_{0}^{2} 3x', '\\pm 3', '\\sum_{i=1}^{3} i', '\\lim x', '\\infty', '\\left.x', '\\text{ cm}', '2 3', '^{2}', 'x^{', '\\sin', '', '   ', 'a|b', 'x\\\\y',
+const EXT_NULLS = ['\\sin x\\sin(2m+1)x', '\\sin(2m+1)x', '\\sin x!', 'x^\\frac{1}{2}', '3\\frac{1}{2}', '\\foo', '\\href{a}{b}', '{x}', 'x_{1}', 'x_1', '\\sin xy', '\\sqrt[n]{x}', '2\\frac{1}{2}', '\\frac{1}{}', '\\int_{0}^{2} 3x', '\\pm 3', '\\sum_{i=1}^{3} i', '\\lim x', '\\infty', '\\left.x', '\\text{ cm}', '2 3', '^{2}', 'x^{', '\\sin', '', '   ', 'a|b', 'x\\\\y',
 '\\phi', '\\lambda', '\\sin^{3.5}x', '\\ln^{-1}x', '\\log_{1}x', '\\log_{x+1}2', 'x^\\circ', '(x+1)^\\circ', '\\sin 2 3', '\\sin x y', "x'''", '\\dot x=3t', '\\dot x t=x\\dot t', '\\int x', '\\int_0^1 x=3', '\\sqrt[13]{x}', '\\left|x'];
 for (const tex of EXT_NULLS) ok(texToPlain(tex, EXTENDED_TEX) === null, `extended: not understood -> null: ${JSON.stringify(tex)} (got ${JSON.stringify(texToPlain(tex, EXTENDED_TEX))})`);
 ok(texToPlainWhy('\\binom52').why === '\\binom' && texToPlainWhy('\\binom52', EXTENDED_TEX).plain === '(5C2)', 'the base reading still refuses \\binom (and says which command), the extended reads it');
@@ -202,7 +204,7 @@ const L = (text, latex) => ({ text, latex });
 // The extended reading reaches the checker for an Australian question only (India's reading is exactly what it was).
 {
   const ops = readFileSync(new URL('../../server/platform/markerOps.js', import.meta.url), 'utf8');
-  ok(/\.\.\.\(candidateRoots\(q\) \? \{ extendedTex: true \} : \{\}\)/.test(ops), 'markerOps passes extendedTex only for a question sealed for the Australian edition (candidateRoots)');
+  ok(/\.\.\.\(usesExtendedTex\(q\) \? \{ extendedTex: true \} : \{\}\)/.test(ops), 'markerOps passes extendedTex only for an author-bank question (usesExtendedTex), never for a generator or paper question');
   const solution = readFileSync(new URL('../src/engine/solutionMatch.js', import.meta.url), 'utf8');
   ok(/if \(!bankReading\) return spanToPlainBraced\(span, false\);/.test(solution), 'solutionMatch reads a generated question exactly as it did; the bank has its own scope');
 }

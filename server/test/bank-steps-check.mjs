@@ -37,7 +37,7 @@ const { bankStepProofs } = await import('../../tools/qbank-import.mjs');
 const sweep = await import('../../tools/bank-steps-sweep.mjs');
 
 // The numbers printed by `node tools/qbank-import.mjs --bank-steps` and `node tools/bank-steps-sweep.mjs` on the committed pack. A new pack changes them on purpose.
-const PIN = { parts: 1287, eligible: 167, verifiable: 175, notVerified: 47, sweepPages: 3497 };
+const PIN = { parts: 1287, eligible: 173, verifiable: 182, notVerified: 47, sweepPages: 3609 };
 
 const c = checks();
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -166,6 +166,17 @@ function require_accepted(q) { return q.answerType === 'numeric' ? String(q.answ
   c.eq(bankStructural({ _bank: 'x', answerType: 'manual', criteria: [{ marks: 2, point: 'p' }], steps: [], authoredMarks: 2 }), false, 'a worked-solution question is not structural');
 }
 
+// ── 4a. the bank's own reading never turns his TeX into a different mathematical statement (review of PR #1121): each is read correctly or left unread ──────────
+{
+  const { withBankReading, spanToPlain } = (await import('../../client/src/engine/solutionMatch.js'))._internals;
+  const rd = t => withBankReading(() => spanToPlain(t));
+  const cases = [
+    ['a\\tan\\tfrac{\\pi}{4}=2', 'a*tan(((π)/4))=2'], ['y=a\\sin x', 'y=a*sin(x)'], ['2e-3', '2*e-3'], ['\\cos\\pi t', 'cos(π*t)'], ['\\ln e^{5}', 'ln(e^(5))'],
+    ['\\sin x\\sin(2m+1)x', null], ['\\sin x!', null], ['\\sin^{-1}x', 'arcsin(x)'], ['3e-2x', '3*e-2x']
+  ];
+  for (const [tex, want] of cases) c.eq(rd(tex), want, `the bank reads ${tex} as ${want === null ? 'nothing (unread)' : want}`);
+}
+
 // ── 4b. an authoring fault is held, never crossed: his step disagrees with his own answer (X12-C2-053: the step has no +C, his answer has it) ──────
 {
   const { BANK_AUTHORING_FAULTS, bankFault, holdFaultCrosses } = await import('../platform/bankFaults.js');
@@ -174,7 +185,7 @@ function require_accepted(q) { return q.answerType === 'numeric' ? String(q.answ
   const { checkBankAnswer } = await import('../platform/qbankMarking.js');
   const { withBankReading } = (await import('../../client/src/engine/solutionMatch.js'))._internals;
   qb.installPack(await qb.loadPack(qb.directorySource(qb.DEFAULT_PACK_DIR)));
-  c.ok(Object.keys(BANK_AUTHORING_FAULTS).length >= 1 && Object.values(BANK_AUTHORING_FAULTS).every(why => typeof why === 'string' && why.length > 20), 'each held question carries its reason');
+  c.ok(Object.keys(BANK_AUTHORING_FAULTS).length >= 1 && Object.values(BANK_AUTHORING_FAULTS).every(f => typeof f.why === 'string' && f.why.length > 20 && typeof f.line === 'string'), 'each held question carries its reason');
   for (const id of Object.keys(BANK_AUTHORING_FAULTS)) {
     const q = qb.qbankEntryQuestion(id, 17);
     c.ok(bankFault(q) !== null && bankFault({ ...q, _bank: undefined }) === null, `${id} is held by its own id alone`);
@@ -192,12 +203,16 @@ function require_accepted(q) { return q.answerType === 'numeric' ? String(q.answ
         c.eq(crossed.length, 0, `${id}: no line of his page is crossed (typed ${typed}, ${scoped ? 'bank scope' : 'as a student page is read'})`);
       }
     }
-    // the hold itself: a cross, and the lines that follow it from it, become a note that says nothing about the line; other reports are returned as they are
-    const rep = { lines: [{ text: 'a', status: 'ok' }, { text: 'b', status: 'break', note: 'x' }, { text: 'c', status: 'note', note: 'Follows from the earlier slip.' }] };
+    // the hold itself: ONLY his faulty line (or a line equal to it) that is crossed becomes a note; every other cross stays a cross
+    const f = BANK_AUTHORING_FAULTS[id];
+    const X = text => ({ text, status: 'break', note: 'x' });
+    const rep = { lines: [{ text: 'a', status: 'ok' }, X(f.line), { text: 'c', status: 'note', note: 'Follows from the earlier slip.' }, X('(1/3)*arctan(4*x)'), X('(1/3)*arctan(3*x)+7'), X('  (1/3) * arctan( 3x )'), X('x=1')] };
     const held = holdFaultCrosses(q, rep);
-    c.deq(held.lines.map(l => l.status), ['ok', 'note', 'note'], `${id}: a cross becomes a note and the tick stays`);
-    c.ok(held.lines.every(l => l.status !== 'break' && l.note !== 'x'), `${id}: no cross, and its words are not shown`);
+    c.deq(held.lines.map(l => l.status), ['ok', 'note', 'note', 'break', 'break', 'note', 'break'], `${id}: his line and a line equal to it become notes; arctan(4x), a different constant and an unrelated line stay crossed`);
+    c.ok(held.lines[1].note !== 'x' && held.lines[3].note === 'x' && held.lines[4].note === 'x', `${id}: the held line's cross words are not shown, the others keep theirs`);
+    c.eq(holdFaultCrosses(q, { lines: [X('(1/3)*arctan(4*x)')] }).lines[0].status, 'break', `${id}: a page with no faulty line is returned as it was`);
     c.eq(holdFaultCrosses({ ...q, _bank: 'A11-F1-001' }, rep), rep, 'a question that is not held is returned unchanged');
+    { const { usesExtendedTex } = await import('../platform/markerOps.js'); c.eq(usesExtendedTex(q), true, 'a bank question is read with the extended TeX reading'); c.eq(usesExtendedTex({ ...q, _bank: undefined, _marking: 'final-answer-only' }), false, 'a generator or paper question sealed final-answer-only uses the default reader'); c.eq(usesExtendedTex({ _methodScheme: 'x' }), false, 'and so does one stamped with a scheme'); }
     c.eq(holdFaultCrosses(q, null), null, 'no report, no change');
   }
   qb.resetQbank();

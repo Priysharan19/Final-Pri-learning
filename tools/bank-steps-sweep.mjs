@@ -61,7 +61,7 @@ const PLAIN_WORD_CLAIMS = ['the gradient is clearly negative here', 'the functio
 export function runSweep({ limit = 0, rule = 'criteria' } = {}) {
   const items = eligibleParts({ limit, rule });
   const R = {
-    parts: 0, pages: 0, byClass: new Map(), a: { pages: 0, dist: new Map() }, b: { full: 0, fullPages: 0, wrongAtN: 0, wrongPages: 0 },
+    parts: 0, pages: 0, byClass: new Map(), a: { pages: 0, dist: new Map(), byN: new Map() }, b: { full: 0, fullPages: 0, wrongAtN: 0, wrongPages: 0 },
     c: { pages: 0, marks: 0, ideal: 0, afterWrong: 0 }, f: { pages: 0, marks: 0, atN: 0 }, e: { alone: 0, aloneEarned: 0, after: 0, afterEarned: 0, afterOwn: 0, afterOther: 0 },
     g: { pages: 0, wrongFull: 0, overN: 0, correctNotFull: 0, unticked: 0, afterCross: 0, answerByWorking: 0, tableNotMark: 0, notPaid: 0 },
     coincidences: [], exceptions: [], violations: []
@@ -115,6 +115,7 @@ export function runSweep({ limit = 0, rule = 'criteria' } = {}) {
       const lines = bad && bad !== texts[lastIdx] ? texts.map((t, i) => (i === lastIdx ? bad : t)) : texts;
       const a = markPage(q, lines, WRONG); check(q, a, 'a-final-wrong');
       R.a.pages++; R.a.dist.set(a.marks, (R.a.dist.get(a.marks) || 0) + 1);
+      { const o = R.a.byN.get(N) || { pages: 0, marks: 0 }; o.pages++; o.marks += a.marks; R.a.byN.set(N, o); }
     }
 
     // c: one middle line made wrong, then his lines. Nothing at or after it. `ideal`: the criteria whose own line stands before it in his working.

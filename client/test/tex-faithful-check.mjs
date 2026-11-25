@@ -138,7 +138,8 @@ function parseSide(src0) {
     let f = null;
     if (peek() && peek().k === 'num') { const n = peek().v; p++; f = () => n; if ((isSym('^') && (isCmd('circ', 1) || (isSym('{', 1) && isCmd('circ', 2))))) { p++; if (isSym('{')) p += 3; else p++; return () => n * Math.PI / 180; } }
     const t = peek();
-    if (t && (t.k === 'var' || (t.k === 'cmd' && /^(?:theta|alpha|beta|pi)$/.test(t.v)))) { p++; const g = t.k === 'var' ? (env => env[t.v]) : t.v === 'pi' ? (() => Math.PI) : (env => env[t.v]); const a = f; return a ? env => a(env) * g(env) : g; }
+    if (t && t.k === 'var' && t.v === 'e' && isSym('^', 1)) { p += 2; const ex = argTok(); return env => Math.pow(Math.E, ex(env)); }   // \ln e^{5}: the power of e is the argument
+    if (t && (t.k === 'var' || (t.k === 'cmd' && /^(?:theta|alpha|beta|pi)$/.test(t.v)))) { p++; const g = t.k === 'var' ? (env => env[t.v]) : t.v === 'pi' ? (() => Math.PI) : (env => env[t.v]); const a = f; const nx = peek(); if (t.k === 'cmd' && nx && nx.k === 'var') { p++; const g0 = g, h = env => env[nx.v]; const prod = env => g0(env) * h(env); return a ? env => a(env) * prod(env) : prod; } return a ? env => a(env) * g(env) : g; }
     if (f) return f;
     return bad('function argument');
   }
@@ -298,6 +299,8 @@ function compareReading(tex, plain) {
 
 // ── Part 1 · every construct, by number ─────────────────────────────────────────────────────────────────────────────────
 const CONSTRUCTS = [
+  // review of PR #1121: coefficient before a function, e beside a number, a product argument, ln of a power of e
+  'a\\tan\\tfrac{\\pi}{4}=2', 'y=a\\sin x', 'a\\cos 2x=b', '2e-3', '3e-2x', '\\cos\\pi t', '\\sin 2\\pi t=0', '\\ln e^{5}=5',
   // Greek letters as variables, π as the constant
   '\\alpha+\\beta=\\beta+\\alpha', '2\\alpha\\beta-3\\alpha=\\alpha(2\\beta-3)', '\\theta=\\theta', '\\sin\\theta\\cos\\theta=\\tfrac12\\sin2\\theta', '2\\pi r=2\\pi r', '\\pi r^{2}h=h\\pi r^{2}',
   // logs
@@ -415,7 +418,7 @@ console.log(`bank: ${bankPieces} pieces, ${bankCompared} compared side by side a
 console.log(`authoring faults (his number-only sides disagree beyond the rounding he printed): ${faultIds.length} parts`);
 for (const f of faults) console.log('  ', f);
 // pinned to the printed numbers (re-derive by running this file after the author fixes a step)
-const PIN = { compared: 3236, faultIds: [] };
+const PIN = { compared: 3256, faultIds: [] };
 if (PIN.compared >= 0) { ok(bankCompared === PIN.compared, `bank pieces compared ${bankCompared} (pinned ${PIN.compared})`); ok(JSON.stringify(faultIds) === JSON.stringify(PIN.faultIds), `authoring faults ${JSON.stringify(faultIds)}`); }
 
 console.log(`TEX FAITHFUL: ${fail ? 'FAIL' : 'PASS'} — ${pass}/${pass + fail} checks — the reader's plain form equals the TeX's own value at sample points, in ${compared} constructs and ${bankCompared} of the author's own steps; anything uncertain is unread`);

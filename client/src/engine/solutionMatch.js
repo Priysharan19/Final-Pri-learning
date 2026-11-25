@@ -91,6 +91,13 @@ function bankSpanToPlain(span) {
   //   · a capital or small a before sin, cos or tan (\sin A\cos B): it reads sin Acos B, in which the engine finds the function acos.
   const trap = /\\(?:sin|cos|tan|sec|csc|cot|ln|log|exp)(?![A-Za-z])(?:\s*\^\s*(?:\{[^{}]*\}|\d))?\s*\d+(?:\.\d+)?\s*(?:[A-Za-z]|\\(?:theta|pi|alpha|beta))/;
   if (trap.test(src)) return strict();
+  // Also read only by the strict reader (null when it is not certain), because the older reading is wrong on each: a constant e next to a number (2e-3 is 2e - 3, not
+  // 0.002); a function followed by a Greek letter and a letter (cos pi t is cos(pi t), not cos(pi) times t); a log or ln of a power of e; a function with a bracketed
+  // argument followed by an operand (sin(2m+1)x); a factorial after a bare argument (sin x!); a letter straight before a function (a tan, a coefficient).
+  if (/\d\s*e(?![A-Za-z])/.test(src) || /\\(?:sin|cos|tan|sec|csc|cot|ln|log|exp)(?![A-Za-z])\s*(?:\d+(?:\.\d+)?)?\s*\\(?:pi|theta|alpha|beta)(?![A-Za-z])\s*[A-Za-z]/.test(src)
+    || /\\(?:ln|log)(?![A-Za-z])[^=,]{0,4}e\^/.test(src) || /\\(?:sin|cos|tan|sec|csc|cot|ln|log|exp)(?![A-Za-z])\s*\([^()]*\)\s*(?:[A-Za-z0-9]|\\(?:pi|theta|alpha|beta)(?![A-Za-z]))/.test(src)
+    || /\\(?:sin|cos|tan|sec|csc|cot|ln|log|exp)(?![A-Za-z])[^!()=]{0,14}!/.test(src) || /[A-Za-z]\s*\\(?:sin|cos|tan|sec|csc|cot)(?![A-Za-z])/.test(src)
+    || /\\(?:sin|cos|tan)\s*\^\s*\{?\s*-\s*1/.test(src) || /\\log\s*_/.test(src)) return strict();
   // A reading that was already there is kept; the strict reading only fills what the older ones left unread.
   const old = spanToPlainBraced(span, true);
   if (old) return /(?<![A-Za-z])[aA](?:sin|cos|tan)/.test(old) ? strict() : old;

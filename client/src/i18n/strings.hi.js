@@ -620,6 +620,7 @@ export default {
   'verdict.yourAnswer': 'आपका उत्तर',
   'verdict.attachedWorking': 'लगाया गया काम',
   'verdict.marksOutOf': '{total} में से {earned} अंक',
+  'mark.readAsBrackets': 'इसे {reading} पढ़ा गया। कोष्ठक लगाइए ताकि इसे {literal} न पढ़ा जाए।',
   'verdict.markedOnDevice': 'जाँच इसी डिवाइस पर Pri इंजन ने की है। अगर आपका तरीका दिए गए हल से अलग है तो उसे अपने शिक्षक से जँचवा लीजिए।',
   'verdict.correct': 'सही।',
   'verdict.revealed': 'हल दिखा दिया गया।',
