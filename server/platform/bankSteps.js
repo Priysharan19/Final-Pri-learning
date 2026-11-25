@@ -45,6 +45,7 @@ import { _internals, _forChains } from '../../client/src/engine/solutionMatch.js
 import { parse, normalize, evaluate, variablesOf, withEvaluationBudget } from '../../client/src/engine/expr.js';
 import { stepEvidence, marksPossibleFor, isSchemeStep } from './markerOps.js';
 import { awardGeneric, genericDigest } from './genericSteps.js';
+import { bankFault } from './bankFaults.js';
 import { texToPlain as readTex, EXTENDED_TEX } from '../../client/src/engine/texToPlain.js';
 
 // His steps are TeX, read here with the extended reading (engine/texToPlain.js) first and, where that is not certain, the older reading below. The switch
@@ -511,6 +512,7 @@ function markBankPageRead(q, specs, lines, typed, correct = false) {
  */
 export function bankPlan(q) { return withBankReading(() => bankPlanRead(q)); }
 function bankPlanRead(q) {
+  if (bankFault(q)) return { eligible: false, why: 'authoring-fault', marks: marksPossibleFor(q), specs: [], proof: {} };
   if (!bankStructural(q)) return { eligible: false, why: 'not-structural', marks: 0, specs: [], proof: {} };
   const k = keyOf(q);
   if (planMemo.has(k)) return planMemo.get(k);

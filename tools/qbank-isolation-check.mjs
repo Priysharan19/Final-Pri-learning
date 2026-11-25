@@ -81,6 +81,8 @@ export const CHANCE_ANSWERS = Object.freeze(['0.6931471805599453', '(e-1)/2']);
 // A trap that is a bare comparison any library's code holds (a PDF worker's own `x >= 2`): its text alone proves nothing; the pack's shape, ids and runs still would.
 export const CHANCE_TRAPS = Object.freeze(['x >= 2']);
 const squash = t => String(t ?? '').replace(/\s+/g, ' ').trim();
+/** Undo one level of JavaScript/JSON string escaping, exactly once and in one pass: a backslash before a backslash or a quote is that character. Separate passes (backslashes first, then quotes) would unescape `\\\\"` twice. */
+const unescapeOnce = t => String(t ?? '').replace(/\\([\\"'])/g, '$1');
 /** The answer, written the ways it is stored. */
 const answerTexts = q => {
   const a = q.answer || {};
@@ -122,7 +124,7 @@ const ambientMemo = new Map();
 const inAmbient = t => { let v = ambientMemo.get(t); if (v === undefined) { v = ambient().includes(t); ambientMemo.set(t, v); } return v; };
 const ambient = () => (ambientText ??= (() => {
   const raw = [...walk(path.join(ROOT, 'client', 'src')), ...walk(path.join(ROOT, 'client', 'public'))].filter(f => TEXT.test(f)).map(f => fs.readFileSync(f, 'utf8')).join(' ');
-  return squash(raw) + ' ' + squash(raw.replace(/\\\\/g, '\\').replace(/\\"/g, '"').replace(/\\'/g, "'"));
+  return squash(raw) + ' ' + squash(unescapeOnce(raw)) + ' ' + squash(unescapeOnce(unescapeOnce(raw)));
 })());
 
 // ── structure: the pack found by its SHAPE, whatever it is named and however it is wrapped ──────────────────────────────────────────────
@@ -236,7 +238,6 @@ export function scanDist(dist, questions, version, { capMs = SCAN_CAP_MS, figure
     if (n[1].length >= FRAGMENT) { const k = n[1].slice(0, FRAGMENT); prefixes.set(k, [...(prefixes.get(k) || []), n]); }
     else { const k = n[1].slice(0, 6); shorts.set(k, [...(shorts.get(k) || []), n]); }
   }
-  const idList = [...ids];
   // A cheap filter for the per-character loop: a window can only match a needle or a step run when its first 6 characters are the first 6 of one.
   const first6 = new Set([...runs.keys(), ...prefixes.keys(), ...shorts.keys()].map(k => k.slice(0, 6)));
   const first2 = new Set([...first6].map(k => k.slice(0, 2)));
@@ -261,8 +262,9 @@ export function scanDist(dist, questions, version, { capMs = SCAN_CAP_MS, figure
         for (const f of structural(text, tokens, ids)) hits.push(`${where}: ${f}`);
         // A bundle holds a string as JavaScript or JSON writes it: backslashes doubled, quotes and newlines escaped. Each reading is scanned:
         // as written, with the escapes undone, and with a newline escape read as the space it is.
-        const undone = text.replace(/\\\\/g, '\\').replace(/\\"/g, '"').replace(/\\'/g, "'");
-        for (const flat of new Set([squash(text), squash(undone), squash(undone.replace(/\\n/g, ' '))])) {
+        const undone = unescapeOnce(text);
+        const undone2 = unescapeOnce(undone);   // a string escaped twice (JSON inside a JSON string) is read once more
+        for (const flat of new Set([squash(text), squash(undone), squash(undone2), squash(undone.replace(/\\n/g, ' ')), squash(undone2.replace(/\\n/g, ' '))])) {
           // Long needles are found by their first 20 characters then confirmed whole; short ones by their own length.
           const found = new Set();
           for (let k = 0; k + FRAGMENT <= flat.length && !capped(); k++) {

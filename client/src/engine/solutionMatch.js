@@ -73,7 +73,8 @@ function spanToPlain(span) {
 function bankSpanToPlain(span) {
   const src = String(span);
   // ± is two statements; as one line of working it would be a comma list, whose half (x = √k, x = √k) the matcher would tick as a step. Left unread here.
-  if (/\\(?:pm|mp)(?![A-Za-z])/.test(src)) return null;
+  // Only the part that is read counts: a span cut at \Rightarrow (`2/a = a/8 \Rightarrow a = \pm 4`) reads as its first statement, as it always did.
+  if (/\\(?:pm|mp)(?![A-Za-z])/.test(src.split(/\\approx|\\simeq|\\Rightarrow|\\therefore|\\text|\\mathrm|\\mid/)[0])) return null;
   // The strict reader on the TeX as written (braces intact). Null when it is not certain.
   const strict = () => {
     let t = src.replace(/\\[dt]frac/g, '\\frac').replace(/\\prime/g, "'");

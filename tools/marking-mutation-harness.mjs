@@ -15,9 +15,11 @@
 //
 // Deterministic: fixed seeds, no model, no network. A measurement; it sets and changes nothing.
 //
-//   node tools/marking-mutation-harness.mjs [--bank] [--ids A11-F1-172,...] [--root <repo>] [--seeds 1] [--seed-from 0] [--max-per-line 12] [--generators y12-diff,me11-poly]
+//   node tools/marking-mutation-harness.mjs [--bank [--bank-unscoped]] [--ids A11-F1-172,...] [--root <repo>] [--seeds 1] [--seed-from 0] [--max-per-line 12] [--generators y12-diff,me11-poly]
 //        [--typed wrong|right] [--dump out.json] [--compare base.json] [--limit-pages N] [--verbose]
 //   --root points the engine at another checkout (the same harness measured against an older tree gives the "before" rate);
+//   --bank reads and marks his pages in the bank's own scope (solutionMatch.withBankReading, as the bank rules do); --bank-unscoped reads and marks them as a student's
+//   page is read (no scope), which is what the product does today and must equal main's tree line for line.
 //   --dump writes every authored line's verdict, --compare lists the ticks a tree lost or gained against such a dump.
 //
 // What is NOT held against the marker (each counted in the totals, by class, never silently dropped):
@@ -576,7 +578,7 @@ export async function loadEngine(root) {
  * handed them (markerOps.markerView over the served question), their answers read as server/platform/qbankMarking.js reads them, and the same
  * real marker. `ids` are the pack's question ids.
  */
-export async function loadBankEngine(root) {
+export async function loadBankEngine(root, { scoped: useScope = true } = {}) {
   const E = await loadEngine(root);
   const pack = await import(path.join(root, 'server/platform/qbankPack.js'));
   const { checkBankAnswer } = await import(path.join(root, 'server/platform/qbankMarking.js'));
@@ -585,20 +587,22 @@ export async function loadBankEngine(root) {
   const ids = pack.qbankEntries().map(e => e.entry.id);
   // his steps are read in the bank's own scope (solutionMatch.withBankReading), as the bank rules read them; a checkout without it reads as it always did
   const SM = await import(path.join(root, 'client/src/engine/solutionMatch.js'));
-  const scoped = SM._internals.withBankReading ? (span => SM._internals.withBankReading(() => SM._internals.spanToPlain(span))) : E.spanToPlain;
-  return { ...E, spanToPlain: scoped, G: { generateQuestion: id => markerView(pack.qbankEntryQuestion(id, 17)) }, checkAnswer: checkBankAnswer, ids, bank: true };
+  const scoped = useScope && SM._internals.withBankReading ? (span => SM._internals.withBankReading(() => SM._internals.spanToPlain(span))) : E.spanToPlain;
+  // the page is MARKED in the same scope it was read in (as markBankPage does): his line and the step it is matched against are read by one reader
+  const scope = useScope && SM._internals.withBankReading ? SM._internals.withBankReading : null;
+  return { ...E, spanToPlain: scoped, scope, G: { generateQuestion: id => markerView(pack.qbankEntryQuestion(id, 17)) }, checkAnswer: checkBankAnswer, ids, bank: true };
 }
 /** The real marker's report lines for a page, or null. A generator question is marked as the server marks one it has sealed (the Australian edition's). */
 export function markPage(E, q, answer, page) {
   const qq = E.bank ? { ...q } : { ...q, _marking: 'final-answer-only' };
-  let ev; try { ev = E.stepEvidence(qq, answer, page.join('\n'), E.checkAnswer(qq, answer), { slipWarnings: true }); } catch { return null; }
+  let ev; try { const go = () => E.stepEvidence(qq, answer, page.join('\n'), E.checkAnswer(qq, answer), { slipWarnings: true }); ev = E.bank && E.scope ? E.scope(go) : go(); } catch { return null; }
   return ev && (ev.shownReport || ev.stepReport) && Array.isArray((ev.shownReport || ev.stepReport).lines) ? (ev.shownReport || ev.stepReport).lines : null;
 }
 /** The report's line for page line i: by position when it judged every line, otherwise by the line's text (a proof is judged line by line from its own plan). */
 export const lineAt = (rep, page, i) => (rep && rep.length === page.length ? rep[i] : rep ? rep.find(l => String(l.text ?? '').trim() === page[i].trim()) : undefined);
 
-export async function run({ root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), seeds = [1], maxPerLine = 12, generators = null, typed = 'wrong', limitPages = Infinity, verbose = false, bank = false, ids = null } = {}) {
-  const E = bank ? await loadBankEngine(root) : await loadEngine(root);
+export async function run({ root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), seeds = [1], maxPerLine = 12, generators = null, typed = 'wrong', limitPages = Infinity, verbose = false, bank = false, ids = null, bankScope = true } = {}) {
+  const E = bank ? await loadBankEngine(root, { scoped: bankScope }) : await loadEngine(root);
   const { G, NSW_BANK_LEDGER, spanToPlain, stepEvidence, checkAnswer } = E;
   const cells = [];
   if (bank) for (const id of E.ids) { if (!ids || ids.includes(id)) cells.push({ generator: id, difficulty: 0, seed: 17 }); }
@@ -797,7 +801,7 @@ export async function run({ root = path.resolve(path.dirname(fileURLToPath(impor
       if (sym) lines.push(`${L} = ±${fmt(Math.abs(sols[0]))}${u}`);
       if (sols.length >= 2 || sym) for (const t of lines) if (same && (sols.length >= 2 || sym)) tryTrue(q, 'solution-list', [t], 0);
       const wrongSets = [];
-      sols.forEach((v, i) => { const withEl = n => sols.map((x, j) => (j === i ? n : x)); wrongSets.push(withEl(v + 1), withEl(-v === v ? v + 2 : -v), withEl(v + 360 === v ? v : v + 90)); });
+      sols.forEach((v, i) => { const withEl = n => sols.map((x, j) => (j === i ? n : x)); wrongSets.push(withEl(v + 1), withEl(-v === v ? v + 2 : -v), withEl(v + 90)); });
       wrongSets.push([...sols, (Math.max(...sols) || 0) + 7]);
       const key = x => x.slice().sort((a, b) => a - b).join();
       const trueKey = key([...new Set(sols)]);
@@ -920,6 +924,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
     typed: arg('typed', 'wrong'),
     limitPages: Number(arg('limit-pages', Infinity)),
     bank: process.argv.includes('--bank'),
+    bankScope: !process.argv.includes('--bank-unscoped'),
     ids: arg('ids', null) ? arg('ids').split(',') : null,
     verbose: process.argv.includes('--verbose')
   });

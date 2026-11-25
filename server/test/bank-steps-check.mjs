@@ -37,7 +37,7 @@ const { bankStepProofs } = await import('../../tools/qbank-import.mjs');
 const sweep = await import('../../tools/bank-steps-sweep.mjs');
 
 // The numbers printed by `node tools/qbank-import.mjs --bank-steps` and `node tools/bank-steps-sweep.mjs` on the committed pack. A new pack changes them on purpose.
-const PIN = { parts: 1287, eligible: 166, verifiable: 174, notVerified: 46, sweepPages: 3478 };
+const PIN = { parts: 1287, eligible: 167, verifiable: 175, notVerified: 47, sweepPages: 3497 };
 
 const c = checks();
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -164,6 +164,43 @@ function require_accepted(q) { return q.answerType === 'numeric' ? String(q.answ
   c.deq(stepsMatching('', steps), [], 'an empty point matches nothing');
   c.eq(PARAMETERS.MIN_MARKS, 2, 'the rule applies from two marks');
   c.eq(bankStructural({ _bank: 'x', answerType: 'manual', criteria: [{ marks: 2, point: 'p' }], steps: [], authoredMarks: 2 }), false, 'a worked-solution question is not structural');
+}
+
+// ── 4b. an authoring fault is held, never crossed: his step disagrees with his own answer (X12-C2-053: the step has no +C, his answer has it) ──────
+{
+  const { BANK_AUTHORING_FAULTS, bankFault, holdFaultCrosses } = await import('../platform/bankFaults.js');
+  const { bankGenericEligible } = await import('../platform/bankGenericSteps.js');
+  const { stepEvidence } = await import('../platform/markerOps.js');
+  const { checkBankAnswer } = await import('../platform/qbankMarking.js');
+  const { withBankReading } = (await import('../../client/src/engine/solutionMatch.js'))._internals;
+  qb.installPack(await qb.loadPack(qb.directorySource(qb.DEFAULT_PACK_DIR)));
+  c.ok(Object.keys(BANK_AUTHORING_FAULTS).length >= 1 && Object.values(BANK_AUTHORING_FAULTS).every(why => typeof why === 'string' && why.length > 20), 'each held question carries its reason');
+  for (const id of Object.keys(BANK_AUTHORING_FAULTS)) {
+    const q = qb.qbankEntryQuestion(id, 17);
+    c.ok(bankFault(q) !== null && bankFault({ ...q, _bank: undefined }) === null, `${id} is held by its own id alone`);
+    c.eq(bankPlan(q).eligible, false, `${id}: the bank rule does not pay a held question`);
+    c.eq(bankPlan(q).why, 'authoring-fault', `${id}: and says why`);
+    c.eq(bankGenericEligible(q), false, `${id}: nor does the generic rule applied to the bank`);
+    // the page he wrote, as the bank reads it and as a student's own page is read: no line is crossed, with a wrong or a right typed answer
+    const lines = bankAuthoredLines(q).map(l => l.text);
+    c.ok(lines.length >= 2, `${id}: his page has ${lines.length} lines`);
+    for (const typed of ['99991', '1']) {
+      for (const scoped of [false, true]) {
+        const go = () => stepEvidence({ ...q }, typed, lines.join('\n'), checkBankAnswer(q, typed), { slipWarnings: true });
+        const ev = scoped ? withBankReading(go) : go();
+        const crossed = [ev.stepReport, ev.shownReport].filter(Boolean).flatMap(r => r.lines).filter(l => l?.status === 'break');
+        c.eq(crossed.length, 0, `${id}: no line of his page is crossed (typed ${typed}, ${scoped ? 'bank scope' : 'as a student page is read'})`);
+      }
+    }
+    // the hold itself: a cross, and the lines that follow it from it, become a note that says nothing about the line; other reports are returned as they are
+    const rep = { lines: [{ text: 'a', status: 'ok' }, { text: 'b', status: 'break', note: 'x' }, { text: 'c', status: 'note', note: 'Follows from the earlier slip.' }] };
+    const held = holdFaultCrosses(q, rep);
+    c.deq(held.lines.map(l => l.status), ['ok', 'note', 'note'], `${id}: a cross becomes a note and the tick stays`);
+    c.ok(held.lines.every(l => l.status !== 'break' && l.note !== 'x'), `${id}: no cross, and its words are not shown`);
+    c.eq(holdFaultCrosses({ ...q, _bank: 'A11-F1-001' }, rep), rep, 'a question that is not held is returned unchanged');
+    c.eq(holdFaultCrosses(q, null), null, 'no report, no change');
+  }
+  qb.resetQbank();
 }
 
 // ── 5. no model, no network, no clock ──────────────────────────────────────────────────────────────────────────────────────

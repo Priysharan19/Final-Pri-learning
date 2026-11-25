@@ -52,12 +52,12 @@ function factorEnd(s, i, first) {
   const rest = s.slice(i);
   let m;
   if ((m = /^\d+(?:\.\d+)?/.exec(rest))) e = i + m[0].length;
-  else if ((m = /^[A-Za-z]/.exec(rest))) e = i + 1;
+  else if (/^[A-Za-z]/.test(rest)) e = i + 1;
   else if ((m = GREEK_TEX.exec(rest))) e = i + m[0].length;
   else if (s[i] === '{') e = texGroup(s, i);
   else if ((m = /^\\[dt]?frac(?![A-Za-z])/.exec(rest))) { const a = texArgEnd(s, i + m[0].length); e = a < 0 ? -1 : texArgEnd(s, a); }
   else if ((m = /^\\sqrt(?![A-Za-z])/.exec(rest))) { let j = i + m[0].length; if (s[j] === '[') { const c = s.indexOf(']', j); if (c < 0) return -1; j = c + 1; } e = texArgEnd(s, j); }
-  else if (first && (m = FN_AT.exec(rest))) { const r = applyAt(s, i); e = r.end; }
+  else if (first && FN_AT.test(rest)) { const r = applyAt(s, i); e = r.end; }
   if (e < 0) return -1;
   for (;;) {   // powers and subscripts bind to the factor
     let j = e; while (s[j] === ' ') j++;

@@ -18,6 +18,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { genericDigest, genericEligible, genericPlan, awardGeneric } from './genericSteps.js';
 import { marksPossibleFor } from './markerOps.js';
+import { bankFault } from './bankFaults.js';
 import { _internals } from '../../client/src/engine/solutionMatch.js';
 
 // His worked steps are TeX. They are read with the extended TeX reading (engine/texToPlain.js) and no older reading where it is known to mean something else;
@@ -49,6 +50,7 @@ export function bankGenericEligible(q) {
 function bankGenericEligibleRead(q) {
   try {
     if (!q || typeof q._bank !== 'string' || q._worked !== undefined || !BANK_GENERIC_PARAMETERS.AUTO_TYPES.includes(q.answerType)) return false;
+    if (bankFault(q)) return false;
     if (marksPossibleFor(q) < BANK_GENERIC_PARAMETERS.MIN_MARKS || !genericEligible(q)) return false;
     return genericPlan(q).keySteps.length >= 1;
   } catch { return false; }

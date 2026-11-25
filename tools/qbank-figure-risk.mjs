@@ -8,7 +8,7 @@
 //       compared by sampling, unless the question only asks for the equation of the curve it shows;
 //   (c) a label or tick, read as numbers, equals the accepted answer, its reciprocal or its negative (1/440 for 440), or a set answer's values
 //       all appear among the numbers of the labels (the boundaries of 0 <= t <= 1, 1 <= t <= 3);
-//   (d) a worked step's RESULT (a point, or a value that is not trivial) is a coordinate, label or tick of the figure.
+//   (d) a worked step's RESULT (a point, or any value but zero) is a coordinate, label or tick of the figure.
 // FAIL CLOSED: where the test needs the geometry and a coordinate or plotted expression cannot be read, the figure is held.
 // Deterministic. No clock, no network, no model, no randomness.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -66,11 +66,9 @@ export function evalMath(src, vars = {}, { deg = false } = {}) {
 }
 
 export const near = (a, b, rel = 2e-3) => Math.abs(a - b) <= Math.max(1e-6, Math.abs(b) * rel);
-const trivial = v => [0, 1, -1].some(t => Math.abs(v - t) < 1e-9);
 
 // ── reading the TikZ ─────────────────────────────────────────────────────────
 function balanced(s, i, open, close) { let d = 0; for (let j = i; j < s.length; j++) { if (s[j] === '\\') { j++; continue; } if (s[j] === open) d++; else if (s[j] === close && --d === 0) return j; } return -1; }
-const hasMacro = s => /\\[A-Za-z]/.test(s);
 
 /**
  * The geometry of a figure: points [{x,y,at}], plotted functions [{expr, deg}], segments [{p,q}], and `unreadable` (coordinates or plots whose
@@ -140,7 +138,7 @@ export function geometryOf(tikz) {
       continue;
     }
     if (s.startsWith('table', i) || s.startsWith('gnuplot', i)) { unreadable.push('addplot table'); continue; }
-    if (s.startsWith('expression', i) || /^\s*\[?/.test('')) { /* falls to the brace */ }
+    // `expression{...}` and a bare `{...}` are read the same way, from the brace.
     const br = s.indexOf('{', i);
     if (br < 0 || br > i + 14) { unreadable.push('addplot without an expression'); continue; }
     const j = balanced(s, br, '{', '}');

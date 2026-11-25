@@ -35,6 +35,7 @@ import { lineChains } from '../../client/src/engine/lineChains.js';
 import { provedLines } from '../../client/src/engine/provedLines.js';
 import { awardBoardScheme, matchBoardPoints } from '../../client/src/engine/boardScheme.js';
 import { constrainToShown, unsupportedCredit } from '../../client/src/engine/markExplanation.js';
+import { holdFaultCrosses } from './bankFaults.js';
 import { answerForm, effectiveSymbols, firstFinalAttempt, planGivens, readClaimForm } from './finalAttempt.js';
 
 // Mirrors the shared deterministic checker input used by local practice;
@@ -433,7 +434,8 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
   // A scheme question (schemeAward.js) also learns which lines the topic check ITSELF verified: the page ticks more than that (a copied
   // given, a rule statement, a true-as-written sum), and "writes a correct derivative" is earned only by a line the check found equal to it.
   const topicTicks = q._methodScheme ? (decided ? decided.lines.flatMap((l, i) => (l?.status === 'ok' ? [i] : [])) : null) : undefined;
-  return { stepReport: report, ...(shownReport ? { shownReport } : {}), partial, ...(board ? { board } : {}), ...(markingReport ? { markingReport } : {}), ...(topicTicks !== undefined ? { topicTicks } : {}) };
+  // A question of the author's bank whose own worked step disagrees with its own answer (bankFaults.js) is never crossed on the page: a cross is shown as a note. After every mark.
+  return { stepReport: holdFaultCrosses(q, report), ...(shownReport ? { shownReport: holdFaultCrosses(q, shownReport) } : {}), partial, ...(board ? { board } : {}), ...(markingReport ? { markingReport } : {}), ...(topicTicks !== undefined ? { topicTicks } : {}) };
 }
 
 /** The Board-scheme award for a question carrying one, from the deterministic report. */

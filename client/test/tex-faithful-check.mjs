@@ -216,7 +216,6 @@ function texSides(tex0) {
   sides.push(tex.slice(last));
   return { sides, rels };
 }
-const PLAIN_REL = /(?<![<>!])(?:<=|>=|!=|≈|=|<|>)/g;
 function plainSides(plain, factorials = true) {
   const sides = [], rels = [];
   let depth = 0, last = 0;
@@ -269,7 +268,7 @@ const numbersOnly = s => !/[A-Za-z]/.test(s.replace(/\\(?:frac|dfrac|tfrac|sqrt|
  */
 function compareReading(tex, plain) {
   const branches = plain.includes(', ') && /\\pm/.test(tex) ? plain.split(/,\s(?=[^,]*$)/) : [plain];
-  const texes = /\\pm/.test(tex) && branches.length === 2 ? [tex.replace('\\pm', '+'), tex.replace('\\pm', '-')] : [tex];
+  const texes = /\\pm/.test(tex) && branches.length === 2 ? [tex.replaceAll('\\pm', '+'), tex.replaceAll('\\pm', '-')] : [tex];
   const dot = /\\d?dot/.test(tex);
   for (let b = 0; b < branches.length; b++) {
     const T = texSides(texes[b]);

@@ -98,8 +98,29 @@ for (const [name, list] of lists) {
   c.ok(stamped > 100, `approved alone it stamps ${stamped} of ${entries.length}`);
 }
 
-// Over the real routes, every scheme approved: a wrong answer, with the author's own worked lines as the working, earns nothing.
-approveSchemeTypesForTests(everything);
+// Neither draft bank rule is on the repository's approved list, and a worked-solution question is never stamped by either, whatever is approved.
+{
+  const draftIds = [BANK_ID, BANK_GENERIC_ID];
+  c.eq(repoList.filter(t => draftIds.includes(t.typeId)).length, 0, 'neither draft bank rule is on the repository approved list');
+  const bothDrafts = [{ typeId: BANK_ID, digest: bankDigest() }, { typeId: BANK_GENERIC_ID, digest: bankGenericDigest() }];
+  const worked = qb.qbankManualEntries();
+  let stampedWorked = 0, unsealedWorked = 0;
+  for (const { entry } of worked) {
+    const q = JSON.parse(JSON.stringify(qb.qbankManualQuestion(entry.id, 17)));
+    q._generator = q.subtopic;
+    sealForEdition(q, { ...bankPolicy('prithagoras'), methodSchemeTypes: [...everything, ...bothDrafts] });
+    if (q._methodScheme !== undefined) stampedWorked++;
+    if (q._marking !== FINAL_ANSWER_MARKING) unsealedWorked++;
+  }
+  c.ok(worked.length > 1500, `the pack holds ${worked.length} worked-solution questions`);
+  c.eq(stampedWorked + unsealedWorked, 0, 'no worked-solution question is stamped by any scheme, the generic rule or either draft bank rule, even with all of them approved');
+}
+
+// (computed before the server starts: a long synchronous loop beside an open keep-alive socket gets it reset)
+const eligibleDraft = entries.filter(e => e.marks >= 2 && (bankEligible(qb.qbankEntryQuestion(e.id, 17)) || bankGenericEligible(qb.qbankEntryQuestion(e.id, 17))));
+
+// Over the real routes, with the REAL repository list and the method-marks switch on (no test override): nothing is stamped or paid by either draft rule
+// or by any approved scheme, a wrong answer earns 0, and a right answer earns what a final-answer-only question earns.
 const h = await startApp({ engine: requestedEngine() });
 try {
   let a = null, used = 0, acct = 0;
@@ -107,6 +128,45 @@ try {
   await fresh();
   let seed = 5000;
   const call = async (p, body, headers = {}) => { if (p.endsWith('/issue')) used++; return h.request(p, { method: 'POST', jar: a.jar, headers, body }); };
+  {
+    c.eq(approvedSchemeTypes().length, repoList.length, 'over HTTP the real repository list is in force');
+    c.ok(eligibleDraft.length > 100, `${eligibleDraft.length} parts could be paid by a draft rule if it were approved`);
+    let drawn = 0, stampedReal = 0, paidReal = 0, wrongPaid = 0, rightShort = 0;
+    for (let i = 0; drawn < 24 && i < 3000; i++) {
+      if (used >= 80) await fresh();
+      const pick = eligibleDraft[(i * 53) % eligibleDraft.length];
+      const place = productPlaceOf(pick.family, pick.dp);
+      if (!place) continue;
+      const dp = place.ordinal === null ? null : dotpointById(`${place.subtopic}.${place.ordinal + 1}`);
+      const asked = dp && dp.forms.includes(pick.level) ? { dotpoint: dp.id } : {};
+      let found = null;
+      for (let t = 0; t < 600 && found === null; t++) { const s2 = (seed += 7919) % 0x7fffffff; if (qb.qbankDraw(place.subtopic, pick.level, s2 >>> 0, asked.dotpoint ?? null)?._bank === pick.id) found = s2; }
+      if (found === null) continue;
+      const r = await call('/v1/practice/issue', { curriculum: 'nsw', generator: place.subtopic, difficulty: pick.level, ...asked, seed: found });
+      if (r.status !== 201) continue;
+      const row = await h.db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=?", [a.account.id, r.data.question.id]);
+      const sealedReal = JSON.parse(row.response_json);
+      if (sealedReal._bank !== pick.id) continue;
+      drawn++;
+      if (sealedReal._methodScheme !== undefined || sealedReal._marking !== FINAL_ANSWER_MARKING) stampedReal++;
+      const qq = qb.qbankEntryQuestion(pick.id, 17);
+      const lines = bankAuthoredLines(qq).map(l => l.text).join('\n');
+      const wrong = await call(`/v1/practice/${r.data.question.id}/submit`, { submissionId: `real-w-${i}`, answer: '99991', steps: lines, mode: 'typed' }, { 'Idempotency-Key': `real-w-${i}` });
+      const w = wrong.data.resolved ? wrong : await call(`/v1/practice/${r.data.question.id}/submit`, { submissionId: `real-w2-${i}`, answer: '99991', steps: lines, mode: 'typed' }, { 'Idempotency-Key': `real-w2-${i}` });
+      if (w.data.correct !== false || (w.data.marksEarned ?? 0) !== 0 || w.data.methodScheme?.paid === true || w.data.methodCriteria) wrongPaid++;
+      if (w.data.methodScheme?.paid === true) paidReal++;
+      const right = await call(`/v1/practice/${r.data.question.id}/submit`, { submissionId: `real-r-${i}`, answer: acceptedInput(qq), steps: lines, mode: 'typed' }, { 'Idempotency-Key': `real-r-${i}` });
+      if (right.data.methodScheme?.paid === true || right.data.methodCriteria) paidReal++;
+      if (right.data.correct === true && right.data.marksEarned !== right.data.marksPossible) rightShort++;
+    }
+    c.ok(drawn >= 20, `${drawn} draft-eligible bank questions drawn through the real routes on the real list`);
+    c.eq(stampedReal, 0, 'none is stamped with a scheme, the generic rule or either draft rule, each stored final-answer-only');
+    c.eq(paidReal, 0, 'no reply carries a method-marks payment or a criteria table');
+    c.eq(wrongPaid, 0, 'a wrong answer with his own worked lines earns 0 on each');
+    c.eq(rightShort, 0, 'a right answer earns exactly the final-answer marks');
+  }
+  // Every scheme and the generic rule approved (neither draft bank rule): the same, for a wrong answer with his own lines.
+  approveSchemeTypesForTests(everything);
   const wrongable = entries.filter(e => e.traps.some(t => trapInput(t) !== null));
   let tested = 0, zero = 0, schemeless = 0;
   for (let i = 0; tested < 40 && i < 4000; i++) {

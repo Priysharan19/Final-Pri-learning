@@ -3,8 +3,8 @@
 // Generated, never hand-edited: every number and every worked example below is produced by running the rule (server/platform/bankSteps.js) on the
 // author's own committed bank, so the packet cannot disagree with what the server would pay. It is written by tools/method-marks-drafts.mjs beside
 // the other packets. It is a DRAFT: nothing is approved by writing it, and this tool never writes an approval record.
-import { BANK_ID, BANK_TITLE, PARAMETERS, bankDigest, bankPlan, bankAuthoredLines, texToPlain } from '../server/platform/bankSteps.js';
-import { installPack, resetQbank, loadPack, directorySource, DEFAULT_PACK_DIR, qbankEntries, qbankEntryQuestion } from '../server/platform/qbankPack.js';
+import { BANK_ID, BANK_TITLE, PARAMETERS, bankDigest, bankAuthoredLines, texToPlain } from '../server/platform/bankSteps.js';
+import { installPack, resetQbank, loadPack, directorySource, DEFAULT_PACK_DIR } from '../server/platform/qbankPack.js';
 import { marksPossibleFor } from '../server/platform/markerOps.js';
 import { falsify, stillTrue } from './generic-steps-sweep.mjs';
 import { markPage, eligibleParts, runSweep, report as sweepReport } from './bank-steps-sweep.mjs';

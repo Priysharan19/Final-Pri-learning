@@ -43,7 +43,7 @@ const { chooseQuestion, ensureBanks, opaqueContentHash } = await import('../plat
 const { acceptedInput } = await import('../../tools/qbank-import.mjs');
 
 const c = checks();
-const pack = await qb.ensureQbank(process.env, { strict: true });
+await qb.ensureQbank(process.env, { strict: true });
 await ensureBanks();
 const policy = bankPolicy('prithagoras');
 const all = qb.qbankEntries();

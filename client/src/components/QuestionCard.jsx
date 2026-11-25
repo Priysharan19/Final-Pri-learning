@@ -33,7 +33,6 @@ import { preparePhoto } from '../ink/photoRaster.js';
 import { buildTranscript, editLine, includedLatex, includedLines, reviveTranscript, unreadablePage, workingOf } from '../photo/transcript.js';
 import { proposeFinalAnswer, readsAsWritten } from '../photo/finalAnswer.js';
 import { clearPhotoDraft, confirmPhotoDraftSaved, readPhotoDraft, savePhotoDraft } from '../local/photoDrafts.js';
-import { lineMarks } from './workingEvidence.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
 import QuestionReport from './QuestionReport.jsx';
 import BankFigure from './BankFigure.jsx';
@@ -42,7 +41,7 @@ import { intakeImageFile, intakeMessageKey, isPdfFile, claimsHeic, PHOTO_OR_PDF_
 import useFileDrop from '../lib/useFileDrop.js';
 import { PhotoEmpty, PhotoBusy, PhotoPreview, PhotoFailure, rotateDataUrl } from './PhotoFrame.jsx';
 import PriPlot from './PriPlot.jsx';
-import { canRetryPhotoReading, readerRefusalAtSubmit, definitiveSubmissionRefusal, draftPersistenceWarning, earlierSubmissionNotice, pdfReceiptWarning, photoEligibleForGrading, photoReadFailure, photoSupportedFormats, photoAwaitingOnlineReader, pdfReaderNeedsOnlineDownload } from './photoSubmissionGuard.js';
+import { canRetryPhotoReading, readerRefusalAtSubmit, definitiveSubmissionRefusal, draftPersistenceWarning, earlierSubmissionNotice, pdfReceiptWarning, photoEligibleForGrading, photoReadFailure, photoAwaitingOnlineReader, pdfReaderNeedsOnlineDownload } from './photoSubmissionGuard.js';
 import { plotSpecFor } from '../engine/plotSpec.js';
 import { buildInkOriginal } from '../ink/originalWork.js';
 import { attestedGrade, gradingReceiptMismatch, matchingGradeResponse, numericalGradeUnavailable, showCommittedMethodAwardNote } from './authoritativeGrade.js';
@@ -3930,12 +3929,6 @@ function Diagnosis({ d, line }) {
       {nameLine ? <div className="diagnosis-fix">{t(named.explain)}</div> : (d.fix && <div className="diagnosis-fix">{d.fix}</div>)}
     </div>
   );
-}
-
-/** The page line (1-based, counting every line) that an index into the kept lines points at. */
-function photoLineNumber(transcript, keptIndex) {
-  const kept = (transcript?.lines || []).map((l, i) => ({ l, i })).filter(x => !x.l.excluded && String(x.l.text).trim());
-  return (kept[keptIndex]?.i ?? kept.at(-1)?.i ?? 0) + 1;
 }
 
 const PDF_REASON_KEY = {

@@ -49,6 +49,10 @@ const markedAll = qb.qbankEntries();
 c.ok(workedAll.length > 1500, `the committed pack holds ${workedAll.length} worked-solution questions`);
 c.ok(workedAll.every(x => x.entry.answerType === 'manual' && x.entry.answer === undefined && x.entry.traps === undefined && x.place), 'each has no answer and no trap, and is placed in a product subtopic');
 c.ok(workedAll.every(x => x.entry.steps.length >= 1 && x.entry.criteria.length >= 1 && x.entry.criteria.reduce((n, k) => n + k.marks, 0) === x.entry.marks), 'each has his steps and his criteria, and the criteria add up to his marks');
+// A worked-solution question is looked up by its id alone, and issued in the subtopic and at the dot point of the family that holds it: an id held by two
+// families would issue one under the other's place, so ids are unique across families, and every one is issued where its own family places it.
+c.ok(new Set(workedAll.map(x => x.entry.id)).size === workedAll.length, 'a worked-solution id is held by exactly one family');
+c.ok(workedAll.every(x => { const q = qb.qbankManualQuestion(x.entry.id); return q.subtopic === x.place.subtopic && q.prompt === x.entry.prompt; }), `each of the ${workedAll.length} is issued in its own family's subtopic with its own prompt`);
 c.ok(workedAll.every(x => x.entry.hints.length <= 3 && JSON.stringify(Object.values(x.entry.ladder)) === JSON.stringify(x.entry.hints)), 'each ladder is his hints, at most three, in his order');
 {
   const leaks = [];
