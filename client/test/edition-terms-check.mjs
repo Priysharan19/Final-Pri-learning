@@ -73,6 +73,12 @@ check('the Australian wording the owner asked for', () => {
   assert.match(AU_STRINGS['inst.mapProvenance'], /not a NESA publication\.$/);
   assert.ok(!/ncert|cbse/i.test(AU_STRINGS['inst.mapProvenance']));
 });
+check('signed out, the Australian gate says the profile is not signed in, not "not connected" (launch QA 26 Nov 2026, polish 3)', () => {
+  assert.match(AU_STRINGS['activation.notLinked'], /not signed in/);
+  assert.ok(!/not connected/i.test(AU_STRINGS['activation.notLinked']));
+  assert.ok(!/[—–!]/.test(AU_STRINGS['activation.notLinked']));
+  assert.match(en['activation.notLinked'], /not connected to a Pri account/, 'Priyabhata keeps its sentence');
+});
 check('Priyabhata keeps Class and NCERT: the shared catalogue is unchanged', () => {
   assert.equal(en['common.classNumber'], 'Class {n}');
   assert.match(en['inst.mapProvenance'], /NCERT or CBSE publication/);
