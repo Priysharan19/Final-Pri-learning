@@ -90,14 +90,19 @@ try {
   const shot = async name => { if (SHOTS) { await page.locator('.qpage [data-bank-figure]').first().scrollIntoViewIfNeeded(); await page.evaluate(() => window.scrollBy(0, -140)); await page.waitForTimeout(200); await page.screenshot({ path: join(SHOTS, name) }); } };
 
   stage = 'reach a question with a diagram';
-  await page.goto(`${platform.origin}/practice?subtopic=${CHAPTER}&dotpoint=${ORDINAL}`, { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
-  await online.settled();
-  await skipTour();
+  // The server's seeds are fixed under test, so the plain request deals the same few questions however long it searches (launch QA 26 Nov 2026:
+  // only content-vouched questions are dealt for a dot point now); each level of the dot point is asked for in turn until one with a diagram comes.
   let hit = null;
-  for (let i = 0; i <= MAX_SKIPS && !hit; i++) {
-    const s = await sealedShown();
-    if (s && typeof s.q._bank === 'string' && s.q.diagram) hit = s; else await next();
+  for (const level of [null, 1, 2, 3, 4]) {
+    if (hit) break;
+    await page.goto(`${platform.origin}/practice?subtopic=${CHAPTER}&dotpoint=${ORDINAL}${level ? `&difficulty=${level}` : ''}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
+    await online.settled();
+    await skipTour();
+    for (let i = 0; i <= MAX_SKIPS && !hit; i++) {
+      const s = await sealedShown();
+      if (s && typeof s.q._bank === 'string' && s.q.diagram) hit = s; else await next();
+    }
   }
   check('a bank question with a diagram is dealt inside ordinary practice', !!hit, 'none within the bounded search');
   if (!hit) throw new Error('no question with a diagram was dealt');

@@ -36,8 +36,8 @@
 // parent's approval from here: the account exists, but the app does not open
 // until the server's own statement (/v1/account/guardian/state) says it may.
 // ─────────────────────────────────────────────────────────────────────────────
-import React, { useEffect, useRef, useState } from 'react';
-import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { cloud, cloudAvailable, discoverCloudOrigin, lastCloudProbe } from '../platform/cloudTransport.js';
 import { cloudDeviceId } from '../platform/cloudAccount.js';
 import { requestIdentityToken, socialProviderConfig } from '../platform/socialSignIn.js';
 import { tLater, useT, useTx } from '../i18n/index.js';
@@ -45,7 +45,7 @@ import OtpInput, { OTP_LENGTH } from './OtpInput.jsx';
 import { priNative } from '../platform/native/index.js';
 import { isNetworkFailure, signInErrorCopy } from './signInErrors.js';
 import { readOnboardingAuthority } from './onboardingAuthority.js';
-import { parentFeaturesOffered, defaultCourse, phoneDialCode, smsOffered } from '../platform/edition.js';
+import { parentFeaturesOffered, defaultCourse, phoneDialCode, smsOffered, walkthroughFixes } from '../platform/edition.js';
 import { planStoredProfile } from '../platform/accountProfileRestore.js';
 import { EDITION_ID } from '../brand/edition.js';
 import { offeredYears, pathwayOffered, defaultOffering } from '../platform/edition.js';
@@ -152,7 +152,17 @@ export default function SignUpFlow({
   // Whether the account's stored profile has been asked for in this sign-in (a guardian-pending child cannot be asked yet).
   const storedAsked = useRef(false);
   const [readRetry, setReadRetry] = useState(null);
+  // Prithagoras only (walkthroughFixes), as the other fixes of that pass: Pri's server is found by asking the page's own origin once at boot. Signed out and offline nothing answers, and that is a
+  // device that cannot reach the server, not a build without accounts: it says so and offers Try again (launch QA 26 Nov 2026).
+  const [, setProbeTick] = useState(0);
   const available = cloudAvailable();
+  const unreachable = walkthroughFixes() && !available && (lastCloudProbe().answered === false || (typeof navigator !== 'undefined' && navigator.onLine === false));
+  const askAgain = useCallback(() => { void discoverCloudOrigin({ timeoutMs: 4000 }).finally(() => setProbeTick(n => n + 1)); }, []);
+  useEffect(() => {
+    if (available || !walkthroughFixes() || typeof window === 'undefined') return undefined;
+    window.addEventListener('online', askAgain);
+    return () => window.removeEventListener('online', askAgain);
+  }, [available, askAgain]);
 
   const needsParent = !!consent?.required && consent.state !== 'given';
   const newAccount = !!ticket || !!pendingSocial;
@@ -584,7 +594,13 @@ export default function SignUpFlow({
         {inline && !bare
           ? <>{heading('signup.signinTitle')}<p className="signup-lead">{t('signup.inlineLead')}</p></>
           : <h2 className="sr-only" tabIndex={-1} ref={headingRef} id="signup-step-title">{t('signup.signinTitle')}</h2>}
-        {!available && <p className="signup-hint" role="status">{t('signup.cloudUnavailable')}</p>}
+        {!available && unreachable && (
+          <p className="signup-hint" role="status" data-testid="signup-unreachable">
+            {t('activation.offline')}{' '}
+            <button type="button" className="btn btn-ghost btn-sm" data-testid="signup-try-again" onClick={askAgain}>{t('common.tryAgain')}</button>
+          </p>
+        )}
+        {!available && !unreachable && <p className="signup-hint" role="status">{t('signup.cloudUnavailable')}</p>}
         {(providers.google || providers.apple) && (
           <>
             <div className={`signup-social${providers.google && providers.apple ? " is-two" : ""}`} data-social-sign-in>

@@ -65,7 +65,7 @@ function mergeRules(steps) {
  *   solution, readStates?: ('read'|'check'|'cant')[], source?: 'handwriting'|'typed' }
  * @returns {null | { cards, proof, summary, marks, criteria, jumps, source }}
  */
-export function buildAnnotatedWorking({ lines, stepReport, receipt = null, solution = null, readStates = null, source = 'typed', attempt = null } = {}) {
+export function buildAnnotatedWorking({ lines, stepReport, receipt = null, solution = null, readStates = null, source = 'typed', attempt = null, page = false } = {}) {
   const report = Array.isArray(stepReport?.lines) ? stepReport.lines.slice(0, MAX_LINES) : null;
   if (!report || report.length < 2) return null;
   if (stepReport?.source === 'value-chain') return buildValueChainModel({ report, lines, stepReport, receipt, source, attempt });
@@ -78,7 +78,12 @@ export function buildAnnotatedWorking({ lines, stepReport, receipt = null, solut
   if (ann.lines.filter(l => l.readable).length < 2) return null;
   // A line Step Check accepted whose '=' does not join equal expressions is an
   // equation (2x + 3 = 7), not a chain of equal expressions: not this panel's.
-  if (ann.lines.some((a, i) => report[i]?.status === 'ok' && a.steps.some(s => report[s.fromLine]?.status === 'ok' && s.justification && s.justification.valid === false))) return null;
+  // On the marked page (`page`: the student's own ink or photo) the same lines are judged one by one, as a value chain is: a fully
+  // correct page of working that states equations is still a marked page, with a tick per line (launch QA 26 Nov 2026: it was
+  // shown as a plain list). Elsewhere it stays with its report.
+  if (ann.lines.some((a, i) => report[i]?.status === 'ok' && a.steps.some(s => report[s.fromLine]?.status === 'ok' && s.justification && s.justification.valid === false))) {
+    return page ? buildValueChainModel({ report, lines, stepReport, receipt, source, attempt }) : null;
+  }
 
   const firstBreak = report.findIndex(l => l?.status === 'break');
   const cards = report.map((l, i) => {

@@ -44,13 +44,15 @@ const check = (name, condition, detail = '') => {
 const SRC = pathToFileURL(join(CLIENT, 'src')).href + '/';
 const T = await import(`${SRC}engine/curriculum.js`);
 const { SUBTOPIC_BY_ID } = await import(`${SRC}engine/curriculum.js`);
-const { nswIssuedForms } = await import(`${SRC}engine/nswOffer.js`);
+const { nswIssuedForms, nswExactLevels } = await import(`${SRC}engine/nswOffer.js`);
+// A dot point is offered only at the levels where its own questions are served (nswDotpointExact.js), not at every level its registry forms name.
+const offered = d => nswIssuedForms(d.subtopic, nswExactLevels(d.subtopic, d.id)).length > 0;
 // A different paired topic at each width: an unfinished question is resumed for any dot point it credits, not issued again.
 const PICK = Object.fromEntries([['desktop', 'me12-induction'], ['phone', 'me12-binomial']].map(([label, base]) => {
   const pair = T.entryPairs().find(p => p.base === base);
   const entryDps = T.entryDotpoints(base);
-  const dp = entryDps.filter(d => d.subtopic === pair.companion && nswIssuedForms(d.subtopic, d.forms).length > 0).at(-1);
-  return [label, { pair, entryDps, dp, name: SUBTOPIC_BY_ID[base].name, ordinal: entryDps.findIndex(d => d.id === dp.id), issuable: entryDps.filter(d => nswIssuedForms(d.subtopic, d.forms).length > 0) }];
+  const dp = entryDps.filter(d => d.subtopic === pair.companion && offered(d)).at(-1);
+  return [label, { pair, entryDps, dp, name: SUBTOPIC_BY_ID[base].name, ordinal: entryDps.findIndex(d => d.id === dp.id), issuable: entryDps.filter(offered) }];
 }));
 
 let platform = null, browser = null, stage = 'start';

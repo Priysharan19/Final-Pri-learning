@@ -33,6 +33,9 @@ for (const token of requiredTokens) {
 check('UI typography is Inter-based', /--font:\s*['"]Inter Variable['"]/.test(theme));
 check('math typography is independently defined', /--font-math:\s*['"]KaTeX_Main['"]/.test(theme));
 check('question prose is set in the maths face', /\.q-prompt\s*\{[^}]*font-family:\s*var\(--font-prose-math\)/s.test(theme));
+// Launch QA 26 Nov 2026: Settings said "Paper is the default" while Prithagoras opens in Night (edition table themeDefault) and
+// Priyabhata follows the device. The note names no default, so it cannot disagree with the edition table.
+check('the theme note in Settings claims no default (it differs by edition)', !/\bdefault\b/i.test(en['settings.themeNote']) && !/डिफ़ॉल्ट/.test(hi['settings.themeNote']));
 check('paper is the default identity', /:root\s*\{[^}]*color-scheme:\s*light[^}]*--page:\s*#f2f0ea/si.test(theme));
 check('dark mode is the same notebook at night', /\[data-theme="dark"\]\s*\{[^}]*--page:\s*#121210/si.test(theme));
 check('one flat teal accent, never a gradient', /--accent:\s*#0b6e69/i.test(theme) && /--brand-grad:\s*linear-gradient\(var\(--accent\),\s*var\(--accent\)\)/.test(theme));

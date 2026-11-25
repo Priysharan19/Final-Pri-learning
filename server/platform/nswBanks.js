@@ -37,6 +37,7 @@
 import {
   LEGACY_CROSSWALK, NEW_OUTCOME_GAPS, NSW_CURRENT_SYLLABUSES, NSW_OUTCOME_BY_CODE, NSW_SYLLABUS_BY_ID, outcomesOf
 } from '../../client/src/engine/curriculum-nsw/index.js';
+import { nswExactLevels } from '../../client/src/engine/nswOffer.js';
 import { dotpointById, dotpointsFor, formDotpointOrdinals, DIFFICULTIES } from '../../client/src/engine/curriculum.js';
 
 /** The course id a Prithagoras client names in a practice request. */
@@ -220,8 +221,8 @@ function practiceTargets() {
     const row = ROW_BY_GENERATOR.get(entry.generator);
     const issuedLevels = new Set(entry.cells.filter(cell => cell.issued).map(cell => cell.difficulty));
     for (const dp of dotpointsFor(entry.generator)) {
-      // The levels whose own form exercises this dot point, and are issued.
-      const difficulties = dp.forms.filter(d => issuedLevels.has(d));
+      // The issued levels at which this dot point's own questions are served (engine/nswDotpointExact.js).
+      const difficulties = nswExactLevels(entry.generator, dp.id).filter(d => issuedLevels.has(d));
       if (!difficulties.length) continue;
       for (const code of row.dotpoints[dp.ordinal] || []) {
         if (!byCode.has(code)) byCode.set(code, []);
@@ -285,7 +286,9 @@ function buildCurriculum() {
       return [entry.generator, {
         requestable,
         dotpoints: Object.fromEntries(dotpointsFor(entry.generator).map(dp => {
-          const levels = dp.forms.filter(d => requestable.includes(d));
+          // Only the levels at which this dot point's own questions are served (engine/nswDotpointExact.js), never a level it shares
+          // with a sibling in one cell: the server refuses that request rather than answer it with the sibling's question.
+          const levels = nswExactLevels(entry.generator, dp.id).filter(d => requestable.includes(d));
           return [dp.id, { requestable: levels, generated: levels.length > 0 }];
         }))
       }];

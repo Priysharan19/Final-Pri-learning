@@ -22,6 +22,10 @@ let pass = 0;
 const failures = [];
 const eq = (name, actual, expected) => { if (actual === expected) pass++; else failures.push(`${name} — expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`); };
 
+// A plain word is never typeset as the product of its letters (launch QA 26 Nov 2026: "Correct answer: 𝑇𝑤𝑜 Two").
+for (const word of ['Two', 'Odd', 'No', 'Yes', 'None', 'Neither', 'Both', 'Not defined', 'two', 'odd', 'Three roots']) eq(`a plain word stays plain: ${word}`, answerToTex(word), word);
+eq('a product of variables is still typeset', answerToTex('xy'), '$xy$');
+
 // ── Authored cases ──────────────────────────────────────────────────────────
 for (const [text, tex] of [
   ['2*x^8 + -8*x', '$2x^{8} - 8x$'],

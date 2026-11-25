@@ -50,6 +50,7 @@ import katex from 'katex';
 const SRC = new URL('../src/', import.meta.url).href;
 const { generateQuestion, loadAllBanks, GENERATORS } = await import(`${SRC}engine/generators/index.js`);
 const { checkAnswer } = await import(`${SRC}engine/checker.js`);
+const { dotpointById } = await import(`${SRC}engine/curriculum.js`);
 const { parse, evaluate } = await import(`${SRC}engine/expr.js`);
 const { NSW_OUTCOME_BY_CODE, NSW_SYLLABUS_BY_ID, LEGACY_CROSSWALK } = await import(`${SRC}engine/curriculum-nsw/index.js`);
 const {
@@ -484,6 +485,9 @@ for (const syllabus of curriculum.syllabuses) for (const subtopic of syllabus.su
     for (const difficulty of target.difficulties) {
       targetsChecked++;
       if (!nswCell(target.generator, difficulty)) { fail(`${dp.code}: advertises ${target.generator} D${difficulty}, which is not issued`); continue; }
+      // A level the engine has no form at for this dot point is the author's bank's (nswDotpointExact.js): the generators are not asked for it;
+      // practice-dotpoint-exact-check.mjs asks the server's own picker, bank included.
+      if (!dotpointById(target.dotpoint)?.forms.includes(difficulty)) continue;
       let hit = 0;
       for (let i = 0; i < 24 && !hit; i++) {
         let q;

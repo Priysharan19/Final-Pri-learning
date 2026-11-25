@@ -75,7 +75,7 @@ html[data-theme="dark"] .in-map-glyph.is-solid { color: var(--in-base); }
   position: relative; width: 310px; z-index: 2; display: grid; gap: 12px; padding: 18px; border-radius: 6px; background: var(--in-l2);
   box-shadow: inset 0 1px 0 var(--in-hi), 0 0 0 1px var(--in-edge-2), 0 24px 60px -24px var(--in-shadow);
 }
-.in-map-card small { font: 500 11px var(--in-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--cc); }
+.in-map-card small { font: 500 11px var(--in-mono); letter-spacing: 0.12em; text-transform: uppercase; color: color-mix(in srgb, var(--cc) 70%, var(--in-tx)); }
 .in-map-card h2 { margin: -6px 0 -8px; font: 500 21px/1.2 var(--in-ui); letter-spacing: -0.03em; color: var(--in-tx); }
 .in-map-prose { margin: 0; color: var(--in-tx-2); font-size: 13.5px; line-height: 1.5; }
 .in-map-card .in-btn { justify-self: start; min-height: 34px; }
