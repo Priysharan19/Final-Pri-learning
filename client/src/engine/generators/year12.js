@@ -740,7 +740,7 @@ export const year12 = {
         { value: a / rf.value, why: 'Limiting sum: $S_\\infty = \\frac{a}{1 - r}$ — divide by $1 - r$, not by r.' },
         { value: a * rf.d / (rf.n + rf.d), why: 'The denominator is $1 - r$, so subtract: check the sign in $\\frac{a}{1-r}$.' }
       ].filter(t => Math.abs(t.value - sum.value) > 0.01),
-      hints: ['First find the common ratio.', `$r = ${rf.latex()}$ (each term × ${rf.latex()}); since $|r| < 1$ a limiting sum exists.`, `$S_\\infty = \\dfrac{${a}}{1 - ${rf.latex()}}$.`],
+      hints: ['First find the common ratio.', `$r = ${rf.latex()}$ (each term $\\times ${rf.latex()}$); since $|r| < 1$ a limiting sum exists.`, `$S_\\infty = \\dfrac{${a}}{1 - ${rf.latex()}}$.`],
       steps: [
         { h: 'Common ratio', d: `$r = ${rf.latex()}$` },
         { h: 'Limiting sum formula', d: `$S_\\infty = \\dfrac{a}{1 - r} = \\dfrac{${a}}{1 - ${rf.latex()}} = \\dfrac{${a}}{${new Frac(rf.d - rf.n, rf.d).latex()}}$` },

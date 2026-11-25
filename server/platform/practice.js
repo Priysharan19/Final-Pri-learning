@@ -1319,7 +1319,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         if (revealed.status) return revealed;
         return { response: { ...revealed.response, rung: 'solution', level: HINT_RUNGS.length, remaining: 0, endsQuestion: true } };
       }
-      const rung = buildHintLadder(q)[want - 1];
+      const rung = buildHintLadder(q, { withholdAnswer: serverEdition(env) === 'prithagoras' })[want - 1];
       return { response: { authoritative: true, questionId: qid, rung: rung.rung, level: reached,
         hint: rung.text, thin: rung.thin, remaining: HINT_RUNGS.length - reached,
         markWeight: markWeightAfter(reached, hintsAreFree(env)), next: nextRungAfter(reached) } };

@@ -155,7 +155,7 @@
     "test:marker:equivalence": "node client/test/marker-equivalence-classes-check.mjs",
     "test:engine:regex": "node client/test/engine-regex-equivalence-check.mjs",
     "test:marker:method": "node client/test/marker-method-marks-check.mjs",
-    "test:hints:leak": "node client/test/input-hint-leak-check.mjs",
+    "test:hints:leak": "node client/test/input-hint-leak-check.mjs && node client/test/hint-ladder-leak-check.mjs",
     "test:marker:progress": "node client/test/marker-method-progress-check.mjs",
     "test:marker:working": "node client/test/marker-working-branch-check.mjs",
     "test:marker:ap": "node client/test/marker-ap-first-error-check.mjs",

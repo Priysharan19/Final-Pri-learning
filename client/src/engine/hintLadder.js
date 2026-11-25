@@ -131,6 +131,63 @@ export function statesAnswerValue(rung, values) {
   return false;
 }
 
+/** How closely a closed number in a rung must match the key to be "the answer": the key's own tolerance, or the rounding the prompt asks for. */
+function keySlack(q, v) {
+  const a = q?.answer || {};
+  let slack = Math.max(1e-9 * Math.max(1, Math.abs(v)), Number.isFinite(a.tol) ? Math.abs(a.tol) : 0);
+  const prompt = String(q?.prompt || '');
+  const dp = prompt.match(/(\d+)\s*decimal\s*places?/i) || prompt.match(/\b(one|two|three|four)\s*decimal\s*places?/i);
+  if (dp) slack = Math.max(slack, 0.5 * 10 ** -(Number(dp[1]) || { one: 1, two: 2, three: 3, four: 4 }[dp[1].toLowerCase()]));
+  const sf = prompt.match(/(\d+)\s*significant\s*figures?/i);
+  if (sf && v) slack = Math.max(slack, 0.5 * 10 ** (Math.floor(Math.log10(Math.abs(v))) + 1 - Number(sf[1])));
+  return slack;
+}
+
+/**
+ * Does a rung before the solution hand the student the final answer? (launch QA 26 Nov 2026: on several topics the worked step
+ * was the whole computation, "E(X) = np = 4 × 0.7 = 2.8".) It does when
+ *   · it is a result: the last side of a `$a = b = key$` chain, or a closed sum, product or fraction that evaluates to the key
+ *     (the one trivial step), allowing the rounding the question asks for;
+ *   · it says "the answer / result / gives / equals / so / is" and then the key;
+ *   · it quotes a key that is not a small whole number, a number the question does not itself print, as bare prose; or
+ *   · for a multiple-choice, expression or other written key, it contains the key's text.
+ * A number the question itself prints is never "the answer"; a small whole key (|k| <= 10) counts only in a result position,
+ * because it turns up in hints by coincidence as often as by leak.
+ */
+export function rungGivesAnswer(q, rung) {
+  const body = String(rung ?? '');
+  if (!body.trim()) return false;
+  const prompt = String(q?.prompt || '').replace(/\$/g, ' ');
+  const quoted = n => new RegExp(`(?<![\\d.])${String(n).replace(/[.*+?^${}()|[\]\\-]/g, '\\$&')}(?!\\d|\\.\\d)`).test(prompt);
+  const values = answerNumbers(q).filter(v => !quoted(v));
+  const hits = (n, v) => Number.isFinite(n) && Math.abs(n - v) <= keySlack(q, v);
+  const small = v => Number.isInteger(v) && Math.abs(v) <= 10;
+  const closed = t => { const u = t.replace(/\^?\\circ|°|\\%|%|\\text\{[^{}]*\}|\\mathrm\{[^{}]*\}/g, '').replace(/\\ /g, ' ').trim(); if (!u || /[a-zA-Z]/.test(u.replace(/sqrt|pi/g, ''))) return null; try { const n = evalNumeric(normalize(u)); return Number.isFinite(n) ? n : null; } catch { return null; } };
+  let leaked = false;
+  if (values.length) {
+    for (const m of body.matchAll(/\$([^$]+)\$/g)) {
+      const sides = texToPlain(m[1].replace(/\\approx|≈/g, '=')).split('=').map(x => x.trim());
+      sides.forEach((side, i) => {
+        if (leaked) return;
+        const n = closed(side);
+        if (n === null) return;
+        const operation = /[+\-*/^]|sqrt/.test(side.replace(/^-/, '')) && /\d/.test(side);
+        const result = i === sides.length - 1 && sides.length > 1;
+        for (const v of values) if (hits(n, v) && (small(v) ? (result || (operation && /\d\s*[+\-*/^)]\s*[\d(]|sqrt|\)\s*[+\-*/^]/.test(side))) : (result || operation || sides.length === 1))) leaked = true;
+      });
+      if (leaked) return true;
+    }
+    const prose = body.replace(/\$[^$]*\$/g, ' ');
+    const spoken = body.replace(/\$/g, ' ').replace(/\\(?:left|right|,|;|!|quad|displaystyle)/g, '');
+    for (const v of values) {
+      const word = new RegExp(`(?:\\b(?:answer|result|gives|equals|therefore|hence|so|is)\\b[^.\\n=]{0,24}?|(?:^|\\s)=\\s*)(?<![\\d.])${String(v).replace(/[.\-]/g, '\\$&')}(?!\\d|\\.\\d)(?!\\s*[+\\-*/^×(\\\\=])`, 'i');
+      if (word.test(spoken)) return true;
+    }
+    if (!values.every(small) && statesAnswerValue(prose, values.filter(v => !small(v)))) return true;
+  }
+  return answerTexts(q).some(t => { const a = plain(t); return a.length >= 4 && !/^-?\d+(\.\d+)?$/.test(a) && !plain(prompt).includes(a) && containsAnswer(body, t); });
+}
+
 /** The answer as text, in the forms a rung could state it. */
 function answerTexts(q) {
   const a = q?.answer || {};
@@ -179,10 +236,11 @@ export function repeats(a, b) {
 /**
  * The four rungs for one question payload. Each rung carries `text` (or null
  * when nothing authored reaches it — `thin`), its cost and the weight left.
+ * `withholdAnswer` drops any rung before the solution that states the final answer (see rungGivesAnswer).
  * The solution rung carries no text of its own: the backend serves the
  * verified solution object when it is opened, the same object Reveal serves.
  */
-export function buildHintLadder(q) {
+export function buildHintLadder(q, { withholdAnswer = false } = {}) {
   const hints = Array.isArray(q?.hints) ? q.hints.map(text).filter(Boolean) : [];
   const steps = Array.isArray(q?.steps) ? q.steps : [];
   // A bank with no authored hints still has its solution's step headings,
@@ -201,11 +259,16 @@ export function buildHintLadder(q) {
   // adds anything, the rung keeps its old text: a rung the student pays for
   // is never emptied by this rule.
   const safe = c => c && !answers.some(a => containsAnswer(c, a)) && !statesAnswerValue(c, values) && !(final && steps.length > 1 && repeats(c, final));
+  // A rung that states the final answer, or gives it by one trivial step, is never served (launch QA 26 Nov 2026): the next
+  // authored text that does not is taken instead, and with none the rung is thin. It is the worked step that mostly does it,
+  // when a one-step question's first step is the whole computation.
+  // Opt-in (the Prithagoras server passes it); the other edition's ladders are served exactly as before.
+  const gives = c => withholdAnswer && rungGivesAnswer(q, c);
   const pick = (original, fallThrough) => {
-    const first = original.find(Boolean) || null;
+    const first = original.find(c => c && !gives(c)) || null;
     if (first && !shown.some(t => repeats(t, first))) { shown.push(first); return first; }
     if (q?.answerType !== 'mcq') {
-      for (const c of fallThrough) if (safe(c) && !shown.some(t => repeats(t, c))) { shown.push(c); return c; }
+      for (const c of fallThrough) if (safe(c) && !gives(c) && !shown.some(t => repeats(t, c))) { shown.push(c); return c; }
     }
     if (first) shown.push(first);
     return first;
