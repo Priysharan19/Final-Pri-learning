@@ -213,8 +213,9 @@ eq(bracketFunctions('\\sin^2 x+\\sin(x)'), '\\sin^2(x)+\\sin(x)', 'a power stays
 eq(plainOf('\\cos 2x-\\cos 4x').plain, 'cos(2x)-cos(4x)', 'read as plain text the argument keeps its brackets');
 eq(evalTeX('\\tfrac12(\\cos2x-\\cos4x)', { x: 0.7 }), 0.5 * (Math.cos(1.4) - Math.cos(2.8)), 'his TeX is evaluated on its own (cos 2x is cos(2x))');
 {
-  const bad = { answerType: 'expression', answer: { expr: '((1)/(2))(cos2x-cos4x)' } };
-  eq(keyAgreesWithTeX(bad, '$\\tfrac12(\\cos2x-\\cos4x)$'), 'key-disagrees-with-his-tex', 'the old key (cos2x is cos(2)·x) is refused by the round trip');
+  const bad = { answerType: 'expression', answer: { expr: '((1)/(2))(cos(2)*x-cos(4)*x)' } };
+  eq(keyAgreesWithTeX(bad, '$\\tfrac12(\\cos2x-\\cos4x)$'), 'key-disagrees-with-his-tex', 'the old misreading as a key (cos(2)·x, written out) is refused by the round trip');
+  eq(keyAgreesWithTeX({ answerType: 'expression', answer: { expr: '((1)/(2))(cos2x-cos4x)' } }, '$\\tfrac12(\\cos2x-\\cos4x)$'), null, 'an unbracketed key now reads as cos(2x) (function-argument reading), so it agrees with his TeX');
   const good = { answerType: 'expression', answer: { expr: '((1)/(2))(cos(2x)-cos(4x))' } };
   eq(keyAgreesWithTeX(good, '$\\tfrac12(\\cos2x-\\cos4x)$'), null, 'the bracketed key agrees with his TeX at every sample point');
   eq(keyAgreesWithTeX({ answerType: 'numeric', answer: { value: 5 } }, '$e^{2}+5$'), 'key-disagrees-with-his-tex', 'a numeric key that is not his value is refused');
@@ -224,7 +225,8 @@ eq(evalTeX('\\tfrac12(\\cos2x-\\cos4x)', { x: 0.7 }), 0.5 * (Math.cos(1.4) - Mat
   const dp = asDerivedPart(base('FD-013', { prompt: 'Express $\\sin x\\sin3x$ as a difference of cosines.' }), k);
   const q = engineQuestion(dp);
   ok(checkBankAnswer(q, '(1/2)(cos(2x)-cos(4x))').correct === true && checkBankAnswer(q, '1/2*(cos(2x)-cos(4x))').correct === true, 'and the correct answer is marked right');
-  ok(checkBankAnswer(q, '(1/2)(cos2x-cos4x)').correct !== true && checkBankAnswer(q, '(cos(2x)-cos(4x))').correct !== true && checkBankAnswer(q, '(1/2)(cos(2x)+cos(4x))').correct !== true, 'and wrong ones, including the old misreading, are not');
+  ok(checkBankAnswer(q, '(1/2)(cos2x-cos4x)').correct === true, 'and the conventional unbracketed typing is marked right (cos2x is cos(2x))');
+  ok(checkBankAnswer(q, '(1/2)(cos(2)*x-cos(4)*x)').correct !== true && checkBankAnswer(q, '(cos(2x)-cos(4x))').correct !== true && checkBankAnswer(q, '(1/2)(cos(2x)+cos(4x))').correct !== true, 'and wrong ones, including the old misreading written out, are not');
 }
 // A prompt that asks for more than a value is never converted.
 for (const prompt of ['Every point of a data set lies on the line $y=2x+1$. State the value of Pearson\'s correlation coefficient, with a reason.', 'State the value of $r$ and interpret it.', 'Find $x$ and justify your answer.', 'State the gradient and the intercept of $y=2x+1$.']) eq(deriveKey(base('FD-014', { prompt, steps: [{ h: 'r', d: '$r=1$' }] }), '$r=1$').no !== undefined, true, `not converted: ${prompt.slice(0, 40)}`);
