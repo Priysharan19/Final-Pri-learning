@@ -43,7 +43,8 @@ import { stepEvidence, stepMetaFor, marksPossibleFor } from '../server/platform/
 import { authoredLines } from '../server/platform/genericSteps.js';
 import { checkBankAnswer } from '../server/platform/qbankMarking.js';
 import { rungDropReason, bankLadder } from './qbank-leak.mjs';
-import { PACK_FORMAT, DEFAULT_PACK_DIR, buildFamily, indexOf, loadPack, sha256 } from '../server/platform/qbankPack.js';
+import { PACK_FORMAT, DEFAULT_PACK_DIR, buildFamily, indexOf, loadPack, sha256, installPack, resetQbank, qbankEntries, qbankEntryQuestion } from '../server/platform/qbankPack.js';
+import { bankProof } from '../server/platform/bankSteps.js';
 import { loadFigureResults, packableFigure, figureRef, figureFiles, figureLeaks, figureAlt } from './qbank-diagrams.mjs';
 import { classifyManual, deriveKey, asDerivedPart, plausibleWrongs, naturalForms, stepResultLeak, stepResults } from './qbank-manual.mjs';
 
@@ -784,11 +785,50 @@ export const NOTICE = 'Question bank content \u00a9 Priysharan Tripathi trading 
 /** An in-memory pack source over compiled files, so a pack is proved loadable before it is written. */
 export const memorySource = files => ({ kind: 'memory', async read(name) { return files.has(name) ? Buffer.from(files.get(name)) : null; } });
 
+// ── step marks from his own criteria: the import-time proof (server/platform/bankSteps.js) ───────────────────────────────
+/**
+ * The bank rule's proof for every marked part worth two or more marks of the INSTALLED pack (qbankPack.installPack): which parts are eligible, why
+ * each of the others is not, and how many of his criteria the rule can verify. Pure of any student. A part that fails a proof page (his steps
+ * with a wrong last line, the question restated, the given values, a trap answer alone) is listed with the reason and stays final-answer-only.
+ */
+export function bankStepProofs() {
+  const rows = [];
+  for (const { entry, family } of qbankEntries()) {
+    if (entry.marks < 2) continue;
+    const q = qbankEntryQuestion(entry.id, 17);
+    const p = bankProof(q);
+    rows.push({ id: entry.id, family, course: family.replace(/^qb-/, '').split('-')[0], topic: family.replace(/^qb-[ax]\d\d-/, ''), marks: entry.marks, answerType: entry.answerType, eligible: p.eligible, why: p.why, verifiable: p.verifiable, notVerified: p.notVerified, criteria: p.criteria });
+  }
+  const by = {}, reasons = {};
+  let eligible = 0, verifiable = 0, notVerified = 0, parts = 0;
+  for (const r of rows) {
+    const k = `${r.course} ${r.topic}`;
+    const o = by[k] || (by[k] = { parts: 0, eligible: 0, criteria: 0, verifiable: 0 });
+    o.parts++; parts++;
+    if (r.eligible) { o.eligible++; eligible++; o.verifiable += r.verifiable; verifiable += r.verifiable; o.criteria += r.verifiable + r.notVerified; notVerified += r.notVerified; }
+    else reasons[r.why] = (reasons[r.why] || 0) + 1;
+  }
+  return { rows, summary: { parts, eligible, verifiable, notVerified, reasons, by } };
+}
+
 // ── command line ─────────────────────────────────────────────────────────────
 function insideRepo(p) { const rel = path.relative(ROOT, path.resolve(p)); return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel)); }
 
 export async function main(argv) {
   const flag = name => { const i = argv.findIndex(a => a === `--${name}`); return i >= 0 ? argv[i + 1] : null; };
+  if (argv.includes('--bank-steps')) {
+    // Prints the bank rule's proof over a pack (default: the committed one). Writes nothing.
+    const dir = flag('bank-steps') && !flag('bank-steps').startsWith('--') ? flag('bank-steps') : DEFAULT_PACK_DIR;
+    const { directorySource } = await import('../server/platform/qbankPack.js');
+    installPack(await loadPack(directorySource(dir)));
+    try {
+      const { rows, summary } = bankStepProofs();
+      console.log(`bank step marks: ${summary.eligible} of ${summary.parts} parts worth 2 or more marks are eligible; criteria verified ${summary.verifiable}, not verified ${summary.notVerified}`);
+      console.log(`not eligible, by reason ${JSON.stringify(summary.reasons)}`);
+      if (argv.includes('--list')) for (const r of rows.filter(x => !x.eligible)) console.log(`  ${r.id}\t${r.why}`);
+    } finally { resetQbank(); }
+    return 0;
+  }
   if (argv.includes('--pack')) {
     const archiveDir = flag('pack'), outDir = flag('out');
     if (!archiveDir || !outDir || archiveDir.startsWith('--') || outDir.startsWith('--')) { console.error('usage: node tools/qbank-import.mjs --pack <archive-dir> --out <pack-dir> [--figures <diagrams-work-dir>] [--overwrite] [--quiet]'); return 2; }

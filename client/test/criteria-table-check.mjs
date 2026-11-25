@@ -35,6 +35,23 @@ ok(criteriaView({ criteria: crit(), mark, cards }) === null, 'an unapproved type
   ok(criteriaView({ criteria: gcrit({ digest: 'c'.repeat(64) }), mark: { awarded: 1, possible: 3 }, cards }) === null, 'the generic rule at a stale digest draws no table');
   ok(criteriaView({ criteria: gcrit(), mark: { awarded: 2, possible: 3 }, cards }) === null, 'the generic rule\'s table that does not equal the server mark is not drawn');
 }
+{
+  // the bank rule (server/platform/bankSteps.js) has its own approval id and digest, and is keyed exactly as the others: the table is drawn only from an
+  // approved list that names it at its current digest (the build's own list does not, until the author files his record), with HIS criteria in his words
+  const bd = allTypes().find(t => t.id === 'bank-author-criteria').digest;
+  const bcrit = (over = {}) => ({ typeId: 'bank-author-criteria', digest: bd, items: [
+    { key: 'c1', text: 'Product rule', marks: 1, awarded: true, basis: 'lines', verified: true, lines: [2], reason: 'Line 2 is ticked and is this criterion.' },
+    { key: 'c2', text: 'Correct derivative of \u221a(2x + 1)', marks: 1, awarded: false, basis: 'lines', verified: false, lines: [], reason: 'Only a person can check this criterion, so Pri does not.' },
+    { key: 'c3', text: 'Single factorised fraction', marks: 1, awarded: false, basis: 'answer', verified: true, lines: [], reason: 'The final answer was not correct.' }], ...over });
+  const listed = [{ typeId: 'bank-author-criteria', digest: bd, approvedBy: 'Fixture Author', date: '2026-11-25' }];   // a test list, never a record
+  ok(!AUTHOR_APPROVED.some(a => a.typeId === 'bank-author-criteria'), 'the build list does not carry the bank rule: the author has not approved it');
+  ok(criteriaView({ criteria: bcrit(), mark: { awarded: 1, possible: 3 }, cards }) === null, 'unapproved in the build, the bank rule draws no table');
+  const bv = criteriaView({ criteria: bcrit(), mark: { awarded: 1, possible: 3 }, cards, approved: listed });
+  ok(bv && bv.typeId === 'bank-author-criteria' && bv.rows.length === 3 && bv.earned === 1 && bv.possible === 3 && bv.rows[1].verified === false && bv.rows[1].text.includes('2x + 1') && bv.rows[0].lines[0] === 2, 'approved at its digest, the bank rule\'s table lists his criteria in his words: earned, not earned, not verified, with the line');
+  ok(criteriaView({ criteria: bcrit({ digest: 'c'.repeat(64) }), mark: { awarded: 1, possible: 3 }, cards, approved: listed }) === null, 'the bank rule at a stale digest draws no table');
+  ok(criteriaView({ criteria: bcrit(), mark: { awarded: 2, possible: 3 }, cards, approved: listed }) === null, 'a table that is not the server mark is not drawn');
+  ok(criteriaView({ criteria: bcrit(), mark: { awarded: 1, possible: 3 }, cards, approved: [{ typeId: 'generic-solution-steps', digest: allTypes().find(t => t.id === 'generic-solution-steps').digest }] }) === null, 'the generic rule\'s approval does not draw the bank rule\'s table');
+}
 const v = criteriaView({ criteria: crit(), mark, cards, approved: FIX });
 ok(v && v.rows.length === 2 && v.earned === 1 && v.possible === 2, 'an approved type shows each criterion with its marks and the total');
 ok(v.rows[0].awarded && v.rows[0].lines[0] === 2 && !v.rows[1].awarded, 'awarded or not, tied to the line that earned it');
