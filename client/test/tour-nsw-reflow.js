@@ -27,7 +27,7 @@ const require = createRequire(join(CLIENT, 'package.json'));
 const katex = require('katex');
 const EDITION = 'prithagoras';
 const CASES = [
-  { topic: 'me12-further-calc', pathway: 'ext1', label: 'Year 12 Extension 1, Further Calculus: Inverse Trigonometric Functions' },
+  { topic: 'me12-further-calc', pathway: 'ext1', needsMcq: true, label: 'Year 12 Extension 1, Further Calculus: Inverse Trigonometric Functions' },
   { topic: 'y12-random-var', pathway: 'advanced', label: 'Year 12 Advanced, Random Variables & the Normal Curve' }
 ];
 const WIDE = katex.renderToString(String.raw`\begin{array}{c|cccc} x & 1 & 2 & 3 & 4 \\ \hline P(X=x) & 0.1 & 0.2 & 0.5 & 0.2 \end{array}\quad\begin{array}{c|cccc} x & 1 & 2 & 3 & 4 \\ \hline P(X=x) & 0.1 & 0.2 & 0.5 & 0.2 \end{array}`, { displayMode: true, throwOnError: false });
@@ -75,7 +75,7 @@ try {
   dist = build();
   platform = await startOnlinePlatform({ dist, env: { PRI_EDITION: EDITION } });
   browser = await chromium.launch();
-  for (const { topic, pathway, label } of CASES) {
+  for (const { topic, pathway, label, needsMcq } of CASES) {
     for (const width of [360, 320]) {
       stage = `${label} at ${width}`;
       const ctx = await browser.newContext({ viewport: { width, height: 800 }, colorScheme: 'dark' });
@@ -83,9 +83,9 @@ try {
       await signUp(page, platform, pathway);
       await page.goto(`${platform.origin}/practice?subtopic=${topic}`, { waitUntil: 'domcontentloaded' });
       let worst = 0, mcqSeen = false;
-      // At least SAMPLE questions, and on until a multiple choice question has been met (up to 40): the checks below that need one then always
+      // At least SAMPLE questions, and for the topic that always has multiple choice questions (`needsMcq`) on until one has been met (up to 40): the checks below that need one then always
       // run, so the count of checks this tour prints is the same every time.
-      for (let i = 0; i < SAMPLE || (!mcqSeen && i < 40); i++) {
+      for (let i = 0; i < SAMPLE || (needsMcq && !mcqSeen && i < 40); i++) {
         await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
         await page.waitForTimeout(600);
         worst = Math.max(worst, await over(page));
@@ -118,7 +118,7 @@ try {
         await page.locator('.ctx-next, .ws-actions .btn-primary').first().click({ timeout: 8000 }).catch(() => {});
         await page.waitForTimeout(1200);
       }
-      check(`${label}, ${width} px: a multiple choice question was met in the sample`, mcqSeen);
+      if (needsMcq) check(`${label}, ${width} px: a multiple choice question was met in the sample`, mcqSeen);
       check(`${label}, ${width} px: ${SAMPLE} questions, the page never scrolls sideways`, worst <= 0, `${worst}px`);
       await ctx.close();
     }
