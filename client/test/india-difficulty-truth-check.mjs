@@ -69,6 +69,7 @@ async function run() {
   const { loadAllBanks, loadBanksFor, generateQuestion } = await import(`${SRC}engine/generators/index.js`);
   await loadAllBanks();
   const { DIFF_LABELS, CURRICULUM, dotpointsFor } = await import(`${SRC}engine/curriculum.js`);
+  const { nswIssuedForms, nswExactLevels } = await import(`${SRC}engine/nswOffer.js`);
   const { IN_CHAPTER_BY_ID } = await import(`${SRC}engine/curriculum-in.js`);
   const { indiaRequestableDifficulties, indiaDifficultyWindow, indiaChapter } = await import(`${SRC}engine/indiaProduct.js`);
   const { practiceDifficulties, practiceHref, practiceRequestFromQuery } = await import(`${SRC}lib/practiceLinks.js`);
@@ -391,16 +392,17 @@ async function run() {
     let checked = 0;
     for (const s9 of CURRICULUM.find(y => y.year === 9).subtopics) {
       for (const dp of dotpointsFor(s9.id)) {
-        const missing = [1, 2, 3, 4].filter(d => dp.forms.length && !dp.forms.includes(d));
+        const own = nswIssuedForms(s9.id, nswExactLevels(s9.id, dp.id)).sort((a, b) => a - b);   // the levels its own questions are served at
+        const missing = [1, 2, 3, 4].filter(d => own.length && !own.includes(d));
         if (!missing.length || checked >= 12) continue;
         const asked = missing[0];
         const before = await questionRows();
         const s = await serve({ mode: 'topic', subtopic: s9.id, dotpoint: dp.ordinal, difficulty: asked });
         checked++;
         ok(`${dp.id} D${asked}: refused, not snapped to another level`, s.error?.code === 'DIFFICULTY_UNAVAILABLE', s.error?.code || `served D${s.res?.question?.difficulty}`);
-        eq(`${dp.id} D${asked}: the alternatives are the dot point's own forms`, s.error?.detail?.available.map(a => a.difficulty), [...dp.forms].sort((a, b) => a - b));
+        eq(`${dp.id} D${asked}: the alternatives are the dot point's own forms`, s.error?.detail?.available.map(a => a.difficulty), own);
         eq(`${dp.id} D${asked}: nothing written`, await questionRows(), before);
-        const pick = dp.forms[0];
+        const pick = own[0];
         const followed = await serve({ mode: 'topic', subtopic: s9.id, dotpoint: dp.ordinal, difficulty: pick });
         ok(`${dp.id} D${pick}: a level it has is served at that level`, !followed.error && followed.res.question.difficulty === pick && followed.res.question.diffLabel === DIFF_LABELS[pick], show(followed.error?.code || followed.res?.question?.difficulty));
       }
