@@ -717,6 +717,45 @@ export async function run({ root = path.resolve(path.dirname(fileURLToPath(impor
         if (rl.status === 'break') { totals.trueCrosses++; totals.insertedTrueCrosses = (totals.insertedTrueCrosses || 0) + 1; failures.trueCrosses.push({ ...cell, line: at0, text: '2 + 3 = 5 (inserted)', inserted: true, note: rl.note }); }
       }
     }
+    // FUNCTION_ARGUMENT_RULE 7 (client/src/engine/expr.js): a line with e^(kx), sqrt(kx) or log(kx) written without the brackets (e^2x) has two readings.
+    //   · TWO-READING TRUE   the unbracketed authored line (true as the conventional reading): never crossed (ticked when the bracketed line is);
+    //   · TWO-READING BOTH FALSE   k changed to another number in the unbracketed form, false as e^(Kx) AND as e^K·x by this file's own evaluator: never ticked, and crossed;
+    //      (and its verdict is the verdict of the bracketed false line: a cross stays a cross). The literal-only case, false as e^(kx) but true as e^k·x,
+    //      has no authored line; it is pinned on constructed questions in client/test/function-argument-reading-check.mjs (a note, never ticked or crossed).
+    if (base) {
+      const TWO = [[/e\^\(\s*(-?)(\d+)\s*\*?\s*([a-z])\s*\)(?![\^(\w])/, (neg, k, v) => `e^${neg}${k}${v}`, (neg, k, v) => `e^${neg}${k}*${v}`],
+        [/sqrt\(\s*(\d+)\s*\*?\s*([a-z])\s*\)(?![\^(\w])/, (k, v) => `sqrt${k}${v}`, (k, v) => `sqrt(${k})*${v}`],
+        [/log\(\s*(\d+)\s*\*?\s*([a-z])\s*\)(?![\^(\w])/, (k, v) => `log${k}${v}`, (k, v) => `log(${k})*${v}`]];
+      lines.forEach((line, i) => {
+        for (const [re, juxta, literal] of TWO) {
+          const m = re.exec(line);
+          if (!m) continue;
+          const g = m.slice(1);
+          const swap = f => line.replace(re, (_, ...a) => f(...a.slice(0, g.length)));
+          const text = swap(juxta);
+          // true as the conventional reading
+          const rep = mark(lines.map((t, j) => (j === i ? text : t))); const rl = rep ? lineAt(rep, lines, i) : null;
+          if (rl) { totals.twoReadingTrue = (totals.twoReadingTrue || 0) + 1; if (rl.status === 'break') { totals.trueCrosses++; failures.trueCrosses.push({ ...cell, line: i, text, note: rl.note, twoReading: true }); } }
+          // both false: the coefficient moved to another number
+          const kIdx = g.findIndex(x => /^\d+$/.test(x));
+          const other = String(Number(g[kIdx]) + 1);
+          const moved = g.map((x, j) => (j === kIdx ? other : x));
+          const badText = line.replace(re, () => juxta(...moved));
+          const badBracketed = line.replace(re, (_, ...a) => m[0].replace(g[kIdx], other));
+          const badLiteral = line.replace(re, () => literal(...moved));
+          if (judgeMutant(line, badBracketed) === 'wrong' && judgeMutant(line, badLiteral) === 'wrong') {
+            const rb = mark(lines.map((t, j) => (j === i ? badText : t))); const lb = rb ? lineAt(rb, lines, i) : null;
+            if (lb) {
+              totals.twoReadingFalse = (totals.twoReadingFalse || 0) + 1;
+              if (lb.status === 'ok') { totals.falseTicks++; failures.falseTicks.push({ ...cell, line: i, text: badText, note: lb.note, twoReading: true }); }
+              if (lb.status === 'break') totals.twoReadingFalseCrossed = (totals.twoReadingFalseCrossed || 0) + 1;
+              const bb = mark(lines.map((t, j) => (j === i ? badBracketed : t))); const bl = bb ? lineAt(bb, lines, i) : null;
+              if (bl && bl.status === 'break' && lb.status !== 'break') { totals.twoReadingCrossLost = (totals.twoReadingCrossLost || 0) + 1; failures.falseTicks.push({ ...cell, line: i, text: badText, note: `crossed as ${badBracketed} but not as written (${lb.status})`, twoReading: true }); }
+            }
+          }
+        }
+      });
+    }
     lines.forEach((line, i) => {
       const wrong = [];
       for (const m of [...mutationsOf(line), ...roundingMutants(line)]) {

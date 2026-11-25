@@ -115,15 +115,15 @@ ok(!right('3*e^(2*x)', '2e^2x') && !right('sqrt(2*x)', 'sqrt3x') && !right('log(
 const I = { prompt: 'Find $\\displaystyle\\int 14e^{2x}\\,dx$. (You may omit the $+C$.)', meta: { kind: 'expression', canonical: '7*e^(2*x)' } };
 const D = { prompt: 'Differentiate $y = \\sqrt{2x}$.', meta: { kind: 'expression', canonical: '1/sqrt(2*x)' } };
 const statuses = (c, lines) => stepCheck(c.meta, lines.join('\n'), { prompt: c.prompt }).lines.map(l => l.status);
-for (const [c, lines] of [[I, ['∫14e^(2x)dx', '7e^2x']], [I, ['∫14e^(2x)dx', '= 7e^2x']], [I, ['∫14e^(2x)dx', '7e^2x + C']], [I, ['∫14e^(2x)dx', '14e^2x']], [D, ['y = sqrt(2x)', 'dy/dx = 1/sqrt2x']], [D, ['y = sqrt(2x)', 'dy/dx = 1/sqrt2x']]]) {
-  const got = statuses(c, lines);
-  ok(got[1] === 'note', `a line with two readings is a note, not ${got[1]}: ${JSON.stringify(lines)}`);
+const J = { prompt: 'Find $\\displaystyle\\int 14e^{2}\\,dx$. (You may omit the $+C$.)', meta: { kind: 'expression', canonical: '14*e^2*x' } };
+const report = (c, lines) => stepCheck(c.meta, lines.join('\n'), { prompt: c.prompt }).lines;
+// true as the conventional reading (and not as written): ticked as the bracketed line would be, with one sentence on how it was read
+for (const [c, lines, reading] of [[I, ['∫14e^(2x)dx', '7e^2x'], 'e^(2x)'], [I, ['∫14e^(2x)dx', '= 7e^2x'], 'e^(2x)'], [D, ['y = sqrt(2x)', 'dy/dx = 1/sqrt2x'], 'sqrt(2x)']]) {
+  const got = report(c, lines)[1];
+  ok(got.status === 'ok' && got.text === lines[1] && got.note.includes(`Read as ${reading}. Write the brackets so it cannot be read as`) && !/[—–]/.test(got.note), `true as the conventional reading is ticked, with its comment: ${JSON.stringify(lines)} ${got.status}: ${got.note}`);
 }
-// the readings disagree: a note. They agree it is false: crossed. An explicit sign: judged as written.
-const line = text => statuses(I, ['∫14e^(2x)dx', text])[1];
-ok(line('7e^2x') === 'note' && line('7xe^2x') === 'break' && line('5e^2x') === 'break' && line('x7e^2x') === 'break', 'a line false under both readings is crossed (5e^2x, 7xe^2x)');
-ok(line('7e^2*x') === 'break' && line('7e^2·x') === 'break' && line('7e^(2x)') === 'ok', 'an explicit sign is judged as written');
-ok(statuses(I, ['∫14e^(2x)dx', '7e^2x', '7e^(2x)']).join() === 'note,note,ok', 'a held line does not stop the next line being judged');
+// true as written only (14e^2·x is the antiderivative of 14e^2): a note, never ticked, never crossed; a line true under both is ticked
+ok(report(J, ['∫14e^2dx', '14e^2x'])[1].status === 'note' && report(J, ['∫14e^2dx', '14e^2*x'])[1].status === 'ok' && report(J, ['∫14e^2dx', '14e^(2x)'])[1].status === 'break', 'true as written only: a note; an explicit sign is judged as written');
 ok(statuses(I, ['∫14e^(2x)dx', '7e^(2x)'])[1] === 'ok' && statuses(I, ['∫14e^(2x)dx', '14e^(2x)'])[1] !== 'ok', 'the bracketed lines are judged as ever (the same verdicts as origin/main)');
 
 if (failures.length) { console.error(`FUNCTION ARGUMENT READING: FAIL ${failures.length} of ${pass + failures.length}`); for (const f of failures.slice(0, 40)) console.error(`  ${f}`); process.exit(1); }

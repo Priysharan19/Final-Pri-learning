@@ -5,7 +5,8 @@
 // that API stable while routing mathematical working through Pri Reason.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { normalize, parse, evaluate, exprEquivalent, ambiguousReadings, numsClose, variablesOf, withEvaluationBudget } from './expr.js';
+import en from '../i18n/strings.en.js';
+import { normalize, parse, evaluate, exprEquivalent, ambiguousReadings, ambiguousForms, numsClose, variablesOf, withEvaluationBudget } from './expr.js';
 
 // Every sum term and counting-loop turn spent while one answer or one page of
 // working is checked comes out of this — see "What an evaluation may cost" in expr.js.
@@ -3110,10 +3111,12 @@ function stepCheckWithinBudget(meta, workingText, options = null) {
   try { return stepCheckAmbiguity(meta, workingText, options); } finally { AU_READING = before; }
 }
 /**
- * FUNCTION_ARGUMENT_RULE 7 for working. A line with `e^2x`, `sqrt2x` or `log2x` is a note only when its readings DISAGREE about its truth: the
- * page is judged as written and again with each such line rewritten under each other reading; a line every reading ticks is ticked, a line
- * every reading crosses is crossed as before, and any other line is held (a note, `ambiguous`) and the page judged once more with it held,
- * so nothing is built on a line that is true under one reading only. A line with an explicit sign (e^2*x) is not ambiguous.
+ * FUNCTION_ARGUMENT_RULE 7 for working. A line with `e^2x`, `sqrt2x` or `log2x` is judged as written and again with each such line rewritten as the
+ * conventional reading (e^(2x), sqrt(2x), log(2x)):
+ *   the same verdict under both ......... that verdict stands (ticked, crossed, or a note);
+ *   true as the conventional reading, not as written ... ticked exactly as the bracketed line would be, and its comment says how it was read;
+ *   anything else (true as written only, or the readings otherwise disagree) ... held: a note that asks for brackets, which no path ticks or crosses.
+ * The page is then judged once more with those changes, so what follows is built on the right lines. An explicit sign (e^2*x) is not ambiguous.
  */
 function stepCheckAmbiguity(meta, workingText, options) {
   if (HELD_AMBIGUOUS !== null) return stepCheckRead(meta, workingText, options);
@@ -3123,11 +3126,24 @@ function stepCheckAmbiguity(meta, workingText, options) {
   const run = (text, held) => { HELD_AMBIGUOUS = held; try { return stepCheckRead(meta, text, options); } finally { HELD_AMBIGUOUS = null; } };
   if (!at.length || at.length > 12) return run(workingText, new Set());
   const literal = run(workingText, new Set());
-  const variants = Math.max(...at.map(i => reads[i].length));
-  const others = [];
-  for (let k = 0; k < variants; k++) others.push(run(lines.map((l, i) => (reads[i].length ? reads[i][Math.min(k, reads[i].length - 1)] : l)).join('\n'), new Set()));
-  const held = new Set(at.filter(i => { const a = literal.lines?.[i]?.status; return others.some(o => o.lines?.[i]?.status !== a); }));
-  return held.size ? run(workingText, held) : literal;
+  const conventional = run(lines.map((l, i) => (reads[i].length ? reads[i][0] : l)).join('\n'), new Set());
+  const read = new Set(), held = new Set();
+  for (const i of at) {
+    const a = literal.lines?.[i]?.status, c = conventional.lines?.[i]?.status;
+    if (a === c) continue;
+    if (c === 'ok') read.add(i); else held.add(i);
+  }
+  if (!read.size && !held.size) return literal;
+  const text = lines.map((l, i) => (read.has(i) ? reads[i][0] : l)).join('\n');
+  const report = run(text, held);
+  if (!read.size || !Array.isArray(report.lines)) return report;
+  const out = report.lines.map((l, i) => {
+    if (!read.has(i) || !l) return l;
+    const f = ambiguousForms(lines[i])[0];
+    const why = f ? en['mark.readAsBrackets'].replace('{reading}', f.reading).replace('{literal}', f.literal) : '';
+    return { ...l, text: lines[i], read: 'conventional', note: [l.note, why].filter(Boolean).join(' ') };
+  });
+  return { ...report, lines: out };
 }
 function stepCheckRead(meta, workingText, options) {
   meta = numericSolutions(meta);

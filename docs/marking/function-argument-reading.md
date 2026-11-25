@@ -16,7 +16,10 @@ Students write and type `sin2x`, `cos 3x`, `tan2θ`, `ln2x`, `sin^2 x`, `sin²x`
 6. If the product is followed by a power, a factorial, a percent sign or a further factor that is not a function name (`sin2x^2`, `sin2xy`, `sin2x(x+1)`), nothing changes: the argument is read as it always was (one atom) and `sin x^2` stays (sin x)^2. The inverse function written as a power, `tan^-1 3x`, is also unchanged.
 7. `e^2x`, `xe^-3x`, `sqrt2x`, `cbrt2x` and `log2x` (the 2 may be a base) have two readings that both parse, so the parser keeps the literal one (e^2·x, sqrt(2)·x, log(2)·x) and `ambiguousReadings` lists the others (e^(2x), sqrt(2x), log(2x) and log base 2 of x). A form is ambiguous ONLY when the number and the letter are juxtaposed with no operator. Any explicit `*`, `·`, `×` (`e^2*x`, `sqrt2·x`, `log2×x`) means what it says and has one reading.
    * A typed final answer is right when the literal reading or another reading equals the key, and no reading of it is a trap the question records.
-   * A working line with one of these forms is judged under every reading. True under every reading: ticked. False under every reading: crossed, as before. True under one and false under the other: a note that asks for brackets, and no path ticks it (not the line checker, not the match to the worked solution, not a display overlay).
+   * A working line with one of these forms is judged as written and as the conventional reading (e^(kx), sqrt(kx), log(kx)), and the deterministic report (which pays) and the displayed report follow the same rule:
+     * the same verdict under both: that verdict stands (ticked, or crossed when false under every reading);
+     * true as the conventional reading and not as written: ticked exactly as the bracketed line would be, and its comment adds `mark.readAsBrackets` (strings.en.js): "Read as e^(2x). Write the brackets so it cannot be read as e^2 times x.";
+     * true as written only, or any other disagreement: a note that asks for brackets, never ticked and never crossed, by any path.
 8. Working lines with a number-and-letter argument (rule 2) keep the every-reading rule that was already there: a calculus or proof line is ticked only when it is true under every reading, and crossed only when false under every reading.
 
 ## Not changed

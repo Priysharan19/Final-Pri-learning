@@ -259,8 +259,8 @@ export function normalize(raw) {
 //   7. `e^2x`, `xe^-3x`, `sqrt2x`, `cbrt2x`, `log2x` (the 2 may be a base), a number and a letter JUXTAPOSED (an explicit * · × means what it says),
 //      have two readings that both parse, so the parser keeps the literal one (sqrt(2)·x, log(2)·x, e^2·x) and `ambiguousReadings` lists the
 //      others. A typed FINAL ANSWER is accepted when the literal reading or another reading equals the key and no reading is a recorded trap of
-//      the question (checker-core.js). A working LINE is judged under every reading (checker.js stepCheckAmbiguity): ticked when all are true,
-//      crossed when all are false, and a note that asks for brackets, ticked by no path, when they disagree.
+//      the question (checker-core.js). A working LINE is judged as written and as the conventional reading (checker.js stepCheckAmbiguity): the same
+//      verdict under both stands, true as the conventional reading only is ticked with a comment on how it was read, anything else is a held note.
 const CONVENTIONAL_ARGUMENT = new Set(['sin', 'cos', 'tan', 'sec', 'cosec', 'csc', 'cot', 'asin', 'acos', 'atan', 'arcsin', 'arccos', 'arctan', 'ln', 'exp']);
 const FUNCTION_NAMES_RE = Object.keys(FUNCTIONS).sort((a, b) => b.length - a.length).join('|');
 const FUNCTION_POWER_BASE = new RegExp(`(?<![A-Za-z])(?:${FUNCTION_NAMES_RE})\\s*$`, 'i');
@@ -271,6 +271,22 @@ const ROOT_FORM = new RegExp(`(?<![A-Za-z])(sqrt|cbrt)\\s*(\\d+(?:\\.\\d+)?)\\s*
 const LOG_FORM = new RegExp(`(?<![A-Za-z])(log)\\s*(\\d+(?:\\.\\d+)?)\\s*${GREEK_OR_LETTER}${BARE_END}`, 'gi');
 const E_POWER_FORM = new RegExp(`(?<![A-Za-z]{2})(?<!\\.)e\\s*\\^\\s*(-?)\\s*(\\d+(?:\\.\\d+)?)\\s*${GREEK_OR_LETTER}${BARE_END}`, 'g');
 
+/** The input in the engine's plain notation with its commas kept: a line rewritten under another reading must still say what it said. */
+function readable(input) { return normalize(String(input ?? '').replace(/,/g, '\u0001')).replace(/\u0001/g, ','); }
+
+/** Each juxtaposed two-reading form in the input: { form: 'e^2x', reading: 'e^(2x)', literal: 'e^2 times x' }, in the order written. */
+export function ambiguousForms(input) {
+  let s;
+  try { s = readable(input); } catch { return []; }
+  if (!s || s.length > 400) return [];
+  const out = [];
+  const take = (re, make) => { const r = new RegExp(re.source, re.flags.includes('i') ? 'gi' : 'g'); for (const m of s.matchAll(r)) out.push({ at: m.index, ...make(...m) }); };
+  take(ROOT_FORM, (w, f, k, v) => ({ form: w.replace(/\s+/g, ''), reading: `${f}(${k}${v})`, literal: `${f}(${k}) times ${v}` }));
+  take(LOG_FORM, (w, f, k, v) => ({ form: w.replace(/\s+/g, ''), reading: `${f}(${k}${v})`, literal: `${f}(${k}) times ${v}` }));
+  take(E_POWER_FORM, (w, neg, k, v) => ({ form: w.replace(/\s+/g, '').replace(/^.*?(e\^)/, '$1'), reading: `e^(${neg}${k}${v})`, literal: `e^${neg}${k} times ${v}` }));
+  return out.sort((a, b) => a.at - b.at).map(({ at, ...rest }) => rest);
+}
+
 /**
  * The other conventional readings of the forms that have two (rule 7): `sqrt2x` as sqrt(2x), `log2x` as log(2x) and as log base 2
  * of x, `e^2x` as e^(2x). Each string is the input rewritten with every such form bracketed (the log base reading separately);
@@ -278,19 +294,19 @@ const E_POWER_FORM = new RegExp(`(?<![A-Za-z]{2})(?<!\\.)e\\s*\\^\\s*(-?)\\s*(\\
  */
 export function ambiguousReadings(input) {
   let s;
-  try { s = normalize(input); } catch { return []; }
+  try { s = readable(input); } catch { return []; }
   if (!s || s.length > 400) return [];
   const bracketed = s
-    .replace(ROOT_FORM, (_, f, k, v) => `${f}(${k}*${v})`)
-    .replace(LOG_FORM, (_, f, k, v) => `${f}(${k}*${v})`)
-    .replace(E_POWER_FORM, (_, neg, k, v) => `e^(${neg}${k}*${v})`);
+    .replace(ROOT_FORM, (_, f, k, v) => `${f}(${k}${v})`)
+    .replace(LOG_FORM, (_, f, k, v) => `${f}(${k}${v})`)
+    .replace(E_POWER_FORM, (_, neg, k, v) => `e^(${neg}${k}${v})`);
   const out = [];
   if (bracketed !== s) out.push(bracketed);
   if (new RegExp(LOG_FORM.source, 'i').test(s)) {
     const base = s
-      .replace(ROOT_FORM, (_, f, k, v) => `${f}(${k}*${v})`)
-      .replace(LOG_FORM, (m, f, k, v) => (Number(k) > 1 && Number.isInteger(Number(k)) ? `(ln(${v})/ln(${k}))` : `log(${k}*${v})`))
-      .replace(E_POWER_FORM, (_, neg, k, v) => `e^(${neg}${k}*${v})`);
+      .replace(ROOT_FORM, (_, f, k, v) => `${f}(${k}${v})`)
+      .replace(LOG_FORM, (m, f, k, v) => (Number(k) > 1 && Number.isInteger(Number(k)) ? `(ln(${v})/ln(${k}))` : `log(${k}${v})`))
+      .replace(E_POWER_FORM, (_, neg, k, v) => `e^(${neg}${k}${v})`);
     if (base !== s && !out.includes(base)) out.push(base);
   }
   return out;
