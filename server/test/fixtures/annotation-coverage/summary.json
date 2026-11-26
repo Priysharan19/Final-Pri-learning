@@ -17,22 +17,22 @@
  "total": {
   "total": 5592,
   "full": 356,
-  "trueOnly": 2151,
-  "uncovered": 3085,
+  "trueOnly": 2150,
+  "uncovered": 3086,
   "fullPct": 6.37,
-  "trueOnlyPct": 38.47,
-  "uncoveredPct": 55.17
+  "trueOnlyPct": 38.45,
+  "uncoveredPct": 55.19
  },
  "halves": {
-  "trueHalfPasses": 2507,
-  "trueHalfPassPct": 44.83,
+  "trueHalfPasses": 2506,
+  "trueHalfPassPct": 44.81,
   "wrongHalfPasses": 589,
   "wrongHalfPassPct": 10.53,
-  "allLinesTickedAndNoneCrossed": 3155,
-  "allLinesPct": 56.42,
-  "answerLineRecognisedAndKeyCorrect": 1342,
+  "allLinesTickedAndNoneCrossed": 3154,
+  "allLinesPct": 56.4,
+  "answerLineRecognisedAndKeyCorrect": 1341,
   "answerLineOfKeyedUnits": 4427,
-  "answerLinePct": 30.31,
+  "answerLinePct": 30.29,
   "answerHalfNotApplicableNoKey": 1165,
   "linesTickedOnlyAsTrueAsWritten": 1793
  },
@@ -40,11 +40,11 @@
   "bank": {
    "total": 2214,
    "full": 190,
-   "trueOnly": 621,
-   "uncovered": 1403,
+   "trueOnly": 620,
+   "uncovered": 1404,
    "fullPct": 8.58,
-   "trueOnlyPct": 28.05,
-   "uncoveredPct": 63.37
+   "trueOnlyPct": 28,
+   "uncoveredPct": 63.41
   },
   "bank-worked": {
    "total": 2247,
@@ -67,14 +67,14 @@
  },
  "causes": {
   "wrong step missed": {
-   "count": 2042,
+   "count": 2041,
    "example": {
     "id": "gen:y11-functions:d2:30a64c2",
     "line": "x=-(4/(2*1))=-2"
    },
    "byKind": {
     "generated": 406,
-    "bank": 613,
+    "bank": 612,
     "bank-worked": 1023
    }
   },
@@ -126,14 +126,14 @@
    }
   },
   "words-only reasoning": {
-   "count": 153,
+   "count": 154,
    "example": {
     "id": "gen:y11-lines:d4:b6d5695",
     "line": "y"
    },
    "byKind": {
     "generated": 38,
-    "bank": 22,
+    "bank": 23,
     "bank-worked": 93
    }
   },
@@ -1174,11 +1174,11 @@
   "bank:a11-ma-t2": {
    "total": 154,
    "full": 0,
-   "trueOnly": 63,
-   "uncovered": 91,
+   "trueOnly": 62,
+   "uncovered": 92,
    "fullPct": 0,
-   "trueOnlyPct": 40.91,
-   "uncoveredPct": 59.09
+   "trueOnlyPct": 40.26,
+   "uncoveredPct": 59.74
   },
   "bank:a12-ma-c2": {
    "total": 185,
@@ -2481,11 +2481,11 @@
   "bank:T2.1a": {
    "total": 88,
    "full": 3,
-   "trueOnly": 44,
-   "uncovered": 41,
+   "trueOnly": 43,
+   "uncovered": 42,
    "fullPct": 3.41,
-   "trueOnlyPct": 50,
-   "uncoveredPct": 46.59
+   "trueOnlyPct": 48.86,
+   "uncoveredPct": 47.73
   },
   "bank:T2.1b": {
    "total": 60,

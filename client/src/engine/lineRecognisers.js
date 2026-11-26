@@ -64,7 +64,10 @@ export function questionOf(q) {
   const slots = slotsOf(plain);
   const bound = new Map();
   for (const l of slots.filter(x => typeof x.v === 'string')) { const nums = [...new Set(slots.filter(x => typeof x.v === 'number' && x.key === l.key).map(x => x.v))]; if (nums.length === 1 && !bound.has(l.v)) bound.set(l.v, nums[0]); }
-  const out = { prompt, plain, facts, numbers, formulas, spans, items: itemsOf(plain), words, slots, bound };
+  // the domain the question gives a letter: `0 <= t <= 4` (and the strict forms) -> t: [0, 4]. Only these two numbers are "the endpoints" of t.
+  const domains = new Map();
+  for (const m of lc(plain).replace(/≤/g, '<=').matchAll(/(-?\d+(?:\.\d+)?)\s*<=?\s*([a-z])\s*<=?\s*(-?\d+(?:\.\d+)?)/g)) domains.set(m[2], [Number(m[1]), Number(m[3])]);
+  const out = { prompt, plain, facts, numbers, formulas, spans, items: itemsOf(plain), words, slots, bound, domains };
   if (q && typeof q === 'object') cache.set(q, out);
   return out;
 }
@@ -79,6 +82,8 @@ export function slotsOf(raw) {
   const t = synonyms(lc(raw).toLowerCase());
   return [...t.matchAll(SLOT)].filter(m => !/^(?:a|i)$/.test(m[2]) || /\d/.test(m[2])).map(m => ({ key: `${m[1]} ${singular(m[m.length - 1])}`, v: /\d/.test(m[2]) ? numOf(m[2]) : m[2] }));
 }
+/** Is `L = value` something the question itself binds: the value its wording gives the letter, or an endpoint of the domain it gives the letter? */
+const provedAssign = (state, L, v) => state.bound.get(L) === v || (state.Q.domains.has(L) && state.Q.domains.get(L).includes(v));
 /** A line that says `after n weeks` ties the letter n to the number the question puts in the same place. */
 function bindFromLine(state, text) {
   for (const l of slotsOf(text).filter(x => typeof x.v === 'string')) {
@@ -184,9 +189,56 @@ const neutral = (l, tickClass, note) => ({ line: { text: l.text, status: 'note',
 const tick = (l, cls, note, says, saysTex) => ({ line: { text: l.text, status: 'ok', state: 'arithmetic', note, valueChain: { rule: 'proved' }, fact: { kind: 'proved', proof: cls, says, saysTex }, tickClass: cls } });
 const fmtNum = v => String(Math.round(v * 1e9) / 1e9);
 
+// ── exact maths ──────────────────────────────────────────────────────────────
+// A line that restates the question may not change a character of its maths. `itemsOf` reads a token that holds letters as a word and drops its digits, signs and exponents
+// (`y=x^3+ax` was `yxax`), so every restating recogniser also asks this: each maths run of the line (a run of tokens joined by an operator, a relation, a bracket or a
+// glued number and letter) must be, exactly and as a whole, a maths run of the prompt (the same expression by the engine, or the same characters once spaces, TeX braces and the
+// minus sign are normalised); a relation must be the same relation.
+const OPCH = /[=<>^+*/≤≥_]/;
+const mathy = t => OPCH.test(t) || (/\d/.test(t) && /[A-Za-z(]/.test(t)) || /[()]/.test(t) && /[A-Za-z0-9]/.test(t) && /\(/.test(t) && !/^\(?[A-Za-z]+\)?[.,;:]?$/.test(t) || /^\\[A-Za-z]+/.test(t) || /\\(?:big|frac|sqrt|le|ge)/.test(t);
+const normRun = t => lc(t).replace(/\\(?:big|Big|left|right)/g, '').replace(/\{/g, '(').replace(/\}/g, ')').replace(/\^\(\s*(-?[\w.]+)\s*\)/g, '^$1').replace(/≤/g, '<=').replace(/≥/g, '>=').replace(/\\le\b/g, '<=').replace(/\\ge\b/g, '>=').replace(/[.,;:]+$/, '').replace(/\s+/g, '');
+const runKey = run => {
+  const t = normRun(run);
+  if (!t) return null;
+  if (/[<>]/.test(t)) return `I:${t}`;
+  const sides = t.split('=');
+  if (sides.length === 2 && sides[0] && sides[1]) { const n = astOf(sides[1]); return `Q:${sides[0]}=${n ? printCanon(n) : sides[1]}`; }
+  const n = astOf(t);
+  return n && !/^[-\d.]+$/.test(t) ? `E:${printCanon(n)}` : `T:${t}`;
+};
+/** The maths runs of a text, as keys: [{ key, text }]. A lone word or number is not a run (the other checks bind those to the prompt's words). */
+export function mathsRuns(raw) {
+  const toks = lc(String(raw ?? '').replace(/\*\*/g, '')).split(/\s+/).filter(Boolean);
+  const runs = [];
+  let cur = [];
+  const flush = () => { if (cur.some(mathy)) runs.push(cur.join(' ')); cur = []; };
+  for (let i = 0; i < toks.length; i++) {
+    const t = toks[i];
+    const opOnly = /^[=<>^+*/≤≥_-]+$/.test(t);
+    const joined = cur.length && (opOnly || /^[=<>^+*/≤≥_]/.test(t) || /[=<>^+*/≤≥_]$/.test(cur[cur.length - 1]) || (mathy(t) && mathy(cur[cur.length - 1])) || /^[-]/.test(t) && !/^-\s*$/.test(t) && mathy(cur[cur.length - 1]));
+    if (cur.length && !joined) flush();
+    if (opOnly || mathy(t) || cur.length) cur.push(t);
+    if (!(opOnly || mathy(t) || cur.length)) continue;
+  }
+  flush();
+  return runs.map(r => ({ text: r, key: runKey(r) })).filter(r => r.key);
+}
+const promptRunKeys = Q => { if (!Q.runKeys) Q.runKeys = new Set(mathsRuns(Q.plain).map(r => r.key)); return Q.runKeys; };
+/** Every maths run of the line is a whole maths run of the prompt. */
+export function mathsExact(Q, text) {
+  const keys = promptRunKeys(Q);
+  const mine = mathsRuns(text);
+  // the run's own pieces too: a student may write one clause of a prompt run (`x = 1` out of `y = 2 and x = 1`) but never a changed one
+  const pieces = new Set([...keys]);
+  for (const r of mathsRuns(Q.plain)) for (const part of r.text.split(/\s*(?:,|;|\band\b)\s*/)) { const k = runKey(part); if (k) pieces.add(k); }
+  return mine.every(r => pieces.has(r.key) || pieces.has(runKey(r.text.replace(/[()]/g, ''))));
+}
+
 // ── a. data restated ─────────────────────────────────────────────────────────
 function dataRestated(Q, l, text) {
   const t = strip(text).replace(/^(?:given|data|information|we are told|the question says|question)\s*:\s*/i, '');
+  // the facts bind its numbers; a line that also carries an operator (`R=10+t`) is maths, and its maths must be the prompt's own, exactly
+  if (/[+*/^<>≤≥]|\d\s*-\s*[A-Za-z(\d]/.test(t) && !mathsExact(Q, t)) return null;
   if (!/\d/.test(t) || NEGATION.test(t) || /[=<>]/.test(t.replace(/\b(?:initial\s+\w+|[a-z]\s)=/gi, '').replace(/\b[a-z]\s*=\s*\d/gi, '')) && false) return null;
   if (!covered(Q, t, DATA_WORDS)) return null;
   const facts = factsOf(t);
@@ -200,6 +252,7 @@ function dataRestated(Q, l, text) {
 // ── b. the question's own sentence ───────────────────────────────────────────
 function sentenceRestated(Q, l, text) {
   const t = strip(text).replace(/^(?:given|data|question|the question|information)\s*:\s*/i, '');
+  if (!mathsExact(Q, t)) return null;
   const items = itemsOf(t);
   const clauses = clausesOf(items);
   const words = items.filter(x => /^[a-z']+$/.test(x));
@@ -213,7 +266,7 @@ function sentenceRestated(Q, l, text) {
 const TITLE = new Set(['to', 'number', 'of', 'find', 'total', 'amount', 'value', 'answer', 'question', 'part', 'determine', 'calculate', 'how', 'many', 'much', 'what', 'is', 'are', 'in', 'for', 'at', 'after']);
 function titleRestated(Q, l, text) {
   const t = strip(text).replace(/:$/, '');
-  if (/[=<>+*^]/.test(t) || NEGATION.test(t)) return null;
+  if (/[=<>+*^]/.test(t) || NEGATION.test(t) || !mathsExact(Q, t)) return null;
   const words = (t.match(/[A-Za-z]+/g) || []).map(w => w.toLowerCase()).filter(w => !STOP.has(w));
   if (words.length < 2 || words.length > 10) return null;
   const run = Q.plain.toLowerCase();
@@ -252,9 +305,16 @@ function methodStated(state, l, text) {
   for (const a of assigns) {
     const L = a[1].toLowerCase();
     if (facts.some(f => f.span && a.index <= f.span[0] && f.span[1] <= a.index + a[0].length)) continue;
-    // a value given to a letter is the value the question gives that letter, where the question's wording binds it
-    if (state.bound.has(L) && state.bound.get(L) !== numOf(a[2])) return null;
+    // a value given to a letter must be a value the question itself binds to that letter (its wording, or an endpoint of the domain it gives): a number that merely appears
+    // elsewhere in the prompt is not a claim the prompt makes about this letter
+    if (!provedAssign(state, L, numOf(a[2]))) return null;
   }
+  // nothing else may be a claim: after the proved assignments and a `dy/dx = 0` condition are taken out, no number, relation or power is left
+  { let residue = body;
+    for (const a of [...assigns].reverse()) residue = residue.slice(0, a.index) + ' ' + residue.slice(a.index + a[0].length);
+    residue = residue.replace(/\bd([a-z])\s*\/\s*d([a-z])\s*=\s*0\b/gi, ' ');
+    for (const f of facts) if (f.span) residue = residue.replace(new RegExp(String(f.v).replace('.', '\\.')), ' ');
+    if (/[=<>^]|\d/.test(residue)) return null; }
   state.methodOpen = true;   // the next line may continue this method statement (methodContinuation)
   const claim = facts.find(f => f.k === 'ratio' || f.k === 'step');
   if (claim) {
@@ -278,7 +338,7 @@ function methodContinuation(state, l, text) {
   t = t.replace(/\bd([a-z])\s*\/\s*d([a-z])\s*=\s*0\b/gi, (m, y, x) => { if (!labels.has(y) || !vars.has(x)) ok = false; return ' '; });
   if (!ok) return null;
   const assigns = [...t.matchAll(new RegExp(String.raw`\b([a-z])\s*=\s*${NUM}`, 'gi'))];
-  for (const a of assigns) { const L = a[1].toLowerCase(); if (!vars.has(L) || !Q.numbers.has(numOf(a[2]))) return null; if (state.bound.has(L) && state.bound.get(L) !== numOf(a[2])) return null; }
+  for (const a of assigns) { const L = a[1].toLowerCase(); if (!vars.has(L) || !provedAssign(state, L, numOf(a[2]))) return null; }
   t = t.replace(new RegExp(String.raw`\b([a-z])\s*=\s*${NUM}`, 'gi'), ' ');
   if (/\d|[=+*^/()]/.test(t.replace(/\(s\)/gi, ''))) return null;
   const words = (t.match(/[A-Za-z]{2,}/g) || []).map(w => w.toLowerCase());

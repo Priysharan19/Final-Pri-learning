@@ -62,6 +62,29 @@ stays(4, 'dw/dt = 0, and compare with the endpoints t = 0 and t = 4.', 'the deri
 { const o = show(V, swap(3, 'Hence compare.'), '12 m/s'); ok(st(o, 4) !== 'condition', 'a method continuation stands only straight after a method statement'); }
 { const lines = VL.slice(); lines.splice(4, 0, 'v = 12t - 3t^2'); const o = show(V, lines, '12 m/s'); ok(!(st(o, 6) === 'condition' && cls(o, 6) === 'method-stated'), 'a line between the method and its continuation breaks the run'); }
 
+// ── review attacks (Train 8): a method line or its continuation with a number the prompt merely contains elsewhere; restatements with one altered character ──
+stays(4, 'dv/dt = 0, and compare with the endpoints t = 0 and t = 12.', 'a wrong endpoint that is not in the prompt');
+stays(4, 'dv/dt = 0, and compare with the endpoints t = 3 and t = 4.', 'an endpoint that is not an endpoint of the domain');
+stays(4, 'dv/dt = 0, and compare with the endpoints t = 4 and t = 12.', 'a wrong endpoint beside a right one');
+stays(4, 'dv/dt = 0, and compare with the endpoints t = 12 and t = 4.', 'the number the answer is, as an endpoint');
+stays(3, 'Method: use t = 12', 'a method line that assigns a number that is not the prompt\'s for that letter');
+stays(3, 'Method: Find the stationary point(s) of v(t) using dv/dt = 12.', 'a method line with a derivative set to a number');
+stays(3, 'Method: Find v(12) and v(3).', 'a method line with values');
+{ const o = show(V, swap(4, 'dv/dt = 0, and compare with the endpoints t = 0 and t = 4.'), '12 m/s'); ok(st(o, 5) === 'condition' && cls(o, 5) === 'method-stated', 'the true continuation (the domain endpoints 0 and 4) is still a method statement'); }
+{ const o = show(V, swap(3, 'Method: Find the stationary point(s) of v(t) and compare the end points.'), '12 m/s'); ok(st(o, 4) === 'condition' && cls(o, 4) === 'method-stated', 'a claim-free method line is neutral'); }
+const bankPrompt = id => markerView(QB.qbankEntryQuestion(id, 17));
+const lineOn = (q, text) => { const r = MARKER_OPS.practice({ q, answer: '0', working: [text, 'x = 1'].join('\n'), evidenceIfWrong: true, policy: { methodMarks: true } }, () => {}); const l = (r.evidence.shownReport || r.evidence.stepReport)?.lines?.[0]; return l ? { status: l.context === true ? 'condition' : l.status === 'ok' ? 'checked' : l.status } : { status: 'note' }; };
+for (const [id, good, bad] of [
+  ['A11-C1-063', 'Find a so that the tangent to y=x^2+ax at x=1 is parallel to y=5x.', ['Find a so that the tangent to y=x^3+ax at x=1 is parallel to y=5x.', 'Find a so that the tangent to y=x^2+ax at x=2 is parallel to y=5x.', 'Find a so that the tangent to y=x^2+ax at x=1 is parallel to y=6x.', 'Find a so that the tangent to y=x^2-ax at x=1 is parallel to y=5x.']],
+  ['A11-E1-034', 'The mass of a substance is m=80e^(-kt) grams after t days.', ['The mass of a substance is m=81e^(-kt) grams after t days.', 'The mass of a substance is m=80e^(kt) grams after t days.', 'The mass of a substance is m=80e^(-kt) grams after t days. After 11 days, 60 g remains.']],
+  ['A11-F1-005(iii)', 'Find the values of m for which the line y=mx+9 is a tangent to the parabola.', ['Find the values of m for which the line y=mx+10 is a tangent to the parabola.', 'Find the values of m for which the line y=mx-9 is a tangent to the parabola.', 'Find the values of m for which the line y=mx+9 is a normal to the parabola.']],
+  ['A12-C2-044', 'Differentiate y=3^(-x).', ['Differentiate y=3^(+x).', 'Differentiate y=3^(-x+1).', 'Differentiate y=2^(-x).']]]) {
+  const q = bankPrompt(id);
+  const c = lineOn(q, good);
+  ok(c.status === 'condition' || c.status === 'checked', `${id}: the true restatement is read (${c.status})`);
+  for (const b of bad) { const l = lineOn(q, b); ok(l.status !== 'condition' && l.status !== 'checked', `${id}: "${b}" is not neutral or ticked (${l.status})`); }
+}
+
 // ── the adversarial inputs of #1135, replayed on a bank-shaped question ──────────────
 const bankOf = (name, prompt, key) => markerView({ id: `bank-${name}`, contentId: `qbank:T-${name}`, _bank: `T-${name}`, _family: 'qb-t', subtopic: 'qb-t', answerType: 'numeric', type: 'numeric', prompt, answer: { type: 'numeric', value: Number(key) }, totalMarks: 1 });
 const SEATS = bankOf('seats', PAGES.seats.prompt, PAGES.seats.key), USERS = bankOf('users', PAGES.users.prompt, PAGES.users.key);

@@ -226,11 +226,13 @@ export function extremeOver(w, dom, kind) {
 // ── what the page has set again ──────────────────────────────────────────────
 /** Does this line set the function letter to something other than the question's function? `v(t) = 5t`, `v = t^2`; never `v(2) = ...` or `dv/dt = ...`. */
 function redefines(text, w) {
-  const t = stripEnd(lead(norm(text)));
+  const LABEL = String.raw`^(?:\(\s*[0-9a-z]{1,4}\s*\)\s*|[0-9a-z]{1,4}\s*[.):]\s*|\d{1,3}\s+)?`;
+  const t0 = stripEnd(lead(norm(text)));
+  const t = t0.replace(new RegExp(`${LABEL}(?=${w.name}\\s*(?:\\(\\s*${w.v}\\s*\\))?\\s*=)`), '');
   if (/[<>:]|=>|->|⇒|→/.test(t)) return false;
-  // a glued question number in front (`8 y = 3/tan x`, the margin number the reader joins to the line) is ambiguous, so the line is read as setting the letter: nothing after it is
+  // a line number or part label in front, in any of its shapes (`8 y = 3/tan x`, `(8) y = ...`, `8. y`, `8) y`, `8 ) y`, `8: y`, `(a) y`, `a) y`), is ambiguous, so the line is read as setting the letter: nothing after it is
   // judged by the question's function (Train 8: without this a true derivative of the page's own curve was crossed against the question's)
-  const m = new RegExp(String.raw`^(?:\d{1,3}\s+)?${w.name}\s*(?:\(\s*${w.v}\s*\))?\s*=\s*(.+)$`).exec(t);
+  const m = new RegExp(String.raw`^${w.name}\s*(?:\(\s*${w.v}\s*\))?\s*=\s*(.+)$`).exec(t);
   if (!m) return false;
   const first = m[1].split('=')[0].trim();
   if (!new RegExp(String.raw`(?<![A-Za-z])${w.v}(?![A-Za-z])`).test(first)) return false;     // no variable on the right: a value, not a definition

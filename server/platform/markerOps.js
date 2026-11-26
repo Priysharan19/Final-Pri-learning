@@ -520,24 +520,54 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
   // consequences, and `answerLine`. Added to the DISPLAYED report only (`stepReport` is untouched, so no mark, scheme pay or stored record reads them).
   // `answerLine` is named only when the answer was marked correct, and by the same answer check that marked it (`accepts`).
   const displayCtx = { correct: result.correct === true, accepts: text => (checkBankAnswer(q, text) || {}).correct === true };
-  // A box drawn round a line (`\\boxed{...}`, "(boxed)", "[boxed]", a bracket round the value) is layout, not mathematics (engine/boxes.js, the card's own reading). The marker's line
-  // check does not read the box, so a line that is only the boxed answer stays a note on the displayed page. Where the answer was marked correct, such an OPEN NOTE whose
-  // value (the whole line, or the end of its chain) the server's own answer check accepts is ticked as stating the answer. Display only; never a cross, never a mark.
+  // A box drawn round a line (`\\boxed{...}`, "(boxed)", "[boxed]", a bracket round the value) is layout, not mathematics (engine/boxes.js, the card's own reading), and it does not
+  // make a line true. The marker's line check does not read the box, so such a line stays a note on the displayed page. Display only, never a mark. Two things are done to an OPEN
+  // NOTE that carries a box, from its text without the box:
+  //   (1) a line that is only the boxed value, or `<the asked symbol> = value` (the question's own answer label), is ticked as stating the answer, and so may be the answer line,
+  //       when the answer was marked correct and the server's own answer check accepts that value;
+  //   (2) any other line (a function value, an arithmetic sum, a derivative, another variable: `v(1) = [12]`, `3 + 4 = [12]`, `t = [12]`) is judged by the same proofs a plain line
+  //       gets (the arithmetic check, the page passes): proved lines are ticked, a provably false line is crossed (never when an earlier line is crossed), anything undecidable stays a note.
   try {
-    if (typeof steps === 'string' && result.correct === true && /\\(?:boxed|fbox|mbox)\b|[(\[]\s*boxed\b|[⌈⎡▭□]/i.test(steps) && !OBJECTIVE.has(q.answerType) && q.answerType !== 'graph-sketch' && !Array.isArray(q.boardScheme) && !(opts && (opts.proved === false || opts.solutionMatch === false)) && (typeof q._bank === 'string' || /^gen:(?:y11|y12|me11|me12)-/.test(String(q.contentId ?? '')))) {
+    if (typeof steps === 'string' && /\\(?:boxed|fbox|mbox)\b|[(\[]\s*boxed\b|[⌈⎡▭□]/i.test(steps) && !OBJECTIVE.has(q.answerType) && q.answerType !== 'graph-sketch' && !Array.isArray(q.boardScheme) && !(opts && (opts.proved === false || opts.solutionMatch === false)) && (typeof q._bank === 'string' || /^gen:(?:y11|y12|me11|me12)-/.test(String(q.contentId ?? '')))) {
       const base = shownReport || report;
       if (base && Array.isArray(base.lines)) {
         const brk = base.lines.findIndex(l => l?.status === 'break');
+        const asked = (/^([A-Za-z][A-Za-z0-9_']*(?:\([^()]*\))?)\s*=$/.exec(String(q.answerPrefix ?? '').trim()) || [])[1] || null;
+        const squash = t => String(t ?? '').replace(/[.\s]+$/, '').replace(/\s+/g, ' ').trim();
+        const bareOf = t => unboxed(t, q.answerType).replace(/^\s*(?:final\s+answer|answer|ans)\s*[:=\-–]\s*/i, '').replace(/[.\s]+$/, '');
+        const boxed = base.lines.map((l, i) => !!l && (brk < 0 || i < brk) && openNote(l) && typeof l.text === 'string' && !!bareOf(l.text) && bareOf(l.text) !== squash(l.text) && !/[<>≤≥≠]/.test(bareOf(l.text)));
+        const lines = base.lines.slice();
+        const rest = [];
         let n = 0;
-        const lines = base.lines.map((l, i) => {
-          if ((brk >= 0 && i >= brk) || !openNote(l) || typeof l.text !== 'string') return l;
-          const bare = unboxed(l.text, q.answerType).replace(/^\s*(?:final\s+answer|answer|ans)\s*[:=\-–]\s*/i, '').replace(/[.\s]+$/, '');
-          if (!bare || bare === l.text.replace(/[.\s]+$/, '').replace(/\s+/g, ' ').trim() || /[<>≤≥≠]/.test(bare)) return l;
-          const sides = bare.replace(/^=\s*/, '').split('=').map(x => x.trim());
-          if (!sides.every(Boolean) || !(displayCtx.accepts(sides[sides.length - 1]) || displayCtx.accepts(bare))) return l;
-          n++;
-          return { text: l.text, status: 'ok', state: 'arithmetic', note: 'This line states the answer the check accepts.', valueChain: { rule: 'proved' }, fact: { kind: 'proved', proof: 'conclusion-matches' }, tickClass: 'conclusion-matches' };
+        base.lines.forEach((l, i) => {
+          if (!boxed[i]) return;
+          const bare = bareOf(l.text), sides = bare.replace(/^=\s*/, '').split('=').map(x => x.trim());
+          if (!sides.every(Boolean)) return;
+          const bareValue = sides.length === 1 && !/[A-Za-z]{4,}/.test(bare);
+          const labelled = sides.length === 2 && asked !== null && sides[0].replace(/\s+/g, '') === asked;
+          if ((bareValue || labelled) && result.correct === true && displayCtx.accepts(sides[sides.length - 1])) {
+            n++; lines[i] = { text: l.text, status: 'ok', state: 'arithmetic', note: 'This line states the answer the check accepts.', valueChain: { rule: 'proved' }, fact: { kind: 'proved', proof: 'conclusion-matches' }, tickClass: 'conclusion-matches' };
+          } else if (!bareValue && !labelled) rest.push(i);
         });
+        if (rest.length) {
+          // the same page with the boxes taken off those lines, read by the proofs a plain line gets; only those lines may change, and each keeps its own text
+          const rawLines = steps.split('\n');
+          const bareSteps = rawLines.map((t, k) => (rest.length && boxed[k] && rest.includes(k) ? bareOf(t) : t));
+          const shadow = { ...base, lines: base.lines.map((l, k) => (rest.includes(k) ? { ...l, text: bareOf(l.text) } : l)) };
+          let proved = shadow;
+          try { proved = typeof q._bank === 'string' ? provedLinesBank(q, shadow) : provedLines(q, meta, shadow); } catch { proved = shadow; }
+          let alt = null;
+          try { alt = rawLines.length === base.lines.length ? trueAsWritten(q, bareSteps.join('\n'), opts) : null; } catch { alt = null; }
+          let crossed = brk >= 0;
+          for (const i of rest) {
+            const a = proved.lines[i], b = alt && alt.lines && alt.lines.length === base.lines.length ? alt.lines[i] : null;
+            const pick = a && a !== shadow.lines[i] && (a.status === 'ok' || a.status === 'break') ? a : b && (b.status === 'ok' || b.status === 'break') ? b : null;
+            if (!pick) continue;
+            if (pick.status === 'break') { if (crossed) continue; crossed = true; }
+            else if (crossed && lines.slice(0, i).some(x => x?.status === 'break')) continue;
+            n++; lines[i] = { ...pick, text: base.lines[i].text };
+          }
+        }
         if (n) shownReport = holdAmbiguous(withLines(base, lines));
       }
     }
