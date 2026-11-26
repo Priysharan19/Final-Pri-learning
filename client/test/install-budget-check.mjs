@@ -189,7 +189,7 @@ const INSTALL_GZIP_CEILING = 1_000_000;
 // ceilings, the banned-from-install list, render-from-install and offline coverage are unchanged.
 // Raised 2026-11-26 (task/tick-every-true-line, under the same owner decision, size not a constraint): FIRST_VISIT_RAW 5,765,000 -> 5,890,000 bytes. What was
 // added: the page proofs and display fields of the marked page (engine/pageProofs.js, engine/displayFields.js, the false-continuation rule in
-// engine/valueChain.js), about 40 kB raw of the whole offline build (origin/main cc4545cd2 measured 5,600 kB, this branch 5,640 kB, install plus warm).
+// engine/valueChain.js), about 40 kB raw of the whole offline build. Measured on a clean tree with the real build of this check: origin/main cc4545cd2 5,600 kB, this branch 5,640 kB (about 5,775,000 bytes, over the old 5,765,000 ceiling); the new ceiling is that measure plus the precedent headroom of about 115 kB (commits 3baddb6bc, 8dbeed462).
 // The gzip ceiling and the install ceilings are unchanged; the banned-from-install list, render-from-install and offline coverage are unchanged.
 const FIRST_VISIT_RAW_CEILING = 5_890_000;
 const FIRST_VISIT_GZIP_CEILING = 1_998_000;
