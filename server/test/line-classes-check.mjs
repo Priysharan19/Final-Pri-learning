@@ -187,7 +187,7 @@ const pages = [];
   }
 }
 ok(pages.length >= 450, `real pages: ${pages.length}`);
-const P2_CLASSES = new Set(['function-value', 'equation-solved', 'condition-stated', 'derivative-of-function', 'conclusion-extremum', 'check-values-list', 'figure-label', 'point-on-curve', 'exact-value', 'binomial-coefficient', 'triangle-value', 'solutions-in-interval', 'same-equation-as-line-above', 'antiderivative-checked', 'definite-integral-evaluated']);
+const P2_CLASSES = new Set(['function-value', 'equation-solved', 'condition-stated', 'derivative-of-function', 'conclusion-extremum', 'check-values-list', 'figure-label', 'point-on-curve', 'exact-value', 'binomial-coefficient', 'triangle-value', 'solutions-in-interval', 'same-equation-as-line-above', 'antiderivative-checked', 'definite-integral-evaluated', 'stated-value', 'equal-to-line-above', 'conclusion-matches']);
 let overturned = 0;
 let noReportPage = null, ticks = 0, withoutClass = 0, withoutPhrase = 0, stepReportDirty = 0, shownMoved = 0, answerLines = 0, answerLineWrong = 0, mutants = 0, mutantTicked = 0, shownCount = 0, answerLineOnWrong = 0;
 const run = (q, answer, text, opts = {}) => { try { return stepEvidence(q, answer, text, checkAnswer(q, answer), { slipWarnings: true, ...opts }); } catch { return null; } };
@@ -203,7 +203,7 @@ for (const p of pages) {
     // a line the integration layer ticked or crossed (engine/integrationLines.js, fact.proof 'integration' / 'integration-false') is held by its own check (integration-lines-check.mjs): a line is exempt only when it was an OPEN NOTE on the marker's report (the layer can never overturn a tick or a cross); every OTHER line must be the marker's, unmoved
     const byIntegration = l => !!l && l.fact && (l.fact.proof === 'integration' || l.fact.proof === 'integration-false' || l.tickClass === 'substitution-defined');
     // the one change a bank page may carry beyond display fields: a note that the SECOND page pass (engine/pageProofs2.js) ticked or marked neutral, with its own class
-    const P2 = new Set(['function-value', 'equation-solved', 'condition-stated', 'derivative-of-function', 'conclusion-extremum', 'check-values-list', 'figure-label', 'point-on-curve', 'exact-value', 'binomial-coefficient', 'triangle-value', 'solutions-in-interval', 'same-equation-as-line-above', 'antiderivative-checked', 'definite-integral-evaluated']);
+    const P2 = new Set(['function-value', 'equation-solved', 'condition-stated', 'derivative-of-function', 'conclusion-extremum', 'check-values-list', 'figure-label', 'point-on-curve', 'exact-value', 'binomial-coefficient', 'triangle-value', 'solutions-in-interval', 'same-equation-as-line-above', 'antiderivative-checked', 'definite-integral-evaluated', 'stated-value', 'equal-to-line-above', 'conclusion-matches']);
     const byPass2 = (l, w) => !!l && !!w && l.status === 'note' && !l.candidate && !l.slipFollow && l.note !== 'Follows from the earlier slip.' && l.state !== 'wrong' && l.context !== true && P2.has(w.tickClass) && String(l.text) === String(w.text);   // only a line that was an OPEN note on the base
     const same = base.lines.length === shown.lines.length && base.lines.every((l, i) => (byIntegration(shown.lines[i]) && openNote(l)) || byPass2(l, shown.lines[i]) || JSON.stringify(strip(l)) === JSON.stringify(strip(shown.lines[i])));
     // the pass never overturns an existing tick or cross: every ok/break line of the marker's report keeps its status, text and state on the displayed report
@@ -284,7 +284,7 @@ for (const [id, text, want] of [['A12-C4-016', 'x=-2,1', 'satisfies-equation-abo
   const { q, lines, key } = noReportPage;
   const r = MARKER_OPS.practice({ q, answer: key, working: lines.join('\n'), evidenceIfWrong: true, policy: { methodMarks: true } }, () => {});
   const ev = r.evidence;
-  ok(!ev.stepReport && ev.shownReport && ev.shownReport.lines.length === lines.length && ev.shownReport.lines.every(l => l.status === 'note'), 'a page the marker judged to nothing returns its all-notes report (no tick, no cross), not nothing');
+  ok(!ev.stepReport && ev.shownReport && ev.shownReport.lines.length === lines.length && ev.shownReport.lines.every(l => l.status === 'note' || (l.status === 'ok' && P2_CLASSES.has(l.tickClass))), 'a page the marker judged to nothing returns its all-notes report (no tick, no cross) but for the lines a display pass proved (each with its own class), not nothing');
   ok(ev.partial === null && !ev.noLineReport, 'and the partial and the reason code are absent');
   const g = { answerType: 'graph-sketch', prompt: 'Sketch.', answer: {}, contentId: 'gen:y12-sketch:d1:s1' };
   const e1 = stepEvidence(g, 'x', 'y = x^2\ny = 2x', { correct: false });

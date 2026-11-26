@@ -16,495 +16,338 @@
  },
  "total": {
   "total": 5592,
-  "full": 361,
-  "trueOnly": 2217,
-  "uncovered": 3014,
-  "fullPct": 6.46,
-  "trueOnlyPct": 39.65,
-  "uncoveredPct": 53.9
+  "full": 405,
+  "trueOnly": 2670,
+  "uncovered": 2517,
+  "fullPct": 7.24,
+  "trueOnlyPct": 47.75,
+  "uncoveredPct": 45.01
  },
  "halves": {
-  "trueHalfPasses": 2578,
-  "trueHalfPassPct": 46.1,
-  "wrongHalfPasses": 589,
-  "wrongHalfPassPct": 10.53,
-  "allLinesTickedAndNoneCrossed": 3266,
-  "allLinesPct": 58.4,
-  "answerLineRecognisedAndKeyCorrect": 1399,
-  "answerLineOfKeyedUnits": 4413,
-  "answerLinePct": 31.7,
-  "answerHalfNotApplicableNoKey": 1179,
-  "linesTickedOnlyAsTrueAsWritten": 1814
+  "trueHalfPasses": 3075,
+  "trueHalfPassPct": 54.99,
+  "wrongHalfPasses": 656,
+  "wrongHalfPassPct": 11.73,
+  "allLinesTickedAndNoneCrossed": 3810,
+  "allLinesPct": 68.13,
+  "answerLineRecognisedAndKeyCorrect": 1652,
+  "answerLineOfKeyedUnits": 4169,
+  "answerLinePct": 39.63,
+  "answerHalfNotApplicableNoKey": 1423,
+  "linesTickedOnlyAsTrueAsWritten": 2070
  },
  "byKind": {
   "bank": {
    "total": 2214,
-   "full": 192,
-   "trueOnly": 664,
-   "uncovered": 1358,
-   "fullPct": 8.67,
-   "trueOnlyPct": 29.99,
-   "uncoveredPct": 61.34
+   "full": 201,
+   "trueOnly": 774,
+   "uncovered": 1239,
+   "fullPct": 9.08,
+   "trueOnlyPct": 34.96,
+   "uncoveredPct": 55.96
   },
   "bank-worked": {
    "total": 2247,
-   "full": 56,
-   "trueOnly": 1123,
-   "uncovered": 1068,
-   "fullPct": 2.49,
-   "trueOnlyPct": 49.98,
-   "uncoveredPct": 47.53
+   "full": 61,
+   "trueOnly": 1362,
+   "uncovered": 824,
+   "fullPct": 2.71,
+   "trueOnlyPct": 60.61,
+   "uncoveredPct": 36.67
   },
   "generated": {
    "total": 1131,
-   "full": 113,
-   "trueOnly": 430,
-   "uncovered": 588,
-   "fullPct": 9.99,
-   "trueOnlyPct": 38.02,
-   "uncoveredPct": 51.99
+   "full": 143,
+   "trueOnly": 534,
+   "uncovered": 454,
+   "fullPct": 12.64,
+   "trueOnlyPct": 47.21,
+   "uncoveredPct": 40.14
   }
  },
  "causes": {
   "wrong step missed": {
-   "count": 2105,
+   "count": 2529,
    "example": {
     "id": "gen:y11-functions:d2:30a64c2",
     "line": "x=-(4/(2*1))=-2"
    },
    "byKind": {
-    "generated": 413,
-    "bank": 655,
-    "bank-worked": 1037
-   }
-  },
-  "algebra expression": {
-   "count": 484,
-   "example": {
-    "id": "gen:y11-quadfunc:d2:58a445b",
-    "line": "0"
-   },
-   "byKind": {
-    "generated": 89,
-    "bank": 162,
-    "bank-worked": 233
+    "generated": 513,
+    "bank": 752,
+    "bank-worked": 1264
    }
   },
   "answer line not recognised (numeric)": {
-   "count": 442,
+   "count": 461,
    "example": {
     "id": "gen:y11-quadfunc:d1:c2b8b95",
     "line": "Δ > 0"
    },
    "byKind": {
-    "generated": 43,
-    "bank": 399
+    "generated": 42,
+    "bank": 419
    }
   },
   "trig step": {
-   "count": 179,
+   "count": 339,
    "example": {
-    "id": "gen:y11-sine-cosine-rule:d2:a2cf3cf",
-    "line": "sin B=((bsin A)/(a))"
+    "id": "gen:y11-trigfunc:d1:053540f",
+    "line": "sin 30° = 10/L"
    },
    "byKind": {
-    "generated": 14,
-    "bank": 94,
-    "bank-worked": 71
-   }
-  },
-  "words-only reasoning": {
-   "count": 155,
-   "example": {
-    "id": "gen:y11-lines:d4:b6d5695",
-    "line": "y"
-   },
-   "byKind": {
-    "generated": 38,
-    "bank": 24,
-    "bank-worked": 93
+    "generated": 69,
+    "bank": 120,
+    "bank-worked": 150
    }
   },
   "algebra equation": {
-   "count": 150,
+   "count": 276,
    "example": {
     "id": "gen:y11-quadfunc:d2:aaadc5a",
     "line": "y=0"
    },
    "byKind": {
-    "generated": 36,
-    "bank": 54,
-    "bank-worked": 60
+    "generated": 95,
+    "bank": 80,
+    "bank-worked": 101
    }
   },
-  "no maths lines in the worked solution (words only)": {
-   "count": 131,
+  "algebra expression": {
+   "count": 227,
    "example": {
-    "id": "gen:me11-inversetrig:d1:52ceb4a",
-    "line": null
+    "id": "gen:y11-quadfunc:d3:02fcf91",
+    "line": "αβ + 6(α + β) + 36"
    },
    "byKind": {
-    "generated": 57,
-    "bank": 74
+    "generated": 37,
+    "bank": 90,
+    "bank-worked": 100
+   }
+  },
+  "words-only reasoning": {
+   "count": 176,
+   "example": {
+    "id": "gen:y11-lines:d4:b6d5695",
+    "line": "y"
+   },
+   "byKind": {
+    "generated": 44,
+    "bank": 26,
+    "bank-worked": 106
    }
   },
   "answer line not recognised (expression)": {
-   "count": 123,
+   "count": 130,
    "example": {
     "id": "gen:me12-induction:d2:eb777de",
     "line": "n=k+1"
    },
    "byKind": {
-    "generated": 4,
-    "bank": 119
-   }
-  },
-  "TeX not readable as a typed line (\\pm)": {
-   "count": 103,
-   "example": {
-    "id": "gen:y11-quadfunc:d2:05504b5",
-    "line": "x - 1 = \\pm 2"
-   },
-   "byKind": {
-    "generated": 10,
-    "bank": 30,
-    "bank-worked": 63
+    "generated": 7,
+    "bank": 123
    }
   },
   "no provable one-line mutation of any step": {
-   "count": 89,
+   "count": 115,
    "example": null,
    "byKind": {
-    "generated": 4,
-    "bank": 8,
-    "bank-worked": 77
+    "generated": 8,
+    "bank": 21,
+    "bank-worked": 86
    }
   },
   "inequality": {
-   "count": 82,
+   "count": 112,
    "example": {
     "id": "gen:y11-quadfunc:d4:aa985a9",
     "line": "k > 6.25"
    },
    "byKind": {
-    "generated": 6,
-    "bank": 27,
-    "bank-worked": 49
+    "generated": 9,
+    "bank": 33,
+    "bank-worked": 70
    }
   },
-  "TeX not readable as a typed line (\\tfrac)": {
-   "count": 75,
+  "integration step": {
+   "count": 100,
    "example": {
-    "id": "A11-T2-114",
-    "line": "2x+\\tfrac{\\pi}{3}\\in\\left[\\tfrac{\\pi}{3},\\tfrac{7\\pi}{3}\\right]"
+    "id": "gen:y12-trigcalc:d1:e94d09b",
+    "line": "∫ sin u du = -cos u + C"
    },
    "byKind": {
-    "bank": 15,
-    "bank-worked": 60
+    "generated": 28,
+    "bank": 41,
+    "bank-worked": 31
    }
   },
-  "worked solution (find) with no maths lines": {
-   "count": 62,
-   "example": null,
+  "limit": {
+   "count": 78,
+   "example": {
+    "id": "gen:y11-trigfunc:d2:d79d3e6",
+    "line": "210° → 210°"
+   },
    "byKind": {
-    "bank-worked": 62
+    "generated": 19,
+    "bank": 16,
+    "bank-worked": 43
+   }
+  },
+  "vectors": {
+   "count": 69,
+   "example": {
+    "id": "A11-F1-221",
+    "line": "|x|-3=±1"
+   },
+   "byKind": {
+    "bank": 41,
+    "bank-worked": 28
    }
   },
   "answer line not recognised (set)": {
-   "count": 59,
+   "count": 65,
    "example": {
     "id": "gen:y11-quadfunc:d1:ab0246e",
     "line": "k=8"
    },
    "byKind": {
     "generated": 9,
-    "bank": 50
+    "bank": 56
    }
   },
   "probability or counting": {
-   "count": 54,
+   "count": 55,
    "example": {
     "id": "gen:y11-polynomials:d2:b3610df",
     "line": "=P(3)"
    },
    "byKind": {
-    "generated": 6,
-    "bank": 38,
-    "bank-worked": 10
-   }
-  },
-  "vectors": {
-   "count": 53,
-   "example": {
-    "id": "X11-C1-010",
-    "line": "30=3x^(2)*(dotx)"
-   },
-   "byKind": {
-    "bank": 37,
-    "bank-worked": 16
-   }
-  },
-  "TeX not readable as a typed line (\\circ)": {
-   "count": 50,
-   "example": {
-    "id": "gen:me11-functions:d4:82709ef",
-    "line": "(f \\circ g)^{-1}(x) = \\dfrac{-44 - x}{25}"
-   },
-   "byKind": {
-    "generated": 10,
-    "bank": 16,
-    "bank-worked": 24
-   }
-  },
-  "TeX not readable as a typed line (\\to)": {
-   "count": 49,
-   "example": {
-    "id": "gen:y11-trigfunc:d2:d79d3e6",
-    "line": "210° \\to 210°"
-   },
-   "byKind": {
-    "generated": 12,
-    "bank": 6,
-    "bank-worked": 31
+    "generated": 27,
+    "bank": 15,
+    "bank-worked": 13
    }
   },
   "surd step": {
-   "count": 44,
+   "count": 55,
    "example": {
-    "id": "A11-T1-173",
-    "line": "arctan((4/(4*sqrt(2))))"
+    "id": "gen:me11-poly:d4:c1ac60a",
+    "line": "x = ±√(u)"
    },
    "byKind": {
-    "bank": 16,
-    "bank-worked": 28
+    "generated": 3,
+    "bank": 19,
+    "bank-worked": 33
    }
   },
   "point or coordinate pair": {
-   "count": 39,
+   "count": 40,
    "example": {
     "id": "gen:y11-diff:d4:8b9dddb",
     "line": "(3, 32)"
    },
    "byKind": {
-    "generated": 10,
-    "bank": 14,
+    "generated": 5,
+    "bank": 20,
     "bank-worked": 15
    }
   },
-  "TeX not readable as a typed line (\\int)": {
-   "count": 37,
+  "series or sequence": {
+   "count": 39,
    "example": {
-    "id": "gen:y12-integration:d3:4906c64",
-    "line": "\\int_0^k (2x + 5)\\,dx = k^2 + 5k"
+    "id": "gen:y12-series:d2:9d70468",
+    "line": "2Σ k + 12Σ 1"
    },
    "byKind": {
     "generated": 10,
-    "bank": 14,
+    "bank": 16,
     "bank-worked": 13
    }
   },
-  "integration step": {
-   "count": 36,
-   "example": {
-    "id": "A12-C4-028",
-    "line": "(1/2)*∫(2/(2x+3))dx"
-   },
-   "byKind": {
-    "bank": 20,
-    "bank-worked": 16
-   }
-  },
-  "TeX not readable as a typed line (\\sum)": {
-   "count": 33,
-   "example": {
-    "id": "gen:y12-series:d2:9d70468",
-    "line": "2\\sum k + 12\\sum 1"
-   },
-   "byKind": {
-    "generated": 8,
-    "bank": 10,
-    "bank-worked": 15
-   }
-  },
-  "TeX not readable as a typed line (\\displaystyle)": {
-   "count": 28,
-   "example": {
-    "id": "gen:y12-trigcalc:d1:e94d09b",
-    "line": "\\displaystyle\\int \\sin\\,u\\,du = -\\cos u + C"
-   },
-   "byKind": {
-    "generated": 28
-   }
-  },
-  "worked solution (prove) with no maths lines": {
-   "count": 28,
-   "example": null,
-   "byKind": {
-    "bank-worked": 28
-   }
-  },
-  "worked solution (explain) with no maths lines": {
-   "count": 26,
-   "example": null,
-   "byKind": {
-    "bank-worked": 26
-   }
-  },
-  "TeX not readable as a typed line (\\alpha)": {
-   "count": 25,
-   "example": {
-    "id": "gen:y11-quadfunc:d3:02fcf91",
-    "line": "\\alpha\\beta + 6(\\alpha + \\beta) + 36"
-   },
-   "byKind": {
-    "generated": 11,
-    "bank": 3,
-    "bank-worked": 11
-   }
-  },
   "answer line not recognised (interval)": {
-   "count": 24,
+   "count": 31,
    "example": {
     "id": "A11-C1-072",
     "line": "x^(2)<4"
    },
    "byKind": {
-    "bank": 24
+    "bank": 31
    }
   },
-  "TeX not readable as a typed line (\\approx)": {
-   "count": 23,
-   "example": {
-    "id": "gen:y11-sine-cosine-rule:d4:c789b15",
-    "line": "\\frac{1}{2}(20)(10)\\sin 46.6° \\approx 72.6"
-   },
+  "worked solution (find) with no maths lines": {
+   "count": 29,
+   "example": null,
    "byKind": {
-    "generated": 18,
-    "bank": 2,
-    "bank-worked": 3
-   }
-  },
-  "TeX not readable as a typed line (\\binom)": {
-   "count": 22,
-   "example": {
-    "id": "gen:me11-comb:d1:7624925",
-    "line": "\\binom{5}{3} = \\dfrac{^{5}P_{3}}{3!}"
-   },
-   "byKind": {
-    "generated": 21,
-    "bank": 1
+    "bank-worked": 29
    }
   },
   "answer line not recognised (point)": {
-   "count": 22,
+   "count": 27,
    "example": {
     "id": "gen:y11-quadfunc:d2:dee9b64",
     "line": "(9, 6)"
    },
    "byKind": {
     "generated": 5,
-    "bank": 17
+    "bank": 22
    }
   },
-  "TeX not readable as a typed line (\\theta)": {
-   "count": 19,
-   "example": {
-    "id": "gen:y12-trigcalc:d4:e33b418",
-    "line": "\\theta = 0, \\pi, 2\\pi, \\ldots, 2\\pi"
-   },
+  "worked solution (explain) with no maths lines": {
+   "count": 22,
+   "example": null,
    "byKind": {
-    "generated": 9,
-    "bank": 3,
-    "bank-worked": 7
-   }
-  },
-  "TeX not readable as a typed line (\\sin)": {
-   "count": 18,
-   "example": {
-    "id": "gen:y11-trigfunc:d1:053540f",
-    "line": "\\sin 30° = \\dfrac{10}{L}"
-   },
-   "byKind": {
-    "generated": 12,
-    "bank": 1,
-    "bank-worked": 5
-   }
-  },
-  "log law": {
-   "count": 18,
-   "example": {
-    "id": "A11-E1-001",
-    "line": "x+1=(log(5)/log(2))"
-   },
-   "byKind": {
-    "bank": 12,
-    "bank-worked": 6
-   }
-  },
-  "TeX not readable as a typed line (\\dfrac)": {
-   "count": 17,
-   "example": {
-    "id": "gen:y11-trigfunc:d1:b919cc4",
-    "line": "105° = \\dfrac{105}{180}\\pi"
-   },
-   "byKind": {
-    "generated": 12,
-    "bank": 2,
-    "bank-worked": 3
+    "bank-worked": 22
    }
   },
   "answer line not recognised (equation)": {
-   "count": 17,
+   "count": 20,
    "example": {
     "id": "A11-C1-070",
     "line": "y'=2x-1=1"
    },
    "byKind": {
+    "bank": 20
+   }
+  },
+  "no maths lines in the worked solution (words only)": {
+   "count": 19,
+   "example": null,
+   "byKind": {
+    "generated": 2,
     "bank": 17
    }
   },
-  "TeX not readable as a typed line (\\dbinom)": {
-   "count": 14,
+  "TeX not readable as a typed line (\\overrightarrow)": {
+   "count": 15,
    "example": {
-    "id": "gen:me11-binomial:d1:b51373e",
-    "line": "\\dbinom{5}{2} + \\dbinom{5}{3} = \\dbinom{6}{3}"
+    "id": "gen:me12-vectors:d1:3b0fc7e",
+    "line": "\\overrightarrow{AB} = \\begin{pmatrix} 16 \\\\ 63 \\end{pmatrix}"
    },
    "byKind": {
-    "generated": 14
+    "generated": 4,
+    "bank": 1,
+    "bank-worked": 10
    }
   },
-  "TeX not readable as a typed line (\\mathbf)": {
-   "count": 14,
+  "log law": {
+   "count": 15,
    "example": {
-    "id": "X12-V1-070",
-    "line": "\\mathbf d=(3,4)"
+    "id": "A11-E1-001",
+    "line": "x+1=(log(5)/log(2))"
    },
    "byKind": {
-    "bank": 2,
-    "bank-worked": 12
-   }
-  },
-  "TeX not readable as a typed line (plain symbols)": {
-   "count": 14,
-   "example": {
-    "id": "gen:y11-trigfunc:d2:152bb9a",
-    "line": "675° - 360° = 315°"
-   },
-   "byKind": {
-    "generated": 9,
-    "bank": 3,
-    "bank-worked": 2
+    "bank": 8,
+    "bank-worked": 7
    }
   },
   "wrong step crossed later": {
-   "count": 14,
+   "count": 15,
    "example": {
     "id": "gen:y11-diff:d3:f6de9e2",
     "line": "2+b=0"
    },
    "byKind": {
     "generated": 12,
-    "bank-worked": 2
+    "bank-worked": 3
    }
   },
   "TeX not readable as a typed line (\\dot)": {
@@ -519,88 +362,8 @@
     "bank-worked": 6
    }
   },
-  "TeX not readable as a typed line (\\in)": {
-   "count": 13,
-   "example": {
-    "id": "A12-F2-013",
-    "line": "2x-2\\in\\{-3,1,4\\}"
-   },
-   "byKind": {
-    "bank": 6,
-    "bank-worked": 7
-   }
-  },
-  "TeX not readable as a typed line (\\angle)": {
-   "count": 12,
-   "example": {
-    "id": "gen:y11-sine-cosine-rule:d1:f07db1e",
-    "line": "\\angle B = 83°"
-   },
-   "byKind": {
-    "generated": 3,
-    "bank": 6,
-    "bank-worked": 3
-   }
-  },
-  "TeX not readable as a typed line (\\mu)": {
-   "count": 12,
-   "example": {
-    "id": "gen:y12-stats:d3:66cf1d1",
-    "line": "\\mu_y = 83"
-   },
-   "byKind": {
-    "generated": 8,
-    "bank": 1,
-    "bank-worked": 3
-   }
-  },
-  "TeX not readable as a typed line (\\overrightarrow)": {
-   "count": 12,
-   "example": {
-    "id": "gen:me12-vectors:d1:3b0fc7e",
-    "line": "\\overrightarrow{AB} = \\begin{pmatrix} 16 \\\\ 63 \\end{pmatrix}"
-   },
-   "byKind": {
-    "generated": 4,
-    "bank": 1,
-    "bank-worked": 7
-   }
-  },
-  "TeX not readable as a typed line (\\cap)": {
-   "count": 11,
-   "example": {
-    "id": "gen:y11-probability:d3:8bf5512",
-    "line": "P(A \\cap B) = 0.07"
-   },
-   "byKind": {
-    "generated": 7,
-    "bank-worked": 4
-   }
-  },
-  "TeX not readable as a typed line (\\dots)": {
-   "count": 11,
-   "example": {
-    "id": "A11-F1-021(ii)",
-    "line": "k = 2,3,\\dots,10"
-   },
-   "byKind": {
-    "bank": 8,
-    "bank-worked": 3
-   }
-  },
-  "TeX not readable as a typed line (\\mapsto)": {
-   "count": 10,
-   "example": {
-    "id": "A12-F2-003",
-    "line": "4\\mapsto2\\mapsto-1"
-   },
-   "byKind": {
-    "bank": 2,
-    "bank-worked": 8
-   }
-  },
   "exponential step": {
-   "count": 10,
+   "count": 12,
    "example": {
     "id": "gen:y12-explogcalc:d4:1999e0d",
     "line": "e^(0.02t) = 10"
@@ -608,35 +371,30 @@
    "byKind": {
     "generated": 1,
     "bank": 2,
-    "bank-worked": 7
+    "bank-worked": 9
    }
   },
-  "TeX not readable as a typed line (\\le)": {
-   "count": 9,
+  "true line crossed": {
+   "count": 11,
    "example": {
-    "id": "gen:me12-trigeq:d3:ac2df43",
-    "line": "0° \\le u \\le 270°"
+    "id": "gen:y11-trigfunc:d4:d80e134",
+    "line": "45°"
    },
    "byKind": {
-    "generated": 1,
-    "bank": 2,
-    "bank-worked": 6
+    "generated": 4,
+    "bank": 3,
+    "bank-worked": 4
    }
   },
-  "TeX not readable as a typed line (\\sigma)": {
-   "count": 9,
-   "example": {
-    "id": "gen:y12-stats:d3:93c257d",
-    "line": "\\sigma = \\dfrac{16}{4} = 4"
-   },
+  "worked solution (prove) with no maths lines": {
+   "count": 11,
+   "example": null,
    "byKind": {
-    "generated": 3,
-    "bank": 1,
-    "bank-worked": 5
+    "bank-worked": 11
    }
   },
   "wrong step ticked": {
-   "count": 9,
+   "count": 11,
    "example": {
     "id": "gen:y11-transform:d3:dd2fde6",
     "line": "y = -x^(2)"
@@ -644,7 +402,7 @@
    "byKind": {
     "generated": 1,
     "bank": 1,
-    "bank-worked": 7
+    "bank-worked": 9
    }
   },
   "TeX not readable as a typed line (\\begin)": {
@@ -668,27 +426,15 @@
     "generated": 8
    }
   },
-  "TeX not readable as a typed line (\\perp)": {
+  "differentiation step": {
    "count": 7,
    "example": {
-    "id": "gen:y11-lines:d1:001756a",
-    "line": "m_{\\perp} = 1"
+    "id": "gen:y11-diff:d1:77df198",
+    "line": "f'(x) = -9/(2√(x))"
    },
    "byKind": {
-    "generated": 4,
-    "bank": 1,
-    "bank-worked": 2
-   }
-  },
-  "TeX not readable as a typed line (\\infty)": {
-   "count": 6,
-   "example": {
-    "id": "gen:y12-series:d4:fe552ee",
-    "line": "S_\\infty = \\dfrac{5/100}{1 - 1/100} = \\dfrac{5}{99}"
-   },
-   "byKind": {
-    "generated": 3,
-    "bank-worked": 3
+    "generated": 2,
+    "bank": 5
    }
   },
   "TeX not readable as a typed line (\\underset)": {
@@ -702,65 +448,22 @@
     "bank-worked": 3
    }
   },
-  "worked solution (sketch) with no maths lines": {
+  "TeX not readable as a typed line (\\vec)": {
    "count": 6,
+   "example": {
+    "id": "X12-V1-154",
+    "line": "\\vec{AB}=4\\mathbf i"
+   },
+   "byKind": {
+    "bank": 2,
+    "bank-worked": 4
+   }
+  },
+  "report does not judge every line": {
+   "count": 5,
    "example": null,
    "byKind": {
-    "bank-worked": 6
-   }
-  },
-  "TeX not readable as a typed line (\\cos)": {
-   "count": 5,
-   "example": {
-    "id": "gen:y11-trigfunc:d1:99e2cdf",
-    "line": "\\cos(45°) = \\dfrac{\\text{adj}}{2}"
-   },
-   "byKind": {
-    "generated": 2,
-    "bank": 1,
-    "bank-worked": 2
-   }
-  },
-  "TeX not readable as a typed line (\\gamma)": {
-   "count": 5,
-   "example": {
-    "id": "X11-F2-107",
-    "line": "\\gamma=-a"
-   },
-   "byKind": {
-    "bank-worked": 5
-   }
-  },
-  "differentiation step": {
-   "count": 5,
-   "example": {
-    "id": "A11-C1-020",
-    "line": "y'=(1/(2*sqrt(x)))=(1/4)"
-   },
-   "byKind": {
-    "bank": 5
-   }
-  },
-  "TeX not readable as a typed line (\\lambda)": {
-   "count": 4,
-   "example": {
-    "id": "gen:me12-vectors-forms:d1:926d1d2",
-    "line": "8 = \\lambda(-2)"
-   },
-   "byKind": {
-    "generated": 2,
-    "bank-worked": 2
-   }
-  },
-  "TeX not readable as a typed line (\\log)": {
-   "count": 4,
-   "example": {
-    "id": "A11-E1-002",
-    "line": "\\log_2\\left[x(x-2)\\right] = 3"
-   },
-   "byKind": {
-    "bank": 3,
-    "bank-worked": 1
+    "generated": 5
    }
   },
   "TeX not readable as a typed line (\\sec)": {
@@ -774,62 +477,14 @@
     "bank-worked": 1
    }
   },
-  "report does not judge every line": {
-   "count": 4,
-   "example": null,
-   "byKind": {
-    "generated": 4
-   }
-  },
-  "true line crossed": {
-   "count": 4,
-   "example": {
-    "id": "A11-C1-043",
-    "line": "2*sqrt(x+1)"
-   },
-   "byKind": {
-    "bank-worked": 4
-   }
-  },
-  "TeX not readable as a typed line (\\ldots)": {
+  "TeX not readable as a typed line (\\bar)": {
    "count": 3,
    "example": {
-    "id": "gen:y11-explog:d4:09390d0",
-    "line": "x = \\dfrac{\\ln 392}{\\ln 2} = 8.615\\ldots \\approx 8.61"
+    "id": "A12-S2-002",
+    "line": "\\bar x=\\tfrac{40}{5}=8"
    },
    "byKind": {
-    "generated": 3
-   }
-  },
-  "TeX not readable as a typed line (\\left)": {
-   "count": 3,
-   "example": {
-    "id": "gen:y12-trigcalc:d3:7fb6f46",
-    "line": "4\\left(\\dfrac{3\\pi}{16}\\right) = 135°"
-   },
-   "byKind": {
-    "generated": 3
-   }
-  },
-  "TeX not readable as a typed line (\\sqrt)": {
-   "count": 3,
-   "example": {
-    "id": "gen:me11-functions:d3:633a8a3",
-    "line": "f^{-1}(x) = \\sqrt[3]{x + 6}"
-   },
-   "byKind": {
-    "generated": 1,
-    "bank-worked": 2
-   }
-  },
-  "TeX not readable as a typed line (\\text)": {
-   "count": 3,
-   "example": {
-    "id": "gen:y11-explog:d1:1a34a38",
-    "line": "\\text{pH} = -\\log_{10}(10^{-5})"
-   },
-   "byKind": {
-    "generated": 3
+    "bank-worked": 3
    }
   },
   "no line report from the marker (graph-sketch)": {
@@ -840,26 +495,6 @@
    },
    "byKind": {
     "generated": 3
-   }
-  },
-  "TeX not readable as a typed line (\\bar)": {
-   "count": 2,
-   "example": {
-    "id": "A12-S2-002",
-    "line": "\\bar x=\\tfrac{40}{5}=8"
-   },
-   "byKind": {
-    "bank-worked": 2
-   }
-  },
-  "TeX not readable as a typed line (\\cup)": {
-   "count": 2,
-   "example": {
-    "id": "gen:y11-probability:d4:cc86fa4",
-    "line": "n(A \\cup B) = 15 + 11 - 3 = 23"
-   },
-   "byKind": {
-    "generated": 2
    }
   },
   "TeX not readable as a typed line (\\hat)": {
@@ -883,113 +518,42 @@
     "bank-worked": 1
    }
   },
-  "TeX not readable as a typed line (\\lim)": {
+  "TeX not readable as a typed line (\\in)": {
    "count": 2,
    "example": {
-    "id": "A11-C1-002",
-    "line": "\\lim_{h\\to0}\\dfrac{-1}{x(x+h)} = -\\dfrac{1}{x^{2}}"
+    "id": "X12-T3-003",
+    "line": "n\\in\\mathbb Z"
    },
    "byKind": {
     "bank-worked": 2
    }
   },
-  "TeX not readable as a typed line (\\ln)": {
+  "TeX not readable as a typed line (\\sigma)": {
    "count": 2,
    "example": {
-    "id": "X12-C2-039",
-    "line": "-\\ln\\cos x"
-   },
-   "byKind": {
-    "bank": 1,
-    "bank-worked": 1
-   }
-  },
-  "TeX not readable as a typed line (\\max)": {
-   "count": 2,
-   "example": {
-    "id": "gen:y12-appdiff:d4:022f893",
-    "line": "A_{\\max} = \\dfrac{F}{4}\\times\\dfrac{F}{2} = \\dfrac{F^2}{8}"
+    "id": "gen:me12-binomial:d4:2bd40e9",
+    "line": "\\sigma_{\\hat{p}} = \\sqrt{\\dfrac{0.3(0.7)}{684}}"
    },
    "byKind": {
     "generated": 1,
     "bank-worked": 1
    }
   },
-  "TeX not readable as a typed line (\\operatorname)": {
+  "TeX not readable as a typed line (\\tfrac)": {
    "count": 2,
    "example": {
-    "id": "A11-S1-004(ii)",
-    "line": "\\operatorname{Var}(X) = 5-2^{2} = 1"
+    "id": "X12-V1-019(ii)",
+    "line": "\\tfrac{u}{g\\sin\\theta}\\le\\tfrac{2u\\sin\\theta}{g}\\iff\\sin^{2}\\theta\\ge\\tfrac12"
    },
    "byKind": {
     "bank-worked": 2
    }
   },
-  "TeX not readable as a typed line (\\tan)": {
-   "count": 2,
-   "example": {
-    "id": "gen:y11-trigfunc:d1:6f1340f",
-    "line": "\\tan(60°) = \\sqrt{3}"
-   },
-   "byKind": {
-    "generated": 2
-   }
-  },
-  "TeX not readable as a typed line (\\times)": {
-   "count": 2,
-   "example": {
-    "id": "gen:y11-explog-more:d3:610f39b",
-    "line": "(1 - 0.6)\\times 100 = 40\\%"
-   },
-   "byKind": {
-    "generated": 2
-   }
-  },
-  "TeX not readable as a typed line (\\vec)": {
-   "count": 2,
-   "example": {
-    "id": "X12-V1-154",
-    "line": "\\vec{AB}=4\\mathbf i"
-   },
-   "byKind": {
-    "bank": 2
-   }
-  },
-  "TeX not readable as a typed line (\\Sigma)": {
+  "TeX not readable as a typed line (\\cap)": {
    "count": 1,
    "example": {
-    "id": "X11-F2-067",
-    "line": "(\\Sigma\\alpha)^{2}-2\\Sigma\\alpha\\beta"
-   },
-   "byKind": {
-    "bank": 1
-   }
-  },
-  "TeX not readable as a typed line (\\cdot)": {
-   "count": 1,
-   "example": {
-    "id": "X11-C1-158",
-    "line": "N_{0}=300e^{-2k}=300\\cdot2^{-2/3}"
-   },
-   "byKind": {
-    "bank-worked": 1
-   }
-  },
-  "TeX not readable as a typed line (\\cot)": {
-   "count": 1,
-   "example": {
-    "id": "A11-T2-203",
-    "line": "1+\\cot^{2}\\theta=\\operatorname{cosec}^{2}\\theta"
-   },
-   "byKind": {
-    "bank-worked": 1
-   }
-  },
-  "TeX not readable as a typed line (\\div)": {
-   "count": 1,
-   "example": {
-    "id": "gen:y12-financial:d1:618b00e",
-    "line": "r = 3\\% \\div 12 = 0.25\\% = 0.0025"
+    "id": "gen:y11-probability:d3:3df9510",
+    "line": "P(A \\cap B) = P(A \\mid B) \\times P(B)"
    },
    "byKind": {
     "generated": 1
@@ -1005,16 +569,6 @@
     "bank": 1
    }
   },
-  "TeX not readable as a typed line (\\frac)": {
-   "count": 1,
-   "example": {
-    "id": "gen:y11-sine-cosine-rule:d4:36df27a",
-    "line": "50.4 = \\frac{1}{2}(7)(x)\\sin 134°"
-   },
-   "byKind": {
-    "generated": 1
-   }
-  },
   "TeX not readable as a typed line (\\gcd)": {
    "count": 1,
    "example": {
@@ -1025,24 +579,54 @@
     "generated": 1
    }
   },
-  "TeX not readable as a typed line (\\ge)": {
+  "TeX not readable as a typed line (\\le)": {
    "count": 1,
    "example": {
-    "id": "X12-P1-019",
-    "line": "(k+1)!=(k+1)k!>(k+1)2^{k}\\ge5\\cdot2^{k}>2^{k+1}"
+    "id": "X12-S1-144",
+    "line": "0.10\\le\\hat p\\le0.14"
+   },
+   "byKind": {
+    "bank": 1
+   }
+  },
+  "TeX not readable as a typed line (\\mathbf)": {
+   "count": 1,
+   "example": {
+    "id": "X12-V1-152",
+    "line": "\\mathbf r(0)=\\mathbf 0"
    },
    "byKind": {
     "bank-worked": 1
    }
   },
-  "TeX not readable as a typed line (\\min)": {
+  "TeX not readable as a typed line (\\pm)": {
    "count": 1,
    "example": {
-    "id": "gen:y11-functions-more:d2:6e97b32",
-    "line": "f_{\\min} = 9"
+    "id": "A12-C3-151",
+    "line": "x=\\pm\\sqrt k"
    },
    "byKind": {
-    "generated": 1
+    "bank": 1
+   }
+  },
+  "TeX not readable as a typed line (\\sim)": {
+   "count": 1,
+   "example": {
+    "id": "X12-S1-120",
+    "line": "X\\sim\\mathrm{Bin}(10,0.25)"
+   },
+   "byKind": {
+    "bank": 1
+   }
+  },
+  "TeX not readable as a typed line (\\theta)": {
+   "count": 1,
+   "example": {
+    "id": "X11-C1-078",
+    "line": "\\cos\\theta\\,\\dot\\theta=0.05"
+   },
+   "byKind": {
+    "bank": 1
    }
   },
   "answer line not recognised (working)": {
@@ -1054,428 +638,396 @@
    "byKind": {
     "generated": 1
    }
+  },
+  "worked solution (sketch) with no maths lines": {
+   "count": 1,
+   "example": null,
+   "byKind": {
+    "bank-worked": 1
+   }
   }
  },
  "wrongHalfFailures": {
-  "wrong step missed": 3686,
-  "no provable one-line mutation of any step": 271,
-  "no maths lines in the worked solution": 252,
-  "TeX not readable as a typed line (\\pm)": 103,
-  "TeX not readable as a typed line (\\tfrac)": 75,
-  "TeX not readable as a typed line (\\circ)": 50,
-  "TeX not readable as a typed line (\\to)": 49,
-  "TeX not readable as a typed line (\\int)": 37,
-  "TeX not readable as a typed line (\\sum)": 33,
-  "TeX not readable as a typed line (\\displaystyle)": 28,
-  "TeX not readable as a typed line (\\alpha)": 25,
-  "TeX not readable as a typed line (\\approx)": 23,
-  "TeX not readable as a typed line (\\binom)": 22,
-  "wrong step ticked": 20,
-  "TeX not readable as a typed line (\\theta)": 19,
-  "TeX not readable as a typed line (\\sin)": 18,
-  "wrong step crossed later": 18,
-  "TeX not readable as a typed line (\\dfrac)": 17,
-  "TeX not readable as a typed line (plain symbols)": 14,
-  "TeX not readable as a typed line (\\dbinom)": 14,
-  "TeX not readable as a typed line (\\mathbf)": 14,
+  "wrong step missed": 4316,
+  "no provable one-line mutation of any step": 410,
+  "no maths lines in the worked solution": 82,
+  "wrong step ticked": 23,
+  "wrong step crossed later": 19,
+  "TeX not readable as a typed line (\\overrightarrow)": 15,
   "TeX not readable as a typed line (\\dot)": 13,
-  "TeX not readable as a typed line (\\in)": 13,
-  "TeX not readable as a typed line (\\angle)": 12,
-  "TeX not readable as a typed line (\\mu)": 12,
-  "TeX not readable as a typed line (\\overrightarrow)": 12,
-  "TeX not readable as a typed line (\\cap)": 11,
-  "TeX not readable as a typed line (\\dots)": 11,
-  "TeX not readable as a typed line (\\mapsto)": 10,
-  "TeX not readable as a typed line (\\sigma)": 9,
-  "TeX not readable as a typed line (\\le)": 9,
   "TeX not readable as a typed line (\\begin)": 8,
   "TeX not readable as a typed line (\\underline)": 8,
-  "TeX not readable as a typed line (\\perp)": 7,
-  "TeX not readable as a typed line (\\infty)": 6,
   "TeX not readable as a typed line (\\underset)": 6,
-  "TeX not readable as a typed line (\\cos)": 5,
-  "TeX not readable as a typed line (\\gamma)": 5,
-  "TeX not readable as a typed line (\\lambda)": 4,
-  "TeX not readable as a typed line (\\log)": 4,
+  "TeX not readable as a typed line (\\vec)": 6,
   "TeX not readable as a typed line (\\sec)": 4,
-  "TeX not readable as a typed line (\\ldots)": 3,
   "wrong step no report": 3,
-  "TeX not readable as a typed line (\\left)": 3,
-  "TeX not readable as a typed line (\\sqrt)": 3,
-  "TeX not readable as a typed line (\\tan)": 2,
-  "TeX not readable as a typed line (\\text)": 2,
-  "TeX not readable as a typed line (\\cup)": 2,
-  "TeX not readable as a typed line (\\max)": 2,
-  "TeX not readable as a typed line (\\times)": 2,
+  "TeX not readable as a typed line (\\bar)": 3,
+  "TeX not readable as a typed line (\\sigma)": 2,
+  "wrong step crossed earlier": 2,
   "TeX not readable as a typed line (\\iff)": 2,
-  "TeX not readable as a typed line (\\ln)": 2,
-  "TeX not readable as a typed line (\\vec)": 2,
-  "TeX not readable as a typed line (\\lim)": 2,
-  "TeX not readable as a typed line (\\operatorname)": 2,
-  "TeX not readable as a typed line (\\bar)": 2,
   "TeX not readable as a typed line (\\hat)": 2,
-  "TeX not readable as a typed line (\\frac)": 1,
-  "TeX not readable as a typed line (\\div)": 1,
+  "TeX not readable as a typed line (\\in)": 2,
+  "TeX not readable as a typed line (\\tfrac)": 2,
+  "TeX not readable as a typed line (\\cap)": 1,
   "TeX not readable as a typed line (\\gcd)": 1,
-  "TeX not readable as a typed line (\\min)": 1,
   "TeX not readable as a typed line (\\ell)": 1,
-  "TeX not readable as a typed line (\\Sigma)": 1,
-  "TeX not readable as a typed line (\\cot)": 1,
-  "wrong step crossed earlier": 1,
-  "TeX not readable as a typed line (\\cdot)": 1,
-  "TeX not readable as a typed line (\\ge)": 1
+  "TeX not readable as a typed line (\\pm)": 1,
+  "TeX not readable as a typed line (\\theta)": 1,
+  "TeX not readable as a typed line (\\sim)": 1,
+  "TeX not readable as a typed line (\\le)": 1,
+  "TeX not readable as a typed line (\\mathbf)": 1
  },
  "byTopic": {
   "bank:a11-ma-c1": {
    "total": 238,
-   "full": 43,
-   "trueOnly": 96,
-   "uncovered": 99,
-   "fullPct": 18.07,
-   "trueOnlyPct": 40.34,
-   "uncoveredPct": 41.6
+   "full": 44,
+   "trueOnly": 107,
+   "uncovered": 87,
+   "fullPct": 18.49,
+   "trueOnlyPct": 44.96,
+   "uncoveredPct": 36.55
   },
   "bank:a11-ma-e1": {
    "total": 186,
-   "full": 10,
-   "trueOnly": 65,
-   "uncovered": 111,
-   "fullPct": 5.38,
-   "trueOnlyPct": 34.95,
-   "uncoveredPct": 59.68
+   "full": 12,
+   "trueOnly": 77,
+   "uncovered": 97,
+   "fullPct": 6.45,
+   "trueOnlyPct": 41.4,
+   "uncoveredPct": 52.15
   },
   "bank:a11-ma-f1": {
    "total": 289,
-   "full": 16,
-   "trueOnly": 128,
-   "uncovered": 145,
-   "fullPct": 5.54,
-   "trueOnlyPct": 44.29,
-   "uncoveredPct": 50.17
+   "full": 18,
+   "trueOnly": 148,
+   "uncovered": 123,
+   "fullPct": 6.23,
+   "trueOnlyPct": 51.21,
+   "uncoveredPct": 42.56
   },
   "bank:a11-ma-s1": {
    "total": 165,
    "full": 11,
-   "trueOnly": 100,
-   "uncovered": 54,
+   "trueOnly": 115,
+   "uncovered": 39,
    "fullPct": 6.67,
-   "trueOnlyPct": 60.61,
-   "uncoveredPct": 32.73
+   "trueOnlyPct": 69.7,
+   "uncoveredPct": 23.64
   },
   "bank:a11-ma-t1": {
    "total": 240,
    "full": 5,
-   "trueOnly": 78,
-   "uncovered": 157,
+   "trueOnly": 95,
+   "uncovered": 140,
    "fullPct": 2.08,
-   "trueOnlyPct": 32.5,
-   "uncoveredPct": 65.42
+   "trueOnlyPct": 39.58,
+   "uncoveredPct": 58.33
   },
   "bank:a11-ma-t2": {
    "total": 154,
    "full": 0,
-   "trueOnly": 65,
-   "uncovered": 89,
+   "trueOnly": 82,
+   "uncovered": 72,
    "fullPct": 0,
-   "trueOnlyPct": 42.21,
-   "uncoveredPct": 57.79
+   "trueOnlyPct": 53.25,
+   "uncoveredPct": 46.75
   },
   "bank:a12-ma-c2": {
    "total": 185,
    "full": 35,
-   "trueOnly": 86,
-   "uncovered": 64,
+   "trueOnly": 90,
+   "uncovered": 60,
    "fullPct": 18.92,
-   "trueOnlyPct": 46.49,
-   "uncoveredPct": 34.59
+   "trueOnlyPct": 48.65,
+   "uncoveredPct": 32.43
   },
   "bank:a12-ma-c3": {
    "total": 138,
    "full": 3,
-   "trueOnly": 65,
-   "uncovered": 70,
+   "trueOnly": 69,
+   "uncovered": 66,
    "fullPct": 2.17,
-   "trueOnlyPct": 47.1,
-   "uncoveredPct": 50.72
+   "trueOnlyPct": 50,
+   "uncoveredPct": 47.83
   },
   "bank:a12-ma-c4": {
    "total": 232,
-   "full": 18,
-   "trueOnly": 103,
-   "uncovered": 111,
-   "fullPct": 7.76,
-   "trueOnlyPct": 44.4,
-   "uncoveredPct": 47.84
+   "full": 19,
+   "trueOnly": 116,
+   "uncovered": 97,
+   "fullPct": 8.19,
+   "trueOnlyPct": 50,
+   "uncoveredPct": 41.81
   },
   "bank:a12-ma-f2": {
    "total": 125,
    "full": 2,
-   "trueOnly": 39,
-   "uncovered": 84,
+   "trueOnly": 52,
+   "uncovered": 71,
    "fullPct": 1.6,
-   "trueOnlyPct": 31.2,
-   "uncoveredPct": 67.2
+   "trueOnlyPct": 41.6,
+   "uncoveredPct": 56.8
   },
   "bank:a12-ma-m1": {
    "total": 171,
-   "full": 7,
-   "trueOnly": 104,
-   "uncovered": 60,
-   "fullPct": 4.09,
-   "trueOnlyPct": 60.82,
-   "uncoveredPct": 35.09
+   "full": 8,
+   "trueOnly": 110,
+   "uncovered": 53,
+   "fullPct": 4.68,
+   "trueOnlyPct": 64.33,
+   "uncoveredPct": 30.99
   },
   "bank:a12-ma-s2": {
    "total": 124,
    "full": 6,
-   "trueOnly": 43,
-   "uncovered": 75,
+   "trueOnly": 59,
+   "uncovered": 59,
    "fullPct": 4.84,
-   "trueOnlyPct": 34.68,
-   "uncoveredPct": 60.48
+   "trueOnlyPct": 47.58,
+   "uncoveredPct": 47.58
   },
   "bank:a12-ma-s3": {
    "total": 154,
    "full": 6,
-   "trueOnly": 76,
-   "uncovered": 72,
+   "trueOnly": 96,
+   "uncovered": 52,
    "fullPct": 3.9,
-   "trueOnlyPct": 49.35,
-   "uncoveredPct": 46.75
+   "trueOnlyPct": 62.34,
+   "uncoveredPct": 33.77
   },
   "bank:a12-ma-t3": {
    "total": 103,
-   "full": 0,
-   "trueOnly": 34,
-   "uncovered": 69,
-   "fullPct": 0,
-   "trueOnlyPct": 33.01,
-   "uncoveredPct": 66.99
+   "full": 1,
+   "trueOnly": 46,
+   "uncovered": 56,
+   "fullPct": 0.97,
+   "trueOnlyPct": 44.66,
+   "uncoveredPct": 54.37
   },
   "bank:x11-me-a1": {
    "total": 237,
-   "full": 22,
-   "trueOnly": 71,
-   "uncovered": 144,
-   "fullPct": 9.28,
-   "trueOnlyPct": 29.96,
-   "uncoveredPct": 60.76
+   "full": 25,
+   "trueOnly": 119,
+   "uncovered": 93,
+   "fullPct": 10.55,
+   "trueOnlyPct": 50.21,
+   "uncoveredPct": 39.24
   },
   "bank:x11-me-c1": {
    "total": 152,
    "full": 0,
-   "trueOnly": 49,
-   "uncovered": 103,
+   "trueOnly": 56,
+   "uncovered": 96,
    "fullPct": 0,
-   "trueOnlyPct": 32.24,
-   "uncoveredPct": 67.76
+   "trueOnlyPct": 36.84,
+   "uncoveredPct": 63.16
   },
   "bank:x11-me-f1": {
    "total": 118,
    "full": 0,
-   "trueOnly": 42,
-   "uncovered": 76,
+   "trueOnly": 58,
+   "uncovered": 60,
    "fullPct": 0,
-   "trueOnlyPct": 35.59,
-   "uncoveredPct": 64.41
+   "trueOnlyPct": 49.15,
+   "uncoveredPct": 50.85
   },
   "bank:x11-me-f2": {
    "total": 175,
-   "full": 11,
-   "trueOnly": 62,
-   "uncovered": 102,
-   "fullPct": 6.29,
-   "trueOnlyPct": 35.43,
-   "uncoveredPct": 58.29
+   "full": 12,
+   "trueOnly": 68,
+   "uncovered": 95,
+   "fullPct": 6.86,
+   "trueOnlyPct": 38.86,
+   "uncoveredPct": 54.29
   },
   "bank:x11-me-t1": {
    "total": 100,
    "full": 6,
-   "trueOnly": 27,
-   "uncovered": 67,
+   "trueOnly": 35,
+   "uncovered": 59,
    "fullPct": 6,
-   "trueOnlyPct": 27,
-   "uncoveredPct": 67
+   "trueOnlyPct": 35,
+   "uncoveredPct": 59
   },
   "bank:x11-me-t2": {
    "total": 192,
    "full": 6,
-   "trueOnly": 101,
-   "uncovered": 85,
+   "trueOnly": 110,
+   "uncovered": 76,
    "fullPct": 3.13,
-   "trueOnlyPct": 52.6,
-   "uncoveredPct": 44.27
+   "trueOnlyPct": 57.29,
+   "uncoveredPct": 39.58
   },
   "bank:x12-me-c2": {
    "total": 205,
-   "full": 22,
-   "trueOnly": 49,
-   "uncovered": 134,
-   "fullPct": 10.73,
-   "trueOnlyPct": 23.9,
-   "uncoveredPct": 65.37
+   "full": 24,
+   "trueOnly": 57,
+   "uncovered": 124,
+   "fullPct": 11.71,
+   "trueOnlyPct": 27.8,
+   "uncoveredPct": 60.49
   },
   "bank:x12-me-c3": {
    "total": 187,
    "full": 0,
-   "trueOnly": 85,
-   "uncovered": 102,
+   "trueOnly": 91,
+   "uncovered": 96,
    "fullPct": 0,
-   "trueOnlyPct": 45.45,
-   "uncoveredPct": 54.55
+   "trueOnlyPct": 48.66,
+   "uncoveredPct": 51.34
   },
   "bank:x12-me-p1": {
    "total": 143,
    "full": 7,
-   "trueOnly": 89,
-   "uncovered": 47,
+   "trueOnly": 111,
+   "uncovered": 25,
    "fullPct": 4.9,
-   "trueOnlyPct": 62.24,
-   "uncoveredPct": 32.87
+   "trueOnlyPct": 77.62,
+   "uncoveredPct": 17.48
   },
   "bank:x12-me-s1": {
    "total": 126,
    "full": 5,
-   "trueOnly": 45,
-   "uncovered": 76,
+   "trueOnly": 69,
+   "uncovered": 52,
    "fullPct": 3.97,
-   "trueOnlyPct": 35.71,
-   "uncoveredPct": 60.32
+   "trueOnlyPct": 54.76,
+   "uncoveredPct": 41.27
   },
   "bank:x12-me-t3": {
    "total": 125,
    "full": 2,
-   "trueOnly": 45,
-   "uncovered": 78,
+   "trueOnly": 52,
+   "uncovered": 71,
    "fullPct": 1.6,
-   "trueOnlyPct": 36,
-   "uncoveredPct": 62.4
+   "trueOnlyPct": 41.6,
+   "uncoveredPct": 56.8
   },
   "bank:x12-me-v1": {
    "total": 197,
    "full": 5,
-   "trueOnly": 40,
-   "uncovered": 152,
+   "trueOnly": 48,
+   "uncovered": 144,
    "fullPct": 2.54,
-   "trueOnlyPct": 20.3,
-   "uncoveredPct": 77.16
+   "trueOnlyPct": 24.37,
+   "uncoveredPct": 73.1
   },
   "gen:me11-binomial": {
    "total": 24,
-   "full": 4,
-   "trueOnly": 2,
-   "uncovered": 18,
-   "fullPct": 16.67,
-   "trueOnlyPct": 8.33,
-   "uncoveredPct": 75
+   "full": 7,
+   "trueOnly": 9,
+   "uncovered": 8,
+   "fullPct": 29.17,
+   "trueOnlyPct": 37.5,
+   "uncoveredPct": 33.33
   },
   "gen:me11-comb": {
    "total": 30,
-   "full": 4,
-   "trueOnly": 3,
-   "uncovered": 23,
-   "fullPct": 13.33,
-   "trueOnlyPct": 10,
-   "uncoveredPct": 76.67
+   "full": 12,
+   "trueOnly": 7,
+   "uncovered": 11,
+   "fullPct": 40,
+   "trueOnlyPct": 23.33,
+   "uncoveredPct": 36.67
   },
   "gen:me11-functions": {
    "total": 24,
    "full": 2,
-   "trueOnly": 11,
-   "uncovered": 11,
+   "trueOnly": 12,
+   "uncovered": 10,
    "fullPct": 8.33,
-   "trueOnlyPct": 45.83,
-   "uncoveredPct": 45.83
+   "trueOnlyPct": 50,
+   "uncoveredPct": 41.67
   },
   "gen:me11-inversetrig": {
    "total": 25,
    "full": 0,
-   "trueOnly": 9,
-   "uncovered": 16,
+   "trueOnly": 15,
+   "uncovered": 10,
    "fullPct": 0,
-   "trueOnlyPct": 36,
-   "uncoveredPct": 64
+   "trueOnlyPct": 60,
+   "uncoveredPct": 40
   },
   "gen:me11-poly": {
    "total": 25,
-   "full": 3,
+   "full": 5,
    "trueOnly": 4,
-   "uncovered": 18,
-   "fullPct": 12,
+   "uncovered": 16,
+   "fullPct": 20,
    "trueOnlyPct": 16,
-   "uncoveredPct": 72
+   "uncoveredPct": 64
   },
   "gen:me11-rates": {
    "total": 31,
    "full": 0,
-   "trueOnly": 20,
-   "uncovered": 11,
+   "trueOnly": 22,
+   "uncovered": 9,
    "fullPct": 0,
-   "trueOnlyPct": 64.52,
-   "uncoveredPct": 35.48
+   "trueOnlyPct": 70.97,
+   "uncoveredPct": 29.03
   },
   "gen:me11-trigid": {
    "total": 25,
    "full": 0,
-   "trueOnly": 9,
-   "uncovered": 16,
+   "trueOnly": 10,
+   "uncovered": 15,
    "fullPct": 0,
-   "trueOnlyPct": 36,
-   "uncoveredPct": 64
+   "trueOnlyPct": 40,
+   "uncoveredPct": 60
   },
   "gen:me12-binomial": {
    "total": 18,
    "full": 0,
-   "trueOnly": 1,
-   "uncovered": 17,
+   "trueOnly": 4,
+   "uncovered": 14,
    "fullPct": 0,
-   "trueOnlyPct": 5.56,
-   "uncoveredPct": 94.44
+   "trueOnlyPct": 22.22,
+   "uncoveredPct": 77.78
   },
   "gen:me12-binomial-forms": {
    "total": 9,
    "full": 0,
-   "trueOnly": 7,
-   "uncovered": 2,
+   "trueOnly": 8,
+   "uncovered": 1,
    "fullPct": 0,
-   "trueOnlyPct": 77.78,
-   "uncoveredPct": 22.22
+   "trueOnlyPct": 88.89,
+   "uncoveredPct": 11.11
   },
   "gen:me12-calc": {
    "total": 21,
-   "full": 0,
-   "trueOnly": 6,
-   "uncovered": 15,
-   "fullPct": 0,
-   "trueOnlyPct": 28.57,
-   "uncoveredPct": 71.43
+   "full": 1,
+   "trueOnly": 9,
+   "uncovered": 11,
+   "fullPct": 4.76,
+   "trueOnlyPct": 42.86,
+   "uncoveredPct": 52.38
   },
   "gen:me12-further-calc": {
    "total": 21,
-   "full": 2,
-   "trueOnly": 5,
-   "uncovered": 14,
-   "fullPct": 9.52,
-   "trueOnlyPct": 23.81,
-   "uncoveredPct": 66.67
+   "full": 3,
+   "trueOnly": 8,
+   "uncovered": 10,
+   "fullPct": 14.29,
+   "trueOnlyPct": 38.1,
+   "uncoveredPct": 47.62
   },
   "gen:me12-induction": {
    "total": 29,
    "full": 3,
-   "trueOnly": 7,
-   "uncovered": 19,
+   "trueOnly": 10,
+   "uncovered": 16,
    "fullPct": 10.34,
-   "trueOnlyPct": 24.14,
-   "uncoveredPct": 65.52
+   "trueOnlyPct": 34.48,
+   "uncoveredPct": 55.17
   },
   "gen:me12-induction-forms": {
    "total": 18,
    "full": 5,
-   "trueOnly": 7,
-   "uncovered": 6,
+   "trueOnly": 8,
+   "uncovered": 5,
    "fullPct": 27.78,
-   "trueOnlyPct": 38.89,
-   "uncoveredPct": 33.33
+   "trueOnlyPct": 44.44,
+   "uncoveredPct": 27.78
   },
   "gen:me12-projectile": {
    "total": 23,
@@ -1498,20 +1050,20 @@
   "gen:me12-trigeq": {
    "total": 6,
    "full": 0,
-   "trueOnly": 0,
-   "uncovered": 6,
+   "trueOnly": 2,
+   "uncovered": 4,
    "fullPct": 0,
-   "trueOnlyPct": 0,
-   "uncoveredPct": 100
+   "trueOnlyPct": 33.33,
+   "uncoveredPct": 66.67
   },
   "gen:me12-vectors": {
    "total": 26,
    "full": 1,
-   "trueOnly": 6,
-   "uncovered": 19,
+   "trueOnly": 7,
+   "uncovered": 18,
    "fullPct": 3.85,
-   "trueOnlyPct": 23.08,
-   "uncoveredPct": 73.08
+   "trueOnlyPct": 26.92,
+   "uncoveredPct": 69.23
   },
   "gen:me12-vectors-forms": {
    "total": 19,
@@ -1525,38 +1077,38 @@
   "gen:y11-data-sets": {
    "total": 23,
    "full": 10,
-   "trueOnly": 2,
-   "uncovered": 11,
+   "trueOnly": 6,
+   "uncovered": 7,
    "fullPct": 43.48,
-   "trueOnlyPct": 8.7,
-   "uncoveredPct": 47.83
+   "trueOnlyPct": 26.09,
+   "uncoveredPct": 30.43
   },
   "gen:y11-diff": {
    "total": 26,
    "full": 5,
-   "trueOnly": 17,
-   "uncovered": 4,
+   "trueOnly": 18,
+   "uncovered": 3,
    "fullPct": 19.23,
-   "trueOnlyPct": 65.38,
-   "uncoveredPct": 15.38
+   "trueOnlyPct": 69.23,
+   "uncoveredPct": 11.54
   },
   "gen:y11-explog": {
    "total": 23,
    "full": 5,
-   "trueOnly": 9,
-   "uncovered": 9,
+   "trueOnly": 12,
+   "uncovered": 6,
    "fullPct": 21.74,
-   "trueOnlyPct": 39.13,
-   "uncoveredPct": 39.13
+   "trueOnlyPct": 52.17,
+   "uncoveredPct": 26.09
   },
   "gen:y11-explog-more": {
    "total": 31,
    "full": 5,
-   "trueOnly": 14,
-   "uncovered": 12,
+   "trueOnly": 16,
+   "uncovered": 10,
    "fullPct": 16.13,
-   "trueOnlyPct": 45.16,
-   "uncoveredPct": 38.71
+   "trueOnlyPct": 51.61,
+   "uncoveredPct": 32.26
   },
   "gen:y11-functions": {
    "total": 3,
@@ -1569,12 +1121,12 @@
   },
   "gen:y11-functions-more": {
    "total": 22,
-   "full": 2,
-   "trueOnly": 12,
-   "uncovered": 8,
-   "fullPct": 9.09,
-   "trueOnlyPct": 54.55,
-   "uncoveredPct": 36.36
+   "full": 4,
+   "trueOnly": 14,
+   "uncovered": 4,
+   "fullPct": 18.18,
+   "trueOnlyPct": 63.64,
+   "uncoveredPct": 18.18
   },
   "gen:y11-lines": {
    "total": 25,
@@ -1597,20 +1149,20 @@
   "gen:y11-probability": {
    "total": 40,
    "full": 3,
-   "trueOnly": 16,
-   "uncovered": 21,
+   "trueOnly": 24,
+   "uncovered": 13,
    "fullPct": 7.5,
-   "trueOnlyPct": 40,
-   "uncoveredPct": 52.5
+   "trueOnlyPct": 60,
+   "uncoveredPct": 32.5
   },
   "gen:y11-quadfunc": {
    "total": 35,
-   "full": 6,
+   "full": 7,
    "trueOnly": 7,
-   "uncovered": 22,
-   "fullPct": 17.14,
+   "uncovered": 21,
+   "fullPct": 20,
    "trueOnlyPct": 20,
-   "uncoveredPct": 62.86
+   "uncoveredPct": 60
   },
   "gen:y11-sine-cosine-rule": {
    "total": 21,
@@ -1623,30 +1175,30 @@
   },
   "gen:y11-transform": {
    "total": 26,
-   "full": 2,
-   "trueOnly": 7,
-   "uncovered": 17,
-   "fullPct": 7.69,
-   "trueOnlyPct": 26.92,
-   "uncoveredPct": 65.38
+   "full": 4,
+   "trueOnly": 11,
+   "uncovered": 11,
+   "fullPct": 15.38,
+   "trueOnlyPct": 42.31,
+   "uncoveredPct": 42.31
   },
   "gen:y11-trig-ident": {
    "total": 27,
-   "full": 2,
-   "trueOnly": 4,
-   "uncovered": 21,
-   "fullPct": 7.41,
-   "trueOnlyPct": 14.81,
-   "uncoveredPct": 77.78
+   "full": 4,
+   "trueOnly": 9,
+   "uncovered": 14,
+   "fullPct": 14.81,
+   "trueOnlyPct": 33.33,
+   "uncoveredPct": 51.85
   },
   "gen:y11-trigfunc": {
    "total": 22,
    "full": 0,
-   "trueOnly": 1,
-   "uncovered": 21,
+   "trueOnly": 11,
+   "uncovered": 11,
    "fullPct": 0,
-   "trueOnlyPct": 4.55,
-   "uncoveredPct": 95.45
+   "trueOnlyPct": 50,
+   "uncoveredPct": 50
   },
   "gen:y12-appdiff": {
    "total": 28,
@@ -1677,30 +1229,30 @@
   },
   "gen:y12-fin-exact": {
    "total": 13,
-   "full": 0,
-   "trueOnly": 1,
-   "uncovered": 12,
-   "fullPct": 0,
-   "trueOnlyPct": 7.69,
-   "uncoveredPct": 92.31
+   "full": 4,
+   "trueOnly": 6,
+   "uncovered": 3,
+   "fullPct": 30.77,
+   "trueOnlyPct": 46.15,
+   "uncoveredPct": 23.08
   },
   "gen:y12-financial": {
    "total": 31,
    "full": 3,
-   "trueOnly": 8,
-   "uncovered": 20,
+   "trueOnly": 10,
+   "uncovered": 18,
    "fullPct": 9.68,
-   "trueOnlyPct": 25.81,
-   "uncoveredPct": 64.52
+   "trueOnlyPct": 32.26,
+   "uncoveredPct": 58.06
   },
   "gen:y12-func-model": {
    "total": 12,
    "full": 4,
-   "trueOnly": 7,
-   "uncovered": 1,
+   "trueOnly": 8,
+   "uncovered": 0,
    "fullPct": 33.33,
-   "trueOnlyPct": 58.33,
-   "uncoveredPct": 8.33
+   "trueOnlyPct": 66.67,
+   "uncoveredPct": 0
   },
   "gen:y12-integral-calc": {
    "total": 30,
@@ -1714,38 +1266,38 @@
   "gen:y12-integration": {
    "total": 17,
    "full": 2,
-   "trueOnly": 4,
-   "uncovered": 11,
+   "trueOnly": 8,
+   "uncovered": 7,
    "fullPct": 11.76,
-   "trueOnlyPct": 23.53,
-   "uncoveredPct": 64.71
+   "trueOnlyPct": 47.06,
+   "uncoveredPct": 41.18
   },
   "gen:y12-motion": {
    "total": 58,
    "full": 6,
-   "trueOnly": 39,
-   "uncovered": 13,
+   "trueOnly": 44,
+   "uncovered": 8,
    "fullPct": 10.34,
-   "trueOnlyPct": 67.24,
-   "uncoveredPct": 22.41
+   "trueOnlyPct": 75.86,
+   "uncoveredPct": 13.79
   },
   "gen:y12-random-var": {
    "total": 12,
-   "full": 2,
+   "full": 3,
    "trueOnly": 4,
-   "uncovered": 6,
-   "fullPct": 16.67,
+   "uncovered": 5,
+   "fullPct": 25,
    "trueOnlyPct": 33.33,
-   "uncoveredPct": 50
+   "uncoveredPct": 41.67
   },
   "gen:y12-series": {
    "total": 49,
-   "full": 8,
+   "full": 11,
    "trueOnly": 31,
-   "uncovered": 10,
-   "fullPct": 16.33,
+   "uncovered": 7,
+   "fullPct": 22.45,
    "trueOnlyPct": 63.27,
-   "uncoveredPct": 20.41
+   "uncoveredPct": 14.29
   },
   "gen:y12-stats": {
    "total": 24,
@@ -1759,121 +1311,121 @@
   "gen:y12-trig-model": {
    "total": 22,
    "full": 0,
-   "trueOnly": 14,
-   "uncovered": 8,
+   "trueOnly": 22,
+   "uncovered": 0,
    "fullPct": 0,
-   "trueOnlyPct": 63.64,
-   "uncoveredPct": 36.36
+   "trueOnlyPct": 100,
+   "uncoveredPct": 0
   },
   "gen:y12-trigcalc": {
    "total": 31,
    "full": 0,
-   "trueOnly": 15,
-   "uncovered": 16,
+   "trueOnly": 17,
+   "uncovered": 14,
    "fullPct": 0,
-   "trueOnlyPct": 48.39,
-   "uncoveredPct": 51.61
+   "trueOnlyPct": 54.84,
+   "uncoveredPct": 45.16
   }
  },
  "byDotpoint": {
   "bank:A1.1a": {
    "total": 83,
-   "full": 8,
-   "trueOnly": 30,
-   "uncovered": 45,
-   "fullPct": 9.64,
-   "trueOnlyPct": 36.14,
-   "uncoveredPct": 54.22
+   "full": 9,
+   "trueOnly": 40,
+   "uncovered": 34,
+   "fullPct": 10.84,
+   "trueOnlyPct": 48.19,
+   "uncoveredPct": 40.96
   },
   "bank:A1.1b": {
    "total": 46,
-   "full": 7,
-   "trueOnly": 6,
-   "uncovered": 33,
-   "fullPct": 15.22,
-   "trueOnlyPct": 13.04,
-   "uncoveredPct": 71.74
+   "full": 9,
+   "trueOnly": 23,
+   "uncovered": 14,
+   "fullPct": 19.57,
+   "trueOnlyPct": 50,
+   "uncoveredPct": 30.43
   },
   "bank:A1.1c": {
    "total": 34,
    "full": 0,
-   "trueOnly": 8,
-   "uncovered": 26,
+   "trueOnly": 23,
+   "uncovered": 11,
    "fullPct": 0,
-   "trueOnlyPct": 23.53,
-   "uncoveredPct": 76.47
+   "trueOnlyPct": 67.65,
+   "uncoveredPct": 32.35
   },
   "bank:A1.2a": {
    "total": 74,
    "full": 7,
-   "trueOnly": 27,
-   "uncovered": 40,
+   "trueOnly": 33,
+   "uncovered": 34,
    "fullPct": 9.46,
-   "trueOnlyPct": 36.49,
-   "uncoveredPct": 54.05
+   "trueOnlyPct": 44.59,
+   "uncoveredPct": 45.95
   },
   "bank:C1.1a": {
    "total": 125,
-   "full": 2,
-   "trueOnly": 35,
-   "uncovered": 88,
-   "fullPct": 1.6,
-   "trueOnlyPct": 28,
-   "uncoveredPct": 70.4
+   "full": 3,
+   "trueOnly": 40,
+   "uncovered": 82,
+   "fullPct": 2.4,
+   "trueOnlyPct": 32,
+   "uncoveredPct": 65.6
   },
   "bank:C1.1b": {
    "total": 55,
    "full": 0,
-   "trueOnly": 30,
-   "uncovered": 25,
+   "trueOnly": 33,
+   "uncovered": 22,
    "fullPct": 0,
-   "trueOnlyPct": 54.55,
-   "uncoveredPct": 45.45
+   "trueOnlyPct": 60,
+   "uncoveredPct": 40
   },
   "bank:C1.2a": {
    "total": 26,
    "full": 0,
-   "trueOnly": 15,
-   "uncovered": 11,
+   "trueOnly": 16,
+   "uncovered": 10,
    "fullPct": 0,
-   "trueOnlyPct": 57.69,
-   "uncoveredPct": 42.31
+   "trueOnlyPct": 61.54,
+   "uncoveredPct": 38.46
   },
   "bank:C1.3a": {
    "total": 39,
    "full": 16,
-   "trueOnly": 10,
-   "uncovered": 13,
+   "trueOnly": 12,
+   "uncovered": 11,
    "fullPct": 41.03,
-   "trueOnlyPct": 25.64,
-   "uncoveredPct": 33.33
+   "trueOnlyPct": 30.77,
+   "uncoveredPct": 28.21
   },
   "bank:C1.3b": {
    "total": 40,
    "full": 18,
-   "trueOnly": 9,
-   "uncovered": 13,
+   "trueOnly": 10,
+   "uncovered": 12,
    "fullPct": 45,
-   "trueOnlyPct": 22.5,
-   "uncoveredPct": 32.5
+   "trueOnlyPct": 25,
+   "uncoveredPct": 30
   },
   "bank:C1.3c": {
    "total": 44,
    "full": 3,
-   "trueOnly": 17,
-   "uncovered": 24,
+   "trueOnly": 20,
+   "uncovered": 21,
    "fullPct": 6.82,
-   "trueOnlyPct": 38.64,
-   "uncoveredPct": 54.55
+   "trueOnlyPct": 45.45,
+   "uncoveredPct": 47.73
   },
   "bank:C1.3d": {
    "total": 36,
    "full": 4,
-   "trueOnly": 22,
-   "uncovered": 10,
+   "trueOnly": 25,
+   "uncovered": 7,
    "fullPct": 11.11,
-   "trueOnlyPct": 61.11,
-   "uncoveredPct": 27.78
+   "trueOnlyPct": 69.44,
+   "uncoveredPct": 19.44
   },
   "bank:C1.3e": {
    "total": 25,
@@ -1886,21 +1438,21 @@
   },
   "bank:C2.1a": {
    "total": 94,
-   "full": 23,
-   "trueOnly": 31,
-   "uncovered": 40,
-   "fullPct": 24.47,
-   "trueOnlyPct": 32.98,
-   "uncoveredPct": 42.55
+   "full": 24,
+   "trueOnly": 33,
+   "uncovered": 37,
+   "fullPct": 25.53,
+   "trueOnlyPct": 35.11,
+   "uncoveredPct": 39.36
   },
   "bank:C2.1b": {
    "total": 57,
    "full": 6,
-   "trueOnly": 25,
-   "uncovered": 26,
+   "trueOnly": 26,
+   "uncovered": 25,
    "fullPct": 10.53,
-   "trueOnlyPct": 43.86,
-   "uncoveredPct": 45.61
+   "trueOnlyPct": 45.61,
+   "uncoveredPct": 43.86
   },
   "bank:C2.2a": {
    "total": 106,
@@ -1914,38 +1466,38 @@
   "bank:C2.2b": {
    "total": 70,
    "full": 1,
-   "trueOnly": 24,
-   "uncovered": 45,
+   "trueOnly": 27,
+   "uncovered": 42,
    "fullPct": 1.43,
-   "trueOnlyPct": 34.29,
-   "uncoveredPct": 64.29
+   "trueOnlyPct": 38.57,
+   "uncoveredPct": 60
   },
   "bank:C2.2c": {
    "total": 63,
-   "full": 1,
-   "trueOnly": 19,
-   "uncovered": 43,
-   "fullPct": 1.59,
-   "trueOnlyPct": 30.16,
-   "uncoveredPct": 68.25
+   "full": 2,
+   "trueOnly": 25,
+   "uncovered": 36,
+   "fullPct": 3.17,
+   "trueOnlyPct": 39.68,
+   "uncoveredPct": 57.14
   },
   "bank:C3.1a": {
    "total": 118,
    "full": 1,
-   "trueOnly": 61,
-   "uncovered": 56,
+   "trueOnly": 67,
+   "uncovered": 50,
    "fullPct": 0.85,
-   "trueOnlyPct": 51.69,
-   "uncoveredPct": 47.46
+   "trueOnlyPct": 56.78,
+   "uncoveredPct": 42.37
   },
   "bank:C3.1b": {
    "total": 36,
    "full": 0,
-   "trueOnly": 20,
-   "uncovered": 16,
+   "trueOnly": 21,
+   "uncovered": 15,
    "fullPct": 0,
-   "trueOnlyPct": 55.56,
-   "uncoveredPct": 44.44
+   "trueOnlyPct": 58.33,
+   "uncoveredPct": 41.67
   },
   "bank:C3.1c": {
    "total": 18,
@@ -1968,38 +1520,38 @@
   "bank:C3.2b": {
    "total": 22,
    "full": 0,
-   "trueOnly": 6,
-   "uncovered": 16,
+   "trueOnly": 8,
+   "uncovered": 14,
    "fullPct": 0,
-   "trueOnlyPct": 27.27,
-   "uncoveredPct": 72.73
+   "trueOnlyPct": 36.36,
+   "uncoveredPct": 63.64
   },
   "bank:C3.2c": {
    "total": 38,
    "full": 0,
-   "trueOnly": 19,
-   "uncovered": 19,
+   "trueOnly": 20,
+   "uncovered": 18,
    "fullPct": 0,
-   "trueOnlyPct": 50,
-   "uncoveredPct": 50
+   "trueOnlyPct": 52.63,
+   "uncoveredPct": 47.37
   },
   "bank:C4.1a": {
    "total": 39,
    "full": 2,
-   "trueOnly": 17,
-   "uncovered": 20,
+   "trueOnly": 20,
+   "uncovered": 17,
    "fullPct": 5.13,
-   "trueOnlyPct": 43.59,
-   "uncoveredPct": 51.28
+   "trueOnlyPct": 51.28,
+   "uncoveredPct": 43.59
   },
   "bank:C4.2a": {
    "total": 76,
-   "full": 14,
+   "full": 15,
    "trueOnly": 24,
-   "uncovered": 38,
-   "fullPct": 18.42,
+   "uncovered": 37,
+   "fullPct": 19.74,
    "trueOnlyPct": 31.58,
-   "uncoveredPct": 50
+   "uncoveredPct": 48.68
   },
   "bank:C4.2b": {
    "total": 57,
@@ -2013,20 +1565,20 @@
   "bank:C4.2c": {
    "total": 28,
    "full": 0,
-   "trueOnly": 14,
-   "uncovered": 14,
+   "trueOnly": 22,
+   "uncovered": 6,
    "fullPct": 0,
-   "trueOnlyPct": 50,
-   "uncoveredPct": 50
+   "trueOnlyPct": 78.57,
+   "uncoveredPct": 21.43
   },
   "bank:C4.2d": {
    "total": 32,
    "full": 0,
-   "trueOnly": 16,
-   "uncovered": 16,
+   "trueOnly": 18,
+   "uncovered": 14,
    "fullPct": 0,
-   "trueOnlyPct": 50,
-   "uncoveredPct": 50
+   "trueOnlyPct": 56.25,
+   "uncoveredPct": 43.75
   },
   "bank:E1.1a": {
    "total": 12,
@@ -2039,66 +1591,66 @@
   },
   "bank:E1.2a": {
    "total": 47,
-   "full": 2,
-   "trueOnly": 16,
-   "uncovered": 29,
-   "fullPct": 4.26,
-   "trueOnlyPct": 34.04,
-   "uncoveredPct": 61.7
+   "full": 4,
+   "trueOnly": 21,
+   "uncovered": 22,
+   "fullPct": 8.51,
+   "trueOnlyPct": 44.68,
+   "uncoveredPct": 46.81
   },
   "bank:E1.2b": {
    "total": 57,
    "full": 6,
-   "trueOnly": 6,
-   "uncovered": 45,
+   "trueOnly": 7,
+   "uncovered": 44,
    "fullPct": 10.53,
-   "trueOnlyPct": 10.53,
-   "uncoveredPct": 78.95
+   "trueOnlyPct": 12.28,
+   "uncoveredPct": 77.19
   },
   "bank:E1.3a": {
    "total": 34,
    "full": 0,
-   "trueOnly": 20,
-   "uncovered": 14,
+   "trueOnly": 23,
+   "uncovered": 11,
    "fullPct": 0,
-   "trueOnlyPct": 58.82,
-   "uncoveredPct": 41.18
+   "trueOnlyPct": 67.65,
+   "uncoveredPct": 32.35
   },
   "bank:E1.3b": {
    "total": 36,
    "full": 1,
-   "trueOnly": 21,
-   "uncovered": 14,
+   "trueOnly": 24,
+   "uncovered": 11,
    "fullPct": 2.78,
-   "trueOnlyPct": 58.33,
-   "uncoveredPct": 38.89
+   "trueOnlyPct": 66.67,
+   "uncoveredPct": 30.56
   },
   "bank:F1.1a": {
    "total": 43,
    "full": 7,
-   "trueOnly": 21,
-   "uncovered": 15,
+   "trueOnly": 23,
+   "uncovered": 13,
    "fullPct": 16.28,
-   "trueOnlyPct": 48.84,
-   "uncoveredPct": 34.88
+   "trueOnlyPct": 53.49,
+   "uncoveredPct": 30.23
   },
   "bank:F1.1b": {
    "total": 41,
    "full": 2,
-   "trueOnly": 15,
-   "uncovered": 24,
+   "trueOnly": 20,
+   "uncovered": 19,
    "fullPct": 4.88,
-   "trueOnlyPct": 36.59,
-   "uncoveredPct": 58.54
+   "trueOnlyPct": 48.78,
+   "uncoveredPct": 46.34
   },
   "bank:F1.2a": {
    "total": 60,
-   "full": 4,
-   "trueOnly": 19,
-   "uncovered": 37,
-   "fullPct": 6.67,
-   "trueOnlyPct": 31.67,
-   "uncoveredPct": 61.67
+   "full": 6,
+   "trueOnly": 32,
+   "uncovered": 22,
+   "fullPct": 10,
+   "trueOnlyPct": 53.33,
+   "uncoveredPct": 36.67
   },
   "bank:F1.2b": {
    "total": 24,
@@ -2112,146 +1664,146 @@
   "bank:F1.3a": {
    "total": 77,
    "full": 1,
-   "trueOnly": 31,
-   "uncovered": 45,
+   "trueOnly": 37,
+   "uncovered": 39,
    "fullPct": 1.3,
-   "trueOnlyPct": 40.26,
-   "uncoveredPct": 58.44
+   "trueOnlyPct": 48.05,
+   "uncoveredPct": 50.65
   },
   "bank:F1.3b": {
    "total": 26,
    "full": 0,
-   "trueOnly": 9,
-   "uncovered": 17,
+   "trueOnly": 11,
+   "uncovered": 15,
    "fullPct": 0,
-   "trueOnlyPct": 34.62,
-   "uncoveredPct": 65.38
+   "trueOnlyPct": 42.31,
+   "uncoveredPct": 57.69
   },
   "bank:F1.3c": {
    "total": 15,
    "full": 0,
-   "trueOnly": 6,
-   "uncovered": 9,
+   "trueOnly": 8,
+   "uncovered": 7,
    "fullPct": 0,
-   "trueOnlyPct": 40,
-   "uncoveredPct": 60
+   "trueOnlyPct": 53.33,
+   "uncoveredPct": 46.67
   },
   "bank:F1.4a": {
    "total": 55,
    "full": 1,
-   "trueOnly": 27,
-   "uncovered": 27,
+   "trueOnly": 29,
+   "uncovered": 25,
    "fullPct": 1.82,
-   "trueOnlyPct": 49.09,
-   "uncoveredPct": 49.09
+   "trueOnlyPct": 52.73,
+   "uncoveredPct": 45.45
   },
   "bank:F1.4b": {
    "total": 18,
    "full": 0,
-   "trueOnly": 5,
-   "uncovered": 13,
-   "fullPct": 0,
-   "trueOnlyPct": 27.78,
-   "uncoveredPct": 72.22
-  },
-  "bank:F1.4c": {
-   "total": 21,
-   "full": 1,
-   "trueOnly": 11,
-   "uncovered": 9,
-   "fullPct": 4.76,
-   "trueOnlyPct": 52.38,
-   "uncoveredPct": 42.86
-  },
-  "bank:F1.4d": {
-   "total": 27,
-   "full": 0,
-   "trueOnly": 10,
-   "uncovered": 17,
-   "fullPct": 0,
-   "trueOnlyPct": 37.04,
-   "uncoveredPct": 62.96
-  },
-  "bank:F2.1a": {
-   "total": 77,
-   "full": 5,
-   "trueOnly": 39,
-   "uncovered": 33,
-   "fullPct": 6.49,
-   "trueOnlyPct": 50.65,
-   "uncoveredPct": 42.86
-  },
-  "bank:F2.1b": {
-   "total": 44,
-   "full": 2,
-   "trueOnly": 12,
-   "uncovered": 30,
-   "fullPct": 4.55,
-   "trueOnlyPct": 27.27,
-   "uncoveredPct": 68.18
-  },
-  "bank:F2.1c": {
-   "total": 21,
-   "full": 0,
-   "trueOnly": 7,
-   "uncovered": 14,
+   "trueOnly": 6,
+   "uncovered": 12,
    "fullPct": 0,
    "trueOnlyPct": 33.33,
    "uncoveredPct": 66.67
   },
-  "bank:F2.1d": {
-   "total": 32,
+  "bank:F1.4c": {
+   "total": 21,
+   "full": 1,
+   "trueOnly": 13,
+   "uncovered": 7,
+   "fullPct": 4.76,
+   "trueOnlyPct": 61.9,
+   "uncoveredPct": 33.33
+  },
+  "bank:F1.4d": {
+   "total": 27,
    "full": 0,
+   "trueOnly": 11,
+   "uncovered": 16,
+   "fullPct": 0,
+   "trueOnlyPct": 40.74,
+   "uncoveredPct": 59.26
+  },
+  "bank:F2.1a": {
+   "total": 77,
+   "full": 5,
+   "trueOnly": 41,
+   "uncovered": 31,
+   "fullPct": 6.49,
+   "trueOnlyPct": 53.25,
+   "uncoveredPct": 40.26
+  },
+  "bank:F2.1b": {
+   "total": 44,
+   "full": 2,
    "trueOnly": 14,
-   "uncovered": 18,
-   "fullPct": 0,
-   "trueOnlyPct": 43.75,
-   "uncoveredPct": 56.25
+   "uncovered": 28,
+   "fullPct": 4.55,
+   "trueOnlyPct": 31.82,
+   "uncoveredPct": 63.64
   },
-  "bank:F2.1e": {
-   "total": 12,
+  "bank:F2.1c": {
+   "total": 21,
    "full": 0,
-   "trueOnly": 3,
+   "trueOnly": 12,
    "uncovered": 9,
-   "fullPct": 0,
-   "trueOnlyPct": 25,
-   "uncoveredPct": 75
-  },
-  "bank:F2.2a": {
-   "total": 75,
-   "full": 6,
-   "trueOnly": 10,
-   "uncovered": 59,
-   "fullPct": 8,
-   "trueOnlyPct": 13.33,
-   "uncoveredPct": 78.67
-  },
-  "bank:F2.2b": {
-   "total": 39,
-   "full": 0,
-   "trueOnly": 16,
-   "uncovered": 23,
-   "fullPct": 0,
-   "trueOnlyPct": 41.03,
-   "uncoveredPct": 58.97
-  },
-  "bank:M1.1a": {
-   "total": 42,
-   "full": 0,
-   "trueOnly": 24,
-   "uncovered": 18,
    "fullPct": 0,
    "trueOnlyPct": 57.14,
    "uncoveredPct": 42.86
   },
+  "bank:F2.1d": {
+   "total": 32,
+   "full": 0,
+   "trueOnly": 18,
+   "uncovered": 14,
+   "fullPct": 0,
+   "trueOnlyPct": 56.25,
+   "uncoveredPct": 43.75
+  },
+  "bank:F2.1e": {
+   "total": 12,
+   "full": 0,
+   "trueOnly": 4,
+   "uncovered": 8,
+   "fullPct": 0,
+   "trueOnlyPct": 33.33,
+   "uncoveredPct": 66.67
+  },
+  "bank:F2.2a": {
+   "total": 75,
+   "full": 6,
+   "trueOnly": 11,
+   "uncovered": 58,
+   "fullPct": 8,
+   "trueOnlyPct": 14.67,
+   "uncoveredPct": 77.33
+  },
+  "bank:F2.2b": {
+   "total": 39,
+   "full": 1,
+   "trueOnly": 20,
+   "uncovered": 18,
+   "fullPct": 2.56,
+   "trueOnlyPct": 51.28,
+   "uncoveredPct": 46.15
+  },
+  "bank:M1.1a": {
+   "total": 42,
+   "full": 0,
+   "trueOnly": 25,
+   "uncovered": 17,
+   "fullPct": 0,
+   "trueOnlyPct": 59.52,
+   "uncoveredPct": 40.48
+  },
   "bank:M1.2a": {
    "total": 41,
-   "full": 7,
-   "trueOnly": 18,
-   "uncovered": 16,
-   "fullPct": 17.07,
-   "trueOnlyPct": 43.9,
-   "uncoveredPct": 39.02
+   "full": 8,
+   "trueOnly": 19,
+   "uncovered": 14,
+   "fullPct": 19.51,
+   "trueOnlyPct": 46.34,
+   "uncoveredPct": 34.15
   },
   "bank:M1.3a": {
    "total": 46,
@@ -2265,110 +1817,110 @@
   "bank:M1.4a": {
    "total": 42,
    "full": 0,
-   "trueOnly": 25,
-   "uncovered": 17,
+   "trueOnly": 29,
+   "uncovered": 13,
    "fullPct": 0,
-   "trueOnlyPct": 59.52,
-   "uncoveredPct": 40.48
+   "trueOnlyPct": 69.05,
+   "uncoveredPct": 30.95
   },
   "bank:P1.1a": {
    "total": 54,
    "full": 4,
-   "trueOnly": 46,
-   "uncovered": 4,
+   "trueOnly": 47,
+   "uncovered": 3,
    "fullPct": 7.41,
-   "trueOnlyPct": 85.19,
-   "uncoveredPct": 7.41
+   "trueOnlyPct": 87.04,
+   "uncoveredPct": 5.56
   },
   "bank:P1.1b": {
    "total": 44,
    "full": 3,
-   "trueOnly": 21,
-   "uncovered": 20,
+   "trueOnly": 41,
+   "uncovered": 0,
    "fullPct": 6.82,
-   "trueOnlyPct": 47.73,
-   "uncoveredPct": 45.45
+   "trueOnlyPct": 93.18,
+   "uncoveredPct": 0
   },
   "bank:P1.1c": {
    "total": 45,
    "full": 0,
-   "trueOnly": 22,
-   "uncovered": 23,
+   "trueOnly": 23,
+   "uncovered": 22,
    "fullPct": 0,
-   "trueOnlyPct": 48.89,
-   "uncoveredPct": 51.11
+   "trueOnlyPct": 51.11,
+   "uncoveredPct": 48.89
   },
   "bank:S1.1a": {
    "total": 121,
    "full": 9,
-   "trueOnly": 55,
-   "uncovered": 57,
+   "trueOnly": 71,
+   "uncovered": 41,
    "fullPct": 7.44,
-   "trueOnlyPct": 45.45,
-   "uncoveredPct": 47.11
+   "trueOnlyPct": 58.68,
+   "uncoveredPct": 33.88
   },
   "bank:S1.1b": {
    "total": 47,
    "full": 1,
-   "trueOnly": 31,
-   "uncovered": 15,
+   "trueOnly": 35,
+   "uncovered": 11,
    "fullPct": 2.13,
-   "trueOnlyPct": 65.96,
-   "uncoveredPct": 31.91
+   "trueOnlyPct": 74.47,
+   "uncoveredPct": 23.4
   },
   "bank:S1.1c": {
    "total": 35,
    "full": 1,
-   "trueOnly": 24,
-   "uncovered": 10,
+   "trueOnly": 27,
+   "uncovered": 7,
    "fullPct": 2.86,
-   "trueOnlyPct": 68.57,
-   "uncoveredPct": 28.57
+   "trueOnlyPct": 77.14,
+   "uncoveredPct": 20
   },
   "bank:S1.2a": {
    "total": 88,
    "full": 5,
-   "trueOnly": 35,
-   "uncovered": 48,
+   "trueOnly": 51,
+   "uncovered": 32,
    "fullPct": 5.68,
-   "trueOnlyPct": 39.77,
-   "uncoveredPct": 54.55
+   "trueOnlyPct": 57.95,
+   "uncoveredPct": 36.36
   },
   "bank:S2.1a": {
    "total": 47,
    "full": 4,
-   "trueOnly": 22,
-   "uncovered": 21,
+   "trueOnly": 29,
+   "uncovered": 14,
    "fullPct": 8.51,
-   "trueOnlyPct": 46.81,
-   "uncoveredPct": 44.68
+   "trueOnlyPct": 61.7,
+   "uncoveredPct": 29.79
   },
   "bank:S2.1b": {
    "total": 19,
    "full": 1,
-   "trueOnly": 3,
-   "uncovered": 15,
+   "trueOnly": 8,
+   "uncovered": 10,
    "fullPct": 5.26,
-   "trueOnlyPct": 15.79,
-   "uncoveredPct": 78.95
+   "trueOnlyPct": 42.11,
+   "uncoveredPct": 52.63
   },
   "bank:S2.2a": {
    "total": 30,
    "full": 0,
-   "trueOnly": 3,
-   "uncovered": 27,
+   "trueOnly": 5,
+   "uncovered": 25,
    "fullPct": 0,
-   "trueOnlyPct": 10,
-   "uncoveredPct": 90
+   "trueOnlyPct": 16.67,
+   "uncoveredPct": 83.33
   },
   "bank:S2.2b": {
    "total": 28,
    "full": 1,
-   "trueOnly": 15,
-   "uncovered": 12,
+   "trueOnly": 17,
+   "uncovered": 10,
    "fullPct": 3.57,
-   "trueOnlyPct": 53.57,
-   "uncoveredPct": 42.86
+   "trueOnlyPct": 60.71,
+   "uncoveredPct": 35.71
   },
   "bank:S3.1a": {
    "total": 25,
@@ -2382,83 +1934,83 @@
   "bank:S3.1b": {
    "total": 25,
    "full": 1,
-   "trueOnly": 16,
-   "uncovered": 8,
+   "trueOnly": 18,
+   "uncovered": 6,
    "fullPct": 4,
-   "trueOnlyPct": 64,
-   "uncoveredPct": 32
+   "trueOnlyPct": 72,
+   "uncoveredPct": 24
   },
   "bank:S3.1c": {
    "total": 25,
    "full": 0,
-   "trueOnly": 17,
-   "uncovered": 8,
+   "trueOnly": 18,
+   "uncovered": 7,
    "fullPct": 0,
-   "trueOnlyPct": 68,
-   "uncoveredPct": 32
+   "trueOnlyPct": 72,
+   "uncoveredPct": 28
   },
   "bank:S3.2a": {
    "total": 38,
    "full": 0,
-   "trueOnly": 18,
-   "uncovered": 20,
+   "trueOnly": 26,
+   "uncovered": 12,
    "fullPct": 0,
-   "trueOnlyPct": 47.37,
-   "uncoveredPct": 52.63
+   "trueOnlyPct": 68.42,
+   "uncoveredPct": 31.58
   },
   "bank:S3.2b": {
    "total": 41,
    "full": 0,
-   "trueOnly": 21,
-   "uncovered": 20,
+   "trueOnly": 30,
+   "uncovered": 11,
    "fullPct": 0,
-   "trueOnlyPct": 51.22,
-   "uncoveredPct": 48.78
+   "trueOnlyPct": 73.17,
+   "uncoveredPct": 26.83
   },
   "bank:T1.1a": {
    "total": 69,
    "full": 3,
-   "trueOnly": 22,
-   "uncovered": 44,
+   "trueOnly": 28,
+   "uncovered": 38,
    "fullPct": 4.35,
-   "trueOnlyPct": 31.88,
-   "uncoveredPct": 63.77
+   "trueOnlyPct": 40.58,
+   "uncoveredPct": 55.07
   },
   "bank:T1.1b": {
    "total": 50,
    "full": 0,
-   "trueOnly": 4,
-   "uncovered": 46,
+   "trueOnly": 7,
+   "uncovered": 43,
    "fullPct": 0,
-   "trueOnlyPct": 8,
-   "uncoveredPct": 92
+   "trueOnlyPct": 14,
+   "uncoveredPct": 86
   },
   "bank:T1.1c": {
    "total": 82,
    "full": 4,
-   "trueOnly": 11,
-   "uncovered": 67,
+   "trueOnly": 15,
+   "uncovered": 63,
    "fullPct": 4.88,
-   "trueOnlyPct": 13.41,
-   "uncoveredPct": 81.71
+   "trueOnlyPct": 18.29,
+   "uncoveredPct": 76.83
   },
   "bank:T1.1d": {
    "total": 34,
    "full": 2,
-   "trueOnly": 13,
-   "uncovered": 19,
+   "trueOnly": 22,
+   "uncovered": 10,
    "fullPct": 5.88,
-   "trueOnlyPct": 38.24,
-   "uncoveredPct": 55.88
+   "trueOnlyPct": 64.71,
+   "uncoveredPct": 29.41
   },
   "bank:T1.1e": {
    "total": 36,
    "full": 0,
-   "trueOnly": 11,
-   "uncovered": 25,
+   "trueOnly": 12,
+   "uncovered": 24,
    "fullPct": 0,
-   "trueOnlyPct": 30.56,
-   "uncoveredPct": 69.44
+   "trueOnlyPct": 33.33,
+   "uncoveredPct": 66.67
   },
   "bank:T1.2a": {
    "total": 27,
@@ -2472,146 +2024,146 @@
   "bank:T1.2b": {
    "total": 42,
    "full": 2,
-   "trueOnly": 24,
-   "uncovered": 16,
+   "trueOnly": 26,
+   "uncovered": 14,
    "fullPct": 4.76,
-   "trueOnlyPct": 57.14,
-   "uncoveredPct": 38.1
+   "trueOnlyPct": 61.9,
+   "uncoveredPct": 33.33
   },
   "bank:T2.1a": {
    "total": 88,
    "full": 3,
-   "trueOnly": 49,
-   "uncovered": 36,
+   "trueOnly": 56,
+   "uncovered": 29,
    "fullPct": 3.41,
-   "trueOnlyPct": 55.68,
-   "uncoveredPct": 40.91
+   "trueOnlyPct": 63.64,
+   "uncoveredPct": 32.95
   },
   "bank:T2.1b": {
    "total": 60,
    "full": 0,
-   "trueOnly": 33,
-   "uncovered": 27,
+   "trueOnly": 35,
+   "uncovered": 25,
    "fullPct": 0,
-   "trueOnlyPct": 55,
-   "uncoveredPct": 45
+   "trueOnlyPct": 58.33,
+   "uncoveredPct": 41.67
   },
   "bank:T2.1c": {
    "total": 74,
    "full": 3,
-   "trueOnly": 48,
-   "uncovered": 23,
+   "trueOnly": 51,
+   "uncovered": 20,
    "fullPct": 4.05,
-   "trueOnlyPct": 64.86,
-   "uncoveredPct": 31.08
+   "trueOnlyPct": 68.92,
+   "uncoveredPct": 27.03
   },
   "bank:T2.1d": {
    "total": 73,
    "full": 0,
-   "trueOnly": 14,
-   "uncovered": 59,
+   "trueOnly": 23,
+   "uncovered": 50,
    "fullPct": 0,
-   "trueOnlyPct": 19.18,
-   "uncoveredPct": 80.82
+   "trueOnlyPct": 31.51,
+   "uncoveredPct": 68.49
   },
   "bank:T2.1e": {
    "total": 51,
    "full": 0,
-   "trueOnly": 22,
-   "uncovered": 29,
+   "trueOnly": 27,
+   "uncovered": 24,
    "fullPct": 0,
-   "trueOnlyPct": 43.14,
-   "uncoveredPct": 56.86
+   "trueOnlyPct": 52.94,
+   "uncoveredPct": 47.06
   },
   "bank:T3.1a": {
    "total": 73,
    "full": 1,
-   "trueOnly": 32,
-   "uncovered": 40,
+   "trueOnly": 39,
+   "uncovered": 33,
    "fullPct": 1.37,
-   "trueOnlyPct": 43.84,
-   "uncoveredPct": 54.79
+   "trueOnlyPct": 53.42,
+   "uncoveredPct": 45.21
   },
   "bank:T3.1b": {
    "total": 49,
    "full": 0,
-   "trueOnly": 15,
-   "uncovered": 34,
+   "trueOnly": 21,
+   "uncovered": 28,
    "fullPct": 0,
-   "trueOnlyPct": 30.61,
-   "uncoveredPct": 69.39
+   "trueOnlyPct": 42.86,
+   "uncoveredPct": 57.14
   },
   "bank:T3.1c": {
    "total": 83,
-   "full": 1,
-   "trueOnly": 20,
-   "uncovered": 62,
-   "fullPct": 1.2,
-   "trueOnlyPct": 24.1,
-   "uncoveredPct": 74.7
+   "full": 2,
+   "trueOnly": 24,
+   "uncovered": 57,
+   "fullPct": 2.41,
+   "trueOnlyPct": 28.92,
+   "uncoveredPct": 68.67
   },
   "bank:T3.1d": {
    "total": 23,
    "full": 0,
-   "trueOnly": 12,
-   "uncovered": 11,
+   "trueOnly": 14,
+   "uncovered": 9,
    "fullPct": 0,
-   "trueOnlyPct": 52.17,
-   "uncoveredPct": 47.83
+   "trueOnlyPct": 60.87,
+   "uncoveredPct": 39.13
   },
   "bank:V1.1a": {
    "total": 32,
    "full": 0,
-   "trueOnly": 8,
-   "uncovered": 24,
+   "trueOnly": 11,
+   "uncovered": 21,
    "fullPct": 0,
-   "trueOnlyPct": 25,
-   "uncoveredPct": 75
+   "trueOnlyPct": 34.38,
+   "uncoveredPct": 65.63
   },
   "bank:V1.1b": {
    "total": 61,
    "full": 5,
-   "trueOnly": 7,
-   "uncovered": 49,
+   "trueOnly": 8,
+   "uncovered": 48,
    "fullPct": 8.2,
-   "trueOnlyPct": 11.48,
-   "uncoveredPct": 80.33
+   "trueOnlyPct": 13.11,
+   "uncoveredPct": 78.69
   },
   "bank:V1.1c": {
    "total": 32,
    "full": 0,
-   "trueOnly": 1,
-   "uncovered": 31,
+   "trueOnly": 2,
+   "uncovered": 30,
    "fullPct": 0,
-   "trueOnlyPct": 3.13,
-   "uncoveredPct": 96.88
+   "trueOnlyPct": 6.25,
+   "uncoveredPct": 93.75
   },
   "bank:V1.2a": {
    "total": 72,
    "full": 0,
-   "trueOnly": 24,
-   "uncovered": 48,
+   "trueOnly": 27,
+   "uncovered": 45,
    "fullPct": 0,
-   "trueOnlyPct": 33.33,
-   "uncoveredPct": 66.67
+   "trueOnlyPct": 37.5,
+   "uncoveredPct": 62.5
   },
   "gen:me11-binomial.1": {
    "total": 5,
    "full": 1,
-   "trueOnly": 0,
-   "uncovered": 4,
+   "trueOnly": 3,
+   "uncovered": 1,
    "fullPct": 20,
-   "trueOnlyPct": 0,
-   "uncoveredPct": 80
+   "trueOnlyPct": 60,
+   "uncoveredPct": 20
   },
   "gen:me11-binomial.2": {
    "total": 12,
-   "full": 0,
-   "trueOnly": 0,
-   "uncovered": 12,
-   "fullPct": 0,
-   "trueOnlyPct": 0,
-   "uncoveredPct": 100
+   "full": 3,
+   "trueOnly": 4,
+   "uncovered": 5,
+   "fullPct": 25,
+   "trueOnlyPct": 33.33,
+   "uncoveredPct": 41.67
   },
   "gen:me11-binomial.3": {
    "total": 7,
@@ -2625,29 +2177,29 @@
   "gen:me11-comb.1": {
    "total": 10,
    "full": 3,
-   "trueOnly": 1,
-   "uncovered": 6,
+   "trueOnly": 2,
+   "uncovered": 5,
    "fullPct": 30,
-   "trueOnlyPct": 10,
-   "uncoveredPct": 60
+   "trueOnlyPct": 20,
+   "uncoveredPct": 50
   },
   "gen:me11-comb.1+me11-comb.2": {
    "total": 4,
    "full": 0,
-   "trueOnly": 2,
-   "uncovered": 2,
+   "trueOnly": 3,
+   "uncovered": 1,
    "fullPct": 0,
-   "trueOnlyPct": 50,
-   "uncoveredPct": 50
+   "trueOnlyPct": 75,
+   "uncoveredPct": 25
   },
   "gen:me11-comb.2": {
    "total": 15,
-   "full": 0,
-   "trueOnly": 0,
-   "uncovered": 15,
-   "fullPct": 0,
-   "trueOnlyPct": 0,
-   "uncoveredPct": 100
+   "full": 8,
+   "trueOnly": 2,
+   "uncovered": 5,
+   "fullPct": 53.33,
+   "trueOnlyPct": 13.33,
+   "uncoveredPct": 33.33
   },
   "gen:me11-comb.3": {
    "total": 1,
@@ -2661,11 +2213,11 @@
   "gen:me11-functions.1": {
    "total": 14,
    "full": 1,
-   "trueOnly": 10,
-   "uncovered": 3,
+   "trueOnly": 11,
+   "uncovered": 2,
    "fullPct": 7.14,
-   "trueOnlyPct": 71.43,
-   "uncoveredPct": 21.43
+   "trueOnlyPct": 78.57,
+   "uncoveredPct": 14.29
   },
   "gen:me11-functions.2": {
    "total": 8,
@@ -2688,20 +2240,20 @@
   "gen:me11-inversetrig.1": {
    "total": 6,
    "full": 0,
-   "trueOnly": 0,
-   "uncovered": 6,
+   "trueOnly": 3,
+   "uncovered": 3,
    "fullPct": 0,
-   "trueOnlyPct": 0,
-   "uncoveredPct": 100
+   "trueOnlyPct": 50,
+   "uncoveredPct": 50
   },
   "gen:me11-inversetrig.1+me11-inversetrig.2": {
    "total": 6,
    "full": 0,
-   "trueOnly": 1,
-   "uncovered": 5,
+   "trueOnly": 4,
+   "uncovered": 2,
    "fullPct": 0,
-   "trueOnlyPct": 16.67,
-   "uncoveredPct": 83.33
+   "trueOnlyPct": 66.67,
+   "uncoveredPct": 33.33
   },
   "gen:me11-inversetrig.2+me11-inversetrig.3": {
    "total": 7,
@@ -2723,12 +2275,12 @@
   },
   "gen:me11-poly.1": {
    "total": 11,
-   "full": 1,
+   "full": 3,
    "trueOnly": 4,
-   "uncovered": 6,
-   "fullPct": 9.09,
+   "uncovered": 4,
+   "fullPct": 27.27,
    "trueOnlyPct": 36.36,
-   "uncoveredPct": 54.55
+   "uncoveredPct": 36.36
   },
   "gen:me11-poly.2": {
    "total": 7,
@@ -2760,11 +2312,11 @@
   "gen:me11-rates.2": {
    "total": 18,
    "full": 0,
-   "trueOnly": 11,
-   "uncovered": 7,
+   "trueOnly": 13,
+   "uncovered": 5,
    "fullPct": 0,
-   "trueOnlyPct": 61.11,
-   "uncoveredPct": 38.89
+   "trueOnlyPct": 72.22,
+   "uncoveredPct": 27.78
   },
   "gen:me11-rates.3": {
    "total": 8,
@@ -2778,11 +2330,11 @@
   "gen:me11-trigid.1": {
    "total": 3,
    "full": 0,
-   "trueOnly": 0,
-   "uncovered": 3,
+   "trueOnly": 1,
+   "uncovered": 2,
    "fullPct": 0,
-   "trueOnlyPct": 0,
-   "uncoveredPct": 100
+   "trueOnlyPct": 33.33,
+   "uncoveredPct": 66.67
   },
   "gen:me11-trigid.1+me11-trigid.2": {
    "total": 5,
@@ -2805,11 +2357,11 @@
   "gen:me12-binomial-forms.1+me12-binomial-forms.2": {
    "total": 7,
    "full": 0,
-   "trueOnly": 5,
-   "uncovered": 2,
+   "trueOnly": 6,
+   "uncovered": 1,
    "fullPct": 0,
-   "trueOnlyPct": 71.43,
-   "uncoveredPct": 28.57
+   "trueOnlyPct": 85.71,
+   "uncoveredPct": 14.29
   },
   "gen:me12-binomial-forms.3": {
    "total": 2,
@@ -2823,20 +2375,20 @@
   "gen:me12-binomial.1": {
    "total": 6,
    "full": 0,
-   "trueOnly": 0,
-   "uncovered": 6,
+   "trueOnly": 2,
+   "uncovered": 4,
    "fullPct": 0,
-   "trueOnlyPct": 0,
-   "uncoveredPct": 100
+   "trueOnlyPct": 33.33,
+   "uncoveredPct": 66.67
   },
   "gen:me12-binomial.1+me12-binomial.3": {
    "total": 6,
    "full": 0,
-   "trueOnly": 0,
-   "uncovered": 6,
+   "trueOnly": 1,
+   "uncovered": 5,
    "fullPct": 0,
-   "trueOnlyPct": 0,
-   "uncoveredPct": 100
+   "trueOnlyPct": 16.67,
+   "uncoveredPct": 83.33
   },
   "gen:me12-binomial.2": {
    "total": 6,
@@ -2850,11 +2402,11 @@
   "gen:me12-calc.1": {
    "total": 10,
    "full": 0,
-   "trueOnly": 0,
-   "uncovered": 10,
+   "trueOnly": 1,
+   "uncovered": 9,
    "fullPct": 0,
-   "trueOnlyPct": 0,
-   "uncoveredPct": 100
+   "trueOnlyPct": 10,
+   "uncoveredPct": 90
   },
   "gen:me12-calc.2": {
    "total": 4,
@@ -2867,39 +2419,39 @@
   },
   "gen:me12-calc.3": {
    "total": 7,
-   "full": 0,
-   "trueOnly": 2,
-   "uncovered": 5,
-   "fullPct": 0,
-   "trueOnlyPct": 28.57,
-   "uncoveredPct": 71.43
+   "full": 1,
+   "trueOnly": 4,
+   "uncovered": 2,
+   "fullPct": 14.29,
+   "trueOnlyPct": 57.14,
+   "uncoveredPct": 28.57
   },
   "gen:me12-further-calc.1": {
    "total": 4,
    "full": 1,
-   "trueOnly": 2,
-   "uncovered": 1,
+   "trueOnly": 3,
+   "uncovered": 0,
    "fullPct": 25,
-   "trueOnlyPct": 50,
-   "uncoveredPct": 25
+   "trueOnlyPct": 75,
+   "uncoveredPct": 0
   },
   "gen:me12-further-calc.2": {
    "total": 5,
    "full": 1,
-   "trueOnly": 3,
-   "uncovered": 1,
+   "trueOnly": 4,
+   "uncovered": 0,
    "fullPct": 20,
-   "trueOnlyPct": 60,
-   "uncoveredPct": 20
+   "trueOnlyPct": 80,
+   "uncoveredPct": 0
   },
   "gen:me12-further-calc.3": {
    "total": 12,
-   "full": 0,
-   "trueOnly": 0,
-   "uncovered": 12,
-   "fullPct": 0,
-   "trueOnlyPct": 0,
-   "uncoveredPct": 100
+   "full": 1,
+   "trueOnly": 1,
+   "uncovered": 10,
+   "fullPct": 8.33,
+   "trueOnlyPct": 8.33,
+   "uncoveredPct": 83.33
   },
   "gen:me12-induction-forms.1": {
    "total": 2,
@@ -2922,11 +2474,11 @@
   "gen:me12-induction-forms.1+me12-induction-forms.3": {
    "total": 10,
    "full": 4,
-   "trueOnly": 3,
-   "uncovered": 3,
+   "trueOnly": 4,
+   "uncovered": 2,
    "fullPct": 40,
-   "trueOnlyPct": 30,
-   "uncoveredPct": 30
+   "trueOnlyPct": 40,
+   "uncoveredPct": 20
   },
   "gen:me12-induction.1": {
    "total": 1,
@@ -2940,11 +2492,11 @@
   "gen:me12-induction.1+me12-induction.3": {
    "total": 15,
    "full": 2,
-   "trueOnly": 2,
-   "uncovered": 11,
+   "trueOnly": 5,
+   "uncovered": 8,
    "fullPct": 13.33,
-   "trueOnlyPct": 13.33,
-   "uncoveredPct": 73.33
+   "trueOnlyPct": 33.33,
+   "uncoveredPct": 53.33
   },
   "gen:me12-induction.2": {
    "total": 11,
@@ -3012,20 +2564,20 @@
   "gen:me12-trigeq.1+me12-trigeq.3": {
    "total": 4,
    "full": 0,
-   "trueOnly": 0,
-   "uncovered": 4,
+   "trueOnly": 1,
+   "uncovered": 3,
    "fullPct": 0,
-   "trueOnlyPct": 0,
-   "uncoveredPct": 100
+   "trueOnlyPct": 25,
+   "uncoveredPct": 75
   },
   "gen:me12-trigeq.2+me12-trigeq.3": {
    "total": 2,
    "full": 0,
-   "trueOnly": 0,
-   "uncovered": 2,
+   "trueOnly": 1,
+   "uncovered": 1,
    "fullPct": 0,
-   "trueOnlyPct": 0,
-   "uncoveredPct": 100
+   "trueOnlyPct": 50,
+   "uncoveredPct": 50
   },
   "gen:me12-vectors-forms.1": {
    "total": 7,
@@ -3084,11 +2636,11 @@
   "gen:me12-vectors.3": {
    "total": 5,
    "full": 0,
-   "trueOnly": 1,
-   "uncovered": 4,
+   "trueOnly": 2,
+   "uncovered": 3,
    "fullPct": 0,
-   "trueOnlyPct": 20,
-   "uncoveredPct": 80
+   "trueOnlyPct": 40,
+   "uncoveredPct": 60
   },
   "gen:y11-data-sets.1": {
    "total": 6,
@@ -3102,11 +2654,11 @@
   "gen:y11-data-sets.2": {
    "total": 6,
    "full": 0,
-   "trueOnly": 0,
-   "uncovered": 6,
+   "trueOnly": 4,
+   "uncovered": 2,
    "fullPct": 0,
-   "trueOnlyPct": 0,
-   "uncoveredPct": 100
+   "trueOnlyPct": 66.67,
+   "uncoveredPct": 33.33
   },
   "gen:y11-data-sets.3": {
    "total": 11,
@@ -3120,11 +2672,11 @@
   "gen:y11-diff.1": {
    "total": 9,
    "full": 1,
-   "trueOnly": 5,
-   "uncovered": 3,
+   "trueOnly": 6,
+   "uncovered": 2,
    "fullPct": 11.11,
-   "trueOnlyPct": 55.56,
-   "uncoveredPct": 33.33
+   "trueOnlyPct": 66.67,
+   "uncoveredPct": 22.22
   },
   "gen:y11-diff.2": {
    "total": 9,
@@ -3147,11 +2699,11 @@
   "gen:y11-explog-more.1": {
    "total": 6,
    "full": 1,
-   "trueOnly": 4,
-   "uncovered": 1,
+   "trueOnly": 5,
+   "uncovered": 0,
    "fullPct": 16.67,
-   "trueOnlyPct": 66.67,
-   "uncoveredPct": 16.67
+   "trueOnlyPct": 83.33,
+   "uncoveredPct": 0
   },
   "gen:y11-explog-more.2": {
    "total": 9,
@@ -3165,29 +2717,29 @@
   "gen:y11-explog-more.3": {
    "total": 16,
    "full": 4,
-   "trueOnly": 4,
-   "uncovered": 8,
+   "trueOnly": 5,
+   "uncovered": 7,
    "fullPct": 25,
-   "trueOnlyPct": 25,
-   "uncoveredPct": 50
+   "trueOnlyPct": 31.25,
+   "uncoveredPct": 43.75
   },
   "gen:y11-explog.1": {
    "total": 6,
    "full": 2,
-   "trueOnly": 2,
-   "uncovered": 2,
+   "trueOnly": 4,
+   "uncovered": 0,
    "fullPct": 33.33,
-   "trueOnlyPct": 33.33,
-   "uncoveredPct": 33.33
+   "trueOnlyPct": 66.67,
+   "uncoveredPct": 0
   },
   "gen:y11-explog.1+y11-explog.3": {
    "total": 5,
    "full": 0,
-   "trueOnly": 0,
-   "uncovered": 5,
+   "trueOnly": 1,
+   "uncovered": 4,
    "fullPct": 0,
-   "trueOnlyPct": 0,
-   "uncoveredPct": 100
+   "trueOnlyPct": 20,
+   "uncoveredPct": 80
   },
   "gen:y11-explog.2": {
    "total": 7,
@@ -3227,12 +2779,12 @@
   },
   "gen:y11-functions-more.3": {
    "total": 17,
-   "full": 1,
-   "trueOnly": 11,
-   "uncovered": 5,
-   "fullPct": 5.88,
-   "trueOnlyPct": 64.71,
-   "uncoveredPct": 29.41
+   "full": 3,
+   "trueOnly": 13,
+   "uncovered": 1,
+   "fullPct": 17.65,
+   "trueOnlyPct": 76.47,
+   "uncoveredPct": 5.88
   },
   "gen:y11-functions.1": {
    "total": 2,
@@ -3300,38 +2852,38 @@
   "gen:y11-probability.1": {
    "total": 11,
    "full": 0,
-   "trueOnly": 7,
-   "uncovered": 4,
+   "trueOnly": 8,
+   "uncovered": 3,
    "fullPct": 0,
-   "trueOnlyPct": 63.64,
-   "uncoveredPct": 36.36
+   "trueOnlyPct": 72.73,
+   "uncoveredPct": 27.27
   },
   "gen:y11-probability.1+y11-probability.2": {
    "total": 11,
    "full": 1,
-   "trueOnly": 5,
-   "uncovered": 5,
+   "trueOnly": 9,
+   "uncovered": 1,
    "fullPct": 9.09,
-   "trueOnlyPct": 45.45,
-   "uncoveredPct": 45.45
+   "trueOnlyPct": 81.82,
+   "uncoveredPct": 9.09
   },
   "gen:y11-probability.2": {
    "total": 7,
    "full": 1,
-   "trueOnly": 3,
-   "uncovered": 3,
+   "trueOnly": 5,
+   "uncovered": 1,
    "fullPct": 14.29,
-   "trueOnlyPct": 42.86,
-   "uncoveredPct": 42.86
+   "trueOnlyPct": 71.43,
+   "uncoveredPct": 14.29
   },
   "gen:y11-probability.3": {
    "total": 11,
    "full": 1,
-   "trueOnly": 1,
-   "uncovered": 9,
+   "trueOnly": 2,
+   "uncovered": 8,
    "fullPct": 9.09,
-   "trueOnlyPct": 9.09,
-   "uncoveredPct": 81.82
+   "trueOnlyPct": 18.18,
+   "uncoveredPct": 72.73
   },
   "gen:y11-quadfunc.1": {
    "total": 14,
@@ -3344,12 +2896,12 @@
   },
   "gen:y11-quadfunc.2": {
    "total": 11,
-   "full": 4,
+   "full": 5,
    "trueOnly": 2,
-   "uncovered": 5,
-   "fullPct": 36.36,
+   "uncovered": 4,
+   "fullPct": 45.45,
    "trueOnlyPct": 18.18,
-   "uncoveredPct": 45.45
+   "uncoveredPct": 36.36
   },
   "gen:y11-quadfunc.3": {
    "total": 10,
@@ -3399,83 +2951,83 @@
   "gen:y11-transform.2": {
    "total": 5,
    "full": 0,
-   "trueOnly": 1,
-   "uncovered": 4,
+   "trueOnly": 3,
+   "uncovered": 2,
    "fullPct": 0,
-   "trueOnlyPct": 20,
-   "uncoveredPct": 80
+   "trueOnlyPct": 60,
+   "uncoveredPct": 40
   },
   "gen:y11-transform.3": {
    "total": 16,
-   "full": 0,
-   "trueOnly": 3,
-   "uncovered": 13,
-   "fullPct": 0,
-   "trueOnlyPct": 18.75,
-   "uncoveredPct": 81.25
+   "full": 2,
+   "trueOnly": 5,
+   "uncovered": 9,
+   "fullPct": 12.5,
+   "trueOnlyPct": 31.25,
+   "uncoveredPct": 56.25
   },
   "gen:y11-trig-ident.1": {
    "total": 8,
-   "full": 2,
+   "full": 4,
    "trueOnly": 2,
-   "uncovered": 4,
-   "fullPct": 25,
+   "uncovered": 2,
+   "fullPct": 50,
    "trueOnlyPct": 25,
-   "uncoveredPct": 50
+   "uncoveredPct": 25
   },
   "gen:y11-trig-ident.2": {
    "total": 14,
    "full": 0,
-   "trueOnly": 0,
-   "uncovered": 14,
+   "trueOnly": 4,
+   "uncovered": 10,
    "fullPct": 0,
-   "trueOnlyPct": 0,
-   "uncoveredPct": 100
+   "trueOnlyPct": 28.57,
+   "uncoveredPct": 71.43
   },
   "gen:y11-trig-ident.3": {
    "total": 5,
    "full": 0,
-   "trueOnly": 2,
-   "uncovered": 3,
+   "trueOnly": 3,
+   "uncovered": 2,
    "fullPct": 0,
-   "trueOnlyPct": 40,
-   "uncoveredPct": 60
+   "trueOnlyPct": 60,
+   "uncoveredPct": 40
   },
   "gen:y11-trigfunc.1": {
    "total": 7,
    "full": 0,
-   "trueOnly": 1,
-   "uncovered": 6,
+   "trueOnly": 4,
+   "uncovered": 3,
    "fullPct": 0,
-   "trueOnlyPct": 14.29,
-   "uncoveredPct": 85.71
+   "trueOnlyPct": 57.14,
+   "uncoveredPct": 42.86
   },
   "gen:y11-trigfunc.1+y11-trigfunc.2": {
    "total": 8,
    "full": 0,
-   "trueOnly": 0,
-   "uncovered": 8,
+   "trueOnly": 2,
+   "uncovered": 6,
    "fullPct": 0,
-   "trueOnlyPct": 0,
-   "uncoveredPct": 100
+   "trueOnlyPct": 25,
+   "uncoveredPct": 75
   },
   "gen:y11-trigfunc.2+y11-trigfunc.3": {
    "total": 6,
    "full": 0,
-   "trueOnly": 0,
-   "uncovered": 6,
+   "trueOnly": 4,
+   "uncovered": 2,
    "fullPct": 0,
-   "trueOnlyPct": 0,
-   "uncoveredPct": 100
+   "trueOnlyPct": 66.67,
+   "uncoveredPct": 33.33
   },
   "gen:y11-trigfunc.3": {
    "total": 1,
    "full": 0,
-   "trueOnly": 0,
-   "uncovered": 1,
+   "trueOnly": 1,
+   "uncovered": 0,
    "fullPct": 0,
-   "trueOnlyPct": 0,
-   "uncoveredPct": 100
+   "trueOnlyPct": 100,
+   "uncoveredPct": 0
   },
   "gen:y12-appdiff.1": {
    "total": 12,
@@ -3561,47 +3113,47 @@
   "gen:y12-fin-exact.1": {
    "total": 2,
    "full": 0,
-   "trueOnly": 0,
-   "uncovered": 2,
+   "trueOnly": 2,
+   "uncovered": 0,
    "fullPct": 0,
-   "trueOnlyPct": 0,
-   "uncoveredPct": 100
+   "trueOnlyPct": 100,
+   "uncoveredPct": 0
   },
   "gen:y12-fin-exact.2": {
    "total": 7,
-   "full": 0,
-   "trueOnly": 1,
-   "uncovered": 6,
-   "fullPct": 0,
-   "trueOnlyPct": 14.29,
-   "uncoveredPct": 85.71
+   "full": 2,
+   "trueOnly": 2,
+   "uncovered": 3,
+   "fullPct": 28.57,
+   "trueOnlyPct": 28.57,
+   "uncoveredPct": 42.86
   },
   "gen:y12-fin-exact.3": {
    "total": 4,
-   "full": 0,
-   "trueOnly": 0,
-   "uncovered": 4,
-   "fullPct": 0,
-   "trueOnlyPct": 0,
-   "uncoveredPct": 100
+   "full": 2,
+   "trueOnly": 2,
+   "uncovered": 0,
+   "fullPct": 50,
+   "trueOnlyPct": 50,
+   "uncoveredPct": 0
   },
   "gen:y12-financial.1": {
    "total": 6,
    "full": 1,
-   "trueOnly": 1,
-   "uncovered": 4,
+   "trueOnly": 2,
+   "uncovered": 3,
    "fullPct": 16.67,
-   "trueOnlyPct": 16.67,
-   "uncoveredPct": 66.67
+   "trueOnlyPct": 33.33,
+   "uncoveredPct": 50
   },
   "gen:y12-financial.1+y12-financial.2": {
    "total": 15,
    "full": 2,
-   "trueOnly": 2,
-   "uncovered": 11,
+   "trueOnly": 3,
+   "uncovered": 10,
    "fullPct": 13.33,
-   "trueOnlyPct": 13.33,
-   "uncoveredPct": 73.33
+   "trueOnlyPct": 20,
+   "uncoveredPct": 66.67
   },
   "gen:y12-financial.2": {
    "total": 2,
@@ -3624,11 +3176,11 @@
   "gen:y12-func-model.1": {
    "total": 6,
    "full": 3,
-   "trueOnly": 2,
-   "uncovered": 1,
+   "trueOnly": 3,
+   "uncovered": 0,
    "fullPct": 50,
-   "trueOnlyPct": 33.33,
-   "uncoveredPct": 16.67
+   "trueOnlyPct": 50,
+   "uncoveredPct": 0
   },
   "gen:y12-func-model.2": {
    "total": 3,
@@ -3696,38 +3248,38 @@
   "gen:y12-integration.3": {
    "total": 7,
    "full": 0,
-   "trueOnly": 2,
-   "uncovered": 5,
+   "trueOnly": 6,
+   "uncovered": 1,
    "fullPct": 0,
-   "trueOnlyPct": 28.57,
-   "uncoveredPct": 71.43
+   "trueOnlyPct": 85.71,
+   "uncoveredPct": 14.29
   },
   "gen:y12-motion.1": {
    "total": 21,
    "full": 2,
-   "trueOnly": 14,
-   "uncovered": 5,
+   "trueOnly": 15,
+   "uncovered": 4,
    "fullPct": 9.52,
-   "trueOnlyPct": 66.67,
-   "uncoveredPct": 23.81
+   "trueOnlyPct": 71.43,
+   "uncoveredPct": 19.05
   },
   "gen:y12-motion.1+y12-motion.3": {
    "total": 21,
    "full": 2,
-   "trueOnly": 14,
-   "uncovered": 5,
+   "trueOnly": 16,
+   "uncovered": 3,
    "fullPct": 9.52,
-   "trueOnlyPct": 66.67,
-   "uncoveredPct": 23.81
+   "trueOnlyPct": 76.19,
+   "uncoveredPct": 14.29
   },
   "gen:y12-motion.2": {
    "total": 16,
    "full": 2,
-   "trueOnly": 11,
-   "uncovered": 3,
+   "trueOnly": 13,
+   "uncovered": 1,
    "fullPct": 12.5,
-   "trueOnlyPct": 68.75,
-   "uncoveredPct": 18.75
+   "trueOnlyPct": 81.25,
+   "uncoveredPct": 6.25
   },
   "gen:y12-random-var.1": {
    "total": 3,
@@ -3740,12 +3292,12 @@
   },
   "gen:y12-random-var.2": {
    "total": 3,
-   "full": 0,
+   "full": 1,
    "trueOnly": 0,
-   "uncovered": 3,
-   "fullPct": 0,
+   "uncovered": 2,
+   "fullPct": 33.33,
    "trueOnlyPct": 0,
-   "uncoveredPct": 100
+   "uncoveredPct": 66.67
   },
   "gen:y12-random-var.3": {
    "total": 6,
@@ -3758,12 +3310,12 @@
   },
   "gen:y12-series.1": {
    "total": 25,
-   "full": 6,
+   "full": 8,
    "trueOnly": 16,
-   "uncovered": 3,
-   "fullPct": 24,
+   "uncovered": 1,
+   "fullPct": 32,
    "trueOnlyPct": 64,
-   "uncoveredPct": 12
+   "uncoveredPct": 4
   },
   "gen:y12-series.2": {
    "total": 6,
@@ -3776,12 +3328,12 @@
   },
   "gen:y12-series.3": {
    "total": 18,
-   "full": 2,
+   "full": 3,
    "trueOnly": 10,
-   "uncovered": 6,
-   "fullPct": 11.11,
+   "uncovered": 5,
+   "fullPct": 16.67,
    "trueOnlyPct": 55.56,
-   "uncoveredPct": 33.33
+   "uncoveredPct": 27.78
   },
   "gen:y12-stats.1": {
    "total": 13,
@@ -3813,47 +3365,47 @@
   "gen:y12-trig-model.1": {
    "total": 6,
    "full": 0,
-   "trueOnly": 4,
-   "uncovered": 2,
+   "trueOnly": 6,
+   "uncovered": 0,
    "fullPct": 0,
-   "trueOnlyPct": 66.67,
-   "uncoveredPct": 33.33
+   "trueOnlyPct": 100,
+   "uncoveredPct": 0
   },
   "gen:y12-trig-model.2": {
    "total": 6,
    "full": 0,
-   "trueOnly": 4,
-   "uncovered": 2,
+   "trueOnly": 6,
+   "uncovered": 0,
    "fullPct": 0,
-   "trueOnlyPct": 66.67,
-   "uncoveredPct": 33.33
+   "trueOnlyPct": 100,
+   "uncoveredPct": 0
   },
   "gen:y12-trig-model.3": {
    "total": 10,
    "full": 0,
-   "trueOnly": 6,
-   "uncovered": 4,
+   "trueOnly": 10,
+   "uncovered": 0,
    "fullPct": 0,
-   "trueOnlyPct": 60,
-   "uncoveredPct": 40
+   "trueOnlyPct": 100,
+   "uncoveredPct": 0
   },
   "gen:y12-trigcalc.1": {
    "total": 12,
    "full": 0,
-   "trueOnly": 6,
-   "uncovered": 6,
+   "trueOnly": 7,
+   "uncovered": 5,
    "fullPct": 0,
-   "trueOnlyPct": 50,
-   "uncoveredPct": 50
+   "trueOnlyPct": 58.33,
+   "uncoveredPct": 41.67
   },
   "gen:y12-trigcalc.2": {
    "total": 6,
    "full": 0,
-   "trueOnly": 2,
-   "uncovered": 4,
+   "trueOnly": 3,
+   "uncovered": 3,
    "fullPct": 0,
-   "trueOnlyPct": 33.33,
-   "uncoveredPct": 66.67
+   "trueOnlyPct": 50,
+   "uncoveredPct": 50
   },
   "gen:y12-trigcalc.3": {
    "total": 13,

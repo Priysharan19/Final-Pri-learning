@@ -50,6 +50,8 @@ const ARROWS = /\s*(?:⇒|⟹|=>|⟶|→|->)\s*/;
 /** The texts of a line that could be the answer it states: the end of a chain, the tail after an arrow, the last equation of a chain, the whole line. */
 function resultTexts(text, answerType) {
   let t = lead(String(text ?? '')).replace(/[.]+$/, '').trim();
+  // a thousands comma (`84,375`, `41,175`) is part of one number, not a list: a number's value is written the way the answer box takes it
+  if (answerType === 'numeric') t = t.replace(/(?<![\d,.])\d{1,3}(?:,\d{3})+(?![\d,])/g, m => m.replace(/,/g, ''));
   if (!t || t.length > 200) return [];
   const out = [];
   const arrow = t.split(ARROWS);

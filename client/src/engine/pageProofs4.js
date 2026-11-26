@@ -111,14 +111,17 @@ export function pageProofs4(q, lines, limit, open) {
   const lastIdx = (() => { for (let k = lines.length - 1; k >= 0; k--) { const t = String(lines[k]?.text ?? '').trim(); if (t) return k; } return -1; })();
   for (let i = 0; i < stop; i++) {
     const l = lines[i];
-    if (!l || l.status !== 'note' || !open(l, i) || l.unread || l.unreadable || l.context === true) continue;
+    // only an unjudged note: a note the marker gave a state of its own (an incomplete list of roots, a candidate, a slip follow-on) keeps what it says
+    if (!l || l.status !== 'note' || !open(l, i) || l.unread || l.unreadable || l.context === true || (l.state !== undefined && l.state !== 'unverified')) continue;
     const items = valuesOf(l.text);
     if (!items) continue;
     // the line above, if it is a letter-free expression or a chain: what a bare value under it would be continuing
     const prev = i > 0 ? aboveValue(lines[i - 1]?.text) : null;
     const single = items.length === 1 ? items[0] : null;
     if (single && prev && prev.open && !single.unit) {
-      if (same(prev.v, single.v)) { out[i] = { text: l.text, status: 'ok', state: 'arithmetic', note: note4('equal', single.v), valueChain: { rule: 'proved' }, fact: { kind: 'proved', proof: CLASS4.equal }, tickClass: CLASS4.equal }; n++; }
+      // a line that only repeats the line above word for word carries nothing on (and a one-character slip that makes two lines alike must not earn a tick)
+      const squash = t => String(t ?? '').replace(/\s+/g, '').replace(/[.]+$/, '');
+      if (same(prev.v, single.v) && squash(lines[i - 1]?.text).split('=').pop() !== squash(l.text)) { out[i] = { text: l.text, status: 'ok', state: 'arithmetic', note: note4('equal', single.v), valueChain: { rule: 'proved' }, fact: { kind: 'proved', proof: CLASS4.equal }, tickClass: CLASS4.equal }; n++; }
       continue;   // a different number under an expression not yet worked out is what a wrong continuation looks like: left a note
     }
     // the last number on the page, against the question's own numeric key
