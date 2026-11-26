@@ -109,7 +109,6 @@ export function keyText(q) {
 }
 
 // ── marking a page: the server's path, then the page's own model ─────────────
-const CARD = { ok: 'checked', break: 'first-error' };
 /**
  * Marks `lines` as the answer `answer` through the server's practice operation, and reads the report the page shows as the marked page does.
  * Returns { correct, cards: [{ status, cls, phrase, line }], answerLine, report } or null when the marker produced no line report.
