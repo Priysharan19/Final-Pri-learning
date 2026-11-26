@@ -186,6 +186,7 @@ const pages = [];
 }
 ok(pages.length >= 450, `real pages: ${pages.length}`);
 const P2_CLASSES = new Set(['function-value', 'equation-solved', 'condition-stated', 'derivative-of-function', 'conclusion-extremum', 'check-values-list', 'figure-label', 'point-on-curve']);
+let overturned = 0;
 let noReportPage = null, ticks = 0, withoutClass = 0, withoutPhrase = 0, stepReportDirty = 0, shownMoved = 0, answerLines = 0, answerLineWrong = 0, mutants = 0, mutantTicked = 0, shownCount = 0, answerLineOnWrong = 0;
 const run = (q, answer, text, opts = {}) => { try { return stepEvidence(q, answer, text, checkAnswer(q, answer), { slipWarnings: true, ...opts }); } catch { return null; } };
 for (const p of pages) {
@@ -199,8 +200,10 @@ for (const p of pages) {
   if (base) {
     // the one change a bank page may carry beyond display fields: a note that the SECOND page pass (engine/pageProofs2.js) ticked or marked neutral, with its own class
     const P2 = new Set(['function-value', 'equation-solved', 'condition-stated', 'derivative-of-function', 'conclusion-extremum', 'check-values-list', 'figure-label', 'point-on-curve']);
-    const byPass2 = (l, w) => !!l && !!w && l.status === 'note' && P2.has(w.tickClass) && String(l.text) === String(w.text);
+    const byPass2 = (l, w) => !!l && !!w && l.status === 'note' && !l.candidate && !l.slipFollow && l.note !== 'Follows from the earlier slip.' && l.state !== 'wrong' && l.context !== true && P2.has(w.tickClass) && String(l.text) === String(w.text);   // only a line that was an OPEN note on the base
     const same = base.lines.length === shown.lines.length && base.lines.every((l, i) => byPass2(l, shown.lines[i]) || JSON.stringify(strip(l)) === JSON.stringify(strip(shown.lines[i])));
+    // the pass never overturns an existing tick or cross: every ok/break line of the marker's report keeps its status, text and state on the displayed report
+    if (p.bank && !base.lines.every((l, i) => !l || (l.status !== 'ok' && l.status !== 'break') || (shown.lines[i] && shown.lines[i].status === l.status && shown.lines[i].state === l.state && shown.lines[i].text === l.text))) overturned++;
     if (!same && !p.bank) continue;      // a generated page's displayed report also carries the proved-line ticks (engine/provedLines.js): its own check holds those
     if (!same) { shownMoved++; if (process.env.DBG) console.log('MOVED', p.id, JSON.stringify(base.lines.map(strip)).slice(0, 400), JSON.stringify(shown.lines.map(strip)).slice(0, 400)); }
   } else { if (p.bank && !shown.lines.every(l => l.status === 'note' || P2_CLASSES.has(l.tickClass))) { shownMoved++; if (process.env.DBG) console.log('NOBASE', p.id, JSON.stringify(shown.lines).slice(0, 500)); } if (p.bank || shown.lines.every(l => l.status === 'note')) noReportPage ||= p; }
@@ -228,6 +231,7 @@ for (const p of pages) {
 }
 ok(shownCount > 300, `pages with a displayed report: ${shownCount}`);
 ok(stepReportDirty === 0, `the marker's stepReport (what the marks read) carries no display field: ${stepReportDirty} pages do`);
+ok(overturned === 0, `the second page pass never overturns a tick or a cross of the marker's report: ${overturned} pages`);
 ok(shownMoved === 0, `the displayed bank report is the marker's report with display fields added, nothing else moved: ${shownMoved} pages moved`);
 ok(ticks > 300 && withoutClass === 0, `every tick on the bank pages (${ticks}) carries a known class id: ${withoutClass} do not`);
 ok(withoutPhrase === 0, `every tick the marked page draws has a phrase: ${withoutPhrase} do not`);

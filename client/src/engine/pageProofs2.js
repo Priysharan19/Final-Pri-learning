@@ -638,7 +638,11 @@ function pointLine(w, l, text) {
   const T = w.f(p.a);
   if (!Number.isFinite(T) || !close(T, p.b, 1e-9)) return null;
   if (w.trig && !isRational(T)) return null;
-  return tickLine(l, CLASS.point, `Correct: ${w.name}(${fmt(p.a)}) = ${fmt(T)} for ${w.name}(${w.v}) = ${show(w.exprPlain)}, so (${fmt(p.a)}, ${fmt(p.b)}) is on the curve${w.domain ? ` and ${w.v} = ${fmt(p.a)} is inside ${showDomain(w)}` : ''}.`);
+  const fits = `${w.name}(${fmt(p.a)}) = ${fmt(T)} for ${w.name}(${w.v}) = ${show(w.exprPlain)}, so (${fmt(p.a)}, ${fmt(p.b)}) is on the curve${w.domain ? ` and ${w.v} = ${fmt(p.a)} is inside ${showDomain(w)}` : ''}`;
+  // A pair on its own line is a label of the sketch, not a claim line: it is ticked only when the reading marks the line as a point label (`pointLabel: true`; the reader does not say so today),
+  // otherwise it is neutral. A pair that does not fit the function stays a note, and is never crossed.
+  if (l.pointLabel === true) return tickLine(l, CLASS.point, `Correct: ${fits}.`);
+  return neutralLine(l, CLASS.figure, `This is a point on the sketch, and it fits: ${fits}. A label is not a step to check.`);
 }
 
 // ── the cross: the first claim that is false by the question's own function ──

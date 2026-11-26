@@ -84,10 +84,10 @@ A real photo of a correct page on "the velocity of a car is v = 12t − 3t² for
 | `equation-solved` | Correct solution of the equation | `12 − 6t = 0 ⇒ t = 2` (also so, hence, therefore, ∴, →, a comma, `dv/dt = 12 − 6t = 0 ⇒ …`) | tick |
 | `derivative-of-function` | Correct derivative | `dv/dt = 12 − 6t`, `v′(t) = …`, `d/dt(12t − 3t²) = …` | tick |
 | `conclusion-extremum` | Correct maximum or minimum | `The maximum velocity is 12 m s⁻¹, obtained at t = 2` | tick (and the answer line when the server's answer check accepts the value) |
-| `point-on-curve` | Point on the curve | `(2, 12)` | tick |
+| `point-on-curve` | Point on the curve | `(2, 12)` when the reading marks the line as a point label (it does not today) | tick |
 | `condition-stated` | Condition stated | `Set dv/dt = 0:`, `Let dy/dx = 0`, `when v = 0` | neutral |
 | `check-values-list` | Values to check listed | `Check values of v at t = 0, 2, 4:` | neutral |
-| `figure-label` | Label on the sketch | a run of bare ticks and axis names read off a graph | neutral |
+| `figure-label` | Label on the sketch | a run of bare ticks and axis names read off a graph; a pair like `(2, 12)` that fits the function (a pair that does not stays a note, never a cross) | neutral |
 
 What decides each:
 
@@ -95,7 +95,7 @@ What decides each:
 - An implication: the right side must be the COMPLETE set of real solutions of the polynomial equation on the left, or the solutions inside the interval the question states. A partial set is a note, and is ticked afterwards only if a later line of the page supplies the missing roots.
 - A conclusion: the engine finds the extreme over the closed interval (stationary points inside it and both ends), and the value, and the place if written, must match. It is read only when the line names the quantity (the function's letter, or a word the question itself uses): `max = 21` is not read, since it may be the value or the place. A minimum when a maximum is asked is a note. Trigonometry on a numeric interval is a note. The endpoint values are named in the explanation only when the student wrote them.
 - A check list is neutral only when it is exactly the two ends and the stationary points inside the interval.
-- A bare number or axis name is a figure label only in a run of two or more such lines, and only when it is a key value of the sketch (0, an end of the domain, a stationary point, or the function's value at one of them). A point label is ticked only when it is on the curve and inside the domain.
+- A bare number or axis name is a figure label only in a run of two or more such lines, and only when it is a key value of the sketch (0, an end of the domain, a stationary point, or the function's value at one of them). A point label is neutral when it is on the curve and inside the domain, and ticked only if the reading marks it a point label.
 - A page that sets the function letter again to something else (`v(t) = 5t`) is no longer judged by the question's function from that line on.
 
 The cross (`witnessOf`, called from the arithmetic reading, one-part Australian questions only): the first line that is false by the question's function is crossed, naming the value the function gives: a false link of a function-value chain, a root that is not a solution of the equation on the same line, a derivative that is not the derivative, a maximum or minimum that is not the extreme over the interval. Nothing else is crossed; an undecidable line is a note. Marks: with method marks off (production Prithagoras) nothing changes; with them on, a cross is a cross of the report like any other (no mark is paid after it, as for every cross the page itself makes).

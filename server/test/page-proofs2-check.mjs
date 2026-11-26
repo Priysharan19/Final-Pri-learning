@@ -62,6 +62,12 @@ ok(wit(V, 'dv/dt = 12 - 6t = 0') === null, 'a derivative then set to zero is not
 ok(one('For $f(x)=e^{2x}$, find the gradient.', "f'(x) = 2e^(2x)") === 'tick:derivative-of-function', 'derivative of an exponential');
 
 // 5. closed-interval extreme
+{ const Q = 'For $f(x)=x^3-3x$, $-2\\le x\\le 3$, find the greatest value of $f$.';
+  ok(one(Q, 'The greatest value of f is 2 at x = -1') === 'note' && wit(Q, 'The greatest value of f is 2 at x = -1').rule === 'extremum', 'the maximum claimed at the stationary point, when it is at an endpoint, is crossed and never ticked');
+  ok(one(Q, 'The greatest value of f is 18 at x = 3') === 'tick:conclusion-extremum', 'the maximum at the endpoint is ticked');
+  ok(one(Q, 'The greatest value of f is 18 at x = -1') === 'note' && wit(Q, 'The greatest value of f is 18 at x = -1').rule === 'extremum', 'the right value at the wrong place is crossed');
+  const Q2 = 'For $f(x)=x^3-3x$, $-2\\le x\\le 3$, find the least value of $f$.';
+  ok(one(Q2, 'The greatest value of f is 18 at x = 3') === 'note' && wit(Q2, 'The greatest value of f is 18 at x = 3') === null, 'a minimum asked and a maximum given is not ticked and not crossed'); }
 ok(one(V, 'Conclusion: The maximum velocity is 12 m s^-1, obtained at t = 2.') === 'tick:conclusion-extremum', 'the owner\'s conclusion');
 ok(one(V, 'Conclusion: The maximum velocity is 12 ms^-1, obtained at t:') === 'tick:conclusion-extremum', 'the reader\'s truncated conclusion');
 ok(one(V, 'Conclusion: The maximum velocity is 12 m s^-1, obtained at t =') === 'tick:conclusion-extremum', 'the reader\'s other truncated conclusion');
@@ -85,11 +91,25 @@ ok(one(V, 'Check values of v at t = 0, 4:') === 'note' && one(V, 'Check values o
 ok(one('A particle has speed $v=12t-3t^{2}$ for $0\\le t\\le1$. Find the maximum speed.', 'Check values of v at t = 0, 1:') === 'neutral:check-values-list', 'a stationary point outside the interval is not listed');
 
 // 7. figure labels
-ok(one(V, '(2, 12)') === 'tick:point-on-curve' && one(V, '(0, 0)') === 'tick:point-on-curve', 'a point on the curve');
+ok(one(V, '(2, 12)') === 'neutral:figure-label' && one(V, '(0, 0)') === 'neutral:figure-label', 'a pair that fits the curve is a neutral sketch label unless the reading marks it as a point label');
+ok(kind(P.pageProofs2({ prompt: V }, [{ text: '(2, 12)', status: 'note', state: 'unverified', unverified: true, pointLabel: true }], 1, () => true).lines[0]) === 'tick:point-on-curve', 'a line the reading marks as a point label, and that fits, is ticked');
+ok(kind(P.pageProofs2({ prompt: V }, [{ text: '(2, 10)', status: 'note', state: 'unverified', unverified: true, pointLabel: true }], 1, () => true).lines[0]) === 'note' && wit(V, '(2, 10)') === null, 'a wrong point label is a note, never a cross');
 ok(one(V, '(2, 13)') === 'note' && one(V, '(5, -15)') === 'note' && one(V, '(3, 10)') === 'note', 'a point off the curve, or outside the domain, is not ticked');
-{ const r = mark(V, ['v', '(2, 12)', '12', '0', '2', '4', 't']).map(kind); ok(r.join() === 'neutral:figure-label,tick:point-on-curve,neutral:figure-label,neutral:figure-label,neutral:figure-label,neutral:figure-label,neutral:figure-label', 'a run of ticks and axis names is figure-label'); }
+{ const r = mark(V, ['v', '(2, 12)', '12', '0', '2', '4', 't']).map(kind); ok(r.join() === 'neutral:figure-label,neutral:figure-label,neutral:figure-label,neutral:figure-label,neutral:figure-label,neutral:figure-label,neutral:figure-label', 'a run of ticks and axis names is figure-label'); }
 ok(kind(mark(V, ['The answer is above', '12', 'so done'])[1]) === 'note', 'a single bare number is not a label');
 ok(kind(mark(V, ['7', '9'])[0]) === 'note', 'bare numbers that are not key values of the sketch are not labels');
+
+// the pass only ever turns an OPEN note into a tick or a neutral line: a tick, a cross, a candidate, a slip follow-on or a context line is never overturned
+{
+  const base = ['dv/dt = 12 - 6t', 'v(2) = 12(2) - 3(2)^2 = 24 - 12 = 12', 'v(3) = 5', 'Set dv/dt = 0:', '12 - 6t = 0 => t = 2', '(2, 12)', 'v(4) = 12(4) - 3(4)^2 = 48 - 48 = 0'];
+  const mk = (t, o) => ({ text: t, status: 'note', state: 'unverified', unverified: true, ...o });
+  const L = [mk(base[0], { status: 'ok', state: 'arithmetic', tickClass: 'arithmetic-chain' }), mk(base[1], { status: 'ok', state: 'arithmetic', tickClass: 'arithmetic-chain' }), mk(base[2], { status: 'break', state: 'wrong' }), mk(base[3], { context: true, tickClass: 'heading' }), mk(base[4], { candidate: true }), mk(base[5], { note: 'Follows from the earlier slip.', slipFollow: true }), mk(base[6], { state: 'wrong' })];
+  const open = l => l.status === 'note' && !l.candidate && !l.slipFollow && l.note !== 'Follows from the earlier slip.' && l.state !== 'wrong' && !l.context;
+  const out = P.pageProofs2({ prompt: V }, L, L.length, (l) => open(l)).lines;
+  ok(out.every((l, i) => l.status === L[i].status && l.state === L[i].state && l.text === L[i].text && l.context === L[i].context && l.candidate === L[i].candidate), 'no tick, cross, candidate, follow-on or context line is overturned');
+  ok(out[3].tickClass === 'heading', 'a heading keeps its class');
+  ok(P.pageProofs2({ prompt: V }, L, 2, () => true).lines.slice(2).every((l, i) => l === L[i + 2]), 'nothing at or after the limit is touched');
+}
 
 // the owner's page, the reader's own lines, through the real marker
 const { MARKER_OPS, markerView } = await import('../platform/markerOps.js');
@@ -103,7 +123,7 @@ const run = (lines, answer) => { const r = MARKER_OPS.practice({ q, answer, work
   const { r, ev, displayed } = run(PAGE, '12');
   ok(r.result.correct === true, 'the key is marked correct');
   const ticks = displayed.lines.filter(l => l.status === 'ok').length, neutral = displayed.lines.filter(l => l.context === true).length, cross = displayed.lines.filter(l => l.status === 'break').length;
-  ok(ticks === 7 && neutral === 8 && cross === 0, `the owner's page: 7 ticked, 8 neutral, none crossed (got ${ticks}, ${neutral}, ${cross})`);
+  ok(ticks === 6 && neutral === 9 && cross === 0, `the owner's page: 6 ticked, 9 neutral, none crossed (got ${ticks}, ${neutral}, ${cross})`);
   ok(displayed.answerLine === 20, 'the conclusion is the answer line');
   ok(JSON.stringify(ev.stepReport.lines.map(l => l.status)) === JSON.stringify(run(PAGE, '12').ev.stepReport.lines.map(l => l.status)), 'deterministic');
 }

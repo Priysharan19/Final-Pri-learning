@@ -34,6 +34,7 @@ const linesOf = e => {
   return out.slice(0, 14);
 };
 const run = (q, lines, extra = {}) => { try { const ev = stepEvidence({ ...q }, '99991', lines.join('\n'), checkAnswer({ ...q }, '99991'), { slipWarnings: true, ...extra }); return ev; } catch { return null; } };
+let overturned = 0;
 let pages = 0, shown = 0, shownMoved = 0, differ = 0, newCross = 0, mutants = 0, tickedByPass = 0, crossed = 0;
 for (const e of entries) {
   if (pages >= 300) break;
@@ -51,9 +52,10 @@ for (const e of entries) {
     // a page whose marker report is absent has an all-notes shown report: no tick, no cross
     // beyond display fields, a bank page may carry notes the SECOND page pass (engine/pageProofs2.js) ticked or marked neutral, each with its own class and the same text
     const P2 = new Set(['function-value', 'equation-solved', 'condition-stated', 'derivative-of-function', 'conclusion-extremum', 'check-values-list', 'figure-label', 'point-on-curve']);
-    const byPass2 = (l, w) => !!l && !!w && l.status === 'note' && P2.has(w.tickClass) && String(l.text) === String(w.text);
+    const byPass2 = (l, w) => !!l && !!w && l.status === 'note' && !l.candidate && !l.slipFollow && l.note !== 'Follows from the earlier slip.' && l.state !== 'wrong' && l.context !== true && P2.has(w.tickClass) && String(l.text) === String(w.text);   // only a line that was an OPEN note on the base
     const same = A ? A.length === B.length && A.every((l, i) => byPass2(l, B[i]) || JSON.stringify(strip(B[i])) === JSON.stringify(strip(l))) : B.every(l => l.status === 'note' || P2.has(l.tickClass));
     if (!same) shownMoved++;
+    if (A && !A.every((l, i) => !l || (l.status !== 'ok' && l.status !== 'break') || (B[i] && B[i].status === l.status && B[i].state === l.state && B[i].text === l.text))) overturned++;
   }
   if (JSON.stringify(on.stepReport) !== JSON.stringify(off.stepReport)) differ++;
   const crossOn = (on.stepReport?.lines || []).filter(l => l.status === 'break').length, crossOff = (off.stepReport?.lines || []).filter(l => l.status === 'break').length;
@@ -73,6 +75,7 @@ for (const e of entries) {
 }
 ok(pages === 300, `${pages} bank pages marked`);
 ok(shownMoved === 0, `the shown report of a bank page differs from the marker's only by display fields, and never ticks or crosses a line: ${shownMoved} of ${shown} pages moved`);
+ok(overturned === 0, `the second page pass never overturns a tick or a cross of the marker's report: ${overturned} pages`);
 ok(shown > 0, `the display fields are on the bank (${shown} pages carry a shown report)`);
 ok(differ === 0, `the report is identical with the pass on and off: ${differ} pages differ`);
 ok(newCross === 0, `the pass adds no cross: ${newCross}`);

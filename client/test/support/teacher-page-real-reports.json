@@ -1553,17 +1553,12 @@
      },
      {
       "text": "(2, 12)",
-      "status": "ok",
-      "state": "arithmetic",
-      "note": "Correct: v(2) = 12 for v(t) = 12t − 3t², so (2, 12) is on the curve and t = 2 is inside 0 ≤ t ≤ 4.",
-      "valueChain": {
-       "rule": "proved"
-      },
-      "fact": {
-       "kind": "proved",
-       "proof": "point-on-curve"
-      },
-      "tickClass": "point-on-curve"
+      "status": "note",
+      "state": "unverified",
+      "unverified": true,
+      "context": true,
+      "note": "This is a point on the sketch, and it fits: v(2) = 12 for v(t) = 12t − 3t², so (2, 12) is on the curve and t = 2 is inside 0 ≤ t ≤ 4. A label is not a step to check.",
+      "tickClass": "figure-label"
      },
      {
       "text": "12",
@@ -1683,13 +1678,12 @@
     "arithmetic": true,
     "summary": {
      "total": 21,
-     "checked": 7,
+     "checked": 6,
      "given": [],
      "verified": [],
      "arithmetic": [
       7,
       9,
-      11,
       18,
       19,
       20,
