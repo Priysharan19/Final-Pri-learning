@@ -296,4 +296,16 @@ check('reports the visual modes exposed to the player', () => {
   assert.ok(visualSummary(timeline).includes('transform'));
 });
 
+{
+  // stepExplain.js cancelling a common factor: the guard is `!closed(a.r)` alone (the second clause was always true). Every cancellation below is still explained, with the verified sentence.
+  const { explainStep } = await import('../src/engine/stepExplain.js');
+  for (const [above, line, short] of [['(x^2+3x)/(x+3)', 'x', '(x² + 3x)/(x + 3) = x'], ['(2x(x+1))/(x+1)', '2x', '(2x(x + 1))/(x + 1) = 2x'], ['(x^2-1)/(x-1)', 'x+1', '(x² − 1)/(x − 1) = x + 1'], ['(5x)/(x)', '5', '(5x)/x = 5']]) {
+    const r = explainStep({ above, line });
+    assert.ok(r && r.short === short, `cancelling ${above} to ${line} is still explained`);
+    checks++;
+  }
+  assert.equal(explainStep({ above: '(x+1)/(x+1)', line: '2' }), null, 'a false cancellation is not explained');
+  checks++;
+}
+
 if (!process.exitCode) console.log(`PRI EXPLAIN SUITE PASSED — ${checks}/${checks} checks`);
