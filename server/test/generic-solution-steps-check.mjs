@@ -60,7 +60,7 @@ const SEVEN_MORE = {   // the seven schemes the author approved on 24 Nov 2026, 
   'y12-trig-extreme-2': '073ae29c731218a52d39a7ceabae69c62115c92a080c8107954e1c92a1907af4'
 };
 ok(Object.entries(SEVEN_MORE).every(([id, d]) => APPROVED_SCHEME_TYPES.some(a => a.typeId === id && a.digest === d) && schemeDigest(SCHEMES.find(s => s.id === id)) === d), 'the seven further approved digests are the digests in the author\'s records');
-ok(APPROVED_SCHEME_TYPES.length === 15 && SCHEMES.filter(s => isApproved(s.id)).length === 14, 'exactly fourteen per-type schemes and the generic rule are approved');
+ok(APPROVED_SCHEME_TYPES.length === 16 && SCHEMES.filter(s => isApproved(s.id)).length === 14 && APPROVED_SCHEME_TYPES.some(a => a.typeId === 'generic-solution-steps-bank'), 'exactly fourteen per-type schemes, the generic rule and the bank generic rule (26 Nov 2026) are approved');
 ok(SCHEMES.filter(s => !isApproved(s.id)).map(s => s.id).sort().join() === 'y10-quadratic-solve-2,y10-quadratic-solve-3,y7-equation-solve-2,y7-equation-solve-3', 'the four Year 7 and Year 10 draft schemes are still not approved');
 ok(!SCHEMES.some(s => s.id === GENERIC_ID), 'the generic rule is not one of the per-type schemes');
 ok(/^[0-9a-f]{64}$/.test(genericDigest()) && Object.isFrozen(PARAMETERS) && Object.isFrozen(GENERIC_WORDING), 'the digest is a sha256 and the parameters and wording are frozen');
@@ -75,7 +75,7 @@ ok(/^[0-9a-f]{64}$/.test(genericDigest()) && Object.isFrozen(PARAMETERS) && Obje
 {
   const dir = new URL('docs/marking/author-approvals/', ROOT);
   const files = fs.readdirSync(dir).filter(f => f.endsWith('.json') && f !== 'schema.json');
-  ok(files.length === 15 && files.includes(`${GENERIC_ID}.json`) && files.every(f => APPROVED_SCHEME_TYPES.some(a => `${a.typeId}.json` === f)), 'docs/marking/author-approvals holds exactly the fifteen records (fourteen types and the generic rule), each on the generated list');
+  ok(files.length === 16 && files.includes(`${GENERIC_ID}.json`) && files.includes('generic-solution-steps-bank.json') && files.every(f => APPROVED_SCHEME_TYPES.some(a => `${a.typeId}.json` === f)), 'docs/marking/author-approvals holds exactly the sixteen records (fourteen types, the generic rule and the bank generic rule), each on the generated list');
   // the author-approval machinery lists it for a valid record at the current digest, and for nothing else
   const types = AA.allTypes();
   ok(types.some(t => t.id === GENERIC_ID && t.digest === genericDigest()), 'the approval machinery knows the rule\'s id and its current digest');
