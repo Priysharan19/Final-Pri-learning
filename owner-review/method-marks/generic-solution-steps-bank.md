@@ -20,19 +20,19 @@ It pays only while the Australian server has the method-marks switch on, the que
 
 ## Coverage: how many bank parts the rule can pay
 
-Of 1473 parts worth 2 or more marks, 413 (28.0%) can pay at least one step, and 308 of those can pay a mark for every step below full marks.
+Of 1472 parts worth 2 or more marks, 413 (28.1%) can pay at least one step, and 308 of those can pay a mark for every step below full marks.
 
 | Course | Parts worth 2 or more | Can pay a step | Share | Can pay all N-1 |
 |---|---:|---:|---:|---:|
 | Advanced Y11 | 403 | 113 | 28.0% | 87 |
-| Advanced Y12 | 374 | 102 | 27.3% | 81 |
+| Advanced Y12 | 373 | 102 | 27.3% | 81 |
 | Extension 1 Y11 | 325 | 110 | 33.8% | 76 |
 | Extension 1 Y12 | 371 | 88 | 23.7% | 64 |
-| ALL | 1473 | 413 | 28.0% | 308 |
+| ALL | 1472 | 413 | 28.1% | 308 |
 
 Why the other parts cannot pay, with an example each:
 
-- no usable step lines ticked but no step is real progress or reached: 654. For example A11-C1-006: Differentiate $y=\dfrac{x^{2}+1}{x-2}$.
+- no usable step lines ticked but no step is real progress or reached: 653. For example A11-C1-006: Differentiate $y=\dfrac{x^{2}+1}{x-2}$.
 - one step solution: 296. For example A11-C1-065: Find the gradient of $y=\dfrac{x}{x^{2}+1}$ at $x=1$.
 - authored working not read: 87. For example A11-C1-072: For which values of $x$ is $y=x^{3}-12x$ decreasing?
 - no usable step engine ticks none of his lines: 12. For example A11-F1-016(ii): A rectangular pen is built against a long straight wall using $60$ m of fencing for the ot
@@ -380,7 +380,7 @@ Marks: **3 of 3**.
 
 These are measured, in the same run, and rewritten each time the packet is generated.
 
-- **It pays 28.0% of the parts.** The rest have a one-step solution (296), no readable steps, or no step that the page ticks and counts as real progress. See the next section.
+- **It pays 28.1% of the parts.** The rest have a one-step solution (296), no readable steps, or no step that the page ticks and counts as real progress. See the next section.
 - **A different valid method earns less.** Your steps with only the last line wrong earn on average 1.02 marks (413 pages; 18 earn 0).
 - **A right method with a wrong last line still earns marks.** On average 1.02 marks over all 413 pages, by marks available: 2 marks 0.95 (282 pages); 3 marks 1.15 (129 pages); 4 marks 1.50 (2 pages). That is the rule working as approved: a mark for each key step reached, at most N minus 1. (The independent review of this draft measured about 1.0 on average: 0.98 at 2 marks, 1.19 at 3, 1.5 at 4.)
 - **A false statement in plain words does not stop the paying.** In the sweep, 1215 of 1239 pages that put a false plain-word sentence before his true lines still earned their step marks: the approved rule does not treat prose as a claim.
@@ -392,7 +392,7 @@ These are measured, in the same run, and rewritten each time the packet is gener
 
 ## What would raise the number most
 
-Your 1473 parts worth 2 or more marks have 3244 worked lines the page can read, of which 2581 are ticked and 663 are not. The commonest kinds of line it does not tick:
+Your 1472 parts worth 2 or more marks have 3241 worked lines the page can read, of which 2578 are ticked and 663 are not. The commonest kinds of line it does not tick:
 
 - 121 lines, a bare number. For example A11-C1-055: 1
 - 112 lines, a single equation or statement. For example A11-C1-141: t=(10/7)
@@ -406,7 +406,7 @@ And the maths the line reader cannot turn into a line at all, by the command it 
 - 25 pieces with \int. For example A12-C4-115: \int_0^1v=\tfrac43
 - 25 pieces with \sum. For example X11-A1-213: (1+1)^{9}+(1-1)^{9}=2\sum\text{even}
 - 14 pieces with \in. For example A11-T2-114: 2x+\tfrac{\pi}{3}\in\left[\tfrac{\pi}{3},\tfrac{7\pi}{3}\right]
-- 13 pieces with \pm. For example A11-F1-137: (\pm3,3)
+- 12 pieces with \pm. For example A11-F1-137: (\pm3,3)
 - 11 pieces with \ln. For example A11-E1-043: n>\dfrac{\ln0.1}{\ln0.8}\approx10.3
 - 10 pieces with \dot. For example X11-C1-011: \dot x=100\sec^{2}\theta\,\dot\theta=100(2)(0.2)
 

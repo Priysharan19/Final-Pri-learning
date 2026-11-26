@@ -45,9 +45,10 @@
   "X12-S1-138": "legibility: the labels overlap (a defect, not a step result)",
   "A11-S1-001(ii)": "held by another gate: the TeX reader reads P(A\\mid B) in his worked step as a different side count (client/test/tex-faithful-check.mjs); the figure decision does not override a pack gate",
   "A11-S1-024": "held by another gate: the TeX reader reads P(A\\mid B) in his worked step as a different side count (client/test/tex-faithful-check.mjs); the figure decision does not override a pack gate",
-  "A11-S1-012(ii)": "held by another gate: the TeX reader reads P(A\\mid B) in his worked step as a different side count (client/test/tex-faithful-check.mjs); the figure decision does not override a pack gate"
+  "A11-S1-012(ii)": "held by another gate: the TeX reader reads P(A\\mid B) in his worked step as a different side count (client/test/tex-faithful-check.mjs); the figure decision does not override a pack gate",
+  "A12-C4-032": "held by another gate: the marking mutation check ticks a provably wrong line (1/2 changed to 1/4) because it matches step 2 of his worked solution (server/test/marking-mutation-check.mjs); the figure decision does not override a pack gate"
  },
- "notReleasedNote": "On the owner list but not released: the by-eye reason says the figure shows the answer, or a legibility or mismatch defect, or (three parts) another pack gate fails once the figure is released. They stay held and are kept out of `parts`.",
+ "notReleasedNote": "On the owner list but not released: the by-eye reason says the figure shows the answer, or a legibility or mismatch defect, or (four parts) another pack gate fails once the figure is released. They stay held and are kept out of `parts`.",
  "parts": [
   "A11-C1-007(i)",
   "A11-C1-007(ii)",
@@ -143,7 +144,6 @@
   "A12-C4-025(i)",
   "A12-C4-025(ii)",
   "A12-C4-030",
-  "A12-C4-032",
   "A12-C4-036(i)",
   "A12-C4-036(ii)",
   "A12-C4-037",
