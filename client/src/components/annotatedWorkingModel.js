@@ -110,6 +110,9 @@ export function buildAnnotatedWorking({ lines, stepReport, receipt = null, solut
       note: status === 'first-error' ? (l.note || null) : null,
       previousText: status === 'first-error' && i > 0 && report[i - 1]?.status === 'ok' ? texts[i - 1] : null,
       text: texts[i],
+      // the engine's display fields (engine/displayFields.js), as the value-chain cards below carry them: the class of the proof that ticked the line and the answer-bearing line
+      tickClass: status === 'checked' && typeof l?.tickClass === 'string' ? l.tickClass : null,
+      answerLine: status === 'checked' && (l?.answerLine === true || (Number.isInteger(stepReport?.answerLine) && stepReport.answerLine === i && l?.status === 'ok')),
       corrected: status === 'first-error' ? correctedOf(l) : null,
       comment: commentOf(l), facts: status === 'first-error' ? factsOf(l) : null
     };
