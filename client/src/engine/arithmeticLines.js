@@ -888,7 +888,11 @@ function wrongFunctionValue(src, defs, raw, i) {
     if (/\d\.\d|(?:^|[^\d])\.\d/.test(d.shown || '') || /\d\.\d/.test(d.expr)) return null;
     // the definition must still be the latest word on the letter: a later line that sets it again (`F(x) = …`, `F = …`) is not read
     const set = new RegExp(`(?<![A-Za-z'])${name}\\s*(?:\\(\\s*[A-Za-z]\\s*\\))?\\s*=`);
-    if (raw.slice(d.line + 1, i).some(l => set.test(l.replace(/[−–—]/g, '-')))) return null;
+    // …and it is the ONLY line that sets the letter, and it is written as a function (`F(x) = …`): a letter that names an equation (`y = x^2`, then `y = 2x`)
+    // may name either, so a value of it is not held to one of them
+    const head = new RegExp(`^\\s*${name}\\s*\\(\\s*${d.variable}\\s*\\)\\s*=`);
+    if (!head.test(String(raw[d.line] ?? '').replace(/[−–—]/g, '-'))) return null;
+    if (raw.slice(0, i).filter(l => set.test(l.replace(/[−–—]/g, '-'))).length !== 1) return null;
     const put = putIn(`${name}(${arg})`, defs, null);
     const truth = put ? numberOf(put.text) : null, said = numberOf(claim);
     if (truth === null || said === null || !Number.isFinite(truth) || !Number.isFinite(said)) return null;

@@ -438,8 +438,8 @@ let corpusFalse = 0, corpusCross = 0, corpusFalseTicked = 0, corpusCrossed = 0, 
   ok(arith(['f(x) = sin(x)', 'f(90) = 5']).every(s => s !== 'break') && arith(['f(x) = log(x)', 'f(100) = 5']).every(s => s !== 'break'), 'an unknown angle unit or log base is never crossed');
   ok(arith(['f(x) = e^2x', 'f(1) = 3']).every(s => s !== 'break'), 'an unbracketed exponent that can be read two ways is never crossed');
   ok(arith(['g(x) = x^2', 'f(3) = 10']).every(s => s !== 'break'), 'a function the page did not define is never judged');
-  ok(arith(['f(x) = x^2', 'f(x) = x^2 + 1', 'f(3) = 10']).every(s => s !== 'break'), 'a redefined function is held to its latest definition (10 is true)');
-  ok(arith(['f(x) = x^2', 'f(x) = x^2 + 1', 'f(3) = 9']).some(s => s === 'break'), 'and the latest definition crosses 9');
+  ok(arith(['f(x) = x^2', 'f(x) = x^2 + 1', 'f(3) = 10']).every(s => s !== 'break') && arith(['f(x) = x^2', 'f(x) = x^2 + 1', 'f(3) = 9']).every(s => s !== 'break'), 'a letter set twice may name either: nothing is crossed against it');
+  ok(arith(['y = x^2', 'y = 2x', 'y(3) = 9']).every(s => s !== 'break') && arith(['y = 3x', 'y(2) = 9']).every(s => s !== 'break'), 'a letter that names an equation, not a function f(x), is never held to a value');
   ok(arith(['f(x) = x^2', 'f = 4', 'f(3) = 10']).every(s => s !== 'break'), 'a letter set again is no longer the function');
   ok(arith(['f(x) = x^2', '(b) f(3) = 10']).every(s => s !== 'break'), 'a new part of the question drops the definition');
   ok(arith(['f(x) = x^2', 'f(3) = 9 or 10']).every(s => s !== 'break'), 'a line that is not purely value claims is not read');
