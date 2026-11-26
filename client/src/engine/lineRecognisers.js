@@ -472,14 +472,15 @@ function conclusion(state, l, text) {
 }
 
 /**
+ * `restateOnly` (the author's bank): only what restates or sets up (data, the question's own maths, the aim, the method and its continuation, a definition, a condition); never a model, a substitution or a conclusion sentence, which tick a line as TRUE and so are judged against the worked solution on a bank page.
  * @returns null, or { line } : a tick (status 'ok') or a neutral line (status 'note', context) for the page pass to put in place of the note
  */
-export function recognise(state, l, text) {
+export function recognise(state, l, text, { restateOnly = false } = {}) {
   if (!state) return null;
   const Q = state.Q;
   const wasOpen = state.methodOpen === true; state.methodOpen = false;
-  const tries = [() => (wasOpen ? methodContinuation(state, l, text) : null), () => definition(state, l, text), () => conditionValue(state, l, text), () => methodStated(state, l, text), () => modelLine(state, l, text), () => substitutionLine(state, l, text),
-    () => dataRestated(Q, l, text), () => givenMaths(Q, l, text), () => sentenceRestated(Q, l, text), () => titleRestated(Q, l, text), () => conclusion(state, l, text)];
+  const tries = [() => (wasOpen ? methodContinuation(state, l, text) : null), () => definition(state, l, text), () => conditionValue(state, l, text), () => methodStated(state, l, text), ...(restateOnly ? [] : [() => modelLine(state, l, text), () => substitutionLine(state, l, text)]),
+    () => dataRestated(Q, l, text), () => givenMaths(Q, l, text), () => sentenceRestated(Q, l, text), () => titleRestated(Q, l, text), ...(restateOnly ? [] : [() => conclusion(state, l, text)])];
   for (const f of tries) { let r = null; try { r = f(); } catch { r = null; } if (r) return r; }
   return null;
 }

@@ -236,7 +236,7 @@ export function pageProofs(q, lines, limit, open, { promptOnly = false } = {}) {
     let res = null;
     const prevCtx = ctx; ctx = null;
     try {
-      const tries = [() => restatedQuestion(q, l, text), () => headingLine(l, text), () => recognise(rs, l, text)];
+      const tries = [() => restatedQuestion(q, l, text), () => headingLine(l, text), () => recognise(rs, l, text, { restateOnly: promptOnly })];
       if (w) tries.push(() => conditionLine(w, l, text), () => derivativeLine(w, l, text), () => conclusionLine(w, l, text, roots, completeRoots, knownRoots), () => chainLine(w, l, text, prevCtx, roots, stationary));
       for (const tr of tries) { try { res = tr(); } catch (e) { if (process.env.DBGP) console.log(e); res = null; } if (res) break; }
     } catch (e) { if (process.env.DBGP) console.log(e); res = null; }

@@ -226,9 +226,11 @@ ok(tallyOf({ lines: [{ status: 'checked' }, { status: 'condition' }, { status: '
   const k = pageOf('key12');
   const km = buildTeacherMarks({ page: k.page });
   const want = { 7: 'Correct derivative', 9: 'Correct solution of the equation', 18: 'Correct function value', 19: 'Correct function value', 20: 'Correct function value', 21: 'Correct answer' };
-  ok(km.length === 6 && km.every(m => m.kind === 'right' && m.phrase === want[m.n]), `the photo page: 6 ticks, each with its own phrase: ${JSON.stringify(km.map(m => [m.n, m.phrase]))}`);
-  ok(k.model.cards.filter(c => c.status === 'condition').length === 9 && k.model.cards.filter(c => c.status === 'first-error').length === 0, 'the photo page: 9 neutral lines (condition, check list, seven sketch labels), none crossed');
-  ok(k.model.cards.filter(c => c.status === 'not-verified').map(c => c.n).join() === '1,2,3,4,5,6', 'the photo page: only the six lines owned by the restated-question and method-statement lane are not checked');
+  // Train 8: the first pass's prompt-bound recognisers also run on a bank question, so line 2 ("Given v = ...", the question's own maths) is ticked too and lines 1 to 6 are no longer "not checked"
+  want[2] = 'Given in the question';
+  ok(km.length === 7 && km.every(m => m.kind === 'right' && m.phrase === want[m.n]), `the photo page: 7 ticks, each with its own phrase: ${JSON.stringify(km.map(m => [m.n, m.phrase]))}`);
+  ok(k.model.cards.filter(c => c.status === 'condition').length === 14 && k.model.cards.filter(c => c.status === 'first-error').length === 0, 'the photo page: 14 neutral lines (two headings, the aim, the method and its continuation, the condition, the check list, seven sketch labels), none crossed');
+  ok(k.model.cards.filter(c => c.status === 'not-verified').length === 0 && /0 not checked\.$/.test(tallyOf(k.page)), `the photo page: 0 not checked (${tallyOf(k.page)})`);
 }
 
 if (failures.length) { console.error(`marked-page-teacher-check: ${failures.length} failed`); for (const f of failures) console.error(' - ' + f); process.exit(1); }
