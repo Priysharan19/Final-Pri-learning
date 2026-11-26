@@ -15,9 +15,14 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { stepEvidence } from '../../platform/markerOps.js';
 import { checkAnswer } from '../../../client/src/engine/checker.js';
 import * as G from '../../../client/src/engine/generators/index.js';
+import { markerView } from '../../platform/markerOps.js';
+import * as QB from '../../platform/qbankPack.js';
+import { checkBankAnswer } from '../../platform/qbankMarking.js';
 
 const OUT = new URL('../../../client/test/support/teacher-page-real-reports.json', import.meta.url);
 await G.loadAllBanks();
+process.env.PRI_EDITION = 'prithagoras'; delete process.env.PRI_QBANK_DIR;
+await QB.ensureQbank(process.env, { strict: true });
 
 const WRONG_LINES = ['y = 2x^3 + 9x^2', "y' = 6x^2 + 18x", "for stat points y' = 0", '0 = 6x^2 + 18x', '0 = 6x[x + 4]', '@@@', 'foo', 'x = 0 or x = -3', 'smallest: (0,0)'];
 const FOLLOWED_LINES = ['y = 2x^3 + 9x^2', "y' = 6x^2 + 18x", "for stat points y' = 0", '0 = 6x^2 + 18x', '0 = 6x[x + 4]', 'x = 0 or x = -4', 'smallest: (-4,0)'];
@@ -44,14 +49,16 @@ const INTEGRATION7_Q = {
   prompt: 'Find $\\int 12x(x^2+8)^5\\,dx$.', answer: { type: 'expression', expr: '(x^2+8)^6+C' }
 };
 
+// the owner's real photo page (26 Nov 2026, key 12): the reader's own 21 lines, graph labels included, against the author-bank question it belongs to
+const KEY12_LINES = ['Solution:', 'Given v = 12t - 3t^2, 0 <= t <= 4.', 'To find the maximum velocity.', 'Method: Find the stationary point(s) of v(t) using', 'dv/dt = 0, and compare with the endpoints t = 0 and t = 4.', 'Working:', 'dv/dt = 12 - 6t.', 'Set dv/dt = 0:', '12 - 6t = 0 => t = 2.', 'v', '(2, 12)', '12', 'Check values of v at t = 0, 2, 4:', '0', '2', '4', 't', 'v(0) = 12(0) - 3(0)^2 = 0', 'v(2) = 12(2) - 3(2)^2 = 24 - 12 = 12', 'v(4) = 12(4) - 3(4)^2 = 48 - 48 = 0.', 'Conclusion: The maximum velocity is 12 m s^-1, obtained at t ='];
 function run(q, lines, answer) {
-  const res = checkAnswer(q, answer);
+  const res = typeof q._bank === 'string' ? checkBankAnswer(q, answer) : checkAnswer(q, answer);
   const ev = stepEvidence(q, answer, lines.join('\n'), res, { slipWarnings: true });
   return { question: { prompt: q.prompt, answer: q.answer }, answer, correct: res.correct === true, lines, stepReport: JSON.parse(JSON.stringify(ev.stepReport)), ...(ev.shownReport ? { shownReport: JSON.parse(JSON.stringify(ev.shownReport)) } : {}) };
 }
 const wrongQ = G.generateQuestion('y12-appdiff', 1, 450);
 const out = { note: 'The server marking path (checkAnswer, stepEvidence) on transcribed pages. Regenerate with server/test/support/teacher-page-real-reports.mjs.',
-  pages: { wrong: run(wrongQ, WRONG_LINES, '0'), followed: run(wrongQ, FOLLOWED_LINES, '-4'), owner19: run(OWNER19_Q, OWNER19_LINES, '6'), integration7: run(INTEGRATION7_Q, INTEGRATION7_LINES, '(x^2+8)^6+C') } };
+  pages: { wrong: run(wrongQ, WRONG_LINES, '0'), followed: run(wrongQ, FOLLOWED_LINES, '-4'), owner19: run(OWNER19_Q, OWNER19_LINES, '6'), integration7: run(INTEGRATION7_Q, INTEGRATION7_LINES, '(x^2+8)^6+C'), key12: run(markerView(QB.qbankEntryQuestion('A12-C3-093', 17)), KEY12_LINES, '12') } };
 const text = JSON.stringify(out, null, 1) + '\n';
 if (process.argv.includes('--check')) {
   if (readFileSync(OUT, 'utf8') !== text) { console.error('teacher-page-real-reports: the saved file is not what the engine returns today; run the script without --check'); process.exit(1); }

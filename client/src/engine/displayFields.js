@@ -24,7 +24,7 @@ import { evaluate, variablesOf } from './expr.js';
 import { explainLines } from './stepExplain.js';
 import { isHeading, worldOf, labelOf, clean, lead, astOf, constOf, fitPoly, polyD, rootsComplete } from './pageProofs.js';
 
-export const CLASSES = Object.freeze(['power-rule-differentiation', 'differentiation', 'factorisation', 'roots-of-a-product', 'equation-setup', 'substitution-evaluated', 'arithmetic-chain', 'second-derivative-value', 'sign-claim', 'nature-claim', 'point-claim', 'conclusion-matches', 'condition-line', 'restated-question', 'restated-function', 'heading', 'solution-list', 'rounded-value', 'labelled-substitution', 'identity', 'derivative-rule', 'true-as-written', 'matches-worked-step', 'equal-to-line-above', 'satisfies-equation-above', 'same-equation-as-line-above', 'substitution-defined', 'substitution-consistent', 'derivative-of-substitution', 'differential-form', 'change-of-variable', 'integral-rewritten', 'antiderivative-checked', 'back-substitution', 'equivalent-expressions', 'definite-integral-evaluated', 'several-claims', 'given-data', 'method-claim', 'method-stated', 'defines', 'condition-value', 'model', 'substitution-formula', 'conclusion-sentence', 'formula-value']);
+export const CLASSES = Object.freeze(['power-rule-differentiation', 'differentiation', 'factorisation', 'roots-of-a-product', 'equation-setup', 'substitution-evaluated', 'arithmetic-chain', 'second-derivative-value', 'sign-claim', 'nature-claim', 'point-claim', 'conclusion-matches', 'condition-line', 'restated-question', 'restated-function', 'heading', 'solution-list', 'rounded-value', 'labelled-substitution', 'identity', 'derivative-rule', 'true-as-written', 'matches-worked-step', 'equal-to-line-above', 'satisfies-equation-above', 'same-equation-as-line-above', 'substitution-defined', 'substitution-consistent', 'derivative-of-substitution', 'differential-form', 'change-of-variable', 'integral-rewritten', 'antiderivative-checked', 'back-substitution', 'equivalent-expressions', 'definite-integral-evaluated', 'several-claims', 'given-data', 'method-claim', 'method-stated', 'defines', 'condition-value', 'model', 'substitution-formula', 'conclusion-sentence', 'formula-value', 'function-value', 'equation-solved', 'condition-stated', 'derivative-of-function', 'conclusion-extremum', 'check-values-list', 'figure-label', 'point-on-curve']);
 const PROVED = { listed: 'solution-list', rounded: 'rounded-value', substituted: 'labelled-substitution', restated: 'restated-question', identity: 'identity', derivative: 'derivative-rule' };
 const NUM = String.raw`-?\d+(?:\.\d+)?`;
 
@@ -137,8 +137,9 @@ function answerLineOf(q, lines, accepts, correct, limit = lines.length) {
   for (let i = 0; i < Math.min(limit, lines.length); i++) {
     const l = lines[i];
     if (!l || l.status !== 'ok' || l.context === true) continue;
+    // a conclusion the second page pass (pageProofs2.js) proved carries the value it states (`statedAnswer`), because its words hide the value from the plain reading above
     const texts = l.fact && l.fact.proof === 'conclusion-sentence' && typeof l.fact.valueText === 'string' ? [l.fact.valueText] : resultTexts(l.text, q.answerType);
-    if (texts.some(ok)) at = i;
+    if (texts.some(ok) || (typeof l.statedAnswer === 'string' && l.tickClass === 'conclusion-extremum' && ok(l.statedAnswer))) at = i;
   }
   if (at < 0) return -1;
   const names = new Set([labelOfLine(lines[at].text)]);

@@ -1512,6 +1512,510 @@
     },
     "answerLine": 6
    }
+  },
+  "key12": {
+   "question": {
+    "prompt": "The velocity of a car is $v=12t-3t^{2}$ m/s for $0\\le t\\le4$. Find the maximum velocity.",
+    "answer": {
+     "value": 12
+    }
+   },
+   "answer": "12",
+   "correct": true,
+   "lines": [
+    "Solution:",
+    "Given v = 12t - 3t^2, 0 <= t <= 4.",
+    "To find the maximum velocity.",
+    "Method: Find the stationary point(s) of v(t) using",
+    "dv/dt = 0, and compare with the endpoints t = 0 and t = 4.",
+    "Working:",
+    "dv/dt = 12 - 6t.",
+    "Set dv/dt = 0:",
+    "12 - 6t = 0 => t = 2.",
+    "v",
+    "(2, 12)",
+    "12",
+    "Check values of v at t = 0, 2, 4:",
+    "0",
+    "2",
+    "4",
+    "t",
+    "v(0) = 12(0) - 3(0)^2 = 0",
+    "v(2) = 12(2) - 3(2)^2 = 24 - 12 = 12",
+    "v(4) = 12(4) - 3(4)^2 = 48 - 48 = 0.",
+    "Conclusion: The maximum velocity is 12 m s^-1, obtained at t ="
+   ],
+   "stepReport": {
+    "lines": [
+     {
+      "text": "Solution:",
+      "status": "note",
+      "note": "Not checked: this line has no arithmetic Pri can check on its own.",
+      "unverified": true,
+      "state": "unverified"
+     },
+     {
+      "text": "Given v = 12t - 3t^2, 0 <= t <= 4.",
+      "status": "note",
+      "note": "Not checked: this line has no arithmetic Pri can check on its own.",
+      "unverified": true,
+      "state": "unverified"
+     },
+     {
+      "text": "To find the maximum velocity.",
+      "status": "note",
+      "note": "Not checked: Pri cannot tell from this line alone whether it is true.",
+      "unverified": true,
+      "state": "unverified"
+     },
+     {
+      "text": "Method: Find the stationary point(s) of v(t) using",
+      "status": "note",
+      "note": "Not checked: Pri cannot tell from this line alone whether it is true.",
+      "unverified": true,
+      "state": "unverified"
+     },
+     {
+      "text": "dv/dt = 0, and compare with the endpoints t = 0 and t = 4.",
+      "status": "note",
+      "note": "Not checked: this line has no arithmetic Pri can check on its own.",
+      "unverified": true,
+      "state": "unverified"
+     },
+     {
+      "text": "Working:",
+      "status": "note",
+      "note": "Not checked: this line has no arithmetic Pri can check on its own.",
+      "unverified": true,
+      "state": "unverified"
+     },
+     {
+      "text": "dv/dt = 12 - 6t.",
+      "status": "note",
+      "note": "Not checked: Pri cannot tell from this line alone whether it is true.",
+      "unverified": true,
+      "state": "unverified"
+     },
+     {
+      "text": "Set dv/dt = 0:",
+      "status": "note",
+      "note": "Not checked: this line has no arithmetic Pri can check on its own.",
+      "unverified": true,
+      "state": "unverified"
+     },
+     {
+      "text": "12 - 6t = 0 => t = 2.",
+      "status": "note",
+      "note": "Not checked: this line has no arithmetic Pri can check on its own.",
+      "unverified": true,
+      "state": "unverified"
+     },
+     {
+      "text": "v",
+      "status": "note",
+      "note": "Not checked: Pri cannot tell from this line alone whether it is true.",
+      "unverified": true,
+      "state": "unverified"
+     },
+     {
+      "text": "(2, 12)",
+      "status": "note",
+      "note": "Not checked: this line has no arithmetic Pri can check on its own.",
+      "unverified": true,
+      "state": "unverified"
+     },
+     {
+      "text": "12",
+      "status": "note",
+      "note": "Not checked: this line has no arithmetic Pri can check on its own.",
+      "unverified": true,
+      "state": "unverified"
+     },
+     {
+      "text": "Check values of v at t = 0, 2, 4:",
+      "status": "note",
+      "note": "Not checked: this line has no arithmetic Pri can check on its own.",
+      "unverified": true,
+      "state": "unverified"
+     },
+     {
+      "text": "0",
+      "status": "note",
+      "note": "Not checked: this line has no arithmetic Pri can check on its own.",
+      "unverified": true,
+      "state": "unverified"
+     },
+     {
+      "text": "2",
+      "status": "note",
+      "note": "Not checked: this line has no arithmetic Pri can check on its own.",
+      "unverified": true,
+      "state": "unverified"
+     },
+     {
+      "text": "4",
+      "status": "note",
+      "note": "Not checked: this line has no arithmetic Pri can check on its own.",
+      "unverified": true,
+      "state": "unverified"
+     },
+     {
+      "text": "t",
+      "status": "note",
+      "note": "Not checked: Pri cannot tell from this line alone whether it is true.",
+      "unverified": true,
+      "state": "unverified"
+     },
+     {
+      "text": "v(0) = 12(0) - 3(0)^2 = 0",
+      "status": "ok",
+      "state": "arithmetic",
+      "note": "Both sides come to $0$.",
+      "valueChain": {
+       "rule": "arithmetic"
+      },
+      "fact": {
+       "kind": "both-sides",
+       "tex": "0"
+      }
+     },
+     {
+      "text": "v(2) = 12(2) - 3(2)^2 = 24 - 12 = 12",
+      "status": "ok",
+      "state": "arithmetic",
+      "note": "Both sides come to $12$.",
+      "valueChain": {
+       "rule": "arithmetic"
+      },
+      "fact": {
+       "kind": "both-sides",
+       "tex": "12"
+      }
+     },
+     {
+      "text": "v(4) = 12(4) - 3(4)^2 = 48 - 48 = 0.",
+      "status": "ok",
+      "state": "arithmetic",
+      "note": "Both sides come to $0$.",
+      "valueChain": {
+       "rule": "arithmetic"
+      },
+      "fact": {
+       "kind": "both-sides",
+       "tex": "0"
+      }
+     },
+     {
+      "text": "Conclusion: The maximum velocity is 12 m s^-1, obtained at t =",
+      "status": "note",
+      "note": "Not checked: this line is too long or too far down the working to check.",
+      "unverified": true,
+      "state": "unverified"
+     }
+    ],
+    "firstBreak": -1,
+    "diagnosis": null,
+    "source": "value-chain",
+    "arithmetic": true,
+    "summary": {
+     "total": 21,
+     "checked": 3,
+     "given": [],
+     "verified": [],
+     "arithmetic": [
+      18,
+      19,
+      20
+     ],
+     "conditions": [],
+     "wrong": [],
+     "unverified": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      21
+     ],
+     "unread": [],
+     "reason": "Pri checks only the arithmetic on this question. These lines have none it can check on its own."
+    }
+   },
+   "shownReport": {
+    "lines": [
+     {
+      "text": "Solution:",
+      "status": "note",
+      "note": "Not checked: this line has no arithmetic Pri can check on its own.",
+      "unverified": true,
+      "state": "unverified"
+     },
+     {
+      "text": "Given v = 12t - 3t^2, 0 <= t <= 4.",
+      "status": "note",
+      "note": "Not checked: this line has no arithmetic Pri can check on its own.",
+      "unverified": true,
+      "state": "unverified"
+     },
+     {
+      "text": "To find the maximum velocity.",
+      "status": "note",
+      "note": "Not checked: Pri cannot tell from this line alone whether it is true.",
+      "unverified": true,
+      "state": "unverified"
+     },
+     {
+      "text": "Method: Find the stationary point(s) of v(t) using",
+      "status": "note",
+      "note": "Not checked: Pri cannot tell from this line alone whether it is true.",
+      "unverified": true,
+      "state": "unverified"
+     },
+     {
+      "text": "dv/dt = 0, and compare with the endpoints t = 0 and t = 4.",
+      "status": "note",
+      "note": "Not checked: this line has no arithmetic Pri can check on its own.",
+      "unverified": true,
+      "state": "unverified"
+     },
+     {
+      "text": "Working:",
+      "status": "note",
+      "note": "Not checked: this line has no arithmetic Pri can check on its own.",
+      "unverified": true,
+      "state": "unverified"
+     },
+     {
+      "text": "dv/dt = 12 - 6t.",
+      "status": "ok",
+      "state": "arithmetic",
+      "note": "Correct: this is the derivative of v(t) = 12t − 3t², and it agrees at every value tried.",
+      "valueChain": {
+       "rule": "proved"
+      },
+      "fact": {
+       "kind": "proved",
+       "proof": "derivative-of-function"
+      },
+      "tickClass": "derivative-of-function"
+     },
+     {
+      "text": "Set dv/dt = 0:",
+      "status": "note",
+      "state": "unverified",
+      "unverified": true,
+      "context": true,
+      "note": "A condition is stated, not a step to check: the question asks for a maximum, and that is found where the derivative is 0.",
+      "tickClass": "condition-stated"
+     },
+     {
+      "text": "12 - 6t = 0 => t = 2.",
+      "status": "ok",
+      "state": "arithmetic",
+      "note": "Correct: 12 − 6t = 0 has exactly one solution, t = 2, and this line states all of them.",
+      "valueChain": {
+       "rule": "proved"
+      },
+      "fact": {
+       "kind": "proved",
+       "proof": "equation-solved"
+      },
+      "tickClass": "equation-solved"
+     },
+     {
+      "text": "v",
+      "status": "note",
+      "state": "unverified",
+      "unverified": true,
+      "context": true,
+      "note": "This is a label of the sketch (an axis name, or a mark at a key value); there is no step in it to check.",
+      "tickClass": "figure-label"
+     },
+     {
+      "text": "(2, 12)",
+      "status": "note",
+      "state": "unverified",
+      "unverified": true,
+      "context": true,
+      "note": "This is a point on the sketch, and it fits: v(2) = 12 for v(t) = 12t − 3t², so (2, 12) is on the curve and t = 2 is inside 0 ≤ t ≤ 4. A label is not a step to check.",
+      "tickClass": "figure-label"
+     },
+     {
+      "text": "12",
+      "status": "note",
+      "state": "unverified",
+      "unverified": true,
+      "context": true,
+      "note": "This is a label of the sketch (an axis name, or a mark at a key value); there is no step in it to check.",
+      "tickClass": "figure-label"
+     },
+     {
+      "text": "Check values of v at t = 0, 2, 4:",
+      "status": "note",
+      "state": "unverified",
+      "unverified": true,
+      "context": true,
+      "note": "The values listed are the two ends of the interval and the stationary point, which is where the greatest value of v(t) can be; this line only names them.",
+      "tickClass": "check-values-list"
+     },
+     {
+      "text": "0",
+      "status": "note",
+      "state": "unverified",
+      "unverified": true,
+      "context": true,
+      "note": "This is a label of the sketch (an axis name, or a mark at a key value); there is no step in it to check.",
+      "tickClass": "figure-label"
+     },
+     {
+      "text": "2",
+      "status": "note",
+      "state": "unverified",
+      "unverified": true,
+      "context": true,
+      "note": "This is a label of the sketch (an axis name, or a mark at a key value); there is no step in it to check.",
+      "tickClass": "figure-label"
+     },
+     {
+      "text": "4",
+      "status": "note",
+      "state": "unverified",
+      "unverified": true,
+      "context": true,
+      "note": "This is a label of the sketch (an axis name, or a mark at a key value); there is no step in it to check.",
+      "tickClass": "figure-label"
+     },
+     {
+      "text": "t",
+      "status": "note",
+      "state": "unverified",
+      "unverified": true,
+      "context": true,
+      "note": "This is a label of the sketch (an axis name, or a mark at a key value); there is no step in it to check.",
+      "tickClass": "figure-label"
+     },
+     {
+      "text": "v(0) = 12(0) - 3(0)^2 = 0",
+      "status": "ok",
+      "state": "arithmetic",
+      "note": "Both sides come to $0$.",
+      "valueChain": {
+       "rule": "arithmetic"
+      },
+      "fact": {
+       "kind": "both-sides",
+       "tex": "0"
+      },
+      "tickClass": "function-value",
+      "explain": {
+       "kind": "simplify",
+       "named": false,
+       "short": "v × 0 = 12 × 0 − 3 × 0², 12 × 0 − 3 × 0² = 0",
+       "sentence": "Two changes: simplified $v \\times 0 = 12 \\times 0 - 3 \\times 0^{2}$; subtracted $12 \\times 0 - 3 \\times 0^{2} = 0$.",
+       "segs": [
+        {
+         "t": "tex",
+         "v": "v \\times 0 = 12 \\times 0 - 3 \\times 0^{2}"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "tex",
+         "v": "12 \\times 0 - 3 \\times 0^{2} = 0"
+        }
+       ]
+      }
+     },
+     {
+      "text": "v(2) = 12(2) - 3(2)^2 = 24 - 12 = 12",
+      "status": "ok",
+      "state": "arithmetic",
+      "note": "Both sides come to $12$.",
+      "valueChain": {
+       "rule": "arithmetic"
+      },
+      "fact": {
+       "kind": "both-sides",
+       "tex": "12"
+      },
+      "tickClass": "function-value"
+     },
+     {
+      "text": "v(4) = 12(4) - 3(4)^2 = 48 - 48 = 0.",
+      "status": "ok",
+      "state": "arithmetic",
+      "note": "Both sides come to $0$.",
+      "valueChain": {
+       "rule": "arithmetic"
+      },
+      "fact": {
+       "kind": "both-sides",
+       "tex": "0"
+      },
+      "tickClass": "function-value"
+     },
+     {
+      "text": "Conclusion: The maximum velocity is 12 m s^-1, obtained at t =",
+      "status": "ok",
+      "state": "arithmetic",
+      "note": "Correct: over 0 ≤ t ≤ 4 the maximum of v(t) = 12t − 3t² is 12, reached at t = 2. The endpoints give v(0) = 0, v(4) = 0.",
+      "valueChain": {
+       "rule": "proved"
+      },
+      "fact": {
+       "kind": "proved",
+       "proof": "conclusion-extremum"
+      },
+      "tickClass": "conclusion-extremum",
+      "statedAnswer": "12"
+     }
+    ],
+    "firstBreak": -1,
+    "diagnosis": null,
+    "source": "value-chain",
+    "arithmetic": true,
+    "summary": {
+     "total": 21,
+     "checked": 6,
+     "given": [],
+     "verified": [],
+     "arithmetic": [
+      7,
+      9,
+      18,
+      19,
+      20,
+      21
+     ],
+     "conditions": [],
+     "wrong": [],
+     "unverified": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+     ],
+     "unread": [],
+     "reason": "Pri checks only the arithmetic on this question. These lines have none it can check on its own."
+    },
+    "answerLine": 20
+   }
   }
  }
 }

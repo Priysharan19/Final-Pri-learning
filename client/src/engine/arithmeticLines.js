@@ -1373,12 +1373,15 @@ let ANSWER_VALUE = null;
 let KNOWN_LABELS = null;
 // Set only by the Australian marking path for a one-part question (server/platform/markerOps.js oneAustralianPart): see equationRewrite.
 let REWRITE_OK = false;
+// Set only with REWRITE_OK: (texts, skip) => { index, rule, message, corrected } | null, the first claim that is false by the question's own function (engine/pageProofs2.js witnessOf).
+let PAGE_WITNESS = null;
 export function stepCheckArithmetic(workingText, opts = null) {
   SOLUTION_VALUES = opts && Array.isArray(opts.solutionValues) ? opts.solutionValues.filter(v => Number.isFinite(v)) : null;
   ANSWER_VALUE = opts && Number.isFinite(opts.answerValue) ? opts.answerValue : null;
   KNOWN_LABELS = opts && Array.isArray(opts.knownLabels) ? new Set(opts.knownLabels) : null;
   REWRITE_OK = !!(opts && opts.equationRewrite === true);
-  try { return stepCheckArithmeticBudgeted(workingText, opts); } finally { SOLUTION_VALUES = null; ANSWER_VALUE = null; KNOWN_LABELS = null; REWRITE_OK = false; }
+  PAGE_WITNESS = REWRITE_OK && opts && typeof opts.pageWitness === 'function' ? opts.pageWitness : null;
+  try { return stepCheckArithmeticBudgeted(workingText, opts); } finally { SOLUTION_VALUES = null; ANSWER_VALUE = null; KNOWN_LABELS = null; REWRITE_OK = false; PAGE_WITNESS = null; }
 }
 function stepCheckArithmeticBudgeted(workingText, opts) {
   return withEvaluationBudget(PAGE_BUDGET, () => {
@@ -2154,11 +2157,14 @@ function stepCheckArithmeticWithinBudget(workingText, prep = null, tickOnly = fa
     let broke = null;
     try { broke = pageDefinitions(raw, out, firstBreak, prep, degreePrimed, tickOnly); } catch { broke = null; }
     if (!broke && !tickOnly && REWRITE_OK && firstBreak === -1) { try { broke = equationRewrite(raw, out); } catch { broke = null; } }
+    if (!broke && !tickOnly && PAGE_WITNESS && firstBreak === -1) { try { broke = PAGE_WITNESS(raw, i => out[i].status !== 'note' || out[i].unreadable === true || out[i].note === 'Follows from the earlier slip.'); } catch { broke = null; } }
     if (broke) {
       const message = broke.message;
       diagnosis = broke.rule === 'equation-rewrite'
         ? { code: 'equation-not-a-rewriting', title: 'This line does not follow from the line above', message, fix: 'Rewrite the equation above again, doing the same thing to both sides, and check the line against it.', confidence: 'high' }
-        : { code: 'page-definition-not-held', title: 'This line does not agree with what you wrote above', message, fix: 'Put the value from the earlier line in again and work this line out once more.', confidence: 'high' };
+        : ['function-value', 'implication', 'derivative', 'extremum'].includes(broke.rule)
+          ? { code: `claim-false-${broke.rule}`, title: 'This line does not agree with the question\u2019s own function', message, fix: 'Work this line out again from the function in the question.', confidence: 'high', ...(broke.corrected ? { corrected: broke.corrected } : {}) }
+          : { code: 'page-definition-not-held', title: 'This line does not agree with what you wrote above', message, fix: 'Put the value from the earlier line in again and work this line out once more.', confidence: 'high' };
       firstBreak = broke.index;
       out[broke.index] = { text: out[broke.index].text, status: 'break', note: message, diagnosis, ...(broke.rule ? { valueChain: { rule: broke.rule } } : {}) };
       for (let k = broke.index + 1; k < out.length; k++) out[k] = { text: out[k].text, status: 'note', unverified: true, note: 'Follows from the earlier slip.' };

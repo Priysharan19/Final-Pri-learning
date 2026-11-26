@@ -53,6 +53,14 @@ export const PHRASES = Object.freeze({
   pointClaim: 'Correct stationary point',
   conclusionMatches: 'Correct conclusion',
   conditionLine: 'Condition stated',
+  functionValue: 'Correct function value',
+  equationSolved: 'Correct solution of the equation',
+  conditionStated: 'Condition stated',
+  derivativeOfFunction: 'Correct derivative',
+  conclusionExtremum: 'Correct maximum or minimum',
+  checkValuesList: 'Values to check listed',
+  figureLabel: 'Label on the sketch',
+  pointOnCurve: 'Point on the curve',
   conclusion: 'Correct answer',
   heading: 'Heading',
   question: 'Question restated',
@@ -125,7 +133,9 @@ const TICK = {
   'substitution-defined': 'substitutionDefined', 'substitution-consistent': 'substitutionConsistent', 'derivative-of-substitution': 'substitutionDerivative', 'differential-form': 'differentialForm',
   'change-of-variable': 'changeOfVariable', 'integral-rewritten': 'integralRewritten', 'antiderivative-checked': 'antiderivativeChecked', 'back-substitution': 'backSubstitution',
   'equivalent-expressions': 'equivalentExpressions', 'definite-integral-evaluated': 'definiteIntegral', 'several-claims': 'severalClaims',
-  'given-data': 'givenData', 'method-stated': 'methodStated', 'formula-value': 'formulaValue', defines: 'defines', 'method-claim': 'methodClaim', 'condition-value': 'conditionValue', model: 'model', 'substitution-formula': 'substitutionFormula', 'conclusion-sentence': 'conclusionSentence'
+  'given-data': 'givenData', 'method-stated': 'methodStated', 'formula-value': 'formulaValue', defines: 'defines', 'method-claim': 'methodClaim', 'condition-value': 'conditionValue', model: 'model', 'substitution-formula': 'substitutionFormula', 'conclusion-sentence': 'conclusionSentence',
+  'function-value': 'functionValue', 'equation-solved': 'equationSolved', 'condition-stated': 'conditionStated', 'derivative-of-function': 'derivativeOfFunction', 'conclusion-extremum': 'conclusionExtremum',
+  'check-values-list': 'checkValuesList', 'figure-label': 'figureLabel', 'point-on-curve': 'pointOnCurve'
 };
 // ids the engine gives a tick when it had no specific proof to name; a named rule the page itself read between the two lines (`card.rules`) is more specific, so it is shown instead
 const WEAK_TICK = new Set(['true-as-written', 'matches-worked-step']);
@@ -436,6 +446,14 @@ export const DETAILS = Object.freeze({
   pointClaim: 'The stationary point stated on this line is correct.',
   conclusionMatches: 'The conclusion on this line matches the working above it.',
   conditionLine: 'The condition stated on this line is correct.',
+  functionValue: 'Every expression on this line comes to what the question\u2019s function gives at that value.',
+  equationSolved: 'The values stated are all of the real solutions of the equation on this line (inside the interval the question gives, when it gives one).',
+  conditionStated: 'A condition is stated. It is the one the question calls for, so there is nothing to check.',
+  derivativeOfFunction: 'This is the derivative, and it agrees with the real derivative at every value tried.',
+  conclusionExtremum: 'This is the greatest or least value over the whole interval, found by comparing the stationary points with both ends.',
+  checkValuesList: 'The values named are the ends of the interval and the stationary points. This line only lists them.',
+  figureLabel: 'A label of the sketch: nothing to check.',
+  pointOnCurve: 'This point is on the curve and inside the interval the question gives.',
   conclusion: 'This is the answer the question asks for, and it is correct.',
   heading: 'A heading: nothing to check.',
   question: 'This line restates the question.',
