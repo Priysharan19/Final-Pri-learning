@@ -163,11 +163,11 @@ for (const s of SUBTOPICS) {
     }
   }
 }
-// The offered cells, counted: 263 = 132 levels at which a content review READ the generator's questions and found them on the dot point
-// (tools/nsw-dotpoint-content-review.json, Years 11 and 12) + 131 levels that only the author's bank (or a question that names its own dot
+// The offered cells, counted: 265 = 132 levels at which a content review READ the generator's questions and found them on the dot point
+// (tools/nsw-dotpoint-content-review.json, Years 11 and 12) + 133 levels that only the author's bank (or a question that names its own dot
 // point) answers. It was `cells` (every cell the registry table names, 381) before the review: the table alone proved nothing, so the cells it
 // names that the review found mixed are no longer offered.
-eq(issuedCells, 263, 'the issued section covers exactly the offered cells');
+eq(issuedCells, 265, 'the issued section covers exactly the offered cells');
 eq(issuedLeaks, {}, 'issued through the server, a requested dot point never returns another one in any cell');
 eq(issuedOn, issuedTotal, `${issuedOn}/${issuedTotal} issued questions belong to the dot point asked for`);
 console.log(`  issued through the server: ${issuedOn}/${issuedTotal} on the dot point across ${issuedCells} cells; leaks ${JSON.stringify(issuedLeaks)}`);
