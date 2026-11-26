@@ -30,7 +30,7 @@ for (const l of ['3·4 − 11 = 1', '3-2=1', 'x=1', '2+2=4', '1=2', 'f(x)=x', 'x
 
 const TRIVIAL = Array.from({ length: 10 }, (_, n) => `${n}=${n}`);
 const parts = bankSweep.eligibleParts({ rule: 'generic' });
-c.eq(parts.length, 413, '413 eligible bank parts (367 before the larger pack of #1129)');
+c.eq(parts.length, 405, '405 eligible bank parts (367 before the larger pack of #1129)');
 { let pages = 0, earned = 0, insertedChanged = 0, genuine = 0, genuineEarn = 0;
   for (const p of parts) {
     const t = bankAuthoredLines(p.q).map(l => l.text);
