@@ -220,13 +220,15 @@ function derivFn(ast, st) {
 }
 /** 'same' | 'differ' | 'unsure', and where it differed. */
 function compare(f, g) {
-  let comparable = 0, differ = null;
+  let comparable = 0, differ = null, unequalDomain = false;
   for (const x of SAMPLES) {
     const a = f(x), b = g(x);
-    if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
+    if (!Number.isFinite(a) || !Number.isFinite(b)) { if (Number.isFinite(a) !== Number.isFinite(b)) unequalDomain = true; continue; }
     comparable++;
     if (!close(a, b, 1e-9)) { if (!close(a, b, 1e-6) && !differ) differ = { x, a, b }; else if (!differ) differ = null, comparable--; }
   }
+  // an identity that holds only where one side is defined (ln(x²) = 2 ln x holds for x > 0 only) is neither ticked nor crossed
+  if (unequalDomain) return { verdict: 'unsure' };
   if (differ && comparable >= 3) return { verdict: 'differ', ...differ };
   if (!differ && comparable >= 8) return { verdict: 'same' };
   return { verdict: 'unsure' };
@@ -362,8 +364,8 @@ function defClaim(c, st, lineNo, back) {
   if (have) {
     const cmp = compare(have.fn, val);
     if (cmp.verdict === 'same') return { verdict: 'consistent', cls: 'substitution-consistent', note: `${L} = ${plain(rhs)} is the substitution defined above`, L };
-    if (cmp.verdict === 'differ' && !c.defining && have.keyword) return falseClaim(`${L} = ${plain(rhs)}`, `the substitution on line ${have.line} is ${showSub(have)}, not ${L} = ${plain(rhs)}`);
-    if (cmp.verdict === 'differ' && c.defining) { /* a new substitution replaces the old one */ } else return unknown('substitution not comparable');
+    // a definition cannot be false: another expression for the same letter (a second part, a new try) REPLACES the old one, and later lines are checked against the latest
+    if (cmp.verdict !== 'differ') return unknown('substitution not comparable');
   }
   st.subs.set(L, { L, ast, text: rhs, fn: val, dAst, line: lineNo, keyword: !!(c.defining || back) });
   return { verdict: 'defined', cls: 'substitution-defined', note: `${L} = ${plain(rhs)} defines the substitution`, L };

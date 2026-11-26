@@ -21,6 +21,7 @@ const { displayFields, bankDisplayFields, CLASSES } = await import('../../client
 const { classOf, phraseOf, PHRASES } = await import('../../client/src/components/markedPageTeacher.js');
 const { stepEvidence, MARKER_OPS } = await import('../platform/markerOps.js');
 const { checkAnswer } = await import('../../client/src/engine/checker.js');
+const { openNote } = await import('../../client/src/engine/provedLines.js');
 
 let pass = 0; const failures = [];
 const ok = (c, l) => { if (c) pass++; else failures.push(l); };
@@ -196,9 +197,9 @@ for (const p of pages) {
   if (!shown) continue;
   shownCount++;
   if (base) {
-    // a line the integration layer ticked or crossed (engine/integrationLines.js, fact.proof 'integration' / 'integration-false') is held by its own check (integration-lines-check.mjs): every OTHER line must be the marker's, unmoved
+    // a line the integration layer ticked or crossed (engine/integrationLines.js, fact.proof 'integration' / 'integration-false') is held by its own check (integration-lines-check.mjs): a line is exempt only when it was an OPEN NOTE on the marker's report (the layer can never overturn a tick or a cross); every OTHER line must be the marker's, unmoved
     const byIntegration = l => !!l && l.fact && (l.fact.proof === 'integration' || l.fact.proof === 'integration-false' || l.tickClass === 'substitution-defined');
-    const same = base.lines.length === shown.lines.length && base.lines.every((l, i) => byIntegration(shown.lines[i]) || JSON.stringify(strip(l)) === JSON.stringify(strip(shown.lines[i])));
+    const same = base.lines.length === shown.lines.length && base.lines.every((l, i) => (byIntegration(shown.lines[i]) && openNote(l)) || JSON.stringify(strip(l)) === JSON.stringify(strip(shown.lines[i])));
     if (!same && !p.bank) continue;      // a generated page's displayed report also carries the proved-line ticks (engine/provedLines.js): its own check holds those
     if (!same) { shownMoved++; if (process.env.DBG) console.log('MOVED', p.id, JSON.stringify(base.lines.map(strip)).slice(0, 400), JSON.stringify(shown.lines.map(strip)).slice(0, 400)); }
   } else { if (p.bank && !shown.lines.every(l => l.status === 'note')) { shownMoved++; if (process.env.DBG) console.log('NOBASE', p.id, JSON.stringify(shown.lines).slice(0, 500)); } if (p.bank || shown.lines.every(l => l.status === 'note')) noReportPage ||= p; }

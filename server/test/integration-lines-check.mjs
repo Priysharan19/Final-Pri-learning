@@ -105,9 +105,9 @@ expect('wrong back-substitution (x²+9)', [DEF, '∫ 12x (x² + 8)⁵ dx = (x² 
 expect('wrong back-substitution (u dropped, x^2 only)', [DEF, '∫ 12x (x² + 8)⁵ dx = (x²)⁶ + C'], 'tx');
 expect('wrong back-substitution (power)', [DEF, '∫ 12x (x² + 8)⁵ dx = (x² + 8)⁵ + C'], 'tx');
 expect('restated substitution, same', [DEF, 'Substituting back u = x² + 8,'], 'tt');
-expect('restated substitution, different', [DEF, 'Substituting back u = x² + 9,'], 'tx');
+expect('restated substitution, different, is a redefinition: never crossed', [DEF, 'Substituting back u = x² + 9,'], 'tn');
 expect('restated reversed', [DEF, 'x² + 8 = u'], 'tt');
-expect('restated reversed, different', [DEF, 'x² + 9 = u'], 'tx');
+expect('restated reversed, different, is a redefinition', [DEF, 'x² + 9 = u'], 'tn');
 expect('answer left in u is a true line', [DEF, '∫ 12x (x² + 8)⁵ dx = u⁶ + C'], 'tt');
 expect('equivalent form of the answer', [DEF, '∫ 12x (x² + 8)⁵ dx = (8 + x²)⁶ + C'], 'tt');
 expect('chain u^6 + C = (x^2+8)^6 + C', [DEF, '∫ 6u⁵ du = u⁶ + C = (x² + 8)⁶ + C'], 'tt');
@@ -142,6 +142,17 @@ expect('u = cos 2x, du=-2sin2x dx', ['Let u = cos 2x.', 'du=-2sin2x dx'], 'nt');
 expect('cos(3x) with its brackets is read', ['Let u = sin(3x).', 'du = 3cos(3x) dx'], 'nt');
 expect('bare argument and a further factor', [DEF, 'du = 2sin2x(x + 1) dx'], 't.');
 expect('wrong with a bracketed argument is still crossed', ['Let u = sin(3x).', 'du = 3sin(3x) dx'], '.x');
+
+// review: a redefinition of the substitution letter is never crossed; later lines follow the LATEST definition
+expect('redefinition 1', [DEF, 'u = x² + 1'], 'tn');
+expect('redefinition 2', ['Let u = x²+8, then du = 2x dx', 'Now u = x²+1, then du = 2x dx'], 'tt');
+expect('after a redefinition the latest holds', [DEF, 'Let u = x² + 1', 'du = 2x dx', '∫ 6u⁵ du = u⁶ + C = (x² + 1)⁶ + C'], 'tntt');
+expect('a back-substitution against the definition in force is still crossed', [DEF, 'u = x² + 1', '∫ 6u⁵ du = u⁶ + C = (x² + 8)⁶ + C'], 'tnx');
+expect('a bare redefinition then a wrong chain', ['Let u = x² + 8', 'u = x² + 1', '∫ 6u⁵ du = u⁶ + C = (x² + 8)⁶ + C'], 'nnx');
+// review: an identity true on a restricted domain is a note, alone or in a chain
+expect('ln(x^2) = 2 ln x alone', ['ln(x²) = 2 ln x'], '.');
+expect('ln(x^2) = 2 ln x chained after an integral', ['∫ 2/x dx = ln(x²) + C = 2 ln x + C'], 'x'.replace('x', '.'));
+expect('ln(x^2) = 2 ln x with a constant', ['ln(x²) + C = 2 ln x + C'], '.');
 
 // ── 3. undecidable is a note ─────────────────────────────────────────────────
 expect('missing dx', [DEF, '12x = 6 du'], 't.');
