@@ -28,7 +28,7 @@ if (edition) {
   const exact = (name, got, want) => ok(got === want, `${edition}: ${name} is ${want}, got ${got}`);
   exact('the questions swept (every generator, four levels, seeds 1-30)', s.questions, 49440);
   exact('the expression keys', s.keyed, 1045); exact('the keys marked correct as authored', s.keyAccepted, 1045);
-  exact('the packed bank questions', s.bankQuestions, 2218); exact('the bank keys', s.bankKeyed, 374); exact('the bank keys marked correct as authored', s.bankKeyAccepted, 374);
+  exact('the packed bank questions', s.bankQuestions, 2214); exact('the bank keys', s.bankKeyed, 374); exact('the bank keys marked correct as authored', s.bankKeyAccepted, 374);
   exact('the unbracketed conventional forms typed', s.conventional, 182); exact('…refused', s.conventionalRefused, 0);
   exact('the two-reading forms typed (e^2x, sqrt2x, log2x)', s.ambiguous, 20); exact('…refused', s.ambiguousRefused, 0);
   exact('the explicit-multiplication typings (e^2*x, e^2·x, e^2×x, sqrt2*x, log2*x)', s.explicit, 60); exact('…marked correct', s.explicitAccepted, 0);

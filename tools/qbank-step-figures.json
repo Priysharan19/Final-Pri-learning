@@ -6,7 +6,6 @@
  "scope": "Only a leak the figure-risk rule words as \"step result: ...\" is waived, and only for the parts in `parts`. Every other rule (the answer drawn, the answer printed, the sketch asked for, legibility, a second review, every pack gate) is unchanged and still holds a figure back.",
  "byEyeCleared": [
   "A11-C1-100",
-  "A12-C3-011",
   "A12-C3-020",
   "A12-C3-059",
   "A12-C4-045",
@@ -16,8 +15,7 @@
   "X11-F2-099",
   "X12-C3-017",
   "X12-C3-028",
-  "X12-C3-099",
-  "X12-T3-031"
+  "X12-C3-099"
  ],
  "byEyeNote": "Entries of HELD_BY_EYE (qbank-figure-risk.mjs) for these parts were read against the decision: each says the figure shows a step of the working, not the answer and not a defect, so the by-eye hold is waived with the step-result rule.",
  "notReleased": {
@@ -87,7 +85,11 @@
   "A12-S3-001(ii)": "shares its figure with a held part of the same question",
   "A12-S3-002(ii)": "shares its figure with a held part of the same question",
   "A12-S3-008(i)": "shares its figure with a held part of the same question",
-  "X11-T1-014(i)": "shares its figure with a held part of the same question"
+  "X11-T1-014(i)": "shares its figure with a held part of the same question",
+  "A12-C3-090": "figure shows the final answer (in part)",
+  "A12-C3-095": "figure shows the final answer (in part)",
+  "A12-C3-011": "figure shows the final answer (in part)",
+  "X12-T3-031": "figure shows the final answer (in part)"
  },
  "notReleasedNote": "On the owner list but not released: the by-eye reason says the figure shows the answer, or a legibility or mismatch defect, or another pack gate fails once the figure is released, or (independent review of 26 Nov 2026, reason \"figure shows the final answer\") the final key can be read off the figure or obtained from its labelled values by one trivial operation. They stay held and are kept out of `parts`.",
  "parts": [
@@ -138,16 +140,13 @@
   "A12-C2-005",
   "A12-C3-004(i)",
   "A12-C3-004(ii)",
-  "A12-C3-011",
   "A12-C3-015(i)",
   "A12-C3-015(ii)",
   "A12-C3-020",
   "A12-C3-059",
   "A12-C3-067",
   "A12-C3-079",
-  "A12-C3-090",
   "A12-C3-094",
-  "A12-C3-095",
   "A12-C4-005",
   "A12-C4-007",
   "A12-C4-009(i)",
@@ -272,7 +271,6 @@
   "X12-S1-137",
   "X12-S1-142",
   "X12-S1-144",
-  "X12-T3-031",
   "X12-T3-067"
  ]
 }
