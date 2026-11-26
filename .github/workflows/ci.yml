@@ -543,6 +543,7 @@ jobs:
           node server/test/alert-notifier-check.mjs 2>&1 | tee -a ops.log
           node server/test/error-telemetry-check.mjs 2>&1 | tee -a ops.log
           node server/test/static-caching-check.mjs 2>&1 | tee -a ops.log
+          node server/test/not-found-status-check.mjs 2>&1 | tee -a ops.log
           node tools/ci-check-counts.mjs verify platform/ops.log
       # V1 blocker #14: every /v1 route is in the reviewed inventory with the
       # guards really mounted on it; every object-level route fails closed for

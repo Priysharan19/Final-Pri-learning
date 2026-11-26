@@ -121,5 +121,7 @@ export const AU_STRINGS = Object.freeze({
   'pricing.why.youConfirm': 'You can see how Pri read your handwriting and correct it. A model’s reading never sets a mark.',
   'scn.label.hand': 'Handwriting read, and checked where it can be',
   'picker.year': 'Year',
-  'picker.course': 'Course'
+  'picker.course': 'Course',
+  // Signing out forgets the account link on the device, so the gate said the profile was not connected. It is signed out.
+  'activation.notLinked': 'This profile is not signed in to a Pri account. Sign in to check your answers.'
 });
