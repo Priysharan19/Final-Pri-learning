@@ -443,7 +443,7 @@ for (const [name, want] of Object.entries(OWNER)) {
         await pg.click('[data-mp-view-option="detailed"]'); await pg.waitForSelector('.mp-t-sheet[data-mp-view="detailed"]');
         const list = await pg.evaluate(() => [...document.querySelectorAll('[data-mp-list] li')].map(li => `${li.getAttribute('data-mp-list-n')} ${li.querySelector('[data-mp-plain]')?.getAttribute('data-mp-plain') ?? li.innerText.replace(/\s+/g, ' ').trim()}`));
         ok(list.length >= want.ticks.length && !list.some(x => /true as written|^\d+ Correct (?:arithmetic|substitution)/i.test(x)), `${where}: the list rows give the fact, not the class name ${JSON.stringify(list.slice(0, 3))}`);
-        for (const [n, text] of Object.entries(want.say).slice(0, 3)) ok(list.some(x => x.startsWith(`${n} `) && x.includes(text.replace(/^Correct answer$/, 'Correct answer'))), `${where}: row ${n} says "${text}"`);
+        for (const [n, text] of Object.entries(want.say).slice(0, 3)) ok(list.some(x => x.startsWith(`${n} `) && x.includes(text)), `${where}: row ${n} says "${text}"`);
       }
       await ctx.close();
     }

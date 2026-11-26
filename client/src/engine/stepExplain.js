@@ -258,7 +258,7 @@ function algebraicName(A, B) {
     const nf = productFactors(a.l), df = productFactors(a.r);
     const keyOf = f => plainOf(f);
     for (const f of nf) { if (unwrap(f).t !== 'num' && df.some(g => keyOf(g) === keyOf(f))) return [`Cancelled the common factor ${plainOf(unwrap(f).t === 'bin' ? f.t === 'group' ? f : { t: 'group', v: f } : f)}`, 'cancel']; }
-    if (!closed(a.r) && !closed(b) !== undefined) {
+    if (!closed(a.r)) {
       const back = { t: 'bin', op: '*', l: { t: 'group', v: b }, r: { t: 'group', v: a.r } };
       if (isSum(a.r) || unwrap(a.r).t === 'var') { if (equalByEngine(back, a.l) && !closed(a.r)) return [`Cancelled the common factor ${plainOf(isSum(a.r) ? { t: 'group', v: a.r } : a.r)}`, 'cancel']; }
     }
@@ -432,11 +432,9 @@ function polyToNode(p) {
 function sample(vars, k) { const env = {}; vars.forEach((v, i) => { env[v] = [0.7, 1.3, -0.6, 2.1, 3.4][(k + i * 2) % 5] + k * 0.31 + i * 0.07; }); return env; }
 const evalAt = (n, env) => { try { const v = evaluate(n, env); return Number.isFinite(v) ? v : null; } catch { return null; } };
 const nice = v => { for (let q = 1; q <= 12; q++) { const p = v * q; if (Math.abs(p - Math.round(p)) < 1e-9) return { p: Math.round(p), q }; } return null; };
-const fracText = (p, q, mode) => (q === 1 ? String(p) : mode === 'tex' ? `\\frac{${p}}{${q}}` : `${p}/${q}`);
 
 function equationStep(L1, R1, L2, R2) {
   const vars = [...new Set([...variablesOf(L1), ...variablesOf(R1), ...variablesOf(L2), ...variablesOf(R2)])].filter(v => v !== 'e');
-  const sentenceOf = (verb, plainK, texK, side) => ({ verb, plainK, texK, side });
   // add or subtract the same thing from both sides
   const p = [L1, R1, L2, R2].map(tryPoly);
   if (p.every(Boolean)) {

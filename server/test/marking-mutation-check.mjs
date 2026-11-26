@@ -21,6 +21,9 @@
 import fs from 'node:fs';
 import { run, judgeMutant, mutationsOf, roundingMutants, sidesOf, sideValues, loadEngine, markPage, lineAt, authoredPage, typedAnswer } from '../../tools/marking-mutation-harness.mjs';
 
+// MM_PART splits the check across CI shards (g = the harness over the generated pages, b = the bank sweep, s = the bank sweep in the bank's own scope, m = the live-defect pages and the later pins; the small checks above run in every part); unset runs all of it. Each sweep prints its own pinned count line.
+const PART = process.env.MM_PART || 'all';
+const want = p => PART === 'all' || PART === p;
 const G = await import('../../client/src/engine/generators/index.js');
 const { stepEvidence, stepMetaFor } = await import('../platform/markerOps.js');
 const { checkAnswer } = await import('../../client/src/engine/checker.js');
@@ -317,7 +320,7 @@ let corpusFalse = 0, corpusCross = 0, corpusFalseTicked = 0, corpusCrossed = 0, 
 }
 
 // ── the harness over the authored pages ──────────────────────────────────────────────────────────────────────────────────────
-{
+if (want('g')) {
   const res = await run({ seeds: SEEDS, maxPerLine: 8 });
   const t = res.totals;
   const aside = Object.entries(res.setAside).sort().map(([k, v]) => `${k} ${v}`).join(', ');
@@ -334,7 +337,7 @@ let corpusFalse = 0, corpusCross = 0, corpusFalseTicked = 0, corpusCrossed = 0, 
 }
 
 // ── the author bank ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-{
+if (want('b')) {
   // as the product reads and marks a page today (no bank scope): the legacy pin below is origin/main's own, and this tree must print it unchanged
   const B = await run({ bank: true, bankScope: false, maxPerLine: 6 });
   const t = B.totals;
@@ -347,7 +350,7 @@ let corpusFalse = 0, corpusCross = 0, corpusFalseTicked = 0, corpusCrossed = 0, 
   ok(t.trueTicks >= 1600, `authored bank lines are still ticked (${t.trueTicks})`);
 }
 
-{
+if (want('s')) {
   // the same pages read and marked in the bank's own scope (solutionMatch.withBankReading: the extended TeX reading the draft bank rules use)
   const B = await run({ bank: true, bankScope: true, maxPerLine: 6 });
   const t = B.totals;
@@ -361,7 +364,7 @@ let corpusFalse = 0, corpusCross = 0, corpusFalseTicked = 0, corpusCrossed = 0, 
 }
 
 // ── the live defect: Solve √(x+5) = x − 1 (A11-F1-172, answer 4) ─────────────────────────────────────────────────────────────────────────
-{
+if (want('m')) {
   const pack = await import('../platform/qbankPack.js');
   const { MARKER_OPS, markerView } = await import('../platform/markerOps.js');
   await pack.ensureQbank({ ...process.env, PRI_EDITION: 'prithagoras' }, { strict: true });
@@ -471,5 +474,6 @@ let corpusFalse = 0, corpusCross = 0, corpusFalseTicked = 0, corpusCrossed = 0, 
     ok(JSON.stringify(withCross.topicTicks) === JSON.stringify(without.topicTicks), 'the cross copies no mark: the ticks that pay are the same'); }
 }
 
-console.log(failed ? `MARKING MUTATION: FAIL: ${failed} of ${checks} checks` : `MARKING MUTATION: PASS: ${checks} checks`);
+const TAG = PART === 'all' ? 'MARKING MUTATION' : `MARKING MUTATION PART ${PART}`;
+console.log(failed ? `${TAG}: FAIL: ${failed} of ${checks} checks` : `${TAG}: PASS: ${checks} checks`);
 process.exit(failed ? 1 : 0);

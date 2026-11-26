@@ -24,6 +24,7 @@ import { normalize, parse, evaluate, variablesOf } from './expr.js';
 import { texToPlain } from './texToPlain.js';
 import { questionFacts } from './questionFacts.js';
 import { pageProofs } from './pageProofs.js';
+import { pageProofs3 } from './pageProofs3.js';
 import { pageProofs2, NEUTRAL as NEUTRAL_CLASSES } from './pageProofs2.js';
 
 const MINUS = /[−–—]/g;
@@ -453,6 +454,8 @@ export function provedLines(q, meta, report) {
   try { const pp = pageProofs(q, lines, limit, (l, i) => openNote(l)); final = pp.lines; pageN = pp.n + pp.lines.filter((l, i) => l !== lines[i] && l.status !== 'ok').length; } catch { final = lines; pageN = 0; }
   // The second page pass (pageProofs2.js): function values, implications, conditions, derivatives, the closed-interval extreme, check lists and the labels of a sketch.
   try { const p2 = pageProofs2(q, final, limit, (l, i) => openNote(l)); if (p2.n) { final = p2.lines; pageN += p2.n; } } catch { /* the first pass stands */ }
+  // The third page pass (pageProofs3.js): chains of exact values (trigonometric, logarithmic, exponential, factorial and counting) the arithmetic check refuses.
+  try { const p3 = pageProofs3(q, final, limit, (l, i) => openNote(l)); if (p3.n) { final = p3.lines; pageN += p3.n; } } catch { /* the earlier passes stand */ }
   if (!n && !pageN) return report;
   return withLines(report, final);
 }
@@ -471,6 +474,7 @@ export function provedLinesBank(q, report) {
   try { const pp = pageProofs(q, lines, limit, (l, i) => openNote(l), { promptOnly: true }); if (pp.lines !== lines) { lines = pp.lines; n += pp.n + pp.lines.filter((l, i) => l !== report.lines[i] && l.status !== 'ok').length; } } catch { lines = report.lines; n = 0; }
   const p2 = pageProofs2(q, lines, limit, (l, i) => openNote(l));
   if (p2.n) { lines = p2.lines; n += p2.n; }
+  try { const p3 = pageProofs3(q, lines, limit, (l, i) => openNote(l)); if (p3.n) { lines = p3.lines; n += p3.n; } } catch { /* the earlier passes stand */ }
   return n ? withLines(report, lines) : report;
 }
 
