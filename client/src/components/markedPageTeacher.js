@@ -65,6 +65,7 @@ export const PHRASES = Object.freeze({
   binomialCoefficient: 'Correct binomial coefficient',
   triangleValue: 'Correct value for the triangle',
   solutionsInInterval: 'All the solutions in the interval',
+  statedValue: 'A value stated without working',
   conclusion: 'Correct answer',
   heading: 'Heading',
   question: 'Question restated',
@@ -139,7 +140,7 @@ const TICK = {
   'equivalent-expressions': 'equivalentExpressions', 'definite-integral-evaluated': 'definiteIntegral', 'several-claims': 'severalClaims',
   'given-data': 'givenData', 'method-stated': 'methodStated', 'formula-value': 'formulaValue', defines: 'defines', 'method-claim': 'methodClaim', 'condition-value': 'conditionValue', model: 'model', 'substitution-formula': 'substitutionFormula', 'conclusion-sentence': 'conclusionSentence',
   'function-value': 'functionValue', 'equation-solved': 'equationSolved', 'condition-stated': 'conditionStated', 'derivative-of-function': 'derivativeOfFunction', 'conclusion-extremum': 'conclusionExtremum',
-  'check-values-list': 'checkValuesList', 'figure-label': 'figureLabel', 'point-on-curve': 'pointOnCurve', 'exact-value': 'exactValue', 'binomial-coefficient': 'binomialCoefficient', 'triangle-value': 'triangleValue', 'solutions-in-interval': 'solutionsInInterval'
+  'check-values-list': 'checkValuesList', 'figure-label': 'figureLabel', 'point-on-curve': 'pointOnCurve', 'exact-value': 'exactValue', 'binomial-coefficient': 'binomialCoefficient', 'triangle-value': 'triangleValue', 'solutions-in-interval': 'solutionsInInterval', 'stated-value': 'statedValue'
 };
 // ids the engine gives a tick when it had no specific proof to name; a named rule the page itself read between the two lines (`card.rules`) is more specific, so it is shown instead
 const WEAK_TICK = new Set(['true-as-written', 'matches-worked-step']);
@@ -461,6 +462,7 @@ export const DETAILS = Object.freeze({
   binomialCoefficient: 'The question names one expansion and one power of x; this line comes to the coefficient of that power, worked out from the expansion.',
   triangleValue: 'The triangle in the question is fixed by what it gives. Every value on this line comes to the same number for that triangle.',
   solutionsInInterval: 'The equation above has exactly these solutions in the interval the question gives, and this line lists them all.',
+  statedValue: 'This value is stated with no working and no relation to check, so Pri does not mark it right or wrong.',
   exactValue: 'Every value on this line comes to the same number, worked out exactly. Only the numbers are checked.',
   conclusion: 'This is the answer the question asks for, and it is correct.',
   heading: 'A heading: nothing to check.',

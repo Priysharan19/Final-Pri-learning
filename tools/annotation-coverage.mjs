@@ -75,7 +75,8 @@ export const genToPlain = span => SM._internals.spanToPlain(span);
  */
 export function authoredLines(q, toPlain) {
   const lines = [];
-  let unreadable = 0, spans = 0, firstUnreadable = null;
+  const latex = [];
+  let unreadable = 0, spans = 0, firstUnreadable = null, flattened = 0;
   for (const st of Array.isArray(q?.steps) ? q.steps : []) {
     for (const m of String(st?.d ?? '').replace(/\\\$/g, '\u0001').matchAll(TEX_SPAN)) {
       for (const part of m[1].split(/\\(?:Rightarrow|Longrightarrow|therefore|implies)/)) {
@@ -83,13 +84,122 @@ export function authoredLines(q, toPlain) {
         spans++;
         let plain = null;
         try { plain = toPlain(part); } catch { plain = null; }
+        let viaReader = false;
+        // The engine's own reading of the TeX did not give a line. A student's page is read by the handwriting reader, which returns the line as flat text AND its TeX
+        // (the pair the marker takes as `workingLatex`): the flat text is made here the way that reader writes it (readerFlat), and the TeX goes with it.
+        if (!plain || !String(plain).trim()) { try { plain = readerFlat(part); } catch { plain = null; } viaReader = !!plain; }
         if (!plain || !String(plain).trim()) { unreadable++; firstUnreadable ||= part.trim(); continue; }
         plain = String(plain).trim();
-        if (lines[lines.length - 1] !== plain) lines.push(plain);
+        if (lines[lines.length - 1] !== plain) {
+          lines.push(plain);
+          if (viaReader) { flattened++; latex.push({ text: plain, latex: part.trim() }); }
+        }
       }
     }
   }
-  return { lines: lines.slice(0, 40), unreadable, spans, firstUnreadable };
+  return { lines: lines.slice(0, 40), unreadable, spans, firstUnreadable, latex, flattened };
+}
+
+// ── the handwriting reader's flat text for a line of TeX ─────────────────────
+// The reader's `text` for a line is plain (see owner pages: `sin B/15 = sin 49°/22`, `C = 180° - 49° - 31°`, `dy/dx = 4x(2x^2 - 4)`): stacked fractions as a/b,
+// powers with ^, the degree sign, ± and the usual symbols as written. This is a measurement aid for the TOOL only: it turns authored TeX into that shape. It reads
+// nothing the engine decides (the line is then judged exactly as a student's line is) and returns null for a layout it would only guess at (environments, over-arrows).
+const GREEK = { alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ', epsilon: 'ε', varepsilon: 'ε', lambda: 'λ', mu: 'μ', sigma: 'σ', omega: 'ω', phi: 'φ', varphi: 'φ', rho: 'ρ', tau: 'τ', kappa: 'κ', theta: 'θ', pi: 'π', Delta: 'Δ', Sigma: 'Σ', Omega: 'Ω', Phi: 'Φ' };
+const SYM = { circ: '°', pm: '±', mp: '∓', times: '×', cdot: '·', div: '÷', le: '≤', leq: '≤', ge: '≥', geq: '≥', ne: '≠', neq: '≠', approx: '≈', to: '→', rightarrow: '→', mapsto: '→', in: '∈', notin: '∉', infty: '∞', cup: '∪', cap: '∩', emptyset: '∅', angle: '∠', perp: '⊥', parallel: '∥', cdots: '...', ldots: '...', dots: '...', lt: '<', gt: '>', sum: 'Σ', prod: 'Π', int: '∫', lim: 'lim', partial: '∂', neg: '¬', setminus: '\\', mathbb: '' };
+const FNS = new Set(['sin', 'cos', 'tan', 'sec', 'csc', 'cosec', 'cot', 'ln', 'log', 'exp', 'arcsin', 'arccos', 'arctan', 'max', 'min']);
+function groupAt(s, i) {   // the {...} group starting at s[i] === '{': [inner, indexAfter] or null
+  if (s[i] !== '{') return null;
+  let d = 0;
+  for (let k = i; k < s.length; k++) { if (s[k] === '{') d++; else if (s[k] === '}' && --d === 0) return [s.slice(i + 1, k), k + 1]; }
+  return null;
+}
+export function readerFlat(tex) {
+  const src = String(tex ?? '').trim();
+  if (!src || /\\(?:begin|end|underline|overline|overrightarrow|hat|bar|vec|dot|ddot|xrightarrow|stackrel|substack|boxed|cancel|hspace|vspace|phantom|label|tag)(?![A-Za-z])/.test(src)) return null;
+  const out = flatten(src);
+  if (out === null || /\\/.test(out) || !out.trim()) return null;
+  return out.replace(/\s+/g, ' ').trim();
+}
+function flatten(s) {
+  let o = '';
+  for (let i = 0; i < s.length;) {
+    const c = s[i];
+    if (c === '\\') {
+      const m = /^\\([A-Za-z]+|.)/.exec(s.slice(i));
+      if (!m) return null;
+      const name = m[1];
+      i += m[0].length;
+      if (/^(?:left|right|big|Big|bigg|Bigg|bigl|bigr|displaystyle|textstyle)$/.test(name)) continue;
+      if (name === ',' && /\d$/.test(o) && /^\d/.test(s.slice(i))) continue;   // a thin space inside a number (30\,000) is the thousands gap
+      if (name === ',' || name === ';' || name === '!' || name === ':' || name === ' ' || name === 'quad' || name === 'qquad') { o += ' '; continue; }
+      if (name === '{' || name === '}') { o += name; continue; }
+      if (name === '|') { o += '|'; continue; }
+      if (name === '%') { o += '%'; continue; }
+      if (name === '$') { o += '$'; continue; }
+      if (/^[dt]?frac$/.test(name)) {
+        const parts = [];
+        for (let k = 0; k < 2; k++) {
+          while (s[i] === ' ') i++;
+          if (s[i] === '{') { const g = groupAt(s, i); if (!g) return null; parts.push(g[0]); i = g[1]; }
+          else { const d = /^(?:\d|[A-Za-z]|\\[A-Za-z]+)/.exec(s.slice(i)); if (!d) return null; parts.push(d[0]); i += d[0].length; }
+        }
+        const a = flatten(parts[0]), b = flatten(parts[1]);
+        if (a === null || b === null) return null;
+        const w = x => (/^-?[A-Za-z0-9.πθαβγδλμσωφρτκ]+$/.test(x.trim()) ? x.trim() : `(${x.trim()})`);
+        o += `${w(a)}/${w(b)}`;
+        continue;
+      }
+      if (name === 'sqrt') {
+        let idx = null;
+        if (s[i] === '[') { const e = s.indexOf(']', i); if (e < 0) return null; idx = s.slice(i + 1, e); i = e + 1; }
+        let body;
+        if (s[i] === '{') { const g = groupAt(s, i); if (!g) return null; body = g[0]; i = g[1]; } else { const d = /^(?:\d+|[A-Za-z]|\\[A-Za-z]+)/.exec(s.slice(i)); if (!d) return null; body = d[0]; i += d[0].length; }
+        const b = flatten(body);
+        if (b === null) return null;
+        o += idx ? `(${b.trim()})^(1/${idx.trim()})` : `√(${b.trim()})`;
+        continue;
+      }
+      if (/^d?binom$/.test(name)) {
+        const parts = [];
+        for (let k = 0; k < 2; k++) { while (s[i] === ' ') i++; const g = groupAt(s, i); if (g) { parts.push(g[0]); i = g[1]; } else { const d = /^(?:\d|[A-Za-z])/.exec(s.slice(i)); if (!d) return null; parts.push(d[0]); i += d[0].length; } }
+        const n = flatten(parts[0]), r = flatten(parts[1]);
+        if (n === null || r === null) return null;
+        o += `(${n.trim()}C${r.trim()})`;
+        continue;
+      }
+      if (/^(?:text|mathrm|mathbf|mathit|textbf|operatorname|mbox)$/.test(name)) {
+        while (s[i] === ' ') i++;
+        const g = groupAt(s, i);
+        if (g) { const t = flatten(g[0]); if (t === null) return null; o += (/^(?:mathbf|mathit)$/.test(name) ? t : ` ${t} `); i = g[1]; continue; }
+        const d = /^[A-Za-z]/.exec(s.slice(i));
+        if (!d) return null;
+        o += d[0]; i += 1;
+        continue;
+      }
+      if (name === 'mathbb') { while (s[i] === ' ') i++; const g = groupAt(s, i); if (!g) return null; o += g[0]; i = g[1]; continue; }
+      if (GREEK[name]) { o += GREEK[name]; continue; }
+      if (FNS.has(name)) { o += name; continue; }
+      if (Object.prototype.hasOwnProperty.call(SYM, name)) { o += SYM[name]; continue; }
+      return null;
+    }
+    if (c === '^' || c === '_') {
+      i += 1;
+      while (s[i] === ' ') i++;
+      let body;
+      if (s[i] === '{') { const g = groupAt(s, i); if (!g) return null; body = g[0]; i = g[1]; }
+      else { const d = /^(?:\\[A-Za-z]+|.)/.exec(s.slice(i)); if (!d) return null; body = d[0]; i += d[0].length; }
+      const b = flatten(body);
+      if (b === null) return null;
+      const t = b.trim();
+      if (c === '^' && t === '°') { o += '°'; continue; }
+      o += c === '^' ? (/^(?:[A-Za-z0-9]|\d+(?:\.\d+)?)$/.test(t) ? `^${t}` : `^(${t})`) : (/^[A-Za-z0-9]+$/.test(t) ? `_${t}` : `_(${t})`);
+      continue;
+    }
+    if (c === '{' || c === '}') { i++; continue; }
+    if (c === '~') { o += ' '; i++; continue; }
+    o += c; i++;
+  }
+  return o;
 }
 
 /** The key as a student types it into the answer box ('' when the question has none). */
@@ -113,9 +223,9 @@ export function keyText(q) {
  * Marks `lines` as the answer `answer` through the server's practice operation, and reads the report the page shows as the marked page does.
  * Returns { correct, cards: [{ status, cls, phrase, line }], answerLine, report } or null when the marker produced no line report.
  */
-export function markPage(q, answer, lines) {
+export function markPage(q, answer, lines, latex = null) {
   let r;
-  try { r = MARKER_OPS.practice({ q, answer, working: lines.join('\n'), evidenceIfWrong: true, policy: { methodMarks: true } }, () => {}); } catch { return null; }
+  try { r = MARKER_OPS.practice({ q, answer, working: lines.join('\n'), ...(latex && latex.length ? { workingLatex: latex } : {}), evidenceIfWrong: true, policy: { methodMarks: true } }, () => {}); } catch { return null; }
   const rep = r?.evidence?.shownReport || r?.evidence?.stepReport || null;
   if (!rep || !Array.isArray(rep.lines)) return { correct: r?.result?.correct === true, cards: null, answerLine: -1, report: null, noLineReport: r?.evidence?.noLineReport || null };
   let cards = null;
@@ -169,12 +279,12 @@ const QUESTION_BUCKET = { mcq: 'multiple-choice (no working page)', 'multi-mcq':
  * The true half. `q` is the marker's view of the question, `lines` its authored lines, `answer` its key as typed.
  * Returns { ok, cause, at, text, answerHalf, linesHalf, statuses[] }.
  */
-export function trueHalf(q, lines, answer, { unreadable = 0, worked = false, firstUnreadable = null } = {}) {
+export function trueHalf(q, lines, answer, { unreadable = 0, worked = false, firstUnreadable = null, latex = null } = {}) {
   const out = (cause, at = -1, extra = {}) => ({ ok: false, cause, at, text: at >= 0 ? lines[at] : null, linesHalf: false, answerHalf: false, statuses: [], ...extra });
   if (QUESTION_BUCKET[q.answerType]) return out(QUESTION_BUCKET[q.answerType]);
   if (!lines.length) return out(q.answerType === 'working' ? 'proof' : q.answerType === 'manual' ? `worked solution (${q._worked || 'find'}) with no maths lines` : 'no maths lines in the worked solution (words only)');
   if (unreadable) return out(unreadableCause(firstUnreadable), -1, { unreadable, text: firstUnreadable });
-  const m = markPage(q, worked ? '' : answer, lines);
+  const m = markPage(q, worked ? '' : answer, lines, latex);
   if (!m || !m.cards) return out(m && m.noLineReport ? `no line report from the marker (${m.noLineReport.reason})` : 'no line report from the marker');
   if (m.cards.length !== lines.length) return out('report does not judge every line', -1, { judged: m.cards.length });
   const statuses = m.cards.map(c => c.status);
@@ -308,7 +418,7 @@ export function chooseMutantLine(lines) {
 }
 
 /** The wrong half. Returns { ok, cause, at, text, mutants[] }. */
-export function wrongHalf(q, lines, { unreadable = 0, firstUnreadable = null } = {}) {
+export function wrongHalf(q, lines, { unreadable = 0, firstUnreadable = null, latex = null } = {}) {
   const fail = (cause, at = -1, extra = {}) => ({ ok: false, cause, at, text: at >= 0 ? lines[at] : null, ...extra });
   if (QUESTION_BUCKET[q.answerType]) return fail(QUESTION_BUCKET[q.answerType]);
   if (!lines.length) return fail('no maths lines in the worked solution');
@@ -319,7 +429,7 @@ export function wrongHalf(q, lines, { unreadable = 0, firstUnreadable = null } =
   for (const m of pick.mutants) {
     const page = lines.map((l, j) => (j === pick.i ? m.text : l));
     const typed = q.answerType === 'working' ? String(page[page.length - 1]) : WRONG_SEED_ANSWER;
-    const r = markPage(q, q._bankWorked ? '' : typed, page);
+    const r = markPage(q, q._bankWorked ? '' : typed, page, latex);
     const cards = r?.cards;
     const first = cards ? cards.findIndex(c => c.status === 'first-error') : -2;
     const verdict = !cards ? 'no report' : first === pick.i ? 'crossed here' : first < 0 ? (cards[pick.i]?.status === 'checked' ? 'ticked' : 'missed') : first > pick.i ? 'crossed later' : 'crossed earlier';
@@ -332,11 +442,11 @@ export function wrongHalf(q, lines, { unreadable = 0, firstUnreadable = null } =
 
 /** Both halves of one question, as a record. */
 export function measureQuestion(q, { toPlain, worked = false } = {}) {
-  const { lines, unreadable, firstUnreadable } = authoredLines(q, toPlain);
+  const { lines, unreadable, firstUnreadable, latex } = authoredLines(q, toPlain);
   const answer = worked ? '' : keyText(q);
   let t, w;
-  try { t = trueHalf(q, lines, answer, { unreadable, worked, firstUnreadable }); } catch (e) { t = { ok: false, cause: 'marker error', at: -1, text: null, linesHalf: false, answerHalf: false, statuses: [] }; }
-  try { w = wrongHalf(q, lines, { unreadable, firstUnreadable }); } catch (e) { w = { ok: false, cause: 'marker error', at: -1, text: null }; }
+  try { t = trueHalf(q, lines, answer, { unreadable, worked, firstUnreadable, latex }); } catch (e) { t = { ok: false, cause: 'marker error', at: -1, text: null, linesHalf: false, answerHalf: false, statuses: [] }; }
+  try { w = wrongHalf(q, lines, { unreadable, firstUnreadable, latex }); } catch (e) { w = { ok: false, cause: 'marker error', at: -1, text: null }; }
   return { lines, t, w };
 }
 
