@@ -24,7 +24,7 @@
 
 /* ── the sheet: the page, untouched, with the margin beside it ── */
 .mp-sheet.mp-t-sheet { display: grid; grid-template-columns: minmax(0, 1fr) var(--mp-gw, 76px); padding-left: 0; background: var(--mk-paper); border: 1px solid var(--mk-rule); }
-.mp-t-sheet[data-mp-size="roomy"] { --mp-gw: 200px; --mp-rule-x: 134px; }
+.mp-t-sheet[data-mp-size="roomy"] { --mp-gw: clamp(180px, 26%, 250px); --mp-rule-x: calc(var(--mp-gw) - 56px); }
 .mp-t-sheet[data-mp-size="compact"] { --mp-gw: 76px; --mp-rule-x: 30px; }
 .mp-t-sheet .mp-sheet-in { min-width: 0; align-self: start; }
 .mp-t-over { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
@@ -55,8 +55,8 @@
 .mp-t-rule { position: absolute; top: 0; bottom: 0; left: var(--mp-rule-x); border-left: 1px solid var(--mk-error); }
 .mp-t-box { position: absolute; left: calc(var(--mp-rule-x) + 1px); box-sizing: border-box; min-width: 42px; height: 24px; padding: 0 6px; border: 1px solid var(--mk-error); color: var(--mk-error); background: var(--mk-paper); font: 400 15px/22px var(--mk-hand); text-align: center; font-variant-numeric: tabular-nums; }
 .mp-t-box.is-traced { background: color-mix(in srgb, var(--mk-accent) 14%, var(--mk-paper)); outline: 2px solid var(--mk-accent); outline-offset: 1px; }
-.mp-t-words { position: absolute; left: 30px; width: calc(var(--mp-rule-x) - 34px); appearance: none; background: none; border: 0; padding: 0; text-align: left; cursor: pointer; overflow: hidden;
-  font: 400 14px/1.1 var(--mk-hand); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.mp-t-words { position: absolute; left: 14px; width: calc(var(--mp-rule-x) - 22px); appearance: none; background: none; border: 0; padding: 0; text-align: left; cursor: pointer; overflow: hidden;
+  font: 400 14px/1.1 var(--mk-hand); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; }
 .mp-t-words.is-right { color: var(--mk-correct); }
 .mp-t-words.is-wrong { color: var(--mk-error); }
 
@@ -106,7 +106,10 @@
 /* the approval label stays; the table repeats the allocation the workspace already shows */
 .mp-t-root .mp-criteria .mp-table { display: none; }
 .mp-t-root .mp-body { grid-template-columns: minmax(0, 1fr); }
-@media (min-width: 800px) { .mp-t-root .mp-body { grid-template-columns: minmax(0, 9fr) minmax(280px, 4fr); } }
+/* The layout follows the width of the page's own container, not the window: a marked page inside a narrow card on a wide screen used to squeeze the photograph
+   into a thumbnail beside a panel. The page is at least 60% of the width when the panel stands beside it, and the whole width when it does not. */
+.mp-t-root { container-type: inline-size; container-name: mpt; }
+@container mpt (min-width: 900px) { .mp-t-root .mp-body { grid-template-columns: minmax(0, 66fr) minmax(280px, 34fr); } }
 .mp-t-root .mp-sentence { color: var(--mk-graphite); }
 
 .mp-t-tick.is-small .mp-t-num { display: none; }

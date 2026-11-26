@@ -46,6 +46,9 @@ const hexOf = rgb => '#' + rgb.match(/\d+/g).slice(0, 3).map(n => Number(n).toSt
 // The page and its report are the engine's REAL output (server/test/support/teacher-page-real-reports.mjs): since the tick-every-true-line engine the engine
 // ticks 16 of these 19 lines, each with its own class id. Lines 1 and 13 are headings (neutral); line 17 is a bare list of points the engine does not read.
 const CLASS_OF = { 2: 'given', 3: 'differentiation', 4: 'conditionLine', 5: 'stationaryEquation', 6: 'factorisation', 7: 'stationaryValues', 8: 'secondDerivative', 9: 'signClaim', 10: 'natureClaim', 11: 'signClaim', 12: 'natureClaim', 14: 'substitution', 15: 'substitution', 16: 'trueAsWritten', 18: 'conclusionMatches', 19: 'conclusion' };
+// Where the engine verified what a line DID (a change between two lines), the page says that fact; every other tick says its class. (engine/stepExplain.js)
+const SPECIFIC = { 3: '4x³ → 12x², −36x² → −72x', 6: '12x² − 72x = 12x(x − 6)', 7: 'x = 0 or x = 6', 14: '4 × 0³ − 36 × 0² = 0', 15: '6³ = 216, 6² = 36', 16: '4 × 216 = 864, 36 × 36 = 1296, 864 − 1296 = −432' };
+const phraseWanted = n => SPECIFIC[n] || PHRASES[CLASS_OF[n]] || null;
 const CHECKED = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 18, 19];
 const UNCHECKED = [1, 13, 17];         // headings (neutral) and a list of points the engine could not verify: no tick, no cross
 
@@ -85,7 +88,7 @@ for (const [size, viewport] of [['desktop', { width: 1280, height: 900 }], ['pho
     // ticks only where the engine proved a line; never on the lines it could not verify
     ok(JSON.stringify(got.ticks.map(t => t.n)) === JSON.stringify(CHECKED), `${where}: a tick on exactly the proved lines ${JSON.stringify(got.ticks.map(t => t.n))}`);
     ok(got.ticks.every(t => t.tag === 'BUTTON' && new RegExp(`^Line ${t.n}: correct\\.`).test(t.label)), `${where}: every tick is a button with a text alternative`);
-    ok(/Line 3: correct\. Correct differentiation\./.test(got.ticks.find(t => t.n === 3).label), `${where}: the label names the class: ${got.ticks.find(t => t.n === 3).label}`);
+    ok(/Line 3: correct\. 4x³ → 12x², −36x² → −72x\./.test(got.ticks.find(t => t.n === 3).label), `${where}: the label says what the line did: ${got.ticks.find(t => t.n === 3).label}`);
     ok(!got.ticks.some(t => UNCHECKED.includes(t.n)), `${where}: no tick and no cross on a line the engine could not verify`);
     // exactly one margin box, on the line that earned the mark, and it says what the server awarded
     ok(got.markBoxes.length === 1 && got.markBoxes[0].text === '1/1' && got.markBoxes[0].n === '7', `${where}: one margin mark, 1/1, on line 7 ${JSON.stringify(got.markBoxes)}`);
@@ -102,8 +105,8 @@ for (const [size, viewport] of [['desktop', { width: 1280, height: 900 }], ['pho
     ok(anchored.every(a => a.dy && a.dx), `${where}: every tick sits on its own line, just after it ${JSON.stringify(anchored.filter(a => !(a.dy && a.dx)))}`);
     ok(size !== 'desktop' || got.ticks.every(t => t.where === 'page'), `${where}: even line 8, beside the second column, keeps its tick on its own line`);
     // the phrase on each tick is the phrase of that line's own class
-    ok(got.ticks.every(t => t.cls === CLASS_OF[t.n] && (t.phrase || null) === (PHRASES[CLASS_OF[t.n]] || null)), `${where}: every phrase is its own line's class ${JSON.stringify(got.ticks.filter(t => t.cls !== CLASS_OF[t.n]).map(t => [t.n, t.cls]))}`);
-    ok(got.ticks.find(t => t.n === 7).phrase === 'Correct stationary values', `${where}: line 7 says its own class`);
+    ok(got.ticks.every(t => t.cls === CLASS_OF[t.n] && (t.phrase || null) === phraseWanted(t.n)), `${where}: every phrase is its own line's class ${JSON.stringify(got.ticks.filter(t => t.cls !== CLASS_OF[t.n]).map(t => [t.n, t.cls]))}`);
+    ok(got.ticks.find(t => t.n === 7).phrase === 'x = 0 or x = 6', `${where}: line 7 says its own class`);
     // the number is clear of the stroke
     ok(got.ticks.filter(t => t.numShown).every(t => t.num.left >= t.r.right - 3), `${where}: tick numbers stand clear of the stroke`);
     ok(got.ticks.filter(t => t.numShown).every(t => !got.boxesPx.some((b, i) => i + 1 !== t.n && t.num.left < b.x1 && b.x0 < t.num.right && t.num.top < b.y1 && b.y0 < t.num.bottom)), `${where}: a number never lands on another line's writing`);
@@ -113,7 +116,7 @@ for (const [size, viewport] of [['desktop', { width: 1280, height: 900 }], ['pho
     const sayN = got.says.map(w => Number(w.n));
     if (size === 'desktop') {
       ok(sayN.includes(3) && sayN.includes(6) && sayN.includes(7), `${where}: phrases after the ticks on lines 3, 6 and 7 (got ${sayN})`);
-      ok(got.says.find(w => w.n === '3').text === 'Correct differentiation' && got.says.find(w => w.n === '6').text === 'Correct factorisation' && got.says.find(w => w.n === '7').text === 'Correct stationary values', `${where}: each says its own class`);
+      ok(got.says.find(w => w.n === '3').text === SPECIFIC[3] && got.says.find(w => w.n === '6').text === SPECIFIC[6] && got.says.find(w => w.n === '7').text === SPECIFIC[7], `${where}: each says its own class`);
     } else ok(got.says.length === 0 && got.words.length === 0, `${where}: a phone page carries no words on it (the popover and the list do); each tick stands once`);
     if (size === 'desktop') {
       const spoken = new Set([...got.says.map(w => Number(w.n)), ...got.words.map(w => Number(w.n))]);
@@ -302,19 +305,19 @@ ok(got.ticks.length === CHECKED.length && (size === 'desktop' ? inGutter.length 
     ok(await pg.locator('[data-mp-pop]').count() === 0, `${theme}: no popover until asked`);
     await pg.hover('[data-mp-box="3"]'); await pg.waitForSelector('[data-mp-pop="3"]');
     let r = await rectsOf(pg, 3);
-    ok(r && r.role === 'tooltip' && r.desc === r.id && /Line 3: correct/.test(r.text) && /The derivative on this line is correct\./.test(r.text), `${theme}: hover opens a tooltip with the class's sentence and aria-describedby ${r && r.text}`);
+    ok(r && r.role === 'tooltip' && r.desc === r.id && /Line 3: correct/.test(r.text) && /Differentiated term by term/.test(r.text), `${theme}: hover opens a tooltip with the class's sentence and aria-describedby ${r && r.text}`);
     ok(r && !r.coversOwn && r.inPage && r.border !== '0px' && r.shadow === 'none', `${theme}: it never covers its own line, stays in the page, fine rule and no shadow`);
     if (shots) await pg.screenshot({ path: `${shots}/teacher-popover-correct-desktop-${theme}.png`, fullPage: true });
     await pg.mouse.move(5, 5); await gone(pg);
     ok(await pg.locator('[data-mp-pop]').count() === 0, `${theme}: moving away closes it`);
     await pg.focus('[data-mp-box="6"]'); await pg.waitForSelector('[data-mp-pop="6"]');
     r = await rectsOf(pg, 6);
-    ok(r && r.via === 'focus' && /Line 6: correct/.test(r.text) && /factorised form equals the line above/.test(r.text) && r.desc === r.id, `${theme}: keyboard focus opens it ${r && r.text}`);
+    ok(r && r.via === 'focus' && /Line 6: correct/.test(r.text) && /Took out the common factor/.test(r.text) && r.desc === r.id, `${theme}: keyboard focus opens it ${r && r.text}`);
     await pg.keyboard.press('Escape');
     ok(await pg.locator('[data-mp-pop]').count() === 0 && await pg.evaluate(() => document.activeElement?.getAttribute('data-mp-box')) === '6', `${theme}: Escape closes it and keeps focus on the mark`);
     await pg.focus('[data-mp-box="16"]'); await pg.waitForSelector('[data-mp-pop="16"]');
     r = await rectsOf(pg, 16);
-    ok(r && /Both sides come to/.test(r.text) && r.maths > 0 && !/\$/.test(r.text), `${theme}: the engine's own piece (both sides come to -432) is typeset with the maths renderer, not shown as source ${r && r.text}`);
+    ok(r && /Three changes/.test(r.text) && r.maths > 0 && !/\$/.test(r.text), `${theme}: the engine's own piece (both sides come to -432) is typeset with the maths renderer, not shown as source ${r && r.text}`);
     await pg.focus('[data-mp-box="7"]'); await pg.waitForSelector('[data-mp-pop="7"]');
     r = await rectsOf(pg, 7);
     ok(r && /Mark awarded here: 1\/1\./.test(r.text) && !r.coversOwn && r.inPage && await pg.locator('[data-mp-pop]').count() === 1, `${theme}: the paid mark says so, the popover stays off its line and in view; one at a time`);
@@ -347,6 +350,73 @@ ok(got.ticks.length === CHECKED.length && (size === 'desktop' ? inGutter.length 
     ok(await pg.locator('[data-mp-pop]').count() === 0, `${theme} phone: a second tap on the same mark closes it`);
     ok(await pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth) <= 0, `${theme} phone: no sideways scroll with a popover`);
     await ctx.close();
+  }
+}
+
+// ── the two owner pages of 26 November 2026 (wide photographs, the reader's boxes in the left 60%) ───────────────────────────────────────────────────────────
+// The page must be read at a glance: the photograph large, a tick of at least 18 px, and the REASON written on the page beside every tick (the gutter, with a
+// leader, only where the paper has no room). The words say what the line did, from the engine's verified facts (engine/stepExplain.js, lineRecognisers.js).
+const OWNER = {
+  seats: { tally: '8 lines correct. 0 wrong. 0 not checked.', ticks: [2, 5, 6, 7, 8, 9, 10, 11], say: { 5: 'Substituted n = 20 into n(58 + 2(n − 1))/2', 6: '20 − 1 = 19', 7: '2 × 19 = 38', 8: '58 + 38 = 96', 9: '20 × 96 = 1920', 10: '1920 ÷ 2 = 960', 11: 'Correct answer' }, pop: [6, /Worked out the bracket/] },
+  users: { tally: '8 lines correct. 0 wrong. 0 not checked.', ticks: [2, 3, 6, 7, 8, 9, 10, 11], say: { 2: 'Given in the question', 3: 'Common ratio 2, from the question', 6: 'Correct model: start 815, ×2 each week', 7: 'n = 4, from the question', 8: 'Substituted n = 4 into 815 × 2^n', 9: '2⁴ = 16', 10: '815 × 16 = 13 040', 11: 'Correct answer' }, pop: [9, /Worked out the power/] }
+};
+for (const [name, want] of Object.entries(OWNER)) {
+  for (const [label, viewport, card] of [['desktop', { width: 1440, height: 1000 }, ''], ['narrow card', { width: 1440, height: 1000 }, 'card=700'], ['phone', { width: 390, height: 844 }, '']]) {
+    for (const theme of ['light', 'dark']) {
+      const where = `${name}/${label}/${theme}`;
+      const ctx = await browser.newContext({ viewport, colorScheme: theme }); const pg = await ctx.newPage();
+      const errs = []; pg.on('pageerror', e => errs.push(e.message));
+      await open(pg, url(name, { theme, extra: card }), 'marked');
+      const got = await pg.evaluate(() => {
+        const sec = document.querySelector('[data-marked-page]'); const rect = el => el.getBoundingClientRect().toJSON();
+        const img = rect(sec.querySelector('.mp-img')); const body = rect(sec.querySelector('.mp-body')); const sheet = rect(sec.querySelector('.mp-t-sheet'));
+        const boxes = JSON.parse(document.querySelector('[data-gallery-boxes]').getAttribute('data-gallery-boxes'));
+        return { img, body, sheet, boxes, boxesPx: boxes.map(b => ({ x0: img.left + b.x * img.width, x1: img.left + (b.x + b.w) * img.width, y0: img.top + b.y * img.height, y1: img.top + (b.y + b.h) * img.height })),
+          tally: sec.querySelector('[data-mp-tally]').textContent,
+          ticks: [...sec.querySelectorAll('.mp-t-tick')].map(b => ({ n: Number(b.getAttribute('data-mp-box')), where: b.getAttribute('data-mp-where'), r: rect(b.querySelector('svg')), phrase: b.getAttribute('data-mp-phrase') })),
+          says: [...sec.querySelectorAll('[data-mp-say]')].map(w => ({ n: Number(w.getAttribute('data-mp-say')), text: w.textContent.trim(), r: rect(w) })),
+          gutter: [...sec.querySelectorAll('[data-mp-words]')].map(w => ({ n: Number(w.getAttribute('data-mp-words')), text: w.textContent.trim() })),
+          overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+      });
+      ok(errs.length === 0, `${where}: no page errors ${errs}`);
+      ok(got.tally === want.tally, `${where}: ${got.tally}`);
+      ok(JSON.stringify(got.ticks.map(t => t.n)) === JSON.stringify(want.ticks), `${where}: ticks on ${JSON.stringify(got.ticks.map(t => t.n))}`);
+      ok(got.ticks.every(t => t.phrase && !/true as written/i.test(t.phrase)), `${where}: no tick says "True as written"`);
+      for (const [n, text] of Object.entries(want.say)) ok(got.ticks.find(t => t.n === Number(n))?.phrase === text, `${where}: line ${n} says "${text}" (got "${got.ticks.find(t => t.n === Number(n))?.phrase}")`);
+      ok(got.overflow <= 0, `${where}: no sideways scroll`);
+      if (label !== 'phone') {
+        const wide = got.sheet.width / got.body.width;
+        ok(got.img.width >= 440, `${where}: the photograph is large enough to read (${Math.round(got.img.width)} px)`);
+        ok(label === 'narrow card' || wide >= 0.6, `${where}: the page column is at least 60% of the width (${Math.round(wide * 100)}%)`);
+        ok(got.ticks.every(t => t.r.height >= 17.5), `${where}: every tick is at least 18 px (${Math.round(Math.min(...got.ticks.map(t => t.r.height)))})`);
+        const spoken = new Set([...got.says.map(w => w.n), ...got.gutter.map(w => w.n)]);
+        ok(got.ticks.every(t => spoken.has(t.n)), `${where}: every reason is written on the page or in the margin ${JSON.stringify(got.ticks.filter(t => !spoken.has(t.n)).map(t => t.n))}`);
+        ok(got.says.length >= got.ticks.length - 2, `${where}: nearly every reason stands beside its tick (${got.says.length} of ${got.ticks.length})`);
+        ok(got.says.every(w => !got.boxesPx.some(b => w.r.left < b.x1 && b.x0 < w.r.right && w.r.top < b.y1 && b.y0 < w.r.bottom)), `${where}: no reason touches writing`);
+        ok(got.ticks.every(t => t.where !== 'page' || !got.boxesPx.some((b, i) => i + 1 !== 0 && t.r.left < b.x1 - 1 && b.x0 < t.r.right && t.r.top + 4 < b.y1 && b.y0 < t.r.bottom - 4)), `${where}: no tick covers writing`);
+      }
+      if (label === 'desktop' && theme === 'light') {
+        const [n, re] = want.pop;
+        await pg.hover(`[data-mp-box="${n}"]`); await pg.waitForSelector(`[data-mp-pop="${n}"]`);
+        const t = await pg.evaluate(k => document.querySelector(`[data-mp-pop="${k}"]`).innerText.replace(/\s+/g, ' '), n);
+        ok(re.test(t) && !/true as written/i.test(t), `${where}: the popover names the operation: ${t}`);
+        if (shots) { await pg.waitForTimeout(900); await pg.screenshot({ path: `${shots}/${name}-popover-desktop-${theme}.png`, fullPage: true }); }
+        await pg.mouse.move(5, 5);
+      }
+      if (shots) {
+        await pg.waitForTimeout(900);
+        await pg.screenshot({ path: `${shots}/${name}-marked-${label.replace(' ', '-')}-${theme}.png`, fullPage: true });
+        await pg.click('[data-mp-view-option="detailed"]'); await pg.waitForSelector('.mp-t-sheet[data-mp-view="detailed"]'); await settle(pg); await pg.waitForTimeout(900);
+        await pg.screenshot({ path: `${shots}/${name}-detailed-${label.replace(' ', '-')}-${theme}.png`, fullPage: true });
+      }
+      if (label === 'desktop') {
+        await pg.click('[data-mp-view-option="detailed"]'); await pg.waitForSelector('.mp-t-sheet[data-mp-view="detailed"]');
+        const list = await pg.evaluate(() => [...document.querySelectorAll('[data-mp-list] li')].map(li => li.innerText.replace(/\s+/g, ' ').trim()));
+        ok(list.length >= want.ticks.length && !list.some(x => /true as written|^\d+ Correct (?:arithmetic|substitution)/i.test(x)), `${where}: the list rows give the fact, not the class name ${JSON.stringify(list.slice(0, 3))}`);
+        for (const [n, text] of Object.entries(want.say).slice(0, 3)) ok(list.some(x => x.startsWith(`${n} `) && x.includes(text.replace(/^Correct answer$/, 'Correct answer'))), `${where}: row ${n} says "${text}"`);
+      }
+      await ctx.close();
+    }
   }
 }
 

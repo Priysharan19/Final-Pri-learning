@@ -66,7 +66,7 @@ export async function loadWorld() {
 
 // ── reading the authored solution as a typed page ────────────────────────────
 const TEX_SPAN = /\$([^$]+)\$/g;
-const bankToPlain = span => (SM._internals.withBankReading ? SM._internals.withBankReading(() => SM._internals.spanToPlain(span)) : SM._internals.spanToPlain(span));
+export const bankToPlain = span => (SM._internals.withBankReading ? SM._internals.withBankReading(() => SM._internals.spanToPlain(span)) : SM._internals.spanToPlain(span));
 export const genToPlain = span => SM._internals.spanToPlain(span);
 
 /**
