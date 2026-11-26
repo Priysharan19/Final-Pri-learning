@@ -392,7 +392,7 @@ These are measured, in the same run, and rewritten each time the packet is gener
 
 ## What would raise the number most
 
-Your 1445 parts worth 2 or more marks have 3277 worked lines the page can read, of which 2670 are ticked and 607 are not. The commonest kinds of line it does not tick:
+Your 1445 parts worth 2 or more marks have 3277 worked lines the page can read, of which 2669 are ticked and 608 are not. The commonest kinds of line it does not tick:
 
 - 126 lines, a bare number. For example A11-C1-055: 1
 - 111 lines, a single equation or statement. For example A11-C1-141: t=(10/7)
