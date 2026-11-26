@@ -10,7 +10,8 @@ import { createServer } from 'vite';
 import { PHRASES } from '../src/components/markedPageTeacher.js';
 
 const CLIENT = fileURLToPath(new URL('..', import.meta.url));
-const shots = (process.argv.find(a => a.startsWith('--shots=')) || '').slice(8);
+// Screenshots are taken only when asked for (--shots=<dir> or PRI_TOUR_SHOTS=<dir>); CI sets neither, so the assertions run without the extra loads.
+const shots = (process.argv.find(a => a.startsWith('--shots=')) || '').slice(8) || process.env.PRI_TOUR_SHOTS || '';
 if (shots) mkdirSync(shots, { recursive: true });
 let pass = 0; const failures = [];
 const ok = (c, l) => { if (c) pass++; else failures.push(l); };
@@ -24,13 +25,21 @@ await server.listen();
 const origin = `http://127.0.0.1:${server.httpServer.address().port}`;
 const url = (c, { theme = 'light', edition = 'prithagoras', teacher = true, extra = '' } = {}) => `${origin}/test/support/marked-page-gallery.html?case=${c}&source=photo&edition=${edition}&theme=${theme}${teacher ? '&teacher=1' : ''}${extra ? `&${extra}` : ''}`;
 const browser = await chromium.launch();
-const open = async (page, u, view = 'marked') => {
-  await page.goto(u, { waitUntil: 'networkidle' });
-  await page.evaluate(v => { try { localStorage.setItem('pri.markedPage.view', v); } catch { /* none */ } }, view);
-  await page.reload({ waitUntil: 'networkidle' });
-  await page.waitForSelector('[data-marked-page]');
-  await page.waitForTimeout(700);
+// One load per page: the lazy marking layer is awaited by its own element, the view is chosen by the control the student uses, and the layout is
+// settled by the browser's own signals (fonts, the image, two frames), never by a fixed sleep.
+const settle = pg => pg.evaluate(() => Promise.all([document.fonts.ready, new Promise(r => { const im = document.querySelector('.mp-img'); if (!im || im.complete) r(); else im.addEventListener('load', r, { once: true }); })]).then(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))));
+const switchView = async (page, view) => {
+  if ((await page.getAttribute('.mp-t-sheet', 'data-mp-view')) !== view) await page.click(`[data-mp-view-option="${view}"]`);
+  await page.waitForSelector(`.mp-t-sheet[data-mp-view="${view}"]`);
+  if (view !== 'original') await page.waitForSelector('.mp-t-tick');
+  await settle(page);
 };
+const open = async (page, u, view = 'marked') => {
+  await page.goto(u, { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('.mp-t-sheet');
+  await switchView(page, view);
+};
+const gone = pg => pg.waitForFunction(() => !document.querySelector('[data-mp-pop]'), null, { timeout: 2000 }).then(() => true, () => false);
 const lum = hex => { const c = hex.match(/\w\w/g).map(h => parseInt(h, 16) / 255).map(v => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
 const contrast = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
 const hexOf = rgb => '#' + rgb.match(/\d+/g).slice(0, 3).map(n => Number(n).toString(16).padStart(2, '0')).join('');
@@ -120,7 +129,7 @@ for (const [size, viewport] of [['desktop', { width: 1280, height: 900 }], ['pho
     ok(got.ticks.every(t => t.r.height >= 15.5), `${where}: every tick is at least 16 px tall (${Math.min(...got.ticks.map(t => t.r.height))})`);
     if (size === 'phone') {
       const before = await page.evaluate(() => document.querySelector('.mp-sheet-in').getBoundingClientRect().width);
-      await page.locator('[data-mp-enlarge]').click(); await page.waitForTimeout(300);
+      await page.locator('[data-mp-enlarge]').click(); await page.waitForSelector('.mp-t-zoom.is-on'); await settle(page);
       const big = await page.evaluate(() => ({ w: document.querySelector('.mp-sheet-in').getBoundingClientRect().width, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth, scrolls: document.querySelector('.mp-t-zoom').scrollWidth > document.querySelector('.mp-t-zoom').clientWidth, tick: Math.min(...[...document.querySelectorAll('.mp-t-tick svg')].map(e => e.getBoundingClientRect().height)) }));
       ok(big.w >= before * 2 && big.overflow <= 0 && big.scrolls && big.tick >= 16, `${where}: Enlarge page makes the page wider, scrolls inside its own frame, the document does not ${JSON.stringify(big)} from ${Math.round(before)}`);
       await page.locator('[data-mp-enlarge]').click();
@@ -194,7 +203,7 @@ for (const [size, viewport] of [['desktop', { width: 1280, height: 900 }], ['pho
   ok(await page.locator('.mp-t-tick').count() === 0 && await page.locator('[data-mp-gutter]').count() === 0 && await page.locator('.mp-panel').isHidden(), 'Original: no tick, no margin, no panel');
   const same = await page.evaluate(() => document.querySelector('.mp-img').getAttribute('src').length);
   ok(same === original.src, 'Original shows the same photograph, untouched');
-  await page.reload({ waitUntil: 'networkidle' }); await page.waitForSelector('[data-marked-page]');
+  await page.reload({ waitUntil: 'domcontentloaded' }); await page.waitForSelector('.mp-t-sheet');
   ok(await page.locator('[data-mp-view-option="original"]').getAttribute('aria-checked') === 'true', 'the choice is remembered');
   await page.locator('[data-mp-view-option="original"]').focus(); await page.keyboard.press('ArrowRight'); await page.keyboard.press('ArrowRight');
   ok(await page.locator('[data-mp-view-option="detailed"]').getAttribute('aria-checked') === 'true', 'arrow keys move between the views');
@@ -202,7 +211,7 @@ for (const [size, viewport] of [['desktop', { width: 1280, height: 900 }], ['pho
   // the page never changes height between views, and every mark stays level with its line in each
   const heights = {};
   for (const v of ['original', 'marked', 'detailed']) {
-    await open(page, url('owner19', { extra: 'criteria=3' }), v);
+    if (v === 'original') await open(page, url('owner19', { extra: 'criteria=3' }), v); else await switchView(page, v);
     heights[v] = await page.evaluate(() => {
       const img = document.querySelector('.mp-img').getBoundingClientRect();
       const sheet = document.querySelector('.mp-sheet-in').getBoundingClientRect();
@@ -260,7 +269,7 @@ for (const [size, viewport] of [['desktop', { width: 1280, height: 900 }], ['pho
   // India renders exactly as before: no marking root, no ticks, the old markers, the old header, in Hindi
   const hi = await browser.newContext({ viewport: { width: 1280, height: 900 } }); const ph = await hi.newPage();
   const requested = []; ph.on('request', r => requested.push(r.url()));
-  await ph.goto(url('stationary', { edition: 'priyabhata', teacher: false }), { waitUntil: 'networkidle' }); await ph.waitForSelector('[data-marked-page]');
+  await ph.goto(url('stationary', { edition: 'priyabhata', teacher: false }), { waitUntil: 'domcontentloaded' }); await ph.waitForSelector('[data-marked-page]'); await ph.waitForSelector('.mp-marker[data-mp-box]');
   const india = await ph.evaluate(() => ({ root: document.querySelector('.mp-t-root, .mp-t-sheet, .mp-t-tick, [data-mp-views], [data-mp-tally], [data-mp-assess], [data-mp-gutter]') !== null, markers: document.querySelectorAll('.mp-marker[data-mp-box]').length, sentence: !!document.querySelector('[data-mp-counts]'), hasPhoto: document.querySelector('.mp-img') !== null || document.querySelector('.mp-ink') !== null,
     photo: document.querySelector('.mp-img')?.getAttribute('data-mp-photo') || null }));
   ok(!india.root && india.markers > 0 && india.sentence, `India: no teacher marks, the old markers and header ${JSON.stringify(india)}`);
@@ -287,29 +296,29 @@ for (const [size, viewport] of [['desktop', { width: 1280, height: 900 }], ['pho
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, colorScheme: theme }); const pg = await ctx.newPage();
     await open(pg, url('owner19', { theme, extra: 'criteria=1' }), 'marked');
     ok(await pg.locator('[data-mp-pop]').count() === 0, `${theme}: no popover until asked`);
-    await pg.hover('[data-mp-box="3"]'); await pg.waitForTimeout(250);
+    await pg.hover('[data-mp-box="3"]'); await pg.waitForSelector('[data-mp-pop="3"]');
     let r = await rectsOf(pg, 3);
     ok(r && r.role === 'tooltip' && r.desc === r.id && /Line 3: correct/.test(r.text) && /The derivative on this line is correct\./.test(r.text), `${theme}: hover opens a tooltip with the class's sentence and aria-describedby ${r && r.text}`);
     ok(r && !r.coversOwn && r.inPage && r.border !== '0px' && r.shadow === 'none', `${theme}: it never covers its own line, stays in the page, fine rule and no shadow`);
     if (shots) await pg.screenshot({ path: `${shots}/teacher-popover-correct-desktop-${theme}.png`, fullPage: true });
-    await pg.mouse.move(5, 5); await pg.waitForTimeout(150);
+    await pg.mouse.move(5, 5); await gone(pg);
     ok(await pg.locator('[data-mp-pop]').count() === 0, `${theme}: moving away closes it`);
-    await pg.focus('[data-mp-box="6"]'); await pg.waitForTimeout(150);
+    await pg.focus('[data-mp-box="6"]'); await pg.waitForSelector('[data-mp-pop="6"]');
     r = await rectsOf(pg, 6);
     ok(r && r.via === 'focus' && /Line 6: correct/.test(r.text) && /stationary condition is set up/.test(r.text) && r.desc === r.id, `${theme}: keyboard focus opens it ${r && r.text}`);
     await pg.keyboard.press('Escape');
     ok(await pg.locator('[data-mp-pop]').count() === 0 && await pg.evaluate(() => document.activeElement?.getAttribute('data-mp-box')) === '6', `${theme}: Escape closes it and keeps focus on the mark`);
-    await pg.focus('[data-mp-box="16"]'); await pg.waitForTimeout(150);
+    await pg.focus('[data-mp-box="16"]'); await pg.waitForSelector('[data-mp-pop="16"]');
     r = await rectsOf(pg, 16);
     ok(r && /Both sides come to/.test(r.text) && r.maths > 0 && !/\$/.test(r.text), `${theme}: the engine's own piece (both sides come to -432) is typeset with the maths renderer, not shown as source ${r && r.text}`);
-    await pg.focus('[data-mp-box="7"]'); await pg.waitForTimeout(150);
+    await pg.focus('[data-mp-box="7"]'); await pg.waitForSelector('[data-mp-pop="7"]');
     r = await rectsOf(pg, 7);
     ok(r && /Mark awarded here: 1\/1\./.test(r.text) && !r.coversOwn && r.inPage && await pg.locator('[data-mp-pop]').count() === 1, `${theme}: the paid mark says so, the popover stays off its line and in view; one at a time`);
-    await pg.evaluate(() => document.activeElement.blur()); await pg.waitForTimeout(100);
+    await pg.evaluate(() => document.activeElement.blur()); await gone(pg);
     ok(await pg.locator('[data-mp-pop]').count() === 0, `${theme}: blur closes it`);
     // a cross: the reason and the corrected line the server sent
     await open(pg, url('wrong', { theme }), 'marked');
-    await pg.hover('.mp-t-tick.is-wrong'); await pg.waitForTimeout(250);
+    await pg.hover('.mp-t-tick.is-wrong'); await pg.waitForSelector('[data-mp-pop="9"]');
     r = await rectsOf(pg, 9);
     ok(r && /Line 9: wrong/.test(r.text) && /is smaller than/.test(r.text) && r.maths > 0 && !/\$/.test(r.text) && !/Corrected line/.test(r.text) && !r.coversOwn && r.inPage, `${theme}: a cross gives the engine's own reason, typeset; no corrected line is shown because the server sent none ${r && r.text}`);
     if (shots) await pg.screenshot({ path: `${shots}/teacher-popover-wrong-desktop-${theme}.png`, fullPage: true });
@@ -317,20 +326,20 @@ for (const [size, viewport] of [['desktop', { width: 1280, height: 900 }], ['pho
   }
   // reduced motion: appears at once
   const rmc = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce' }); const rp = await rmc.newPage();
-  await open(rp, url('owner19', { extra: 'criteria=1' }), 'marked'); await rp.hover('[data-mp-box="3"]'); await rp.waitForTimeout(100);
+  await open(rp, url('owner19', { extra: 'criteria=1' }), 'marked'); await rp.hover('[data-mp-box="3"]'); await rp.waitForSelector('[data-mp-pop="3"]');
   ok((await rectsOf(rp, 3)).anim === 'none', 'reduced motion: the popover appears without animation');
   await rmc.close();
   // a phone: tap opens, a second tap on the same mark or a tap elsewhere closes
   for (const theme of ['light', 'dark']) {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, colorScheme: theme }); const pg = await ctx.newPage();
     await open(pg, url('owner19', { theme, extra: 'criteria=1' }), 'marked');
-    await pg.tap('[data-mp-box="7"]'); await pg.waitForTimeout(250);
+    await pg.tap('[data-mp-box="7"]'); await pg.waitForSelector('[data-mp-pop="7"]');
     let r = await rectsOf(pg, 7);
     ok(r && r.via === 'tap' && /Mark awarded here: 1\/1\./.test(r.text) && !r.coversOwn && r.inPage, `${theme} phone: a tap opens it, inside the page, off its own line ${r && r.text}`);
     if (shots) await pg.screenshot({ path: `${shots}/teacher-popover-correct-phone-${theme}.png`, fullPage: true });
-    await pg.tap('.mp-t-tally'); await pg.waitForTimeout(150);
+    await pg.tap('.mp-t-tally'); await gone(pg);
     ok(await pg.locator('[data-mp-pop]').count() === 0, `${theme} phone: a tap elsewhere closes it`);
-    await pg.tap('[data-mp-box="3"]'); await pg.waitForTimeout(150); await pg.tap('[data-mp-box="3"]'); await pg.waitForTimeout(150);
+    await pg.tap('[data-mp-box="3"]'); await pg.waitForSelector('[data-mp-pop="3"]'); await pg.tap('[data-mp-box="3"]'); await gone(pg);
     ok(await pg.locator('[data-mp-pop]').count() === 0, `${theme} phone: a second tap on the same mark closes it`);
     ok(await pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth) <= 0, `${theme} phone: no sideways scroll with a popover`);
     await ctx.close();
