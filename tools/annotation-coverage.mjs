@@ -50,6 +50,7 @@ const { buildAnnotatedWorking } = await import('../client/src/components/annotat
 const { buildMarkedPage } = await import('../client/src/components/markedPageModel.js');
 const { classOf, phraseOf } = await import('../client/src/components/markedPageTeacher.js');
 const SM = await import('../client/src/engine/solutionMatch.js');
+const EX = await import('../client/src/engine/expr.js');
 
 export const markerViewOf = markerView;
 
@@ -192,23 +193,117 @@ export function trueHalf(q, lines, answer, { unreadable = 0, worked = false, fir
 }
 
 const squash = s => String(s).replace(/\s+/g, '').toLowerCase();
-/** Up to two provably false one-line mutants of the line, different kinds first. */
-export function mutantsOf(lines, i) {
+
+// A mutant is PROVABLY FALSE ON ITS OWN when two neighbouring sides of one `=` chain are plain numbers (no letter, no function, no constant) that
+// disagree by more than any rounding could explain: `Δ = (8)^2 - 4(-3)(3) = 49 - (-36)`. Most other mutants of a worked line (`3x - 18 = 8x - 8`
+// for `4x - 18 = ...`, `x = 4` for `x = 3`, `h = 5(2)^2 + ...`) are false only against the lines around them, and the engine rightly keeps a line of
+// that kind as a note: it may be a different equation (another part), a different value, or a step to another form. Such a mutant is not a test
+// of the engine (it would be a test that the engine knows the question), so the wrong half is first tried on a line whose mutant is false by itself.
+const NAMED_FN = /(?<![A-Za-z])(?:sin|cos|tan|sec|cosec|csc|cot|ln|log|sqrt|exp|arcsin|arccos|arctan|abs)(?![A-Za-z])/;
+const bareNumber = x => /^-?\d+(?:\.\d+)?$/.test(String(x).replace(/\s+/g, ''));
+const unitOf = x => { const t = String(x).replace(/\s+/g, '').replace(/^-/, ''); return t.includes('.') ? 10 ** -(t.split('.')[1].length) : 10 ** ((/[1-9](0+)$/.exec(t) || [0, ''])[1].length); };
+export function falseOnItsOwn(text) {
+  const t = String(text);
+  if (/[<>≤≥≈≠,;:]|\bpi\b|π|\be\b/.test(t.replace(/\be\^/g, '')) || NAMED_FN.test(t) || /[A-Za-z]{2,}/.test(t.replace(/\b(?:sqrt)\b/g, ''))) return false;
+  let sides;
+  try { sides = H.sidesOf(t); } catch { return false; }
+  if (sides.length < 2 || sides.some(x => !x)) return false;
+  const free = sides.map(x => !H.lettersIn(x).length);
+  const vals = sides.map((x, k) => { if (!free[k]) return null; const v = H.sideValues(x, []); return v && v[0] !== null ? v[0] : null; });
+  const decimal = /\d\.\d|^\.\d/.test(t);
+  for (let k = 0; k + 1 < sides.length; k++) {
+    // two neighbouring sides that are plain numbers once worked out (a name or a letter elsewhere on the line does not matter)
+    if (vals[k] === null || vals[k + 1] === null) continue;
+    if (Math.abs(vals[k] - vals[k + 1]) <= 1e-9 * Math.max(1, Math.abs(vals[k]), Math.abs(vals[k + 1]))) continue;
+    const bares = [sides[k], sides[k + 1]].filter(bareNumber);
+    if (bares.length === 2) continue;   // two bare numbers: words lost in reading, not a sum
+    if (k === 0 && bareNumber(sides[0]) && sides.slice(1).some(x => !bareNumber(x))) continue;   // a bare number in front of worked sides is margin work to the engine
+    if (!decimal) return true;   // no decimal on the line: no rounding is in play
+    const places = [...`${sides[k]} ${sides[k + 1]}`.matchAll(/\d*\.(\d+)/g)].map(m => m[1].length);
+    const band = bares.length ? Math.min(...bares.map(unitOf)) : places.length ? 10 ** -Math.min(...places) : 0;
+    if (Math.abs(vals[k] - vals[k + 1]) > band * (1 + 1e-9)) return true;
+  }
+  return false;
+}
+
+// A mutant is provably false only in one of two ways, neither of which reads the engine under test:
+//   1. false on its own (falseOnItsOwn above);
+//   2. PLANTED: the authored line is the correct result of one standard single operation on the line above it (add or subtract one term on both sides, or
+//      multiply both sides by a nonzero constant), and the mutant differs from that correct result in exactly one coefficient, constant or sign. The tool
+//      planted that one error, so it knows the line is wrong: it is the correct result with one thing changed.
+// A mutant that is merely a different equation from its neighbours (a different solution set) is not provably false: it may be a new equation.
+const polyOf = text => {
+  const t = String(text).replace(/[−–—]/g, '-').replace(/[×·]/g, '*').replace(/\s*[.;]\s*$/, '');
+  if (/[<>≤≥≠≈,;:±%°|]|[A-Za-z]{2,}|\d\.\d/.test(t.replace(/(?<![A-Za-z])[A-Za-z](?![A-Za-z])/g, '#')) || (t.match(/=/g) || []).length !== 1) return null;
+  const [l, r] = t.split('=').map(x => x.trim());
+  if (!l || !r) return null;
+  let a, b;
+  try { a = EX.parse(EX.normalize(l)); b = EX.parse(EX.normalize(r)); } catch { return null; }
+  const vars = [...new Set([...EX.variablesOf(a), ...EX.variablesOf(b)])];
+  if (vars.length !== 1 || vars[0] === 'e') return null;
+  const v = vars[0];
+  const coef = n => {
+    const f = x => { const y = EX.evaluate(n, { [v]: x }); if (!Number.isFinite(y)) throw new Error('nf'); return y; };
+    const c0 = f(0), c2 = (f(1) + f(-1)) / 2 - c0, c1 = (f(1) - f(-1)) / 2;
+    for (const x of [-3, -1.5, 2, 3.5]) if (Math.abs(f(x) - (c2 * x * x + c1 * x + c0)) > 1e-8 * Math.max(1, Math.abs(f(x)))) return null;
+    return [c0, c1, c2];
+  };
+  try { const L = coef(a), R = coef(b); return L && R ? { v, L, R } : null; } catch { return null; }
+};
+const eqSlot = (x, y) => Math.abs(x - y) <= 1e-9 * Math.max(1, Math.abs(x), Math.abs(y));
+// the results of every single operation on P, nontrivial: [{ L, R }]
+const operationsOn = P => {
+  const out = [];
+  for (let d = 0; d < 3; d++) for (let c = -200; c <= 200; c++) { if (!c) continue; out.push({ L: P.L.map((x, j) => (j === d ? x + c : x)), R: P.R.map((x, j) => (j === d ? x + c : x)) }); }
+  for (let p = 1; p <= 24; p++) for (let q = 1; q <= 24; q++) for (const sg of [1, -1]) { const k = sg * p / q; if (k === 1) continue; out.push({ L: P.L.map(x => k * x), R: P.R.map(x => k * x) }); }
+  return out;
+};
+const slotsDiffering = (X, Y) => [...X.L, ...X.R].filter((x, j) => !eqSlot(x, [...Y.L, ...Y.R][j])).length;
+const PLANT_CACHE = new Map();
+export function plantedOnLineAbove(lines, i, text) {
+  if (i < 1) return false;
+  const A = polyOf(lines[i - 1]), O = polyOf(lines[i]), M = polyOf(text);
+  if (!A || !O || !M || A.v !== O.v || O.v !== M.v) return false;
+  const key = `${lines[i - 1]}|${lines[i]}`;
+  if (!PLANT_CACHE.has(key)) { if (PLANT_CACHE.size > 5000) PLANT_CACHE.clear(); PLANT_CACHE.set(key, operationsOn(A).some(R => slotsDiffering(R, O) === 0)); }
+  return PLANT_CACHE.get(key) && slotsDiffering(O, M) === 1;
+}
+/** True when the mutant is provably false: false on its own, or the one-error plant on the correct result of a single operation on the line above. */
+export const provableGivenPage = (lines, i, text) => falseOnItsOwn(text) || plantedOnLineAbove(lines, i, text);
+
+// The ladder of mutations the wrong half tries, in order. Every unit with a maths line in its worked solution gets a wrong-half test:
+//   (a) PLANTED: one coefficient of the correct result of a single known operation on the line above is changed (plantedOnLineAbove);
+//   (b) SELF-FALSE: a number of a middle line is changed so that the line is no longer true (an arithmetic chain link, a function value, a derivative
+//       coefficient, a substituted value): the evaluator of tools/marking-mutation-harness.mjs finds a different value, and for an equation in one letter
+//       the solutions are not the same (7(x - 1)(x - 7) = 0 for 6(x - 1)(x - 7) = 0 is still true, and is dropped);
+//   (c) the same on any line, the first and the last included (a changed final value in a chain).
+// The first rung that has a mutant is used; the unit is not-applicable for the wrong half only when it is multiple choice, and has no wrong half to test
+// (a failure, never an excuse) when its worked solution has no maths line at all.
+const sameRoots = (a, b) => !!a && !!b && a.v === b.v && a.roots.length > 0 && a.roots.length === b.roots.length && a.roots.every((x, k) => Math.abs(x - b.roots[k]) < 1e-4);
+const stillTrueMutant = (line, text) => { try { return sameRoots(H.rootsOf(line), H.rootsOf(text)); } catch { return false; } };
+export function mutantsOf(lines, i, rung = 'b') {
   const line = lines[i];
   const others = new Set(lines.filter((_, j) => j !== i).map(squash));
   const all = [];
-  try { for (const m of H.mutationsOf(line)) { if (!others.has(squash(m.text)) && H.judgeMutant(line, m.text) === 'wrong') all.push(m); } } catch { return []; }
+  try {
+    for (const m of H.mutationsOf(line)) {
+      if (others.has(squash(m.text)) || H.judgeMutant(line, m.text) !== 'wrong') continue;
+      if (rung === 'a' ? !plantedOnLineAbove(lines, i, m.text) : stillTrueMutant(line, m.text)) continue;
+      all.push(m);
+    }
+  } catch { return []; }
   const picked = [], kinds = new Set();
   for (const m of all) if (!kinds.has(m.kind)) { picked.push(m); kinds.add(m.kind); if (picked.length === 2) return picked; }
   for (const m of all) if (!picked.includes(m)) { picked.push(m); if (picked.length === 2) break; }
   return picked;
 }
 
-/** The middle-most line that has a provable mutant: for three or more lines the interior ones (the middle first), else the lines in order. */
+/** The first rung of the ladder that has a mutant, on the middle-most line that has one (rung c: any line, in order). */
 export function chooseMutantLine(lines) {
   const n = lines.length;
-  const order = n >= 3 ? [...Array(n - 2).keys()].map(k => k + 1).sort((a, b) => Math.abs(a - (n - 1) / 2) - Math.abs(b - (n - 1) / 2) || a - b) : [...Array(n).keys()];
-  for (const i of order) { const ms = mutantsOf(lines, i); if (ms.length) return { i, mutants: ms }; }
+  const interior = n >= 3 ? [...Array(n - 2).keys()].map(k => k + 1).sort((a, b) => Math.abs(a - (n - 1) / 2) - Math.abs(b - (n - 1) / 2) || a - b) : [...Array(n).keys()];
+  const every = [...Array(n).keys()];
+  for (const [rung, order] of [['a', interior], ['b', interior], ['c', every]]) for (const i of order) { const ms = mutantsOf(lines, i, rung === 'a' ? 'a' : 'b'); if (ms.length) return { i, mutants: ms, rung }; }
   return null;
 }
 

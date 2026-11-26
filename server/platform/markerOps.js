@@ -58,6 +58,17 @@ export const markerView = q => (q && typeof q._bank === 'string' && typeof q._fa
  */
 /** The extended TeX reading (engine/texToPlain.js) is the author bank's alone: a generator or paper question, however it is sealed, uses the default reader. */
 export const usesExtendedTex = q => !!q && typeof q._bank === 'string';
+// The equation-rewrite cross (engine/arithmeticLines.js, equationRewrite) is for an Australian Years 11-12 question (a bank question, or a generator of
+// y11, y12, me11, me12) that has ONE part: with several parts the equations of different parts follow one another on the page and are not rewritings.
+const NSW_SUBTOPIC = /^(?:y11|y12|me11|me12)-/;
+const PART_MARK = /(?<![A-Za-z0-9])\(\s*(?:[a-h]|i{1,3}|iv)\s*\)/g;
+export function oneAustralianPart(q) {
+  if (!q || !(typeof q._bank === 'string' || NSW_SUBTOPIC.test(String(q.subtopic ?? '')))) return false;
+  const prompt = String(q.prompt ?? '');
+  if (new Set((prompt.match(PART_MARK) || []).map(x => x.replace(/\s+/g, ''))).size >= 2) return false;
+  const steps = Array.isArray(q.steps) ? q.steps : [];
+  return steps.filter(st => /^\(?[a-h]\)?\.?$/i.test(String(st?.h ?? '').trim())).length < 2;
+}
 export const candidateRoots = q => !!q && (q._marking === 'final-answer-only' || typeof q._methodScheme === 'string' || typeof q._bank === 'string');
 /** The equations the question's own worked solution writes (plain text): what a derived line of the page may be a multiple of. */
 function authoredEquations(q) {
@@ -174,7 +185,7 @@ function trueAsWritten(q, steps, opts) {
     const facts = opts && Object.hasOwn(opts, 'facts') ? opts.facts : questionFacts(q);
     const solutionValues = solutionNumbers(q);
     // the reader's TeX is read with the extended reading (engine/texToPlain.js) on an author-bank question only (usesExtendedTex); every other question, India's included, is read as before
-    return stepCheckArithmetic(steps, { latex: opts && Array.isArray(opts.latex) ? opts.latex : null, ...(usesExtendedTex(q) ? { extendedTex: true } : {}), facts, solutionValues, knownLabels: functionLabels(q), answerValue: typeof q?.answer?.value === 'number' ? q.answer.value : null });
+    return stepCheckArithmetic(steps, { latex: opts && Array.isArray(opts.latex) ? opts.latex : null, ...(usesExtendedTex(q) ? { extendedTex: true } : {}), facts, solutionValues, knownLabels: functionLabels(q), answerValue: typeof q?.answer?.value === 'number' ? q.answer.value : null, equationRewrite: oneAustralianPart(q) });
   } catch { return null; }
 }
 

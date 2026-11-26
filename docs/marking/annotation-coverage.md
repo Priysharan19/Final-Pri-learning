@@ -15,7 +15,7 @@ True half:
 - no maths line is left unchecked, and none is crossed;
 - for a question with a key: the key typed as the answer is marked correct, and the final line is the report's `answerLine`. A worked-solution part has no key and no mark, so this part does not apply to it (the tool counts those units separately).
 
-Wrong half, for the same question: a one-line mutation of a middle step (one of the first two provably false mutants of the middle-most line that has any, judged by the independent evaluator of `tools/marking-mutation-harness.mjs`, never the product engine) is crossed at exactly that line, not later, not earlier, not ticked, not missed. A question with no provable mutation of any step fails this half.
+Wrong half, for the same question: a one-line mutation of a line of its worked solution is crossed at exactly that line, not later, not earlier, not ticked, not missed. The tool tries, in order: (a) a planted error (one coefficient changed in the correct result of one standard operation on the line above), (b) a self-false mutation of a middle line (a number changed so that the line is no longer true: a chain link, a function value, a derivative coefficient, a substituted value; for an equation in one letter the solutions must differ, so `7(x - 1)(x - 7) = 0` for `6(x - 1)(x - 7) = 0` is dropped as still true), (c) the same on any line, the first and last included. Every unit with a maths line gets a wrong half; only a multiple-choice question is not-applicable, and a worked solution with no maths line fails (it is never excused).
 
 Statuses: fully covered needs both halves; true half only has the first and not the second; everything else is uncovered; not-applicable is multiple choice (above). The two halves are reported separately.
 
