@@ -886,6 +886,15 @@ function wrongFunctionValue(src, defs, raw, i) {
     if (!d || !d.variable || d.given || d.glued || d.open || !(d.line >= 0) || d.line >= i) return null;
     if (FN_UNIT_UNKNOWN.test(d.expr) || FN_UNIT_UNKNOWN.test(d.shown || '') || FN_TWO_WAYS.test(d.shown || '') || FN_TWO_WAYS.test(d.expr)) return null;
     if (/\d\.\d|(?:^|[^\d])\.\d/.test(d.shown || '') || /\d\.\d/.test(d.expr)) return null;
+    // When in doubt, a note: the definition is built of the argument, whole numbers, + - * / ^ and brackets and nothing else. So no other letter
+    // (a value set earlier may have been set again), no π, e, root, log or other named function (the exact value is irrational and a student may be
+    // rounding), no variable or fractional exponent, no ^0 (0^0 and its kin are conventions), and no juxtaposition that reads two ways (`x^2 3`).
+    { const text = String(d.shown || '').replace(/[−–—]/g, '-');
+      const only = new RegExp(`^[0-9${d.variable}+\\-*/^()\\s]+$`);
+      if (!only.test(text) || !only.test(String(d.expr))) return null;
+      if (/\^/.test(text.replace(/\^\s*\(?\s*-?\d+\s*\)?/g, ''))) return null;
+      if (/\^\s*\(?\s*-?0+\s*\)?(?!\d)/.test(text)) return null;
+      if (/\d\s+\d|\)\s+\d|[${d.variable}]\s+\d/.test(text)) return null; }
     // the definition must still be the latest word on the letter: a later line that sets it again (`F(x) = …`, `F = …`) is not read
     const set = new RegExp(`(?<![A-Za-z'])${name}\\s*(?:\\(\\s*[A-Za-z]\\s*\\))?\\s*=`);
     // …and it is the ONLY line that sets the letter, and it is written as a function (`F(x) = …`): a letter that names an equation (`y = x^2`, then `y = 2x`)

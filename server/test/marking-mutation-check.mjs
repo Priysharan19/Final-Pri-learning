@@ -443,6 +443,25 @@ let corpusFalse = 0, corpusCross = 0, corpusFalseTicked = 0, corpusCrossed = 0, 
   ok(arith(['f(x) = x^2', 'f = 4', 'f(3) = 10']).every(s => s !== 'break'), 'a letter set again is no longer the function');
   ok(arith(['f(x) = x^2', '(b) f(3) = 10']).every(s => s !== 'break'), 'a new part of the question drops the definition');
   ok(arith(['f(x) = x^2', 'f(3) = 9 or 10']).every(s => s !== 'break'), 'a line that is not purely value claims is not read');
+  // review of #1126: when in doubt, a note
+  const none = lines => arith(lines).every(x => x !== 'break');
+  ok(none(['k = 2', 'f(x) = kx', 'k = 5', 'f(3) = 15']) && none(['k = 2', 'f(x) = kx', 'f(3) = 6', 'k = 5', 'f(3) = 15']) && none(['k = 2', 'f(x) = kx', 'f(3) = 7']), 'a definition built on a letter that is set again is never judged');
+  ok(none(['f(x) = πx', 'f(2) = 6']) && none(['f(x) = e^x', 'f(1) = 3']) && none(['f(x) = √2 x', 'f(2) = 3']) && none(['f(x) = sqrt(x)', 'f(2) = 1']), 'an irrational value may be rounded: never crossed');
+  ok(none(['f(x) = x^0', 'f(0) = 5']) && none(['f(x) = 0^x', 'f(0) = 5']) && none(['f(x) = x^x', 'f(0) = 5']) && none(['f(x) = 1/x', 'f(0) = 5']) && none(['f(x) = x^(-1)', 'f(0) = 5']), 'undefined or conventional values (0^0, 1/0) are never crossed');
+  ok(none(['f(x) = x^2 3', 'f(2) = 5']) && none(['f(x) = 2 3x', 'f(1) = 5']), 'a definition that reads two ways is never judged');
+  ok(none(['f(x) = ln(x)', 'f(1) = 4']) && none(['f(x) = abs(x)', 'f(-2) = 5']) && none(['f(x) = exp(x)', 'f(0) = 5']), 'named functions (ln, log, abs, exp) are never judged');
+  ok(arith(['f(x) = 2x + 1', 'f(3) = 8'])[1] === 'break' && arith(['f(x) = (x - 1)^2', 'f(3) = 5'])[1] === 'break', 'whole-number polynomials are still judged');
+  // generated true pages: no cross, and the same ticks that pay
+  { let pages = 0, crossed = 0;
+    for (const fam of ['y12-integration', 'y12-diff', 'y12-appdiff', 'me12-calc', 'y12-series']) for (let d = 1; d <= 4; d++) for (let sd = 1; sd <= 20; sd++) {
+      let g; try { g = G.generateQuestion(fam, d, sd); } catch { continue; }
+      const lines = (g.solution || g.steps || []).map(x => String(x.d || '').replace(/\$/g, '').replace(/\\[;,]/g, ' ')).filter(Boolean);
+      if (!lines.length) continue;
+      pages++;
+      const st = (() => { try { return (stepEvidence({ ...g }, '99991', lines.join('\n'), checkAnswer(g, '99991'), { slipWarnings: true }).shownReport || {}).lines || []; } catch { return []; } })();
+      crossed += st.filter(l => l.valueChain?.rule === 'function-value').length;
+    }
+    ok(pages >= 150 && crossed === 0, `generated authored pages are never crossed by the function-value rule (${pages} pages, ${crossed})`); }
   // the final-answer marks are unchanged by the cross
   { const withCross = stepEvidence({ ...q }, '-405', [D, 'F(3) = -405', 'F(0) = 3'].join('\n'), checkAnswer(q, '-405'), { slipWarnings: true });
     const without = stepEvidence({ ...q }, '-405', [D, 'F(3) = -405', 'F(0) = 0'].join('\n'), checkAnswer(q, '-405'), { slipWarnings: true });
