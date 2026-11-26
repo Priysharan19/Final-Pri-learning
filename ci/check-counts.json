@@ -875,7 +875,7 @@
       "job": "platform-contracts",
       "log": "reading-floor-http.log",
       "pins": [
-        {"has":"READING FLOOR HTTP (sqlite): PASS: 71 checks"}
+        {"has":"READING FLOOR HTTP (sqlite): PASS: 75 checks","note":"71 -> 75 on the merged tree of Train 8, as printed by running server/test/reading-floor-http-check.mjs: task/final-answer-from-conclusion (#1134) added section 4b (a working that arrives as one string is read line by line by the floor; four checks) and did not bump this pin. Nothing dropped."}
       ]
     },
     "platform/qbank-pack.log": {
