@@ -20,7 +20,12 @@ export function TickMark({ kind, index = 0 }) {
     <svg className={`mp-t-glyph is-${kind}`} viewBox="0 0 26 24" width="26" height="24" aria-hidden="true" focusable="false" style={{ '--i': Math.min(index, 12) }}>
       {kind === 'right'
         ? <path d={TICK_PATH} pathLength="1" />
-        : <><path d={CROSS_A} pathLength="1" /><path d={CROSS_B} pathLength="1" className="b" /></>}
+        : kind === 'ai'
+          // the AI tick: the same stroke, drawn dotted, so it can never be taken for an engine tick
+          ? <path d={TICK_PATH} pathLength="1" />
+          : kind === 'doubt'
+            ? <circle cx="13" cy="12" r="8" />
+            : <><path d={CROSS_A} pathLength="1" /><path d={CROSS_B} pathLength="1" className="b" /></>}
     </svg>
   );
 }
@@ -135,7 +140,7 @@ export function TeacherSheet({ kind, view, page, marks, selected, pick, onKey, m
                 const style = onPage ? { left: `${(p.x / dim.w) * 100}%`, top: `${(p.y / dim.h) * 100}%`, '--sz': `${p.size}px` } : { top: `${(p.y / dim.h) * 100}%`, '--sz': `${p.size}px` };
                 return (
                   <button key={m.n} type="button" className={`mp-marker mp-t-tick is-${m.kind}${onPage ? '' : ' in-gutter'}${selected === m.n ? ' is-active' : ''}${p.num ? '' : ' is-small'}`}
-                    data-mp-box={m.n} data-mp-status={m.kind === 'right' ? 'checked' : 'first-error'} data-mp-where={p.where} data-mp-placement={p.placement}
+                    data-mp-box={m.n} data-mp-status={m.kind === 'right' ? 'checked' : m.kind === 'ai' ? 'ai-checked' : m.kind === 'doubt' ? 'ai-doubt' : 'first-error'} data-mp-where={p.where} data-mp-placement={p.placement}
                     data-mp-class={m.cls || undefined} data-mp-phrase={m.phrase || undefined} aria-label={markLabel(m)} aria-pressed={selected === m.n} tabIndex={selected === m.n ? 0 : -1} aria-describedby={open?.n === m.n ? `${uid}-pop` : undefined}
                     style={style} onClick={() => { pick(m.n, false); setOpen(o => (o?.n === m.n && o.via === 'tap' ? null : { n: m.n, via: 'tap' })); }}
                     onMouseEnter={() => setOpen(o => (o?.via === 'tap' ? o : { n: m.n, via: 'hover' }))} onMouseLeave={() => setOpen(o => (o?.n === m.n && o.via === 'hover' ? null : o))}
@@ -289,6 +294,7 @@ export function Assessment({ model, rowFocus, setRowFocus, tracedRows, examinerN
         </>
       )}
       <p className="mp-t-foot" data-mp-foot>{model.footer}</p>
+      {model.aiNote && <p className="mp-t-ainote" data-mp-ai-note>{model.aiNote}</p>}
       {examinerNote && <div className="mp-t-note" data-mp-examiner-note><h4 className="mp-t-caps mp-t-h">{TEXT.note}</h4><p>{examinerNote}</p></div>}
       {children}
     </details>

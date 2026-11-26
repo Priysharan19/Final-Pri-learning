@@ -36,7 +36,9 @@ const WEIGHTS = {
   // measured locally, not from run 39186561084: the mutation check inside it (seeds 1-6 of the harness plus the recorded corpus) is ~80 s
   'test:first:wrong:step': 120,
   // measured locally (26 Nov 2026): the annotation-coverage gate marks every Years 11-12 generator form and every bank part twice, about 25 s
-  'test:annotation:coverage': 30
+  'test:annotation:coverage': 30,
+  // measured locally (27 Nov 2026): the AI line check suites (a fake provider; unit 3.3 s, over HTTP 1.1 s, page model 0.1 s), about 6 s with start-up
+  'test:ai:line:check': 6
 };
 const DEFAULT_WEIGHT = 3;
 

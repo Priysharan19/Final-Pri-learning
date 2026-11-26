@@ -28,7 +28,11 @@ export const STATE = Object.freeze({
   follows: { word: 'aw.status.follows', icon: 'arrowRight', tone: 'partial' },
   incomplete: { word: 'aw.status.incomplete', icon: 'uncertain', tone: 'partial' },
   'not-verified': { word: 'aw.status.notVerified', icon: 'uncertain', tone: 'quiet' },
-  unread: { word: 'aw.status.unread', icon: 'uncertain', tone: 'quiet' }
+  unread: { word: 'aw.status.unread', icon: 'uncertain', tone: 'quiet' },
+  // An AI model's comment on a line the engine left open (server/platform/aiLineCheck). Never engine-verified, never a mark. The Prithagoras
+  // teacher page words these itself; other surfaces fall back to the plain "not verified" word.
+  'ai-checked': { word: 'aw.status.notVerified', icon: 'uncertain', tone: 'quiet' },
+  'ai-doubt': { word: 'aw.status.notVerified', icon: 'uncertain', tone: 'quiet' }
 });
 /** The four things the page says about a line, in plain words: right, wrong, unchecked or context. */
 export const stateOf = status => (status === 'checked' ? 'right' : status === 'first-error' ? 'wrong' : status === 'condition' ? 'context' : 'unchecked');
@@ -133,7 +137,8 @@ export function buildMarkedPage({ model, boxes = null, markReady = true } = {}) 
   const quiet = cards.filter(c => isQuiet(c.status)).map(c => c.n);
   const everyLine = !first && !quiet.length && !notFinished.length && cards.every(c => c.status === 'checked') && model.allChecked !== false && model.onlyArithmetic !== true && model.mixedAll !== true;
 
-  const counts = { right: checked, wrong: first ? 1 : 0, unchecked: cards.filter(c => c.status !== 'checked' && c.status !== 'condition' && c.status !== 'first-error').length };
+  // AI lines (server/platform/aiLineCheck) are counted by their own words on the teacher page (tallyOf), never as right and never as wrong; here they are not "not checked" either.
+  const counts = { right: checked, wrong: first ? 1 : 0, unchecked: cards.filter(c => c.status !== 'checked' && c.status !== 'condition' && c.status !== 'first-error' && c.status !== 'ai-checked' && c.status !== 'ai-doubt').length };
   // The mark is the server's, copied as it is; a page that is not a marked result shows none.
   const markOf = markReady && model.marks && Number.isFinite(Number(model.marks.awarded)) && Number(model.marks.possible) > 0
     ? { awarded: Number(model.marks.awarded), possible: Number(model.marks.possible) } : null;

@@ -12,6 +12,8 @@
 // a separate mandatory release gate.
 import { interpretAfterStepCheck, reportWithInterpretation } from './lineInterpreter/overlay.js';
 import { adoptProved } from '../../client/src/engine/provedLines.js';
+import { aiLineCheckEnabled, runAiLineCheck, applyAiLineCheck } from './aiLineCheck/index.js';
+import { reserveLineCheck } from './aiLineCheck/budget.js';
 import { createHash, randomInt, randomUUID } from 'node:crypto';
 import { asyncRouter, asyncHandler } from './asyncRouter.js';
 import { asStore } from './store.js';
@@ -1577,6 +1579,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     // Evidence the commit turned out to need although step 1 forecast it would
     // not (another submission spent the first try meanwhile).
     let evidenceForced = false;
+    // The AI line check's result for this request (see 2b), computed at most once.
+    let aiCheck = null, aiCheckDone = false;
     // The reading of a picture this submission carries (read once, kept across
     // the rounds below).
     let reading = null;
@@ -1721,6 +1725,30 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         result = answered;
         evidence = { stepReport: result.stepReport || null, partial: null };
         workingNotRead = true;
+      }
+
+      // ── 2b. The AI line check (Prithagoras only, off unless PRI_FEATURE_AI_LINE_CHECK=1) ──
+      // After every mark was computed (the marker above is finished: `result` and `evidence` are what decide the marks) and BEFORE the
+      // transaction opens (a provider call is never held inside one). Its result is feedback on lines the engine left open: it is folded
+      // into the displayed report below, after the marks and the scheme pay, and no mark reads it. Once per request, whatever the rounds.
+      // Never in a sealed context (Rush, Match, Placement, review), never for a question that is not marked this reply.
+      if (!aiCheckDone && marked.ok && evidence && !workingNotRead && !result.invalid && working.trim() !== ''
+        && aiLineCheckEnabled(env) && ['practice', 'task'].includes(forecast.q._practiceMode || 'practice')
+        && !['mcq', 'graph-sketch', 'manual'].includes(forecast.q.answerType)
+        && (result.correct === true || writtenWorking || forecast.spent)) {
+        aiCheckDone = true;
+        const fq = forecast.q;
+        const shown = evidence.shownReport ? (evidence.stepReport ? adoptProved(evidence.stepReport, evidence.shownReport) : evidence.shownReport) : evidence.stepReport;
+        const key = fq.answerType === 'numeric' && Number.isFinite(Number(fq.answer?.value)) ? { kind: 'numeric', value: Number(fq.answer.value) } : null;
+        const submitted = /^\s*[-\u2212]?\d+(?:\.\d+)?\s*$/.test(String(markAnswer ?? '')) ? Number(String(markAnswer).replace('\u2212', '-')) : null;
+        try {
+          aiCheck = await runAiLineCheck({
+            question: fq, questionId: qid, working, report: shown, env,
+            reference: [`Answer: ${answerTextFor(fq)}`, ...(Array.isArray(fq.steps) ? fq.steps.slice(0, 14).map(st => `${String(st?.h ?? '')}: ${String(st?.d ?? '')}`) : [])].join('\n'),
+            answer: { key, correct: result.correct === true, submitted },
+            reserve: () => reserveLineCheck(db, { accountId, env, now })
+          });
+        } catch { aiCheck = null; }
       }
 
       // ── 3. Commit ────────────────────────────────────────────────────────
@@ -1893,6 +1921,12 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       if (resolved && !invalid && !notRead && evidence && evidence.shownReport) response.stepReport = response.stepReport ? adoptProved(response.stepReport, evidence.shownReport) : evidence.shownReport;
       // A question the marker could not judge line by line says why (`noLineReport.reason`: no-working, multiple-choice, graph-sketch, board-scheme, lines-not-readable), so the page never has to guess.
       if (resolved && !invalid && !notRead && !response.stepReport && evidence && evidence.noLineReport) response.noLineReport = evidence.noLineReport;
+      // The AI line check, folded into the DISPLAYED report only (after every mark and the scheme pay: nothing above reads it). A line the engine
+      // judged is never touched; AI lines carry `ai` and are labelled by the page. Stored with the reply, so a re-opened page cannot change.
+      if (resolved && !invalid && !notRead && aiCheck) {
+        const folded = applyAiLineCheck({ report: response.stepReport || null, result: aiCheck, working });
+        if (folded) { response.stepReport = folded; delete response.noLineReport; }
+      }
       // Everything this reply adds to the account's records goes in ONE
       // statement: the immutable reply, the completion when it resolves, and —
       // for a submission that carried its picture — the receipts /recognize

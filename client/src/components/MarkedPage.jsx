@@ -287,6 +287,9 @@ export default function MarkedPage({ teacherMarks = EDITION === 'prithagoras', e
       comment = <p className="mp-text mp-sentence-1" data-mp-why-error>{text ? <EngineComment text={text} lang={language} /> : sentence ? (sentence.includes('$') && dollarsBalanced(sentence) ? <EngineComment text={sentence} /> : <Typeset text={sentence} texOf={texOf} />) : (n > 1 ? t('aw.body.firstError', { n: leadFrom }) : t('aw.body.firstErrorStart'))}</p>;
     } else if (status === 'unread') {
       comment = <><p className="mp-text" data-mp-unread={String(n)}>{t('mp.unread', { count: 1, list: String(n) })}</p><p className="mp-text mp-how" data-mp-unread-how>{t('mp.unreadHow')}</p></>;
+    } else if (status === 'ai-checked' || status === 'ai-doubt') {
+      // An AI model's comment on a line the engine left open: labelled as such, never as a verification (the words are the teacher layer's).
+      comment = <p className="mp-text" data-mp-ai={status}>{tm ? `${status === 'ai-checked' ? T.TEXT.aiChecked + ':' : T.TEXT.aiDoubtLead} ${card.ai?.comment || ''}` : t('mp.collapsed', { count: 1, list: String(n) })}</p>;
     } else if (status === 'not-verified') {
       comment = <p className="mp-text">{card.comment ? <EngineComment text={typesetProse(card.comment)} /> : t('mp.collapsed', { count: 1, list: String(n) })}</p>;
     } else {
