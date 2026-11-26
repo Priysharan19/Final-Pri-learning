@@ -23,7 +23,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { texToPlain } from './texToPlain.js';
 import { variablesOf, evaluate } from './expr.js';
-import { astOf, unwrap, closed, valueOf, same, polyOf, findSubstitution, printPlain, printTex, printCanon } from './stepExplain.js';
+import { astOf, unwrap, closed, valueOf, same, polyOf, equalByEngine, findSubstitution, printPlain, printTex, printCanon } from './stepExplain.js';
 
 const MINUS = /[−–—]/g;
 const NUM = String.raw`(\d{1,3}(?:[ , ]\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)`;
@@ -362,6 +362,9 @@ function substitutionLine(state, l, text) {
   if (!cont && parts.length >= 2) { label = parts[0]; exprText = parts[1]; }
   const B = astOf(exprText);
   if (!B) return null;
+  // the whole line must be true: every side after the substituted one is the same value (`g(3) = 2(3) + 4 = 9` is not a substitution)
+  { const rest = (cont ? parts.slice(1) : parts.slice(2)).map(astOf); let prevNode = B;
+    for (const r of rest) { if (!r || !equalByEngine(prevNode, r)) return null; prevNode = r; } }
   // a label names what the line is the value of (`U_4`, `f(3)`, `y`): its argument must be the value substituted, or the letter itself
   const lab = label ? /^([A-Za-z])(?:_\{?([A-Za-z0-9.]+)\}?|\(\s*([^()]+?)\s*\))?$/.exec(label) : null;
   if (label && !lab) return null;

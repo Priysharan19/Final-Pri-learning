@@ -130,5 +130,10 @@ ok(!/stepExplain/.test(readFileSync(new URL('../../client/src/components/markedP
   ok(good.page.lines[0].card.tickClass === 'substitution-formula' || good.page.lines[0].status === 'checked', 'f(3) = 2(3)^2 - 2(3) - 3 is a substitution');
   ok(bad.page.lines[0].card.tickClass !== 'formula-value' && bad.page.lines[0].card.tickClass !== 'substitution-formula', `f(4) with 3 substituted is never ticked as a substitution (${bad.page.lines[0].card.tickClass})`); }
 
+{ const prompt = 'Let $g(x) = 2x + 4$. Find $g(3)$.';
+  const bad = run('f', ['g(3)=2(3)+4=9', '=9'], '10', prompt), good = run('f', ['g(3)=2(3)+4=10', '=10'], '10', prompt);
+  ok(bad.page.lines[0].card.tickClass !== 'formula-value' && bad.page.lines[0].card.tickClass !== 'substitution-formula', `g(3) = 2(3) + 4 = 9: the last side is wrong, so it is not a substitution tick (${bad.page.lines[0].card.tickClass})`);
+  ok(good.page.lines[0].status === 'checked', 'g(3) = 2(3) + 4 = 10 is ticked'); }
+
 console.log(`step-explain: ${pass} checks passed${fail ? `, ${fail} failed` : ''}`);
 process.exit(fail ? 1 : 0);
