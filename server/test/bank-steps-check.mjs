@@ -74,14 +74,14 @@ let eligibleIds = [];
     const q2 = served(entry.id); q2._generator = q2.subtopic;
     const q3 = served(entry.id); q3._generator = q3.subtopic;
     if (!(sealForEdition(q, repo) && sealForEdition(q2, tests) && sealForEdition(q3, stale))) unsealed++;
-    if (q._methodScheme !== undefined) repoStamped++;
+    if (q._methodScheme !== undefined && q._methodScheme !== 'generic-solution-steps-bank') repoStamped++;
     if (q3._methodScheme !== undefined) staleStamped++;
     if (entry.marks >= 2) multi++;
     if (q2._methodScheme === BANK_ID) { testStamped++; eligibleIds.push(entry.id); if (!bankEligible(q2)) notEligibleStamped++; }
     else if (q2._marking === FINAL_ANSWER_MARKING) sealedWhenNot++;
   }
   c.eq(unsealed, 0, 'every bank question seals');
-  c.eq(repoStamped, 0, 'with the repository\'s own list no bank question is stamped with the rule');
+  c.eq(repoStamped, 0, 'with the repository\'s own list no bank question is stamped with this rule (the bank generic rule, approved on 26 Nov 2026, is the only bank rule the list holds)');
   c.eq(staleStamped, 0, 'with the rule at a stale digest no bank question is stamped');
   c.eq(notEligibleStamped, 0, 'a part that did not pass the import-time proof is never stamped');
   c.eq(testStamped + sealedWhenNot, entries.length, 'with the rule approved in the test list every question is either stamped or sealed final-answer-only');

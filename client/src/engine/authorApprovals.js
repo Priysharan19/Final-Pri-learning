@@ -3,6 +3,12 @@
 // the digest he read. Lists only the types he has reviewed and approved. Approval here never turns method marks on by itself.
 export const AUTHOR_APPROVED = Object.freeze([
   {
+    "typeId": "generic-solution-steps-bank",
+    "digest": "83e159283e2d466356727e52315b0ef79b92ddf33cc55749c5936206e85f40d8",
+    "approvedBy": "Priysharan Tripathi",
+    "date": "2026-11-26"
+  },
+  {
     "typeId": "generic-solution-steps",
     "digest": "d8f1119ae311c778679bebfa49b836e73a67838e3e4a35d7054dfa2c81f5c329",
     "approvedBy": "Priysharan Tripathi",

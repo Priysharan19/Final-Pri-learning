@@ -244,6 +244,20 @@ function blankGaps(steps) {
   return out;
 }
 
+/** A line whose sides are the same text, or are all bare numbers of one value (`1=1`, `2.0=2`, `x=x`): it says nothing about the question. */
+export function isIdentityLine(text) {
+  if (typeof text !== 'string') return false;
+  const sides = text.replace(/\$/g, '').split('=').map(x => x.replace(/\s+/g, '').replace(/^\((.*)\)$/, '$1').replace(/·/g, '*'));
+  if (sides.length < 2 || sides.some(x => x === '')) return false;
+  if (sides.every(x => x === sides[0])) return true;
+  return sides.every(x => /^[-+]?\d+(?:\.\d+)?$/.test(x)) && sides.every(x => Number(x) === Number(sides[0]));
+}
+/** The report with each identity line kept true but neutral: marked as restating what is given (`restates`), which the step-mark rules neither credit nor treat as a stop. */
+export function holdIdentityLines(report) {
+  if (!report || !Array.isArray(report.lines) || !report.lines.some(l => l?.status === 'ok' && isIdentityLine(l.text))) return report;
+  return { ...report, lines: report.lines.map(l => (l?.status === 'ok' && isIdentityLine(l.text) ? { text: l.text, status: 'ok', restates: true, note: 'This line says a thing equals itself. It is true, and it shows no working, so it is not counted towards a step.' } : l)) };
+}
+
 export function stepEvidence(q, answer, steps, result, opts = null) {
   const meta = stepMetaFor(q);
   let report = result.stepReport || null;
@@ -487,7 +501,10 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
   } catch { /* the report stands */ }
   // A scheme question (schemeAward.js) also learns which lines the topic check ITSELF verified: the page ticks more than that (a copied
   // given, a rule statement, a true-as-written sum), and "writes a correct derivative" is earned only by a line the check found equal to it.
-  const topicTicks = q._methodScheme ? (decided ? decided.lines.flatMap((l, i) => (l?.status === 'ok' ? [i] : [])) : null) : undefined;
+  // A step-mark question (stamped at issue) never credits a line that only says a thing equals itself (`1=1`, `x=x`): it reaches no key step, whatever the
+  // step's value is. Applied here, to the report every pay reads; the lines the topic check verified are filtered the same way.
+  if (q._methodScheme && report) report = holdIdentityLines(report);
+  const topicTicks = q._methodScheme ? (decided ? decided.lines.flatMap((l, i) => (l?.status === 'ok' && !isIdentityLine(l.text) ? [i] : [])) : null) : undefined;
   // A question of the author's bank whose own worked step disagrees with its own answer (bankFaults.js) is never crossed on the page: a cross is shown as a note. After every mark.
   return { stepReport: holdFaultCrosses(q, report), ...(shownReport ? { shownReport: holdFaultCrosses(q, shownReport) } : {}), partial, ...(board ? { board } : {}), ...(markingReport ? { markingReport } : {}), ...(topicTicks !== undefined ? { topicTicks } : {}) };
 }

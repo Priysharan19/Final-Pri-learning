@@ -47,18 +47,20 @@ const everything = [...SCHEMES.map(s => ({ typeId: s.id, digest: schemeDigest(s)
 c.ok(repoList.length > 0, `the repository's own approved list is in force (${repoList.length} types)`);
 const lists = [['the repository list', repoList], ['every scheme and the generic rule approved', everything]];
 for (const [name, list] of lists) {
-  let stamped = 0, sealed = 0, noMarking = 0;
+  let stamped = 0, sealed = 0, noMarking = 0, stampedBankGeneric = 0;
   for (const e of entries) {
     const q = JSON.parse(JSON.stringify(qb.qbankEntryQuestion(e.id, 17)));
     q._generator = q.subtopic;
     const ok = sealForEdition(q, { ...bankPolicy('prithagoras'), methodSchemeTypes: list });
     if (!ok) { noMarking++; continue; }
-    if (q._methodScheme !== undefined) stamped++;
+    if (q._methodScheme !== undefined) { stamped++; if (q._methodScheme === BANK_GENERIC_ID && bankGenericEligible(q)) stampedBankGeneric++; }
     if (q._marking === FINAL_ANSWER_MARKING) sealed++;
   }
   c.eq(noMarking, 0, `${name}: every packed question seals`);
-  c.eq(stamped, 0, `${name}: none of the ${entries.length} packed questions is stamped with a scheme or the generic rule`);
-  c.eq(sealed, entries.length, `${name}: every one is sealed final-answer-only`);
+  // The repository list now holds the bank generic rule (author record of 26 Nov 2026): it alone may stamp a bank part, only an eligible one (2+ marks).
+  const only = name === 'the repository list';
+  c.eq(stamped, only ? stampedBankGeneric : 0, `${name}: ${only ? 'only the bank generic rule stamps a packed question' : `none of the ${entries.length} packed questions is stamped with a scheme or the generic rule`}`);
+  c.eq(sealed + (only ? stamped : 0), entries.length, `${name}: every one is stamped by the bank generic rule or sealed final-answer-only`);
 }
 
 // The bank rule (bankSteps.js, approval id `bank-author-criteria`) is the ONE rule that may pay a bank question, and only once the author files his own
@@ -98,10 +100,11 @@ for (const [name, list] of lists) {
   c.ok(stamped > 100, `approved alone it stamps ${stamped} of ${entries.length}`);
 }
 
-// Neither draft bank rule is on the repository's approved list, and a worked-solution question is never stamped by either, whatever is approved.
+// Only the bank criteria rule is a draft (the bank generic rule is approved), and a worked-solution question is never stamped by either, whatever is approved.
 {
   const draftIds = [BANK_ID, BANK_GENERIC_ID];
-  c.eq(repoList.filter(t => draftIds.includes(t.typeId)).length, 0, 'neither draft bank rule is on the repository approved list');
+  c.eq(repoList.filter(t => t.typeId === BANK_ID).length, 0, 'the bank criteria rule is still a draft: not on the repository approved list');
+  c.ok(repoList.some(t => t.typeId === BANK_GENERIC_ID && t.digest === bankGenericDigest()), 'the bank generic rule is on the repository approved list at its current digest (author record, 26 Nov 2026)');
   const bothDrafts = [{ typeId: BANK_ID, digest: bankDigest() }, { typeId: BANK_GENERIC_ID, digest: bankGenericDigest() }];
   const worked = qb.qbankManualEntries();
   let stampedWorked = 0, unsealedWorked = 0;
@@ -117,7 +120,7 @@ for (const [name, list] of lists) {
 }
 
 // (computed before the server starts: a long synchronous loop beside an open keep-alive socket gets it reset)
-const eligibleDraft = entries.filter(e => e.marks >= 2 && (bankEligible(qb.qbankEntryQuestion(e.id, 17)) || bankGenericEligible(qb.qbankEntryQuestion(e.id, 17))));
+const eligibleDraft = entries.filter(e => e.marks >= 2 && bankEligible(qb.qbankEntryQuestion(e.id, 17)) && !bankGenericEligible(qb.qbankEntryQuestion(e.id, 17)));
 
 // Over the real routes, with the REAL repository list and the method-marks switch on (no test override): nothing is stamped or paid by either draft rule
 // or by any approved scheme, a wrong answer earns 0, and a right answer earns what a final-answer-only question earns.
@@ -130,7 +133,7 @@ try {
   const call = async (p, body, headers = {}) => { if (p.endsWith('/issue')) used++; return h.request(p, { method: 'POST', jar: a.jar, headers, body }); };
   {
     c.eq(approvedSchemeTypes().length, repoList.length, 'over HTTP the real repository list is in force');
-    c.ok(eligibleDraft.length > 100, `${eligibleDraft.length} parts could be paid by a draft rule if it were approved`);
+    c.ok(eligibleDraft.length > 20, `${eligibleDraft.length} parts could be paid only by the draft criteria rule if it were approved`);
     let drawn = 0, stampedReal = 0, paidReal = 0, wrongPaid = 0, rightShort = 0;
     for (let i = 0; drawn < 24 && i < 3000; i++) {
       if (used >= 80) await fresh();
