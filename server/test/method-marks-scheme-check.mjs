@@ -26,6 +26,7 @@ import * as R from '../../tools/method-marks-ready.mjs';
 import { TYPES } from '../../tools/method-marks-drafts.mjs';
 import { SCHEMES, UNAVAILABLE, APPROVED_SCHEME_TYPES, schemeDigest, schemeMarks, schemePay, schemeTypeOf, isApproved, awardScheme } from '../platform/schemeAward.js';
 import { genericDigest } from '../platform/genericSteps.js';
+import { bankGenericDigest } from '../platform/bankGenericSteps.js';
 import { stepEvidence, marksPossibleFor, practiceMarksEarned, MARKER_OPS } from '../platform/markerOps.js';
 import { FINAL_ANSWER_ONLY } from '../platform/markingPolicy.js';
 import { UNCERTIFIED_EDITIONS, editionMarkingPolicy } from '../platform/editionMarking.js';
@@ -116,7 +117,7 @@ ok(typed.every(([s, q]) => schemePay({ q, report: { lines: [] }, correct: false,
   const allTypes = AA.allTypes();
   const derived = AA.approvedTypes(AA.readRecords(), allTypes).map(a => ({ typeId: a.typeId, digest: a.digest }));
   ok(Object.isFrozen(AUTHOR_APPROVED_SERVER) && APPROVED_SCHEME_TYPES === AUTHOR_APPROVED_SERVER && JSON.stringify(AUTHOR_APPROVED_SERVER) === JSON.stringify(derived), 'the generated server list equals exactly what the tool derives from the committed records and types.json');
-  ok(AA.readRecords().flatMap(r => AA.recordProblems(r, allTypes)).length === 0 && derived.every(d => allTypes.find(t => t.id === d.typeId)?.digest === d.digest && (d.typeId === 'generic-solution-steps' ? genericDigest() === d.digest : SCHEMES.some(x => x.id === d.typeId && schemeDigest(x) === d.digest))), 'every committed record is valid and its digest is the type\'s current digest');
+  ok(AA.readRecords().flatMap(r => AA.recordProblems(r, allTypes)).length === 0 && derived.every(d => allTypes.find(t => t.id === d.typeId)?.digest === d.digest && (d.typeId === 'generic-solution-steps' ? genericDigest() === d.digest : d.typeId === 'generic-solution-steps-bank' ? bankGenericDigest() === d.digest : SCHEMES.some(x => x.id === d.typeId && schemeDigest(x) === d.digest))), 'every committed record is valid and its digest is the type\'s current digest');
   // fixtures in a temporary directory: valid + approved + current digest is listed; stale digest, changes-needed, automation names are not
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pri-approvals-'));
   const rec = (typeId, o = {}) => ({ schemaVersion: 1, typeId, digest: typesJson.find(t => t.id === typeId).digest, verdict: 'approved', role: 'author (tutor)', approvedBy: 'Priysharan Tripathi', date: '2026-11-24', note: 'ok', ...o });
