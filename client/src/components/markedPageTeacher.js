@@ -64,6 +64,9 @@ export const TEXT = Object.freeze({
   steps: 'Steps',
   enlarge: 'Enlarge page',
   fit: 'Fit to screen',
+  markAwarded: 'Mark awarded here:',
+  corrected: 'Corrected line:',
+  provedTrue: 'The engine proved this line true.',
   enlargedLabel: 'Enlarged page, scroll to move',
   heading: 'Heading',
   question: 'Question restated',
@@ -217,7 +220,14 @@ export function placeMarks({ marks, obstacles = null, words = {}, reserve = 0, w
         }
         if (!word) word = 'gutter';
       }
-      out.push({ n: m.n, where: 'page', x: tick.x0 + tsize / 2, y: cy, size: tsize, leader: null, placement: 'box', word, num });
+      // a phrase that cannot stand beside its tick goes to the gutter, joined by a thin leader along the free part of the line's level
+      let leader = null;
+      if (word === 'gutter') {
+        const lx0 = tick.x1 + (num ? nw : 0) + 2;
+        const stop = Math.min(W, ...all.filter(b => b.n !== m.n && b.x0 > lx0 && b.y0 <= cy && b.y1 >= cy).map(b => b.x0 - 2));
+        if (stop - lx0 >= 10) leader = { x0: lx0, x1: stop, y: cy };
+      }
+      out.push({ n: m.n, where: 'page', x: tick.x0 + tsize / 2, y: cy, size: tsize, leader, placement: 'box', word, num });
       return;
     }
     // the gutter: the leader runs along the foot of the line and stops where other writing begins
@@ -294,4 +304,79 @@ export function lineWord(card) {
   if (kinds.includes('heading')) return TEXT.heading;
   if (kinds.includes('question') || (card.valueChain === 'given' && card.restated)) return TEXT.question;
   return null;
+}
+
+// ── the popover: the fuller detail behind a tick or a cross ─────────────────
+
+/** One general sentence per proof class: what the engine established. Nothing here says more than the class does. */
+export const DETAILS = Object.freeze({
+  differentiation: 'The derivative on this line is correct.',
+  substitution: 'The value was substituted correctly.',
+  solutionList: 'These values are exactly the solutions of the question.',
+  rounding: 'The value is correct to the places written.',
+  restated: 'This line restates the question.',
+  given: 'This line is given by the question.',
+  identity: 'Both sides are equal at every value tried, so this is a true identity.',
+  one: 'Multiplying by 1 changes nothing, so this equals the line above.',
+  expansion: 'The expansion is correct.',
+  collecting: 'The like terms were collected correctly.',
+  factorisation: 'The factorised form equals the line above.',
+  cancelling: 'The common factor was cancelled correctly.',
+  arithmetic: 'The arithmetic on this line is correct.',
+  equal: 'This line is equal to the line above.',
+  ruleStatement: 'The rule is stated correctly.',
+  solutionStep: 'This line matches a step of the worked solution.',
+  factors: 'The factors chosen multiply to the function in the question.',
+  differenceOfSquares: 'The difference of squares is applied correctly.',
+  indexLaw: 'The index law is applied correctly.',
+  logLaw: 'The log law is applied correctly.',
+  trigIdentity: 'The trigonometric identity is applied correctly.',
+  fractions: 'The fraction work is correct.',
+  conclusion: 'This is the answer the question asks for, and it is correct.',
+  heading: 'A heading: nothing to check.',
+  question: 'This line restates the question.'
+});
+const clip = (v, n = 90) => { const t = String(v ?? '').replace(/\$/g, '').replace(/\s+/g, ' ').trim(); return t.length > n ? '' : t; };
+
+/** The one sentence the engine's own pieces allow for a class, or null (then the class's general sentence stands). */
+function piecesSentence(cls, how) {
+  const h = how && typeof how === 'object' ? how : {};
+  if (cls === 'differentiation' && h.kind === 'derivative-rule' && clip(h.exprText) && clip(h.rhsText) && clip(h.v, 4)) return `The derivative of ${clip(h.exprText)} with respect to ${clip(h.v, 4)} is ${clip(h.rhsText)}.`;
+  if (cls === 'substitution' && h.kind === 'substituted-at' && clip(h.name, 12) && clip(h.argText, 24) && clip(h.valueText, 24)) return `${clip(h.name, 12)}(${clip(h.argText, 24)}) = ${clip(h.valueText, 24)} is substituted correctly.`;
+  return null;
+}
+
+/**
+ * What the popover on a tick or cross says. From the deterministic class table and the engine's own fields; no model text.
+ * @returns {{ title, lines: string[], mark: string|null }}
+ */
+export function detailFor(m, card = null) {
+  if (m.kind === 'wrong') {
+    const lines = [m.reason];
+    const f = card?.facts || {};
+    const why = firstSentence(f.whatChanged || '');
+    if (why && why !== m.reason) lines.push(why);
+    if (m.corrected) lines.push(`${TEXT.corrected} ${plain(m.corrected)}`);
+    return { title: `Line ${m.n}: wrong`, lines, mark: null };
+  }
+  const general = m.cls && Object.hasOwn(DETAILS, m.cls) ? DETAILS[m.cls] : TEXT.provedTrue;
+  const lines = [piecesSentence(m.cls, card?.how) || general];
+  return { title: `Line ${m.n}: correct`, lines, mark: m.paid ? `${TEXT.markAwarded} ${m.paid.text}.` : null };
+}
+
+/**
+ * Where the popover for a mark stands, in pixels of the page: below the line it explains, or above when there is no room below, never over
+ * the line itself, and kept inside the page sideways. Pure.
+ * @param line  { x0, x1, y0, y1 } the line's box in px;  tick  { x, y } its centre
+ */
+export function placePopover({ line, tick, width, height, w = 240, h = 80, gap = 6 }) {
+  const W = Math.max(1, width), H = Math.max(1, height);
+  const pw = Math.min(w, W - 8);
+  const below = line.y1 + gap, above = line.y0 - gap - h;
+  const fitsBelow = below + h <= H - 2, fitsAbove = above >= 2;
+  const side = fitsBelow || !fitsAbove ? 'below' : 'above';
+  const top = side === 'below' ? Math.min(below, Math.max(2, H - h - 2)) : above;
+  // when the page is too short for either, it still never covers the line: it goes beside the page's other free side
+  const left = Math.max(4, Math.min(tick.x - 16, W - pw - 4));
+  return { left, top: Math.max(2, top), width: pw, side };
 }

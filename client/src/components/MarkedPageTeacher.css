@@ -24,7 +24,7 @@
 
 /* ── the sheet: the page, untouched, with the margin beside it ── */
 .mp-sheet.mp-t-sheet { display: grid; grid-template-columns: minmax(0, 1fr) var(--mp-gw, 76px); padding-left: 0; background: var(--mk-paper); border: 1px solid var(--mk-rule); }
-.mp-t-sheet[data-mp-size="roomy"] { --mp-gw: 150px; --mp-rule-x: 92px; }
+.mp-t-sheet[data-mp-size="roomy"] { --mp-gw: 200px; --mp-rule-x: 134px; }
 .mp-t-sheet[data-mp-size="compact"] { --mp-gw: 76px; --mp-rule-x: 30px; }
 .mp-t-sheet .mp-sheet-in { min-width: 0; align-self: start; }
 .mp-t-over { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
@@ -56,7 +56,7 @@
 .mp-t-box { position: absolute; left: calc(var(--mp-rule-x) + 1px); box-sizing: border-box; min-width: 42px; height: 24px; padding: 0 6px; border: 1px solid var(--mk-error); color: var(--mk-error); background: var(--mk-paper); font: 400 15px/22px var(--mk-hand); text-align: center; font-variant-numeric: tabular-nums; }
 .mp-t-box.is-traced { background: color-mix(in srgb, var(--mk-accent) 14%, var(--mk-paper)); outline: 2px solid var(--mk-accent); outline-offset: 1px; }
 .mp-t-words { position: absolute; left: 30px; width: calc(var(--mp-rule-x) - 34px); appearance: none; background: none; border: 0; padding: 0; text-align: left; cursor: pointer; overflow: hidden;
-  font: 400 15px/1.1 var(--mk-hand); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+  font: 400 14px/1.1 var(--mk-hand); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
 .mp-t-words.is-right { color: var(--mk-correct); }
 .mp-t-words.is-wrong { color: var(--mk-error); }
 
@@ -132,3 +132,23 @@
   .mp-t-box { min-width: 36px; padding: 0 3px; font-size: 14px; }
   .mp-t-zoom.is-on .mp-t-sheet[data-mp-size="compact"] { --mp-gw: 76px; --mp-rule-x: 30px; }
 }
+
+/* the popover: paper, a fine rule, no shadow; it explains one mark and never sits on the line it explains */
+.mp-t-pop { position: absolute; z-index: 5; box-sizing: border-box; padding: var(--space-2) var(--space-3); background: var(--mk-paper); color: var(--mk-graphite); border: 1px solid var(--mk-graphite);
+  border-radius: 3px; font: 400 13.5px/1.45 var(--font); pointer-events: none; }
+.mp-t-pop p { margin: 0; }
+.mp-t-pop p + p { margin-top: 2px; }
+.mp-t-pop-h { font-weight: 600; font-size: 12px; letter-spacing: .04em; color: var(--mk-correct); }
+.mp-t-pop.is-wrong .mp-t-pop-h { color: var(--mk-error); }
+.mp-t-pop-m { margin-top: 4px; font-weight: 600; font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: no-preference) { .mp-t-pop { animation: mp-t-pop .12s ease-out both; } }
+@keyframes mp-t-pop { from { opacity: 0; } to { opacity: 1; } }
+
+/* what is drawn on the photograph is read against paper, whatever the theme: it keeps the light-theme marking colours (AA on paper) */
+.mp-t-over { --pg-ok: #287449; --pg-bad: #B83238; --pg-quiet: #5a5953; }
+.mp-t-say.is-right, .mp-t-leader.is-right { color: var(--pg-ok); }
+.mp-t-say.is-wrong, .mp-t-leader.is-wrong { color: var(--pg-bad); }
+.mp-t-num { color: var(--pg-quiet); }
+.mp-marker.mp-t-tick svg.mp-t-glyph.is-right, .mp-marker.mp-t-tick.is-active svg.mp-t-glyph.is-right { color: var(--pg-ok); }
+.mp-marker.mp-t-tick svg.mp-t-glyph.is-wrong, .mp-marker.mp-t-tick.is-active svg.mp-t-glyph.is-wrong { color: var(--pg-bad); }
+.mp-t-sheet .mp-under { border-bottom-color: var(--pg-bad, #B83238); }

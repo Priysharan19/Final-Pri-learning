@@ -54,7 +54,7 @@ const C = (text, fact) => ({ text, status: 'note', state: 'unverified', context:
 const OWNER19 = [
   C('Solution:', { kind: 'heading' }),
   V('y = 4x^3 - 36x^2', null, null, { state: 'given', solutionMatch: true }),
-  V('dy/dx = 12x^2 - 72x', { kind: 'derivative-rule' }),
+  V('dy/dx = 12x^2 - 72x', { kind: 'derivative-rule', v: 'x', exprText: '4x^3 - 36x^2', rhsText: '12x^2 - 72x' }),
   C('Stationary points when dy/dx = 0:'),
   V('12x^2 - 72x = 0', null, { kind: 'both-sides' }),
   V('12x(x - 6) = 0', { kind: 'factorised', factors: [] }),

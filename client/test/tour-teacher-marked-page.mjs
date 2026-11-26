@@ -54,9 +54,10 @@ for (const [size, viewport] of [['desktop', { width: 1280, height: 900 }], ['pho
         img, boxes, ticks, boxesPx: boxes.map(b => ({ x0: img.left + b.x * img.width, x1: img.left + (b.x + b.w) * img.width, y0: img.top + b.y * img.height, y1: img.top + (b.y + b.h) * img.height })),
         markBoxes: [...sec.querySelectorAll('[data-mp-markbox]')].map(b => ({ n: b.getAttribute('data-mp-markbox'), text: b.textContent.trim(), label: b.getAttribute('aria-label'), r: rect(b) })),
         says: [...sec.querySelectorAll('[data-mp-say]')].map(w => ({ n: w.getAttribute('data-mp-say'), text: w.textContent.trim(), r: rect(w), font: getComputedStyle(w).fontFamily })),
+        onPaper: { say: (() => { const e = sec.querySelector('.mp-t-say'); return e ? getComputedStyle(e).color : null; })(), tick: getComputedStyle(sec.querySelector('.mp-t-glyph.is-right')).color, under: 'rgb(184, 50, 56)' },
         gutterBg: getComputedStyle(sec.querySelector('[data-mp-gutter]')).backgroundColor,
         sheetH: rect(sec.querySelector('.mp-sheet-in')).height, sheetTop: rect(sec.querySelector('.mp-sheet-in')).top,
-        words: [...sec.querySelectorAll('[data-mp-words]')].map(w => ({ n: w.getAttribute('data-mp-words'), text: w.textContent.trim(), font: getComputedStyle(w).fontFamily })),
+        words: [...sec.querySelectorAll('[data-mp-words]')].map(w => ({ n: w.getAttribute('data-mp-words'), text: w.textContent.trim(), font: getComputedStyle(w).fontFamily, r: rect(w) })),
         tally: sec.querySelector('[data-mp-tally]')?.textContent, figure: sec.querySelector('[data-mp-figure]')?.getAttribute('data-mp-figure'), stateWord: sec.querySelector('[data-mp-state-word]')?.textContent,
         foot: sec.querySelector('[data-mp-foot]')?.textContent, assess: sec.querySelector('[data-mp-assess] summary')?.innerText.replace(/\s+/g, ' ').trim(),
         rows: [...sec.querySelectorAll('[data-mp-row]')].map(r => r.innerText.replace(/\s+/g, ' ').trim()),
@@ -103,6 +104,11 @@ for (const [size, viewport] of [['desktop', { width: 1280, height: 900 }], ['pho
       ok(sayN.includes(3) && sayN.includes(6) && sayN.includes(19), `${where}: phrases after the ticks on lines 3, 6 and 19 (got ${sayN})`);
       ok(got.says.find(w => w.n === '3').text === 'Correct differentiation' && got.says.find(w => w.n === '6').text === 'Correct factorisation' && got.says.find(w => w.n === '19').text === 'Correct answer', `${where}: each says its own class`);
     }
+    if (size === 'desktop') {
+      const spoken = new Set([...got.says.map(w => Number(w.n)), ...got.words.map(w => Number(w.n))]);
+      ok(got.ticks.filter(t => t.phrase).every(t => spoken.has(t.n)), `${where}: every tick with a phrase carries it on the page, beside it or in the margin ${JSON.stringify(got.ticks.filter(t => t.phrase && !spoken.has(t.n)).map(t => t.n))}`);
+    }
+    ok(got.onPaper.say === 'rgb(40, 116, 73)' && got.onPaper.tick === 'rgb(40, 116, 73)' && got.onPaper.under === 'rgb(184, 50, 56)', `${where}: what is drawn on the photograph keeps the colours that read on paper in both themes ${JSON.stringify(got.onPaper)}`);
     ok(got.says.every(w => /Pri Hand/.test(w.font)), `${where}: phrases are in the bundled face`);
     ok(got.says.every(w => { const t = got.ticks.find(x => String(x.n) === w.n); return w.r.left >= t.r.right - 1 && w.r.left - t.r.right <= 30 && Math.abs((w.r.top + w.r.bottom) / 2 - (t.r.top + t.r.bottom) / 2) <= 10; }), `${where}: each phrase follows its own tick on the same line`);
     ok(got.says.every(w => !got.boxesPx.some(b => w.r.left < b.x1 && b.x0 < w.r.right && w.r.top < b.y1 && b.y0 < w.r.bottom) && !got.ticks.some(t => t.r.left < w.r.right && w.r.left < t.r.right && t.r.top < w.r.bottom && w.r.top < t.r.bottom) && got.says.every(o => o === w || !(w.r.left < o.r.right && o.r.left < w.r.right && w.r.top < o.r.bottom && o.r.top < w.r.bottom))), `${where}: no phrase touches writing, a tick or another phrase`);
@@ -154,7 +160,7 @@ for (const [size, viewport] of [['desktop', { width: 1280, height: 900 }], ['pho
     });
     ok(cross.n === '9' && /^Line 9: wrong\. /.test(cross.label) && cross.under === 1 && cross.ticks === 4 && cross.none, `${where}: one cross on the first wrong line, with its underline; none on unverified lines ${JSON.stringify(cross)}`);
     if (size === 'desktop') ok(cross.words.some(w => /does not follow from the one above/.test(w)), `${where}: the cross says why, in the engine's fixed words ${cross.words}`);
-    ok(contrast(hexOf(cross.color), theme === 'light' ? '#f8f7f3' : '#1d1d1b') >= 4.5, `${where}: the cross is red enough to read`);
+    ok(contrast(hexOf(cross.color), '#fbfaf6') >= 4.5, `${where}: the cross is red enough to read on the photographed paper`);
     if (shots) {
       for (const v of ['marked', 'detailed', 'original']) {
         await open(page, url('owner19', { theme, extra: 'criteria=1' }), v);
@@ -249,6 +255,68 @@ for (const [size, viewport] of [['desktop', { width: 1280, height: 900 }], ['pho
   ok(/teacherMarks = EDITION === 'prithagoras'/.test(src), 'the teacher-marked page is on only in the Prithagoras build');
   const strings = readFileSync(new URL('../src/components/markedPageTeacher.js', import.meta.url), 'utf8') + readFileSync(new URL('../src/components/TeacherMarks.jsx', import.meta.url), 'utf8');
   ok(!/[ऀ-ॿ]/.test(strings), 'no Hindi in the new surface');
+}
+
+{
+  // the popover: hover, keyboard focus and tap each open the fuller detail anchored to the mark
+  const rectsOf = async (pg, n) => pg.evaluate(k => {
+    const pop = document.querySelector('[data-mp-pop]'); const tick = document.querySelector(`[data-mp-box="${k}"]`);
+    if (!pop) return null;
+    const img = document.querySelector('.mp-img').getBoundingClientRect();
+    const boxes = JSON.parse(document.querySelector('[data-gallery-boxes]').getAttribute('data-gallery-boxes'));
+    const b = boxes[k - 1]; const pr = pop.getBoundingClientRect(); const own = { l: img.left + b.x * img.width, r: img.left + (b.x + b.w) * img.width, t: img.top + b.y * img.height, b: img.top + (b.y + b.h) * img.height };
+    return { text: pop.innerText.replace(/\s+/g, ' ').trim(), role: pop.getAttribute('role'), id: pop.id, desc: tick.getAttribute('aria-describedby'), via: pop.getAttribute('data-mp-pop-via'), side: pop.getAttribute('data-mp-pop-side'),
+      coversOwn: pr.left < own.r && own.l < pr.right && pr.top < own.b && own.t < pr.bottom, inPage: pr.left >= img.left - 1 && pr.right <= img.right + 1 && pr.top >= img.top - 1 && pr.bottom <= img.bottom + 1, anim: getComputedStyle(pop).animationName, bg: getComputedStyle(pop).backgroundColor, border: getComputedStyle(pop).borderTopWidth, shadow: getComputedStyle(pop).boxShadow };
+  }, n);
+  for (const theme of ['light', 'dark']) {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, colorScheme: theme }); const pg = await ctx.newPage();
+    await open(pg, url('owner19', { theme, extra: 'criteria=1' }), 'marked');
+    ok(await pg.locator('[data-mp-pop]').count() === 0, `${theme}: no popover until asked`);
+    await pg.hover('[data-mp-box="3"]'); await pg.waitForTimeout(250);
+    let r = await rectsOf(pg, 3);
+    ok(r && r.role === 'tooltip' && r.desc === r.id && /Line 3: correct/.test(r.text) && /The derivative of 4x\^3 - 36x\^2 with respect to x is 12x\^2 - 72x\./.test(r.text), `${theme}: hover opens a tooltip with the engine's own pieces and aria-describedby ${r && r.text}`);
+    ok(r && !r.coversOwn && r.inPage && r.border !== '0px' && r.shadow === 'none', `${theme}: it never covers its own line, stays in the page, fine rule and no shadow`);
+    if (shots) await pg.screenshot({ path: `${shots}/teacher-popover-correct-desktop-${theme}.png`, fullPage: true });
+    await pg.mouse.move(5, 5); await pg.waitForTimeout(150);
+    ok(await pg.locator('[data-mp-pop]').count() === 0, `${theme}: moving away closes it`);
+    await pg.focus('[data-mp-box="6"]'); await pg.waitForTimeout(150);
+    r = await rectsOf(pg, 6);
+    ok(r && r.via === 'focus' && /Line 6: correct/.test(r.text) && /factorised form equals the line above/.test(r.text) && r.desc === r.id, `${theme}: keyboard focus opens it ${r && r.text}`);
+    await pg.keyboard.press('Escape');
+    ok(await pg.locator('[data-mp-pop]').count() === 0 && await pg.evaluate(() => document.activeElement?.getAttribute('data-mp-box')) === '6', `${theme}: Escape closes it and keeps focus on the mark`);
+    await pg.focus('[data-mp-box="7"]'); await pg.focus('[data-mp-box="19"]'); await pg.waitForTimeout(150);
+    r = await rectsOf(pg, 19);
+    ok(r && /Mark awarded here: 1\/1\./.test(r.text) && r.side === 'above' && !r.coversOwn && r.inPage && await pg.locator('[data-mp-pop]').count() === 1, `${theme}: the paid mark says so; the last line's popover flips above and stays in view; one at a time ${r && r.side}`);
+    await pg.evaluate(() => document.activeElement.blur()); await pg.waitForTimeout(100);
+    ok(await pg.locator('[data-mp-pop]').count() === 0, `${theme}: blur closes it`);
+    // a cross: the reason and the corrected line the server sent
+    await open(pg, url('crossed', { theme, extra: 'facts=1' }), 'marked');
+    await pg.hover('.mp-t-tick.is-wrong'); await pg.waitForTimeout(250);
+    r = await rectsOf(pg, 9);
+    ok(r && /Line 9: wrong/.test(r.text) && /does not follow from the one above/.test(r.text) && /Corrected line: 0=6x\[x\+3\]/.test(r.text) && !r.coversOwn && r.inPage, `${theme}: a cross explains why and shows the corrected line ${r && r.text}`);
+    if (shots) await pg.screenshot({ path: `${shots}/teacher-popover-wrong-desktop-${theme}.png`, fullPage: true });
+    await ctx.close();
+  }
+  // reduced motion: appears at once
+  const rmc = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce' }); const rp = await rmc.newPage();
+  await open(rp, url('owner19', { extra: 'criteria=1' }), 'marked'); await rp.hover('[data-mp-box="3"]'); await rp.waitForTimeout(100);
+  ok((await rectsOf(rp, 3)).anim === 'none', 'reduced motion: the popover appears without animation');
+  await rmc.close();
+  // a phone: tap opens, a second tap on the same mark or a tap elsewhere closes
+  for (const theme of ['light', 'dark']) {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, colorScheme: theme }); const pg = await ctx.newPage();
+    await open(pg, url('owner19', { theme, extra: 'criteria=1' }), 'marked');
+    await pg.tap('[data-mp-box="19"]'); await pg.waitForTimeout(250);
+    let r = await rectsOf(pg, 19);
+    ok(r && r.via === 'tap' && /Mark awarded here: 1\/1\./.test(r.text) && !r.coversOwn && r.inPage, `${theme} phone: a tap opens it, inside the page, off its own line ${r && r.text}`);
+    if (shots) await pg.screenshot({ path: `${shots}/teacher-popover-correct-phone-${theme}.png`, fullPage: true });
+    await pg.tap('.mp-t-tally'); await pg.waitForTimeout(150);
+    ok(await pg.locator('[data-mp-pop]').count() === 0, `${theme} phone: a tap elsewhere closes it`);
+    await pg.tap('[data-mp-box="3"]'); await pg.waitForTimeout(150); await pg.tap('[data-mp-box="3"]'); await pg.waitForTimeout(150);
+    ok(await pg.locator('[data-mp-pop]').count() === 0, `${theme} phone: a second tap on the same mark closes it`);
+    ok(await pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth) <= 0, `${theme} phone: no sideways scroll with a popover`);
+    await ctx.close();
+  }
 }
 
 await browser.close(); await server.close();

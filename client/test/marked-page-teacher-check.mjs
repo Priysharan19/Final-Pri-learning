@@ -1,7 +1,7 @@
 // The teacher-marked page's pure logic: the phrase table, which lines are ticked, where a margin mark may stand, and where a tick is placed.
 // Nothing here marks anything: every input is a deterministic report the server produced, and the checks prove the layer only reads it.
 //   node client/test/marked-page-teacher-check.mjs
-import { PHRASES, TEXT, classOf, lineWord, phraseOf, reasonOf, buildTeacherMarks, placeMarks, tallyOf, buildAssessment, groupPhrases, textHeight, wordWidth } from '../src/components/markedPageTeacher.js';
+import { DETAILS, PHRASES, TEXT, detailFor, placePopover, classOf, lineWord, phraseOf, reasonOf, buildTeacherMarks, placeMarks, tallyOf, buildAssessment, groupPhrases, textHeight, wordWidth } from '../src/components/markedPageTeacher.js';
 import { buildMarkedPage } from '../src/components/markedPageModel.js';
 
 let pass = 0; const failures = [];
@@ -134,6 +134,29 @@ ok(aw.state === 'not' && aw.corrections === 1 && aw.footer === '1 correction', '
 ok(buildAssessment({ page: buildMarkedPage({ model: { cards: [{ n: 1, status: 'checked' }, { n: 2, status: 'checked' }], marks: { awarded: 1, possible: 2 } } }) }).state === 'partly', 'a part mark is "Partly correct"');
 ok(!/%/.test(JSON.stringify(a1)), 'no percentage anywhere');
 ok(buildAssessment({ page: null }) === null, 'no page, no assessment');
+
+// ── the popover ────────────────────────────────────────────────────────────
+ok(Object.keys(PHRASES).every(k => typeof DETAILS[k] === 'string' && DETAILS[k].length > 10), 'every class has its general sentence');
+ok(Object.values(DETAILS).every(v => !/[\u2014\u2013]/.test(v)), 'no dash in a sentence');
+const d3 = detailFor({ n: 3, kind: 'right', cls: 'differentiation', paid: { marks: 1, text: '1/1' } }, { how: { kind: 'derivative-rule', v: 'x', exprText: '4x^3 - 36x^2', rhsText: '12x^2 - 72x' } });
+ok(d3.title === 'Line 3: correct' && d3.lines[0] === 'The derivative of 4x^3 - 36x^2 with respect to x is 12x^2 - 72x.' && d3.mark === 'Mark awarded here: 1/1.', `the engine's own pieces fill the sentence: ${JSON.stringify(d3)}`);
+const dg = detailFor({ n: 3, kind: 'right', cls: 'differentiation', paid: null }, { how: { kind: 'derivatives' } });
+ok(dg.lines[0] === DETAILS.differentiation && dg.mark === null, 'without pieces, the class\'s general sentence; no mark where none was earned');
+ok(detailFor({ n: 4, kind: 'right', cls: null, paid: null }).lines[0] === TEXT.provedTrue, 'a tick with no class still says the engine proved it');
+ok(detailFor({ n: 4, kind: 'right', cls: 'unheard-of', paid: null }).lines[0] === TEXT.provedTrue, 'an unknown class is tolerated');
+const dw = detailFor({ n: 9, kind: 'wrong', reason: TEXT.noReason, corrected: 'x = 6' }, { facts: { whatChanged: 'The sign changed. Then more.' } });
+ok(dw.lines.join('|') === `${TEXT.noReason}|The sign changed.|Corrected line: x = 6` && dw.mark === null, `a cross: the reason, what changed and the corrected line as the server sent them: ${dw.lines}`);
+ok(detailFor({ n: 9, kind: 'wrong', reason: TEXT.noReason, corrected: null }).lines.length === 1, 'no corrected line sent, none shown');
+ok(detailFor({ n: 3, kind: 'right', cls: 'differentiation' }, { how: { kind: 'derivative-rule', v: 'x', exprText: 'a'.repeat(200), rhsText: 'b' } }).lines[0] === DETAILS.differentiation, 'an over-long piece falls back to the general sentence');
+const PL = { x0: 40, x1: 300, y0: 100, y1: 140 };
+let pp = placePopover({ line: PL, tick: { x: 310, y: 120 }, width: 600, height: 800, h: 80 });
+ok(pp.side === 'below' && pp.top >= PL.y1 && pp.left >= 4 && pp.left + pp.width <= 596, 'the popover stands below its line and inside the page');
+pp = placePopover({ line: { x0: 40, x1: 300, y0: 740, y1: 780 }, tick: { x: 310, y: 760 }, width: 600, height: 800, h: 80 });
+ok(pp.side === 'above' && pp.top + 80 <= 740, 'it flips above when there is no room below');
+pp = placePopover({ line: PL, tick: { x: 590, y: 120 }, width: 600, height: 800, h: 80 });
+ok(pp.left + pp.width <= 596, 'and stays in view sideways');
+pp = placePopover({ line: PL, tick: { x: 20, y: 120 }, width: 276, height: 400, h: 80 });
+ok(pp.width <= 268 && pp.left >= 4, 'on a phone it fits the page');
 
 if (failures.length) { console.error(`marked-page-teacher-check: ${failures.length} failed`); for (const f of failures) console.error(' - ' + f); process.exit(1); }
 console.log(`marked-page-teacher-check: ${pass} checks passed`);
