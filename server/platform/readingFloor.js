@@ -26,6 +26,17 @@ const statesValue = (text, value) => {
   return false;
 };
 
+/**
+ * A line the page gives as its conclusion: a conclusion/answer label, a "so / hence / ∴" line, a boxed value or a sentence
+ * "The X is …". Working ("v(2) = … = 12", "Check: v(2) = 12") is not one: a doubtful last line is never rescued by a number
+ * that merely appears in working, since the doubtful line may say something else.
+ */
+const isConclusion = text => {
+  const s = String(text);
+  if (/^\s*[(\[]?\s*(?:check|verify|verification|proof|l\.?h\.?s|r\.?h\.?s)(?![\p{L}])/iu.test(s)) return false;
+  return /(?:^|[^\p{L}])(?:conclusion|final\s+answer|answer|ans|hence|therefore|thus)(?![\p{L}])|∴|\\boxed|\[[^\]]*\d[^\]]*\]|^\s*(?:the\s+)?[\p{L}][\p{L}\s'’-]{2,40}?\s+(?:is|are)\s+\S/iu.test(s);
+};
+
 /** A line is judgeable only when the reader gave a confidence at or above the floor and the line is not blank. */
 export const lineJudgeable = (line, floor) => {
   const c = Number(line?.confidence);
@@ -62,7 +73,7 @@ export function applyReadingFloor({ readLines, floor, steps, answer, answerTyped
   // A number that is also the text of an unrelated doubtful line (a tick mark "12" on a graph, read below the floor) is still
   // the answer when a line the reader WAS sure of states it as a value of its own ("The maximum velocity is 12 m/s"). The
   // answer is unreadable only when nothing the reader was sure of says it.
-  const statedAbove = [...above].some(text => text !== given && statesValue(text, given));
+  const statedAbove = [...above].some(text => text !== given && isConclusion(text) && statesValue(text, given));
   const answerUnreadable = given === '' || (answerTyped !== true && below.has(given) && !above.has(given) && !statedAbove);
   return { judged, excluded, answer: answerUnreadable ? '' : given, answerUnreadable, unconfirmed: true };
 }

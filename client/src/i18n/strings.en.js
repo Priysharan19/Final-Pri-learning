@@ -4486,8 +4486,6 @@ export default {
   "mp.collapsed": {"one": "Line {list} wasn’t checked: Pri read it, but it states nothing Pri can check on its own.", "other": "Lines {list} weren’t checked: Pri read them, but they state nothing Pri can check on their own."},
   "verdict.markMyWorking": "Mark my working",
   "mark.finalUnreadable": "Pri couldn’t read your final answer. Rewrite that line or type it here.",
-  "mark.finalLookedPick": "Pri looked at this line for your final answer: {line} Tap the answer you mean, or type it here.",
-  "mark.finalLookedNone": "Pri looked at this line for your final answer: {line} It does not give one Pri can take. Type it here.",
   "mark.workingUnreadable": "Pri couldn’t read your working. Rewrite it, or type it.",
   "mp.seeLine": "See how Pri read this line",
   "mp.seePage": "See how Pri read your page",

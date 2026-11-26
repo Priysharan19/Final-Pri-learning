@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `6499ca20b1af6d86469be48e29dd8c42b80a4ff03e86da4da43e098b5de1db0f` (`docs/marking/hsc-examiner-certification-dossier.md`).
+Dossier digest: `050ce35f6072fc88c3b07d64304796b6dd527fd75c1449cc4339de35241f8eaf` (`docs/marking/hsc-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 

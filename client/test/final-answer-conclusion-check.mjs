@@ -230,11 +230,13 @@ ok(unreadable === 0, `no page that states its answer is "couldn't read" (${unrea
 // ── The card: one honest sentence, tappable choices, both languages ─────────────────────────────────────────
 const card = readFileSync(new URL('../src/components/QuestionCard.jsx', import.meta.url), 'utf8');
 ok(/function FinalAnswerNote/.test(card) && /data-final-answer-choice/.test(card), 'the card names the line it looked at and offers the reading as a tap');
-ok(/mark\.finalLookedPick/.test(card) && /mark\.finalLookedNone/.test(card), 'with its two sentences');
+ok(/AU_FINAL_ANSWER_NOTE/.test(card) && /EDITION_ID !== 'prithagoras'/.test(card), 'with its two sentences, for Prithagoras only (Priyabhata keeps its one sentence)');
 ok(/spellUnits\(given, publicAnswerShape\)/.test(card), 'and spells a typed unit as the marker reads it');
 const en = (await import('../src/i18n/strings.en.js')).default;
 const hi = (await import('../src/i18n/strings.hi.js')).default;
-for (const k of ['mark.finalLookedPick', 'mark.finalLookedNone']) ok(en[k] && hi[k] && /\{line\}/.test(en[k]) && /\{line\}/.test(hi[k]), `${k} exists in both languages and carries the line`);
+const { AU_FINAL_ANSWER_NOTE } = await import('../src/i18n/strings.au.js');
+ok(!('mark.finalLookedPick' in en) && !('mark.finalLookedPick' in hi) && !('mark.finalLookedNone' in hi), 'no catalogue key and no Hindi was written for the new sentences');
+ok(/Pri looked at this line/.test(AU_FINAL_ANSWER_NOTE.pick('v = 3')) && /v = 3/.test(AU_FINAL_ANSWER_NOTE.none('v = 3')), 'the Prithagoras sentences carry the line');
 ok(/^Pri couldn’t read your final answer\. Rewrite that line or type it here\.$/.test(en['mark.finalUnreadable']), 'the original sentence is unchanged for a page with no line to name');
 
 console.log(`FINAL ANSWER FROM CONCLUSION: PASS — ${n} checks — the owner's page states 12, ${variants} conclusion layouts, units in any notation, a clause never replaces the answer, two candidates are offered, the sweep reads ${pages.length - unreadable} of ${pages.length}`);

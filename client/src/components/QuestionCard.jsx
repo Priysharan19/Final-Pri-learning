@@ -32,6 +32,8 @@ import { retryClock, retryWhen } from '../ink/readerFailure.js';
 import { preparePhoto } from '../ink/photoRaster.js';
 import { buildTranscript, editLine, includedLatex, includedLines, reviveTranscript, unreadablePage, workingOf } from '../photo/transcript.js';
 import { proposeFinalAnswer, readsAsWritten, spellUnits } from '../photo/finalAnswer.js';
+import { EDITION_ID } from '../brand/edition.js';
+import { AU_FINAL_ANSWER_NOTE } from '../i18n/strings.au.js';
 import { clearPhotoDraft, confirmPhotoDraftSaved, readPhotoDraft, savePhotoDraft } from '../local/photoDrafts.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
 import QuestionReport from './QuestionReport.jsx';
@@ -349,11 +351,11 @@ const REASON_TAG_KEY = {
  */
 function FinalAnswerNote({ t, note, onPick, id }) {
   const choices = note?.status === 'ambiguous' ? (note.candidates || []) : (note?.best ? [note.best] : []);
-  if (!note?.lineText) return <p className="photo-lines-note" id={id} role="status" data-final-answer-sentence data-final-answer-unreadable="true">{t('mark.finalUnreadable')}</p>;
+  if (EDITION_ID !== 'prithagoras' || !note?.lineText) return <p className="photo-lines-note" id={id} role="status" data-final-answer-sentence data-final-answer-unreadable="true">{t('mark.finalUnreadable')}</p>;
   return (
     <>
       <p className="photo-lines-note" id={id} role="status" data-final-answer-sentence data-final-answer-unreadable="true" data-final-answer-line={note.lineText}>
-        {t(choices.length ? 'mark.finalLookedPick' : 'mark.finalLookedNone', { line: note.lineText })}
+        {(choices.length ? AU_FINAL_ANSWER_NOTE.pick : AU_FINAL_ANSWER_NOTE.none)(note.lineText)}
       </p>
       {choices.length > 0 && (
         <div className="final-answer-choices" role="group" aria-label={t('verdict.finalAnswer')} data-final-answer-choices>

@@ -24,6 +24,10 @@ ok(JSON.stringify(applyReadingFloor({ readLines: [], floor: FLOOR, steps: ['a'],
 // A tick mark "12" read below the floor does not make a stated "12" unreadable (the owner's velocity page, 26 Nov 2026) ...
 const page = [L('The maximum velocity is 12 m s^-1', 0.95), L('12', 0.5)];
 ok(applyReadingFloor({ readLines: page, floor: FLOOR, steps: ['The maximum velocity is 12 m s^-1', '12'], answer: '12' }).answerUnreadable === false, 'an answer a sure line states is readable although an unrelated doubtful line is the same bare number');
+// A doubtful last line is NOT rescued by a number in working: the doubtful line may say something else (reviewer, 26 Nov 2026).
+ok(applyReadingFloor({ readLines: [L('v(2) = 12(2) - 3(2)^2 = 12', 0.95), L('12', 0.4)], floor: FLOOR, steps: ['v(2) = 12(2) - 3(2)^2 = 12', '12'], answer: '12' }).answerUnreadable === true, 'a working line with the same number does not rescue a doubtful final 12');
+ok(applyReadingFloor({ readLines: [L('Check: v(2) = 12', 0.95), L('12', 0.4)], floor: FLOOR, steps: ['Check: v(2) = 12', '12'], answer: '12' }).answerUnreadable === true, 'nor does a check line');
+ok(applyReadingFloor({ readLines: [L('v(2) = 24 - 12 = 12', 0.95), L('10', 0.4)], floor: FLOOR, steps: ['v(2) = 24 - 12 = 12', '10'], answer: '10' }).answerUnreadable === true, 'and a doubtful 10 stays unreadable');
 // ... but only a whole value: 12 is not "120", "1.12" or "x12".
 ok(applyReadingFloor({ readLines: [L('area = 120', 0.95), L('12', 0.5)], floor: FLOOR, steps: ['area = 120', '12'], answer: '12' }).answerUnreadable === true, 'a longer number in a sure line does not state the doubtful 12');
 ok(applyReadingFloor({ readLines: [L('x = 1.12', 0.95), L('12', 0.5)], floor: FLOOR, steps: ['x = 1.12', '12'], answer: '12' }).answerUnreadable === true, 'the tail of a decimal does not state it either');
