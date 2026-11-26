@@ -36,6 +36,8 @@
 // model it has an account with; the contract is the JSON schema below.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { restoreReadingOrder } from './readingOrder.js';
+
 const DEFAULT_ENDPOINT = 'https://api.openai.com/v1/responses';
 const DEFAULT_PRIMARY_MODEL = 'gpt-5.6-terra';
 const DEFAULT_FALLBACK_MODEL = 'gpt-5.6-sol';
@@ -577,7 +579,8 @@ function normalizeLines(raw) {
 }
 
 export function normalizeResult(parsed, { model, confidenceFloor }) {
-  const lines = normalizeLines(parsed?.lines);
+  // A second column the reader met row by row is read column by column again, from the reader's own boxes (readingOrder.js).
+  const lines = restoreReadingOrder(normalizeLines(parsed?.lines)).lines;
   const stated = unitConfidence(parsed?.confidence);
   // The overall confidence is never allowed to exceed the least confident line:
   // a page is only as readable as its worst line, and the marker reads them all.

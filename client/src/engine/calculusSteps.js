@@ -903,6 +903,8 @@ export function sideLine(line, ctx, previousTexts = []) {
     const v = ctx.variable;
     const text = normalize(String(line)).replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore)\s+/i, '').trim();
     const defNote = 'This defines something the method uses, so it is not checked against the answer.';
+    // A derivative of the method's own letter is not a definition: it is said as what it is.
+    const sideNote = 'This is a derivative of something the method uses, not of the answer, so it is not checked against the answer.';
     if (/^let\b/i.test(text)) return { status: 'note', note: defNote };
     const dep = new Set(['y', 'F', ctx.dependent].filter(Boolean));
     // dN/dD = rhs
@@ -925,9 +927,9 @@ export function sideLine(line, ctx, previousTexts = []) {
         const same = sameFunction(x => valueAt(R, x, D), x => derivativeAt(E, x, D, cache).value, 1e-6);
         const exact = derivativeAt(E, 1.3, D, cache).exact;
         return same ? { status: 'note', note: `True: it follows from ${N} = ${def}.` }
-          : exact ? { status: 'break', note: `This does not follow from your own line ${N} = ${def}.` } : { status: 'note', note: defNote };
+          : exact ? { status: 'break', note: `This does not follow from your own line ${N} = ${def}.` } : { status: 'note', note: sideNote };
       }
-      return { status: 'note', note: defNote };
+      return { status: 'note', note: sideNote };
     }
     // a letter (or letter(x)) = something, where the letter is not the question's own function or derivative: a definition or an assignment
     const a = /^([A-Za-z])\s*(?:\(\s*[A-Za-z]\s*\))?\s*=\s*(.+)$/.exec(text);

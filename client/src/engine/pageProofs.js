@@ -130,7 +130,7 @@ export function labelOf(raw, w) {
   if (call2 && call2[1] !== v) { const a = constOf(call2[1]); if (a !== null) return { kind: 'd2', a }; }
   return null;
 }
-const truthOf = (kind, w, a) => (kind === 'y' ? w.f(a) : kind === 'd1' ? w.d1(a) : w.d2(a));
+export const truthOf = (kind, w, a) => (kind === 'y' ? w.f(a) : kind === 'd1' ? w.d1(a) : w.d2(a));
 const fmt = x => { const r = Math.round(x * 1e6) / 1e6; return String(Object.is(r, -0) ? 0 : r); };
 
 // ── a line, taken apart ─────────────────────────────────────────────────────
@@ -139,7 +139,7 @@ const FILLER_TAIL = /(?:\b(?:so|hence|therefore|thus|giving|which\s+is|it\s+is|t
 /** `(a, b)` with a and b constants. */
 function pointOf(s) { const m = new RegExp(String.raw`^\(\s*(${NUMRE})\s*,\s*(${NUMRE})\s*\)$`).exec(clean(s)); if (!m) return null; const p = constOf(m[1]), q = constOf(m[2]); return p === null || q === null ? null : { p, q }; }
 
-function takeApart(text, w) {
+export function takeApart(text, w) {
   let t = lead(text).replace(/[.]+$/, '').trim();
   let nature = null;
   if (/^\(.*\)$/.test(t) && !/[=<>]/.test(t)) t = t.slice(1, -1).trim();
@@ -174,7 +174,7 @@ function takeApart(text, w) {
 }
 
 const holdsRel = (v, rel) => (rel.op === '<' ? v < rel.rhs - 1e-6 : rel.op === '>' ? v > rel.rhs + 1e-6 : rel.op === '≤' ? v <= rel.rhs + 1e-9 : v >= rel.rhs - 1e-9);
-const elemAt = (s, w, a) => {
+export const elemAt = (s, w, a) => {
   const ast = astOf(s);
   if (!ast || ast.t === 'equation') return null;
   const free = [...variablesOf(ast)].filter(x => x !== 'e');

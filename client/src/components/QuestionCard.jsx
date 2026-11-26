@@ -677,8 +677,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // question: the kind of answer its field takes. Public, and used only on
   // the device after the page has been read; the reader is never sent it.
   const publicAnswerShape = useMemo(
-    () => ({ answerType: question.answerType, answerSuffix: question.answerSuffix }),
-    [question.answerType, question.answerSuffix]
+    // askedPrompt is the public question text: it only names the quantity a conclusion sentence may state ("Find k"), never an answer.
+    () => ({ answerType: question.answerType, answerSuffix: question.answerSuffix, askedPrompt: question.prompt }),
+    [question.answerType, question.answerSuffix, question.prompt]
   );
 
 

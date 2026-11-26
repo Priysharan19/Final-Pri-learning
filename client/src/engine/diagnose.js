@@ -506,7 +506,10 @@ const COPY = {
   }),
   'arithmetic-slip': d => ({
     title: 'The method is right: the arithmetic is not',
-    message: `This line is the line above with ${d.from} in place of ${d.to}. Everything around it is correct.`,
+    // `from` is the number written on THIS line; `to` is the number it is measured against: the line above's (`above`), or the one that would make this line true.
+    message: d.above
+      ? `This line is the line above with ${d.from} in place of ${d.to}.`
+      : `This line has ${d.from} where ${d.to} would make it true.`,
     fix: 'Check that one calculation and carry the rest of the working forward.'
   }),
   'variable-swapped': d => ({
@@ -581,7 +584,7 @@ function singleEditDiagnosis(A, B) {
   const diffs = structDiff(stripAll(A), stripAll(B));
   if (diffs.length !== 1) return null;
   const d = diffs[0];
-  if (d.kind === 'num') return build('arithmetic-slip', { from: fmtNum(d.from), to: fmtNum(d.to) }, 'high');
+  if (d.kind === 'num') return build('arithmetic-slip', { from: fmtNum(d.to), to: fmtNum(d.from), above: true }, 'high');
   if (d.kind === 'op') return build('operator-swapped', { from: d.from, to: d.to, left: '', right: '' }, 'medium');
   if (d.kind === 'name') return build('variable-swapped', { from: SYMBOL[d.from] || d.from, to: SYMBOL[d.to] || d.to }, 'high');
   return null;

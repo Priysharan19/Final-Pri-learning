@@ -24,7 +24,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { evaluate, variablesOf, ambiguousForms } from './expr.js';
 import { texToPlain } from './texToPlain.js';
-import { clean, lead, astOf, constOf, worldOf, fitPoly, polyAt, polyD } from './pageProofs.js';
+import { clean, lead, astOf, constOf, worldOf, fitPoly, polyAt, polyD, takeApart, labelOf as labelOf1, elemAt as elemAt1, truthOf as truthOf1 } from './pageProofs.js';
 
 const close = (a, b, tol = 1e-9) => Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= tol * Math.max(1, Math.abs(a), Math.abs(b));
 const NUMRE = String.raw`-?\d+(?:\.\d+)?(?:/\d+(?:\.\d+)?)?`;
@@ -497,7 +497,7 @@ export function extremumClaim(world, text) {
   if (!num) return null;
   const value = constVal(num[1]);
   if (value === null) return null;
-  let tail = num[2].trim(), at = null;
+  let tail = num[2].trim(), at = null, truncated = false;
   const am = new RegExp(String.raw`^(.*?)\s*[,;(]?\s*\b(?:obtained|reached|attained|occurs?|achieved|found|when|at|where)\b\s*(?:\b(?:at|when|for)\b\s*)?(?:${w.v}\s*=\s*)?(${NUMRE})\s*\)?\s*$`, 'i').exec(tail);
   if (am) { at = constOf(am[2]); if (at === null) return null; tail = am[1].trim(); }
   else if (/\b(?:at|when|obtained|occurs|reached|attained|achieved|where)\b/i.test(tail)) {
@@ -505,10 +505,11 @@ export function extremumClaim(world, text) {
     const cut = /^(.*?)\s*[,;(]?\s*\b(?:obtained|reached|attained|occurs?|achieved|found|when|at|where)\b.*$/i.exec(tail);
     if (!cut) return null;
     tail = cut[1].trim();
+    truncated = true;
   }
   tail = tail.replace(/[,;.]+$/, '').trim();
   if (tail) { const toks = tail.split(/\s+/); if (toks.length > 4 || !toks.every(unitToken)) return null; }
-  return { nature, value, valueText: num[1], at, unit: tail };
+  return { nature, value, valueText: num[1], at, unit: tail, subject, ...(truncated ? { truncated: true } : {}) };
 }
 /** The verdict on a conclusion: 'true' | 'false' | 'note' (undecidable, or not what the question asks) with the engine's extreme. */
 export function conclusionVerdict(world, claim) {
@@ -662,7 +663,13 @@ function conclusionLine(world, l, text, texts, i) {
   if (r.verdict !== 'true') return null;
   const ends = endpointFacts(w, texts, i, r.ex);
   const where = r.ex.at.map(x => `${w.v} = ${fmt(x)}`).join(' and ');
-  return tickLine(l, CLASS.extremum, `Correct: over ${showDomain(w)} the ${claim.nature === 'max' ? 'maximum' : 'minimum'} of ${w.name}(${w.v}) = ${show(w.exprPlain)} is ${fmt(r.ex.value)}, reached at ${where}${claim.at !== null ? ', as this line says' : ''}.${r.rounded ? ' The value written is that maximum rounded.' : ''}${ends}`, { statedAnswer: fmt(claim.value) });
+  // The phrase says only what the line says. A place is named only when the line gives one; a line cut off at "obtained at t =" is judged
+  // and described by its complete part (27 Nov 2026: the tick said "reached at t = 2" over a line the reader had cut short).
+  const nature = claim.nature === 'max' ? 'maximum' : 'minimum';
+  const named = String(claim.subject ?? '').replace(/\b(?:the|of|value)\b/gi, ' ').replace(/\s+/g, ' ').trim();
+  const unit = claim.unit ? ` ${claim.unit}` : '';
+  const place = claim.at !== null ? ` It is reached at ${where}, as this line says.` : '';
+  return tickLine(l, CLASS.extremum, `Correct answer: ${nature}${named && named.toLowerCase() !== nature ? ` ${named}` : ''} ${fmt(r.ex.value)}${unit}. Over ${showDomain(w)} the ${nature} of ${w.name}(${w.v}) = ${show(w.exprPlain)} is ${fmt(r.ex.value)}.${place}${r.rounded ? ' The value written is that maximum rounded.' : ''}${ends}`, { statedAnswer: fmt(claim.value) });
 }
 /** The endpoint values the student wrote, named only when the page wrote them (and they are right). */
 function endpointFacts(w, texts, i, ex) {
@@ -697,6 +704,47 @@ function pointLine(w, l, text) {
 
 // ── the cross: the first claim that is false by the question's own function ──
 /**
+ * A page chain: "At x = 6: y = 4(6)^3 - 36(6)^2 = 4(216) - 36(36)" and the lines that continue it ("= 864 - 1296 = -436 => (6, -436)"). Every value on a link is
+ * the question's function at that x; the first value that is not is the false link (27 Nov 2026: -436 for -432, which the page header called "too far down to check").
+ * Only a polynomial's exact value is held to (a decimal that is the true value rounded to the places written is not a slip), and only inside the question's domain.
+ * @returns { index, got, truth, a } or null
+ */
+function chainSlip(fn, texts, skip, stop) {
+  if (!fn || fn.trig || !fn.poly) return null;
+  let ctx = null;
+  for (let i = 0; i < stop; i++) {
+    const text = String(texts[i] ?? '');
+    let p = null;
+    try { p = takeApart(text, fn); } catch { p = null; }
+    if (!p || !p.parts.length || p.rel || p.nature) { ctx = null; continue; }
+    let a = p.at, kind, value, items = p.parts;
+    if (p.cont) {
+      if (!ctx) continue;
+      ({ a, kind, value } = ctx);
+    } else {
+      const label = p.parts.length >= 2 ? labelOf1(p.parts[0], fn) : null;
+      if (!label) { ctx = null; continue; }
+      if (label.a !== undefined) { if (a !== null && Math.abs(a - label.a) > 1e-9) { ctx = null; continue; } a = label.a; }
+      if (a === null) { ctx = null; continue; }
+      kind = label.kind; value = truthOf1(kind, fn, a); items = p.parts.slice(1);
+    }
+    if (kind !== 'y' || a === null || !Number.isFinite(value) || !inDomain(fn.domain, a)) { ctx = null; continue; }
+    const vals = items.map(s => elemAt1(s, fn, a));
+    if (vals.some(v => v === null)) { ctx = null; continue; }
+    const bad = vals.findIndex((v, k) => {
+      if (close(v, value, 1e-9)) return false;
+      const places = (/^-?\d*\.(\d+)$/.exec(String(items[k]).trim()) || [])[1];
+      return !(places && Math.abs(v - value) <= 10 ** -places.length);
+    });
+    // A continuation of one value ("= 4") rests on the adjacency of the line above alone: it stays a warning note (engine/lineChains.js), never a cross. A continuation
+    // that is a chain of its own ("= 864 - 1296 = -436") states its values itself and is held to the function like any labelled chain.
+    if (bad >= 0) { if (!skip(i) && !(p.cont && items.length < 2)) return { index: i, got: vals[bad], truth: value, a }; ctx = null; continue; }
+    ctx = { a, kind, value };
+  }
+  return null;
+}
+
+/**
  * The first line of `texts` that states something false: a function value (the first false link of its chain, by the question's function), a solution
  * that does not solve the equation on the same line, a derivative that is not the derivative of the question's function, or a maximum/minimum over the
  * closed interval that is not. `skip(i)` names lines that must not be judged (a line the engine already ticked, or that follows a slip).
@@ -706,7 +754,12 @@ export function witnessOf(q, texts, skip = () => false) {
   const world = world2(q);
   const fn = world.fn;
   const stop = Math.min(texts.length, redefinedAt(texts, fn));
+  let chain = null;
+  try { chain = chainSlip(fn, texts, skip, stop); } catch { chain = null; }
   for (let i = 0; i < stop; i++) {
+    if (chain && chain.index === i) {
+      return { index: i, rule: 'function-value', message: `With $${fn.name}(${fn.v}) = ${texOf(fn.exprPlain)}$ from the question, $${fn.name}(${fmt(chain.a)})$ comes to $${fmt(chain.truth)}$, but this line gives $${fmt(chain.got)}$.`, corrected: `${fn.name}(${fmt(chain.a)}) = ${fmt(chain.truth)}` };
+    }
     if (skip(i)) continue;
     const text = String(texts[i] ?? '');
     let im = null;

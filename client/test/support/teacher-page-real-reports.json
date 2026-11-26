@@ -857,23 +857,26 @@
      {
       "text": "The stationary points are:",
       "status": "note",
-      "note": "Not verified: this line is too long or too far down the working to check.",
+      "note": "This line could not be read as maths, so it is not checked.",
       "unverified": true,
-      "state": "unverified"
+      "unreadable": true,
+      "state": "unread"
      },
      {
       "text": "At x = 0: y = 4(0)^3 - 36(0)^2 = 0",
       "status": "note",
-      "note": "Not verified: this line is too long or too far down the working to check.",
+      "note": "This line could not be read as maths, so it is not checked.",
       "unverified": true,
-      "state": "unverified"
+      "unreadable": true,
+      "state": "unread"
      },
      {
       "text": "At x = 6: y = 4(6)^3 - 36(6)^2 = 4(216) - 36(36)",
       "status": "note",
-      "note": "Not verified: this line is too long or too far down the working to check.",
+      "note": "This line could not be read as maths, so it is not checked.",
       "unverified": true,
-      "state": "unverified"
+      "unreadable": true,
+      "state": "unread"
      },
      {
       "text": "= 864 - 1296 = -432",
@@ -891,21 +894,21 @@
      {
       "text": "(0, 0) and (6, -432)",
       "status": "note",
-      "note": "Not verified: this line is too long or too far down the working to check.",
+      "note": "Not verified: Pri cannot check this line against the question.",
       "unverified": true,
       "state": "unverified"
      },
      {
       "text": "The two stationary points are (0,0) and (6,-432).",
       "status": "note",
-      "note": "Not verified: this line is too long or too far down the working to check.",
+      "note": "Not verified: Pri cannot check this line against the question.",
       "unverified": true,
       "state": "unverified"
      },
      {
       "text": "The larger x-coordinate is 6",
       "status": "note",
-      "note": "Not verified: this line is too long or too far down the working to check.",
+      "note": "Not verified: Pri cannot check this line against the question.",
       "unverified": true,
       "state": "unverified"
      }
@@ -935,15 +938,15 @@
       10,
       11,
       12,
-      13,
-      14,
-      15,
       17,
       18,
       19
      ],
      "unread": [
-      1
+      1,
+      13,
+      14,
+      15
      ],
      "reason": "Pri could not tie these lines to anything it can prove about this question, so it did not mark them.",
      "arithmetic": [
@@ -1260,7 +1263,7 @@
      {
       "text": "(0, 0) and (6, -432)",
       "status": "note",
-      "note": "Not verified: this line is too long or too far down the working to check.",
+      "note": "Not verified: Pri cannot check this line against the question.",
       "unverified": true,
       "state": "unverified"
      },
@@ -1367,7 +1370,7 @@
      {
       "text": "Hence 12x dx = 6 du. Also, x² + 8 = u, so",
       "status": "note",
-      "note": "This defines something the method uses, so it is not checked against the answer."
+      "note": "This is about a quantity the method introduces, not the answer itself, so it is not checked against the answer."
      },
      {
       "text": "∫ 12x (x² + 8)⁵ dx = ∫ 6u⁵ du.",
@@ -1377,12 +1380,12 @@
      {
       "text": "∫ 6u⁵ du = 6 · u⁶/6 + C = u⁶ + C.",
       "status": "note",
-      "note": "This defines something the method uses, so it is not checked against the answer."
+      "note": "This is about a quantity the method introduces, not the answer itself, so it is not checked against the answer."
      },
      {
       "text": "Substituting back u = x² + 8,",
       "status": "note",
-      "note": "This defines something the method uses, so it is not checked against the answer."
+      "note": "This is about a quantity the method introduces, not the answer itself, so it is not checked against the answer."
      },
      {
       "text": "∫ 12x (x² + 8)⁵ dx = (x² + 8)⁶ + C.",
@@ -1983,7 +1986,7 @@
       "text": "Conclusion: The maximum velocity is 12 m s^-1, obtained at t =",
       "status": "ok",
       "state": "arithmetic",
-      "note": "Correct: over 0 ≤ t ≤ 4 the maximum of v(t) = 12t − 3t² is 12, reached at t = 2. The endpoints give v(0) = 0, v(4) = 0.",
+      "note": "Correct answer: maximum velocity 12 m/s. Over 0 ≤ t ≤ 4 the maximum of v(t) = 12t − 3t² is 12. The endpoints give v(0) = 0, v(4) = 0.",
       "valueChain": {
        "rule": "proved"
       },

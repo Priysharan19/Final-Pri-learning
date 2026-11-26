@@ -200,7 +200,7 @@ for (const c of ENGINE_CLASSES) {
   const neutral = c === 'heading';
   ok(neutral ? true : phraseOf(cls) !== null, `engine class ${c} has a phrase (got ${cls})`);
 }
-ok(phraseOf(classOf({ status: 'checked', tickClass: 'point-claim' })) === 'Correct stationary point', 'point-claim says its own phrase');
+ok(phraseOf(classOf({ status: 'checked', tickClass: 'point-claim' })) === 'Point is on the curve', 'point-claim says what the engine proved: the point is on the curve (27 Nov 2026: it said "Correct stationary point", which the proof does not show)');
 ok(classOf({ status: 'checked', tickClass: 'power-rule-differentiation', answerLine: true }) === 'conclusion' && phraseOf('conclusion') === 'Correct answer', 'the server\'s answer-bearing line says Correct answer, whatever its class');
 ok(classOf({ status: 'checked', tickClass: 'not-a-class' }) === null, 'an unknown engine class id gives no phrase');
 ok(lineWord({ followsFromError: 5 }) === 'Follows from the error on line 5' && lineWord({ followsFromError: true }) === 'Follows from the error above', 'a line that follows from the error says so');

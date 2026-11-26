@@ -86,7 +86,10 @@ ok(st(['|4a+3b| > 20', '4a ≠ 3b']) === 'note,note', 'inequalities are not judg
 ok(st(['4a = (-20,-4,0)']) === 'note', 'a vector of another dimension is not judged');
 ok(st(['4a+3b = (-26,+8)']) === 'note', 'a component with a leading plus is the misread signature: a note');
 ok(st(['4a/0 = 3', 'sqrt(-4) = 2', '4a^2 = 3', '((((', '']) === 'note,note,note,note', 'malformed lines abstain');
-ok(st(Array(14).fill('4a = (-20,-4)')).split(',').slice(12).join() === 'note,note', 'lines past the limit are not judged');
+// The limit was 12 lines, a guess for a few typed lines; it is now the checker's own working limit (100 lines, as engine/valueChain.js: 27 Nov 2026, a false link on line 15 was left unchecked).
+ok(st(Array(104).fill('4a = (-20,-4)')).split(',').slice(100).join() === 'note,note,note,note', 'lines past the limit (100) are not judged');
+{ const far = [...Array(20).fill('4a = (-20,-4)'), '4a = (-20,-5)'];
+  ok(st(far).split(',')[19] === 'ok' && st(far).split(',')[20] === 'break', 'a true vector line stays ticked and a false one is crossed on line 21'); }
 ok(vectorChainMeta({ kind: 'vector-chain', vectors: { a: [1, 2] }, target: '3' }) === null && vectorChainMeta({ kind: 'vector-chain', vectors: { a: [1, 2], b: [1, 2, 3] }, target: 'a' }) === null && vectorChainMeta({ kind: 'vector-chain', vectors: { ab: [1, 2] }, target: 'a' }) === null, 'a malformed meta is refused');
 ok(st(['4a = (-20,-4)'], { kind: 'vector-chain', vectors: { a: [1, 'x'] }, target: 'a' }) === 'note', 'and judges nothing');
 
