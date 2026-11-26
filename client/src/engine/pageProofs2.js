@@ -228,7 +228,9 @@ export function extremeOver(w, dom, kind) {
 function redefines(text, w) {
   const t = stripEnd(lead(norm(text)));
   if (/[<>:]|=>|->|⇒|→/.test(t)) return false;
-  const m = new RegExp(String.raw`^${w.name}\s*(?:\(\s*${w.v}\s*\))?\s*=\s*(.+)$`).exec(t);
+  // a glued question number in front (`8 y = 3/tan x`, the margin number the reader joins to the line) is ambiguous, so the line is read as setting the letter: nothing after it is
+  // judged by the question's function (Train 8: without this a true derivative of the page's own curve was crossed against the question's)
+  const m = new RegExp(String.raw`^(?:\d{1,3}\s+)?${w.name}\s*(?:\(\s*${w.v}\s*\))?\s*=\s*(.+)$`).exec(t);
   if (!m) return false;
   const first = m[1].split('=')[0].trim();
   if (!new RegExp(String.raw`(?<![A-Za-z])${w.v}(?![A-Za-z])`).test(first)) return false;     // no variable on the right: a value, not a definition
