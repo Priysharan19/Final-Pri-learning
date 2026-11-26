@@ -894,7 +894,11 @@ function wrongFunctionValue(src, defs, raw, i) {
       if (!only.test(text) || !only.test(String(d.expr))) return null;
       if (/\^/.test(text.replace(/\^\s*\(?\s*-?\d+\s*\)?/g, ''))) return null;
       if (/\^\s*\(?\s*-?0+\s*\)?(?!\d)/.test(text)) return null;
-      if (/\d\s+\d|\)\s+\d|[${d.variable}]\s+\d/.test(text)) return null; }
+      if (/\d\s+\d|\)\s+\d|[${d.variable}]\s+\d/.test(text)) return null;
+      // a stacked power (x^2^3) and a division followed by a product or juxtaposition (8/2*x, 8/2x, 8/2 x) can be read two ways
+      const flat = text.replace(/\s+/g, '');
+      if (/\^\(?-?\w+\)?\^/.test(flat) || /\^-?\d+\^/.test(flat)) return null;
+      if (/\/[^+\-()]*[*\w(]/.test(flat.replace(/\/\(?-?\d+\)?(?![*\w(^])/g, '/'))) return null; }
     // the definition must still be the latest word on the letter: a later line that sets it again (`F(x) = …`, `F = …`) is not read
     const set = new RegExp(`(?<![A-Za-z'])${name}\\s*(?:\\(\\s*[A-Za-z]\\s*\\))?\\s*=`);
     // …and it is the ONLY line that sets the letter, and it is written as a function (`F(x) = …`): a letter that names an equation (`y = x^2`, then `y = 2x`)

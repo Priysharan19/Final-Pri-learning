@@ -451,6 +451,9 @@ let corpusFalse = 0, corpusCross = 0, corpusFalseTicked = 0, corpusCrossed = 0, 
   ok(none(['f(x) = x^2 3', 'f(2) = 5']) && none(['f(x) = 2 3x', 'f(1) = 5']), 'a definition that reads two ways is never judged');
   ok(none(['f(x) = ln(x)', 'f(1) = 4']) && none(['f(x) = abs(x)', 'f(-2) = 5']) && none(['f(x) = exp(x)', 'f(0) = 5']), 'named functions (ln, log, abs, exp) are never judged');
   ok(arith(['f(x) = 2x + 1', 'f(3) = 8'])[1] === 'break' && arith(['f(x) = (x - 1)^2', 'f(3) = 5'])[1] === 'break', 'whole-number polynomials are still judged');
+  ok(none(['f(x) = x^2^3', 'f(2) = 64']) && none(['f(x) = x^2^3', 'f(2) = 256']) && none(['f(x) = (x^2)^3', 'f(2) = 5']), 'a stacked power may be read either way: never judged (nor the bracketed one, held to the notes)');
+  ok(none(['f(x) = 8/2*x', 'f(2) = 2']) && none(['f(x) = 8/2*x', 'f(2) = 8']) && none(['f(x) = 8/2x', 'f(2) = 2']) && none(['f(x) = 8/2 x', 'f(2) = 8']), 'a division followed by a product or juxtaposition may be read either way: never judged');
+  ok(arith(['f(x) = x/2', 'f(4) = 3'])[1] === 'break' && arith(['f(x) = x^(2)', 'f(3) = 10'])[1] === 'break' && none(['f(x) = x/2', 'f(4) = 2']), 'the plain readings (x/2, x^(2)) are still judged, true ones never crossed');
   // generated true pages: no cross, and the same ticks that pay
   { let pages = 0, crossed = 0;
     for (const fam of ['y12-integration', 'y12-diff', 'y12-appdiff', 'me12-calc', 'y12-series']) for (let d = 1; d <= 4; d++) for (let sd = 1; sd <= 20; sd++) {
