@@ -510,7 +510,7 @@ export const NSW_DOTPOINT_EXACT = Object.freeze({
   },
   'me11-inversetrig': {
     'me11-inversetrig.1': [1, 2, 3, 4],
-    'me11-inversetrig.2': [2, 3, 4],
+    'me11-inversetrig.2': [2, 3],
     'me11-inversetrig.3': [1, 2, 3, 4]
   },
   'me11-comb': {
