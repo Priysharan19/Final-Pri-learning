@@ -1758,44 +1758,75 @@
      {
       "text": "Solution:",
       "status": "note",
-      "note": "Not checked: this line has no arithmetic Pri can check on its own.",
+      "state": "unverified",
       "unverified": true,
-      "state": "unverified"
+      "context": true,
+      "note": "This line states the task or names the method; there is no step in it to check.",
+      "tickClass": "heading"
      },
      {
       "text": "Given v = 12t - 3t^2, 0 <= t <= 4.",
-      "status": "note",
-      "note": "Not checked: this line has no arithmetic Pri can check on its own.",
-      "unverified": true,
-      "state": "unverified"
+      "status": "ok",
+      "state": "arithmetic",
+      "note": "This line states what the question gives, and every part of it is the question's own.",
+      "valueChain": {
+       "rule": "proved"
+      },
+      "fact": {
+       "kind": "proved",
+       "proof": "given-data",
+       "says": "Given in the question",
+       "saysTex": null
+      },
+      "tickClass": "given-data",
+      "explain": {
+       "kind": "given-data",
+       "named": true,
+       "short": "Given in the question",
+       "segs": [
+        {
+         "t": "text",
+         "v": "Given in the question"
+        }
+       ],
+       "sentence": "Given in the question."
+      }
      },
      {
       "text": "To find the maximum velocity.",
       "status": "note",
-      "note": "Not checked: Pri cannot tell from this line alone whether it is true.",
+      "state": "unverified",
       "unverified": true,
-      "state": "unverified"
+      "context": true,
+      "note": "This line repeats the question; there is no step in it to check.",
+      "tickClass": "restated"
      },
      {
       "text": "Method: Find the stationary point(s) of v(t) using",
       "status": "note",
-      "note": "Not checked: Pri cannot tell from this line alone whether it is true.",
+      "state": "unverified",
       "unverified": true,
-      "state": "unverified"
+      "context": true,
+      "note": "This line states the method; there is no step in it to check.",
+      "tickClass": "method-stated"
      },
      {
       "text": "dv/dt = 0, and compare with the endpoints t = 0 and t = 4.",
       "status": "note",
-      "note": "Not checked: this line has no arithmetic Pri can check on its own.",
+      "state": "unverified",
       "unverified": true,
-      "state": "unverified"
+      "context": true,
+      "note": "This line states the method; there is no step in it to check.",
+      "tickClass": "method-stated"
      },
      {
       "text": "Working:",
       "status": "note",
-      "note": "Not checked: this line has no arithmetic Pri can check on its own.",
+      "state": "unverified",
       "unverified": true,
-      "state": "unverified"
+      "context": true,
+      "note": "This line states the task or names the method; there is no step in it to check.",
+      "tickClass": "heading"
      },
      {
       "text": "dv/dt = 12 - 6t.",
@@ -1970,10 +2001,11 @@
     "arithmetic": true,
     "summary": {
      "total": 21,
-     "checked": 6,
+     "checked": 7,
      "given": [],
      "verified": [],
      "arithmetic": [
+      2,
       7,
       9,
       18,
@@ -1983,16 +2015,9 @@
      ],
      "conditions": [],
      "wrong": [],
-     "unverified": [
-      1,
-      2,
-      3,
-      4,
-      5,
-      6
-     ],
+     "unverified": [],
      "unread": [],
-     "reason": "Pri checks only the arithmetic on this question. These lines have none it can check on its own."
+     "reason": null
     },
     "answerLine": 20
    }

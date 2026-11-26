@@ -55,7 +55,7 @@ const FN_WORDS = /(?:arcsin|arccos|arctan|asin|acos|atan|sqrt|cbrt|cosec|csc|sec
 const CONSTANT_TERM = /^(?:[CcKk])(?:[0-9₀-₉]|_\d|_\{\d\})?$/;
 const SUBLETTERS = 'uvwtzs';
 
-const tidy = t => String(t ?? '').replace(/[−–—]/g, '-').replace(/[×·⋅]/g, '*').replace(/[⁄∕]/g, '/').replace(/\\boxed\{([^}]*)\}/g, '$1').replace(/\s+/g, ' ').trim();
+const tidy = t => String(t ?? '').replace(/[−–—]/g, '-').replace(/[×·⋅]/g, '*').replace(/[⁄∕]/g, '/').replace(/\\boxed\{([^}]*)\}/g, '$1').replace(/\s*[(\[]\s*boxed(?:\s+answer)?\s*[)\]]/gi, '').replace(/^\s*\[\s*([^\[\]]*\S)\s*\]\s*[.]?\s*$/, '$1').replace(/=\s*\[\s*([^\[\]]*\S)\s*\]\s*[.]?\s*$/, '= $1').replace(/\s+/g, ' ').trim();
 const close = (a, b, rel = 1e-9) => Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= rel * Math.max(1, Math.abs(a), Math.abs(b));
 const lettersOf = ast => { const s = variablesOf(ast); s.delete('e'); return s; };
 const wordsLeft = s => /[A-Za-z]{3,}/.test(s.replace(FN_WORDS, ''));

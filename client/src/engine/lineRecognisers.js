@@ -175,6 +175,7 @@ const lastSideValue = text => {
 /** A line that is already ticked: remember the value it reached. */
 export function observe(state, l) {
   if (!state || !l || l.status !== 'ok') return;
+  state.methodOpen = false;
   const v = lastSideValue(String(l.text ?? ''));
   if (v !== null) state.last = v;
 }
@@ -209,7 +210,7 @@ function sentenceRestated(Q, l, text) {
 }
 
 // a title: the question's own words (and a few fixed ones), with the question's own numbers each beside the word the question puts after it
-const TITLE = new Set(['number', 'of', 'find', 'total', 'amount', 'value', 'answer', 'question', 'part', 'determine', 'calculate', 'how', 'many', 'much', 'what', 'is', 'are', 'in', 'for', 'at', 'after']);
+const TITLE = new Set(['to', 'number', 'of', 'find', 'total', 'amount', 'value', 'answer', 'question', 'part', 'determine', 'calculate', 'how', 'many', 'much', 'what', 'is', 'are', 'in', 'for', 'at', 'after']);
 function titleRestated(Q, l, text) {
   const t = strip(text).replace(/:$/, '');
   if (/[=<>+*^]/.test(t) || NEGATION.test(t)) return null;
@@ -229,7 +230,7 @@ function titleRestated(Q, l, text) {
 
 // ── c. method statements ─────────────────────────────────────────────────────
 const VERBS = /^(?:use|using|apply|substitute|sub|put|find|calculate|evaluate|set|take|solve|differentiate|integrate|factorise|factorize|expand|simplify|rearrange|work out|write|let)\b/i;
-const VOCAB = new Set(['use', 'using', 'apply', 'substitute', 'sub', 'put', 'find', 'calculate', 'evaluate', 'set', 'take', 'solve', 'differentiate', 'integrate', 'factorise', 'factorize', 'expand', 'simplify', 'rearrange', 'work', 'out', 'write', 'into', 'in', 'the', 'given', 'formula', 'equation', 'expression', 'value', 'values', 'a', 'an', 'geometric', 'arithmetic', 'sequence', 'series', 'with', 'common', 'ratio', 'difference', 'for', 'to', 'of', 'and', 'then', 'this', 'that', 'each', 'first', 'term', 'terms', 'nth', 'sum', 'model', 'exponential', 'growth', 'it', 'n', 'r', 'd', 'be', 'let', 'rule', 'quotient', 'product', 'chain', 'power', 'derivative', 'both', 'sides', 'by', 'on', 'from', 'question', 'known']);
+const VOCAB = new Set(['use', 'using', 'apply', 'substitute', 'sub', 'put', 'find', 'calculate', 'evaluate', 'set', 'take', 'solve', 'differentiate', 'integrate', 'factorise', 'factorize', 'expand', 'simplify', 'rearrange', 'work', 'out', 'write', 'into', 'in', 'the', 'given', 'formula', 'equation', 'expression', 'value', 'values', 'a', 'an', 'geometric', 'arithmetic', 'sequence', 'series', 'with', 'common', 'ratio', 'difference', 'for', 'to', 'of', 'and', 'then', 'this', 'that', 'each', 'first', 'term', 'terms', 'nth', 'sum', 'model', 'exponential', 'growth', 'it', 'n', 'r', 'd', 'be', 'let', 'rule', 'quotient', 'product', 'chain', 'power', 'derivative', 'both', 'sides', 'by', 'on', 'from', 'question', 'known', 'stationary', 'point', 'points', 'compare', 'endpoint', 'endpoints', 'end', 'ends', 'maximum', 'minimum']);
 function methodStated(state, l, text) {
   const Q = state.Q;
   const m = /^\s*(?:method|approach|plan|strategy|idea|step\s*\d*)\s*[:\-]\s*(.+)$/i.exec(strip(text));
@@ -254,12 +255,58 @@ function methodStated(state, l, text) {
     // a value given to a letter is the value the question gives that letter, where the question's wording binds it
     if (state.bound.has(L) && state.bound.get(L) !== numOf(a[2])) return null;
   }
+  state.methodOpen = true;   // the next line may continue this method statement (methodContinuation)
   const claim = facts.find(f => f.k === 'ratio' || f.k === 'step');
   if (claim) {
     const word = claim.k === 'ratio' ? 'Common ratio' : 'Common difference';
     return tick(l, 'method-claim', `This line names the method and states ${word.toLowerCase()} ${fmtNum(claim.v)}, which is the question's own.`, `${word} ${fmtNum(claim.v)}, from the question`, null);
   }
   return neutral(l, 'method-stated', 'This line states the method; there is no step in it to check.');
+}
+
+/**
+ * The next line of a method statement that ran on ("Method: Find the stationary point(s) of v(t) using" / "dv/dt = 0, and compare with the endpoints t = 0 and t = 4."):
+ * only fixed method words, the derivative of the question's own letter set to 0 (an instruction, not a claim), and a letter set to a number the question itself states.
+ * Any other number, word or symbol leaves the line a note. Only the line straight after a method statement.
+ */
+function methodContinuation(state, l, text) {
+  const Q = state.Q;
+  let t = strip(text).replace(/[,;.]+$/, '');
+  if (!t || NEGATION.test(t) || /[<>≤≥≠]/.test(t)) return null;
+  const labels = new Set(Q.formulas.map(f => f.label).filter(Boolean)), vars = new Set(Q.formulas.map(f => f.v));
+  let ok = true;
+  t = t.replace(/\bd([a-z])\s*\/\s*d([a-z])\s*=\s*0\b/gi, (m, y, x) => { if (!labels.has(y) || !vars.has(x)) ok = false; return ' '; });
+  if (!ok) return null;
+  const assigns = [...t.matchAll(new RegExp(String.raw`\b([a-z])\s*=\s*${NUM}`, 'gi'))];
+  for (const a of assigns) { const L = a[1].toLowerCase(); if (!vars.has(L) || !Q.numbers.has(numOf(a[2]))) return null; if (state.bound.has(L) && state.bound.get(L) !== numOf(a[2])) return null; }
+  t = t.replace(new RegExp(String.raw`\b([a-z])\s*=\s*${NUM}`, 'gi'), ' ');
+  if (/\d|[=+*^/()]/.test(t.replace(/\(s\)/gi, ''))) return null;
+  const words = (t.match(/[A-Za-z]{2,}/g) || []).map(w => w.toLowerCase());
+  if (!words.length || !words.every(w => VOCAB.has(w))) return null;
+  return neutral(l, 'method-stated', 'This line states the method; there is no step in it to check.');
+}
+
+// ── a'. "Given ..." maths the question itself writes ─────────────────────────
+// `Given v = 12t - 3t^2, 0 <= t <= 4.`: nothing but the word "Given" and maths, every comma-separated part the same statement as a part of one of the question's own maths spans.
+const splitTop = t => { const out = []; let d = 0, cur = ''; for (const ch of t) { if ('([{'.includes(ch)) d++; else if (')]}'.includes(ch)) d--; if ((ch === ',' || ch === ';') && d === 0) { out.push(cur); cur = ''; } else cur += ch; } out.push(cur); return out.map(x => x.trim()).filter(Boolean); };
+const sideKey = x => { const n = astOf(x.replace(/\s+/g, ' ').trim()); return n ? `E:${printCanon(n)}` : `T:${x.replace(/\s+/g, '').toLowerCase()}`; };
+const mathsKey = part => {
+  const t = lc(part).replace(/≤/g, '<=').replace(/≥/g, '>=').replace(/\\le\b/g, '<=').replace(/\\ge\b/g, '>=').trim();
+  if (/[<>]/.test(t)) return `I:${t.replace(/\s+/g, '')}`;
+  const sides = t.split('=').map(x => x.trim());
+  if (sides.length !== 2 || !sides[0] || !sides[1]) return null;
+  return `Q:${sides[0].replace(/\s+/g, '')}=${sideKey(sides[1])}`;
+};
+function givenMaths(Q, l, text) {
+  const body = /^\s*given\s*[:,]?\s*(.+)$/i.exec(strip(text));
+  if (!body || NEGATION.test(body[1])) return null;
+  if ((body[1].match(/[A-Za-z]{2,}/g) || []).some(w => !/^(?:sin|cos|tan|ln|log|sqrt|exp|pi)$/i.test(w))) return null;
+  const mine = splitTop(body[1].replace(/[.]+$/, ''));
+  if (!mine.length) return null;
+  const theirs = new Set();
+  for (const s of Q.spans) { if (!s.plain) continue; for (const part of splitTop(s.plain)) { const k = mathsKey(part); if (k) theirs.add(k); } }
+  for (const part of mine) { const k = mathsKey(part); if (!k || !theirs.has(k)) return null; }
+  return tick(l, 'given-data', 'This line states what the question gives, and every part of it is the question\'s own.', 'Given in the question', null);
 }
 
 // ── d. definitions ───────────────────────────────────────────────────────────
@@ -430,8 +477,9 @@ function conclusion(state, l, text) {
 export function recognise(state, l, text) {
   if (!state) return null;
   const Q = state.Q;
-  const tries = [() => definition(state, l, text), () => conditionValue(state, l, text), () => methodStated(state, l, text), () => modelLine(state, l, text), () => substitutionLine(state, l, text),
-    () => dataRestated(Q, l, text), () => sentenceRestated(Q, l, text), () => titleRestated(Q, l, text), () => conclusion(state, l, text)];
+  const wasOpen = state.methodOpen === true; state.methodOpen = false;
+  const tries = [() => (wasOpen ? methodContinuation(state, l, text) : null), () => definition(state, l, text), () => conditionValue(state, l, text), () => methodStated(state, l, text), () => modelLine(state, l, text), () => substitutionLine(state, l, text),
+    () => dataRestated(Q, l, text), () => givenMaths(Q, l, text), () => sentenceRestated(Q, l, text), () => titleRestated(Q, l, text), () => conclusion(state, l, text)];
   for (const f of tries) { let r = null; try { r = f(); } catch { r = null; } if (r) return r; }
   return null;
 }

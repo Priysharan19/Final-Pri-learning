@@ -459,18 +459,23 @@ export function provedLines(q, meta, report) {
 
 /**
  * The author's bank (a packed `qbank:` question): ONLY the second page pass (pageProofs2.js), on the page the marker made. The first pass and the older proofs
- * above are for the generated Years 11-12 banks and do not run here. Returns the same report when nothing is proved. Display only: never a cross, never a mark.
+ * above are for the generated Years 11-12 banks and do not run here. Returns the same report when nothing is proved. (Train 8: the first pass's prompt-bound recognisers run here too, ahead of the second pass.) Display only: never a cross, never a mark.
  */
 export function provedLinesBank(q, report) {
   if (!report || !Array.isArray(report.lines)) return report;
   const brk = report.lines.findIndex(l => l?.status === 'break');
   const limit = brk >= 0 ? brk : report.lines.length;
-  const p2 = pageProofs2(q, report.lines, limit, (l, i) => openNote(l));
-  return p2.n ? withLines(report, p2.lines) : report;
+  // The first pass's prompt-bound recognisers (headings, the restated question, "Given ..." data, the aim, the method and its continuation, "Working:"), under the
+  // same truth rules as a generated page: a line is ticked or neutral only when every content word and number binds to the question's own prompt.
+  let lines = report.lines, n = 0;
+  try { const pp = pageProofs(q, lines, limit, (l, i) => openNote(l), { promptOnly: true }); if (pp.lines !== lines) { lines = pp.lines; n += pp.n + pp.lines.filter((l, i) => l !== report.lines[i] && l.status !== 'ok').length; } } catch { lines = report.lines; n = 0; }
+  const p2 = pageProofs2(q, lines, limit, (l, i) => openNote(l));
+  if (p2.n) { lines = p2.lines; n += p2.n; }
+  return n ? withLines(report, lines) : report;
 }
 
 // The report with these lines in place of its own, the summary counted again from them.
-function withLines(report, lines) {
+export function withLines(report, lines) {
   const stated = lines.map(l => ({ ...l, state: l.state || (l.status === 'ok' ? 'verified' : l.status === 'break' ? 'wrong' : l.unreadable ? 'unread' : 'unverified') }));
   const at = st => stated.flatMap((l, k) => (l.state === st ? [k + 1] : []));
   const unverified = stated.flatMap((l, k) => (l.state === 'unverified' && l.context !== true ? [k + 1] : [])), unread = at('unread');

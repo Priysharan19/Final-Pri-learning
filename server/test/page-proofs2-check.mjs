@@ -170,7 +170,8 @@ const run = (lines, answer) => { const r = MARKER_OPS.practice({ q, answer, work
   const { r, ev, displayed } = run(PAGE, '12');
   ok(r.result.correct === true, 'the key is marked correct');
   const ticks = displayed.lines.filter(l => l.status === 'ok').length, neutral = displayed.lines.filter(l => l.context === true).length, cross = displayed.lines.filter(l => l.status === 'break').length;
-  ok(ticks === 6 && neutral === 9 && cross === 0, `the owner's page: 6 ticked, 9 neutral, none crossed (got ${ticks}, ${neutral}, ${cross})`);
+  // Train 8: the first pass's prompt-bound recognisers also run on a bank question, so the heading, the given line, the aim, the method and its continuation are no longer left "not checked": 6 -> 7 ticked, 9 -> 14 neutral (bank-first-pass-check.mjs holds their truth rules)
+  ok(ticks === 7 && neutral === 14 && cross === 0 && ticks + neutral === displayed.lines.length, `the owner's page: 7 ticked, 14 neutral, none crossed, none not checked (got ${ticks}, ${neutral}, ${cross})`);
   ok(displayed.answerLine === 20, 'the conclusion is the answer line');
   ok(JSON.stringify(ev.stepReport.lines.map(l => l.status)) === JSON.stringify(run(PAGE, '12').ev.stepReport.lines.map(l => l.status)), 'deterministic');
 }

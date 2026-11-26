@@ -34,9 +34,10 @@ import { infoOf as arithmeticInfo, cleanStatement } from '../../client/src/engin
 import { annotateMilestones } from '../../client/src/engine/milestones.js';
 import { solutionMatch, _internals as SOLUTION_INTERNALS } from '../../client/src/engine/solutionMatch.js';
 import { lineChains } from '../../client/src/engine/lineChains.js';
-import { provedLines, provedLinesBank, openNote } from '../../client/src/engine/provedLines.js';
+import { provedLines, provedLinesBank, openNote, withLines } from '../../client/src/engine/provedLines.js';
 import { integrationLines } from '../../client/src/engine/integrationLines.js';
 import { witnessOf } from '../../client/src/engine/pageProofs2.js';
+import { unboxed } from '../../client/src/engine/boxes.js';
 import { displayFields, bankDisplayFields } from '../../client/src/engine/displayFields.js';
 import { awardBoardScheme, matchBoardPoints } from '../../client/src/engine/boardScheme.js';
 import { constrainToShown, unsupportedCredit } from '../../client/src/engine/markExplanation.js';
@@ -517,6 +518,28 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
   // consequences, and `answerLine`. Added to the DISPLAYED report only (`stepReport` is untouched, so no mark, scheme pay or stored record reads them).
   // `answerLine` is named only when the answer was marked correct, and by the same answer check that marked it (`accepts`).
   const displayCtx = { correct: result.correct === true, accepts: text => (checkBankAnswer(q, text) || {}).correct === true };
+  // A box drawn round a line (`\\boxed{...}`, "(boxed)", "[boxed]", a bracket round the value) is layout, not mathematics (engine/boxes.js, the card's own reading). The marker's line
+  // check does not read the box, so a line that is only the boxed answer stays a note on the displayed page. Where the answer was marked correct, such an OPEN NOTE whose
+  // value (the whole line, or the end of its chain) the server's own answer check accepts is ticked as stating the answer. Display only; never a cross, never a mark.
+  try {
+    if (typeof steps === 'string' && result.correct === true && /\\(?:boxed|fbox|mbox)\b|[(\[]\s*boxed\b|[⌈⎡▭□]/i.test(steps) && !OBJECTIVE.has(q.answerType) && q.answerType !== 'graph-sketch' && !Array.isArray(q.boardScheme) && !(opts && (opts.proved === false || opts.solutionMatch === false)) && (typeof q._bank === 'string' || /^gen:(?:y11|y12|me11|me12)-/.test(String(q.contentId ?? '')))) {
+      const base = shownReport || report;
+      if (base && Array.isArray(base.lines)) {
+        const brk = base.lines.findIndex(l => l?.status === 'break');
+        let n = 0;
+        const lines = base.lines.map((l, i) => {
+          if ((brk >= 0 && i >= brk) || !openNote(l) || typeof l.text !== 'string') return l;
+          const bare = unboxed(l.text, q.answerType).replace(/^\s*(?:final\s+answer|answer|ans)\s*[:=\-–]\s*/i, '').replace(/[.\s]+$/, '');
+          if (!bare || bare === l.text.replace(/[.\s]+$/, '').replace(/\s+/g, ' ').trim() || /[<>≤≥≠]/.test(bare)) return l;
+          const sides = bare.replace(/^=\s*/, '').split('=').map(x => x.trim());
+          if (!sides.every(Boolean) || !(displayCtx.accepts(sides[sides.length - 1]) || displayCtx.accepts(bare))) return l;
+          n++;
+          return { text: l.text, status: 'ok', state: 'arithmetic', note: 'This line states the answer the check accepts.', valueChain: { rule: 'proved' }, fact: { kind: 'proved', proof: 'conclusion-matches' }, tickClass: 'conclusion-matches' };
+        });
+        if (n) shownReport = holdAmbiguous(withLines(base, lines));
+      }
+    }
+  } catch { /* the report stands */ }
   try {
     if (typeof steps === 'string' && steps.trim() && !OBJECTIVE.has(q.answerType) && q.answerType !== 'graph-sketch' && !Array.isArray(q.boardScheme) && !(opts && (opts.proved === false || opts.solutionMatch === false)) && /^gen:(?:y11|y12|me11|me12)-/.test(String(q.contentId ?? ''))) {
       const base = shownReport || report;

@@ -22,6 +22,7 @@ import { cleanInput, parseNumericInput, readAnswerLabel } from '../engine/checke
 import { normalize, parse } from '../engine/expr.js';
 import { parseIntervalInput, parseMatrixInput, parseVectorInput } from '../engine/answer-forms.js';
 import { canonicalUnit, withoutUnit } from '../engine/units.js';
+import { unboxed, LIST_TYPES } from '../engine/boxes.js';
 
 /** Answer types this module can propose for. A choice or a page of working has no final-answer field. */
 export const PROPOSABLE_TYPES = Object.freeze(['numeric', 'expression', 'set', 'point', 'ratio', 'interval', 'matrix', 'vector']);
@@ -128,18 +129,8 @@ function beforeOwnUnit(text, suffix) {
 // a box drawn round the value, a unit written after it in any notation, and a clause that says WHERE
 // the value was reached. Everything here is read from the page's own words; no key is ever consulted.
 
-const BOX_NOTE = /\s*[(\[]\s*(?:boxed(?:\s+answer)?|in\s+(?:a\s+)?box|box|circled|underlined|highlighted)\s*[)\]]/giu;
-/** The value a box was drawn round, without the box: "\boxed{12}", "[12 m/s]", "⌈12⌉", "(boxed)". */
-export function unboxed(text, type = 'numeric') {
-  let s = String(text ?? '');
-  s = s.replace(/\\(?:boxed|fbox|mbox)\s*\{((?:[^{}]|\{[^{}]*\})*)\}/g, ' $1 ');
-  s = s.replace(BOX_NOTE, ' ');
-  // A bracket round a value is a box on a number-like answer; for list-shaped answers it is an interval or a set.
-  if (!LIST_TYPES.has(type)) {
-    s = s.replace(/(?<![\p{L}\p{N})\]])[[⌈⎡【〔▭□]\s*([^[\]⌈⌉⎡⎤【】〔〕▭□,;]*?\S)\s*[\]⌉⎤】〕▭□]/gu, (m, inner) => (/[\d]|π/u.test(inner) ? ` ${inner} ` : m));
-  }
-  return s.replace(/\s+/g, ' ').trim();
-}
+// The reading of a box is shared with the marked page's answer line (engine/boxes.js): one function, so the card and the page agree.
+export { unboxed };
 
 // "…, obtained at t = 2", "which occurs when x = 3", "(at t = 2)": where the value was reached, not the value.
 const CLAUSE_VERBS = '(?:is|are|was|were|occurs?|occurring|occurred|happens?|obtained|attained|achieved|reached|found|given|seen|realised|realized|got|gained|taking\\s+place|being\\s+reached|attained)';
@@ -309,7 +300,6 @@ export function readsAsWritten(text, question = {}) {
 }
 
 // Types whose answer may itself contain a comma, "or" or an inequality sign.
-const LIST_TYPES = new Set(['set', 'point', 'interval', 'matrix', 'vector']);
 
 /** Split at top-level "," ";" "or" "and" — never inside brackets. */
 function segments(s) {

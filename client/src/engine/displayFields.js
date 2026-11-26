@@ -22,6 +22,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { evaluate, variablesOf } from './expr.js';
 import { explainLines } from './stepExplain.js';
+import { unboxed as unboxedText } from './boxes.js';
+// the line as the answer check reads it: without the box drawn round it, and without an "Answer:" label in front of it
+const unboxed = (t, type) => unboxedText(t, type).replace(/^\s*(?:final\s+answer|answer|ans)\s*[:=\-–]\s*/i, '');
 import { isHeading, worldOf, labelOf, clean, lead, astOf, constOf, fitPoly, polyD, rootsComplete } from './pageProofs.js';
 
 export const CLASSES = Object.freeze(['power-rule-differentiation', 'differentiation', 'factorisation', 'roots-of-a-product', 'equation-setup', 'substitution-evaluated', 'arithmetic-chain', 'second-derivative-value', 'sign-claim', 'nature-claim', 'point-claim', 'conclusion-matches', 'condition-line', 'restated-question', 'restated-function', 'heading', 'solution-list', 'rounded-value', 'labelled-substitution', 'identity', 'derivative-rule', 'true-as-written', 'matches-worked-step', 'equal-to-line-above', 'satisfies-equation-above', 'same-equation-as-line-above', 'substitution-defined', 'substitution-consistent', 'derivative-of-substitution', 'differential-form', 'change-of-variable', 'integral-rewritten', 'antiderivative-checked', 'back-substitution', 'equivalent-expressions', 'definite-integral-evaluated', 'several-claims', 'given-data', 'method-claim', 'method-stated', 'defines', 'condition-value', 'model', 'substitution-formula', 'conclusion-sentence', 'formula-value', 'function-value', 'equation-solved', 'condition-stated', 'derivative-of-function', 'conclusion-extremum', 'check-values-list', 'figure-label', 'point-on-curve']);
@@ -138,21 +141,23 @@ function answerLineOf(q, lines, accepts, correct, limit = lines.length) {
     const l = lines[i];
     if (!l || l.status !== 'ok' || l.context === true) continue;
     // a conclusion the second page pass (pageProofs2.js) proved carries the value it states (`statedAnswer`), because its words hide the value from the plain reading above
-    const texts = l.fact && l.fact.proof === 'conclusion-sentence' && typeof l.fact.valueText === 'string' ? [l.fact.valueText] : resultTexts(l.text, q.answerType);
+    // a box drawn round the answer is layout (engine/boxes.js, the card's own reading): the line is read without it
+    const texts = l.fact && l.fact.proof === 'conclusion-sentence' && typeof l.fact.valueText === 'string' ? [l.fact.valueText] : resultTexts(unboxed(l.text, q.answerType), q.answerType);
     if (texts.some(ok) || (typeof l.statedAnswer === 'string' && l.tickClass === 'conclusion-extremum' && ok(l.statedAnswer))) at = i;
   }
   if (at < 0) return -1;
-  const names = new Set([labelOfLine(lines[at].text)]);
+  const names = new Set([labelOfLine(unboxed(lines[at].text, q.answerType))]);
   const box = /^([A-Za-z][A-Za-z0-9_']*(?:\([^()]*\))?)\s*=$/.exec(String(q?.answerPrefix ?? '').trim());
   if (box) names.add(box[1]);
   names.delete('');
   for (let j = at + 1; j < lines.length; j++) {
     const l = lines[j];
     if (!l || l.context === true || typeof l.text !== 'string' || isHeading(l.text)) continue;
-    const v = statedValue(l.text);
+    const shown = unboxed(l.text, q.answerType);
+    const v = statedValue(shown);
     if (!v) continue;
     let accepted = ok(v.last);
-    if (!accepted) for (const c of resultTexts(l.text, q.answerType)) if (ok(c)) { accepted = true; break; }
+    if (!accepted) for (const c of resultTexts(shown, q.answerType)) if (ok(c)) { accepted = true; break; }
     if (accepted) continue;
     if (constOf(v.last) !== null || (v.label !== '' && names.has(v.label))) return -1;
   }

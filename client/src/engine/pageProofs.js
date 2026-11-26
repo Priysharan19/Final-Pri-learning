@@ -205,8 +205,8 @@ export function isHeading(text) {
  * @param open   (l, i) => may this line take a new tick? Notes only.
  * @returns the new lines (the same array when nothing changed) and a count
  */
-export function pageProofs(q, lines, limit, open) {
-  const w = worldOf(q);
+export function pageProofs(q, lines, limit, open, { promptOnly = false } = {}) {
+  const w = promptOnly ? null : worldOf(q);   // promptOnly (the author's bank, Train 8): only the recognisers that read the question's own words and numbers, never a function world
   const out = lines.slice();
   let n = 0;
   const roots = new Set();                       // x values an earlier ticked line of the page stated as solutions, each checked against the question's own derivative
