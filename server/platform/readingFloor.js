@@ -27,15 +27,13 @@ const statesValue = (text, value) => {
 };
 
 /**
- * A line the page gives as its conclusion: a conclusion/answer label, a "so / hence / ∴" line, a boxed value or a sentence
- * "The X is …". Working ("v(2) = … = 12", "Check: v(2) = 12") is not one: a doubtful last line is never rescued by a number
- * that merely appears in working, since the doubtful line may say something else.
+ * A line in conclusion FORM: a "Conclusion:" / "Answer:" label, a ∴ at the start, or a boxed value. "Hence v(2) = 12" and
+ * other working are not: a doubtful last line is never rescued by working, since it may say something else.
  */
-const isConclusion = text => {
-  const s = String(text);
-  if (/^\s*[(\[]?\s*(?:check|verify|verification|proof|l\.?h\.?s|r\.?h\.?s)(?![\p{L}])/iu.test(s)) return false;
-  return /(?:^|[^\p{L}])(?:conclusion|final\s+answer|answer|ans|hence|therefore|thus)(?![\p{L}])|∴|\\boxed|\[[^\]]*\d[^\]]*\]|^\s*(?:the\s+)?[\p{L}][\p{L}\s'’-]{2,40}?\s+(?:is|are)\s+\S/iu.test(s);
-};
+const conclusionForm = text => /^\s*[(\[]?\s*(?:conclusion|final\s+answer|answer|ans)(?![\p{L}])|^\s*∴|\\boxed|\[[^\]]*\d[^\]]*\]/iu.test(String(text));
+const numbersOf = text => (String(text).replace(/[−–]/g, '-').match(/-?\d+(?:\.\d+)?/g) || []).map(Number);
+/** A doubtful line that is more than a mark on a graph: it has words or a relation, so it can state a value of its own. */
+const statesSomething = text => /\p{L}{3,}|[=⇒→∴]/u.test(String(text));
 
 /** A line is judgeable only when the reader gave a confidence at or above the floor and the line is not blank. */
 export const lineJudgeable = (line, floor) => {
@@ -73,7 +71,13 @@ export function applyReadingFloor({ readLines, floor, steps, answer, answerTyped
   // A number that is also the text of an unrelated doubtful line (a tick mark "12" on a graph, read below the floor) is still
   // the answer when a line the reader WAS sure of states it as a value of its own ("The maximum velocity is 12 m/s"). The
   // answer is unreadable only when nothing the reader was sure of says it.
-  const statedAbove = [...above].some(text => text !== given && isConclusion(text) && statesValue(text, given));
+  // Only the LAST confident line can rescue it, only in conclusion form, and only when no doubtful line after it states a
+  // different value (a doubtful "Conclusion: ... is 10" under a confident "Conclusion: ... is 12" is the student's to confirm).
+  const lastSure = read.map(l => lineJudgeable(l, floor)).lastIndexOf(true);
+  const sure = lastSure >= 0 ? norm(read[lastSure]?.text) : '';
+  const givenNumbers = numbersOf(given);
+  const contradicted = lastSure >= 0 && read.slice(lastSure + 1).some(l => statesSomething(l?.text) && numbersOf(l?.text).some(v => !givenNumbers.includes(v)));
+  const statedAbove = !!sure && sure !== given && conclusionForm(sure) && statesValue(sure, given) && !contradicted;
   const answerUnreadable = given === '' || (answerTyped !== true && below.has(given) && !above.has(given) && !statedAbove);
   return { judged, excluded, answer: answerUnreadable ? '' : given, answerUnreadable, unconfirmed: true };
 }

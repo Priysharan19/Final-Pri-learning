@@ -22,12 +22,21 @@ ok(applyReadingFloor({ readLines: read, floor: FLOOR, steps: ['3x = 15', 'x = 5'
 ok(applyReadingFloor({ readLines: read, floor: FLOOR, steps: ['3x = 15'], answer: '', answerTyped: true }).answerUnreadable === true, 'but an absent typed answer is still absent');
 ok(JSON.stringify(applyReadingFloor({ readLines: [], floor: FLOOR, steps: ['a'], answer: 'a' }).judged) === '["a"]', 'with no read (typed working) nothing is excluded');
 // A tick mark "12" read below the floor does not make a stated "12" unreadable (the owner's velocity page, 26 Nov 2026) ...
-const page = [L('The maximum velocity is 12 m s^-1', 0.95), L('12', 0.5)];
-ok(applyReadingFloor({ readLines: page, floor: FLOOR, steps: ['The maximum velocity is 12 m s^-1', '12'], answer: '12' }).answerUnreadable === false, 'an answer a sure line states is readable although an unrelated doubtful line is the same bare number');
+const page = [L('Conclusion: The maximum velocity is 12 m s^-1', 0.95), L('12', 0.5)];
+ok(applyReadingFloor({ readLines: page, floor: FLOOR, steps: ['Conclusion: The maximum velocity is 12 m s^-1', '12'], answer: '12' }).answerUnreadable === false, 'an answer a sure conclusion line states is readable although an unrelated doubtful line is the same bare number');
 // A doubtful last line is NOT rescued by a number in working: the doubtful line may say something else (reviewer, 26 Nov 2026).
 ok(applyReadingFloor({ readLines: [L('v(2) = 12(2) - 3(2)^2 = 12', 0.95), L('12', 0.4)], floor: FLOOR, steps: ['v(2) = 12(2) - 3(2)^2 = 12', '12'], answer: '12' }).answerUnreadable === true, 'a working line with the same number does not rescue a doubtful final 12');
 ok(applyReadingFloor({ readLines: [L('Check: v(2) = 12', 0.95), L('12', 0.4)], floor: FLOOR, steps: ['Check: v(2) = 12', '12'], answer: '12' }).answerUnreadable === true, 'nor does a check line');
 ok(applyReadingFloor({ readLines: [L('v(2) = 24 - 12 = 12', 0.95), L('10', 0.4)], floor: FLOOR, steps: ['v(2) = 24 - 12 = 12', '10'], answer: '10' }).answerUnreadable === true, 'and a doubtful 10 stays unreadable');
+// Reviewer, 26 Nov 2026: "Hence" working is not a conclusion; only the last confident line in conclusion form rescues, and a
+// later doubtful line that states another value is the student's to confirm.
+ok(applyReadingFloor({ readLines: [L('Hence v(2) = 12', 0.95), L('12', 0.4)], floor: FLOOR, steps: ['Hence v(2) = 12', '12'], answer: '12' }).answerUnreadable === true, '"Hence v(2) = 12" is working, not a conclusion');
+const contra = applyReadingFloor({ readLines: [L('Conclusion: The maximum velocity is 12 m/s', 0.95), L('v', 0.4), L('Conclusion: the maximum velocity is 10 m/s', 0.4)], floor: FLOOR, steps: ['Conclusion: The maximum velocity is 12 m/s', 'v', 'Conclusion: the maximum velocity is 10 m/s', '12'], answer: '12' });
+ok(contra.answerUnreadable === false, 'the answer 12 is not the text of any doubtful line, so the floor alone does not stop it (the card asks, below)');
+const tick = applyReadingFloor({ readLines: [L('Conclusion: The maximum velocity is 12 m/s, obtained at t = 2', 0.95), L('(2, 12)', 0.5), L('12', 0.4), L('4', 0.4)], floor: FLOOR, steps: ['Conclusion: The maximum velocity is 12 m/s, obtained at t = 2', '12'], answer: '12' });
+ok(tick.answerUnreadable === false, 'a labelled conclusion that is the last confident line rescues an answer that equals a graph tick');
+ok(applyReadingFloor({ readLines: [L('Conclusion: The maximum velocity is 12 m/s', 0.95), L('12', 0.4), L('Conclusion: the maximum velocity is 10 m/s', 0.4)], floor: FLOOR, steps: ['Conclusion: The maximum velocity is 12 m/s', '12', 'Conclusion: the maximum velocity is 10 m/s'], answer: '12' }).answerUnreadable === true, 'a doubtful later line stating 10 stops the rescue: not auto-accepted');
+ok(applyReadingFloor({ readLines: [L('Conclusion: v is 12', 0.95), L('x = 3', 0.9), L('12', 0.4)], floor: FLOOR, steps: ['x = 3', '12'], answer: '12' }).answerUnreadable === true, 'a conclusion that is not the last confident line does not rescue');
 // ... but only a whole value: 12 is not "120", "1.12" or "x12".
 ok(applyReadingFloor({ readLines: [L('area = 120', 0.95), L('12', 0.5)], floor: FLOOR, steps: ['area = 120', '12'], answer: '12' }).answerUnreadable === true, 'a longer number in a sure line does not state the doubtful 12');
 ok(applyReadingFloor({ readLines: [L('x = 1.12', 0.95), L('12', 0.5)], floor: FLOOR, steps: ['x = 1.12', '12'], answer: '12' }).answerUnreadable === true, 'the tail of a decimal does not state it either');
