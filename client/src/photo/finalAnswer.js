@@ -545,7 +545,7 @@ function fromLastConnector(s) {
 // answer was "ambiguous (84 or 7)". When the question names one quantity by a letter ("Find k", "the value of k") and the sentence assigns a
 // value to that letter, that value is the answer and the other quantities in the sentence are not candidates. Read from the public prompt
 // only: no key, no solution.
-const ASK_VERBS = String.raw`(?:find|calculate|determine|work\s+out|evaluate|solve\s+for|state|show\s+that\s+the\s+value\s+of)`;
+const ASK_VERBS = String.raw`(?:find|calculate|determine|work\s+out|evaluate|solve\s+for|state|what\s+is|show\s+that\s+the\s+value\s+of)`;
 /** The one letter the question names as the thing to find ("Find $k$.", "the value of k"), or null when it names none or several. */
 export function askedName(question = {}) {
   const prompt = String(question?.askedPrompt ?? question?.prompt ?? '').replace(/\\\$/g, '\u0001');
@@ -555,6 +555,14 @@ export function askedName(question = {}) {
   for (const m of prompt.matchAll(new RegExp(String.raw`(?:^|[^\p{L}])${ASK_VERBS}\s+(?:the\s+)?(?:value\s+of\s+)?(?:(\$)\s*([A-Za-z])\s*\$|([A-Za-z]))(?=[\s.,?;]|$)`, 'giu'))) take(m[2] || m[3], !!m[1]);
   for (const m of prompt.matchAll(/(?:^|[^\p{L}])value\s+of\s+(?:(\$)\s*([A-Za-z])\s*\$|([A-Za-z]))(?=[\s.,?;]|$)/giu)) take(m[2] || m[3], !!m[1]);
   if (found.size !== 1) return null;
+  // Bind only when the prompt asks for EXACTLY ONE quantity (independent review of PR #1140): a second imperative ("hence find the area"), a second target
+  // ("Find k and the area"), a part label or a question word leaves nothing bound, and the card keeps offering the choices.
+  const imperatives = prompt.match(/(?:^|[^\p{L}])(?:find|determine|calculate|work\s+out|evaluate|state|solve|show|prove|hence|sketch|explain|justify|write|what|how\s+(?:many|much)|give|express|simplify|expand|factorise|factorize|differentiate|integrate)(?![\p{L}])/giu) || [];
+  if (imperatives.length !== 1) return null;
+  if (/(?:^|[\s(])\(\s*(?:[a-h]|[ivx]{1,4})\s*\)|\bpart\b/iu.test(prompt)) return null;
+  for (const m of prompt.matchAll(new RegExp(String.raw`(?:^|[^\p{L}])${ASK_VERBS}[^.?]*`, 'giu'))) {
+    if (/(?:^|[^\p{L}])and(?![\p{L}])/iu.test(m[0]) || /[;]/.test(m[0])) return null;
+  }
   // "Find $k$ and $m$.": the sentence that asks names more than one letter, so no one of them is bound.
   for (const m of prompt.matchAll(new RegExp(String.raw`(?:^|[^\p{L}])${ASK_VERBS}[^.?]*`, 'giu'))) {
     const letters = new Set([...m[0].matchAll(/\$\s*([A-Za-z])\s*\$/g)].map(x => x[1]));

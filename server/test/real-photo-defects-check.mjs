@@ -140,6 +140,19 @@ const count = (lines, status) => lines.filter(l => l.status === status).length;
   const twoValues = FA.proposeFinalAnswer(['k = 7 or k = -12, so the area is 84'], shape);
   ok(twoValues.status === 'ambiguous' && twoValues.candidates.length === 2 && !twoValues.candidates.includes('84'), `two values of k are offered, never the area (${JSON.stringify(twoValues)})`);
   ok(FA.proposeFinalAnswer(['So the area is 84 square units.'], { answerType: 'numeric' }).answer === '84', 'a sentence with one value is unchanged');
+  // independent review of PR #1140: bind only when the prompt asks for exactly one quantity
+  const MULTI = ['Find k. Hence find the area of the triangle.', 'Find k and the area.', '(a) Find k. (b) Find the area of the triangle.', 'What is k? Find the area.', 'Find $k$, then find the area.', 'Find $k$; hence the area.', 'Find k and hence the area.'];
+  for (const prompt of MULTI) {
+    ok(FA.askedName({ askedPrompt: prompt }) === null, `"${prompt}" asks for several quantities: nothing is bound`);
+    for (const line of ['k = 7, area = 84', 'The value of k is 7, so the area is 84 square units.']) {
+      const withAsk = FA.proposeFinalAnswer([line], { answerType: 'numeric', askedPrompt: prompt });
+      const main = FA.proposeFinalAnswer([line], { answerType: 'numeric' });
+      same(withAsk.status === 'proposed' ? [withAsk.status, withAsk.answer] : [withAsk.status, withAsk.candidates], main.status === 'proposed' ? [main.status, main.answer] : [main.status, main.candidates], `"${prompt}" / "${line}": the same as with no prompt (main's behaviour)`);
+    }
+  }
+  const comma = FA.proposeFinalAnswer(['k = 7, area = 84'], { answerType: 'numeric', askedPrompt: 'Find k. Hence find the area of the triangle.' });
+  ok(comma.status === 'ambiguous' && comma.candidates.length === 2, 'k = 7, area = 84 under "Find k. Hence find the area": both values are offered');
+  for (const prompt of ['Find $k$.', 'Calculate the value of $k$.', 'Determine the value of k where k > 0.', 'The area is 84 square units. What is k?']) ok(FA.askedName({ askedPrompt: prompt }) === 'k', `"${prompt}" asks for exactly one quantity: k`);
 }
 
 // ── 6 · reading order of a two-column page ───────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -164,7 +177,7 @@ const ids = Object.keys(PAGES);
   ok(inOrder.reordered === false && inOrder.lines === PAGES['real-key6-two-column-in-order'].reading.lines, 'the earlier read of the same page, columns already one after the other, is untouched');
   // every stored page: only the three whose columns the reader interleaved move
   const moved = ids.filter(id => restoreReadingOrder(PAGES[id].reading.lines).reordered);
-  same(moved.sort(), ['real-key6-two-column-interleaved', 'synth1-integration', 'synth3-sinerule' in PAGES ? 'synth3-sinerule' : 'synth3', 'synth8-arithmetic-slip'].sort(), 'of the stored pages exactly the interleaved two-column ones move');
+  same(moved.sort(), ['real-key6-two-column-interleaved', 'synth3', 'synth8-arithmetic-slip'].sort(), 'of the stored pages exactly the interleaved two-column ones whose rows do not align move (synth1\'s rows align pairwise, so it is left as the reader gave it)');
   for (const id of ids.filter(i => !moved.includes(i))) ok(restoreReadingOrder(PAGES[id].reading.lines).lines === PAGES[id].reading.lines, `${id}: returned as it came`);
   // adversaries
   const L = (text, x, y, w, h = 0.04) => ({ text, box: { x, y, w, h } });
@@ -178,8 +191,39 @@ const ids = Object.keys(PAGES);
   ok(restoreReadingOrder(single.map(l => ({ text: l.text }))).lines.length === 10, 'lines without boxes are returned as they came');
   ok(restoreReadingOrder(null).reordered === false && restoreReadingOrder([]).reordered === false, 'nothing to order');
   const twoCols = [];
-  for (let i = 0; i < 5; i++) { twoCols.push(L(`L${i}`, 0.08, 0.1 + i * 0.1, 0.35)); twoCols.push(L(`R${i}`, 0.55, 0.1 + i * 0.1, 0.3)); }
+  for (let i = 0; i < 5; i++) { twoCols.push(L(`L${i}`, 0.08, 0.1 + i * 0.1, 0.35)); twoCols.push(L(`R${i}`, 0.55, 0.15 + i * 0.1, 0.3)); }
   same(restoreReadingOrder(twoCols).lines.map(l => l.text), ['L0', 'L1', 'L2', 'L3', 'L4', 'R0', 'R1', 'R2', 'R3', 'R4'], 'a plain two-column layout read row by row is read column by column');
+  // independent review of PR #1140: tables, three columns, a stranded line, and the properties
+  const rowTable = [];
+  for (let i = 1; i <= 4; i++) { rowTable.push(L(`x = ${i}`, 0.2, 0.1 + i * 0.1, 0.15)); rowTable.push(L(`y = ${i * 2 + 1}`, 0.6, 0.1 + i * 0.1, 0.15)); }
+  ok(restoreReadingOrder(rowTable).lines === rowTable, 'a row-wise table (x = 1 | y = 3 ...) read row by row stays as the reader gave it');
+  const threeCol = [];
+  for (let i = 1; i <= 4; i++) { threeCol.push(L(`a${i}`, 0.1, 0.1 + i * 0.1, 0.15)); threeCol.push(L(`b${i}`, 0.4, 0.1 + i * 0.1, 0.15)); threeCol.push(L(`c${i}`, 0.7, 0.1 + i * 0.1, 0.15)); }
+  ok(restoreReadingOrder(threeCol).lines === threeCol, 'a three-column table is not two columns: untouched');
+  const stranded = [L('A', 0.1, 0.1, 0.3), L('A1', 0.1, 0.2, 0.3), L('A2', 0.1, 0.3, 0.3), L('B', 0.6, 0.12, 0.3), L('B2', 0.6, 0.25, 0.3), L('A3', 0.1, 0.4, 0.3), L('B3', 0.6, 0.35, 0.3), L('A4', 0.1, 0.5, 0.3)];
+  same(restoreReadingOrder(stranded).lines.map(l => l.text), ['A', 'A1', 'A2', 'A3', 'A4', 'B', 'B2', 'B3'], 'a left line just below the right column is not stranded between right lines: the left column, then the right');
+  const banded = [L('title', 0.1, 0.02, 0.8), L('A1', 0.1, 0.1, 0.3), L('B1', 0.6, 0.12, 0.3), L('A2', 0.1, 0.2, 0.3), L('B2', 0.6, 0.27, 0.3), L('A3', 0.1, 0.3, 0.3), L('B3', 0.6, 0.38, 0.3), L('A4', 0.1, 0.4, 0.3), L('across', 0.1, 0.55, 0.8), L('C1', 0.1, 0.65, 0.3), L('D1', 0.6, 0.66, 0.3), L('C2', 0.1, 0.75, 0.3), L('D2', 0.6, 0.78, 0.3), L('C3', 0.1, 0.85, 0.3), L('D3', 0.6, 0.9, 0.3), L('C4', 0.1, 0.95, 0.3)];
+  same(restoreReadingOrder(banded).lines.map(l => l.text), ['title', 'A1', 'A2', 'A3', 'A4', 'B1', 'B2', 'B3', 'across', 'C1', 'C2', 'C3', 'C4', 'D1', 'D2', 'D3'], 'a line across the gutter splits the page into bands, each read left column then right, in order top to bottom');
+  // properties over random layouts: a permutation, idempotent; a single column or a table is never moved
+  let seed = 11; const rnd = () => { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; };
+  let moves = 0;
+  for (let t = 0; t < 3000; t++) {
+    const n = 6 + Math.floor(rnd() * 16), split = 0.45 + rnd() * 0.2, kind = rnd();
+    const ls = [];
+    for (let i = 0; i < n; i++) {
+      const right = kind < 0.6 && rnd() < 0.4;
+      const x = right ? split + rnd() * 0.05 : 0.05 + rnd() * 0.08;
+      const w = right ? Math.min(0.08 + rnd() * 0.4, 0.95 - x) : Math.min(0.08 + rnd() * 0.4, split - x - 0.04);
+      ls.push(L(`t${i}`, x, 0.02 + rnd() * 0.9, Math.max(0.03, w), 0.03 + rnd() * 0.03));
+    }
+    ls.sort(() => rnd() - 0.5);
+    const r = restoreReadingOrder(ls);
+    if (r.reordered) moves++;
+    if (r.lines.length !== ls.length || new Set(r.lines.map(l => l.text)).size !== ls.length) ok(false, 'output is a permutation of the input');
+    if (restoreReadingOrder(r.lines).reordered) ok(false, 'reordering is idempotent');
+    if (kind >= 0.6 && r.reordered) ok(false, 'a single column is never moved');
+  }
+  ok(moves > 0, `random two-column layouts do move (${moves} of 3000)`);
   // the server applies it where the reader's reply is normalised
   const reply = { lines: fresh.map(l => ({ text: l.text, confidence: l.confidence, box: l.box, gap_before: l.gapBefore })), confidence: 0.99 };
   const normal = normalizeResult(reply, { model: 'm', confidenceFloor: 0.8 });
