@@ -71,7 +71,7 @@ Final answer check: correct.
 | 1 | `2(x + 5 + 20) = 54` | true line | step |
 | 2 | `x + 25 = 27` | true line | nothing |
 | 3 | `x = 2` | true line | nothing |
-| 4 | `x = 3` | wrong here (This line is the line above with 2 in place of 3. Everything around it is correct.) | nothing |
+| 4 | `x = 3` | wrong here (This line is the line above with 3 in place of 2.) | nothing |
 
 Award: **1 of 2**. Criteria earned: step (1).
 Final answer check: not correct.
@@ -81,7 +81,7 @@ Final answer check: not correct.
 | # | What the student wrote | What the marked page shows | Counts toward |
 |---:|---|---|---|
 | 1 | `2(x + 5 + 20) = 55` | wrong here (Put a solution of the original equation in for x (try it yourself) and this line reads 54 = 55, which is false: a correct step keeps every solution.) | nothing |
-| 2 | `x = 3` | no verdict (This line is the line above with 3 in place of 2. Everything around it is correct.) | nothing |
+| 2 | `x = 3` | no verdict (This line has 3 where 2 would make it true.) | nothing |
 
 Award: **0 of 2**. Criteria earned: none.
 Final answer check: not correct.
@@ -95,7 +95,7 @@ Transcript with an earlier slip, on the same question:
 | 1 | `2(x + 5 + 20) = 55` | wrong here (Put a solution of the original equation in for x (try it yourself) and this line reads 54 = 55, which is false: a correct step keeps every solution.) | nothing |
 | 2 | `x + 25 = 27` | true line (The left side was divided by 2 but the right side had 28 taken off. If the left side is what you meant, the right side should read 27.5.) | nothing |
 | 3 | `x = 2` | true line | nothing |
-| 4 | `x = 3` | no verdict (This line is the line above with 2 in place of 3. Everything around it is correct.) | nothing |
+| 4 | `x = 3` | no verdict (This line is the line above with 3 in place of 2.) | nothing |
 
 Award: **0 of 2**. Criteria earned: none.
 Final answer check: not correct.
