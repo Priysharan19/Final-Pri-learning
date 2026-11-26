@@ -193,13 +193,11 @@ function promptPlain(prompt) {
   return String(prompt ?? '').replace(/\\\$/g, '\u0001').replace(/\$\$?([^$]+)\$\$?/g, (m, tex) => { try { return texToPlain(tex) || tex; } catch { return tex; } }).replace(/\*\*/g, '').replace(/\u0001/g, '$');
 }
 
-const HEAD_WORDS = /^(?:solution|answer|working|working out|workings|method|solve|step\s*\d+|part\s*\(?[a-z0-9]\)?|stationary points|nature of (?:the )?stationary points|second derivative test|second derivative|to find (?:the )?stationary points|finding (?:the )?stationary points)$/i;
+const HEAD_WORDS = /^(?:solution|answer|working|working out|workings|method|solve|conclusion|step\s*\d+|part\s*\(?[a-z0-9]\)?|stationary points|the stationary points are|nature of (?:the )?stationary points|second derivative test|the second derivative|to find (?:the )?stationary points|finding (?:the )?stationary points)$/i;
+/** A heading is one of a short fixed set of label forms: a line with a number, a relation or any assertion ("The larger root is zero:") is never one. */
 export function isHeading(text) {
-  const t = clean(text).replace(/[.]+$/, '').trim();
-  if (!t || /\d.*:|[=<>+*^/]/.test(t)) { if (!HEAD_WORDS.test(t.replace(/:$/, '').trim())) return false; }
-  const bare = t.replace(/:$/, '').trim();
-  if (HEAD_WORDS.test(bare)) return true;
-  return /^[A-Za-z][A-Za-z ,'-]{2,70}:$/.test(t) && t.split(/\s+/).length <= 9 && !/\d/.test(t);
+  const t = clean(text).replace(/[.:]+$/, '').trim();
+  return HEAD_WORDS.test(t);
 }
 
 /**
@@ -251,12 +249,38 @@ export function pageProofs(q, lines, limit, open) {
   return { lines: out, n };
 }
 
+/** The prompt as masked text plus its maths spans (plain, normalised): `The curve § has two stationary points. Find the larger §-coordinate.` */
+function promptMask(prompt) {
+  const text = String(prompt ?? '').replace(/\\\$/g, '\u0001');
+  const spans = []; let masked = '', last = 0;
+  for (const m of text.matchAll(/\$\$?([^$]+)\$\$?/g)) {
+    let plain = m[1]; try { plain = texToPlain(m[1]) || m[1]; } catch { /* the TeX as written */ }
+    const n = normQ(plain);
+    masked += normQ(text.slice(last, m.index).replace(/\*\*/g, '')); last = m.index + m[0].length;
+    if (n.length >= 3) { spans.push(n); masked += '§'; } else masked += n;
+  }
+  masked += normQ(text.slice(last).replace(/\*\*/g, ''));
+  return { masked, spans: [...new Set(spans)].sort((x, y) => y.length - x.length) };
+}
+/**
+ * A restated question proves nothing, so it is NEVER a tick: it is context (neutral, not "not checked"). It is only recognised when the line's maths
+ * is the prompt's maths exactly: every expression of the line is a whole, token-bounded expression of the prompt, the line holds the prompt's main
+ * (longest) expression in full, and its words are the prompt's words. A line with any coefficient changed, or cut so that it holds only part of the
+ * main expression, is ordinary maths and is judged as such.
+ */
 function restatedQuestion(q, l, text) {
   const line = normQ(clean(text));
   if (line.length < 12) return null;
-  const prompt = normQ(promptPlain(q?.prompt));
-  if (!prompt || !prompt.includes(line)) return null;
-  return { line: { text: l.text, status: 'ok', state: 'given', solutionMatch: true, note: 'Correct. This copies the question.', tickClass: 'restated-question' } };
+  const { masked, spans } = promptMask(q?.prompt);
+  if (!spans.length || !masked) return null;
+  let lineMasked = line, mainSeen = false;
+  for (const sp of spans) {
+    const esc = sp.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(`(?<![0-9^+\\-=/.])${esc}(?![0-9^+\\-=/.(])`, 'g');
+    if (re.test(lineMasked)) { if (sp === spans[0]) mainSeen = true; lineMasked = lineMasked.replace(re, '§'); }
+  }
+  if (!mainSeen || !masked.includes(lineMasked) || /[0-9=^+]/.test(lineMasked.replace(/§/g, ''))) return null;
+  return { line: { text: l.text, status: 'note', state: 'unverified', unverified: true, context: true, note: 'This line repeats the question; there is no step in it to check.', tickClass: 'restated' } };
 }
 function headingLine(l, text) {
   if (!isHeading(text)) return null;

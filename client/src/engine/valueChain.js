@@ -374,10 +374,12 @@ function curveLine(fn, text, original, eqState = null, lineIndex = -1) {
         const deg = p => (p && p.c.size ? Math.max(...p.c.keys()) : -1);
         if (a && b && a.v === variable && b.v === variable && deg(a) >= 1 && deg(a) === deg(b) && !readingIsAmbiguous(written) && !readingIsAmbiguous(eqState.side)) {
           const facts = falseStepFacts(eqState.side, written);
-          if (facts) {
+          const fixed0 = facts ? oneNumberRepair(eqState.side, written) : null;
+          // only a wrong REWRITING of the line above: one number off (a unique repair) or one term different, never a new unrelated equation of the same degree
+          if (facts && (fixed0 || facts.changed.length === 1)) {
             const d = crossDiagnosis(facts, null, { aboveSide: eqState.side, writtenSide: written, lineNo: lineIndex + 1, checkedBefore: 0 });
             // the line written again with ONE number changed so that it equals the line above, when exactly one such repair exists (`6x[x + 4]` -> `6x[x + 3]`)
-            const fixed = oneNumberRepair(eqState.side, written);
+            const fixed = fixed0;
             if (fixed) { d.corrected = zeroSide === 0 ? `= ${fixed}` : `${fixed} =`; d.errorType = 'factor-number-wrong'; d.correctedRhs = fixed; d.comment = `${d.comment} The factorised line should read ${fixed}.`; d.message = d.comment; }
             return { status: 'break', code: d.code, note: d.message, diagnosis: d };
           }
@@ -396,8 +398,10 @@ function oneNumberRepair(above, written) {
   while ((m = re.exec(written))) {
     for (let v = -30; v <= 30; v++) {
       if (String(v) === m[0]) continue;
-      const lit = v < 0 ? `(${v})` : String(v);
-      const cand = written.slice(0, m.index) + lit + written.slice(m.index + m[0].length);
+      // a negative value takes the sign of the operator before it (`x + 6` -> `x - 6`), else it is bracketed
+      const before = written.slice(0, m.index), op = /([+-])\s*$/.exec(before);
+      const cand = v < 0 && op ? before.slice(0, op.index) + (op[1] === '+' ? '- ' : '+ ') + String(-v) + written.slice(m.index + m[0].length)
+        : v >= 0 && op && op[1] === '-' && false ? '' : before + (v < 0 ? `(${v})` : String(v)) + written.slice(m.index + m[0].length);
       let eq = false;
       try { const a = readPoly(above), b = readPoly(cand); eq = !!(a && b && falseStepFacts(above, cand) === null); } catch { eq = false; }
       if (eq) found.add(v < 0 ? cand : cand);

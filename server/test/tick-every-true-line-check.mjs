@@ -37,20 +37,20 @@ const vary = (idx, text) => TRUE.map((t, i) => (i === idx ? text : t));
   const { ev, rows } = status(TRUE);
   const ticked = rows.map(l => l.status === 'ok');
   ok(ev.stepReport.lines.filter(l => l.status === 'ok').length <= 8, 'before: the engine report alone ticks at most 8 of the 19 lines');
-  const want = [1, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
+  const want = [3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
   ok(want.every(n => ticked[n - 1]), `lines ${want.filter(n => !ticked[n - 1])} should be ticks: ${rows.map(l => l.status[0]).join('')}`);
   ok(!rows.some(l => l.status === 'break'), 'no cross on a true page');
   ok(rows[1].context === true && rows[8].context === true && rows[1].status === 'note' && rows[8].status === 'note', 'lines 2 and 9 are headings: context notes');
-  ok(rows[0].state === 'given' && rows[0].solutionMatch === true, 'line 1 is the restated question');
+  ok(rows[0].status === 'note' && rows[0].context === true && rows[0].tickClass === 'restated', 'line 1 is the restated question: context, never a tick');
   const s = shown(ev).summary;
   ok(s.unverified.length === 0 && s.unread.length === 0 && s.wrong.length === 0, `no line is unverified or unread: ${JSON.stringify(s)}`);
   const model = buildAnnotatedWorking({ lines: TRUE, stepReport: shown(ev) });
   const page = buildMarkedPage({ model });
   ok(page.header.counts.unchecked === 0 && page.header.counts.wrong === 0, `the marked page counts nothing as not checked: ${JSON.stringify(page.header.counts)}`);
-  ok(page.header.counts.right >= 17, `17 right lines: ${JSON.stringify(page.header.counts)}`);
+  ok(page.header.counts.right >= 16, `16 right lines: ${JSON.stringify(page.header.counts)}`);
   // 2. classes, notRequired, answerLine
   const cls = rows.map(l => l.tickClass);
-  const expect = { 0: 'restated-question', 1: 'heading', 2: 'restated-function', 3: 'power-rule-differentiation', 4: 'condition-line', 6: 'factorisation', 7: 'roots-of-a-product', 8: 'heading', 9: 'point-claim', 10: 'substitution-evaluated', 11: 'point-claim', 12: 'conclusion-matches', 13: 'conclusion-matches', 14: 'second-derivative-value', 15: 'sign-claim', 16: 'nature-claim', 17: 'sign-claim', 18: 'nature-claim' };
+  const expect = { 0: 'restated', 1: 'heading', 2: 'restated-function', 3: 'power-rule-differentiation', 4: 'condition-line', 6: 'factorisation', 7: 'roots-of-a-product', 8: 'heading', 9: 'point-claim', 10: 'substitution-evaluated', 11: 'point-claim', 12: 'conclusion-matches', 13: 'conclusion-matches', 14: 'second-derivative-value', 15: 'sign-claim', 16: 'nature-claim', 17: 'sign-claim', 18: 'nature-claim' };
   for (const [i, c] of Object.entries(expect)) ok(cls[i] === c, `line ${Number(i) + 1} class is ${c}, got ${cls[i]}`);
   ok(shown(ev).answerLine === 13, `the answer-bearing line is line 14: ${shown(ev).answerLine}`);
   ok(rows.every((l, i) => (l.notRequired === true) === (i > 13 && l.status === 'ok')), `notRequired exactly on the ticks after line 14: ${rows.map(l => l.notRequired ? 1 : 0).join('')}`);
@@ -96,7 +96,11 @@ const WRONG = [
   [5, 'Stationary points when dy/dx = 1:', 'a wrong condition'],
   [5, 'Stationary points when y = 0:', 'a condition on the wrong quantity'],
   [1, 'The curve y = 4x^3 − 35x^2 has two stationary points. Find the larger x-coordinate.', 'a restated question with a changed number'],
-  [1, 'The curve y = 4x^3 − 36x^2 has two stationary points. Find the smaller x-coordinate.', 'a restated question with a changed word']
+  [1, 'The curve y = 4x^3 − 36x^2 has two stationary points. Find the smaller x-coordinate.', 'a restated question with a changed word'],
+  [1, '6x^2 has two stationary points. Find the larger x-coordinate.', 'a cut-off restated question'],
+  [1, 'x^3 − 36x^2 has two stationary points.', 'a restated question missing a term'],
+  [1, '4x^3 − 36x^2 has two stationary points', 'a restated question missing the y ='],
+  [1, 'The curve y = 4x^3 − 36x^2 has two stationary points. Find the larger x-coordinate. x = 6', 'a restated question with a claim added']
 ];
 for (const [n, text, why] of WRONG) {
   const lines = vary(n - 1, text);
@@ -113,7 +117,11 @@ for (const [n, text, why] of WRONG) {
   ok(rows[14].status === 'ok' && rows[9].status === 'ok', 'the second derivative and the substitutions do not need that line');
 }
 // a heading never hides a claim
-for (const t of ['The larger root is 7:', 'x = 12:', 'Answer: 7']) ok(!status(vary(8, t)).rows[8].context, `"${t}" is not a heading`);
+for (const t of ['The larger root is 7:', 'x = 12:', 'Answer: 7', 'The larger root is zero:', 'The curve has no stationary points:', 'The maximum is at the origin:', 'Hence x = 6 is larger:']) ok(!status(vary(8, t)).rows[8].context, `"${t}" is not a heading`);
+for (const t of ['Solution:', 'Working:', 'The stationary points are:', 'Answer:', 'Part (a)']) ok(status(vary(8, t)).rows[8].context === true && status(vary(8, t)).rows[8].status === 'note', `"${t}" is a heading`);
+// a restated question is never a tick, and a line with any changed coefficient is not read as one
+for (const t of ['The curve y = 4x^3 − 36x^2 has two stationary points. Find the larger x-coordinate.', 'The curve y = 4x^3 - 36x^2 has two stationary points.']) { const r = status(vary(0, t)).rows[0]; ok(r.status === 'note' && r.context === true && r.tickClass === 'restated', `"${t}" is the restated question (neutral): ${r.status} ${r.tickClass}`); }
+for (const t of ['The curve y = 4x^3 − 35x^2 has two stationary points.', 'The curve y = 5x^3 − 36x^2 has two stationary points.', 'The curve y = 4x^3 − 36x^2 has two stationary points. Find the smaller x-coordinate.', '6x^2 has two stationary points. Find the larger x-coordinate.']) { const r = status(vary(0, t)).rows[0]; ok(r.tickClass !== 'restated' && r.status !== 'ok', `"${t}" is not restated and not ticked: ${r.status} ${r.tickClass}`); }
 
 // 4. the first wrong line
 {
@@ -164,8 +172,8 @@ for (const t of ['The larger root is 7:', 'x = 12:', 'Answer: 7']) ok(!status(va
     const rows = stepEvidence(c, String(hi), page.join('\n'), checkAnswer(c, String(hi)), { slipWarnings: true });
     const rr = (rows.shownReport || rows.stepReport).lines;
     if (rr.length !== page.length) continue;
-    pages++; trueLines += page.length - 2;
-    trueTicked += rr.filter((l, i) => l.status === 'ok' && i !== 1 && i !== 7).length;
+    pages++; trueLines += page.length - 3;
+    trueTicked += rr.filter((l, i) => l.status === 'ok' && i !== 0 && i !== 1 && i !== 7).length;
     if (rr.some(l => l.status === 'break')) failures.push(`a true page is crossed: ${c.prompt}`);
     // the wrong variants of the tick classes, on this page
     const wrong = [[8, sub(lo).replace(`= ${f(lo)} ⇒ (${lo},${f(lo)})`, `= ${f(lo) + 1} ⇒ (${lo},${f(lo) + 1})`)], [9, sub(hi).replace(/⇒ \(.*\)$/, `⇒ (${hi},${f(hi) + 2})`)], [10, `The two stationary points are ${pt(lo)} and (${hi},${f(hi) + 1}).`], [11, `The larger x-coordinate is ${lo}.`], [12, `d²y/dx² = ${6 * A}x${2 * B ? `${sgn(2 * B)}${Math.abs(2 * B)}` : ''} + 1`], [13, `At x = ${lo}: d²y/dx² = ${d2(lo)} ${d2(lo) < 0 ? '>' : '<'} 0`], [14, d2(lo) < 0 ? '(local minimum)' : '(local maximum)'], [16, d2(hi) < 0 ? '(local minimum)' : '(local maximum)']];
@@ -201,6 +209,13 @@ for (const t of ['The larger root is 7:', 'x = 12:', 'Answer: 7']) ok(!status(va
   }
   const consequence = mark(pg('(x+4)', ['x(x+4)=0', 'x=0 or x=−4', 'x=0 or x=−3']));
   ok(consequence.rows[5].followsFromError === true && consequence.rows[6].followsFromError === true && consequence.rows[7].followsFromError !== true, `correct consequences of the wrong line are labelled, the line that is not one is not: ${consequence.rows.map(l => l.followsFromError ? 1 : 0).join('')}`);
+  // round-bracket wrong factorisations are crossed too, but only a wrong rewriting of the line above: true, equivalent and unrelated lines are not
+  {
+    const F = f => ['y = 4x^3 − 36x^2', 'dy/dx = 12x^2 − 72x', 'Stationary points when dy/dx = 0:', '12x^2 − 72x = 0', f];
+    const mk = f => { const e = stepEvidence(q, '6', F(f).join('\n'), checkAnswer(q, '6'), { slipWarnings: true }); return (e.shownReport || e.stepReport).lines[4]; };
+    for (const f of ['12x(x − 5) = 0', '12x(x − 7) = 0', '0 = 12x(x − 5)', '12x(x + 6) = 0']) { const r = mk(f); ok(r.status === 'break' && /12x\(x - 6\)/.test(r.diagnosis?.corrected ?? ''), `the wrong factorisation ${f} is crossed with 12x(x - 6): ${r.status} ${r.diagnosis?.corrected}`); }
+    for (const f of ['12x(x − 6) = 0', 'x(x − 6) = 0', '12x^2 − 72x = 0', '6x(2x − 12) = 0', '11x(x − 6) = 0', '2x(6x − 36) = 0', 'x^2 − 6x = 0', '0 = 12x(x − 6)', 'x = 0 or x = 6', 'x − 6 = 0', 'x^2 − 5 = 0', '3x + 1 = 7', 'x^2 = 36', '5x^2 − 3x + 2 = 0']) { const r = mk(f); ok(r.status !== 'break', `${f} is not crossed (a true or equivalent form, a factor, or a new unrelated equation): ${r.status}`); }
+  }
   // bracket forms that are not grouping are never read into a tick or a cross on this line
   for (const odd of ['x ∈ [0, 6]', '[0, 6]', 'floor[3.5]', '[1 2; 3 4]', '(0,0)', '{1, 2}', '[-3, 0)']) {
     const r = mark(['y=2x³+9x²', "y'=6x²+18x", "for stat points y'=0", '0=6x²+18x', odd]).rows[4];
