@@ -45,6 +45,12 @@ export const PHRASES = Object.freeze({
   choice: 'Correct choice of value',
   trueAsWritten: 'True as written',
   // classes the line-coverage work may emit; unknown to main today, so nothing maps to them unless the engine names them
+  secondDerivative: 'Correct second derivative',
+  signClaim: 'Correct sign',
+  natureClaim: 'Correct nature',
+  pointClaim: 'Correct stationary point',
+  conclusionMatches: 'Correct conclusion',
+  conditionLine: 'Condition stated',
   conclusion: 'Correct answer',
   heading: 'Heading',
   question: 'Question restated'
@@ -53,6 +59,8 @@ export const PHRASES = Object.freeze({
 export const TEXT = Object.freeze({
   noReason: 'This line does not follow from the one above.',
   noReasonFirst: 'This line is not correct.',
+  followsFrom: n => `Follows from the error on line ${n}`,
+  followsFromGeneric: 'Follows from the error above',
   assessment: 'Assessment',
   attempt: 'Attempt',
   marked: 'Marked',
@@ -83,6 +91,14 @@ export const TEXT = Object.freeze({
   typeIt: 'Tap to type it.'
 });
 
+// the stable class ids the engine's display fields emit on every tick (engine/displayFields.js CLASSES), to a phrase; a class not listed has no phrase
+const TICK = {
+  'power-rule-differentiation': 'differentiation', differentiation: 'differentiation', 'derivative-rule': 'differentiation', factorisation: 'factorisation',
+  'roots-of-a-product': 'stationaryValues', 'equation-setup': 'stationaryEquation', 'substitution-evaluated': 'substitution', 'labelled-substitution': 'substitution',
+  'arithmetic-chain': 'arithmetic', 'second-derivative-value': 'secondDerivative', 'sign-claim': 'signClaim', 'nature-claim': 'natureClaim', 'point-claim': 'pointClaim',
+  'conclusion-matches': 'conclusionMatches', 'condition-line': 'conditionLine', 'restated-question': 'restated', 'restated-function': 'given', heading: 'heading',
+  'solution-list': 'solutionList', 'rounded-value': 'rounding', identity: 'identity', 'true-as-written': 'trueAsWritten', restated: 'restated'
+};
 const PROVED = { derivative: 'differentiation', substituted: 'substitution', listed: 'solutionList', rounded: 'rounding', restated: 'restated', identity: 'identity' };
 const HOW = {
   'derivative-rule': 'differentiation', derivatives: 'differentiation', substituted: 'substitution', 'substituted-at': 'substitution', one: 'one',
@@ -107,6 +123,7 @@ export function classOf(card) {
   if (!card || card.status !== 'checked') return null;
   // "Correct answer" only when the server's report itself names this line as the answer-bearing one (a field the line-coverage engine work adds; absent today)
   if (card.answerLine === true) return 'conclusion';
+  if (typeof card.tickClass === 'string' && Object.hasOwn(TICK, card.tickClass)) return TICK[card.tickClass];
   const f = card.fact && typeof card.fact === 'object' ? card.fact : {};
   const h = card.how && typeof card.how === 'object' ? card.how : {};
   if (h.kind === 'conclusion' || h.kind === 'heading' || h.kind === 'question') return h.kind;
@@ -313,7 +330,9 @@ export const listWords = m => ({
 export function lineWord(card) {
   if (!card) return null;
   const kinds = [card.fact?.kind, card.how?.kind];
-  if (kinds.includes('heading')) return TEXT.heading;
+  if (kinds.includes('heading') || card.tickClass === 'heading') return TEXT.heading;
+  if (Number.isInteger(card.followsFromError)) return TEXT.followsFrom(card.followsFromError);
+  if (card.followsFromError === true) return TEXT.followsFromGeneric;
   if (kinds.includes('question') || (card.valueChain === 'given' && (card.restated || card.restates))) return TEXT.question;
   return null;
 }
@@ -348,6 +367,12 @@ export const DETAILS = Object.freeze({
   stationaryValues: 'These are the stationary values of the curve.',
   choice: 'The value chosen is the one the question asks for.',
   trueAsWritten: 'This line is true as written.',
+  secondDerivative: 'The second derivative on this line is correct.',
+  signClaim: 'The sign stated on this line is correct.',
+  natureClaim: 'The nature stated on this line is correct.',
+  pointClaim: 'The stationary point stated on this line is correct.',
+  conclusionMatches: 'The conclusion on this line matches the working above it.',
+  conditionLine: 'The condition stated on this line is correct.',
   conclusion: 'This is the answer the question asks for, and it is correct.',
   heading: 'A heading: nothing to check.',
   question: 'This line restates the question.'

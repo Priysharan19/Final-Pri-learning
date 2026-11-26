@@ -24,7 +24,7 @@ const factsOf = l => { const d = l?.diagnosis || {}; const from = Number.isInteg
 // `firstBreak` is the zero-based index; `firstBreakLine` is the same line, one-based.
 const breakIndexOf = r => (Number.isInteger(r?.firstBreak) && r.firstBreak >= 0 ? r.firstBreak : Number.isInteger(r?.firstBreakLine) && r.firstBreakLine >= 1 ? r.firstBreakLine - 1 : null);
 const commentOf = l => clip(l?.diagnosis?.comment ?? l?.how ?? l?.comment, 300);
-const correctedOf = l => clip(l?.diagnosis?.corrected ?? l?.corrected, 200);
+const correctedOf = l => clip(l?.diagnosis?.corrected ?? l?.corrected ?? l?.correctedLine, 200);
 
 /** 6, 7, 8 → "6–8"; 2, 4 → "2, 4". */
 export function lineRange(ns) {
@@ -167,7 +167,7 @@ function buildValueChainModel({ report: reportIn, stepReport, receipt, source, a
     n: i + 1, line: i, status: l?.context === true && !['wrong', 'verified', 'given', 'arithmetic', 'unread'].includes(l?.state) ? 'condition' : STATUS[l?.state] || 'not-verified', valueChain: l?.state || 'unverified', vcRule: typeof l?.valueChain?.rule === 'string' ? l.valueChain.rule : null,
     start: false, startSide: null, rules: [], more: false, same: false, unnamed: false, followsFrom: null,
     diagnosis: l?.state === 'wrong' ? (l.diagnosis || null) : null, note: l?.state === 'wrong' || l?.state === 'given' || l?.state === 'incomplete' || l?.state === 'arithmetic' || l?.state === 'verified' ? (l.note || null) : null,
-    previousText: null, text: String(l?.text ?? ''), restated: l?.state === 'given' && l?.solutionMatch === true, restates: l?.restates === true, answerLine: l?.answerLine === true, fact: l?.fact || null, how: l?.how || null,
+    previousText: null, text: String(l?.text ?? ''), restated: l?.state === 'given' && l?.solutionMatch === true, restates: l?.restates === true, answerLine: l?.answerLine === true || (Number.isInteger(stepReport?.answerLine) && stepReport.answerLine === i && l?.status === 'ok'), tickClass: typeof l?.tickClass === 'string' ? l.tickClass : null, notRequired: l?.notRequired === true, followsFromError: l?.followsFromError === true ? (Number.isInteger(l.followsFrom) ? l.followsFrom : true) : null, fact: l?.fact || null, how: l?.how || null,
     corrected: l?.state === 'wrong' ? correctedOf(l) : null,
     comment: commentOf(l), facts: l?.state === 'wrong' ? factsOf(l) : null
   }));

@@ -20,6 +20,7 @@ const OUT = new URL('../../../client/test/support/teacher-page-real-reports.json
 await G.loadAllBanks();
 
 const WRONG_LINES = ['y = 2x^3 + 9x^2', "y' = 6x^2 + 18x", "for stat points y' = 0", '0 = 6x^2 + 18x', '0 = 6x[x + 4]', '@@@', 'foo', 'x = 0 or x = -3', 'smallest: (0,0)'];
+const FOLLOWED_LINES = ['y = 2x^3 + 9x^2', "y' = 6x^2 + 18x", "for stat points y' = 0", '0 = 6x^2 + 18x', '0 = 6x[x + 4]', 'x = 0 or x = -4', 'smallest: (-4,0)'];
 const OWNER19_LINES = [
   'Solution:', 'y = 4x^3 - 36x^2', 'dy/dx = 12x^2 - 72x', 'Stationary points when dy/dx = 0:', '12x^2 - 72x = 0', '12x(x - 6) = 0', 'x = 0 or x = 6',
   'd2y/dx2 = 24x - 72', 'At x = 0: d2y/dx2 = -72 < 0', '(local maximum)', 'At x = 6: d2y/dx2 = 72 > 0', '(local minimum)',
@@ -40,7 +41,7 @@ function run(q, lines, answer) {
 }
 const wrongQ = G.generateQuestion('y12-appdiff', 1, 450);
 const out = { note: 'The server marking path (checkAnswer, stepEvidence) on transcribed pages. Regenerate with server/test/support/teacher-page-real-reports.mjs.',
-  pages: { wrong: run(wrongQ, WRONG_LINES, '0'), owner19: run(OWNER19_Q, OWNER19_LINES, '6') } };
+  pages: { wrong: run(wrongQ, WRONG_LINES, '0'), followed: run(wrongQ, FOLLOWED_LINES, '-4'), owner19: run(OWNER19_Q, OWNER19_LINES, '6') } };
 const text = JSON.stringify(out, null, 1) + '\n';
 if (process.argv.includes('--check')) {
   if (readFileSync(OUT, 'utf8') !== text) { console.error('teacher-page-real-reports: the saved file is not what the engine returns today; run the script without --check'); process.exit(1); }

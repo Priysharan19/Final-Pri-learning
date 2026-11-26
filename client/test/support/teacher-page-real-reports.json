@@ -57,81 +57,134 @@
      },
      {
       "text": "0 = 6x[x + 4]",
-      "status": "note",
-      "note": "Not verified: Pri does not check lines with this label.",
-      "unverified": true,
-      "state": "unverified"
+      "status": "break",
+      "note": "Collected, the x terms come to 18x in the line above and 24x in this line. Corrected line: = 6x^2 + 18x. At x = 1 the line above gives 24 but this line gives 30. The factorised line should read 6x[x + 3].",
+      "diagnosis": {
+       "code": "false-continuation",
+       "title": "This line is not equal to the line above",
+       "fix": "Work this line out again from the line above, one term at a time.",
+       "confidence": "high",
+       "expectedFrom": "symbolic",
+       "exact": true,
+       "aboveTex": "6x^2 + 18x",
+       "writtenTex": "6x^2 + 24x",
+       "correctedTex": "6x^2 + 18x",
+       "correctedText": "6x^2 + 18x",
+       "changed": [
+        {
+         "fromTex": "18x",
+         "toTex": "24x"
+        }
+       ],
+       "same": [
+        "6x^2"
+       ],
+       "whatChanged": "Collected, the x terms come to 18x in the line above and 24x in this line.",
+       "corrected": "= 6x[x + 3]",
+       "check": "At x = 1 the line above gives 24 but this line gives 30.",
+       "checkAt": {
+        "v": "x",
+        "x": 1,
+        "above": "24",
+        "written": "30"
+       },
+       "fromLine": 4,
+       "comment": "Collected, the x terms come to 18x in the line above and 24x in this line. Corrected line: = 6x^2 + 18x. At x = 1 the line above gives 24 but this line gives 30. The factorised line should read 6x[x + 3].",
+       "message": "Collected, the x terms come to 18x in the line above and 24x in this line. Corrected line: = 6x^2 + 18x. At x = 1 the line above gives 24 but this line gives 30. The factorised line should read 6x[x + 3].",
+       "errorType": "factor-number-wrong",
+       "correctedRhs": "6x[x + 3]"
+      },
+      "state": "wrong"
      },
      {
       "text": "@@@",
       "status": "note",
-      "note": "This line could not be read as maths, so it is not checked.",
+      "note": "Follows from the earlier slip.",
       "unverified": true,
-      "unreadable": true,
-      "state": "unread"
+      "state": "unverified"
      },
      {
       "text": "foo",
       "status": "note",
-      "note": "Not verified: Pri cannot check this line against the question.",
+      "note": "Follows from the earlier slip.",
       "unverified": true,
       "state": "unverified"
      },
      {
       "text": "x = 0 or x = -3",
-      "status": "ok",
-      "state": "verified",
-      "valueChain": {
-       "rule": "stationary-values"
-      }
+      "status": "note",
+      "note": "Follows from the earlier slip.",
+      "unverified": true,
+      "state": "unverified"
      },
      {
       "text": "smallest: (0,0)",
-      "status": "break",
-      "note": "$x = -3$ is smaller than $x = 0$, so use $x = -3$: $y(-3) = 27$.",
-      "diagnosis": {
-       "code": "wrong-stationary-point",
-       "title": "This value is not the quantity it is labelled as",
-       "message": "$x = -3$ is smaller than $x = 0$, so use $x = -3$: $y(-3) = 27$.",
-       "fix": "Recompute this value from the function in the question.",
-       "confidence": "high"
-      },
-      "state": "wrong"
+      "status": "note",
+      "note": "Follows from the earlier slip.",
+      "unverified": true,
+      "state": "unverified"
      }
     ],
-    "firstBreak": 8,
+    "firstBreak": 4,
     "diagnosis": {
-     "code": "wrong-stationary-point",
-     "title": "This value is not the quantity it is labelled as",
-     "message": "$x = -3$ is smaller than $x = 0$, so use $x = -3$: $y(-3) = 27$.",
-     "fix": "Recompute this value from the function in the question.",
-     "confidence": "high"
+     "code": "false-continuation",
+     "title": "This line is not equal to the line above",
+     "fix": "Work this line out again from the line above, one term at a time.",
+     "confidence": "high",
+     "expectedFrom": "symbolic",
+     "exact": true,
+     "aboveTex": "6x^2 + 18x",
+     "writtenTex": "6x^2 + 24x",
+     "correctedTex": "6x^2 + 18x",
+     "correctedText": "6x^2 + 18x",
+     "changed": [
+      {
+       "fromTex": "18x",
+       "toTex": "24x"
+      }
+     ],
+     "same": [
+      "6x^2"
+     ],
+     "whatChanged": "Collected, the x terms come to 18x in the line above and 24x in this line.",
+     "corrected": "= 6x[x + 3]",
+     "check": "At x = 1 the line above gives 24 but this line gives 30.",
+     "checkAt": {
+      "v": "x",
+      "x": 1,
+      "above": "24",
+      "written": "30"
+     },
+     "fromLine": 4,
+     "comment": "Collected, the x terms come to 18x in the line above and 24x in this line. Corrected line: = 6x^2 + 18x. At x = 1 the line above gives 24 but this line gives 30. The factorised line should read 6x[x + 3].",
+     "message": "Collected, the x terms come to 18x in the line above and 24x in this line. Corrected line: = 6x^2 + 18x. At x = 1 the line above gives 24 but this line gives 30. The factorised line should read 6x[x + 3].",
+     "errorType": "factor-number-wrong",
+     "correctedRhs": "6x[x + 3]"
     },
     "source": "value-chain",
     "summary": {
      "total": 9,
-     "checked": 4,
+     "checked": 3,
      "given": [
       1
      ],
      "verified": [
       2,
-      4,
-      8
+      4
      ],
      "conditions": [
       3
      ],
      "wrong": [
-      9
+      5
      ],
      "unverified": [
-      5,
-      7
+      6,
+      7,
+      8,
+      9
      ],
-     "unread": [
-      6
-     ],
+     "unread": [],
      "reason": "Pri could not tie these lines to anything it can prove about this question, so it did not mark them."
     },
     "missing": [
@@ -141,6 +194,540 @@
      }
     ],
     "stepsFound": 1,
+    "stepsReadable": 2
+   },
+   "shownReport": {
+    "lines": [
+     {
+      "text": "y = 2x^3 + 9x^2",
+      "status": "ok",
+      "restates": true,
+      "note": "Restates the function from the question.",
+      "valueChain": {
+       "rule": "restated"
+      },
+      "state": "given",
+      "tickClass": "restated-function"
+     },
+     {
+      "text": "y' = 6x^2 + 18x",
+      "status": "ok",
+      "state": "verified",
+      "valueChain": {
+       "rule": "derivative"
+      },
+      "tickClass": "power-rule-differentiation"
+     },
+     {
+      "text": "for stat points y' = 0",
+      "status": "note",
+      "state": "condition",
+      "note": "A stated condition: stationary points are where the derivative is 0."
+     },
+     {
+      "text": "0 = 6x^2 + 18x",
+      "status": "ok",
+      "state": "verified",
+      "valueChain": {
+       "rule": "stationary-equation"
+      },
+      "tickClass": "equation-setup"
+     },
+     {
+      "text": "0 = 6x[x + 4]",
+      "status": "break",
+      "note": "Collected, the x terms come to 18x in the line above and 24x in this line. Corrected line: = 6x^2 + 18x. At x = 1 the line above gives 24 but this line gives 30. The factorised line should read 6x[x + 3].",
+      "diagnosis": {
+       "code": "false-continuation",
+       "title": "This line is not equal to the line above",
+       "fix": "Work this line out again from the line above, one term at a time.",
+       "confidence": "high",
+       "expectedFrom": "symbolic",
+       "exact": true,
+       "aboveTex": "6x^2 + 18x",
+       "writtenTex": "6x^2 + 24x",
+       "correctedTex": "6x^2 + 18x",
+       "correctedText": "6x^2 + 18x",
+       "changed": [
+        {
+         "fromTex": "18x",
+         "toTex": "24x"
+        }
+       ],
+       "same": [
+        "6x^2"
+       ],
+       "whatChanged": "Collected, the x terms come to 18x in the line above and 24x in this line.",
+       "corrected": "= 6x[x + 3]",
+       "check": "At x = 1 the line above gives 24 but this line gives 30.",
+       "checkAt": {
+        "v": "x",
+        "x": 1,
+        "above": "24",
+        "written": "30"
+       },
+       "fromLine": 4,
+       "comment": "Collected, the x terms come to 18x in the line above and 24x in this line. Corrected line: = 6x^2 + 18x. At x = 1 the line above gives 24 but this line gives 30. The factorised line should read 6x[x + 3].",
+       "message": "Collected, the x terms come to 18x in the line above and 24x in this line. Corrected line: = 6x^2 + 18x. At x = 1 the line above gives 24 but this line gives 30. The factorised line should read 6x[x + 3].",
+       "errorType": "factor-number-wrong",
+       "correctedRhs": "6x[x + 3]"
+      },
+      "state": "wrong",
+      "reasonId": "factor-number-wrong",
+      "correctedLine": "= 6x[x + 3]",
+      "correctedRhs": "6x[x + 3]"
+     },
+     {
+      "text": "@@@",
+      "status": "note",
+      "note": "Follows from the earlier slip.",
+      "unverified": true,
+      "state": "unverified"
+     },
+     {
+      "text": "foo",
+      "status": "note",
+      "note": "Follows from the earlier slip.",
+      "unverified": true,
+      "state": "unverified"
+     },
+     {
+      "text": "x = 0 or x = -3",
+      "status": "note",
+      "note": "Follows from the earlier slip.",
+      "unverified": true,
+      "state": "unverified"
+     },
+     {
+      "text": "smallest: (0,0)",
+      "status": "note",
+      "note": "Follows from the earlier slip.",
+      "unverified": true,
+      "state": "unverified"
+     }
+    ],
+    "firstBreak": 4,
+    "diagnosis": {
+     "code": "false-continuation",
+     "title": "This line is not equal to the line above",
+     "fix": "Work this line out again from the line above, one term at a time.",
+     "confidence": "high",
+     "expectedFrom": "symbolic",
+     "exact": true,
+     "aboveTex": "6x^2 + 18x",
+     "writtenTex": "6x^2 + 24x",
+     "correctedTex": "6x^2 + 18x",
+     "correctedText": "6x^2 + 18x",
+     "changed": [
+      {
+       "fromTex": "18x",
+       "toTex": "24x"
+      }
+     ],
+     "same": [
+      "6x^2"
+     ],
+     "whatChanged": "Collected, the x terms come to 18x in the line above and 24x in this line.",
+     "corrected": "= 6x[x + 3]",
+     "check": "At x = 1 the line above gives 24 but this line gives 30.",
+     "checkAt": {
+      "v": "x",
+      "x": 1,
+      "above": "24",
+      "written": "30"
+     },
+     "fromLine": 4,
+     "comment": "Collected, the x terms come to 18x in the line above and 24x in this line. Corrected line: = 6x^2 + 18x. At x = 1 the line above gives 24 but this line gives 30. The factorised line should read 6x[x + 3].",
+     "message": "Collected, the x terms come to 18x in the line above and 24x in this line. Corrected line: = 6x^2 + 18x. At x = 1 the line above gives 24 but this line gives 30. The factorised line should read 6x[x + 3].",
+     "errorType": "factor-number-wrong",
+     "correctedRhs": "6x[x + 3]"
+    },
+    "source": "value-chain",
+    "summary": {
+     "total": 9,
+     "checked": 3,
+     "given": [
+      1
+     ],
+     "verified": [
+      2,
+      4
+     ],
+     "conditions": [
+      3
+     ],
+     "wrong": [
+      5
+     ],
+     "unverified": [
+      6,
+      7,
+      8,
+      9
+     ],
+     "unread": [],
+     "reason": "Pri could not tie these lines to anything it can prove about this question, so it did not mark them."
+    },
+    "missing": [
+     {
+      "step": 3,
+      "heading": "Substitute"
+     }
+    ],
+    "stepsFound": 1,
+    "stepsReadable": 2
+   }
+  },
+  "followed": {
+   "question": {
+    "prompt": "The curve $y = 2x^3 + 9x^2$ has two stationary points. Find the $y$-coordinate of the one with the smaller $x$-coordinate.",
+    "answer": {
+     "value": 27
+    }
+   },
+   "answer": "-4",
+   "correct": false,
+   "lines": [
+    "y = 2x^3 + 9x^2",
+    "y' = 6x^2 + 18x",
+    "for stat points y' = 0",
+    "0 = 6x^2 + 18x",
+    "0 = 6x[x + 4]",
+    "x = 0 or x = -4",
+    "smallest: (-4,0)"
+   ],
+   "stepReport": {
+    "lines": [
+     {
+      "text": "y = 2x^3 + 9x^2",
+      "status": "ok",
+      "restates": true,
+      "note": "Restates the function from the question.",
+      "valueChain": {
+       "rule": "restated"
+      },
+      "state": "given"
+     },
+     {
+      "text": "y' = 6x^2 + 18x",
+      "status": "ok",
+      "state": "verified",
+      "valueChain": {
+       "rule": "derivative"
+      }
+     },
+     {
+      "text": "for stat points y' = 0",
+      "status": "note",
+      "state": "condition",
+      "note": "A stated condition: stationary points are where the derivative is 0."
+     },
+     {
+      "text": "0 = 6x^2 + 18x",
+      "status": "ok",
+      "state": "verified",
+      "valueChain": {
+       "rule": "stationary-equation"
+      }
+     },
+     {
+      "text": "0 = 6x[x + 4]",
+      "status": "break",
+      "note": "Collected, the x terms come to 18x in the line above and 24x in this line. Corrected line: = 6x^2 + 18x. At x = 1 the line above gives 24 but this line gives 30. The factorised line should read 6x[x + 3].",
+      "diagnosis": {
+       "code": "false-continuation",
+       "title": "This line is not equal to the line above",
+       "fix": "Work this line out again from the line above, one term at a time.",
+       "confidence": "high",
+       "expectedFrom": "symbolic",
+       "exact": true,
+       "aboveTex": "6x^2 + 18x",
+       "writtenTex": "6x^2 + 24x",
+       "correctedTex": "6x^2 + 18x",
+       "correctedText": "6x^2 + 18x",
+       "changed": [
+        {
+         "fromTex": "18x",
+         "toTex": "24x"
+        }
+       ],
+       "same": [
+        "6x^2"
+       ],
+       "whatChanged": "Collected, the x terms come to 18x in the line above and 24x in this line.",
+       "corrected": "= 6x[x + 3]",
+       "check": "At x = 1 the line above gives 24 but this line gives 30.",
+       "checkAt": {
+        "v": "x",
+        "x": 1,
+        "above": "24",
+        "written": "30"
+       },
+       "fromLine": 4,
+       "comment": "Collected, the x terms come to 18x in the line above and 24x in this line. Corrected line: = 6x^2 + 18x. At x = 1 the line above gives 24 but this line gives 30. The factorised line should read 6x[x + 3].",
+       "message": "Collected, the x terms come to 18x in the line above and 24x in this line. Corrected line: = 6x^2 + 18x. At x = 1 the line above gives 24 but this line gives 30. The factorised line should read 6x[x + 3].",
+       "errorType": "factor-number-wrong",
+       "correctedRhs": "6x[x + 3]"
+      },
+      "state": "wrong"
+     },
+     {
+      "text": "x = 0 or x = -4",
+      "status": "note",
+      "note": "Follows from the earlier slip.",
+      "unverified": true,
+      "state": "unverified"
+     },
+     {
+      "text": "smallest: (-4,0)",
+      "status": "note",
+      "note": "Follows from the earlier slip.",
+      "unverified": true,
+      "state": "unverified"
+     }
+    ],
+    "firstBreak": 4,
+    "diagnosis": {
+     "code": "false-continuation",
+     "title": "This line is not equal to the line above",
+     "fix": "Work this line out again from the line above, one term at a time.",
+     "confidence": "high",
+     "expectedFrom": "symbolic",
+     "exact": true,
+     "aboveTex": "6x^2 + 18x",
+     "writtenTex": "6x^2 + 24x",
+     "correctedTex": "6x^2 + 18x",
+     "correctedText": "6x^2 + 18x",
+     "changed": [
+      {
+       "fromTex": "18x",
+       "toTex": "24x"
+      }
+     ],
+     "same": [
+      "6x^2"
+     ],
+     "whatChanged": "Collected, the x terms come to 18x in the line above and 24x in this line.",
+     "corrected": "= 6x[x + 3]",
+     "check": "At x = 1 the line above gives 24 but this line gives 30.",
+     "checkAt": {
+      "v": "x",
+      "x": 1,
+      "above": "24",
+      "written": "30"
+     },
+     "fromLine": 4,
+     "comment": "Collected, the x terms come to 18x in the line above and 24x in this line. Corrected line: = 6x^2 + 18x. At x = 1 the line above gives 24 but this line gives 30. The factorised line should read 6x[x + 3].",
+     "message": "Collected, the x terms come to 18x in the line above and 24x in this line. Corrected line: = 6x^2 + 18x. At x = 1 the line above gives 24 but this line gives 30. The factorised line should read 6x[x + 3].",
+     "errorType": "factor-number-wrong",
+     "correctedRhs": "6x[x + 3]"
+    },
+    "source": "value-chain",
+    "summary": {
+     "total": 7,
+     "checked": 3,
+     "given": [
+      1
+     ],
+     "verified": [
+      2,
+      4
+     ],
+     "conditions": [
+      3
+     ],
+     "wrong": [
+      5
+     ],
+     "unverified": [
+      6,
+      7
+     ],
+     "unread": [],
+     "reason": "Pri could not tie these lines to anything it can prove about this question, so it did not mark them."
+    },
+    "missing": [
+     {
+      "step": 2,
+      "heading": "Choose"
+     },
+     {
+      "step": 3,
+      "heading": "Substitute"
+     }
+    ],
+    "stepsFound": 0,
+    "stepsReadable": 2
+   },
+   "shownReport": {
+    "lines": [
+     {
+      "text": "y = 2x^3 + 9x^2",
+      "status": "ok",
+      "restates": true,
+      "note": "Restates the function from the question.",
+      "valueChain": {
+       "rule": "restated"
+      },
+      "state": "given",
+      "tickClass": "restated-function"
+     },
+     {
+      "text": "y' = 6x^2 + 18x",
+      "status": "ok",
+      "state": "verified",
+      "valueChain": {
+       "rule": "derivative"
+      },
+      "tickClass": "power-rule-differentiation"
+     },
+     {
+      "text": "for stat points y' = 0",
+      "status": "note",
+      "state": "condition",
+      "note": "A stated condition: stationary points are where the derivative is 0."
+     },
+     {
+      "text": "0 = 6x^2 + 18x",
+      "status": "ok",
+      "state": "verified",
+      "valueChain": {
+       "rule": "stationary-equation"
+      },
+      "tickClass": "equation-setup"
+     },
+     {
+      "text": "0 = 6x[x + 4]",
+      "status": "break",
+      "note": "Collected, the x terms come to 18x in the line above and 24x in this line. Corrected line: = 6x^2 + 18x. At x = 1 the line above gives 24 but this line gives 30. The factorised line should read 6x[x + 3].",
+      "diagnosis": {
+       "code": "false-continuation",
+       "title": "This line is not equal to the line above",
+       "fix": "Work this line out again from the line above, one term at a time.",
+       "confidence": "high",
+       "expectedFrom": "symbolic",
+       "exact": true,
+       "aboveTex": "6x^2 + 18x",
+       "writtenTex": "6x^2 + 24x",
+       "correctedTex": "6x^2 + 18x",
+       "correctedText": "6x^2 + 18x",
+       "changed": [
+        {
+         "fromTex": "18x",
+         "toTex": "24x"
+        }
+       ],
+       "same": [
+        "6x^2"
+       ],
+       "whatChanged": "Collected, the x terms come to 18x in the line above and 24x in this line.",
+       "corrected": "= 6x[x + 3]",
+       "check": "At x = 1 the line above gives 24 but this line gives 30.",
+       "checkAt": {
+        "v": "x",
+        "x": 1,
+        "above": "24",
+        "written": "30"
+       },
+       "fromLine": 4,
+       "comment": "Collected, the x terms come to 18x in the line above and 24x in this line. Corrected line: = 6x^2 + 18x. At x = 1 the line above gives 24 but this line gives 30. The factorised line should read 6x[x + 3].",
+       "message": "Collected, the x terms come to 18x in the line above and 24x in this line. Corrected line: = 6x^2 + 18x. At x = 1 the line above gives 24 but this line gives 30. The factorised line should read 6x[x + 3].",
+       "errorType": "factor-number-wrong",
+       "correctedRhs": "6x[x + 3]"
+      },
+      "state": "wrong",
+      "reasonId": "factor-number-wrong",
+      "correctedLine": "= 6x[x + 3]",
+      "correctedRhs": "6x[x + 3]"
+     },
+     {
+      "text": "x = 0 or x = -4",
+      "status": "note",
+      "note": "Follows from the earlier slip.",
+      "unverified": true,
+      "state": "unverified",
+      "followsFromError": true,
+      "followsFrom": 5
+     },
+     {
+      "text": "smallest: (-4,0)",
+      "status": "note",
+      "note": "Follows from the earlier slip.",
+      "unverified": true,
+      "state": "unverified"
+     }
+    ],
+    "firstBreak": 4,
+    "diagnosis": {
+     "code": "false-continuation",
+     "title": "This line is not equal to the line above",
+     "fix": "Work this line out again from the line above, one term at a time.",
+     "confidence": "high",
+     "expectedFrom": "symbolic",
+     "exact": true,
+     "aboveTex": "6x^2 + 18x",
+     "writtenTex": "6x^2 + 24x",
+     "correctedTex": "6x^2 + 18x",
+     "correctedText": "6x^2 + 18x",
+     "changed": [
+      {
+       "fromTex": "18x",
+       "toTex": "24x"
+      }
+     ],
+     "same": [
+      "6x^2"
+     ],
+     "whatChanged": "Collected, the x terms come to 18x in the line above and 24x in this line.",
+     "corrected": "= 6x[x + 3]",
+     "check": "At x = 1 the line above gives 24 but this line gives 30.",
+     "checkAt": {
+      "v": "x",
+      "x": 1,
+      "above": "24",
+      "written": "30"
+     },
+     "fromLine": 4,
+     "comment": "Collected, the x terms come to 18x in the line above and 24x in this line. Corrected line: = 6x^2 + 18x. At x = 1 the line above gives 24 but this line gives 30. The factorised line should read 6x[x + 3].",
+     "message": "Collected, the x terms come to 18x in the line above and 24x in this line. Corrected line: = 6x^2 + 18x. At x = 1 the line above gives 24 but this line gives 30. The factorised line should read 6x[x + 3].",
+     "errorType": "factor-number-wrong",
+     "correctedRhs": "6x[x + 3]"
+    },
+    "source": "value-chain",
+    "summary": {
+     "total": 7,
+     "checked": 3,
+     "given": [
+      1
+     ],
+     "verified": [
+      2,
+      4
+     ],
+     "conditions": [
+      3
+     ],
+     "wrong": [
+      5
+     ],
+     "unverified": [
+      6,
+      7
+     ],
+     "unread": [],
+     "reason": "Pri could not tie these lines to anything it can prove about this question, so it did not mark them."
+    },
+    "missing": [
+     {
+      "step": 2,
+      "heading": "Choose"
+     },
+     {
+      "step": 3,
+      "heading": "Substitute"
+     }
+    ],
+    "stepsFound": 0,
     "stepsReadable": 2
    }
   },
@@ -364,6 +951,274 @@
      ]
     },
     "folded": true
+   },
+   "shownReport": {
+    "lines": [
+     {
+      "text": "Solution:",
+      "status": "note",
+      "state": "unverified",
+      "unverified": true,
+      "context": true,
+      "note": "This line states the task or names the method; there is no step in it to check.",
+      "tickClass": "heading"
+     },
+     {
+      "text": "y = 4x^3 - 36x^2",
+      "status": "ok",
+      "restates": true,
+      "note": "Restates the function from the question.",
+      "valueChain": {
+       "rule": "restated"
+      },
+      "state": "given",
+      "tickClass": "restated-function"
+     },
+     {
+      "text": "dy/dx = 12x^2 - 72x",
+      "status": "ok",
+      "state": "verified",
+      "valueChain": {
+       "rule": "derivative"
+      },
+      "tickClass": "power-rule-differentiation"
+     },
+     {
+      "text": "Stationary points when dy/dx = 0:",
+      "status": "ok",
+      "state": "arithmetic",
+      "note": "Correct: stationary points are where the derivative is 0, so this is the right condition to set.",
+      "valueChain": {
+       "rule": "proved"
+      },
+      "fact": {
+       "kind": "proved",
+       "proof": "condition-line"
+      },
+      "tickClass": "condition-line"
+     },
+     {
+      "text": "12x^2 - 72x = 0",
+      "status": "ok",
+      "state": "verified",
+      "valueChain": {
+       "rule": "stationary-equation"
+      },
+      "tickClass": "equation-setup"
+     },
+     {
+      "text": "12x(x - 6) = 0",
+      "status": "ok",
+      "state": "verified",
+      "valueChain": {
+       "rule": "stationary-equation"
+      },
+      "tickClass": "factorisation"
+     },
+     {
+      "text": "x = 0 or x = 6",
+      "status": "ok",
+      "state": "verified",
+      "valueChain": {
+       "rule": "stationary-values"
+      },
+      "tickClass": "roots-of-a-product"
+     },
+     {
+      "text": "d2y/dx2 = 24x - 72",
+      "status": "ok",
+      "state": "arithmetic",
+      "note": "Correct: this is the second derivative of the function in the question, and it agrees at every value tried.",
+      "valueChain": {
+       "rule": "proved"
+      },
+      "fact": {
+       "kind": "proved",
+       "proof": "second-derivative-value"
+      },
+      "tickClass": "second-derivative-value"
+     },
+     {
+      "text": "At x = 0: d2y/dx2 = -72 < 0",
+      "status": "ok",
+      "state": "arithmetic",
+      "note": "Correct: the second derivative is -72 at x = 0, and -72 is below 0.",
+      "valueChain": {
+       "rule": "proved"
+      },
+      "fact": {
+       "kind": "proved",
+       "proof": "sign-claim"
+      },
+      "tickClass": "sign-claim"
+     },
+     {
+      "text": "(local maximum)",
+      "status": "ok",
+      "state": "arithmetic",
+      "note": "Correct: the derivative is 0 at x = 0 and the second derivative there is negative, so it is a local maximum.",
+      "valueChain": {
+       "rule": "proved"
+      },
+      "fact": {
+       "kind": "proved",
+       "proof": "nature-claim"
+      },
+      "tickClass": "nature-claim"
+     },
+     {
+      "text": "At x = 6: d2y/dx2 = 72 > 0",
+      "status": "ok",
+      "state": "arithmetic",
+      "note": "Correct: the second derivative is 72 at x = 6, and 72 is above 0.",
+      "valueChain": {
+       "rule": "proved"
+      },
+      "fact": {
+       "kind": "proved",
+       "proof": "sign-claim"
+      },
+      "tickClass": "sign-claim"
+     },
+     {
+      "text": "(local minimum)",
+      "status": "ok",
+      "state": "arithmetic",
+      "note": "Correct: the derivative is 0 at x = 6 and the second derivative there is positive, so it is a local minimum.",
+      "valueChain": {
+       "rule": "proved"
+      },
+      "fact": {
+       "kind": "proved",
+       "proof": "nature-claim"
+      },
+      "tickClass": "nature-claim"
+     },
+     {
+      "text": "The stationary points are:",
+      "status": "note",
+      "state": "unverified",
+      "unverified": true,
+      "context": true,
+      "note": "This line states the task or names the method; there is no step in it to check.",
+      "tickClass": "heading"
+     },
+     {
+      "text": "At x = 0: y = 4(0)^3 - 36(0)^2 = 0",
+      "status": "ok",
+      "state": "arithmetic",
+      "note": "Correct: for the function in the question at x = 0, y = 0, and every expression on this line comes to 0.",
+      "valueChain": {
+       "rule": "proved"
+      },
+      "fact": {
+       "kind": "proved",
+       "proof": "substitution-evaluated"
+      },
+      "tickClass": "substitution-evaluated"
+     },
+     {
+      "text": "At x = 6: y = 4(6)^3 - 36(6)^2 = 4(216) - 36(36)",
+      "status": "ok",
+      "state": "arithmetic",
+      "note": "Correct: for the function in the question at x = 6, y = -432, and every expression on this line comes to -432.",
+      "valueChain": {
+       "rule": "proved"
+      },
+      "fact": {
+       "kind": "proved",
+       "proof": "substitution-evaluated"
+      },
+      "tickClass": "substitution-evaluated"
+     },
+     {
+      "text": "= 864 - 1296 = -432",
+      "status": "ok",
+      "state": "arithmetic",
+      "note": "Both sides come to $-432$.",
+      "valueChain": {
+       "rule": "arithmetic"
+      },
+      "fact": {
+       "kind": "both-sides",
+       "tex": "-432"
+      },
+      "tickClass": "true-as-written"
+     },
+     {
+      "text": "(0, 0) and (6, -432)",
+      "status": "note",
+      "note": "Not verified: this line is too long or too far down the working to check.",
+      "unverified": true,
+      "state": "unverified"
+     },
+     {
+      "text": "The two stationary points are (0,0) and (6,-432).",
+      "status": "ok",
+      "state": "arithmetic",
+      "note": "Correct: each of these points is on the curve, the derivative is 0 at each, and there is no other stationary point.",
+      "valueChain": {
+       "rule": "proved"
+      },
+      "fact": {
+       "kind": "proved",
+       "proof": "conclusion-matches"
+      },
+      "tickClass": "conclusion-matches"
+     },
+     {
+      "text": "The larger x-coordinate is 6",
+      "status": "ok",
+      "state": "arithmetic",
+      "note": "Correct: the stationary points are at x = 0 and x = 6, so the larger x-coordinate is 6.",
+      "valueChain": {
+       "rule": "proved"
+      },
+      "fact": {
+       "kind": "proved",
+       "proof": "conclusion-matches"
+      },
+      "tickClass": "conclusion-matches"
+     }
+    ],
+    "firstBreak": -1,
+    "diagnosis": null,
+    "source": "value-chain",
+    "summary": {
+     "total": 19,
+     "checked": 16,
+     "given": [
+      2
+     ],
+     "verified": [
+      3,
+      5,
+      6,
+      7
+     ],
+     "conditions": [],
+     "wrong": [],
+     "unverified": [
+      17
+     ],
+     "unread": [],
+     "reason": "Pri could not tie these lines to anything it can prove about this question, so it did not mark them.",
+     "arithmetic": [
+      4,
+      8,
+      9,
+      10,
+      11,
+      12,
+      14,
+      15,
+      16,
+      18,
+      19
+     ]
+    },
+    "folded": true,
+    "answerLine": 18
    }
   }
  }

@@ -8,7 +8,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { alignCards } from './markedPageModel.js';
-import { TEXT, detailFor, figureLabel, listWords, markBoxLabel, markLabel, placeMarks, placePopover, stepMarkText, textHeight } from './markedPageTeacher.js';
+import { TEXT, detailFor, lineWord, figureLabel, listWords, markBoxLabel, markLabel, placeMarks, placePopover, stepMarkText, textHeight } from './markedPageTeacher.js';
 import './MarkedPageTeacher.css';
 
 const TICK_PATH = 'M3 13 C5.6 14.8 7.6 17.4 9.6 21 C13 13.6 17.6 7.2 23.6 2.6';
@@ -184,8 +184,17 @@ export function MarkList({ page, marks, lineOpen, toggleLine, readingOfLine, can
   const byN = new Map(marks.map(m => [m.n, m]));
   return (
     <ol className="mp-t-list" data-mp-list aria-label={TEXT.listLabel}>
-      {page.lines.filter(l => byN.has(l.n) || l.status === 'unread').map(l => {
+      {page.lines.filter(l => byN.has(l.n) || l.status === 'unread' || l.card?.followsFromError).map(l => {
         const m = byN.get(l.n);
+        if (!m && l.status !== 'unread') {
+          // a line after the first cross that is a correct consequence of the wrong line above: labelled, never ticked, never crossed, no mark
+          return (
+            <li key={l.n} data-mp-list-n={l.n} data-mp-follows={l.n}>
+              <span className="n">{l.n}</span>
+              <span className="is-follows"><button type="button" className="mp-link" onClick={() => pick(l.n, true)}>{lineWord(l.card)}</button></span>
+            </li>
+          );
+        }
         if (!m) {
           return (
             <li key={l.n} data-mp-list-n={l.n} data-mp-unread-item>

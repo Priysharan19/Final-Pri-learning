@@ -43,10 +43,11 @@ const gone = pg => pg.waitForFunction(() => !document.querySelector('[data-mp-po
 const lum = hex => { const c = hex.match(/\w\w/g).map(h => parseInt(h, 16) / 255).map(v => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
 const contrast = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
 const hexOf = rgb => '#' + rgb.match(/\d+/g).slice(0, 3).map(n => Number(n).toString(16).padStart(2, '0')).join('');
-// The page and its report are the engine's REAL output (server/test/support/teacher-page-real-reports.mjs): the engine ticks these six lines today.
-const CLASS_OF = { 2: 'restated', 3: 'differentiation', 5: 'stationaryEquation', 6: 'stationaryEquation', 7: 'stationaryValues', 16: 'arithmetic' };
-const CHECKED = [2, 3, 5, 6, 7, 16];
-const UNCHECKED = [1, 4, 8, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19];         // conditions and lines it could not verify: no tick, no cross
+// The page and its report are the engine's REAL output (server/test/support/teacher-page-real-reports.mjs): since the tick-every-true-line engine the engine
+// ticks 16 of these 19 lines, each with its own class id. Lines 1 and 13 are headings (neutral); line 17 is a bare list of points the engine does not read.
+const CLASS_OF = { 2: 'given', 3: 'differentiation', 4: 'conditionLine', 5: 'stationaryEquation', 6: 'factorisation', 7: 'stationaryValues', 8: 'secondDerivative', 9: 'signClaim', 10: 'natureClaim', 11: 'signClaim', 12: 'natureClaim', 14: 'substitution', 15: 'substitution', 16: 'trueAsWritten', 18: 'conclusionMatches', 19: 'conclusion' };
+const CHECKED = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 18, 19];
+const UNCHECKED = [1, 13, 17];         // headings (neutral) and a list of points the engine could not verify: no tick, no cross
 
 for (const [size, viewport] of [['desktop', { width: 1280, height: 900 }], ['phone', { width: 390, height: 844 }]]) {
   for (const theme of ['light', 'dark']) {
@@ -139,7 +140,7 @@ for (const [size, viewport] of [['desktop', { width: 1280, height: 900 }], ['pho
     }
     ok(got.gutterBg === 'rgb(248, 247, 243)', `${where}: the margin is the same paper in both themes (${got.gutterBg})`);
     ok(got.fontOk, `${where}: the bundled handwriting face loads`);
-    ok(got.tally === '6 lines correct. 0 wrong. 12 not checked.', `${where}: the tally counts maths lines only: ${got.tally}`);
+    ok(got.tally === '16 lines correct. 0 wrong. 1 not checked.', `${where}: the tally counts maths lines only: ${got.tally}`);
     ok(got.figure === '1/1' && got.stateWord === 'Fully correct', `${where}: the server's mark and its one-word state ${got.figure} ${got.stateWord}`);
     ok(/Assessment . Attempt 01/i.test(got.assess) && /Marked/i.test(got.assess), `${where}: the assessment line: ${got.assess}`);
     ok(got.rows.length === 1 && /Finds the stationary values/.test(got.rows[0]) && /1\/1/.test(got.rows[0]) && /Line 7 gives x = 0 or x = 6/.test(got.rows[0]), `${where}: one mark-allocation row for the one real criterion ${JSON.stringify(got.rows)}`);

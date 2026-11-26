@@ -2,6 +2,7 @@
 // Nothing here marks anything: every input is a deterministic report the server produced, and the checks prove the layer only reads it.
 //   node client/test/marked-page-teacher-check.mjs
 import { DETAILS, PHRASES, TEXT, detailFor, placePopover, plainLine, classOf, lineWord, phraseOf, reasonOf, buildTeacherMarks, placeMarks, tallyOf, buildAssessment, groupPhrases, textHeight, wordWidth } from '../src/components/markedPageTeacher.js';
+import { CLASSES as ENGINE_CLASSES } from '../src/engine/displayFields.js';
 import { buildMarkedPage } from '../src/components/markedPageModel.js';
 
 let pass = 0; const failures = [];
@@ -190,6 +191,18 @@ pp = placePopover({ line: PL, tick: { x: 590, y: 120 }, width: 600, height: 800,
 ok(pp.left + pp.width <= 596, 'and stays in view sideways');
 pp = placePopover({ line: PL, tick: { x: 20, y: 120 }, width: 276, height: 400, h: 80 });
 ok(pp.width <= 268 && pp.left >= 4, 'on a phone it fits the page');
+
+// ── the engine's display fields (engine/displayFields.js): every class id it can emit on a tick has a phrase here, or is neutral by design ──
+for (const c of ENGINE_CLASSES) {
+  const cls = classOf({ status: 'checked', tickClass: c });
+  const neutral = c === 'heading';
+  ok(neutral ? true : phraseOf(cls) !== null, `engine class ${c} has a phrase (got ${cls})`);
+}
+ok(phraseOf(classOf({ status: 'checked', tickClass: 'point-claim' })) === 'Correct stationary point', 'point-claim says its own phrase');
+ok(classOf({ status: 'checked', tickClass: 'power-rule-differentiation', answerLine: true }) === 'conclusion' && phraseOf('conclusion') === 'Correct answer', 'the server\'s answer-bearing line says Correct answer, whatever its class');
+ok(classOf({ status: 'checked', tickClass: 'not-a-class' }) === null, 'an unknown engine class id gives no phrase');
+ok(lineWord({ followsFromError: 5 }) === 'Follows from the error on line 5' && lineWord({ followsFromError: true }) === 'Follows from the error above', 'a line that follows from the error says so');
+ok(tallyOf({ lines: [{ status: 'checked' }, { status: 'condition' }, { status: 'condition' }, { status: 'checked' }] }) === '2 lines correct. 0 wrong. 0 not checked.', 'headings and restated lines are not counted as not checked');
 
 if (failures.length) { console.error(`marked-page-teacher-check: ${failures.length} failed`); for (const f of failures) console.error(' - ' + f); process.exit(1); }
 console.log(`marked-page-teacher-check: ${pass} checks passed`);
