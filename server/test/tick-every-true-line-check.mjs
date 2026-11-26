@@ -183,5 +183,33 @@ for (const t of ['The larger root is 7:', 'x = 12:', 'Answer: 7']) ok(!status(va
   console.log(`generated cubic pages: ${pages}, true lines ${trueLines}, ticked ${trueTicked}; wrong variants ${mutants}, ticked ${falseTicked}`);
 }
 
+// 7. a wrong factorisation of the stationary equation is the first error (the page of 26 Nov 2026), in square brackets, braces and round brackets alike
+{
+  let c2;
+  for (let s2 = 1; s2 < 80000 && !c2; s2++) { try { const c = G.generateQuestion('y12-appdiff', 1, s2); if (c && /\$y = 2x\^3 \+ 9x\^2\$ has two stationary points\. Find the \$y\$-coordinate of the one with the smaller/.test(c.prompt)) c2 = c; } catch { /* next seed */ } }
+  ok(!!c2, 'the 2x^3 + 9x^2 question exists');
+  const pg = (factor, extra = []) => ['y=2x³+9x²', "y'=6x²+18x", "for stat points y'=0", '0=6x²+18x', `0=6x${factor}`, ...extra];
+  const mark = (lines, off = {}) => { const e = stepEvidence(c2, '0', lines.join('\n'), checkAnswer(c2, '0'), { slipWarnings: true, ...off }); return { e, rows: (e.shownReport || e.stepReport).lines }; };
+  for (const [open, close] of [['[', ']'], ['(', ')'], ['{', '}']]) {
+    const good = mark(pg(`${open}x+3${close}`, ['x=0 or x=−3'])).rows;
+    ok(good[4].status === 'ok' && !good.some(l => l.status === 'break'), `the true factorisation 6x${open}x+3${close} is ticked and nothing is crossed: ${good.map(l => l.status[0]).join('')}`);
+    const bad = mark(pg(`${open}x+4${close}`, ['x=0 or x=−3', 'smallest: (0,0)']));
+    ok(bad.rows[4].status === 'break' && bad.rows.findIndex(l => l.status === 'break') === 4, `6x${open}x+4${close} is the first and only cross: ${bad.rows.map(l => l.status[0]).join('')}`);
+    ok(/6x[\[(]x\+3[\])]/.test(bad.rows[4].diagnosis?.corrected ?? ''), `the corrected factorisation is supplied: ${bad.rows[4].diagnosis?.corrected}`);
+    ok(bad.rows[4].reasonId === 'factor-number-wrong' && /^6x[\[(]x\+3[\])]$/.test(bad.rows[4].correctedRhs ?? ''), `reason id and corrected right-hand side on the shown line: ${bad.rows[4].reasonId} ${bad.rows[4].correctedRhs}`);
+    ok(bad.rows[6].status === 'note' && bad.rows[5].followsFromError !== true, 'the lines after are notes, and a root list that is not a consequence of the wrong line is not labelled one');
+  }
+  const consequence = mark(pg('(x+4)', ['x(x+4)=0', 'x=0 or x=−4', 'x=0 or x=−3']));
+  ok(consequence.rows[5].followsFromError === true && consequence.rows[6].followsFromError === true && consequence.rows[7].followsFromError !== true, `correct consequences of the wrong line are labelled, the line that is not one is not: ${consequence.rows.map(l => l.followsFromError ? 1 : 0).join('')}`);
+  // bracket forms that are not grouping are never read into a tick or a cross on this line
+  for (const odd of ['x ∈ [0, 6]', '[0, 6]', 'floor[3.5]', '[1 2; 3 4]', '(0,0)', '{1, 2}', '[-3, 0)']) {
+    const r = mark(['y=2x³+9x²', "y'=6x²+18x", "for stat points y'=0", '0=6x²+18x', odd]).rows[4];
+    ok(r.status !== 'ok' && r.status !== 'break', `"${odd}" is neither ticked nor crossed: ${r.status}`);
+  }
+  // marks: crossing this line is the only engine change; nothing else moves, and a true page is unchanged
+  const t1 = mark(pg('[x+3]', ['x=0 or x=−3', 'smallest: (−3,27)']));
+  ok(!t1.rows.some(l => l.status === 'break'), `the whole true page is uncrossed: ${t1.rows.map(l => l.status[0]).join('')}`);
+}
+
 if (failures.length) { for (const f of failures) console.log(' - ' + f); console.log(`TICK EVERY TRUE LINE: FAIL: ${failures.length} of ${pass + failures.length} checks`); process.exit(1); }
 console.log(`TICK EVERY TRUE LINE: PASS: ${pass} checks`);

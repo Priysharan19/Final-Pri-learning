@@ -28,7 +28,7 @@ import { questionFacts } from './questionFacts.js';
 
 const MINUS = /[−–—]/g;
 const SUP = { '²': '^2', '³': '^3', '⁴': '^4' };
-export const clean = t => String(t ?? '').replace(MINUS, '-').replace(/[²³⁴]/g, c => SUP[c]).replace(/[×·]/g, '*').replace(/\*\*/g, '').replace(/\[\s*(-?\d+(?:\.\d+)?)\s*\]/g, '$1').replace(/\\boxed\{([^}]*)\}/g, '$1').replace(/\s+/g, ' ').trim();
+export const clean = t => String(t ?? '').replace(/(?<!\^)\{([^{},;]*)\}/g, '($1)').replace(MINUS, '-').replace(/[²³⁴]/g, c => SUP[c]).replace(/[×·]/g, '*').replace(/\*\*/g, '').replace(/\[\s*(-?\d+(?:\.\d+)?)\s*\]/g, '$1').replace(/\\boxed\{([^}]*)\}/g, '$1').replace(/\s+/g, ' ').trim();
 const close = (a, b, tol = 1e-7) => Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= tol * Math.max(1, Math.abs(a), Math.abs(b));
 export const lead = t => clean(t).replace(/^(?:∴|so|hence|then|therefore|thus)\s*:?\s*/i, '');
 const NUMRE = String.raw`-?\d+(?:\.\d+)?(?:/\d+(?:\.\d+)?)?`;

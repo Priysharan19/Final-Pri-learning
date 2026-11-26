@@ -39,6 +39,7 @@
 // note, not a break. Nothing here awards a method mark.
 import { parse, normalize, evaluate, variablesOf, exprEquivalent } from './expr.js';
 import { assignSpan } from './commentTex.js';
+import { falseStepFacts, readPoly, crossDiagnosis, readingIsAmbiguous } from './falseStep.js';
 
 export const VALUE_CHAIN = 'value-chain';
 
@@ -53,9 +54,12 @@ const GENERIC_NOTE = 'Not verified: Pri cannot check this line against the quest
 
 const close = (a, b) => Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b));
 
+/** A brace pair holding no comma or semicolon groups like a bracket (`6x{x + 3}`); a set `{1, 2}`, an interval and a coordinate pair are left as they are. */
+export const groupBraces = t => { let s = String(t); for (let k = 0; k < 4 && /\{[^{},;]*\}/.test(s); k++) s = s.replace(/(?<!\^)\{([^{},;]*)\}/g, '($1)'); return s; };
+
 function parseSafe(text) {
   try {
-    const ast = parse(normalize(text));
+    const ast = parse(normalize(groupBraces(text)));
     return ast && ast.t !== 'equation' ? ast : null;
   } catch { return null; }
 }
@@ -179,6 +183,7 @@ export function stepCheckValueChain(meta, workingText, options = null) {
   const out = [];
   let firstBreak = -1;
   let diagnosis = null;
+  const eqState = { at: -2, side: null };   // the last line that was the stationary equation: where, and its side that is not 0
   let prev = null; // the last verified line's value: { value } for a number, { ast } for a function
   const note = (text, why, extra = {}) => { out.push({ text, status: 'note', note: why, unverified: true, ...extra }); prev = null; };
 
@@ -186,12 +191,12 @@ export function stepCheckValueChain(meta, workingText, options = null) {
     if (!fn) return note(line, GENERIC_NOTE);
     if (i >= LIMITS.lines || line.length > LIMITS.chars) return note(line, 'Not verified: this line is too long or too far down the working to check.');
     if (firstBreak !== -1) return note(line, 'Follows from the earlier slip.');
-    const text = line.replace(/[′’]/g, "'").replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore|thus)\s+/i, '').replace(/[−–—]/g, '-');
+    const text = groupBraces(line).replace(/[′’]/g, "'").replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore|thus)\s+/i, '').replace(/[−–—]/g, '-');
     if (/[<>≤≥≠≈]|==|!=/.test(text)) return note(line, GENERIC_NOTE);
     if (ambiguousCall(text)) return note(line, 'Not verified: write the function’s argument in brackets, like sin(π/2).');
-    const curveRule = fn.curve ? curveLine(fn, text, line) : null;
+    const curveRule = fn.curve ? curveLine(fn, text, line, eqState, i) : null;
     if (curveRule) {
-      if (curveRule.status === 'break') return breakLine(line, i, curveRule.note, curveRule.code);
+      if (curveRule.status === 'break') return breakLine(line, i, curveRule.note, curveRule.code, curveRule.diagnosis);
       out.push({ text: line, ...curveRule }); prev = curveRule.status === 'ok' ? prev : null; return;
     }
     const parts = text.split('=').map(p => p.trim());
@@ -263,8 +268,8 @@ export function stepCheckValueChain(meta, workingText, options = null) {
     breakLine(line, i, `This comes to ${shown(wrong)}, which is not the ${name}.`, 'value-not-true');
   });
 
-  function breakLine(line, i, message, code) {
-    diagnosis = { code, title: 'This value is not the quantity it is labelled as', message, fix: 'Recompute this value from the function in the question.', confidence: 'high' };
+  function breakLine(line, i, message, code, given) {
+    diagnosis = given || { code, title: 'This value is not the quantity it is labelled as', message, fix: 'Recompute this value from the function in the question.', confidence: 'high' };
     firstBreak = i;
     out.push({ text: line, status: 'break', note: message, diagnosis });
     prev = null;
@@ -292,7 +297,7 @@ const sameNum = (a, b) => Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Mat
  * Lines about a curve with stationary points. Returns null when none of these rules is about the
  * line (the general rules then apply), else { status, note?, state, code? }.
  */
-function curveLine(fn, text, original) {
+function curveLine(fn, text, original, eqState = null, lineIndex = -1) {
   const { curve, variable, name } = fn;
   const num = (ast, x) => { try { return evaluate(ast, { [variable]: x }); } catch { return NaN; } };
   const at = x => num(fn.ast, x);
@@ -353,12 +358,52 @@ function curveLine(fn, text, original) {
     if (A && B && !freeVars(A).some(v => v !== variable) && !freeVars(B).some(v => v !== variable) && (freeVars(A).length || freeVars(B).length)) {
       const g = x => num(A, x) - num(B, x);
       const ratios = [-3.1, -1.7, 0.6, 1.3, 2.9, 4.1].map(x => { const d = num(curve.dast, x); return Math.abs(d) < 1e-6 ? NaN : g(x) / d; });
+      const zeroSide = constantValue(sides[0]) === 0 ? 0 : constantValue(sides[1]) === 0 ? 1 : -1;
       if (ratios.every(r => Number.isFinite(r)) && Math.abs(ratios[0]) > 1e-9 && ratios.every(r => Math.abs(r - ratios[0]) <= 1e-7 * Math.max(1, Math.abs(ratios[0])))) {
+        if (eqState && zeroSide >= 0) { eqState.at = lineIndex; eqState.side = sides[1 - zeroSide].trim(); }
         return { status: 'ok', state: 'verified', valueChain: { rule: 'stationary-equation' } };
+      }
+      // The line above was the stationary equation (`0 = 6x^2 + 18x`) and this one is the same equation with the other side rewritten
+      // (`0 = 6x(x + 4)`): a rewrite of one side of an equation whose other side is 0 must keep that side's value everywhere (or divide it by a
+      // constant), so a polynomial of the same degree that is not a constant multiple of it is a false step. A lower degree is a factor (a root
+      // line), and anything that is not a polynomial in the letter is left alone.
+      if (eqState && zeroSide >= 0 && eqState.at === lineIndex - 1 && eqState.side) {
+        const written = sides[1 - zeroSide].trim();
+        let a = null, b = null;
+        try { a = readPoly(eqState.side); b = readPoly(written); } catch { a = null; b = null; }
+        const deg = p => (p && p.c.size ? Math.max(...p.c.keys()) : -1);
+        if (a && b && a.v === variable && b.v === variable && deg(a) >= 1 && deg(a) === deg(b) && !readingIsAmbiguous(written) && !readingIsAmbiguous(eqState.side)) {
+          const facts = falseStepFacts(eqState.side, written);
+          if (facts) {
+            const d = crossDiagnosis(facts, null, { aboveSide: eqState.side, writtenSide: written, lineNo: lineIndex + 1, checkedBefore: 0 });
+            // the line written again with ONE number changed so that it equals the line above, when exactly one such repair exists (`6x[x + 4]` -> `6x[x + 3]`)
+            const fixed = oneNumberRepair(eqState.side, written);
+            if (fixed) { d.corrected = zeroSide === 0 ? `= ${fixed}` : `${fixed} =`; d.errorType = 'factor-number-wrong'; d.correctedRhs = fixed; d.comment = `${d.comment} The factorised line should read ${fixed}.`; d.message = d.comment; }
+            return { status: 'break', code: d.code, note: d.message, diagnosis: d };
+          }
+        }
       }
     }
   }
   return null;
+}
+
+/** `written` with exactly one number changed so that it equals `above` as a polynomial; the one repair, or null when there is none or more than one. */
+function oneNumberRepair(above, written) {
+  const found = new Set();
+  const re = /\d+(?:\.\d+)?/g;
+  let m;
+  while ((m = re.exec(written))) {
+    for (let v = -30; v <= 30; v++) {
+      if (String(v) === m[0]) continue;
+      const lit = v < 0 ? `(${v})` : String(v);
+      const cand = written.slice(0, m.index) + lit + written.slice(m.index + m[0].length);
+      let eq = false;
+      try { const a = readPoly(above), b = readPoly(cand); eq = !!(a && b && falseStepFacts(above, cand) === null); } catch { eq = false; }
+      if (eq) found.add(v < 0 ? cand : cand);
+    }
+  }
+  return found.size === 1 ? [...found][0] : null;
 }
 
 /** The expression is the function's right-hand side: the same variable only, and equivalent. */
