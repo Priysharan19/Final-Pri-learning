@@ -155,3 +155,6 @@
 .mp-marker.mp-t-tick svg.mp-t-glyph.is-right, .mp-marker.mp-t-tick.is-active svg.mp-t-glyph.is-right { color: var(--pg-ok); }
 .mp-marker.mp-t-tick svg.mp-t-glyph.is-wrong, .mp-marker.mp-t-tick.is-active svg.mp-t-glyph.is-wrong { color: var(--pg-bad); }
 .mp-t-sheet .mp-under { border-bottom-color: var(--pg-bad, #B83238); }
+
+/* maths set beside a tick is the size of the words around it */
+.mp-t-say .katex, .mp-t-words .katex { font-size: 1em; }

@@ -147,7 +147,7 @@ for (const [ps_, set] of [[pl, crowded], [pd, dense]]) for (const p of ps_) {
   ok(p.y >= m.box.y * H - 0.5 && p.y <= (m.box.y + m.box.h) * H + 0.5, `mark ${p.n}: its y lies on its own line`);
 }
 // the words: straight after the tick on the same line when the space is free, else the gutter
-const wlist = placeMarks({ marks: [{ n: 4, box: { x: 0.05, y: 0.3, w: 0.2, h: 0.04 } }, { n: 5, box: { x: 0.05, y: 0.5, w: 0.2, h: 0.04 } }, { n: 6, box: { x: 0.05, y: 0.7, w: 0.78, h: 0.04 } }], words: { 4: 'Correct differentiation', 6: 'Matches a step of the worked solution' }, reserve: 12, width: W, height: H });
+const wlist = placeMarks({ marks: [{ n: 4, box: { x: 0.05, y: 0.3, w: 0.2, h: 0.04 } }, { n: 5, box: { x: 0.05, y: 0.5, w: 0.2, h: 0.04 } }, { n: 6, box: { x: 0.05, y: 0.7, w: 0.9, h: 0.04 } }], words: { 4: 'Correct differentiation', 6: 'Matches a step of the worked solution' }, reserve: 12, width: W, height: H });
 ok(wlist[0].word && wlist[0].word !== 'gutter' && wlist[0].word.x0 > wlist[0].x && Math.abs(wlist[0].word.y - wlist[0].y) < 0.5, 'the words follow the tick on its own line');
 ok(wlist[1].word === null, 'no words wanted, none placed');
 ok(wlist[2].word === 'gutter', 'words that do not fit beside the tick go to the gutter');

@@ -981,7 +981,27 @@
       "valueChain": {
        "rule": "derivative"
       },
-      "tickClass": "power-rule-differentiation"
+      "tickClass": "power-rule-differentiation",
+      "explain": {
+       "kind": "differentiate",
+       "named": true,
+       "short": "4x³ → 12x², −36x² → −72x",
+       "sentence": "Differentiated term by term: $4x^{3} \\to 12x^{2},\\ -36x^{2} \\to -72x$.",
+       "segs": [
+        {
+         "t": "tex",
+         "v": "4x^{3} \\to 12x^{2}"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "tex",
+         "v": "-36x^{2} \\to -72x"
+        }
+       ]
+      }
      },
      {
       "text": "Stationary points when dy/dx = 0:",
@@ -1013,7 +1033,19 @@
       "valueChain": {
        "rule": "stationary-equation"
       },
-      "tickClass": "factorisation"
+      "tickClass": "factorisation",
+      "explain": {
+       "kind": "factorise",
+       "named": true,
+       "short": "12x² − 72x = 12x(x − 6)",
+       "sentence": "Took out the common factor: $12x^{2} - 72x = 12x\\left(x - 6\\right)$.",
+       "segs": [
+        {
+         "t": "tex",
+         "v": "12x^{2} - 72x = 12x\\left(x - 6\\right)"
+        }
+       ]
+      }
      },
      {
       "text": "x = 0 or x = 6",
@@ -1022,7 +1054,27 @@
       "valueChain": {
        "rule": "stationary-values"
       },
-      "tickClass": "roots-of-a-product"
+      "tickClass": "roots-of-a-product",
+      "explain": {
+       "kind": "roots",
+       "named": true,
+       "short": "x = 0 or x = 6",
+       "sentence": "Read the solutions off the factors: $x = 0\\text{ or }x = 6$.",
+       "segs": [
+        {
+         "t": "tex",
+         "v": "x = 0"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "tex",
+         "v": "x = 6"
+        }
+       ]
+      }
      },
      {
       "text": "d2y/dx2 = 24x - 72",
@@ -1115,7 +1167,19 @@
        "kind": "proved",
        "proof": "substitution-evaluated"
       },
-      "tickClass": "substitution-evaluated"
+      "tickClass": "substitution-evaluated",
+      "explain": {
+       "kind": "arithmetic",
+       "named": true,
+       "short": "4 × 0³ − 36 × 0² = 0",
+       "sentence": "Subtracted: $4 \\times 0^{3} - 36 \\times 0^{2} = 0$.",
+       "segs": [
+        {
+         "t": "tex",
+         "v": "4 \\times 0^{3} - 36 \\times 0^{2} = 0"
+        }
+       ]
+      }
      },
      {
       "text": "At x = 6: y = 4(6)^3 - 36(6)^2 = 4(216) - 36(36)",
@@ -1129,7 +1193,27 @@
        "kind": "proved",
        "proof": "substitution-evaluated"
       },
-      "tickClass": "substitution-evaluated"
+      "tickClass": "substitution-evaluated",
+      "explain": {
+       "kind": "arithmetic",
+       "named": true,
+       "short": "6³ = 216, 6² = 36",
+       "sentence": "Two changes: worked out the power $6^{3} = 216$; worked out the power $6^{2} = 36$.",
+       "segs": [
+        {
+         "t": "tex",
+         "v": "6^{3} = 216"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "tex",
+         "v": "6^{2} = 36"
+        }
+       ]
+      }
      },
      {
       "text": "= 864 - 1296 = -432",
@@ -1143,7 +1227,35 @@
        "kind": "both-sides",
        "tex": "-432"
       },
-      "tickClass": "true-as-written"
+      "tickClass": "true-as-written",
+      "explain": {
+       "kind": "arithmetic",
+       "named": true,
+       "short": "4 × 216 = 864, 36 × 36 = 1296, 864 − 1296 = −432",
+       "sentence": "Three changes: multiplied $4 \\times 216 = 864$; multiplied $36 \\times 36 = 1296$; subtracted $864 - 1296 = -432$.",
+       "segs": [
+        {
+         "t": "tex",
+         "v": "4 \\times 216 = 864"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "tex",
+         "v": "36 \\times 36 = 1296"
+        },
+        {
+         "t": "text",
+         "v": ", "
+        },
+        {
+         "t": "tex",
+         "v": "864 - 1296 = -432"
+        }
+       ]
+      }
      },
      {
       "text": "(0, 0) and (6, -432)",

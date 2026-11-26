@@ -23,7 +23,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { texToPlain } from './texToPlain.js';
 import { variablesOf, evaluate } from './expr.js';
-import { astOf, unwrap, closed, valueOf, same, findSubstitution, printPlain, printTex, printCanon } from './stepExplain.js';
+import { astOf, unwrap, closed, valueOf, same, polyOf, findSubstitution, printPlain, printTex, printCanon } from './stepExplain.js';
 
 const MINUS = /[−–—]/g;
 const NUM = String.raw`(\d{1,3}(?:[ , ]\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)`;
@@ -60,10 +60,37 @@ export function questionOf(q) {
     const vars = [...variablesOf(rhs)].filter(v => v !== 'e');
     if (vars.length === 1) formulas.push({ label: sides.length === 2 ? sides[0] : null, v: vars[0], ast: rhs, text: sides[sides.length - 1], source: 'question' });
   }
-  const out = { prompt, plain, facts, numbers, formulas, spans, items: itemsOf(plain) };
+  const words = new Set(wordsOf(plain));
+  const slots = slotsOf(plain);
+  const bound = new Map();
+  for (const l of slots.filter(x => typeof x.v === 'string')) { const nums = [...new Set(slots.filter(x => typeof x.v === 'number' && x.key === l.key).map(x => x.v))]; if (nums.length === 1 && !bound.has(l.v)) bound.set(l.v, nums[0]); }
+  const out = { prompt, plain, facts, numbers, formulas, spans, items: itemsOf(plain), words, slots, bound };
   if (q && typeof q === 'object') cache.set(q, out);
   return out;
 }
+
+// ── words, and the places where a letter and a number stand for the same thing ──
+const singular = w => (w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w);
+/** The words of a text (two letters or more), as the fixed synonym table reads them, plurals made singular. */
+export function wordsOf(raw) { return (synonyms(String(raw ?? '').toLowerCase()).match(/[a-z]{2,}/g) || []).map(singular); }
+const SLOT = new RegExp(String.raw`\b(first|last|after|before|over|within)\s+(${NUM}|[a-z])\s+([a-z]+)`, 'g');
+/** `first 20 rows`, `first n rows`, `after 4 weeks`, `after n weeks`: { key: 'first row', v: 20 | 'n' }. */
+export function slotsOf(raw) {
+  const t = synonyms(lc(raw).toLowerCase());
+  return [...t.matchAll(SLOT)].filter(m => !/^(?:a|i)$/.test(m[2]) || /\d/.test(m[2])).map(m => ({ key: `${m[1]} ${singular(m[m.length - 1])}`, v: /\d/.test(m[2]) ? numOf(m[2]) : m[2] }));
+}
+/** A line that says `after n weeks` ties the letter n to the number the question puts in the same place. */
+function bindFromLine(state, text) {
+  for (const l of slotsOf(text).filter(x => typeof x.v === 'string')) {
+    const nums = [...new Set(state.Q.slots.filter(x => typeof x.v === 'number' && x.key === l.key).map(x => x.v))];
+    if (nums.length === 1 && !state.bound.has(l.v)) state.bound.set(l.v, nums[0]);
+  }
+}
+const DATA_WORDS = new Set(['given', 'initial', 'initially', 'data', 'information', 'question', 'the', 'an', 'and', 'of', 'is', 'are', 'was', 'were', 'ha', 'have', 'there', 'that', 'with', 'at', 'in', 'for', 'to', 'by', 'on', 'from', 'then', 'so', 'each', 'every', 'per', 'number', 'start', 'begin']);
+const DEF_WORDS = new Set(['let', 'be', 'denote', 'represent', 'stand', 'for', 'the', 'number', 'value', 'total', 'amount', 'after', 'at', 'in', 'of', 'an', 'after', 'and']);
+const CONC_WORDS = new Set(['there', 'are', 'is', 'will', 'be', 'an', 'the', 'total', 'answer', 'conclusion', 'therefore', 'hence', 'so', 'in', 'after', 'of', 'have', 'ha']);
+/** Every content word of the line is a word of the question or one of a fixed few: nothing is said about the data that the question did not say. */
+function covered(Q, text, fixed) { return wordsOf(text).every(w => Q.words.has(w) || fixed.has(w)); }
 
 // ── facts a line can state ───────────────────────────────────────────────────
 const UNITS = String.raw`(?:weeks?|days?|years?|months?|hours?|minutes?|seconds?|rows?|terms?|steps?|rounds?|turns?)`;
@@ -137,7 +164,7 @@ const promptRun = Q => Q.items.filter(x => x !== '|' && x !== 'and');
 
 // ── the pass state ───────────────────────────────────────────────────────────
 /** The state a page pass carries: values the page has set (n = 4), models it proved, the value its last ticked line reached. */
-export function newState(q) { return { Q: questionOf(q), vars: new Map(), formulas: [], last: null }; }
+export function newState(q) { const Q = questionOf(q); return { Q, bound: new Map(Q.bound), formulas: [], last: null }; }
 const lastSideValue = text => {
   const t = strip(text);
   if (!t || /[<>≤≥≠,;:]|=>|⇒/.test(t) || (wordy(t) && !/^\s*=/.test(t) && !t.includes('='))) return null;
@@ -160,6 +187,7 @@ const fmtNum = v => String(Math.round(v * 1e9) / 1e9);
 function dataRestated(Q, l, text) {
   const t = strip(text).replace(/^(?:given|data|information|we are told|the question says|question)\s*:\s*/i, '');
   if (!/\d/.test(t) || NEGATION.test(t) || /[=<>]/.test(t.replace(/\b(?:initial\s+\w+|[a-z]\s)=/gi, '').replace(/\b[a-z]\s*=\s*\d/gi, '')) && false) return null;
+  if (!covered(Q, t, DATA_WORDS)) return null;
   const facts = factsOf(t);
   if (!facts.length || !consumed(t, facts)) return null;
   const have = new Set(Q.facts.map(factKey));
@@ -220,7 +248,12 @@ function methodStated(state, l, text) {
     if (facts.some(f => f.span && f.span[0] <= at && end <= f.span[1])) continue;
     if (!Q.numbers.has(numOf(m[1])) || !assigns.some(a => a.index <= at && at < a.index + a[0].length)) return null;
   }
-  for (const a of assigns) if (!facts.some(f => f.span && a.index <= f.span[0] && f.span[1] <= a.index + a[0].length)) state.vars.set(a[1].toLowerCase(), numOf(a[2]));
+  for (const a of assigns) {
+    const L = a[1].toLowerCase();
+    if (facts.some(f => f.span && a.index <= f.span[0] && f.span[1] <= a.index + a[0].length)) continue;
+    // a value given to a letter is the value the question gives that letter, where the question's wording binds it
+    if (state.bound.has(L) && state.bound.get(L) !== numOf(a[2])) return null;
+  }
   const claim = facts.find(f => f.k === 'ratio' || f.k === 'step');
   if (claim) {
     const word = claim.k === 'ratio' ? 'Common ratio' : 'Common difference';
@@ -230,11 +263,14 @@ function methodStated(state, l, text) {
 }
 
 // ── d. definitions ───────────────────────────────────────────────────────────
-function definition(Q, l, text) {
+function definition(state, l, text) {
+  const Q = state.Q;
   const t = strip(text);
   const m = /^let\s+([A-Za-z](?:_\{?[A-Za-z0-9]+\}?|\([a-z]\))?)\s+(?:be|denote|represent|stand for)\s+(.+)$/i.exec(t);
   if (!m || /[=<>]/.test(t) || NEGATION.test(t)) return null;
   for (const n of t.matchAll(new RegExp(NUM, 'g'))) if (!Q.numbers.has(numOf(n[1]))) return null;
+  if (!covered(Q, m[2], DEF_WORDS)) return null;
+  bindFromLine(state, t);
   return neutral(l, 'defines', 'This line defines a letter; there is no step in it to check.');
 }
 
@@ -249,7 +285,10 @@ function conditionValue(state, l, text) {
   if (m && numOf(m[1]) !== value) return null;
   const after = Q.facts.filter(f => f.k === 'after');
   if (!after.some(f => f.v === value && (!unit || f.unit === unit))) return null;
-  state.vars.set(letter, value);
+  // `n = 4` is the question's own only where the letter is tied to the question's quantity: by the line itself (`After 4 weeks (n = 4)`) or by a definition above
+  if (!m && state.bound.get(letter) !== value) return null;
+  if (state.bound.has(letter) && state.bound.get(letter) !== value) return null;
+  state.bound.set(letter, value);
   return tick(l, 'condition-value', `The question says after ${fmtNum(value)}, and this line sets ${letter} = ${fmtNum(value)}.`, `${letter} = ${fmtNum(value)}, from the question`, null);
 }
 
@@ -262,11 +301,28 @@ function modelOf(Q) {
   const one = a => (a.length === 1 || (a.length > 1 && new Set(a.map(x => x.v)).size === 1) ? a[0] : null);
   const i = one(initial), fi = one(first), r = one(ratio), d = one(step);
   const out = [];
-  if (i && r && !d) out.push({ index: 0, f: n => i.v * r.v ** n, says: `Correct model: start ${fmtNum(i.v)}, ×${fmtNum(r.v)} each ${per || 'step'}` });
-  if (fi && r && !d) out.push({ index: 1, f: n => fi.v * r.v ** (n - 1), says: `Correct model: first ${fmtNum(fi.v)}, ×${fmtNum(r.v)} each ${per || 'step'}` });
-  if (i && d && !r) out.push({ index: 0, f: n => i.v + n * d.v, says: `Correct model: start ${fmtNum(i.v)}, +${fmtNum(d.v)} each ${per || 'step'}` });
-  if (fi && d && !r) out.push({ index: 1, f: n => fi.v + (n - 1) * d.v, says: `Correct model: first ${fmtNum(fi.v)}, +${fmtNum(d.v)} each ${per || 'step'}` });
+  if (i && r && !d) out.push({ kind: 'geom', index: 0, a: i.v, r: r.v, says: `Correct model: start ${fmtNum(i.v)}, ×${fmtNum(r.v)} each ${per || 'step'}` });
+  if (fi && r && !d) out.push({ kind: 'geom', index: 1, a: fi.v, r: r.v, says: `Correct model: first ${fmtNum(fi.v)}, ×${fmtNum(r.v)} each ${per || 'step'}` });
+  if (i && d && !r) out.push({ kind: 'arith', index: 0, a: i.v, d: d.v, says: `Correct model: start ${fmtNum(i.v)}, +${fmtNum(d.v)} each ${per || 'step'}` });
+  if (fi && d && !r) out.push({ kind: 'arith', index: 1, a: fi.v, d: d.v, says: `Correct model: first ${fmtNum(fi.v)}, +${fmtNum(d.v)} each ${per || 'step'}` });
   return out;
+}
+const near = (a, b) => Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b));
+/** The tree is exactly C * B^(n + k) (C and B numbers): { C, B, k }, or null. Proved from the tree, not from sample values. */
+function geometricForm(ast, v) {
+  let x = unwrap(ast);
+  let C = 1, pow = null;
+  if (x.t === 'bin' && x.op === '*') {
+    const l = unwrap(x.l), r = unwrap(x.r);
+    if (closed(l) && r.t === 'bin' && r.op === '^') { C = valueOf(l); pow = r; } else if (closed(r) && l.t === 'bin' && l.op === '^') { C = valueOf(r); pow = l; } else return null;
+  } else if (x.t === 'bin' && x.op === '^') pow = x; else return null;
+  if (C === null || !pow || !closed(pow.l)) return null;
+  const E = polyOf(pow.r);
+  if (!E) return null;
+  const coef = E.get(`${v}1`), cst = E.get('');
+  if (!coef || !near(coef.c, 1) || E.size > 2 || (E.size === 2 && !cst)) return null;
+  if (E.size === 1 && cst) return null;
+  return { C, B: valueOf(pow.l), k: cst ? cst.c : 0 };
 }
 function modelLine(state, l, text) {
   const t = strip(text).replace(/[,;]+$/, '');
@@ -276,14 +332,21 @@ function modelLine(state, l, text) {
   if (!lab) return null;
   const v = lab[2] || lab[3];
   const rhs = astOf(parts[1]);
-  if (!rhs || [...variablesOf(rhs)].some(x => x !== v)) return null;
-  if (![...variablesOf(rhs)].length) return null;
+  if (!rhs || [...variablesOf(rhs)].some(x => x !== v) || ![...variablesOf(rhs)].length) return null;
   for (const m of modelOf(state.Q)) {
-    let ok = true;
-    for (let k = 0; k < 7 && ok; k++) { const n = m.index + k; let got; try { got = evaluate(rhs, { [v]: n }); } catch { got = NaN; } const want = m.f(n); if (!Number.isFinite(got) || !Number.isFinite(want) || Math.abs(got - want) > 1e-9 * Math.max(1, Math.abs(want))) ok = false; }
+    let ok = false;
+    if (m.kind === 'geom') {
+      const g = geometricForm(rhs, v);
+      // C * B^(n + k) with B the question's ratio, and the value at the first index the question's start value
+      ok = !!g && near(g.B, m.r) && near(g.C * m.r ** (m.index + g.k), m.a);
+    } else {
+      const P = polyOf(rhs);
+      const c1 = P && P.get(`${v}1`), c0 = P && P.get('');
+      ok = !!P && P.size <= 2 && near(c1 ? c1.c : 0, m.d) && near((c0 ? c0.c : 0) + (c1 ? c1.c : 0) * m.index, m.a) && !!c1;
+    }
     if (!ok) continue;
     state.formulas.push({ label: lab[1], v, ast: rhs, text: parts[1], source: 'page' });
-    return tick(l, 'model', 'This model gives the start value and the change the question states, at every step from 0 to 6.', m.says, null);
+    return tick(l, 'model', 'This model gives the start value and the change the question states, as an exact form (not only at sample values).', m.says, null);
   }
   return null;
 }
@@ -299,19 +362,30 @@ function substitutionLine(state, l, text) {
   if (!cont && parts.length >= 2) { label = parts[0]; exprText = parts[1]; }
   const B = astOf(exprText);
   if (!B) return null;
-  const lab = label ? LABEL.exec(label) : null;
-  const subscript = lab ? /^\d+(?:\.\d+)?$/.exec(label.replace(/^[A-Za-z](?:_\{?|\()/, '').replace(/[})]$/, '')) : null;
+  // a label names what the line is the value of (`U_4`, `f(3)`, `y`): its argument must be the value substituted, or the letter itself
+  const lab = label ? /^([A-Za-z])(?:_\{?([A-Za-z0-9.]+)\}?|\(\s*([^()]+?)\s*\))?$/.exec(label) : null;
+  if (label && !lab) return null;
+  const arg = lab ? (lab[2] || lab[3] || null) : null;
   for (const f of [...state.formulas, ...state.Q.formulas]) {
     if (lab && f.label && f.label[0] !== lab[1]) continue;
+    if (['var', 'num', 'const'].includes(unwrap(f.ast).t)) continue;
     const subs = findSubstitution(f.ast, B);
     if (!subs || subs.length !== 1 || subs[0].v !== f.v) continue;
     const c = valueOf(subs[0].node);
-    if (c === null) continue;
-    const given = state.vars.get(f.v) === c || (subscript && numOf(subscript[0]) === c) || (!lab && state.Q.numbers.has(c) && state.vars.has(f.v) && state.vars.get(f.v) === c);
-    if (!given) continue;
-    const says = `Substituted ${f.v} = ${printPlain(subs[0].node)} into ${printCanon(f.ast)}`;
-    const tex = `${f.v} = ${printTex(subs[0].node)}\\text{ into }${printTex(f.ast)}`;
-    return tick(l, 'substitution-formula', `Putting ${f.v} = ${printPlain(subs[0].node)} into ${printCanon(f.ast)} gives exactly this expression.`, says, tex);
+    if (c === null || !['num', 'neg'].includes(unwrap(subs[0].node).t)) continue;
+    if (arg !== null && !(/^[A-Za-z]$/.test(arg) ? arg === f.v : near(numOf(arg), c))) continue;
+    const names = `${f.v} = ${printPlain(subs[0].node)}`, namesTex = `${f.v} = ${printTex(subs[0].node)}`;
+    const formula = printCanon(f.ast), formulaTex = printTex(f.ast);
+    // the value is the question's own only where the question's wording binds this letter to it; otherwise the line is a true evaluation of the formula, and nothing more
+    if (state.bound.get(f.v) === c) {
+      const out = tick(l, 'substitution-formula', `Putting ${names} into ${formula} gives exactly this expression, and ${f.v} = ${fmtNum(c)} is the question's value.`, `Substituted ${names} into ${formula}`, null);
+      out.line.fact.saysSegs = [{ t: 'text', v: 'Substituted ' }, { t: 'tex', v: namesTex }, { t: 'text', v: ' into ' }, { t: 'tex', v: formulaTex }];
+      out.line.fact.sentence = `Substituted $${namesTex}$ into $${formulaTex}$.`;
+      return out;
+    }
+    const out = tick(l, 'formula-value', `This is the formula with ${names}: a true evaluation of the formula, not checked against what the question asks.`, `Value of the formula at ${names}`, null);
+    out.line.fact.saysSegs = [{ t: 'text', v: 'Value of the formula at ' }, { t: 'tex', v: namesTex }];
+    return out;
   }
   return null;
 }
@@ -322,7 +396,7 @@ function conclusion(state, l, text) {
   const Q = state.Q;
   if (state.last === null) return null;
   let t = strip(text).replace(/^(?:conclusion|answer|ans|therefore|hence|so)\s*[:\-]?\s*/i, '');
-  if (!wordy(t) || NEGATION.test(t) || /[=<>]/.test(t)) return null;
+  if (!wordy(t) || NEGATION.test(t) || /[=<>]/.test(t) || !covered(Q, t, CONC_WORDS)) return null;
   const nums = [...t.matchAll(new RegExp(NUM, 'g'))];
   if (!nums.length) return null;
   const value = state.last;
@@ -353,7 +427,7 @@ function conclusion(state, l, text) {
 export function recognise(state, l, text) {
   if (!state) return null;
   const Q = state.Q;
-  const tries = [() => definition(Q, l, text), () => conditionValue(state, l, text), () => methodStated(state, l, text), () => modelLine(state, l, text), () => substitutionLine(state, l, text),
+  const tries = [() => definition(state, l, text), () => conditionValue(state, l, text), () => methodStated(state, l, text), () => modelLine(state, l, text), () => substitutionLine(state, l, text),
     () => dataRestated(Q, l, text), () => sentenceRestated(Q, l, text), () => titleRestated(Q, l, text), () => conclusion(state, l, text)];
   for (const f of tries) { let r = null; try { r = f(); } catch { r = null; } if (r) return r; }
   return null;

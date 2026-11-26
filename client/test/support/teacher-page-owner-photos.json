@@ -42,7 +42,19 @@
        "says": "Given in the question",
        "saysTex": null
       },
-      "tickClass": "given-data"
+      "tickClass": "given-data",
+      "explain": {
+       "kind": "given-data",
+       "named": true,
+       "short": "Given in the question",
+       "segs": [
+        {
+         "t": "text",
+         "v": "Given in the question"
+        }
+       ],
+       "sentence": "Given in the question."
+      }
      },
      {
       "text": "The first n rows hold n(58+2(n−1))/2 seats.",
@@ -66,7 +78,7 @@
       "text": "= 20(58 + 2(20 − 1))/2",
       "status": "ok",
       "state": "arithmetic",
-      "note": "Putting n = 20 into n(58 + 2(n − 1))/2 gives exactly this expression.",
+      "note": "Putting n = 20 into n(58 + 2(n − 1))/2 gives exactly this expression, and n = 20 is the question's value.",
       "valueChain": {
        "rule": "proved"
       },
@@ -74,9 +86,52 @@
        "kind": "proved",
        "proof": "substitution-formula",
        "says": "Substituted n = 20 into n(58 + 2(n − 1))/2",
-       "saysTex": "n = 20\\text{ into }\\left(\\frac{\\left(n\\left(58 + 2\\left(n - 1\\right)\\right)\\right)}{2}\\right)"
+       "saysTex": null,
+       "saysSegs": [
+        {
+         "t": "text",
+         "v": "Substituted "
+        },
+        {
+         "t": "tex",
+         "v": "n = 20"
+        },
+        {
+         "t": "text",
+         "v": " into "
+        },
+        {
+         "t": "tex",
+         "v": "\\left(\\frac{\\left(n\\left(58 + 2\\left(n - 1\\right)\\right)\\right)}{2}\\right)"
+        }
+       ],
+       "sentence": "Substituted $n = 20$ into $\\left(\\frac{\\left(n\\left(58 + 2\\left(n - 1\\right)\\right)\\right)}{2}\\right)$."
       },
-      "tickClass": "substitution-formula"
+      "tickClass": "substitution-formula",
+      "explain": {
+       "kind": "substitution-formula",
+       "named": true,
+       "short": "Substituted n = 20 into n(58 + 2(n − 1))/2",
+       "segs": [
+        {
+         "t": "text",
+         "v": "Substituted "
+        },
+        {
+         "t": "tex",
+         "v": "n = 20"
+        },
+        {
+         "t": "text",
+         "v": " into "
+        },
+        {
+         "t": "tex",
+         "v": "\\left(\\frac{\\left(n\\left(58 + 2\\left(n - 1\\right)\\right)\\right)}{2}\\right)"
+        }
+       ],
+       "sentence": "Substituted $n = 20$ into $\\left(\\frac{\\left(n\\left(58 + 2\\left(n - 1\\right)\\right)\\right)}{2}\\right)$."
+      }
      },
      {
       "text": "= 20(58 + 2(19))/2",
@@ -90,7 +145,19 @@
        "kind": "equals-line-above",
        "tex": "960"
       },
-      "tickClass": "true-as-written"
+      "tickClass": "true-as-written",
+      "explain": {
+       "kind": "arithmetic",
+       "named": true,
+       "short": "20 − 1 = 19",
+       "sentence": "Worked out the bracket: $20 - 1 = 19$.",
+       "segs": [
+        {
+         "t": "tex",
+         "v": "20 - 1 = 19"
+        }
+       ]
+      }
      },
      {
       "text": "= 20(58 + 38)/2",
@@ -107,7 +174,19 @@
       "how": {
        "kind": "equal-above"
       },
-      "tickClass": "true-as-written"
+      "tickClass": "true-as-written",
+      "explain": {
+       "kind": "arithmetic",
+       "named": true,
+       "short": "2 × 19 = 38",
+       "sentence": "Multiplied: $2 \\times 19 = 38$.",
+       "segs": [
+        {
+         "t": "tex",
+         "v": "2 \\times 19 = 38"
+        }
+       ]
+      }
      },
      {
       "text": "= 20(96)/2",
@@ -124,7 +203,19 @@
       "how": {
        "kind": "equal-above"
       },
-      "tickClass": "true-as-written"
+      "tickClass": "true-as-written",
+      "explain": {
+       "kind": "arithmetic",
+       "named": true,
+       "short": "58 + 38 = 96",
+       "sentence": "Worked out the bracket: $58 + 38 = 96$.",
+       "segs": [
+        {
+         "t": "tex",
+         "v": "58 + 38 = 96"
+        }
+       ]
+      }
      },
      {
       "text": "= 1920/2",
@@ -141,7 +232,19 @@
       "how": {
        "kind": "equal-above"
       },
-      "tickClass": "true-as-written"
+      "tickClass": "true-as-written",
+      "explain": {
+       "kind": "arithmetic",
+       "named": true,
+       "short": "20 × 96 = 1920",
+       "sentence": "Multiplied: $20 \\times 96 = 1920$.",
+       "segs": [
+        {
+         "t": "tex",
+         "v": "20 \\times 96 = 1920"
+        }
+       ]
+      }
      },
      {
       "text": "= 960",
@@ -159,7 +262,19 @@
        "kind": "evaluated",
        "valueTex": "960"
       },
-      "tickClass": "true-as-written"
+      "tickClass": "true-as-written",
+      "explain": {
+       "kind": "arithmetic",
+       "named": true,
+       "short": "1920 ÷ 2 = 960",
+       "sentence": "Divided: $\\frac{1920}{2} = 960$.",
+       "segs": [
+        {
+         "t": "tex",
+         "v": "\\frac{1920}{2} = 960"
+        }
+       ]
+      }
      },
      {
       "text": "There are [960] seats in the first 20 rows.",
@@ -248,7 +363,19 @@
        "says": "Given in the question",
        "saysTex": null
       },
-      "tickClass": "given-data"
+      "tickClass": "given-data",
+      "explain": {
+       "kind": "given-data",
+       "named": true,
+       "short": "Given in the question",
+       "segs": [
+        {
+         "t": "text",
+         "v": "Given in the question"
+        }
+       ],
+       "sentence": "Given in the question."
+      }
      },
      {
       "text": "Method: Use a geometric sequence with common ratio r = 2.",
@@ -264,7 +391,19 @@
        "says": "Common ratio 2, from the question",
        "saysTex": null
       },
-      "tickClass": "method-claim"
+      "tickClass": "method-claim",
+      "explain": {
+       "kind": "method-claim",
+       "named": true,
+       "short": "Common ratio 2, from the question",
+       "segs": [
+        {
+         "t": "text",
+         "v": "Common ratio 2, from the question"
+        }
+       ],
+       "sentence": "Common ratio 2, from the question."
+      }
      },
      {
       "text": "Working:",
@@ -288,7 +427,7 @@
       "text": "Then U_n = 815 × 2^n.",
       "status": "ok",
       "state": "arithmetic",
-      "note": "This model gives the start value and the change the question states, at every step from 0 to 6.",
+      "note": "This model gives the start value and the change the question states, as an exact form (not only at sample values).",
       "valueChain": {
        "rule": "proved"
       },
@@ -298,7 +437,19 @@
        "says": "Correct model: start 815, ×2 each week",
        "saysTex": null
       },
-      "tickClass": "model"
+      "tickClass": "model",
+      "explain": {
+       "kind": "model",
+       "named": true,
+       "short": "Correct model: start 815, ×2 each week",
+       "segs": [
+        {
+         "t": "text",
+         "v": "Correct model: start 815, ×2 each week"
+        }
+       ],
+       "sentence": "Correct model: start 815, ×2 each week."
+      }
      },
      {
       "text": "After 4 weeks (n = 4),",
@@ -314,13 +465,25 @@
        "says": "n = 4, from the question",
        "saysTex": null
       },
-      "tickClass": "condition-value"
+      "tickClass": "condition-value",
+      "explain": {
+       "kind": "condition-value",
+       "named": true,
+       "short": "n = 4, from the question",
+       "segs": [
+        {
+         "t": "text",
+         "v": "n = 4, from the question"
+        }
+       ],
+       "sentence": "n = 4, from the question."
+      }
      },
      {
       "text": "U_4 = 815 × 2^4",
       "status": "ok",
       "state": "arithmetic",
-      "note": "Putting n = 4 into 815 × 2^n gives exactly this expression.",
+      "note": "Putting n = 4 into 815 × 2^n gives exactly this expression, and n = 4 is the question's value.",
       "valueChain": {
        "rule": "proved"
       },
@@ -328,9 +491,52 @@
        "kind": "proved",
        "proof": "substitution-formula",
        "says": "Substituted n = 4 into 815 × 2^n",
-       "saysTex": "n = 4\\text{ into }815 \\times 2^{n}"
+       "saysTex": null,
+       "saysSegs": [
+        {
+         "t": "text",
+         "v": "Substituted "
+        },
+        {
+         "t": "tex",
+         "v": "n = 4"
+        },
+        {
+         "t": "text",
+         "v": " into "
+        },
+        {
+         "t": "tex",
+         "v": "815 \\times 2^{n}"
+        }
+       ],
+       "sentence": "Substituted $n = 4$ into $815 \\times 2^{n}$."
       },
-      "tickClass": "substitution-formula"
+      "tickClass": "substitution-formula",
+      "explain": {
+       "kind": "substitution-formula",
+       "named": true,
+       "short": "Substituted n = 4 into 815 × 2^n",
+       "segs": [
+        {
+         "t": "text",
+         "v": "Substituted "
+        },
+        {
+         "t": "tex",
+         "v": "n = 4"
+        },
+        {
+         "t": "text",
+         "v": " into "
+        },
+        {
+         "t": "tex",
+         "v": "815 \\times 2^{n}"
+        }
+       ],
+       "sentence": "Substituted $n = 4$ into $815 \\times 2^{n}$."
+      }
      },
      {
       "text": "= 815 × 16",
@@ -344,7 +550,19 @@
        "kind": "equals-line-above",
        "tex": "13040"
       },
-      "tickClass": "true-as-written"
+      "tickClass": "true-as-written",
+      "explain": {
+       "kind": "arithmetic",
+       "named": true,
+       "short": "2⁴ = 16",
+       "sentence": "Worked out the power: $2^{4} = 16$.",
+       "segs": [
+        {
+         "t": "tex",
+         "v": "2^{4} = 16"
+        }
+       ]
+      }
      },
      {
       "text": "= 13 040.",
@@ -358,7 +576,19 @@
       "how": {
        "kind": "equal-above"
       },
-      "tickClass": "true-as-written"
+      "tickClass": "true-as-written",
+      "explain": {
+       "kind": "arithmetic",
+       "named": true,
+       "short": "815 × 16 = 13 040",
+       "sentence": "Multiplied: $815 \\times 16 = 13\\,040$.",
+       "segs": [
+        {
+         "t": "tex",
+         "v": "815 \\times 16 = 13\\,040"
+        }
+       ]
+      }
      },
      {
       "text": "Conclusion: There are [13 040] users after 4 weeks.",

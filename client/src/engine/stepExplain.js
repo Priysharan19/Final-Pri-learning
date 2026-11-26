@@ -127,7 +127,8 @@ function print(node, mode, sym = false, parent = 0) {
           && (r.t === 'var' || r.t === 'const' || r.t === 'call' || n.r.t === 'group' || (r.t === 'bin' && (r.op === '^' || r.op === '*') && !/^\d/.test(rs)) || (r.t === 'bin' && r.op === '+') || (r.t === 'bin' && r.op === '-'));
         if (juxta) {
           const rr = (r.t === 'bin' && (r.op === '+' || r.op === '-')) || n.r.t === 'group' ? (/^\(|^\\left\(/.test(rs) ? rs : wrap(rs, true)) : rs;
-          return wrap(`${ls}${rr}`, parent > p);
+          const gap = tex && /\\[A-Za-z]+$/.test(ls) && /^[A-Za-z\\]/.test(rr) ? ' ' : '';
+          return wrap(`${ls}${gap}${rr}`, parent > p);
         }
         return wrap(`${ls} ${tex ? '\\times' : '×'} ${rs}`, parent > p);
       }
@@ -218,7 +219,10 @@ const FN_VERB = { sqrt: 'Took the square root', sin: 'Evaluated the sine', cos: 
 function numericVerb(from, to, inBracket) {
   const f = unwrap(from), t = unwrap(to);
   if (inBracket) return 'Worked out the bracket';
-  if (f.t === 'bin' && f.op === '/' && t.t === 'bin' && t.op === '/' && closed(f.l) && closed(f.r)) return 'Simplified the fraction';
+  if (f.t === 'bin' && f.op === '/' && t.t === 'bin' && t.op === '/' && closed(f.l) && closed(f.r) && closed(t.l) && closed(t.r)) {
+    const [a, b, c, d] = [valueOf(f.l), valueOf(f.r), valueOf(t.l), valueOf(t.r)];
+    if ([a, b, c, d].every(Number.isInteger) && gcd(a, b) > 1 && c * gcd(a, b) === a && d * gcd(a, b) === b) return 'Simplified the fraction';
+  }
   if (f.t === 'call' && FN_VERB[f.fn]) return t.t === 'num' || t.t === 'bin' && t.op === '/' ? FN_VERB[f.fn] : 'Simplified the surd';
   if (f.t === 'bin' && BIN_VERB[f.op]) return BIN_VERB[f.op];
   if (f.t === 'neg') return 'Took the negative';
@@ -391,7 +395,7 @@ function substitutionFact(A, B, subs) {
   const expr = plainOf(A), exprTex = texOf(A);
   const plain = `Substituted ${names.join(' and ')} into ${expr}`;
   if (plain.length > 90) return null;
-  return { plain: `Substituted ${names.join(' and ')}`, tex: `${names_tex.join(', ')}\\text{ into }${exprTex}`, verb: 'Substituted', kind: 'substitute', named: true, long: plain, sentence: `Substituted $${names_tex.join(',\\ ')}$ into $${exprTex}$.` };
+  return { plain: `Substituted ${names.join(' and ')}`, tex: `${names_tex.join(', ')}\\text{ into }${exprTex}`, verb: 'Substituted', kind: 'substitute', named: true, long: plain, segs: [{ t: 'text', v: 'Substituted ' }, { t: 'tex', v: names_tex.join(', ') }], sentence: `Substituted $${names_tex.join(',\\ ')}$ into $${exprTex}$.` };
 }
 
 const findSub = (A, B) => substitution(A, B);
@@ -550,7 +554,7 @@ function solvedStep(L1, R1, L2, R2) {
 }
 
 // ── differentiation ──────────────────────────────────────────────────────────
-const DERIV_LABEL = /^(?:d[a-z]?\/d([a-z])|[a-zA-Z]['′]{1}(?:\(\s*([a-z])\s*\))?)$/;
+const DERIV_LABEL = /^(?:d([a-z]?)\/d([a-z])|([a-zA-Z])['′](?:\(\s*([a-z])\s*\))?)$/;
 const D_OF = /^d\s*\/\s*d([a-z])\s*\((.+)\)$/;
 function derivativeStep(prev, cur) {
   // prev: `y = P` (or an expression P); cur: `dy/dx = Q`, `y' = Q`, `d/dx(P) = Q`
@@ -558,7 +562,16 @@ function derivativeStep(prev, cur) {
   let P = null, v = null;
   const dm = D_OF.exec(lab);
   const lm = DERIV_LABEL.exec(lab);
-  if (dm) { v = dm[1]; P = astOf(dm[2]); } else if (lm) { v = lm[1] || lm[2] || null; const ps = prev && prev.sides; if (!ps) return null; P = astOf(ps[ps.length - 1]); } else return null;
+  if (dm) { v = dm[1]; P = astOf(dm[2]); } else if (lm) {
+    v = lm[2] || lm[4] || null;
+    const fn = lm[1] || lm[3] || '';
+    const ps = prev && prev.sides;
+    // the line above must name the function that is being differentiated: `y = ...` for dy/dx and y', `f(x) = ...` for f'(x)
+    if (!ps || ps.length !== 2 || !fn) return null;
+    const name = tidy(ps[0]).replace(/\s+/g, '');
+    if (name !== fn && name !== `${fn}(${v || ''})`) return null;
+    P = astOf(ps[1]);
+  } else return null;
   const Q = astOf(c[c.length - 1]);
   if (!P || !Q || c.length !== 2) return null;
   const vars = [...variablesOf(P)].filter(x => x !== 'e');
@@ -599,7 +612,15 @@ function sentenceOf(parts) {
 export function explainStep({ above, line }) {
   try { return explainUnsafe(above, line); } catch { return null; }
 }
-function build(kind, named, facts, short, sentence, extra = {}) { return { kind, named, facts, short, sentence, ...extra }; }
+function segsOf(kind, facts, short) {
+  if (kind === 'both-sides' || kind === 'several') return [{ t: 'text', v: short }];
+  if (kind === 'substitute' && facts[0] && facts[0].segs) return facts[0].segs;
+  if (kind === 'solve') return [{ t: 'tex', v: facts[0].tex }, { t: 'text', v: ' solves it' }];
+  const out = [];
+  facts.slice(0, 3).forEach((f, i) => { if (i) out.push({ t: 'text', v: ', ' }); out.push({ t: 'tex', v: f.tex }); });
+  return out;
+}
+function build(kind, named, facts, short, sentence, extra = {}) { return { kind, named, facts: facts.map(f => ({ plain: f.plain, tex: f.tex, verb: f.verb })), short, sentence, segs: segsOf(kind, facts, short), ...extra }; }
 function explainUnsafe(aboveRaw, lineRaw) {
   const cur = sidesOf(lineRaw);
   if (!cur) {
@@ -653,7 +674,11 @@ function explainUnsafe(aboveRaw, lineRaw) {
         }
         if (rl && !rr) hops.push({ A: L1, B: L2 });
         else if (rr && !rl) hops.push({ A: R1, B: R2 });
-        else if (rl && rr) { for (const [A, B] of [[L1, L2], [R1, R2]]) if (equalByEngine(A, B)) hops.push({ A, B }); }
+        else if (rl && rr) {
+          // neither a whole-line operation nor a root: each side must be a rewrite of the same side above, or the step is not explained
+          if (!equalByEngine(L1, L2) || !equalByEngine(R1, R2)) return null;
+          hops.push({ A: L1, B: L2 }, { A: R1, B: R2 });
+        }
       }
     } else if (prev && prev.sides.length >= 2 && cur.sides.length >= 2 && same(astOf(prev.sides[0]) || { t: '?' }, trees[0])) {
       // `y = 4x^3 - 36x^2` then `y = 4(6)^3 - 36(6)^2 = ...`: the same name, the right-hand side rewritten
@@ -685,6 +710,8 @@ function explainUnsafe(aboveRaw, lineRaw) {
   // a lone letter in front is a name (`y = ...`, `At x = 6: y = ...`), never a change to explain
   for (let i = hops.length - 1; i >= 0; i--) { const A = hops[i].A && unwrap(hops[i].A); if (A && A.t === 'var' && !same(hops[i].A, hops[i].B)) hops.splice(i, 1); }
   if (!hops.length || hops.some(h => !h.A)) return null;
+  // every hop must be a true step as a WHOLE (the line above equals the line, or the letter was replaced by a value that gives it)
+  for (const h of hops) if (!findSub(h.A, h.B) && !equalByEngine(unwrap(h.A), unwrap(h.B))) return null;
   // the facts of every hop, in order
   const all = []; let several = false;
   for (const h of hops) {
@@ -706,6 +733,29 @@ function explainUnsafe(aboveRaw, lineRaw) {
     const short = all.map(f => f.plain).join(', ');
   const shortFinal = short.length > 96 ? all[0].plain : short;
   return build(all[0].kind, named, all, shortFinal, sentenceOf(all));
+}
+
+const NO_EXPLAIN = new Set(['heading', 'restated-question', 'restated-function', 'condition-line', 'solution-list', 'rounded-value', 'identity', 'given-data', 'method-stated', 'defines', 'conclusion-sentence', 'sign-claim', 'nature-claim', 'point-claim', 'second-derivative-value']);
+/**
+ * The explanation of each ticked line of a report, from the engine's own text of the line and of its parent (server side: this is what the page shows).
+ * A line is explained only when the engine ticked it, it is before the first cross, it is not the answer line, and the step from its parent (the nearest
+ * earlier line that is not a stated context) is verified as a WHOLE by the expression engine. A line that carries its own proved fact (a model, a substitution
+ * into a formula, a condition) says that fact. Everything else is null and keeps its class phrase.
+ * @returns {(null | { kind, named, short, sentence, segs })[]}  one entry per line
+ */
+export function explainLines(lines, limit, answerLine = -1) {
+  return lines.map((l, i) => {
+    if (!l || l.status !== 'ok' || i >= limit || i === answerLine || l.context === true || l.followsFromError) return null;
+    const f = l.fact;
+    if (f && f.kind === 'proved' && typeof f.says === 'string' && f.says) return { kind: String(f.proof), named: true, short: f.says, segs: Array.isArray(f.saysSegs) ? f.saysSegs : [{ t: 'text', v: f.says }], sentence: typeof f.sentence === 'string' ? f.sentence : `${f.says}.` };
+    if (NO_EXPLAIN.has(l.tickClass) || ['given-data', 'method-claim', 'condition-value', 'model', 'substitution-formula', 'formula-value'].includes(l.tickClass)) return null;
+    let j = i - 1;
+    while (j >= 0 && lines[j] && lines[j].context === true) j--;
+    const p = j >= 0 ? lines[j] : null;
+    if (!p || p.status === 'break' || p.unreadable || p.unread) return null;
+    const r = explainStep({ above: String(p.text ?? ''), line: String(l.text ?? '') });
+    return r ? { kind: r.kind, named: r.named, short: r.short, sentence: r.sentence, segs: r.segs } : null;
+  });
 }
 
 // shared with the line recognisers (lineRecognisers.js)
