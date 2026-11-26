@@ -51,7 +51,7 @@ for (const e of entries) {
     const strip = l => Object.fromEntries(Object.entries(l || {}).filter(([k]) => !SHOWN_ONLY.has(k)));
     // a page whose marker report is absent has an all-notes shown report: no tick, no cross
     // beyond display fields, a bank page may carry notes the SECOND page pass (engine/pageProofs2.js) ticked or marked neutral, each with its own class and the same text
-    const P2 = new Set(['function-value', 'equation-solved', 'condition-stated', 'derivative-of-function', 'conclusion-extremum', 'check-values-list', 'figure-label', 'point-on-curve']);
+    const P2 = new Set(['function-value', 'equation-solved', 'condition-stated', 'derivative-of-function', 'conclusion-extremum', 'check-values-list', 'figure-label', 'point-on-curve', 'exact-value', 'binomial-coefficient', 'triangle-value', 'solutions-in-interval', 'same-equation-as-line-above', 'antiderivative-checked', 'definite-integral-evaluated', 'stated-value', 'equal-to-line-above', 'conclusion-matches']);
     const byPass2 = (l, w) => !!l && !!w && l.status === 'note' && !l.candidate && !l.slipFollow && l.note !== 'Follows from the earlier slip.' && l.state !== 'wrong' && l.context !== true && P2.has(w.tickClass) && String(l.text) === String(w.text);   // only a line that was an OPEN note on the base
     const same = A ? A.length === B.length && A.every((l, i) => byPass2(l, B[i]) || JSON.stringify(strip(B[i])) === JSON.stringify(strip(l))) : B.every(l => l.status === 'note' || P2.has(l.tickClass));
     if (!same) shownMoved++;

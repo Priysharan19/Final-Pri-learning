@@ -34,7 +34,6 @@ let n = 0;
 const ok = (c, m) => { assert.ok(c, m); n += 1; };
 // The number a proposed answer carries (its unit, if any, is read off as the marker reads it).
 const valueOf = a => { try { return parseNumericInput(String(a)).value; } catch { return Number(String(a).replace(/[−–]/g, '-').match(/^[^\d-]*(-?[\d.]+)/)?.[1]); } };
-const same = (got, want, m) => { assert.deepEqual(got, want, m); n += 1; };
 
 // ── The owner's page, as the reader returns it (one entry per written line, reading order) ──────────────
 const QUESTION = {
@@ -201,7 +200,7 @@ const NSW = /^(y11|y12|ms11|ms12|me11|me12|mex)-/;
 const pages = [];
 for (const gen of Object.keys(GENERATORS).filter(g => NSW.test(g))) for (let d = 1; d <= 4; d += 1) for (let i = 1; i <= 8; i += 1) {
   let q; try { q = generateQuestion(gen, d, i * 7919 + d * 104729); } catch { continue; }
-  if (!q || q.answerType !== 'numeric' || !Number.isFinite(q.answer?.value) || !q.answer.value === 0) continue;
+  if (!q || q.answerType !== 'numeric' || !Number.isFinite(q.answer?.value) || q.answer.value === 0) continue;
   const value = q.answer.value;
   const shown = fmt(value);
   const last = plain(q.steps?.at(-1)?.d).replace(/\.$/, '');
@@ -220,7 +219,7 @@ for (const p of pages) {
   else if (Math.abs(valueOf(got.answer) - p.value) > 1e-9 * Math.max(1, Math.abs(p.value))) wrongValue += 1;
 }
 // The same pages through the extraction as it stood on 879c605e1, measured by running it (not estimated).
-const BEFORE = { pages: 7668, unreadable: 7217, wrongValue: 60 };
+const BEFORE = { pages: 7647, unreadable: 7217, wrongValue: 60 };
 console.log(`NSW sweep: ${pages.length} pages · "couldn't read" before ${BEFORE.unreadable} → now ${unreadable} · read as a wrong value before ${BEFORE.wrongValue} → now ${wrongValue}`);
 ok(pages.length === BEFORE.pages, `the same ${BEFORE.pages} pages as the measurement on 879c605e1 (${pages.length})`);
 ok(pages.length >= 400, `the sweep covers at least 400 pages (${pages.length})`);

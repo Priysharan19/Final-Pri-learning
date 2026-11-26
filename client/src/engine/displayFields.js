@@ -26,8 +26,9 @@ import { unboxed as unboxedText } from './boxes.js';
 // the line as the answer check reads it: without the box drawn round it, and without an "Answer:" label in front of it
 const unboxed = (t, type) => unboxedText(t, type).replace(/^\s*(?:final\s+answer|answer|ans)\s*[:=\-–]\s*/i, '');
 import { isHeading, worldOf, labelOf, clean, lead, astOf, constOf, fitPoly, polyD, rootsComplete } from './pageProofs.js';
+import { valueOfSide } from './pageProofs3.js';
 
-export const CLASSES = Object.freeze(['power-rule-differentiation', 'differentiation', 'factorisation', 'roots-of-a-product', 'equation-setup', 'substitution-evaluated', 'arithmetic-chain', 'second-derivative-value', 'sign-claim', 'nature-claim', 'point-claim', 'conclusion-matches', 'condition-line', 'restated-question', 'restated-function', 'heading', 'solution-list', 'rounded-value', 'labelled-substitution', 'identity', 'derivative-rule', 'true-as-written', 'matches-worked-step', 'equal-to-line-above', 'satisfies-equation-above', 'same-equation-as-line-above', 'substitution-defined', 'substitution-consistent', 'derivative-of-substitution', 'differential-form', 'change-of-variable', 'integral-rewritten', 'antiderivative-checked', 'back-substitution', 'equivalent-expressions', 'definite-integral-evaluated', 'several-claims', 'given-data', 'method-claim', 'method-stated', 'defines', 'condition-value', 'model', 'substitution-formula', 'conclusion-sentence', 'formula-value', 'function-value', 'equation-solved', 'condition-stated', 'derivative-of-function', 'conclusion-extremum', 'check-values-list', 'figure-label', 'point-on-curve']);
+export const CLASSES = Object.freeze(['power-rule-differentiation', 'differentiation', 'factorisation', 'roots-of-a-product', 'equation-setup', 'substitution-evaluated', 'arithmetic-chain', 'second-derivative-value', 'sign-claim', 'nature-claim', 'point-claim', 'conclusion-matches', 'condition-line', 'restated-question', 'restated-function', 'heading', 'solution-list', 'rounded-value', 'labelled-substitution', 'identity', 'derivative-rule', 'true-as-written', 'matches-worked-step', 'equal-to-line-above', 'satisfies-equation-above', 'same-equation-as-line-above', 'substitution-defined', 'substitution-consistent', 'derivative-of-substitution', 'differential-form', 'change-of-variable', 'integral-rewritten', 'antiderivative-checked', 'back-substitution', 'equivalent-expressions', 'definite-integral-evaluated', 'several-claims', 'given-data', 'method-claim', 'method-stated', 'defines', 'condition-value', 'model', 'substitution-formula', 'conclusion-sentence', 'formula-value', 'function-value', 'equation-solved', 'condition-stated', 'derivative-of-function', 'conclusion-extremum', 'check-values-list', 'figure-label', 'point-on-curve', 'exact-value', 'binomial-coefficient', 'triangle-value', 'solutions-in-interval', 'stated-value']);
 const PROVED = { listed: 'solution-list', rounded: 'rounded-value', substituted: 'labelled-substitution', restated: 'restated-question', identity: 'identity', derivative: 'derivative-rule' };
 const NUM = String.raw`-?\d+(?:\.\d+)?`;
 
@@ -49,6 +50,8 @@ const ARROWS = /\s*(?:⇒|⟹|=>|⟶|→|->)\s*/;
 /** The texts of a line that could be the answer it states: the end of a chain, the tail after an arrow, the last equation of a chain, the whole line. */
 function resultTexts(text, answerType) {
   let t = lead(String(text ?? '')).replace(/[.]+$/, '').trim();
+  // a thousands comma (`84,375`, `41,175`) is part of one number, not a list: a number's value is written the way the answer box takes it
+  if (answerType === 'numeric') t = t.replace(/(?<![\d,.])\d{1,3}(?:,\d{3})+(?![\d,])/g, m => m.replace(/,/g, ''));
   if (!t || t.length > 200) return [];
   const out = [];
   const arrow = t.split(ARROWS);
@@ -82,10 +85,19 @@ function resultTexts(text, answerType) {
 /** The value of a letter-free arithmetic text as a plain fraction (when it is rational with a small denominator) and as a decimal; [] for anything else, or when the text is already a plain number. */
 function valueTexts(c) {
   const t = String(c).trim();
-  if (!t || /^-?\d+(?:\.\d+)?$/.test(t) || /[A-Za-z]{2,}/.test(t.replace(/\b(?:sqrt|pi)\b/gi, '')) || !/[-+*/^()]/.test(t.slice(1))) return [];
-  const ast = astOf(t);
-  if (!ast || ast.t === 'equation') return [];
-  let v; try { if ([...variablesOf(ast)].some(x => x !== 'e')) return []; v = evaluate(ast, {}); } catch { return []; }
+  const FNS = /\b(?:sin|cos|tan|sec|cosec|csc|cot|ln|log|exp|arcsin|arccos|arctan)\b/i;
+  if (!t || /^-?\d+(?:\.\d+)?$/.test(t) || /[A-Za-z]{2,}/.test(t.replace(/\b(?:sqrt|pi|sin|cos|tan|sec|cosec|csc|cot|ln|log|exp|arcsin|arccos|arctan)\b/gi, '')) || !/[-+*/^()]/.test(t.slice(1)) && !FNS.test(t)) return [];
+  let v;
+  if (FNS.test(t)) {
+    // a function of a number (ln 8, arcsin(1/2), sin(30°)): read only where the line itself fixes every angle's unit (pageProofs3.valueOfSide), never a guess
+    const r = valueOfSide(t);
+    if (!r) return [];
+    v = r.v;
+  } else {
+    const ast = astOf(t);
+    if (!ast || ast.t === 'equation') return [];
+    try { if ([...variablesOf(ast)].some(x => x !== 'e')) return []; v = evaluate(ast, {}); } catch { return []; }
+  }
   if (!Number.isFinite(v) || Math.abs(v) > 1e9) return [];
   const out = [];
   for (let d = 1; d <= 2000; d++) { const n = Math.round(v * d); if (Math.abs(v * d - n) <= 1e-9 * Math.max(1, Math.abs(v * d))) { out.push(d === 1 ? String(n) : `${n}/${d}`); break; } }
@@ -133,13 +145,17 @@ function statedValue(text) {
  * answer check does not accept (`x = 5`, `= 5`, `≈ 5`, `Hence 5`, a bare `5`, a chain ending at another number, whatever its label), or any value under the answer's
  * own name or the answer box's label. When it is unsure it names no line. Only a line under `At x = a:` / `When ...:` and a not-equal line are set aside.
  */
+const statedAlone = l => !!l && l.status === 'note' && l.context === true && l.tickClass === 'stated-value';
+/** The line that is the answer and was only stated (neutral), as the tick the box rule gives such a line: it states the answer the server's check accepts. */
+const asAnswerTick = l => ({ text: l.text, status: 'ok', state: 'arithmetic', note: 'This line states the answer the check accepts.', valueChain: { rule: 'proved' }, fact: { kind: 'proved', proof: 'conclusion-matches' }, tickClass: 'conclusion-matches' });
 function answerLineOf(q, lines, accepts, correct, limit = lines.length) {
   if (correct !== true || typeof accepts !== 'function' || !ANSWER_TYPES.has(q?.answerType)) return -1;
   const ok = c => { try { return accepts(c) === true; } catch { return false; } };
   let at = -1;
   for (let i = 0; i < Math.min(limit, lines.length); i++) {
     const l = lines[i];
-    if (!l || l.status !== 'ok' || l.context === true) continue;
+    // a value stated alone (pageProofs4.js, neutral) is the answer line when the server's check accepts it: the box rule's own precedent (a line that is only the value)
+    if (!l || (l.status !== 'ok' && !statedAlone(l)) || (l.context === true && !statedAlone(l))) continue;
     // a conclusion the second page pass (pageProofs2.js) proved carries the value it states (`statedAnswer`), because its words hide the value from the plain reading above
     // a box drawn round the answer is layout (engine/boxes.js, the card's own reading): the line is read without it
     const texts = l.fact && l.fact.proof === 'conclusion-sentence' && typeof l.fact.valueText === 'string' ? [l.fact.valueText] : resultTexts(unboxed(l.text, q.answerType), q.answerType);
@@ -152,7 +168,7 @@ function answerLineOf(q, lines, accepts, correct, limit = lines.length) {
   names.delete('');
   for (let j = at + 1; j < lines.length; j++) {
     const l = lines[j];
-    if (!l || l.context === true || typeof l.text !== 'string' || isHeading(l.text)) continue;
+    if (!l || (l.context === true && !statedAlone(l)) || typeof l.text !== 'string' || isHeading(l.text)) continue;
     const shown = unboxed(l.text, q.answerType);
     const v = statedValue(shown);
     if (!v) continue;
@@ -296,7 +312,9 @@ export function displayFields(q, report, ctx = null) {
   let changed = false;
   const v = w ? w.v : (/^[a-z]$/.test(String(q?.variable ?? '')) ? q.variable : 'x');
   const out = [];
-  lines.forEach((l, i) => {
+  lines.forEach((l0, i) => {
+    const l = i === answerLine && statedAlone(l0) ? asAnswerTick(l0) : l0;
+    if (l !== l0) changed = true;
     if (!l) { out.push(l); return; }
     const add = {};
     if (l.status === 'ok') {
@@ -367,7 +385,9 @@ export function bankDisplayFields(q, report, ctx = null) {
   let answerLine = -1; try { answerLine = answerLineOf(q, lines, ctx && ctx.accepts, ctx && ctx.correct, limit); } catch { answerLine = -1; }
   let explained = []; try { explained = explainLines(lines, limit, answerLine); } catch { explained = []; }
   let changed = false;
-  const out = lines.map((l, i) => {
+  const out = lines.map((l0, i) => {
+    const l = i === answerLine && statedAlone(l0) ? asAnswerTick(l0) : l0;
+    if (l !== l0) changed = true;
     if (!l || l.status !== 'ok') return l;
     const add = {};
     if (explained[i]) add.explain = explained[i];

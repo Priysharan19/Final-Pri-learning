@@ -61,7 +61,7 @@ function promptPlain(prompt) {
 
 /** `0 <= t <= 4`, `t >= 0`, `1 < x < 5`, `x > 2`: the domain the prompt states for the variable v (a bound is null when not stated). null when none. */
 export function domainOf(prompt, v) {
-  const { spans, text } = promptPlain(prompt);
+  const { spans } = promptPlain(prompt);
   // only a maths span is read (exact); a domain written in prose (`for 0 ≤ t ≤ 1`, `for t ≥ 3`) is not normalised
   const pieces = spans.map(s => s.trim());
   let dom = null;
