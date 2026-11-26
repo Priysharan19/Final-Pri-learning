@@ -57,6 +57,11 @@ ok(marks.find(m => m.n === 7).corrected === 'x = 6' && marks.find(m => m.n === 7
 ok(tallyOf(page) === '3 lines correct. 1 wrong. 3 not checked.', `tally counts maths lines only: ${tallyOf(page)}`);
 ok(tallyOf({ lines: [line(1, 'checked'), line(2, 'condition')] }) === '1 line correct. 0 wrong. 0 not checked.', 'a stated condition is not "not checked"');
 
+// the answer-bearing line says "Correct answer" only when the server marked the answer right
+const cp = (awarded, lastStatus) => ({ lines: [line(1, 'checked', { how: { kind: 'derivative-rule' } }), line(2, 'condition'), line(3, lastStatus, { fact: { kind: 'solution-step', step: 2 } })], header: { mark: { awarded, possible: 1 } } });
+ok(buildTeacherMarks({ page: cp(1, 'checked') }).find(m => m.n === 3).phrase === 'Correct answer' && buildTeacherMarks({ page: cp(1, 'checked') }).find(m => m.n === 1).phrase === 'Correct differentiation', 'the last judged line is the correct answer when the server marked it right; no other line changes');
+ok(buildTeacherMarks({ page: cp(0, 'checked') }).find(m => m.n === 3).phrase === PHRASES.solutionStep, 'a page the server did not mark right keeps the line\'s own class');
+ok(buildTeacherMarks({ page: cp(1, 'not-verified') }).every(m => m.n !== 3), 'an unchecked last line gets no phrase at all');
 // ── placement: never on the writing, a gutter tick with a leader when the line end is taken ────────
 const W = 800, H = 1000;
 const rects = (arr, pl, size = 24) => pl.filter(p => p.where === 'page').map(p => ({ x0: p.x - size / 2, x1: p.x + size / 2, y0: p.y - size / 2, y1: p.y + size / 2 }));

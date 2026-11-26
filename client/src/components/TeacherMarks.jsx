@@ -53,27 +53,31 @@ export function TeacherSheet({ kind, view, page, marks, selected, pick, onKey, m
   const sheetRef = useRef(null);
   const dim = useSize(pageRef, { w: 800, h: 1000 });
   const sheet = useSize(sheetRef, { w: 1000, h: 1000 });
+  const zoomRef = useRef(null);
+  const zoom = useSize(zoomRef, { w: 1000, h: 1000 });
+  const [enlarged, setEnlarged] = useState(false);
   const marked = view !== 'original';
-  // Marked mode is a teacher's marks, not a commentary: words only at a cross and beside a mark the server paid. The list in Detailed feedback has the rest.
-  const words = useMemo(() => Object.fromEntries(marks.filter(m => m.phrase && (m.kind === 'wrong' || m.paid)).map(m => [m.n, m.phrase])), [marks]);
+  // A short phrase stands after each tick that has free space beside it; where there is none it is left out, except at a cross and beside a paid mark, which take the margin. The list in Detailed feedback has every one.
+  const words = useMemo(() => Object.fromEntries(marks.filter(m => m.phrase).map(m => [m.n, m.phrase])), [marks]);
+  const important = useMemo(() => new Set(marks.filter(m => m.kind === 'wrong' || m.paid).map(m => m.n)), [marks]);
   // The tick is as large as the writing allows: on a small page of many lines it shrinks so neighbours do not sit on each other.
   const pitch = useMemo(() => { const ys = page.lines.filter(l => l.box).map(l => (l.box.y + l.box.h / 2) * dim.h).sort((x, y) => x - y); const d = []; for (let i = 1; i < ys.length; i += 1) d.push(ys[i] - ys[i - 1]); d.sort((x, y) => x - y); return d.length ? d[Math.floor(d.length / 2)] : Infinity; }, [page, dim.h]);
-  const tick = Number.isFinite(pitch) ? Math.round(Math.min(24, Math.max(14, pitch * 0.9))) : 24;
-  const reserve = tick >= 18 ? 12 : 0;
+  const tick = Number.isFinite(pitch) ? Math.round(Math.min(24, Math.max(16, pitch * 0.9))) : 24;
+  const reserve = tick >= 16 ? 12 : 0;
   const place = (w, h) => placeMarks({ marks, obstacles: page.lines, words, reserve, width: w, height: h, size: tick });
   // The margin is only as wide as it has to be: wide when some words cannot stand beside their tick, judged as if it were wide (so the choice cannot flip back and forth).
   const aspect = dim.h / dim.w;
   const needWide = useMemo(() => {
     if (sheet.w < 600) return false;
     const w = sheet.w - GUTTER_WIDE - 2;
-    return place(w, w * aspect).some(p => p.word === 'gutter');
+    return place(w, w * aspect).some(p => p.word === 'gutter' && important.has(p.n));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sheet.w, aspect, marks, page, words, tick]);
+  }, [sheet.w, aspect, marks, page, words, tick, important]);
   const placements = useMemo(() => place(dim.w, dim.h),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [marks, page, words, dim.w, dim.h, tick]);
   const at = n => placements.find(p => p.n === n);
-  const gutterWords = needWide ? marks.filter(m => at(m.n)?.word === 'gutter').map(m => ({ id: `p${m.n}`, n: m.n, kind: m.kind, text: m.phrase, y: at(m.n).y })) : [];
+  const gutterWords = needWide ? marks.filter(m => at(m.n)?.word === 'gutter' && important.has(m.n)).map(m => ({ id: `p${m.n}`, n: m.n, kind: m.kind, text: m.phrase, y: at(m.n).y })) : [];
   const colW = GUTTER_WIDE - 34 - 58;
   const items = gutterWords.map(p => ({ id: p.id, y: p.y / dim.h, h: textHeight(p.text.length + 2, colW, 15) }));
   const tops = alignCards(items, dim.h, { gap: 4 }).map((t, i) => Math.max(0, Math.min(t.top, dim.h - items[i].h)));
@@ -81,6 +85,8 @@ export function TeacherSheet({ kind, view, page, marks, selected, pick, onKey, m
   const markTops = alignCards(paidMarks.map(m => ({ id: m.n, y: at(m.n).y / dim.h, h: 24 })), dim.h, { gap: 4 });
 
   return (
+    <>
+    <div className={`mp-t-zoom${enlarged ? ' is-on' : ''}`} ref={zoomRef} data-mp-zoom={enlarged ? 'on' : 'off'} tabIndex={enlarged ? 0 : undefined} role={enlarged ? 'group' : undefined} aria-label={enlarged ? TEXT.enlargedLabel : undefined}>
     <div className="mp-sheet mp-t-sheet" data-mp-sheet={kind} data-mp-view={view} data-mp-size={needWide ? 'roomy' : 'compact'} ref={sheetRef}>
       <div className="mp-sheet-in" ref={pageRef} style={viewBoxStyle}>
         {children}
@@ -135,6 +141,11 @@ export function TeacherSheet({ kind, view, page, marks, selected, pick, onKey, m
         </div>
       )}
     </div>
+    </div>
+    {marked && zoom.w < 700 && (
+      <button type="button" className="mp-link mp-t-enlarge" data-mp-enlarge aria-pressed={enlarged} onClick={() => setEnlarged(v => !v)}>{enlarged ? TEXT.fit : TEXT.enlarge}</button>
+    )}
+    </>
   );
 }
 

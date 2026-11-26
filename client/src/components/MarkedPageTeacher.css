@@ -27,7 +27,7 @@
 .mp-t-sheet[data-mp-size="roomy"] { --mp-gw: 150px; --mp-rule-x: 92px; }
 .mp-t-sheet[data-mp-size="compact"] { --mp-gw: 76px; --mp-rule-x: 30px; }
 .mp-t-sheet .mp-sheet-in { min-width: 0; align-self: start; }
-.mp-t-over { position: absolute; inset: 0; pointer-events: none; }
+.mp-t-over { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
 .mp-t-markers { position: absolute; inset: 0; pointer-events: none; }
 .mp-t-trace { position: absolute; box-sizing: border-box; pointer-events: none; background: color-mix(in srgb, var(--mk-accent) 12%, transparent); outline: 1px solid color-mix(in srgb, var(--mk-accent) 60%, transparent); border-radius: 3px; }
 .mp-t-sheet .mp-under { border-bottom: 2px solid var(--mk-error); }
@@ -118,3 +118,17 @@
 .mp-t-say { position: absolute; transform: translateY(-50%); white-space: nowrap; font-family: var(--mk-hand); line-height: 1; pointer-events: none; }
 .mp-t-say.is-right { color: var(--mk-correct); }
 .mp-t-say.is-wrong { color: var(--mk-error); }
+
+/* the margin is the same paper whatever the theme: the page beside it is a photograph of paper, and the rule and the marks need light ground */
+.mp-t-gutter { --mk-paper: #F8F7F3; --mk-error: #B83238; --mk-correct: #287449; --mk-graphite: #20201E; background: #F8F7F3; }
+.mp-t-zoom { max-width: 100%; overflow-x: hidden; touch-action: pan-x pan-y pinch-zoom; }
+.mp-t-zoom.is-on { overflow-x: auto; overscroll-behavior-x: contain; }
+.mp-t-zoom.is-on .mp-t-sheet { width: 900px; }
+.mp-t-zoom:focus-visible { outline: 2px solid var(--mk-accent); outline-offset: 2px; }
+.mp-t-enlarge { margin-top: var(--space-1); }
+@media (max-width: 520px) {
+  .mp-t-root { padding: var(--space-2); }
+  .mp-t-sheet[data-mp-size="compact"] { --mp-gw: 64px; --mp-rule-x: 24px; }
+  .mp-t-box { min-width: 36px; padding: 0 3px; font-size: 14px; }
+  .mp-t-zoom.is-on .mp-t-sheet[data-mp-size="compact"] { --mp-gw: 76px; --mp-rule-x: 30px; }
+}

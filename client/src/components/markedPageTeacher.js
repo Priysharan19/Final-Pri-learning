@@ -62,6 +62,9 @@ export const TEXT = Object.freeze({
   markedView: 'Marked',
   detailed: 'Detailed feedback',
   steps: 'Steps',
+  enlarge: 'Enlarge page',
+  fit: 'Fit to screen',
+  enlargedLabel: 'Enlarged page, scroll to move',
   heading: 'Heading',
   question: 'Question restated',
   step: 'Step',
@@ -131,9 +134,14 @@ export function buildTeacherMarks({ page, table = null } = {}) {
     const at = Math.max(...row.lines);
     paidAt.set(at, (paidAt.get(at) || 0) + row.marks);
   }
+  // The answer-bearing line is the last line of working the page judges; it is said to be the correct answer only when the server's own mark is the
+  // full mark (the server marked the answer right) and the engine ticked the line.
+  const judged = page.lines.filter(l => l.status !== 'condition');
+  const answerN = judged.length ? judged[judged.length - 1].n : null;
+  const fullMark = !!page.header?.mark && page.header.mark.awarded >= page.header.mark.possible && page.header.mark.possible > 0;
   return page.lines.filter(l => l.status === 'checked' || l.status === 'first-error').map(l => {
     const right = l.status === 'checked';
-    const cls = right ? classOf(l.card) : null;
+    const cls = right ? (l.n === answerN && fullMark && l.card?.valueChain !== 'given' ? 'conclusion' : classOf(l.card)) : null;
     return {
       n: l.n, kind: right ? 'right' : 'wrong', cls, phrase: right ? phraseOf(cls) : reasonOf(l.card),
       reason: right ? null : reasonOf(l.card), corrected: right ? null : (l.card.corrected || null),
@@ -173,7 +181,7 @@ export const wordWidth = (text, font) => Math.ceil(String(text).length * font * 
  * @param {number} reserve  px kept clear after a tick for its small number
  * @returns {{ n, where: 'page'|'gutter', x, y, size, leader, placement, word: null|'gutter'|{x0,x1,y,font,text} }[]}  x, y in px (y is the line's centre)
  */
-export function placeMarks({ marks, obstacles = null, words = {}, reserve = 0, width, height, size = 24, min = 14, gap = 4 }) {
+export function placeMarks({ marks, obstacles = null, words = {}, reserve = 0, width, height, size = 24, min = 16, gap = 4 }) {
   const W = Math.max(1, Number(width) || 1), H = Math.max(1, Number(height) || 1);
   const all = (obstacles || marks).filter(m => m.box).map(m => ({ n: m.n, x0: m.box.x * W, x1: (m.box.x + m.box.w) * W, y0: m.box.y * H, y1: (m.box.y + m.box.h) * H }));
   const placed = [];
@@ -188,7 +196,7 @@ export function placeMarks({ marks, obstacles = null, words = {}, reserve = 0, w
     let tick = null, tsize = size;
     for (const k of [1, 0.85, 0.7]) {
       const sz = Math.round(size * k);
-      if (sz < min) break;
+      if (sz < Math.min(min, size)) break;
       const r = { x0: own.x1 + gap, y0: cy - sz / 2, x1: own.x1 + gap + sz, y1: cy + sz / 2 };
       if (r.x1 <= W - 1 && r.y0 >= 0 && clearOf(r, m.n)) { tick = r; tsize = sz; break; }
     }

@@ -314,7 +314,7 @@ export default function MarkedPage({ teacherMarks = EDITION === 'prithagoras', e
         {wrong && fromText && field('from', t('mp.from', { n: from }), <p className="mp-expr mp-prev" data-mp-from><Typeset text={fromText} texOf={lineOf} /></p>)}
         {inlineRead && readingOfLine(n, true)}
         {showRead && card.text && field('read', t('mp.readAs'), <p className="mp-expr" data-mp-expr><Typeset text={card.text} texOf={lineOf} tex={textOf(n).replace(/\s+/g, '') === String(card.text).replace(/\s+/g, '') ? latexOf(n) : null} /></p>)}
-        {comment}
+        {!(tm && T.lineWord(card) === T.TEXT.heading) && comment}
         {wrong && facts.whatChanged && field('whatChanged', t('mp.whatChanged'), <p className="mp-text"><EngineComment text={typesetProse(facts.whatChanged)} lang="en" /></p>)}
         {wrong && facts.whyWrong && field('whyWrong', t('mp.whyWrong'), <p className="mp-text"><EngineComment text={typesetProse(facts.whyWrong)} lang="en" /></p>)}
         {wrong && card.corrected && field('corrected', t('mp.corrected'), <p className="mp-expr mp-fix" data-mp-corrected><Typeset text={card.corrected} texOf={lineOf} /></p>, 'is-fix')}

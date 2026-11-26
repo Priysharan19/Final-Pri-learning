@@ -34,7 +34,7 @@ const open = async (page, u, view = 'marked') => {
 const lum = hex => { const c = hex.match(/\w\w/g).map(h => parseInt(h, 16) / 255).map(v => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
 const contrast = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
 const hexOf = rgb => '#' + rgb.match(/\d+/g).slice(0, 3).map(n => Number(n).toString(16).padStart(2, '0')).join('');
-const CLASS_OF = { 2: 'restated', 3: 'differentiation', 5: 'equal', 6: 'factorisation', 7: 'solutionList', 8: 'differentiation', 14: 'arithmetic', 15: 'arithmetic', 16: 'arithmetic', 19: 'solutionStep' };
+const CLASS_OF = { 2: 'restated', 3: 'differentiation', 5: 'equal', 6: 'factorisation', 7: 'solutionList', 8: 'differentiation', 14: 'arithmetic', 15: 'arithmetic', 16: 'arithmetic', 19: 'conclusion' };
 const CHECKED = [2, 3, 5, 6, 7, 8, 14, 15, 16, 19];          // the fixture lines the engine ticks
 const UNCHECKED = [1, 4, 9, 10, 11, 12, 13, 17, 18];         // conditions and lines it could not verify: no tick, no cross
 
@@ -54,6 +54,7 @@ for (const [size, viewport] of [['desktop', { width: 1280, height: 900 }], ['pho
         img, boxes, ticks, boxesPx: boxes.map(b => ({ x0: img.left + b.x * img.width, x1: img.left + (b.x + b.w) * img.width, y0: img.top + b.y * img.height, y1: img.top + (b.y + b.h) * img.height })),
         markBoxes: [...sec.querySelectorAll('[data-mp-markbox]')].map(b => ({ n: b.getAttribute('data-mp-markbox'), text: b.textContent.trim(), label: b.getAttribute('aria-label'), r: rect(b) })),
         says: [...sec.querySelectorAll('[data-mp-say]')].map(w => ({ n: w.getAttribute('data-mp-say'), text: w.textContent.trim(), r: rect(w), font: getComputedStyle(w).fontFamily })),
+        gutterBg: getComputedStyle(sec.querySelector('[data-mp-gutter]')).backgroundColor,
         sheetH: rect(sec.querySelector('.mp-sheet-in')).height, sheetTop: rect(sec.querySelector('.mp-sheet-in')).top,
         words: [...sec.querySelectorAll('[data-mp-words]')].map(w => ({ n: w.getAttribute('data-mp-words'), text: w.textContent.trim(), font: getComputedStyle(w).fontFamily })),
         tally: sec.querySelector('[data-mp-tally]')?.textContent, figure: sec.querySelector('[data-mp-figure]')?.getAttribute('data-mp-figure'), stateWord: sec.querySelector('[data-mp-state-word]')?.textContent,
@@ -90,17 +91,37 @@ for (const [size, viewport] of [['desktop', { width: 1280, height: 900 }], ['pho
     ok(size !== 'desktop' || got.ticks.every(t => t.where === 'page'), `${where}: even line 8, beside the second column, keeps its tick on its own line`);
     // the phrase on each tick is the phrase of that line's own class
     ok(got.ticks.every(t => t.cls === CLASS_OF[t.n] && (t.phrase || null) === (PHRASES[CLASS_OF[t.n]] || null)), `${where}: every phrase is its own line's class ${JSON.stringify(got.ticks.filter(t => t.cls !== CLASS_OF[t.n]).map(t => [t.n, t.cls]))}`);
-    ok(got.ticks.find(t => t.n === 19).phrase === 'Matches a step of the worked solution' && !/Correct solutions/.test(got.text), `${where}: line 19 says its own class, not a solution list`);
+    ok(got.ticks.find(t => t.n === 19).phrase === 'Correct answer', `${where}: line 19 says its own class, not a solution list`);
     // the number is clear of the stroke
     ok(got.ticks.filter(t => t.numShown).every(t => t.num.left >= t.r.right - 3), `${where}: tick numbers stand clear of the stroke`);
     ok(got.ticks.filter(t => t.numShown).every(t => !got.boxesPx.some((b, i) => i + 1 !== t.n && t.num.left < b.x1 && b.x0 < t.num.right && t.num.top < b.y1 && b.y0 < t.num.bottom)), `${where}: a number never lands on another line's writing`);
     // the margin mark is level with its line; the few words follow the tick on the same line
     ok(got.markBoxes.every(m => { const b = got.boxesPx[Number(m.n) - 1]; const cy = (m.r.top + m.r.bottom) / 2; return cy >= b.y0 - 1 && cy <= b.y1 + 1; }), `${where}: each margin mark is level with its own line`);
-    if (size === 'desktop') ok(got.says.length === 1 && got.says[0].n === '19' && got.says[0].text === 'Matches a step of the worked solution' && /Pri Hand/.test(got.says[0].font), `${where}: one short comment, in the bundled face ${JSON.stringify(got.says.map(w => w.text))}`);
-    if (got.says.length) { const t19 = got.ticks.find(t => t.n === 19); const w = got.says[0]; ok(w.r.left >= t19.r.right - 1 && w.r.left - t19.r.right <= 30 && Math.abs((w.r.top + w.r.bottom) / 2 - (t19.r.top + t19.r.bottom) / 2) <= 10, `${where}: the comment follows its tick on the same line`);
-      ok(!got.boxesPx.some(b => w.r.left < b.x1 && b.x0 < w.r.right && w.r.top < b.y1 && b.y0 < w.r.bottom), `${where}: the comment covers no writing`); }
-    ok(got.sheetAttr === 'compact', `${where}: no wide empty margin when every comment fits beside its tick (${got.sheetAttr})`);
-    ok(got.says.length + got.words.length <= 3, `${where}: only a few words at most`);
+    // the short phrase stands after the tick on every ticked line that has free space beside it, and never touches ink, a tick or another phrase
+    const sayN = got.says.map(w => Number(w.n));
+    if (size === 'desktop') {
+      ok(sayN.includes(3) && sayN.includes(6) && sayN.includes(19), `${where}: phrases after the ticks on lines 3, 6 and 19 (got ${sayN})`);
+      ok(got.says.find(w => w.n === '3').text === 'Correct differentiation' && got.says.find(w => w.n === '6').text === 'Correct factorisation' && got.says.find(w => w.n === '19').text === 'Correct answer', `${where}: each says its own class`);
+    }
+    ok(got.says.every(w => /Pri Hand/.test(w.font)), `${where}: phrases are in the bundled face`);
+    ok(got.says.every(w => { const t = got.ticks.find(x => String(x.n) === w.n); return w.r.left >= t.r.right - 1 && w.r.left - t.r.right <= 30 && Math.abs((w.r.top + w.r.bottom) / 2 - (t.r.top + t.r.bottom) / 2) <= 10; }), `${where}: each phrase follows its own tick on the same line`);
+    ok(got.says.every(w => !got.boxesPx.some(b => w.r.left < b.x1 && b.x0 < w.r.right && w.r.top < b.y1 && b.y0 < w.r.bottom) && !got.ticks.some(t => t.r.left < w.r.right && w.r.left < t.r.right && t.r.top < w.r.bottom && w.r.top < t.r.bottom) && got.says.every(o => o === w || !(w.r.left < o.r.right && o.r.left < w.r.right && w.r.top < o.r.bottom && o.r.top < w.r.bottom))), `${where}: no phrase touches writing, a tick or another phrase`);
+    // tick 8 stands at the end of "d2y/dx2 = 24x - 72", its own line, not in the next column
+    { const t8 = got.ticks.find(t => t.n === 8); const b8 = got.boxesPx[7]; const cy = (t8.r.top + t8.r.bottom) / 2;
+      ok(cy >= b8.y0 && cy <= b8.y1 && (t8.where === 'gutter' ? size === 'phone' : (t8.r.left >= b8.x1 - 1 && t8.r.left - b8.x1 <= 14)), `${where}: tick 8 stands at the end of its own line (${Math.round(t8.r.left - b8.x1)} px after it)`); }
+    // phone: ticks stay legible; the margin is paper in either theme
+    ok(got.ticks.every(t => t.r.height >= 15.5), `${where}: every tick is at least 16 px tall (${Math.min(...got.ticks.map(t => t.r.height))})`);
+    if (size === 'phone') {
+      const before = await page.evaluate(() => document.querySelector('.mp-sheet-in').getBoundingClientRect().width);
+      await page.locator('[data-mp-enlarge]').click(); await page.waitForTimeout(300);
+      const big = await page.evaluate(() => ({ w: document.querySelector('.mp-sheet-in').getBoundingClientRect().width, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth, scrolls: document.querySelector('.mp-t-zoom').scrollWidth > document.querySelector('.mp-t-zoom').clientWidth, tick: Math.min(...[...document.querySelectorAll('.mp-t-tick svg')].map(e => e.getBoundingClientRect().height)) }));
+      ok(big.w >= before * 2 && big.overflow <= 0 && big.scrolls && big.tick >= 16, `${where}: Enlarge page makes the page wider, scrolls inside its own frame, the document does not ${JSON.stringify(big)} from ${Math.round(before)}`);
+      await page.locator('[data-mp-enlarge]').click();
+      ok(await page.evaluate(() => document.querySelector('.mp-sheet-in').getBoundingClientRect().width) <= before + 1, `${where}: Fit to screen returns`);
+      const fill = await page.evaluate(() => ({ sheet: document.querySelector('.mp-t-sheet').getBoundingClientRect().width, body: document.querySelector('.mp-body').getBoundingClientRect().width }));
+      ok(fill.sheet >= fill.body - 1, `${where}: the page and its margin fill the width (${Math.round(fill.sheet)} of ${Math.round(fill.body)} px)`);
+    }
+    ok(got.gutterBg === 'rgb(248, 247, 243)', `${where}: the margin is the same paper in both themes (${got.gutterBg})`);
     ok(got.fontOk, `${where}: the bundled handwriting face loads`);
     ok(got.tally === '10 lines correct. 0 wrong. 9 not checked.' || /^10 lines correct\. 0 wrong\. \d+ not checked\.$/.test(got.tally), `${where}: the tally counts maths lines only: ${got.tally}`);
     ok(got.figure === '1/1' && got.stateWord === 'Fully correct', `${where}: the server's mark and its one-word state ${got.figure} ${got.stateWord}`);
@@ -132,7 +153,7 @@ for (const [size, viewport] of [['desktop', { width: 1280, height: 900 }], ['pho
         none: ['5', '6', '7'].every(n => !document.querySelector(`[data-mp-box="${n}"]`)) };
     });
     ok(cross.n === '9' && /^Line 9: wrong\. /.test(cross.label) && cross.under === 1 && cross.ticks === 4 && cross.none, `${where}: one cross on the first wrong line, with its underline; none on unverified lines ${JSON.stringify(cross)}`);
-    if (cross.words.length) ok(cross.words.length === 1 && /does not follow from the one above/.test(cross.words[0]), `${where}: the cross says why, in the engine's fixed words ${cross.words}`);
+    if (size === 'desktop') ok(cross.words.some(w => /does not follow from the one above/.test(w)), `${where}: the cross says why, in the engine's fixed words ${cross.words}`);
     ok(contrast(hexOf(cross.color), theme === 'light' ? '#f8f7f3' : '#1d1d1b') >= 4.5, `${where}: the cross is red enough to read`);
     if (shots) {
       for (const v of ['marked', 'detailed', 'original']) {
@@ -182,6 +203,7 @@ for (const [size, viewport] of [['desktop', { width: 1280, height: 900 }], ['pho
   await open(page, url('owner19', { extra: 'criteria=3' }), 'detailed');
   const first = await page.evaluate(() => ({ state: document.querySelector('.mp-state')?.innerText.replace(/\s+/g, ' ').trim(), icons: document.querySelectorAll('.mp-state svg').length }));
   ok(/^Heading/.test(first.state) && first.icons === 0 && !/[\u2013\u2014\u2012-]\s*Context/.test(first.state), `a heading says Heading, with no dash glyph: ${first.state}`);
+  ok(!/Condition stated/.test(await page.locator('[data-mp-detail]').innerText()), 'a heading shows no second sentence');
   await page.locator('[data-mp-box="2"]').click();
   ok(/^Question restated/.test(await page.locator('.mp-state').innerText()), 'the restated question says Question restated');
   // Detailed: steps are keyboard reachable, name the step with its mark and one sentence, and trace to the page

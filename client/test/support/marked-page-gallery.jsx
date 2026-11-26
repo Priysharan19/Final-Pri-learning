@@ -79,13 +79,15 @@ function owner19Page() {
   const g = canvas.getContext('2d');
   g.fillStyle = '#fbfaf6'; g.fillRect(0, 0, W, H);
   g.fillStyle = '#1d2a55'; g.font = '30px "Bradley Hand","Segoe Print","Comic Sans MS",cursive'; g.textBaseline = 'middle';
+  // the right-hand column starts 44 px after line 8's writing ends, a little lower, so a tick at the end of line 8 has to fit in a narrow gap
+  const rightX = Math.round(40 + g.measureText(OWNER19[7].text).width + 6 + 44);
   const lines = OWNER19.map((l, i) => {
     const right = OWNER19_COL(i) === 1;
-    const x = right ? 478 : 40;
-    // lines 8 and 9 are written side by side: line 8 ends at x = 440 and line 9 starts at 478 a little lower
+    const x = right ? rightX : 40;
+    // lines 8 and 9 are written side by side: line 8 ends where its writing ends and line 9 starts 44 px further right, a little lower
     const y = i < 8 ? 40 + i * 52 : i === 8 ? 40 + 7 * 52 + 26 : 40 + 7 * 52 + 26 + (i - 8) * 52;
     g.fillText(l.text.replace(/\^2/g, '\u00b2').replace(/\^3/g, '\u00b3'), x, y);
-    const w = i === 7 ? 400 : Math.min((right ? W - 478 - 20 : W - 80), g.measureText(l.text).width + 16);
+    const w = Math.min((right ? W - rightX - 20 : W - 80), g.measureText(l.text).width + 6);
     return { text: l.text, box: { x: x / W, y: (y - 22) / H, w: w / W, h: 44 / H } };
   });
   return { src: canvas.toDataURL('image/png'), lines };
