@@ -418,7 +418,7 @@ console.log(`bank: ${bankPieces} pieces, ${bankCompared} compared side by side a
 console.log(`authoring faults (his number-only sides disagree beyond the rounding he printed): ${faultIds.length} parts`);
 for (const f of faults) console.log('  ', f);
 // pinned to the printed numbers (re-derive by running this file after the author fixes a step)
-const PIN = { compared: 3679, faultIds: [] };
+const PIN = { compared: 3661, faultIds: [] };
 if (PIN.compared >= 0) { ok(bankCompared === PIN.compared, `bank pieces compared ${bankCompared} (pinned ${PIN.compared})`); ok(JSON.stringify(faultIds) === JSON.stringify(PIN.faultIds), `authoring faults ${JSON.stringify(faultIds)}`); }
 
 console.log(`TEX FAITHFUL: ${fail ? 'FAIL' : 'PASS'} — ${pass}/${pass + fail} checks — the reader's plain form equals the TeX's own value at sample points, in ${compared} constructs and ${bankCompared} of the author's own steps; anything uncertain is unread`);

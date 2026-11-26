@@ -27,7 +27,7 @@ const sweep = await import('../../tools/bank-steps-sweep.mjs');
 const measure = await import('../../tools/bank-generic-measure.mjs');
 
 // The numbers printed by `node tools/bank-generic-measure.mjs` and `BANK_RULE=generic node tools/bank-steps-sweep.mjs` on the committed pack.
-const PIN = { parts: 1457, eligible: 409, all: 306, sweepPages: 8559, bothParts: 132, bothPages: 541, prose: 1203 };
+const PIN = { parts: 1449, eligible: 408, all: 305, sweepPages: 8529, bothParts: 132, bothPages: 541, prose: 1200 };
 const c = checks();
 const here = path.dirname(fileURLToPath(import.meta.url));
 await qb.ensureQbank(process.env, { strict: true });

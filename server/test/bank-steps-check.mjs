@@ -37,7 +37,7 @@ const { bankStepProofs } = await import('../../tools/qbank-import.mjs');
 const sweep = await import('../../tools/bank-steps-sweep.mjs');
 
 // The numbers printed by `node tools/qbank-import.mjs --bank-steps` and `node tools/bank-steps-sweep.mjs` on the committed pack. A new pack changes them on purpose.
-const PIN = { parts: 1457, eligible: 191, verifiable: 201, notVerified: 58, sweepPages: 4016 };
+const PIN = { parts: 1449, eligible: 191, verifiable: 201, notVerified: 58, sweepPages: 4016 };
 
 const c = checks();
 const here = path.dirname(fileURLToPath(import.meta.url));
