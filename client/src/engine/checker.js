@@ -1877,7 +1877,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
           // is a line about another quantity: it is not the integral or the derivative, so it is
           // not held to it.
           status = 'note';
-          // Only a line that IS a definition, or a derivative of the method's own letter, says so. Any other line the engine could not prove (a bare
+          // Only a line that IS a definition says so; a line about the method's own letter says that; any other line the engine could not prove (a bare
           // expression, a sentence, the answer line) says only that it was not checked: "defines something" on a final answer was not true of it.
           note = SIDE_DEFINITION.test(squashed)
             ? 'This defines something the method uses, so it is not checked against the answer.'
