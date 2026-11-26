@@ -55,7 +55,19 @@ export const PHRASES = Object.freeze({
   conditionLine: 'Condition stated',
   conclusion: 'Correct answer',
   heading: 'Heading',
-  question: 'Question restated'
+  question: 'Question restated',
+  // integration working (engine/integrationLines.js)
+  substitutionDefined: 'Substitution defined',
+  substitutionConsistent: 'Consistent with the substitution',
+  substitutionDerivative: 'Correct derivative of the substitution',
+  differentialForm: 'Correct differential form',
+  changeOfVariable: 'Correct change of variable',
+  integralRewritten: 'Correct rewriting of the integral',
+  antiderivativeChecked: 'Correct antiderivative (checked)',
+  backSubstitution: 'Correct back-substitution',
+  equivalentExpressions: 'Equivalent expressions',
+  definiteIntegral: 'Correct evaluation of the integral',
+  severalClaims: 'Every statement on this line is correct'
 });
 
 export const TEXT = Object.freeze({
@@ -100,7 +112,10 @@ const TICK = {
   'arithmetic-chain': 'arithmetic', 'second-derivative-value': 'secondDerivative', 'sign-claim': 'signClaim', 'nature-claim': 'natureClaim', 'point-claim': 'pointClaim',
   'conclusion-matches': 'conclusionMatches', 'condition-line': 'conditionLine', 'restated-question': 'restated', 'restated-function': 'given', heading: 'heading',
   'solution-list': 'solutionList', 'rounded-value': 'rounding', identity: 'identity', 'true-as-written': 'trueAsWritten', restated: 'restated',
-  'matches-worked-step': 'solutionStep', 'equal-to-line-above': 'equal', 'satisfies-equation-above': 'satisfiesEquation', 'same-equation-as-line-above': 'sameEquation'
+  'matches-worked-step': 'solutionStep', 'equal-to-line-above': 'equal', 'satisfies-equation-above': 'satisfiesEquation', 'same-equation-as-line-above': 'sameEquation',
+  'substitution-defined': 'substitutionDefined', 'substitution-consistent': 'substitutionConsistent', 'derivative-of-substitution': 'substitutionDerivative', 'differential-form': 'differentialForm',
+  'change-of-variable': 'changeOfVariable', 'integral-rewritten': 'integralRewritten', 'antiderivative-checked': 'antiderivativeChecked', 'back-substitution': 'backSubstitution',
+  'equivalent-expressions': 'equivalentExpressions', 'definite-integral-evaluated': 'definiteIntegral', 'several-claims': 'severalClaims'
 };
 // ids the engine gives a tick when it had no specific proof to name; a named rule the page itself read between the two lines (`card.rules`) is more specific, so it is shown instead
 const WEAK_TICK = new Set(['true-as-written', 'matches-worked-step']);
@@ -385,7 +400,18 @@ export const DETAILS = Object.freeze({
   conditionLine: 'The condition stated on this line is correct.',
   conclusion: 'This is the answer the question asks for, and it is correct.',
   heading: 'A heading: nothing to check.',
-  question: 'This line restates the question.'
+  question: 'This line restates the question.',
+  substitutionDefined: 'This line defines the substitution the method uses.',
+  substitutionConsistent: 'This is the substitution defined above, stated again.',
+  substitutionDerivative: 'The derivative of the substitution is correct.',
+  differentialForm: 'The differential follows from the derivative of the substitution.',
+  changeOfVariable: 'The integrand times the derivative of the substitution matches, so the change of variable is correct.',
+  integralRewritten: 'The integral is rewritten correctly.',
+  antiderivativeChecked: 'Differentiating the antiderivative gives the integrand, so it is correct.',
+  backSubstitution: 'Differentiating the result with respect to the original variable gives the integrand, so putting the substitution back is correct.',
+  equivalentExpressions: 'Both sides are the same expression.',
+  definiteIntegral: 'The limits are put in correctly.',
+  severalClaims: 'Every statement on this line was checked and is correct.'
 });
 const clip = (v, n = 90) => { const t = String(v ?? '').replace(/\$/g, '').replace(/\s+/g, ' ').trim(); return t.length > n ? '' : t; };
 const T = v => ({ t: 'text', v });

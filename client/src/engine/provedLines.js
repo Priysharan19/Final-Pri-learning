@@ -484,7 +484,9 @@ export function adoptProved(displayed, shown) {
     if (!l || !w || String(w.text ?? '') !== String(l.text ?? '')) return l;
     if (brk < 0 || i < brk) {
       // a heading is context, never a tick; a page-proved tick may replace any open note, an older proved tick only an unjudged one
-      if (w.context === true && (w.tickClass === 'heading' || w.tickClass === 'restated') && openNote(l)) { n++; return w; }
+      if (w.context === true && (w.tickClass === 'heading' || w.tickClass === 'restated' || w.tickClass === 'substitution-defined') && openNote(l)) { n++; return w; }
+      // a line of integration working (integrationLines.js) that is provably false is crossed on the displayed page, and only on it (no mark reads the shown report)
+      if (w.status === 'break' && w.fact?.proof === 'integration-false' && openNote(l)) { n++; return w; }
       if (w.status === 'ok' && (unjudged(l) || (w.fact?.kind === 'proved' && openNote(l)))) { n++; return w; }
     }
     // display-only fields (displayFields.js) are copied onto a line that keeps its own status and state

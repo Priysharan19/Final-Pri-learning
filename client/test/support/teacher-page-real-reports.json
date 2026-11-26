@@ -1220,6 +1220,186 @@
     "folded": true,
     "answerLine": 18
    }
+  },
+  "integration7": {
+   "question": {
+    "prompt": "Find $\\int 12x(x^2+8)^5\\,dx$.",
+    "answer": {
+     "type": "expression",
+     "expr": "(x^2+8)^6+C"
+    }
+   },
+   "answer": "(x^2+8)^6+C",
+   "correct": true,
+   "lines": [
+    "Solution:",
+    "Let u = x² + 8. Then du/dx = 2x ⇒ du = 2x dx.",
+    "Hence 12x dx = 6 du. Also, x² + 8 = u, so",
+    "∫ 12x (x² + 8)⁵ dx = ∫ 6u⁵ du.",
+    "∫ 6u⁵ du = 6 · u⁶/6 + C = u⁶ + C.",
+    "Substituting back u = x² + 8,",
+    "∫ 12x (x² + 8)⁵ dx = (x² + 8)⁶ + C."
+   ],
+   "stepReport": {
+    "lines": [
+     {
+      "text": "Solution:",
+      "status": "note",
+      "note": "Not checked: Pri cannot place this line on the way to the answer, so it is not marked right or wrong."
+     },
+     {
+      "text": "Let u = x² + 8. Then du/dx = 2x ⇒ du = 2x dx.",
+      "status": "note",
+      "note": "This defines something the method uses, so it is not checked against the answer."
+     },
+     {
+      "text": "Hence 12x dx = 6 du. Also, x² + 8 = u, so",
+      "status": "note",
+      "note": "This defines something the method uses, so it is not checked against the answer."
+     },
+     {
+      "text": "∫ 12x (x² + 8)⁵ dx = ∫ 6u⁵ du.",
+      "status": "note",
+      "note": "Not checked: Pri cannot place this line on the way to the answer, so it is not marked right or wrong."
+     },
+     {
+      "text": "∫ 6u⁵ du = 6 · u⁶/6 + C = u⁶ + C.",
+      "status": "note",
+      "note": "This defines something the method uses, so it is not checked against the answer."
+     },
+     {
+      "text": "Substituting back u = x² + 8,",
+      "status": "note",
+      "note": "This defines something the method uses, so it is not checked against the answer."
+     },
+     {
+      "text": "∫ 12x (x² + 8)⁵ dx = (x² + 8)⁶ + C.",
+      "status": "note",
+      "note": "True: differentiating this line gives the integrand. It differs from the final answer by a constant, or is not yet simplified."
+     }
+    ],
+    "firstBreak": -1,
+    "diagnosis": null
+   },
+   "shownReport": {
+    "lines": [
+     {
+      "text": "Solution:",
+      "status": "note",
+      "state": "unverified",
+      "unverified": true,
+      "context": true,
+      "note": "This line states the task or names the method; there is no step in it to check.",
+      "tickClass": "heading"
+     },
+     {
+      "text": "Let u = x² + 8. Then du/dx = 2x ⇒ du = 2x dx.",
+      "status": "ok",
+      "state": "arithmetic",
+      "note": "Correct: u = x² + 8 defines the substitution; du/dx = 2x is the derivative of the substitution; du = 2x dx follows from the derivative of the substitution.",
+      "valueChain": {
+       "rule": "proved"
+      },
+      "fact": {
+       "kind": "proved",
+       "proof": "integration"
+      },
+      "tickClass": "several-claims"
+     },
+     {
+      "text": "Hence 12x dx = 6 du. Also, x² + 8 = u, so",
+      "status": "ok",
+      "state": "arithmetic",
+      "note": "Correct: 12x dx = 6 du follows from the derivative of the substitution; u = x² + 8 is the substitution defined above.",
+      "valueChain": {
+       "rule": "proved"
+      },
+      "fact": {
+       "kind": "proved",
+       "proof": "integration"
+      },
+      "tickClass": "differential-form"
+     },
+     {
+      "text": "∫ 12x (x² + 8)⁵ dx = ∫ 6u⁵ du.",
+      "status": "ok",
+      "state": "arithmetic",
+      "note": "Correct: ∫ 12x (x² + 8)⁵ dx = ∫ 6u⁵ du is a correct change of variable: the integrand times the derivative of the substitution agrees.",
+      "valueChain": {
+       "rule": "proved"
+      },
+      "fact": {
+       "kind": "proved",
+       "proof": "integration"
+      },
+      "tickClass": "change-of-variable"
+     },
+     {
+      "text": "∫ 6u⁵ du = 6 · u⁶/6 + C = u⁶ + C.",
+      "status": "ok",
+      "state": "arithmetic",
+      "note": "Correct: ∫ 6u⁵ du = 6 · u⁶/6 + C is correct: differentiating the right side gives the integrand; 6 · u⁶/6 + C = u⁶ + C is true: both sides are the same expression.",
+      "valueChain": {
+       "rule": "proved"
+      },
+      "fact": {
+       "kind": "proved",
+       "proof": "integration"
+      },
+      "tickClass": "antiderivative-checked"
+     },
+     {
+      "text": "Substituting back u = x² + 8,",
+      "status": "ok",
+      "state": "arithmetic",
+      "note": "Correct: u = x² + 8 is the substitution defined above.",
+      "valueChain": {
+       "rule": "proved"
+      },
+      "fact": {
+       "kind": "proved",
+       "proof": "integration"
+      },
+      "tickClass": "substitution-consistent"
+     },
+     {
+      "text": "∫ 12x (x² + 8)⁵ dx = (x² + 8)⁶ + C.",
+      "status": "ok",
+      "state": "arithmetic",
+      "note": "Correct: ∫ 12x (x² + 8)⁵ dx = (x² + 8)⁶ + C is correct: differentiating the right side gives the integrand.",
+      "valueChain": {
+       "rule": "proved"
+      },
+      "fact": {
+       "kind": "proved",
+       "proof": "integration"
+      },
+      "tickClass": "back-substitution"
+     }
+    ],
+    "firstBreak": -1,
+    "diagnosis": null,
+    "summary": {
+     "total": 7,
+     "checked": 0,
+     "given": [],
+     "verified": [],
+     "arithmetic": [],
+     "conditions": [],
+     "wrong": [],
+     "unverified": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "unread": [],
+     "reason": "Pri could not tie these lines to anything it can prove about this question, so it did not mark them."
+    },
+    "answerLine": 6
+   }
   }
  }
 }
