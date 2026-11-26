@@ -122,6 +122,11 @@ const browser0 = await chromium.launch();
   ok(/Line 5 of 9/.test(await pg.locator('[data-mp-step-of]').innerText()) && await pg.locator('[data-mp-step="next"]').isEnabled() && await pg.locator('[data-mp-step="prev"]').isEnabled(), 'a compact stepper says Line 5 of 9, with Next and Previous both on in the middle');
   await pg.locator('[data-mp-step="prev"]').click();
   ok(await pg.locator('[data-marked-page]').getAttribute('data-mp-selected') === '4' && /Line 4 of 9/.test(await pg.locator('[data-mp-step-of]').innerText()), 'Previous moves to line 4');
+  // the end of the page (the old assertions, kept): the last line is Line 9 of 9 with Next off, and Previous moves to line 8
+  await pg.locator('[data-mp-box="9"]').click();
+  ok(/Line 9 of 9/.test(await pg.locator('[data-mp-step-of]').innerText()) && await pg.locator('[data-mp-step="next"]').isDisabled() && await pg.locator('[data-mp-step="prev"]').isEnabled(), 'a compact stepper says Line 9 of 9, with Next off at the end');
+  await pg.locator('[data-mp-step="prev"]').click();
+  ok(await pg.locator('[data-marked-page]').getAttribute('data-mp-selected') === '8' && /Line 8 of 9/.test(await pg.locator('[data-mp-step-of]').innerText()), 'Previous moves to line 8');
   const box = await pg.locator('.mp-detail').evaluate(d => { const s = getComputedStyle(d); return { b: s.borderTopWidth, bg: s.backgroundColor }; });
   ok(box.b === '0px' && box.bg === 'rgba(0, 0, 0, 0)', 'the panel is a calm column, not a box');
   const q = await pg.evaluate(() => { const g = id => getComputedStyle(document.querySelector(`[data-mp-box="${id}"]`)); return { tick: g(1).borderTopColor, quiet: g(6).borderTopColor, quietOpacity: g(6).opacity, tickOpacity: g(1).opacity }; });
