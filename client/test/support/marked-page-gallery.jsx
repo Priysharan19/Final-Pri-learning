@@ -75,8 +75,8 @@ function owner19Page() {
 }
 const O19 = which === 'owner19' ? owner19Page() : null;
 
-const c = which === 'owner19' ? { meta: null, lines: REAL.owner19.lines, report: REAL.owner19.stepReport, receipt: q.get('criteria') === '3' ? { awarded: 3, possible: 3 } : { awarded: 1, possible: 1 } }
-  : which === 'wrong' ? { meta: null, lines: REAL.wrong.lines, report: REAL.wrong.stepReport, receipt: { awarded: 0, possible: 1 } } : FIXTURE_PAGE ? { ...CASES.buoy, lines: FIXTURE_PAGE.lines.map(l => l.text) } : (CASES[which] || CASES.buoy);
+const c = which === 'owner19' ? { meta: null, lines: REAL.owner19.lines, report: REAL.owner19.shownReport || REAL.owner19.stepReport, receipt: q.get('criteria') === '3' ? { awarded: 3, possible: 3 } : { awarded: 1, possible: 1 } }
+  : which === 'wrong' ? { meta: null, lines: REAL.wrong.lines, report: REAL.wrong.shownReport || REAL.wrong.stepReport, receipt: { awarded: 0, possible: 1 } } : which === 'followed' ? { meta: null, lines: REAL.followed.lines, report: REAL.followed.shownReport || REAL.followed.stepReport, receipt: { awarded: 0, possible: 1 } } : FIXTURE_PAGE ? { ...CASES.buoy, lines: FIXTURE_PAGE.lines.map(l => l.text) } : (CASES[which] || CASES.buoy);
 const stepReport = c.report || stepCheck(c.meta, c.lines.join('\n'));
 // ?facts=1: the optional fields the engine may add (a first-break index, a corrected line on the crossed line). Absent otherwise.
 if (q.get('facts') === '1' && !c.report) {

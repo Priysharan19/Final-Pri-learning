@@ -387,7 +387,7 @@ export const plainLine = segs => segs.map(x => x.v).join('');
 function piecesSentence(cls, how, fact) {
   const h = how && typeof how === 'object' ? how : {};
   const f = fact && typeof fact === 'object' ? fact : {};
-  if ((cls === 'arithmetic' || cls === 'equal') && f.kind === 'both-sides' && typeof f.tex === 'string' && f.tex.length > 0 && f.tex.length <= 40 && !f.tex.includes('$')) return [T('Both sides come to '), { t: 'prose', v: '$' + f.tex + '$' }, T('.')];
+  if ((cls === 'arithmetic' || cls === 'equal' || cls === 'trueAsWritten') && f.kind === 'both-sides' && typeof f.tex === 'string' && f.tex.length > 0 && f.tex.length <= 40 && !f.tex.includes('$')) return [T('Both sides come to '), { t: 'prose', v: '$' + f.tex + '$' }, T('.')];
   if (cls === 'differentiation' && h.kind === 'derivative-rule' && clip(h.exprText) && clip(h.rhsText) && clip(h.v, 4)) return [T('The derivative of '), M(clip(h.exprText)), T(' with respect to '), M(clip(h.v, 4)), T(' is '), M(clip(h.rhsText)), T('.')];
   if (cls === 'substitution' && h.kind === 'substituted-at' && clip(h.name, 12) && clip(h.argText, 24) && clip(h.valueText, 24)) return [M(`${clip(h.name, 12)}(${clip(h.argText, 24)}) = ${clip(h.valueText, 24)}`), T(' is substituted correctly.')];
   return null;

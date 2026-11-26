@@ -113,7 +113,7 @@ for (const [size, viewport] of [['desktop', { width: 1280, height: 900 }], ['pho
     const sayN = got.says.map(w => Number(w.n));
     if (size === 'desktop') {
       ok(sayN.includes(3) && sayN.includes(6) && sayN.includes(7), `${where}: phrases after the ticks on lines 3, 6 and 7 (got ${sayN})`);
-      ok(got.says.find(w => w.n === '3').text === 'Correct differentiation' && got.says.find(w => w.n === '6').text === 'Correct stationary equation' && got.says.find(w => w.n === '7').text === 'Correct stationary values', `${where}: each says its own class`);
+      ok(got.says.find(w => w.n === '3').text === 'Correct differentiation' && got.says.find(w => w.n === '6').text === 'Correct factorisation' && got.says.find(w => w.n === '7').text === 'Correct stationary values', `${where}: each says its own class`);
     } else ok(got.says.length === 0 && got.words.length === 0, `${where}: a phone page carries no words on it (the popover and the list do); each tick stands once`);
     if (size === 'desktop') {
       const spoken = new Set([...got.says.map(w => Number(w.n)), ...got.words.map(w => Number(w.n))]);
@@ -123,7 +123,10 @@ for (const [size, viewport] of [['desktop', { width: 1280, height: 900 }], ['pho
     ok(got.says.every(w => /Pri Hand/.test(w.font)), `${where}: phrases are in the bundled face`);
     ok(got.says.every(w => { const t = got.ticks.find(x => String(x.n) === w.n); return w.r.left >= t.r.right - 1 && w.r.left - t.r.right <= 30 && Math.abs((w.r.top + w.r.bottom) / 2 - (t.r.top + t.r.bottom) / 2) <= 10; }), `${where}: each phrase follows its own tick on the same line`);
     ok(got.says.every(w => !got.boxesPx.some(b => w.r.left < b.x1 && b.x0 < w.r.right && w.r.top < b.y1 && b.y0 < w.r.bottom) && !got.ticks.some(t => t.r.left < w.r.right && w.r.left < t.r.right && t.r.top < w.r.bottom && w.r.top < t.r.bottom) && got.says.every(o => o === w || !(w.r.left < o.r.right && o.r.left < w.r.right && w.r.top < o.r.bottom && o.r.top < w.r.bottom))), `${where}: no phrase touches writing, a tick or another phrase`);
-    ok(got.ticks.every(t => t.where === 'page') && got.ticks.length === CHECKED.length, `${where}: every tick stands at the end of its own line on the page; none is repeated in the margin`);
+    // On a phone the page is 330 px wide and the two-column middle of this fixture leaves no free space beside some lines: a tick may then stand in the right
+// gutter, level with its own line (the anchoring check above), never more than two, and never twice. On a desktop every tick stands on the page.
+const inGutter = got.ticks.filter(t => t.where !== 'page').map(t => t.n);
+ok(got.ticks.length === CHECKED.length && (size === 'desktop' ? inGutter.length === 0 : inGutter.length <= 2), `${where}: every tick stands once, at the end of its own line on the page (phone: at most two in the gutter, level with their lines) ${JSON.stringify(inGutter)}`);
     // ticks stand at the end of their own lines, one each: no tick is drawn twice (a page tick and a margin tick for the same line)
     ok(new Set(got.ticks.map(t => t.n)).size === got.ticks.length && (size !== 'phone' || got.ticks.every(t => t.where === 'page') || got.ticks.filter(t => t.where === 'gutter').every(t => !got.ticks.some(o => o !== t && o.n === t.n))), `${where}: each tick once`);
     // phone: ticks stay legible; the margin is paper in either theme
@@ -174,10 +177,10 @@ for (const [size, viewport] of [['desktop', { width: 1280, height: 900 }], ['pho
       const b = document.querySelector('.mp-t-tick.is-wrong');
       return { n: b?.getAttribute('data-mp-box'), label: b?.getAttribute('aria-label'), color: b && getComputedStyle(b.querySelector('svg')).color, under: document.querySelectorAll('[data-mp-under]').length,
         words: [...document.querySelectorAll('[data-mp-say], [data-mp-words]')].map(w => w.textContent.trim()), ticks: document.querySelectorAll('.mp-t-tick.is-right').length,
-        none: ['5', '6', '7'].every(n => !document.querySelector(`[data-mp-box="${n}"]`)) };
+        none: ['6', '7', '8', '9'].every(n => !document.querySelector(`[data-mp-box="${n}"]`)) };
     });
-    ok(cross.n === '9' && /^Line 9: wrong\. /.test(cross.label) && cross.under === 1 && cross.ticks === 4 && cross.none, `${where}: one cross on the first wrong line, with its underline; none on unverified lines ${JSON.stringify(cross)}`);
-    if (size === 'desktop') ok(cross.words.some(w => /is smaller than/.test(w)), `${where}: the cross says why, in the engine's own words ${cross.words}`);
+    ok(cross.n === '5' && /^Line 5: wrong\. /.test(cross.label) && cross.under === 1 && cross.ticks === 3 && cross.none, `${where}: one cross on the first wrong line, with its underline; none on unverified lines ${JSON.stringify(cross)}`);
+    if (size === 'desktop') ok(cross.words.some(w => /x terms come to 18x/.test(w)), `${where}: the cross says why, in the engine's own words ${cross.words}`);
     ok(contrast(hexOf(cross.color), '#fbfaf6') >= 4.5, `${where}: the cross is red enough to read on the photographed paper`);
     if (shots) {
       for (const v of ['marked', 'detailed', 'original']) {
@@ -306,7 +309,7 @@ for (const [size, viewport] of [['desktop', { width: 1280, height: 900 }], ['pho
     ok(await pg.locator('[data-mp-pop]').count() === 0, `${theme}: moving away closes it`);
     await pg.focus('[data-mp-box="6"]'); await pg.waitForSelector('[data-mp-pop="6"]');
     r = await rectsOf(pg, 6);
-    ok(r && r.via === 'focus' && /Line 6: correct/.test(r.text) && /stationary condition is set up/.test(r.text) && r.desc === r.id, `${theme}: keyboard focus opens it ${r && r.text}`);
+    ok(r && r.via === 'focus' && /Line 6: correct/.test(r.text) && /factorised form equals the line above/.test(r.text) && r.desc === r.id, `${theme}: keyboard focus opens it ${r && r.text}`);
     await pg.keyboard.press('Escape');
     ok(await pg.locator('[data-mp-pop]').count() === 0 && await pg.evaluate(() => document.activeElement?.getAttribute('data-mp-box')) === '6', `${theme}: Escape closes it and keeps focus on the mark`);
     await pg.focus('[data-mp-box="16"]'); await pg.waitForSelector('[data-mp-pop="16"]');
@@ -319,9 +322,9 @@ for (const [size, viewport] of [['desktop', { width: 1280, height: 900 }], ['pho
     ok(await pg.locator('[data-mp-pop]').count() === 0, `${theme}: blur closes it`);
     // a cross: the reason and the corrected line the server sent
     await open(pg, url('wrong', { theme }), 'marked');
-    await pg.hover('.mp-t-tick.is-wrong'); await pg.waitForSelector('[data-mp-pop="9"]');
-    r = await rectsOf(pg, 9);
-    ok(r && /Line 9: wrong/.test(r.text) && /is smaller than/.test(r.text) && r.maths > 0 && !/\$/.test(r.text) && !/Corrected line/.test(r.text) && !r.coversOwn && r.inPage, `${theme}: a cross gives the engine's own reason, typeset; no corrected line is shown because the server sent none ${r && r.text}`);
+    await pg.hover('.mp-t-tick.is-wrong'); await pg.waitForSelector('[data-mp-pop="5"]');
+    r = await rectsOf(pg, 5);
+    ok(r && /Line 5: wrong/.test(r.text) && r.maths > 0 && !/\$/.test(r.text) && /Corrected line/.test(r.text) && /6x/.test(r.text) && !r.coversOwn && r.inPage, `${theme}: the cross is on line 5 (the wrong factorisation 0 = 6x[x + 4]) with the engine's own reason, typeset, and the corrected line the server sent ${r && r.text}`);
     if (shots) await pg.screenshot({ path: `${shots}/teacher-popover-wrong-desktop-${theme}.png`, fullPage: true });
     await ctx.close();
   }
