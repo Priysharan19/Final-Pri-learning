@@ -34,7 +34,8 @@ import { infoOf as arithmeticInfo, cleanStatement } from '../../client/src/engin
 import { annotateMilestones } from '../../client/src/engine/milestones.js';
 import { solutionMatch, _internals as SOLUTION_INTERNALS } from '../../client/src/engine/solutionMatch.js';
 import { lineChains } from '../../client/src/engine/lineChains.js';
-import { provedLines } from '../../client/src/engine/provedLines.js';
+import { provedLines, openNote } from '../../client/src/engine/provedLines.js';
+import { integrationLines } from '../../client/src/engine/integrationLines.js';
 import { displayFields, bankDisplayFields } from '../../client/src/engine/displayFields.js';
 import { awardBoardScheme, matchBoardPoints } from '../../client/src/engine/boardScheme.js';
 import { constrainToShown, unsupportedCredit } from '../../client/src/engine/markExplanation.js';
@@ -468,6 +469,16 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
       if (more && more !== base) shownReport = holdAmbiguous(more);
     } catch { /* the report stands */ }
   }
+  // Feedback only (engine/integrationLines.js): a page of integration is read claim by claim (a substitution, its derivative and differential, a change of
+  // variable, an antiderivative, a back-substitution). A line is ticked only when every claim on it is proved, crossed when one is provably false, and
+  // left alone otherwise. DISPLAY ONLY, like the proved lines above: `stepReport` and every mark are untouched. Australian edition (NSW Years 11-12) questions only.
+  try {
+    if (typeof steps === 'string' && steps.trim() && !OBJECTIVE.has(q.answerType) && q.answerType !== 'graph-sketch' && !Array.isArray(q.boardScheme) && !(opts && (opts.proved === false || opts.solutionMatch === false || opts.integrationLines === false)) && (/^gen:(?:y11|y12|me11|me12)-/.test(String(q.contentId ?? '')) || typeof q._bank === 'string')) {
+      const base = shownReport || report || trueAsWritten(q, steps, opts);
+      const more = base ? integrationLines(q, base, l => openNote(l)) : null;
+      if (more && more !== base) shownReport = holdAmbiguous(more);
+    }
+  } catch { /* the report stands */ }
   let markingReport = null;
   if (decided && decided !== report) {
     let reproduces = false;

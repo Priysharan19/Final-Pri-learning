@@ -34,6 +34,16 @@ const OWNER19_Q = {
   steps: [{ h: 'Stationary $x$-values', d: "$y' = 12x^2 - 72x = 0 \\Rightarrow x = 0, 6$" }, { h: 'Choose', d: 'The larger is $x = 6$' }]
 };
 
+// The owner's integration-by-substitution page (26 Nov 2026): seven lines, "0 lines correct, 0 wrong, 7 not checked" before engine/integrationLines.js.
+const INTEGRATION7_LINES = [
+  'Solution:', 'Let u = x² + 8. Then du/dx = 2x ⇒ du = 2x dx.', 'Hence 12x dx = 6 du. Also, x² + 8 = u, so', '∫ 12x (x² + 8)⁵ dx = ∫ 6u⁵ du.',
+  '∫ 6u⁵ du = 6 · u⁶/6 + C = u⁶ + C.', 'Substituting back u = x² + 8,', '∫ 12x (x² + 8)⁵ dx = (x² + 8)⁶ + C.'
+];
+const INTEGRATION7_Q = {
+  id: 'owner-integration-substitution', contentId: 'gen:y12-integration:d3:owner-7-line-page', answerType: 'expression', type: 'expression', difficulty: 3,
+  prompt: 'Find $\\int 12x(x^2+8)^5\\,dx$.', answer: { type: 'expression', expr: '(x^2+8)^6+C' }
+};
+
 function run(q, lines, answer) {
   const res = checkAnswer(q, answer);
   const ev = stepEvidence(q, answer, lines.join('\n'), res, { slipWarnings: true });
@@ -41,7 +51,7 @@ function run(q, lines, answer) {
 }
 const wrongQ = G.generateQuestion('y12-appdiff', 1, 450);
 const out = { note: 'The server marking path (checkAnswer, stepEvidence) on transcribed pages. Regenerate with server/test/support/teacher-page-real-reports.mjs.',
-  pages: { wrong: run(wrongQ, WRONG_LINES, '0'), followed: run(wrongQ, FOLLOWED_LINES, '-4'), owner19: run(OWNER19_Q, OWNER19_LINES, '6') } };
+  pages: { wrong: run(wrongQ, WRONG_LINES, '0'), followed: run(wrongQ, FOLLOWED_LINES, '-4'), owner19: run(OWNER19_Q, OWNER19_LINES, '6'), integration7: run(INTEGRATION7_Q, INTEGRATION7_LINES, '(x^2+8)^6+C') } };
 const text = JSON.stringify(out, null, 1) + '\n';
 if (process.argv.includes('--check')) {
   if (readFileSync(OUT, 'utf8') !== text) { console.error('teacher-page-real-reports: the saved file is not what the engine returns today; run the script without --check'); process.exit(1); }

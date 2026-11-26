@@ -196,7 +196,9 @@ for (const p of pages) {
   if (!shown) continue;
   shownCount++;
   if (base) {
-    const same = base.lines.length === shown.lines.length && base.lines.every((l, i) => JSON.stringify(strip(l)) === JSON.stringify(strip(shown.lines[i])));
+    // a line the integration layer ticked or crossed (engine/integrationLines.js, fact.proof 'integration' / 'integration-false') is held by its own check (integration-lines-check.mjs): every OTHER line must be the marker's, unmoved
+    const byIntegration = l => !!l && l.fact && (l.fact.proof === 'integration' || l.fact.proof === 'integration-false' || l.tickClass === 'substitution-defined');
+    const same = base.lines.length === shown.lines.length && base.lines.every((l, i) => byIntegration(shown.lines[i]) || JSON.stringify(strip(l)) === JSON.stringify(strip(shown.lines[i])));
     if (!same && !p.bank) continue;      // a generated page's displayed report also carries the proved-line ticks (engine/provedLines.js): its own check holds those
     if (!same) { shownMoved++; if (process.env.DBG) console.log('MOVED', p.id, JSON.stringify(base.lines.map(strip)).slice(0, 400), JSON.stringify(shown.lines.map(strip)).slice(0, 400)); }
   } else { if (p.bank && !shown.lines.every(l => l.status === 'note')) { shownMoved++; if (process.env.DBG) console.log('NOBASE', p.id, JSON.stringify(shown.lines).slice(0, 500)); } if (p.bank || shown.lines.every(l => l.status === 'note')) noReportPage ||= p; }
@@ -239,7 +241,9 @@ ok(answerLines > 50 && answerLineWrong === 0 && answerLineOnWrong === 0, `answer
         const page = p.lines.map((l, j) => (j === i ? m.text : l));
         const a = run(p.q, '99991', page.join('\n')); if (!a) continue;
         mutants++;
-        const mine = (a.shownReport || a.stepReport)?.lines?.map(l => l.status) || [], theirs = a.stepReport?.lines?.map(l => l.status) || [];
+        // the integration layer may CROSS a line that is provably false (engine/integrationLines.js): a mutant here is judged wrong, so that cross is the point. It may never tick one.
+        const shownLines = (a.shownReport || a.stepReport)?.lines || [];
+        const mine = shownLines.map(l => (l && l.fact && l.fact.proof === 'integration-false' ? 'note' : l?.status)), theirs = a.stepReport?.lines?.map(l => l.status) || [];
         if (a.stepReport && !p.bank) continue;     // generated pages carry the proved-line ticks the other checks hold
         if (a.stepReport && mine.some((s, j) => s !== theirs[j])) mutantTicked++;
         if (!a.stepReport && mine.some(s => s !== 'note')) mutantTicked++;

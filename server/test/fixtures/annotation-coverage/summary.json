@@ -16,132 +16,132 @@
  },
  "total": {
   "total": 5592,
-  "full": 316,
-  "trueOnly": 1751,
-  "uncovered": 3525,
-  "fullPct": 5.65,
-  "trueOnlyPct": 31.31,
-  "uncoveredPct": 63.04
+  "full": 352,
+  "trueOnly": 2143,
+  "uncovered": 3097,
+  "fullPct": 6.29,
+  "trueOnlyPct": 38.32,
+  "uncoveredPct": 55.38
  },
  "halves": {
-  "trueHalfPasses": 2067,
-  "trueHalfPassPct": 36.96,
-  "wrongHalfPasses": 527,
-  "wrongHalfPassPct": 9.42,
-  "allLinesTickedAndNoneCrossed": 3123,
-  "allLinesPct": 55.85,
-  "answerLineRecognisedAndKeyCorrect": 912,
-  "answerLineOfKeyedUnits": 4437,
-  "answerLinePct": 20.55,
-  "answerHalfNotApplicableNoKey": 1155,
-  "linesTickedOnlyAsTrueAsWritten": 1811
+  "trueHalfPasses": 2495,
+  "trueHalfPassPct": 44.62,
+  "wrongHalfPasses": 542,
+  "wrongHalfPassPct": 9.69,
+  "allLinesTickedAndNoneCrossed": 3138,
+  "allLinesPct": 56.12,
+  "answerLineRecognisedAndKeyCorrect": 1339,
+  "answerLineOfKeyedUnits": 4436,
+  "answerLinePct": 30.18,
+  "answerHalfNotApplicableNoKey": 1156,
+  "linesTickedOnlyAsTrueAsWritten": 1801
  },
  "byKind": {
   "bank": {
    "total": 2214,
-   "full": 136,
-   "trueOnly": 257,
-   "uncovered": 1821,
-   "fullPct": 6.14,
-   "trueOnlyPct": 11.61,
-   "uncoveredPct": 82.25
+   "full": 172,
+   "trueOnly": 637,
+   "uncovered": 1405,
+   "fullPct": 7.77,
+   "trueOnlyPct": 28.77,
+   "uncoveredPct": 63.46
   },
   "bank-worked": {
    "total": 2247,
    "full": 62,
-   "trueOnly": 1093,
-   "uncovered": 1092,
+   "trueOnly": 1094,
+   "uncovered": 1091,
    "fullPct": 2.76,
-   "trueOnlyPct": 48.64,
-   "uncoveredPct": 48.6
+   "trueOnlyPct": 48.69,
+   "uncoveredPct": 48.55
   },
   "generated": {
    "total": 1131,
    "full": 118,
-   "trueOnly": 401,
-   "uncovered": 612,
+   "trueOnly": 412,
+   "uncovered": 601,
    "fullPct": 10.43,
-   "trueOnlyPct": 35.46,
-   "uncoveredPct": 54.11
+   "trueOnlyPct": 36.43,
+   "uncoveredPct": 53.14
   }
  },
  "causes": {
-  "no provable one-line mutation of any step": {
-   "count": 877,
-   "example": null,
-   "byKind": {
-    "generated": 191,
-    "bank": 128,
-    "bank-worked": 558
-   }
-  },
-  "answer line not recognised (numeric)": {
-   "count": 832,
-   "example": {
-    "id": "gen:y11-quadfunc:d1:c2b8b95",
-    "line": "Δ > 0"
-   },
-   "byKind": {
-    "generated": 51,
-    "bank": 781
-   }
-  },
   "wrong step missed": {
-   "count": 817,
+   "count": 1140,
    "example": {
     "id": "gen:y11-quadfunc:d1:4faffdc",
     "line": "-3x^2+2x+6=0"
    },
    "byKind": {
     "generated": 167,
-    "bank": 127,
-    "bank-worked": 523
+    "bank": 449,
+    "bank-worked": 524
+   }
+  },
+  "no provable one-line mutation of any step": {
+   "count": 943,
+   "example": null,
+   "byKind": {
+    "generated": 202,
+    "bank": 183,
+    "bank-worked": 558
    }
   },
   "algebra expression": {
-   "count": 496,
+   "count": 497,
    "example": {
     "id": "gen:y11-quadfunc:d2:58a445b",
     "line": "0"
    },
    "byKind": {
-    "generated": 85,
+    "generated": 86,
     "bank": 175,
     "bank-worked": 236
    }
   },
+  "answer line not recognised (numeric)": {
+   "count": 417,
+   "example": {
+    "id": "gen:y11-quadfunc:d1:c2b8b95",
+    "line": "Δ > 0"
+   },
+   "byKind": {
+    "generated": 43,
+    "bank": 374
+   }
+  },
   "trig step": {
-   "count": 221,
+   "count": 218,
    "example": {
     "id": "gen:y11-sine-cosine-rule:d2:a2cf3cf",
     "line": "sin B=((bsin A)/(a))"
    },
    "byKind": {
-    "generated": 14,
-    "bank": 128,
+    "generated": 13,
+    "bank": 126,
     "bank-worked": 79
    }
   },
   "algebra equation": {
-   "count": 168,
+   "count": 162,
    "example": {
     "id": "gen:y11-quadfunc:d2:aaadc5a",
     "line": "y=0"
    },
    "byKind": {
-    "generated": 45,
-    "bank": 59,
+    "generated": 41,
+    "bank": 57,
     "bank-worked": 64
    }
   },
   "words-only reasoning": {
-   "count": 156,
+   "count": 159,
    "example": {
     "id": "gen:y11-lines:d4:b6d5695",
     "line": "y"
    },
    "byKind": {
-    "generated": 38,
+    "generated": 41,
     "bank": 23,
     "bank-worked": 95
    }
@@ -155,14 +155,14 @@
    }
   },
   "answer line not recognised (expression)": {
-   "count": 113,
+   "count": 115,
    "example": {
     "id": "gen:me12-induction:d2:eb777de",
     "line": "n=k+1"
    },
    "byKind": {
     "generated": 4,
-    "bank": 109
+    "bank": 111
    }
   },
   "TeX not readable as a typed line (\\pm)": {
@@ -219,6 +219,18 @@
     "bank-worked": 62
    }
   },
+  "wrong step crossed later": {
+   "count": 57,
+   "example": {
+    "id": "gen:y11-lines:d1:3e85771",
+    "line": "-(1/4)*(-k)=-1"
+   },
+   "byKind": {
+    "generated": 43,
+    "bank": 5,
+    "bank-worked": 9
+   }
+  },
   "answer line not recognised (set)": {
    "count": 54,
    "example": {
@@ -228,18 +240,6 @@
    "byKind": {
     "generated": 9,
     "bank": 45
-   }
-  },
-  "wrong step crossed later": {
-   "count": 54,
-   "example": {
-    "id": "gen:y11-lines:d1:3e85771",
-    "line": "-(1/4)*(-k)=-1"
-   },
-   "byKind": {
-    "generated": 43,
-    "bank": 2,
-    "bank-worked": 9
    }
   },
   "point or coordinate pair": {
@@ -301,14 +301,14 @@
    }
   },
   "integration step": {
-   "count": 48,
+   "count": 40,
    "example": {
-    "id": "A12-C4-003",
-    "line": "[-(1/2)*cos(2x)]_{0}^{π/3}"
+    "id": "A12-C4-028",
+    "line": "(1/2)*∫(2/(2x+3))dx"
    },
    "byKind": {
-    "bank": 31,
-    "bank-worked": 17
+    "bank": 24,
+    "bank-worked": 16
    }
   },
   "TeX not readable as a typed line (\\int)": {
@@ -666,17 +666,6 @@
     "bank-worked": 2
    }
   },
-  "differentiation step": {
-   "count": 7,
-   "example": {
-    "id": "gen:y12-diff:d2:3d865c8",
-    "line": "u' = 3x^(2)"
-   },
-   "byKind": {
-    "generated": 2,
-    "bank": 5
-   }
-  },
   "TeX not readable as a typed line (\\infty)": {
    "count": 6,
    "example": {
@@ -726,6 +715,16 @@
    },
    "byKind": {
     "bank-worked": 5
+   }
+  },
+  "differentiation step": {
+   "count": 5,
+   "example": {
+    "id": "A11-C1-020",
+    "line": "y'=(1/(2*sqrt(x)))=(1/4)"
+   },
+   "byKind": {
+    "bank": 5
    }
   },
   "TeX not readable as a typed line (\\lambda)": {
@@ -1054,7 +1053,7 @@
   }
  },
  "wrongHalfFailures": {
-  "wrong step missed": 2066,
+  "wrong step missed": 2051,
   "no provable one-line mutation of any step": 1909,
   "no maths lines in the worked solution": 252,
   "TeX not readable as a typed line (\\pm)": 103,
@@ -1126,146 +1125,146 @@
   "bank:a11-ma-c1": {
    "total": 238,
    "full": 43,
-   "trueOnly": 80,
-   "uncovered": 115,
+   "trueOnly": 91,
+   "uncovered": 104,
    "fullPct": 18.07,
-   "trueOnlyPct": 33.61,
-   "uncoveredPct": 48.32
+   "trueOnlyPct": 38.24,
+   "uncoveredPct": 43.7
   },
   "bank:a11-ma-e1": {
    "total": 186,
-   "full": 5,
-   "trueOnly": 56,
-   "uncovered": 125,
-   "fullPct": 2.69,
-   "trueOnlyPct": 30.11,
-   "uncoveredPct": 67.2
+   "full": 6,
+   "trueOnly": 65,
+   "uncovered": 115,
+   "fullPct": 3.23,
+   "trueOnlyPct": 34.95,
+   "uncoveredPct": 61.83
   },
   "bank:a11-ma-f1": {
    "total": 289,
-   "full": 15,
-   "trueOnly": 117,
-   "uncovered": 157,
-   "fullPct": 5.19,
-   "trueOnlyPct": 40.48,
-   "uncoveredPct": 54.33
+   "full": 16,
+   "trueOnly": 125,
+   "uncovered": 148,
+   "fullPct": 5.54,
+   "trueOnlyPct": 43.25,
+   "uncoveredPct": 51.21
   },
   "bank:a11-ma-s1": {
    "total": 165,
    "full": 12,
-   "trueOnly": 57,
-   "uncovered": 96,
+   "trueOnly": 99,
+   "uncovered": 54,
    "fullPct": 7.27,
-   "trueOnlyPct": 34.55,
-   "uncoveredPct": 58.18
+   "trueOnlyPct": 60,
+   "uncoveredPct": 32.73
   },
   "bank:a11-ma-t1": {
    "total": 240,
    "full": 2,
-   "trueOnly": 55,
-   "uncovered": 183,
+   "trueOnly": 77,
+   "uncovered": 161,
    "fullPct": 0.83,
-   "trueOnlyPct": 22.92,
-   "uncoveredPct": 76.25
+   "trueOnlyPct": 32.08,
+   "uncoveredPct": 67.08
   },
   "bank:a11-ma-t2": {
    "total": 154,
    "full": 0,
-   "trueOnly": 56,
-   "uncovered": 98,
+   "trueOnly": 62,
+   "uncovered": 92,
    "fullPct": 0,
-   "trueOnlyPct": 36.36,
-   "uncoveredPct": 63.64
+   "trueOnlyPct": 40.26,
+   "uncoveredPct": 59.74
   },
   "bank:a12-ma-c2": {
    "total": 185,
    "full": 34,
-   "trueOnly": 84,
-   "uncovered": 67,
+   "trueOnly": 86,
+   "uncovered": 65,
    "fullPct": 18.38,
-   "trueOnlyPct": 45.41,
-   "uncoveredPct": 36.22
+   "trueOnlyPct": 46.49,
+   "uncoveredPct": 35.14
   },
   "bank:a12-ma-c3": {
    "total": 138,
    "full": 3,
-   "trueOnly": 60,
-   "uncovered": 75,
+   "trueOnly": 64,
+   "uncovered": 71,
    "fullPct": 2.17,
-   "trueOnlyPct": 43.48,
-   "uncoveredPct": 54.35
+   "trueOnlyPct": 46.38,
+   "uncoveredPct": 51.45
   },
   "bank:a12-ma-c4": {
    "total": 232,
-   "full": 4,
-   "trueOnly": 73,
-   "uncovered": 155,
-   "fullPct": 1.72,
-   "trueOnlyPct": 31.47,
-   "uncoveredPct": 66.81
+   "full": 8,
+   "trueOnly": 110,
+   "uncovered": 114,
+   "fullPct": 3.45,
+   "trueOnlyPct": 47.41,
+   "uncoveredPct": 49.14
   },
   "bank:a12-ma-f2": {
    "total": 125,
    "full": 4,
-   "trueOnly": 35,
-   "uncovered": 86,
+   "trueOnly": 36,
+   "uncovered": 85,
    "fullPct": 3.2,
-   "trueOnlyPct": 28,
-   "uncoveredPct": 68.8
+   "trueOnlyPct": 28.8,
+   "uncoveredPct": 68
   },
   "bank:a12-ma-m1": {
    "total": 171,
-   "full": 4,
-   "trueOnly": 45,
-   "uncovered": 122,
-   "fullPct": 2.34,
-   "trueOnlyPct": 26.32,
-   "uncoveredPct": 71.35
+   "full": 11,
+   "trueOnly": 100,
+   "uncovered": 60,
+   "fullPct": 6.43,
+   "trueOnlyPct": 58.48,
+   "uncoveredPct": 35.09
   },
   "bank:a12-ma-s2": {
    "total": 124,
    "full": 6,
-   "trueOnly": 36,
-   "uncovered": 82,
+   "trueOnly": 41,
+   "uncovered": 77,
    "fullPct": 4.84,
-   "trueOnlyPct": 29.03,
-   "uncoveredPct": 66.13
+   "trueOnlyPct": 33.06,
+   "uncoveredPct": 62.1
   },
   "bank:a12-ma-s3": {
    "total": 154,
    "full": 2,
-   "trueOnly": 45,
-   "uncovered": 107,
+   "trueOnly": 80,
+   "uncovered": 72,
    "fullPct": 1.3,
-   "trueOnlyPct": 29.22,
-   "uncoveredPct": 69.48
+   "trueOnlyPct": 51.95,
+   "uncoveredPct": 46.75
   },
   "bank:a12-ma-t3": {
    "total": 103,
    "full": 0,
-   "trueOnly": 32,
-   "uncovered": 71,
+   "trueOnly": 33,
+   "uncovered": 70,
    "fullPct": 0,
-   "trueOnlyPct": 31.07,
-   "uncoveredPct": 68.93
+   "trueOnlyPct": 32.04,
+   "uncoveredPct": 67.96
   },
   "bank:x11-me-a1": {
    "total": 237,
-   "full": 11,
-   "trueOnly": 13,
-   "uncovered": 213,
-   "fullPct": 4.64,
-   "trueOnlyPct": 5.49,
-   "uncoveredPct": 89.87
+   "full": 22,
+   "trueOnly": 56,
+   "uncovered": 159,
+   "fullPct": 9.28,
+   "trueOnlyPct": 23.63,
+   "uncoveredPct": 67.09
   },
   "bank:x11-me-c1": {
    "total": 152,
    "full": 0,
-   "trueOnly": 36,
-   "uncovered": 116,
+   "trueOnly": 49,
+   "uncovered": 103,
    "fullPct": 0,
-   "trueOnlyPct": 23.68,
-   "uncoveredPct": 76.32
+   "trueOnlyPct": 32.24,
+   "uncoveredPct": 67.76
   },
   "bank:x11-me-f1": {
    "total": 118,
@@ -1279,47 +1278,47 @@
   "bank:x11-me-f2": {
    "total": 175,
    "full": 13,
-   "trueOnly": 56,
-   "uncovered": 106,
+   "trueOnly": 59,
+   "uncovered": 103,
    "fullPct": 7.43,
-   "trueOnlyPct": 32,
-   "uncoveredPct": 60.57
+   "trueOnlyPct": 33.71,
+   "uncoveredPct": 58.86
   },
   "bank:x11-me-t1": {
    "total": 100,
-   "full": 4,
-   "trueOnly": 15,
-   "uncovered": 81,
-   "fullPct": 4,
-   "trueOnlyPct": 15,
-   "uncoveredPct": 81
+   "full": 5,
+   "trueOnly": 28,
+   "uncovered": 67,
+   "fullPct": 5,
+   "trueOnlyPct": 28,
+   "uncoveredPct": 67
   },
   "bank:x11-me-t2": {
    "total": 192,
    "full": 9,
-   "trueOnly": 82,
-   "uncovered": 101,
+   "trueOnly": 94,
+   "uncovered": 89,
    "fullPct": 4.69,
-   "trueOnlyPct": 42.71,
-   "uncoveredPct": 52.6
+   "trueOnlyPct": 48.96,
+   "uncoveredPct": 46.35
   },
   "bank:x12-me-c2": {
    "total": 205,
-   "full": 8,
-   "trueOnly": 22,
-   "uncovered": 175,
-   "fullPct": 3.9,
-   "trueOnlyPct": 10.73,
-   "uncoveredPct": 85.37
+   "full": 18,
+   "trueOnly": 36,
+   "uncovered": 151,
+   "fullPct": 8.78,
+   "trueOnlyPct": 17.56,
+   "uncoveredPct": 73.66
   },
   "bank:x12-me-c3": {
    "total": 187,
    "full": 0,
-   "trueOnly": 64,
-   "uncovered": 123,
+   "trueOnly": 85,
+   "uncovered": 102,
    "fullPct": 0,
-   "trueOnlyPct": 34.22,
-   "uncoveredPct": 65.78
+   "trueOnlyPct": 45.45,
+   "uncoveredPct": 54.55
   },
   "bank:x12-me-p1": {
    "total": 143,
@@ -1333,29 +1332,29 @@
   "bank:x12-me-s1": {
    "total": 126,
    "full": 6,
-   "trueOnly": 25,
-   "uncovered": 95,
+   "trueOnly": 43,
+   "uncovered": 77,
    "fullPct": 4.76,
-   "trueOnlyPct": 19.84,
-   "uncoveredPct": 75.4
+   "trueOnlyPct": 34.13,
+   "uncoveredPct": 61.11
   },
   "bank:x12-me-t3": {
    "total": 125,
    "full": 1,
-   "trueOnly": 43,
-   "uncovered": 81,
+   "trueOnly": 44,
+   "uncovered": 80,
    "fullPct": 0.8,
-   "trueOnlyPct": 34.4,
-   "uncoveredPct": 64.8
+   "trueOnlyPct": 35.2,
+   "uncoveredPct": 64
   },
   "bank:x12-me-v1": {
    "total": 197,
-   "full": 7,
-   "trueOnly": 30,
-   "uncovered": 160,
-   "fullPct": 3.55,
-   "trueOnlyPct": 15.23,
-   "uncoveredPct": 81.22
+   "full": 8,
+   "trueOnly": 35,
+   "uncovered": 154,
+   "fullPct": 4.06,
+   "trueOnlyPct": 17.77,
+   "uncoveredPct": 78.17
   },
   "gen:me11-binomial": {
    "total": 24,
@@ -1405,11 +1404,11 @@
   "gen:me11-rates": {
    "total": 31,
    "full": 0,
-   "trueOnly": 17,
-   "uncovered": 14,
+   "trueOnly": 20,
+   "uncovered": 11,
    "fullPct": 0,
-   "trueOnlyPct": 54.84,
-   "uncoveredPct": 45.16
+   "trueOnlyPct": 64.52,
+   "uncoveredPct": 35.48
   },
   "gen:me11-trigid": {
    "total": 25,
@@ -1612,11 +1611,11 @@
   "gen:y11-sine-cosine-rule": {
    "total": 21,
    "full": 0,
-   "trueOnly": 0,
-   "uncovered": 21,
+   "trueOnly": 1,
+   "uncovered": 20,
    "fullPct": 0,
-   "trueOnlyPct": 0,
-   "uncoveredPct": 100
+   "trueOnlyPct": 4.76,
+   "uncoveredPct": 95.24
   },
   "gen:y11-transform": {
    "total": 26,
@@ -1657,11 +1656,11 @@
   "gen:y12-diff": {
    "total": 26,
    "full": 7,
-   "trueOnly": 12,
-   "uncovered": 7,
+   "trueOnly": 14,
+   "uncovered": 5,
    "fullPct": 26.92,
-   "trueOnlyPct": 46.15,
-   "uncoveredPct": 26.92
+   "trueOnlyPct": 53.85,
+   "uncoveredPct": 19.23
   },
   "gen:y12-explogcalc": {
    "total": 57,
@@ -1738,11 +1737,11 @@
   "gen:y12-series": {
    "total": 49,
    "full": 9,
-   "trueOnly": 27,
-   "uncovered": 13,
+   "trueOnly": 30,
+   "uncovered": 10,
    "fullPct": 18.37,
-   "trueOnlyPct": 55.1,
-   "uncoveredPct": 26.53
+   "trueOnlyPct": 61.22,
+   "uncoveredPct": 20.41
   },
   "gen:y12-stats": {
    "total": 24,
@@ -1765,67 +1764,67 @@
   "gen:y12-trigcalc": {
    "total": 31,
    "full": 0,
-   "trueOnly": 13,
-   "uncovered": 18,
+   "trueOnly": 15,
+   "uncovered": 16,
    "fullPct": 0,
-   "trueOnlyPct": 41.94,
-   "uncoveredPct": 58.06
+   "trueOnlyPct": 48.39,
+   "uncoveredPct": 51.61
   }
  },
  "byDotpoint": {
   "bank:A1.1a": {
    "total": 83,
-   "full": 3,
-   "trueOnly": 5,
-   "uncovered": 75,
-   "fullPct": 3.61,
-   "trueOnlyPct": 6.02,
-   "uncoveredPct": 90.36
+   "full": 7,
+   "trueOnly": 29,
+   "uncovered": 47,
+   "fullPct": 8.43,
+   "trueOnlyPct": 34.94,
+   "uncoveredPct": 56.63
   },
   "bank:A1.1b": {
    "total": 46,
-   "full": 2,
-   "trueOnly": 0,
-   "uncovered": 44,
-   "fullPct": 4.35,
-   "trueOnlyPct": 0,
-   "uncoveredPct": 95.65
+   "full": 7,
+   "trueOnly": 6,
+   "uncovered": 33,
+   "fullPct": 15.22,
+   "trueOnlyPct": 13.04,
+   "uncoveredPct": 71.74
   },
   "bank:A1.1c": {
    "total": 34,
    "full": 0,
-   "trueOnly": 4,
-   "uncovered": 30,
+   "trueOnly": 8,
+   "uncovered": 26,
    "fullPct": 0,
-   "trueOnlyPct": 11.76,
-   "uncoveredPct": 88.24
+   "trueOnlyPct": 23.53,
+   "uncoveredPct": 76.47
   },
   "bank:A1.2a": {
    "total": 74,
-   "full": 6,
-   "trueOnly": 4,
-   "uncovered": 64,
-   "fullPct": 8.11,
-   "trueOnlyPct": 5.41,
-   "uncoveredPct": 86.49
+   "full": 8,
+   "trueOnly": 13,
+   "uncovered": 53,
+   "fullPct": 10.81,
+   "trueOnlyPct": 17.57,
+   "uncoveredPct": 71.62
   },
   "bank:C1.1a": {
    "total": 125,
    "full": 3,
-   "trueOnly": 21,
-   "uncovered": 101,
+   "trueOnly": 34,
+   "uncovered": 88,
    "fullPct": 2.4,
-   "trueOnlyPct": 16.8,
-   "uncoveredPct": 80.8
+   "trueOnlyPct": 27.2,
+   "uncoveredPct": 70.4
   },
   "bank:C1.1b": {
    "total": 55,
    "full": 0,
-   "trueOnly": 24,
-   "uncovered": 31,
+   "trueOnly": 30,
+   "uncovered": 25,
    "fullPct": 0,
-   "trueOnlyPct": 43.64,
-   "uncoveredPct": 56.36
+   "trueOnlyPct": 54.55,
+   "uncoveredPct": 45.45
   },
   "bank:C1.2a": {
    "total": 26,
@@ -1848,29 +1847,29 @@
   "bank:C1.3b": {
    "total": 40,
    "full": 19,
-   "trueOnly": 6,
-   "uncovered": 15,
+   "trueOnly": 8,
+   "uncovered": 13,
    "fullPct": 47.5,
-   "trueOnlyPct": 15,
-   "uncoveredPct": 37.5
+   "trueOnlyPct": 20,
+   "uncoveredPct": 32.5
   },
   "bank:C1.3c": {
    "total": 44,
    "full": 3,
-   "trueOnly": 13,
-   "uncovered": 28,
+   "trueOnly": 14,
+   "uncovered": 27,
    "fullPct": 6.82,
-   "trueOnlyPct": 29.55,
-   "uncoveredPct": 63.64
+   "trueOnlyPct": 31.82,
+   "uncoveredPct": 61.36
   },
   "bank:C1.3d": {
    "total": 36,
    "full": 1,
-   "trueOnly": 21,
-   "uncovered": 14,
+   "trueOnly": 23,
+   "uncovered": 12,
    "fullPct": 2.78,
-   "trueOnlyPct": 58.33,
-   "uncoveredPct": 38.89
+   "trueOnlyPct": 63.89,
+   "uncoveredPct": 33.33
   },
   "bank:C1.3e": {
    "total": 25,
@@ -1901,39 +1900,39 @@
   },
   "bank:C2.2a": {
    "total": 106,
-   "full": 15,
-   "trueOnly": 29,
-   "uncovered": 62,
-   "fullPct": 14.15,
-   "trueOnlyPct": 27.36,
-   "uncoveredPct": 58.49
+   "full": 25,
+   "trueOnly": 37,
+   "uncovered": 44,
+   "fullPct": 23.58,
+   "trueOnlyPct": 34.91,
+   "uncoveredPct": 41.51
   },
   "bank:C2.2b": {
    "total": 70,
    "full": 1,
-   "trueOnly": 19,
-   "uncovered": 50,
+   "trueOnly": 24,
+   "uncovered": 45,
    "fullPct": 1.43,
-   "trueOnlyPct": 27.14,
-   "uncoveredPct": 71.43
+   "trueOnlyPct": 34.29,
+   "uncoveredPct": 64.29
   },
   "bank:C2.2c": {
    "total": 63,
    "full": 0,
-   "trueOnly": 3,
-   "uncovered": 60,
+   "trueOnly": 6,
+   "uncovered": 57,
    "fullPct": 0,
-   "trueOnlyPct": 4.76,
-   "uncoveredPct": 95.24
+   "trueOnlyPct": 9.52,
+   "uncoveredPct": 90.48
   },
   "bank:C3.1a": {
    "total": 118,
    "full": 2,
-   "trueOnly": 40,
-   "uncovered": 76,
+   "trueOnly": 59,
+   "uncovered": 57,
    "fullPct": 1.69,
-   "trueOnlyPct": 33.9,
-   "uncoveredPct": 64.41
+   "trueOnlyPct": 50,
+   "uncoveredPct": 48.31
   },
   "bank:C3.1b": {
    "total": 36,
@@ -1956,11 +1955,11 @@
   "bank:C3.2a": {
    "total": 93,
    "full": 1,
-   "trueOnly": 36,
-   "uncovered": 56,
+   "trueOnly": 40,
+   "uncovered": 52,
    "fullPct": 1.08,
-   "trueOnlyPct": 38.71,
-   "uncoveredPct": 60.22
+   "trueOnlyPct": 43.01,
+   "uncoveredPct": 55.91
   },
   "bank:C3.2b": {
    "total": 22,
@@ -1974,11 +1973,11 @@
   "bank:C3.2c": {
    "total": 38,
    "full": 0,
-   "trueOnly": 17,
-   "uncovered": 21,
+   "trueOnly": 19,
+   "uncovered": 19,
    "fullPct": 0,
-   "trueOnlyPct": 44.74,
-   "uncoveredPct": 55.26
+   "trueOnlyPct": 50,
+   "uncoveredPct": 50
   },
   "bank:C4.1a": {
    "total": 39,
@@ -1991,39 +1990,39 @@
   },
   "bank:C4.2a": {
    "total": 76,
-   "full": 1,
-   "trueOnly": 21,
-   "uncovered": 54,
-   "fullPct": 1.32,
-   "trueOnlyPct": 27.63,
-   "uncoveredPct": 71.05
+   "full": 5,
+   "trueOnly": 30,
+   "uncovered": 41,
+   "fullPct": 6.58,
+   "trueOnlyPct": 39.47,
+   "uncoveredPct": 53.95
   },
   "bank:C4.2b": {
    "total": 57,
    "full": 1,
-   "trueOnly": 21,
-   "uncovered": 35,
+   "trueOnly": 33,
+   "uncovered": 23,
    "fullPct": 1.75,
-   "trueOnlyPct": 36.84,
-   "uncoveredPct": 61.4
+   "trueOnlyPct": 57.89,
+   "uncoveredPct": 40.35
   },
   "bank:C4.2c": {
    "total": 28,
    "full": 0,
-   "trueOnly": 4,
-   "uncovered": 24,
+   "trueOnly": 14,
+   "uncovered": 14,
    "fullPct": 0,
-   "trueOnlyPct": 14.29,
-   "uncoveredPct": 85.71
+   "trueOnlyPct": 50,
+   "uncoveredPct": 50
   },
   "bank:C4.2d": {
    "total": 32,
    "full": 0,
-   "trueOnly": 10,
-   "uncovered": 22,
+   "trueOnly": 16,
+   "uncovered": 16,
    "fullPct": 0,
-   "trueOnlyPct": 31.25,
-   "uncoveredPct": 68.75
+   "trueOnlyPct": 50,
+   "uncoveredPct": 50
   },
   "bank:E1.1a": {
    "total": 12,
@@ -2036,12 +2035,12 @@
   },
   "bank:E1.2a": {
    "total": 47,
-   "full": 1,
-   "trueOnly": 12,
-   "uncovered": 34,
-   "fullPct": 2.13,
-   "trueOnlyPct": 25.53,
-   "uncoveredPct": 72.34
+   "full": 2,
+   "trueOnly": 16,
+   "uncovered": 29,
+   "fullPct": 4.26,
+   "trueOnlyPct": 34.04,
+   "uncoveredPct": 61.7
   },
   "bank:E1.2b": {
    "total": 57,
@@ -2064,20 +2063,20 @@
   "bank:E1.3b": {
    "total": 36,
    "full": 0,
-   "trueOnly": 17,
-   "uncovered": 19,
+   "trueOnly": 22,
+   "uncovered": 14,
    "fullPct": 0,
-   "trueOnlyPct": 47.22,
-   "uncoveredPct": 52.78
+   "trueOnlyPct": 61.11,
+   "uncoveredPct": 38.89
   },
   "bank:F1.1a": {
    "total": 43,
    "full": 6,
-   "trueOnly": 19,
-   "uncovered": 18,
+   "trueOnly": 22,
+   "uncovered": 15,
    "fullPct": 13.95,
-   "trueOnlyPct": 44.19,
-   "uncoveredPct": 41.86
+   "trueOnlyPct": 51.16,
+   "uncoveredPct": 34.88
   },
   "bank:F1.1b": {
    "total": 41,
@@ -2100,20 +2099,20 @@
   "bank:F1.2b": {
    "total": 24,
    "full": 0,
-   "trueOnly": 15,
-   "uncovered": 9,
+   "trueOnly": 16,
+   "uncovered": 8,
    "fullPct": 0,
-   "trueOnlyPct": 62.5,
-   "uncoveredPct": 37.5
+   "trueOnlyPct": 66.67,
+   "uncoveredPct": 33.33
   },
   "bank:F1.3a": {
    "total": 77,
    "full": 1,
-   "trueOnly": 29,
-   "uncovered": 47,
+   "trueOnly": 30,
+   "uncovered": 46,
    "fullPct": 1.3,
-   "trueOnlyPct": 37.66,
-   "uncoveredPct": 61.04
+   "trueOnlyPct": 38.96,
+   "uncoveredPct": 59.74
   },
   "bank:F1.3b": {
    "total": 26,
@@ -2127,20 +2126,20 @@
   "bank:F1.3c": {
    "total": 15,
    "full": 0,
-   "trueOnly": 5,
-   "uncovered": 10,
+   "trueOnly": 6,
+   "uncovered": 9,
    "fullPct": 0,
-   "trueOnlyPct": 33.33,
-   "uncoveredPct": 66.67
+   "trueOnlyPct": 40,
+   "uncoveredPct": 60
   },
   "bank:F1.4a": {
    "total": 55,
-   "full": 1,
+   "full": 2,
    "trueOnly": 25,
-   "uncovered": 29,
-   "fullPct": 1.82,
+   "uncovered": 28,
+   "fullPct": 3.64,
    "trueOnlyPct": 45.45,
-   "uncoveredPct": 52.73
+   "uncoveredPct": 50.91
   },
   "bank:F1.4b": {
    "total": 18,
@@ -2154,11 +2153,11 @@
   "bank:F1.4c": {
    "total": 21,
    "full": 1,
-   "trueOnly": 9,
-   "uncovered": 11,
+   "trueOnly": 11,
+   "uncovered": 9,
    "fullPct": 4.76,
-   "trueOnlyPct": 42.86,
-   "uncoveredPct": 52.38
+   "trueOnlyPct": 52.38,
+   "uncoveredPct": 42.86
   },
   "bank:F1.4d": {
    "total": 27,
@@ -2172,11 +2171,11 @@
   "bank:F2.1a": {
    "total": 77,
    "full": 7,
-   "trueOnly": 33,
-   "uncovered": 37,
+   "trueOnly": 37,
+   "uncovered": 33,
    "fullPct": 9.09,
-   "trueOnlyPct": 42.86,
-   "uncoveredPct": 48.05
+   "trueOnlyPct": 48.05,
+   "uncoveredPct": 42.86
   },
   "bank:F2.1b": {
    "total": 44,
@@ -2235,38 +2234,38 @@
   "bank:M1.1a": {
    "total": 42,
    "full": 1,
-   "trueOnly": 3,
-   "uncovered": 38,
+   "trueOnly": 23,
+   "uncovered": 18,
    "fullPct": 2.38,
-   "trueOnlyPct": 7.14,
-   "uncoveredPct": 90.48
+   "trueOnlyPct": 54.76,
+   "uncoveredPct": 42.86
   },
   "bank:M1.2a": {
    "total": 41,
-   "full": 1,
-   "trueOnly": 9,
-   "uncovered": 31,
-   "fullPct": 2.44,
-   "trueOnlyPct": 21.95,
-   "uncoveredPct": 75.61
+   "full": 8,
+   "trueOnly": 17,
+   "uncovered": 16,
+   "fullPct": 19.51,
+   "trueOnlyPct": 41.46,
+   "uncoveredPct": 39.02
   },
   "bank:M1.3a": {
    "total": 46,
    "full": 2,
-   "trueOnly": 22,
-   "uncovered": 22,
+   "trueOnly": 35,
+   "uncovered": 9,
    "fullPct": 4.35,
-   "trueOnlyPct": 47.83,
-   "uncoveredPct": 47.83
+   "trueOnlyPct": 76.09,
+   "uncoveredPct": 19.57
   },
   "bank:M1.4a": {
    "total": 42,
    "full": 0,
-   "trueOnly": 11,
-   "uncovered": 31,
+   "trueOnly": 25,
+   "uncovered": 17,
    "fullPct": 0,
-   "trueOnlyPct": 26.19,
-   "uncoveredPct": 73.81
+   "trueOnlyPct": 59.52,
+   "uncoveredPct": 40.48
   },
   "bank:P1.1a": {
    "total": 54,
@@ -2298,47 +2297,47 @@
   "bank:S1.1a": {
    "total": 121,
    "full": 10,
-   "trueOnly": 29,
-   "uncovered": 82,
+   "trueOnly": 53,
+   "uncovered": 58,
    "fullPct": 8.26,
-   "trueOnlyPct": 23.97,
-   "uncoveredPct": 67.77
+   "trueOnlyPct": 43.8,
+   "uncoveredPct": 47.93
   },
   "bank:S1.1b": {
    "total": 47,
    "full": 1,
-   "trueOnly": 19,
-   "uncovered": 27,
+   "trueOnly": 31,
+   "uncovered": 15,
    "fullPct": 2.13,
-   "trueOnlyPct": 40.43,
-   "uncoveredPct": 57.45
+   "trueOnlyPct": 65.96,
+   "uncoveredPct": 31.91
   },
   "bank:S1.1c": {
    "total": 35,
    "full": 1,
-   "trueOnly": 9,
-   "uncovered": 25,
+   "trueOnly": 24,
+   "uncovered": 10,
    "fullPct": 2.86,
-   "trueOnlyPct": 25.71,
-   "uncoveredPct": 71.43
+   "trueOnlyPct": 68.57,
+   "uncoveredPct": 28.57
   },
   "bank:S1.2a": {
    "total": 88,
    "full": 6,
-   "trueOnly": 25,
-   "uncovered": 57,
+   "trueOnly": 34,
+   "uncovered": 48,
    "fullPct": 6.82,
-   "trueOnlyPct": 28.41,
-   "uncoveredPct": 64.77
+   "trueOnlyPct": 38.64,
+   "uncoveredPct": 54.55
   },
   "bank:S2.1a": {
    "total": 47,
    "full": 4,
-   "trueOnly": 18,
-   "uncovered": 25,
+   "trueOnly": 21,
+   "uncovered": 22,
    "fullPct": 8.51,
-   "trueOnlyPct": 38.3,
-   "uncoveredPct": 53.19
+   "trueOnlyPct": 44.68,
+   "uncoveredPct": 46.81
   },
   "bank:S2.1b": {
    "total": 19,
@@ -2361,65 +2360,65 @@
   "bank:S2.2b": {
    "total": 28,
    "full": 1,
-   "trueOnly": 12,
-   "uncovered": 15,
+   "trueOnly": 14,
+   "uncovered": 13,
    "fullPct": 3.57,
-   "trueOnlyPct": 42.86,
-   "uncoveredPct": 53.57
+   "trueOnlyPct": 50,
+   "uncoveredPct": 46.43
   },
   "bank:S3.1a": {
    "total": 25,
    "full": 2,
-   "trueOnly": 3,
-   "uncovered": 20,
+   "trueOnly": 7,
+   "uncovered": 16,
    "fullPct": 8,
-   "trueOnlyPct": 12,
-   "uncoveredPct": 80
+   "trueOnlyPct": 28,
+   "uncoveredPct": 64
   },
   "bank:S3.1b": {
    "total": 25,
    "full": 0,
-   "trueOnly": 15,
-   "uncovered": 10,
+   "trueOnly": 17,
+   "uncovered": 8,
    "fullPct": 0,
-   "trueOnlyPct": 60,
-   "uncoveredPct": 40
+   "trueOnlyPct": 68,
+   "uncoveredPct": 32
   },
   "bank:S3.1c": {
    "total": 25,
    "full": 0,
-   "trueOnly": 13,
-   "uncovered": 12,
+   "trueOnly": 17,
+   "uncovered": 8,
    "fullPct": 0,
-   "trueOnlyPct": 52,
-   "uncoveredPct": 48
+   "trueOnlyPct": 68,
+   "uncoveredPct": 32
   },
   "bank:S3.2a": {
    "total": 38,
    "full": 0,
-   "trueOnly": 9,
-   "uncovered": 29,
+   "trueOnly": 18,
+   "uncovered": 20,
    "fullPct": 0,
-   "trueOnlyPct": 23.68,
-   "uncoveredPct": 76.32
+   "trueOnlyPct": 47.37,
+   "uncoveredPct": 52.63
   },
   "bank:S3.2b": {
    "total": 41,
    "full": 0,
-   "trueOnly": 5,
-   "uncovered": 36,
+   "trueOnly": 21,
+   "uncovered": 20,
    "fullPct": 0,
-   "trueOnlyPct": 12.2,
-   "uncoveredPct": 87.8
+   "trueOnlyPct": 51.22,
+   "uncoveredPct": 48.78
   },
   "bank:T1.1a": {
    "total": 69,
-   "full": 1,
-   "trueOnly": 11,
-   "uncovered": 57,
-   "fullPct": 1.45,
-   "trueOnlyPct": 15.94,
-   "uncoveredPct": 82.61
+   "full": 2,
+   "trueOnly": 23,
+   "uncovered": 44,
+   "fullPct": 2.9,
+   "trueOnlyPct": 33.33,
+   "uncoveredPct": 63.77
   },
   "bank:T1.1b": {
    "total": 50,
@@ -2433,83 +2432,83 @@
   "bank:T1.1c": {
    "total": 82,
    "full": 4,
-   "trueOnly": 10,
-   "uncovered": 68,
+   "trueOnly": 11,
+   "uncovered": 67,
    "fullPct": 4.88,
-   "trueOnlyPct": 12.2,
-   "uncoveredPct": 82.93
+   "trueOnlyPct": 13.41,
+   "uncoveredPct": 81.71
   },
   "bank:T1.1d": {
    "total": 34,
    "full": 1,
-   "trueOnly": 9,
-   "uncovered": 24,
+   "trueOnly": 12,
+   "uncovered": 21,
    "fullPct": 2.94,
-   "trueOnlyPct": 26.47,
-   "uncoveredPct": 70.59
+   "trueOnlyPct": 35.29,
+   "uncoveredPct": 61.76
   },
   "bank:T1.1e": {
    "total": 36,
    "full": 0,
-   "trueOnly": 8,
-   "uncovered": 28,
+   "trueOnly": 11,
+   "uncovered": 25,
    "fullPct": 0,
-   "trueOnlyPct": 22.22,
-   "uncoveredPct": 77.78
+   "trueOnlyPct": 30.56,
+   "uncoveredPct": 69.44
   },
   "bank:T1.2a": {
    "total": 27,
    "full": 0,
-   "trueOnly": 11,
-   "uncovered": 16,
+   "trueOnly": 20,
+   "uncovered": 7,
    "fullPct": 0,
-   "trueOnlyPct": 40.74,
-   "uncoveredPct": 59.26
+   "trueOnlyPct": 74.07,
+   "uncoveredPct": 25.93
   },
   "bank:T1.2b": {
    "total": 42,
    "full": 0,
-   "trueOnly": 19,
-   "uncovered": 23,
+   "trueOnly": 26,
+   "uncovered": 16,
    "fullPct": 0,
-   "trueOnlyPct": 45.24,
-   "uncoveredPct": 54.76
+   "trueOnlyPct": 61.9,
+   "uncoveredPct": 38.1
   },
   "bank:T2.1a": {
    "total": 88,
    "full": 3,
-   "trueOnly": 34,
-   "uncovered": 51,
+   "trueOnly": 43,
+   "uncovered": 42,
    "fullPct": 3.41,
-   "trueOnlyPct": 38.64,
-   "uncoveredPct": 57.95
+   "trueOnlyPct": 48.86,
+   "uncoveredPct": 47.73
   },
   "bank:T2.1b": {
    "total": 60,
    "full": 0,
-   "trueOnly": 27,
-   "uncovered": 33,
+   "trueOnly": 32,
+   "uncovered": 28,
    "fullPct": 0,
-   "trueOnlyPct": 45,
-   "uncoveredPct": 55
+   "trueOnlyPct": 53.33,
+   "uncoveredPct": 46.67
   },
   "bank:T2.1c": {
    "total": 74,
    "full": 6,
-   "trueOnly": 43,
-   "uncovered": 25,
+   "trueOnly": 45,
+   "uncovered": 23,
    "fullPct": 8.11,
-   "trueOnlyPct": 58.11,
-   "uncoveredPct": 33.78
+   "trueOnlyPct": 60.81,
+   "uncoveredPct": 31.08
   },
   "bank:T2.1d": {
    "total": 73,
    "full": 0,
-   "trueOnly": 12,
-   "uncovered": 61,
+   "trueOnly": 14,
+   "uncovered": 59,
    "fullPct": 0,
-   "trueOnlyPct": 16.44,
-   "uncoveredPct": 83.56
+   "trueOnlyPct": 19.18,
+   "uncoveredPct": 80.82
   },
   "bank:T2.1e": {
    "total": 51,
@@ -2523,20 +2522,20 @@
   "bank:T3.1a": {
    "total": 73,
    "full": 1,
-   "trueOnly": 31,
-   "uncovered": 41,
+   "trueOnly": 32,
+   "uncovered": 40,
    "fullPct": 1.37,
-   "trueOnlyPct": 42.47,
-   "uncoveredPct": 56.16
+   "trueOnlyPct": 43.84,
+   "uncoveredPct": 54.79
   },
   "bank:T3.1b": {
    "total": 49,
    "full": 0,
-   "trueOnly": 13,
-   "uncovered": 36,
+   "trueOnly": 14,
+   "uncovered": 35,
    "fullPct": 0,
-   "trueOnlyPct": 26.53,
-   "uncoveredPct": 73.47
+   "trueOnlyPct": 28.57,
+   "uncoveredPct": 71.43
   },
   "bank:T3.1c": {
    "total": 83,
@@ -2568,11 +2567,11 @@
   "bank:V1.1b": {
    "total": 61,
    "full": 4,
-   "trueOnly": 6,
-   "uncovered": 51,
+   "trueOnly": 7,
+   "uncovered": 50,
    "fullPct": 6.56,
-   "trueOnlyPct": 9.84,
-   "uncoveredPct": 83.61
+   "trueOnlyPct": 11.48,
+   "uncoveredPct": 81.97
   },
   "bank:V1.1c": {
    "total": 32,
@@ -2585,12 +2584,12 @@
   },
   "bank:V1.2a": {
    "total": 72,
-   "full": 3,
-   "trueOnly": 16,
-   "uncovered": 53,
-   "fullPct": 4.17,
-   "trueOnlyPct": 22.22,
-   "uncoveredPct": 73.61
+   "full": 4,
+   "trueOnly": 20,
+   "uncovered": 48,
+   "fullPct": 5.56,
+   "trueOnlyPct": 27.78,
+   "uncoveredPct": 66.67
   },
   "gen:me11-binomial.1": {
    "total": 5,
@@ -2757,11 +2756,11 @@
   "gen:me11-rates.2": {
    "total": 18,
    "full": 0,
-   "trueOnly": 8,
-   "uncovered": 10,
+   "trueOnly": 11,
+   "uncovered": 7,
    "fullPct": 0,
-   "trueOnlyPct": 44.44,
-   "uncoveredPct": 55.56
+   "trueOnlyPct": 61.11,
+   "uncoveredPct": 38.89
   },
   "gen:me11-rates.3": {
    "total": 8,
@@ -3360,11 +3359,11 @@
   "gen:y11-sine-cosine-rule.1": {
    "total": 11,
    "full": 0,
-   "trueOnly": 0,
-   "uncovered": 11,
+   "trueOnly": 1,
+   "uncovered": 10,
    "fullPct": 0,
-   "trueOnlyPct": 0,
-   "uncoveredPct": 100
+   "trueOnlyPct": 9.09,
+   "uncoveredPct": 90.91
   },
   "gen:y11-sine-cosine-rule.2": {
    "total": 4,
@@ -3504,11 +3503,11 @@
   "gen:y12-diff.1": {
    "total": 8,
    "full": 1,
-   "trueOnly": 5,
-   "uncovered": 2,
+   "trueOnly": 7,
+   "uncovered": 0,
    "fullPct": 12.5,
-   "trueOnlyPct": 62.5,
-   "uncoveredPct": 25
+   "trueOnlyPct": 87.5,
+   "uncoveredPct": 0
   },
   "gen:y12-diff.2": {
    "total": 6,
@@ -3756,11 +3755,11 @@
   "gen:y12-series.1": {
    "total": 25,
    "full": 6,
-   "trueOnly": 14,
-   "uncovered": 5,
+   "trueOnly": 16,
+   "uncovered": 3,
    "fullPct": 24,
-   "trueOnlyPct": 56,
-   "uncoveredPct": 20
+   "trueOnlyPct": 64,
+   "uncoveredPct": 12
   },
   "gen:y12-series.2": {
    "total": 6,
@@ -3774,11 +3773,11 @@
   "gen:y12-series.3": {
    "total": 18,
    "full": 2,
-   "trueOnly": 9,
-   "uncovered": 7,
+   "trueOnly": 10,
+   "uncovered": 6,
    "fullPct": 11.11,
-   "trueOnlyPct": 50,
-   "uncoveredPct": 38.89
+   "trueOnlyPct": 55.56,
+   "uncoveredPct": 33.33
   },
   "gen:y12-stats.1": {
    "total": 13,
@@ -3837,11 +3836,11 @@
   "gen:y12-trigcalc.1": {
    "total": 12,
    "full": 0,
-   "trueOnly": 5,
-   "uncovered": 7,
+   "trueOnly": 6,
+   "uncovered": 6,
    "fullPct": 0,
-   "trueOnlyPct": 41.67,
-   "uncoveredPct": 58.33
+   "trueOnlyPct": 50,
+   "uncoveredPct": 50
   },
   "gen:y12-trigcalc.2": {
    "total": 6,
@@ -3855,11 +3854,11 @@
   "gen:y12-trigcalc.3": {
    "total": 13,
    "full": 0,
-   "trueOnly": 6,
-   "uncovered": 7,
+   "trueOnly": 7,
+   "uncovered": 6,
    "fullPct": 0,
-   "trueOnlyPct": 46.15,
-   "uncoveredPct": 53.85
+   "trueOnlyPct": 53.85,
+   "uncoveredPct": 46.15
   }
  }
 }

@@ -350,6 +350,36 @@ ok(got.ticks.length === CHECKED.length && (size === 'desktop' ? inGutter.length 
   }
 }
 
+// The owner's integration-by-substitution page (26 Nov 2026), the engine's REAL report (server/test/support/teacher-page-real-reports.mjs, `integration7`): seven lines,
+// "0 lines correct, 0 wrong, 7 not checked" before engine/integrationLines.js; now the heading is neutral, six lines are ticked (each with its own sentence)
+// and the last line is the answer. The page drawing and its line boxes are synthetic.
+{
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, colorScheme: 'light' }); const pg = await ctx.newPage();
+  const errors = []; pg.on('pageerror', e => errors.push(e.message));
+  await open(pg, url('integration7', { theme: 'light', extra: 'criteria=1' }), 'marked');
+  const got = await pg.evaluate(() => {
+    const sec = document.querySelector('[data-marked-page]');
+    return { ticks: [...sec.querySelectorAll('.mp-t-tick')].map(b => ({ n: Number(b.getAttribute('data-mp-box')), label: b.getAttribute('aria-label') })), says: [...sec.querySelectorAll('[data-mp-say]')].map(w => w.textContent.trim()), tally: sec.querySelector('[data-mp-tally]')?.textContent,
+      wrong: sec.querySelectorAll('.mp-t-tick.is-wrong').length, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+  });
+  ok(got.ticks.length === 6 && got.ticks.map(t => t.n).join() === '2,3,4,5,6,7', `integration page: six ticks, on lines 2 to 7 (${got.ticks.map(t => t.n)})`);
+  ok(got.wrong === 0, 'integration page: nothing is crossed');
+  ok(got.ticks.every(t => /correct/i.test(t.label || '')), `integration page: every tick is announced as correct (${got.ticks.map(t => t.label).join(' | ')})`);
+  ok(/0 wrong|^(?!.*not checked)/i.test(got.tally || ''), `integration page: the tally does not say "not checked" (${got.tally})`);
+  ok(got.overflow <= 0, 'integration page: no sideways scroll');
+  ok(errors.length === 0, `integration page: no page error ${errors.join(' | ')}`);
+  await pg.focus('[data-mp-box="4"]'); await pg.waitForSelector('[data-mp-pop="4"]');
+  const popText = await pg.evaluate(() => document.querySelector('[data-mp-pop="4"]')?.innerText.replace(/\s+/g, ' ').trim());
+  ok(/Line 4: correct/.test(popText || '') && /change of variable is correct/.test(popText || ''), `integration page: line 4 says why it is right (${popText})`);
+  await pg.keyboard.press('Escape');
+  await pg.focus('[data-mp-box="7"]'); await pg.waitForSelector('[data-mp-pop="7"]');
+  const last = await pg.evaluate(() => document.querySelector('[data-mp-pop="7"]')?.innerText.replace(/\s+/g, ' ').trim());
+  ok(/Line 7: correct/.test(last || '') && /answer the question asks for/.test(last || ''), `integration page: line 7 is the correct answer (${last})`);
+  await pg.keyboard.press('Escape');
+  if (shots) { await pg.mouse.move(5, 5); await pg.screenshot({ path: `${shots}/integration7-marked-desktop-light.png`, fullPage: true }); }
+  await ctx.close();
+}
+
 await browser.close(); await server.close();
 if (failures.length) { console.error(`tour-teacher-marked-page: ${failures.length} failed of ${pass + failures.length}`); for (const f of failures) console.error(' - ' + f); process.exit(1); }
 console.log(`tour-teacher-marked-page: ${pass} checks passed${shots ? `, shots in ${shots}` : ''}`);

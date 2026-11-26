@@ -23,7 +23,7 @@
 import { evaluate, variablesOf } from './expr.js';
 import { isHeading, worldOf, labelOf, clean, lead, astOf, constOf, fitPoly, polyD, rootsComplete } from './pageProofs.js';
 
-export const CLASSES = Object.freeze(['power-rule-differentiation', 'differentiation', 'factorisation', 'roots-of-a-product', 'equation-setup', 'substitution-evaluated', 'arithmetic-chain', 'second-derivative-value', 'sign-claim', 'nature-claim', 'point-claim', 'conclusion-matches', 'condition-line', 'restated-question', 'restated-function', 'heading', 'solution-list', 'rounded-value', 'labelled-substitution', 'identity', 'derivative-rule', 'true-as-written', 'matches-worked-step', 'equal-to-line-above', 'satisfies-equation-above', 'same-equation-as-line-above']);
+export const CLASSES = Object.freeze(['power-rule-differentiation', 'differentiation', 'factorisation', 'roots-of-a-product', 'equation-setup', 'substitution-evaluated', 'arithmetic-chain', 'second-derivative-value', 'sign-claim', 'nature-claim', 'point-claim', 'conclusion-matches', 'condition-line', 'restated-question', 'restated-function', 'heading', 'solution-list', 'rounded-value', 'labelled-substitution', 'identity', 'derivative-rule', 'true-as-written', 'matches-worked-step', 'equal-to-line-above', 'satisfies-equation-above', 'same-equation-as-line-above', 'substitution-defined', 'substitution-consistent', 'derivative-of-substitution', 'differential-form', 'change-of-variable', 'integral-rewritten', 'antiderivative-checked', 'back-substitution', 'equivalent-expressions', 'definite-integral-evaluated', 'several-claims']);
 const PROVED = { listed: 'solution-list', rounded: 'rounded-value', substituted: 'labelled-substitution', restated: 'restated-question', identity: 'identity', derivative: 'derivative-rule' };
 const NUM = String.raw`-?\d+(?:\.\d+)?`;
 
@@ -70,7 +70,23 @@ function resultTexts(text, answerType) {
     if (!single || !/[A-Za-z]{3,}/.test(t.replace(/\b(?:sqrt|cbrt|ln|log|sin|cos|tan|sec|csc|cot|arcsin|arccos|arctan|exp|pi)\b/gi, ''))) out.push(t);
   }
   for (const c of out.slice()) { const u = flatFraction(unwrap(c)); if (u !== c) out.push(u); }
+  // a line that ends in arithmetic not yet carried out (`32 - 64/3`, `(1/2) + 2`, `2*1.1903`) STATES its value: that value, written the way the answer box takes it, is offered
+  // to the same answer check as well. The check decides; nothing here accepts a value itself.
+  if (answerType === 'numeric') for (const c of out.slice()) out.push(...valueTexts(c));
   return [...new Set(out)];
+}
+/** The value of a letter-free arithmetic text as a plain fraction (when it is rational with a small denominator) and as a decimal; [] for anything else, or when the text is already a plain number. */
+function valueTexts(c) {
+  const t = String(c).trim();
+  if (!t || /^-?\d+(?:\.\d+)?$/.test(t) || /[A-Za-z]{2,}/.test(t.replace(/\b(?:sqrt|pi)\b/gi, '')) || !/[-+*/^()]/.test(t.slice(1))) return [];
+  const ast = astOf(t);
+  if (!ast || ast.t === 'equation') return [];
+  let v; try { if ([...variablesOf(ast)].some(x => x !== 'e')) return []; v = evaluate(ast, {}); } catch { return []; }
+  if (!Number.isFinite(v) || Math.abs(v) > 1e9) return [];
+  const out = [];
+  for (let d = 1; d <= 2000; d++) { const n = Math.round(v * d); if (Math.abs(v * d - n) <= 1e-9 * Math.max(1, Math.abs(v * d))) { out.push(d === 1 ? String(n) : `${n}/${d}`); break; } }
+  out.push(String(Number(v.toPrecision(12))));
+  return out;
 }
 /** `-(4639/6561)` as `-4639/6561`: a bracketed plain fraction written the way a numeric answer box takes it. */
 const flatFraction = t => t.replace(/\(\s*(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)\s*\)/g, '$1/$2');

@@ -73,9 +73,26 @@ function owner19Page() {
   });
   return { src: canvas.toDataURL('image/png'), lines };
 }
-const O19 = which === 'owner19' ? owner19Page() : null;
+// ?case=integration7: the owner's 7-line integration-by-substitution page (a SYNTHETIC drawing in one column; the report is the engine's real output)
+function integration7Page() {
+  const lines7 = REAL.integration7.lines;
+  const W = 900, H = 520;
+  const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H;
+  const g = canvas.getContext('2d');
+  g.fillStyle = '#fbfaf6'; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#1d2a55'; g.font = '30px "Bradley Hand","Segoe Print","Comic Sans MS",cursive'; g.textBaseline = 'middle';
+  const lines = lines7.map((text, i) => {
+    const y = 40 + i * 64;
+    g.fillText(text, 40, y);
+    const w = Math.min(W - 80, g.measureText(text).width + 6);
+    return { text, box: { x: 40 / W, y: (y - 26) / H, w: w / W, h: 52 / H } };
+  });
+  return { src: canvas.toDataURL('image/png'), lines };
+}
+const O19 = which === 'owner19' ? owner19Page() : which === 'integration7' ? integration7Page() : null;
 
-const c = which === 'owner19' ? { meta: null, lines: REAL.owner19.lines, report: REAL.owner19.shownReport || REAL.owner19.stepReport, receipt: q.get('criteria') === '3' ? { awarded: 3, possible: 3 } : { awarded: 1, possible: 1 } }
+const c = which === 'integration7' ? { meta: null, lines: REAL.integration7.lines, report: REAL.integration7.shownReport || REAL.integration7.stepReport, receipt: { awarded: 1, possible: 1 } }
+  : which === 'owner19' ? { meta: null, lines: REAL.owner19.lines, report: REAL.owner19.shownReport || REAL.owner19.stepReport, receipt: q.get('criteria') === '3' ? { awarded: 3, possible: 3 } : { awarded: 1, possible: 1 } }
   : which === 'wrong' ? { meta: null, lines: REAL.wrong.lines, report: REAL.wrong.shownReport || REAL.wrong.stepReport, receipt: { awarded: 0, possible: 1 } } : which === 'followed' ? { meta: null, lines: REAL.followed.lines, report: REAL.followed.shownReport || REAL.followed.stepReport, receipt: { awarded: 0, possible: 1 } } : FIXTURE_PAGE ? { ...CASES.buoy, lines: FIXTURE_PAGE.lines.map(l => l.text) } : (CASES[which] || CASES.buoy);
 const stepReport = c.report || stepCheck(c.meta, c.lines.join('\n'));
 // ?facts=1: the optional fields the engine may add (a first-break index, a corrected line on the crossed line). Absent otherwise.
@@ -83,7 +100,7 @@ if (q.get('facts') === '1' && !c.report) {
   const at = stepReport.lines.findIndex(l => l.state === 'wrong' || l.status === 'break');
   if (at >= 0) { stepReport.firstBreak = at; stepReport.lines[at] = { ...stepReport.lines[at], corrected: '0=6x[x+3]' }; }
 }
-const input = { lines: c.lines, stepReport, solution: null, source: source === 'ink' ? 'handwriting' : 'typed', receipt: { ...c.receipt, id: 'synthetic-0000' }, attempt: 1 };
+const input = { ...(which === 'integration7' ? { page: true } : {}), lines: c.lines, stepReport, solution: null, source: source === 'ink' ? 'handwriting' : 'typed', receipt: { ...c.receipt, id: 'synthetic-0000' }, attempt: 1 };
 
 // ── a synthetic page ─────────────────────────────────────────────────────────
 // Ink: each line is a run of small wobbling strokes, as wide as its text is long.
