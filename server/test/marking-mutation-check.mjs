@@ -414,5 +414,62 @@ let corpusFalse = 0, corpusCross = 0, corpusFalseTicked = 0, corpusCrossed = 0, 
   ok(india[1].status === 'break', `a question the Australian edition has not sealed reads the page as it always did (${india.map(l => l.status)})`);
 }
 
+// ── a value of the student's OWN function is a claim (QA 26 Nov 2026, item 12) ───────────────────────────────────────────────
+// `F(x) = -5x^4` then `F(0) = 3`: F(0) is 0 by the student's own line. Crossed (alone or in a list) when it provably contradicts the definition
+// written on the page; never crossed when true, undecidable, rounded, redefined, given by the question, or in an unknown angle unit.
+{
+  const { stepCheckArithmetic } = await import('../../client/src/engine/arithmeticLines.js');
+  const arith = lines => stepCheckArithmetic(lines.join('\n')).lines.map(l => l.status);
+  const q = G.generateQuestion('y12-integration', 1, 32);
+  const topic = lines => { const typed = '-405'; const ev = stepEvidence({ ...q }, typed, lines.join('\n'), checkAnswer(q, typed), { slipWarnings: true }); return (ev.shownReport || ev.stepReport).lines.map(l => l.status); };
+  const D = 'F(x) = -5x^4';
+  // the defect: wrong values are crossed, on a question with no Step Check and on one with a plan
+  ok(arith([D, 'F(3) = -405', 'F(0) = 3'])[2] === 'break', 'F(0) = 3 after F(x) = -5x^4 is crossed');
+  ok(arith([D, 'F(3) = -405, F(0) = 3'])[1] === 'break', 'a list F(3) = -405, F(0) = 3 is crossed for its wrong part');
+  ok(arith(['f(x) = x^2', 'f(3) = 10'])[1] === 'break', 'f(3) = 10 after f(x) = x^2 is crossed');
+  ok(arith(['f(x) = x^2', 'f(1/2) = 1/4'])[1] !== 'break' && arith(['f(x) = x^2', 'f(2) = 1/4'])[1] === 'break', 'fractions are exact: f(1/2) = 1/4 is not crossed, f(2) = 1/4 is');
+  ok(topic([D, 'F(3) = -405', 'F(0) = 3', '-405-0=-405'])[2] === 'break', 'on a question with a plan the crossed line is crossed on the card too');
+  ok(topic([D, 'F(3) = -405, F(0) = 3'])[1] === 'break', 'a plan question: the list is crossed');
+  // never a false cross
+  ok(arith([D, 'F(3) = -405', 'F(0) = 0']).every(s => s !== 'break') && arith([D, 'F(3) = -405, F(0) = 0']).every(s => s !== 'break'), 'true values are never crossed');
+  ok(topic([D, 'F(3) = -405, F(0) = 0', '-405-0=-405']).every(s => s !== 'break'), 'a true list on a plan question is never crossed');
+  ok(arith(['F(x) = x^3 - x^2', 'F(3) = 18, F(0) = 0', 'F(1) = 0']).every(s => s !== 'break'), 'true values of x^3 - x^2 are never crossed');
+  ok(arith(['f(x) = x^2', 'f(3) = 9.1']).every(s => s !== 'break') && arith(['f(x) = x^2', 'f(1.5) = 5']).every(s => s !== 'break'), 'a decimal is a rounding, never crossed');
+  ok(arith(['f(x) = sin(x)', 'f(90) = 5']).every(s => s !== 'break') && arith(['f(x) = log(x)', 'f(100) = 5']).every(s => s !== 'break'), 'an unknown angle unit or log base is never crossed');
+  ok(arith(['f(x) = e^2x', 'f(1) = 3']).every(s => s !== 'break'), 'an unbracketed exponent that can be read two ways is never crossed');
+  ok(arith(['g(x) = x^2', 'f(3) = 10']).every(s => s !== 'break'), 'a function the page did not define is never judged');
+  ok(arith(['f(x) = x^2', 'f(x) = x^2 + 1', 'f(3) = 10']).every(s => s !== 'break') && arith(['f(x) = x^2', 'f(x) = x^2 + 1', 'f(3) = 9']).every(s => s !== 'break'), 'a letter set twice may name either: nothing is crossed against it');
+  ok(arith(['y = x^2', 'y = 2x', 'y(3) = 9']).every(s => s !== 'break') && arith(['y = 3x', 'y(2) = 9']).every(s => s !== 'break'), 'a letter that names an equation, not a function f(x), is never held to a value');
+  ok(arith(['f(x) = x^2', 'f = 4', 'f(3) = 10']).every(s => s !== 'break'), 'a letter set again is no longer the function');
+  ok(arith(['f(x) = x^2', '(b) f(3) = 10']).every(s => s !== 'break'), 'a new part of the question drops the definition');
+  ok(arith(['f(x) = x^2', 'f(3) = 9 or 10']).every(s => s !== 'break'), 'a line that is not purely value claims is not read');
+  // review of #1126: when in doubt, a note
+  const none = lines => arith(lines).every(x => x !== 'break');
+  ok(none(['k = 2', 'f(x) = kx', 'k = 5', 'f(3) = 15']) && none(['k = 2', 'f(x) = kx', 'f(3) = 6', 'k = 5', 'f(3) = 15']) && none(['k = 2', 'f(x) = kx', 'f(3) = 7']), 'a definition built on a letter that is set again is never judged');
+  ok(none(['f(x) = πx', 'f(2) = 6']) && none(['f(x) = e^x', 'f(1) = 3']) && none(['f(x) = √2 x', 'f(2) = 3']) && none(['f(x) = sqrt(x)', 'f(2) = 1']), 'an irrational value may be rounded: never crossed');
+  ok(none(['f(x) = x^0', 'f(0) = 5']) && none(['f(x) = 0^x', 'f(0) = 5']) && none(['f(x) = x^x', 'f(0) = 5']) && none(['f(x) = 1/x', 'f(0) = 5']) && none(['f(x) = x^(-1)', 'f(0) = 5']), 'undefined or conventional values (0^0, 1/0) are never crossed');
+  ok(none(['f(x) = x^2 3', 'f(2) = 5']) && none(['f(x) = 2 3x', 'f(1) = 5']), 'a definition that reads two ways is never judged');
+  ok(none(['f(x) = ln(x)', 'f(1) = 4']) && none(['f(x) = abs(x)', 'f(-2) = 5']) && none(['f(x) = exp(x)', 'f(0) = 5']), 'named functions (ln, log, abs, exp) are never judged');
+  ok(arith(['f(x) = 2x + 1', 'f(3) = 8'])[1] === 'break' && arith(['f(x) = (x - 1)^2', 'f(3) = 5'])[1] === 'break', 'whole-number polynomials are still judged');
+  ok(none(['f(x) = x^2^3', 'f(2) = 64']) && none(['f(x) = x^2^3', 'f(2) = 256']) && none(['f(x) = (x^2)^3', 'f(2) = 5']), 'a stacked power may be read either way: never judged (nor the bracketed one, held to the notes)');
+  ok(none(['f(x) = 8/2*x', 'f(2) = 2']) && none(['f(x) = 8/2*x', 'f(2) = 8']) && none(['f(x) = 8/2x', 'f(2) = 2']) && none(['f(x) = 8/2 x', 'f(2) = 8']), 'a division followed by a product or juxtaposition may be read either way: never judged');
+  ok(arith(['f(x) = x/2', 'f(4) = 3'])[1] === 'break' && arith(['f(x) = x^(2)', 'f(3) = 10'])[1] === 'break' && none(['f(x) = x/2', 'f(4) = 2']), 'the plain readings (x/2, x^(2)) are still judged, true ones never crossed');
+  // generated true pages: no cross, and the same ticks that pay
+  { let pages = 0, crossed = 0;
+    for (const fam of ['y12-integration', 'y12-diff', 'y12-appdiff', 'me12-calc', 'y12-series']) for (let d = 1; d <= 4; d++) for (let sd = 1; sd <= 20; sd++) {
+      let g; try { g = G.generateQuestion(fam, d, sd); } catch { continue; }
+      const lines = (g.solution || g.steps || []).map(x => String(x.d || '').replace(/\$/g, '').replace(/\\[;,]/g, ' ')).filter(Boolean);
+      if (!lines.length) continue;
+      pages++;
+      const st = (() => { try { return (stepEvidence({ ...g }, '99991', lines.join('\n'), checkAnswer(g, '99991'), { slipWarnings: true }).shownReport || {}).lines || []; } catch { return []; } })();
+      crossed += st.filter(l => l.valueChain?.rule === 'function-value').length;
+    }
+    ok(pages >= 150 && crossed === 0, `generated authored pages are never crossed by the function-value rule (${pages} pages, ${crossed})`); }
+  // the final-answer marks are unchanged by the cross
+  { const withCross = stepEvidence({ ...q }, '-405', [D, 'F(3) = -405', 'F(0) = 3'].join('\n'), checkAnswer(q, '-405'), { slipWarnings: true });
+    const without = stepEvidence({ ...q }, '-405', [D, 'F(3) = -405', 'F(0) = 0'].join('\n'), checkAnswer(q, '-405'), { slipWarnings: true });
+    ok(JSON.stringify(withCross.topicTicks) === JSON.stringify(without.topicTicks), 'the cross copies no mark: the ticks that pay are the same'); }
+}
+
 console.log(failed ? `MARKING MUTATION: FAIL: ${failed} of ${checks} checks` : `MARKING MUTATION: PASS: ${checks} checks`);
 process.exit(failed ? 1 : 0);

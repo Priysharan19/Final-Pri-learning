@@ -193,20 +193,27 @@ export function foldTrueAsWritten(report, arithmetic) {
   const brk = report.lines.findIndex(l => l?.status === 'break');
   const limit = brk >= 0 ? brk : report.lines.length;
   let folded = 0;
+  const crossed = [];
   const lines = report.lines.map((l, i) => {
     const a = arithmetic.lines[i];
     const unjudged = l?.status === 'note' && (l.state === undefined || l.state === 'unverified' || l.state === 'unread') && l.note !== 'Follows from the earlier slip.';
+    // The ONE cross that is copied: a value of the student's own function that contradicts the definition the student wrote (QA 26 Nov 2026, item 12).
+    if (i < limit && unjudged && a?.status === 'break' && a.valueChain?.rule === 'function-value') {
+      crossed.push(i);
+      return { text: l.text, status: 'break', state: 'wrong', note: a.note, diagnosis: a.diagnosis, valueChain: a.valueChain };
+    }
     if (i >= limit || !unjudged || a?.status !== 'ok' || a.state !== 'arithmetic') return l;
     folded++;
     return { text: l.text, status: 'ok', state: 'arithmetic', note: a.note, valueChain: a.valueChain, ...(a.fact ? { fact: a.fact } : {}) };
   });
-  if (!folded) return report;
+  if (!folded && !crossed.length) return report;
   // The report is now one that judges each line on its own (a state on every line), so the card says WHICH lines were checked.
   const stated = lines.map(l => ({ ...l, state: l.state || (l.status === 'ok' ? 'verified' : l.status === 'break' ? 'wrong' : l.unreadable ? 'unread' : 'unverified') }));
   const at = st => stated.flatMap((l, k) => (l.state === st ? [k + 1] : []));
   const unverified = at('unverified'), unread = at('unread');
   return {
     ...report, lines: stated, source: 'value-chain', folded: true,
+    ...(crossed.length && !(report.firstBreak >= 0) ? { firstBreak: crossed[0], diagnosis: report.diagnosis ?? lines[crossed[0]].diagnosis } : {}),
     summary: {
       ...(report.summary || {}), total: stated.length, checked: stated.filter(l => l.status === 'ok').length,
       given: at('given'), verified: at('verified'), arithmetic: at('arithmetic'), conditions: at('condition'), wrong: at('wrong'), unverified, unread,
