@@ -5,7 +5,8 @@
 // marks, the stored record or the engine's own `stepReport`: this module only returns a copy of the displayed report with extra fields, and
 // returns the report itself when it has nothing to add. It never changes a line's `status` or `state`, never crosses, never ticks.
 //
-// Report level:  answerLine        zero-based index of the line that states the question's answer (a single value equal to the key), else absent
+// Report level:  answerLine        zero-based index of the line whose stated result the server's answer check accepts as the final answer (the last
+//                                  value of a chain included), set only when the answer was marked correct, else absent
 // Line level:    tickClass         stable id of why a tick is true (see CLASSES)
 //                notRequired       true on a line Pri proved true that the question did not need: it comes after the answer-bearing line
 //                reasonId          on the first wrong line only: why it is wrong, from the engine's own diagnosis (errorType) or computed
@@ -16,12 +17,13 @@
 //                                  the wrong line or another such line; its status stays a note (no cross repeated) and no mark changes
 //                followsFrom       the 1-based number of the first wrong line, with followsFromError
 //
-// Reads the question's prompt for the function (pageProofs.worldOf) and `answer.value` ONLY for the answer-bearing line (a numeric key).
+// Reads the question's prompt for the function (pageProofs.worldOf). The answer-bearing line is decided by the server's own answer check, handed in as
+// `ctx.accepts` (text -> boolean); this module never reads the key itself.
 // ─────────────────────────────────────────────────────────────────────────────
 import { evaluate, variablesOf, exprEquivalent } from './expr.js';
 import { isHeading, worldOf, labelOf, clean, lead, astOf, constOf, fitPoly, polyD, rootsComplete } from './pageProofs.js';
 
-export const CLASSES = Object.freeze(['power-rule-differentiation', 'differentiation', 'factorisation', 'roots-of-a-product', 'equation-setup', 'substitution-evaluated', 'arithmetic-chain', 'second-derivative-value', 'sign-claim', 'nature-claim', 'point-claim', 'conclusion-matches', 'condition-line', 'restated-question', 'restated-function', 'heading', 'solution-list', 'rounded-value', 'labelled-substitution', 'identity', 'derivative-rule', 'true-as-written']);
+export const CLASSES = Object.freeze(['power-rule-differentiation', 'differentiation', 'factorisation', 'roots-of-a-product', 'equation-setup', 'substitution-evaluated', 'arithmetic-chain', 'second-derivative-value', 'sign-claim', 'nature-claim', 'point-claim', 'conclusion-matches', 'condition-line', 'restated-question', 'restated-function', 'heading', 'solution-list', 'rounded-value', 'labelled-substitution', 'identity', 'derivative-rule', 'true-as-written', 'matches-worked-step', 'equal-to-line-above']);
 const PROVED = { listed: 'solution-list', rounded: 'rounded-value', substituted: 'labelled-substitution', restated: 'restated-question', identity: 'identity', derivative: 'derivative-rule' };
 const NUM = String.raw`-?\d+(?:\.\d+)?`;
 
@@ -38,21 +40,90 @@ function engineClass(l, w) {
   return 'true-as-written';
 }
 
-/** The index of the line that states the answer: a single value equal to the numeric key, never a list or a point. */
-function answerLineOf(q, lines) {
-  const key = q && q.answer && Number.isFinite(Number(q.answer.value)) && q.answerType === 'numeric' ? Number(q.answer.value) : null;
-  if (key === null) return -1;
+const ANSWER_TYPES = new Set(['numeric', 'expression', 'set', 'interval', 'equation', 'point']);
+const ARROWS = /\s*(?:⇒|⟹|=>|⟶|→|->)\s*/;
+/** The texts of a line that could be the answer it states: the end of a chain, the tail after an arrow, the last equation of a chain, the whole line. */
+function resultTexts(text, answerType) {
+  let t = lead(String(text ?? '')).replace(/[.]+$/, '').trim();
+  if (!t || t.length > 200) return [];
+  const out = [];
+  const arrow = t.split(ARROWS);
+  if (arrow.length > 1) t = arrow[arrow.length - 1].trim();
+  if (!t) return [];
+  const relational = /[<>≤≥]/.test(t);
+  // `x = 0 or x = 6` lists values: no end of it is "the" value of a number
+  const listed = /\b(?:or|and)\b|[,;]/i.test(t);
+  const single = answerType === 'numeric';
+  if (!(single && listed)) {
+    if (!relational && t.includes('=')) {
+      // `= 5*4*3*2 = 120` continues the line above: its first side is that line, so it is dropped
+      const sides = t.replace(/^=\s*/, '').split('=').map(x => x.trim());
+      if (sides.every(Boolean)) {
+        out.push(sides[sides.length - 1]);
+        if (sides.length > 2) out.push(`${sides[sides.length - 2]} = ${sides[sides.length - 1]}`);
+      }
+    }
+    // "The larger x-coordinate is 6": what follows the verb
+    const tail = !t.includes('=') ? /\b(?:is|are)\s+(?:[a-z]\s*=\s*)?(-?[\d(][^A-Za-z]*)$/i.exec(t) : null;
+    if (tail) out.push(tail[1].trim());
+    // the line itself: always for a set, an interval, a point or an equation; for a number only when it has no words in it
+    if (!single || !/[A-Za-z]{3,}/.test(t.replace(/\b(?:sqrt|cbrt|ln|log|sin|cos|tan|sec|csc|cot|arcsin|arccos|arctan|exp|pi)\b/gi, ''))) out.push(t);
+  }
+  for (const c of out.slice()) { const u = flatFraction(unwrap(c)); if (u !== c) out.push(u); }
+  return [...new Set(out)];
+}
+/** `-(4639/6561)` as `-4639/6561`: a bracketed plain fraction written the way a numeric answer box takes it. */
+const flatFraction = t => t.replace(/\(\s*(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)\s*\)/g, '$1/$2');
+/** `(5/3)` as `5/3`: one pair of brackets that encloses the whole text. */
+function unwrap(t) {
+  let s = String(t).trim();
+  while (s.startsWith('(') && s.endsWith(')')) {
+    let depth = 0, whole = true;
+    for (let i = 0; i < s.length; i++) { if (s[i] === '(') depth++; else if (s[i] === ')') { depth--; if (depth === 0 && i < s.length - 1) { whole = false; break; } } }
+    if (!whole) break;
+    s = s.slice(1, -1).trim();
+  }
+  return s;
+}
+/** The name a line gives to its value (`x`, `y`, `f(2)`, `dy/dx`), '' for a line that starts with an expression. */
+function labelOfLine(text) {
+  const t = lead(String(text ?? '')).split(ARROWS)[0];
+  if (!t.includes('=') || /[<>≤≥]/.test(t)) return '';
+  const head = t.split('=')[0].trim().replace(/\s+/g, '');
+  return /^(?:[A-Za-z][A-Za-z0-9_']*(?:\([^()=]*\))?|d\^?2?[A-Za-z]+\/d[A-Za-z]+\^?2?)$/.test(head) ? head : '';
+}
+/**
+ * The index of the line that states the answer: the LAST line before the first cross, ticked, one of whose results (end of a chain, tail after an arrow, the line
+ * itself) the server's answer check accepts, and only when the answer was marked correct. A later line that gives the same quantity (the answer's own name, or
+ * the answer box's label such as `x =`) a different value (`x = 5` after `x = 3`) contradicts it, and then no line is named; a check line that names another quantity
+ * does not. A key met on an earlier line by coincidence is therefore never the answer line when the page goes on to state a different value for the answer.
+ */
+function answerLineOf(q, lines, accepts, correct) {
+  if (correct !== true || typeof accepts !== 'function' || !ANSWER_TYPES.has(q?.answerType)) return -1;
+  const ok = c => { try { return accepts(c) === true; } catch { return false; } };
+  let at = -1;
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i];
-    if (!l || l.status !== 'ok') continue;
-    const t = clean(l.text).replace(/[.]+$/, '');
-    if (/\b(?:or|and)\b|[,;()⇒→]|=>|:/.test(t.replace(/^[^=]*?\b(?:is|are)\b/i, ''))) { if (!/^(?:so|hence|then|therefore|thus)?\s*[a-z]\s*=\s*-?\d/i.test(t)) continue; }
-    const m = new RegExp(String.raw`(?:=|\bis\b|\bare\b)\s*(${NUM})$`, 'i').exec(t);
-    if (!m || /\b(?:or|and)\b|,/.test(t)) continue;
-    if (/[<>]/.test(t)) continue;
-    if (Math.abs(Number(m[1]) - key) <= 1e-9 * Math.max(1, Math.abs(key))) return i;
+    if (!l || l.status !== 'ok' || l.context === true) continue;
+    if (resultTexts(l.text, q.answerType).some(ok)) at = i;
   }
-  return -1;
+  if (at < 0) return -1;
+  const names = new Set([labelOfLine(lines[at].text)]);
+  const box = /^([A-Za-z][A-Za-z0-9_']*(?:\([^()]*\))?)\s*=$/.exec(String(q?.answerPrefix ?? '').trim());
+  if (box) names.add(box[1]);
+  names.delete('');
+  for (let j = at + 1; j < lines.length; j++) {
+    const l = lines[j];
+    if (!l || l.status !== 'ok' || l.context === true) continue;
+    const t = lead(String(l.text ?? '')).replace(/[.]+$/, '').trim();
+    if (/:|\b(?:at|when|check|substitut\w*)\b/i.test(t.split('=')[0] || '') || ARROWS.test(t) || /[<>≤≥]/.test(t) || !t.includes('=')) continue;
+    const sides = t.split('=').map(x => x.trim());
+    if (sides.some(x => !x)) continue;
+    const label = labelOfLine(t), last = sides[sides.length - 1];
+    // only a later statement of the SAME quantity (`x = 5` after `x = 3`) contradicts: a check that substitutes back (`17 + 22 = 39`) names another quantity
+    if (label !== '' && names.has(label) && !ok(last)) return -1;
+  }
+  return at;
 }
 
 const termText = (c, k, v) => { const a = Math.abs(c); const body = k === 0 ? String(a) : `${a === 1 ? '' : a}${v}${k === 1 ? '' : `^${k}`}`; return body; };
@@ -176,13 +247,13 @@ function rootsFollow(prev, cur, v) {
  * @param report  the report the page shows (shownReport, or the engine's report when nothing was proved)
  * @returns the same report with the display fields added, or `report` itself when there is nothing to add
  */
-export function displayFields(q, report) {
+export function displayFields(q, report, ctx = null) {
   if (!report || !Array.isArray(report.lines)) return report;
   let w = null; try { w = worldOf(q); } catch { w = null; }
   const lines = report.lines;
   const brk = lines.findIndex(l => l?.status === 'break');
   const limit = brk >= 0 ? brk : lines.length;
-  let answerLine = -1; try { answerLine = answerLineOf(q, lines.slice(0, limit)); } catch { answerLine = -1; }
+  let answerLine = -1; try { answerLine = answerLineOf(q, lines.slice(0, limit), ctx && ctx.accepts, ctx && ctx.correct); } catch { answerLine = -1; }
   let changed = false;
   const v = w ? w.v : (/^[a-z]$/.test(String(q?.variable ?? '')) ? q.variable : 'x');
   const out = [];
@@ -208,6 +279,52 @@ export function displayFields(q, report) {
     if (!Object.keys(add).length) { out.push(l); return; }
     changed = true;
     out.push({ ...l, ...add });
+  });
+  if (!changed && answerLine < 0) return report;
+  return { ...report, lines: out, ...(answerLine >= 0 ? { answerLine } : {}) };
+}
+
+// ── the author bank ──────────────────────────────────────────────────────────
+// A bank line is ticked by the deterministic report (the topic check, the arithmetic reading, a match to a step of the worked solution), and each of
+// those leaves its proof in the line's own fields. The class below is read from THAT proof and claims no more than it: a line ticked only because it
+// equals a step of the author's worked solution is `matches-worked-step`; a line ticked with no proof field at all is `true-as-written`, the same
+// fallback the generated path uses. DISPLAY ONLY: no status, state, note or text is changed, so no tick, cross or mark moves.
+function bankClass(l) {
+  if (l.tickClass) return l.tickClass;
+  if (l.state === 'given' && (l.solutionMatch === true || l.restates === true)) return 'restated-question';
+  const rule = l.valueChain && typeof l.valueChain === 'object' ? l.valueChain.rule : null;
+  if (l.fact?.kind === 'proved' && PROVED[l.fact.proof]) return PROVED[l.fact.proof];
+  if (rule === 'question-given') return 'restated-function';
+  if (l.how?.kind === 'equal-above' || l.fact?.kind === 'equal-above' || l.fact?.kind === 'equals-line-above') return 'equal-to-line-above';
+  if (l.solutionMatch === true) return 'matches-worked-step';
+  if (rule === 'derivative') return 'differentiation';
+  if (rule === 'stationary-values') return 'roots-of-a-product';
+  if (rule === 'continuation' || rule === 'arithmetic' || rule === 'page-definitions') return 'arithmetic-chain';
+  if (l.coversAll === true) return 'solution-list';
+  return 'true-as-written';
+}
+
+/**
+ * The display fields of a question of the author's bank: `tickClass` on every tick, `answerLine`, and `notRequired` after it. Nothing else (no reason id and no
+ * corrected line on a cross: the bank's crosses are shown as the report made them). Returns the report itself when there is nothing to add.
+ * @param ctx  { correct: the answer was marked correct, accepts: text -> boolean, the server's answer check }
+ */
+export function bankDisplayFields(q, report, ctx = null) {
+  if (!report || !Array.isArray(report.lines)) return report;
+  const lines = report.lines;
+  const brk = lines.findIndex(l => l?.status === 'break');
+  const limit = brk >= 0 ? brk : lines.length;
+  let answerLine = -1; try { answerLine = answerLineOf(q, lines.slice(0, limit), ctx && ctx.accepts, ctx && ctx.correct); } catch { answerLine = -1; }
+  let changed = false;
+  const out = lines.map((l, i) => {
+    if (!l || l.status !== 'ok') return l;
+    const add = {};
+    const cls = bankClass(l);
+    if (cls && l.tickClass !== cls) add.tickClass = cls;
+    if (answerLine >= 0 && i > answerLine && i < limit) add.notRequired = true;
+    if (!Object.keys(add).length) return l;
+    changed = true;
+    return { ...l, ...add };
   });
   if (!changed && answerLine < 0) return report;
   return { ...report, lines: out, ...(answerLine >= 0 ? { answerLine } : {}) };

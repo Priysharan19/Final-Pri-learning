@@ -1889,6 +1889,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // The page also shows the lines Pri can prove true as ticked (markerOps `shownReport`, engine/provedLines.js): feedback only, set on the reply AFTER
       // every mark and the scheme pay above, which read the engine's report (evidence.stepReport) and never this one.
       if (resolved && !invalid && !notRead && evidence && evidence.shownReport) response.stepReport = response.stepReport ? adoptProved(response.stepReport, evidence.shownReport) : evidence.shownReport;
+      // A question the marker could not judge line by line says why (`noLineReport.reason`: no-working, multiple-choice, graph-sketch, board-scheme, lines-not-readable), so the page never has to guess.
+      if (resolved && !invalid && !notRead && !response.stepReport && evidence && evidence.noLineReport) response.noLineReport = evidence.noLineReport;
       // Everything this reply adds to the account's records goes in ONE
       // statement: the immutable reply, the completion when it resolves, and —
       // for a submission that carried its picture — the receipts /recognize

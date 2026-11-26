@@ -35,7 +35,7 @@ import { annotateMilestones } from '../../client/src/engine/milestones.js';
 import { solutionMatch, _internals as SOLUTION_INTERNALS } from '../../client/src/engine/solutionMatch.js';
 import { lineChains } from '../../client/src/engine/lineChains.js';
 import { provedLines } from '../../client/src/engine/provedLines.js';
-import { displayFields } from '../../client/src/engine/displayFields.js';
+import { displayFields, bankDisplayFields } from '../../client/src/engine/displayFields.js';
 import { awardBoardScheme, matchBoardPoints } from '../../client/src/engine/boardScheme.js';
 import { constrainToShown, unsupportedCredit } from '../../client/src/engine/markExplanation.js';
 import { holdFaultCrosses } from './bankFaults.js';
@@ -492,11 +492,39 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
   // Feedback only, last of all: the display fields the marked page reads (engine/displayFields.js): a stable class id on every tick, `notRequired` on proved
   // lines after the answer-bearing line, the first wrong line's reason id and corrected right-hand side, `followsFromError` on later lines that are correct
   // consequences, and `answerLine`. Added to the DISPLAYED report only (`stepReport` is untouched, so no mark, scheme pay or stored record reads them).
+  // `answerLine` is named only when the answer was marked correct, and by the same answer check that marked it (`accepts`).
+  const displayCtx = { correct: result.correct === true, accepts: text => (checkBankAnswer(q, text) || {}).correct === true };
   try {
     if (typeof steps === 'string' && steps.trim() && !OBJECTIVE.has(q.answerType) && q.answerType !== 'graph-sketch' && !Array.isArray(q.boardScheme) && !(opts && (opts.proved === false || opts.solutionMatch === false)) && /^gen:(?:y11|y12|me11|me12)-/.test(String(q.contentId ?? ''))) {
       const base = shownReport || report;
-      const more = base ? displayFields(q, base) : null;
+      const more = base ? displayFields(q, base, displayCtx) : null;
       if (more && more !== base) shownReport = more;
+    }
+  } catch { /* the report stands */ }
+  // The author's bank gets the same fields (bankDisplayFields): a class id on every tick read from the proof that ticked it, and `answerLine`. Display only.
+  try {
+    if (typeof steps === 'string' && steps.trim() && !OBJECTIVE.has(q.answerType) && q.answerType !== 'graph-sketch' && !Array.isArray(q.boardScheme) && !(opts && (opts.proved === false || opts.solutionMatch === false)) && typeof q._bank === 'string') {
+      const base = shownReport || report;
+      const more = base ? bankDisplayFields(q, base, displayCtx) : null;
+      if (more && more !== base) shownReport = more;
+    }
+  } catch { /* the report stands */ }
+  // A question whose working the marker judged line by line to nothing (no line was arithmetic, none matched a step, none was crossed) used to come back
+  // with no report at all. Where there are lines, the report is the one the arithmetic reading already made: every line a note, none ticked, none crossed. Display only.
+  let noLineReport = null;
+  try {
+    const hasWorking = typeof steps === 'string' && steps.trim();
+    if (!report && !shownReport) {
+      if (!hasWorking) noLineReport = { reason: 'no-working' };
+      else if (OBJECTIVE.has(q.answerType)) noLineReport = { reason: 'multiple-choice' };
+      else if (q.answerType === 'graph-sketch') noLineReport = { reason: 'graph-sketch' };
+      else if (Array.isArray(q.boardScheme)) noLineReport = { reason: 'board-scheme' };
+      else if (opts && (opts.proved === false || opts.solutionMatch === false)) noLineReport = null;
+      else {
+        const unjudged = trueAsWritten(q, steps, opts);
+        if (unjudged && Array.isArray(unjudged.lines) && unjudged.lines.length && !unjudged.lines.some(l => l?.status === 'ok' || l?.status === 'break')) shownReport = unjudged;
+        else noLineReport = { reason: 'lines-not-readable' };
+      }
     }
   } catch { /* the report stands */ }
   // A scheme question (schemeAward.js) also learns which lines the topic check ITSELF verified: the page ticks more than that (a copied
@@ -506,7 +534,7 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
   if (q._methodScheme && report) report = holdIdentityLines(report);
   const topicTicks = q._methodScheme ? (decided ? decided.lines.flatMap((l, i) => (l?.status === 'ok' && !isIdentityLine(l.text) ? [i] : [])) : null) : undefined;
   // A question of the author's bank whose own worked step disagrees with its own answer (bankFaults.js) is never crossed on the page: a cross is shown as a note. After every mark.
-  return { stepReport: holdFaultCrosses(q, report), ...(shownReport ? { shownReport: holdFaultCrosses(q, shownReport) } : {}), partial, ...(board ? { board } : {}), ...(markingReport ? { markingReport } : {}), ...(topicTicks !== undefined ? { topicTicks } : {}) };
+  return { stepReport: holdFaultCrosses(q, report), ...(shownReport ? { shownReport: holdFaultCrosses(q, shownReport) } : {}), ...(noLineReport ? { noLineReport } : {}), partial, ...(board ? { board } : {}), ...(markingReport ? { markingReport } : {}), ...(topicTicks !== undefined ? { topicTicks } : {}) };
 }
 
 /** The Board-scheme award for a question carrying one, from the deterministic report. */
@@ -770,7 +798,7 @@ const RAW_MARKER_OPS = Object.freeze({
     if (!wanted) return { result, evidence: null };
     const evidence = stepEvidence(q, answer, working, result, { slipWarnings: true, ...(Array.isArray(workingGaps) ? { gaps: workingGaps } : {}), ...(Array.isArray(workingLatex) ? { latex: workingLatex } : {}) });
     // Final answer only: the step report stays, the method mark does not.
-    return { result, evidence: policyOf({ policy }).methodMarks ? evidence : { stepReport: evidence.stepReport, ...(evidence.shownReport ? { shownReport: evidence.shownReport } : {}), partial: null, ...(evidence.board ? { board: evidence.board } : {}), ...(evidence.topicTicks !== undefined ? { topicTicks: evidence.topicTicks } : {}) } };
+    return { result, evidence: policyOf({ policy }).methodMarks ? evidence : { stepReport: evidence.stepReport, ...(evidence.shownReport ? { shownReport: evidence.shownReport } : {}), ...(evidence.noLineReport ? { noLineReport: evidence.noLineReport } : {}), partial: null, ...(evidence.board ? { board: evidence.board } : {}), ...(evidence.topicTicks !== undefined ? { topicTicks: evidence.topicTicks } : {}) } };
   },
   /** One examination response: the answer stage, then (method marks on) the working stage. */
   exam({ q, given, working, grid, policy }, emit) {

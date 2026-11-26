@@ -97,8 +97,11 @@ const TICK = {
   'roots-of-a-product': 'stationaryValues', 'equation-setup': 'stationaryEquation', 'substitution-evaluated': 'substitution', 'labelled-substitution': 'substitution',
   'arithmetic-chain': 'arithmetic', 'second-derivative-value': 'secondDerivative', 'sign-claim': 'signClaim', 'nature-claim': 'natureClaim', 'point-claim': 'pointClaim',
   'conclusion-matches': 'conclusionMatches', 'condition-line': 'conditionLine', 'restated-question': 'restated', 'restated-function': 'given', heading: 'heading',
-  'solution-list': 'solutionList', 'rounded-value': 'rounding', identity: 'identity', 'true-as-written': 'trueAsWritten', restated: 'restated'
+  'solution-list': 'solutionList', 'rounded-value': 'rounding', identity: 'identity', 'true-as-written': 'trueAsWritten', restated: 'restated',
+  'matches-worked-step': 'solutionStep', 'equal-to-line-above': 'equal'
 };
+// ids the engine gives a tick when it had no specific proof to name; a named rule the page itself read between the two lines (`card.rules`) is more specific, so it is shown instead
+const WEAK_TICK = new Set(['true-as-written', 'matches-worked-step']);
 const PROVED = { derivative: 'differentiation', substituted: 'substitution', listed: 'solutionList', rounded: 'rounding', restated: 'restated', identity: 'identity' };
 const HOW = {
   'derivative-rule': 'differentiation', derivatives: 'differentiation', substituted: 'substitution', 'substituted-at': 'substitution', one: 'one',
@@ -123,7 +126,10 @@ export function classOf(card) {
   if (!card || card.status !== 'checked') return null;
   // "Correct answer" only when the server's report itself names this line as the answer-bearing one (a field the line-coverage engine work adds; absent today)
   if (card.answerLine === true) return 'conclusion';
-  if (typeof card.tickClass === 'string' && Object.hasOwn(TICK, card.tickClass)) return TICK[card.tickClass];
+  if (typeof card.tickClass === 'string' && Object.hasOwn(TICK, card.tickClass)) {
+    if (WEAK_TICK.has(card.tickClass)) { const named = Array.isArray(card.rules) && card.rules[0] ? RULE[card.rules[0].rule] : null; if (named) return named; }
+    return TICK[card.tickClass];
+  }
   const f = card.fact && typeof card.fact === 'object' ? card.fact : {};
   const h = card.how && typeof card.how === 'object' ? card.how : {};
   if (h.kind === 'conclusion' || h.kind === 'heading' || h.kind === 'question') return h.kind;

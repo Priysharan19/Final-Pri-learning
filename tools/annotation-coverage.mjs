@@ -42,7 +42,7 @@ export const GEN_SEED_SCAN = 200;       // seeds 1..200 of each issued cell are 
 export const GEN_SEEDS_PER_FORM = 2;    // the first two seeds of each form are marked
 export const WRONG_SEED_ANSWER = '99991';
 export const SCOPE = /^(y11|y12|me11|me12)-/;
-export const STATUS = Object.freeze({ full: 'full', trueOnly: 'true-only', uncovered: 'uncovered' });
+export const STATUS = Object.freeze({ full: 'full', trueOnly: 'true-only', uncovered: 'uncovered', notApplicable: 'not-applicable' });
 
 const { MARKER_OPS, markerView } = await import('../server/platform/markerOps.js');
 const H = await import('./marking-mutation-harness.mjs');
@@ -117,7 +117,7 @@ export function markPage(q, answer, lines) {
   let r;
   try { r = MARKER_OPS.practice({ q, answer, working: lines.join('\n'), evidenceIfWrong: true, policy: { methodMarks: true } }, () => {}); } catch { return null; }
   const rep = r?.evidence?.shownReport || r?.evidence?.stepReport || null;
-  if (!rep || !Array.isArray(rep.lines)) return { correct: r?.result?.correct === true, cards: null, answerLine: -1, report: null };
+  if (!rep || !Array.isArray(rep.lines)) return { correct: r?.result?.correct === true, cards: null, answerLine: -1, report: null, noLineReport: r?.evidence?.noLineReport || null };
   let cards = null;
   try {
     const model = buildAnnotatedWorking({ lines, stepReport: rep, page: true });
@@ -175,7 +175,7 @@ export function trueHalf(q, lines, answer, { unreadable = 0, worked = false, fir
   if (!lines.length) return out(q.answerType === 'working' ? 'proof' : q.answerType === 'manual' ? `worked solution (${q._worked || 'find'}) with no maths lines` : 'no maths lines in the worked solution (words only)');
   if (unreadable) return out(unreadableCause(firstUnreadable), -1, { unreadable, text: firstUnreadable });
   const m = markPage(q, worked ? '' : answer, lines);
-  if (!m || !m.cards) return out('no line report from the marker');
+  if (!m || !m.cards) return out(m && m.noLineReport ? `no line report from the marker (${m.noLineReport.reason})` : 'no line report from the marker');
   if (m.cards.length !== lines.length) return out('report does not judge every line', -1, { judged: m.cards.length });
   const statuses = m.cards.map(c => c.status);
   const cross = statuses.indexOf('first-error');
@@ -246,7 +246,7 @@ export function measureQuestion(q, { toPlain, worked = false } = {}) {
   return { lines, t, w };
 }
 
-const statusOf = (t, w) => (t.ok && w.ok ? STATUS.full : t.ok ? STATUS.trueOnly : STATUS.uncovered);
+const statusOf = (t, w, q = null) => (q && QUESTION_BUCKET[q.answerType] ? STATUS.notApplicable : t.ok && w.ok ? STATUS.full : t.ok ? STATUS.trueOnly : STATUS.uncovered);
 
 // ── the generated side ───────────────────────────────────────────────────────
 const formKeyOf = q => `${q.answerType}|${(q.steps || []).map(s => String(s?.h ?? '').replace(/\d+(?:\.\d+)?/g, 'N')).join('>')}`;
@@ -286,14 +286,14 @@ export function measureGeneratedForm(W, form) {
   const worstT = per.find(p => !p.t.ok), worstW = per.find(p => !p.w.ok);
   const t = worstT ? worstT.t : per[0].t, w = worstW ? worstW.w : per[0].w;
   const first = worstT || worstW || per[0];
-  return { id: form.id, kind: 'generated', topic: form.generator, dp: first.q.dotpoint || (first.q.dotpoints || []).join('+') || 'none', difficulty: form.difficulty, answerType: first.q.answerType, status: statusOf(t, w), t, w, seeds: form.seeds, samples: per.map(p => ({ seed: p.seed, lines: p.lines, statuses: p.t.statuses })) };
+  return { id: form.id, kind: 'generated', topic: form.generator, dp: first.q.dotpoint || (first.q.dotpoints || []).join('+') || 'none', difficulty: form.difficulty, answerType: first.q.answerType, status: statusOf(t, w, first.q), t, w, seeds: form.seeds, samples: per.map(p => ({ seed: p.seed, lines: p.lines, statuses: p.t.statuses })) };
 }
 
 // ── the bank side ────────────────────────────────────────────────────────────
 export function measureBankEntry(W, entry, family, { worked = false } = {}) {
   const q = markerView(worked ? W.pack.qbankManualQuestion(entry.id, 17) : W.pack.qbankEntryQuestion(entry.id, 17));
   const { t, w, lines } = measureQuestion({ ...q, ...(worked ? { _bankWorked: true } : {}) }, { toPlain: bankToPlain, worked });
-  return { id: entry.id, kind: worked ? 'bank-worked' : 'bank', topic: family.replace(/^qb-/, ''), dp: entry.dp, difficulty: entry.level, answerType: q.answerType, status: statusOf(t, w), t, w, samples: [{ seed: 17, lines, statuses: t.statuses }] };
+  return { id: entry.id, kind: worked ? 'bank-worked' : 'bank', topic: family.replace(/^qb-/, ''), dp: entry.dp, difficulty: entry.level, answerType: q.answerType, status: statusOf(t, w, q), t, w, samples: [{ seed: 17, lines, statuses: t.statuses }] };
 }
 
 export function bankEntriesOf(W) {
@@ -334,8 +334,11 @@ const add = (o, r) => { o.total++; if (r.status === STATUS.full) o.full++; else 
 const pct = (n, d) => (d ? Math.round((n / d) * 10000) / 100 : 0);
 
 export function summarise(records) {
-  const total = blank(), byKind = {}, byTopic = {}, byDotpoint = {}, causes = {}, wrongCauses = {};
+  const total = blank(), byKind = {}, byTopic = {}, byDotpoint = {}, causes = {}, wrongCauses = {}, notApplicable = { multipleChoice: 0, byKind: {} };
   let trueOk = 0, wrongOk = 0, linesOk = 0, answerOk = 0, answerNA = 0, weakTicks = 0;
+  // A multiple-choice question has no working page: it is not-applicable, counted here and in no denominator below.
+  for (const r of records.filter(x => x.status === STATUS.notApplicable)) { notApplicable.multipleChoice++; bump(notApplicable.byKind, r.kind); }
+  records = records.filter(x => x.status !== STATUS.notApplicable);
   for (const r of records) {
     add(total, r); add(byKind[r.kind] ||= blank(), r); add(byTopic[`${r.kind === 'generated' ? 'gen' : 'bank'}:${r.topic}`] ||= blank(), r); add(byDotpoint[`${r.kind === 'generated' ? 'gen' : 'bank'}:${r.dp}`] ||= blank(), r);
     if (r.t.ok) trueOk++; if (r.w.ok) wrongOk++; if (r.t.linesHalf) linesOk++; if (r.t.answerNA) answerNA++; else if (r.t.answerHalf) answerOk++;
@@ -350,8 +353,9 @@ export function summarise(records) {
   return {
     format: 'pri-annotation-coverage-v1',
     scope: { edition: 'prithagoras', generated: `NSW generators y11, y12, me11, me12 (every issued difficulty), seeds 1-${GEN_SEED_SCAN} grouped into forms, the first ${GEN_SEEDS_PER_FORM} seeds of each form marked`, bank: 'every part of server/content/qbank: auto-marked parts and worked-solution parts' },
-    definition: 'covered = own worked solution, line by line through the server marking path: every maths line ticked with a class that has a phrase, headings and the restated question neutral, none unchecked, none crossed, and (for a question with a key) the key marked correct and the final line the report\'s answerLine (true half); and a one-line mutation of a middle step crossed at that line (wrong half)',
+    definition: 'units = every unit that is not multiple choice; covered = own worked solution, line by line through the server marking path: every maths line ticked with a class that has a phrase, headings and the restated question neutral, none unchecked, none crossed, and (for a question with a key) the key marked correct and the final line the report\'s answerLine (true half); and a one-line mutation of a middle step crossed at that line (wrong half)',
     units: 'a generated unit is a form (answer type and step headings) of a generator at a difficulty; a bank unit is one part',
+    notApplicable: { ...notApplicable, note: 'multiple-choice questions have no working page (not-applicable: multiple choice): counted here, in no denominator and in no baseline' },
     total: rate(total),
     halves: { trueHalfPasses: trueOk, trueHalfPassPct: pct(trueOk, total.total), wrongHalfPasses: wrongOk, wrongHalfPassPct: pct(wrongOk, total.total), allLinesTickedAndNoneCrossed: linesOk, allLinesPct: pct(linesOk, total.total), answerLineRecognisedAndKeyCorrect: answerOk, answerLineOfKeyedUnits: total.total - answerNA, answerLinePct: pct(answerOk, total.total - answerNA), answerHalfNotApplicableNoKey: answerNA, linesTickedOnlyAsTrueAsWritten: weakTicks },
     byKind: sortKeys(byKind),
@@ -382,6 +386,7 @@ export function compareToBaseline(records, baseline) {
   for (const r of records) {
     seen.add(r.id);
     const rec = baseline.ids[r.id];
+    if (r.status === STATUS.notApplicable) { if (rec !== undefined) violations.push({ kind: 'now-covered', id: r.id, message: `${r.id} is not-applicable (multiple choice) now: remove it from the baseline (node tools/annotation-coverage.mjs --write)` }); continue; }
     if (rec === undefined) {
       if (r.status !== STATUS.full) {
         const line = r.t.ok ? r.w : r.t;
@@ -404,7 +409,7 @@ export function baselineOf(records) {
   const causes = [];
   const ids = {};
   for (const r of records.slice().sort((a, b) => (a.id < b.id ? -1 : 1))) {
-    if (r.status === STATUS.full) continue;
+    if (r.status === STATUS.full || r.status === STATUS.notApplicable) continue;
     const c = causeOf(r) || '';
     let k = causes.indexOf(c); if (k < 0) { causes.push(c); k = causes.length - 1; }
     ids[r.id] = `${SHORT[r.status]}${k}`;
@@ -419,6 +424,7 @@ export function detailOf(records) {
 export const printable = s => {
   const lines = [];
   const t = s.total;
+  lines.push(`not applicable (multiple choice, no working page): ${s.notApplicable.multipleChoice}, in no denominator`);
   lines.push(`units ${t.total}: fully covered ${t.full} (${t.fullPct}%), true half only ${t.trueOnly} (${t.trueOnlyPct}%), uncovered ${t.uncovered} (${t.uncoveredPct}%)`);
   for (const [k, v] of Object.entries(s.byKind)) lines.push(`  ${k}: ${v.total} units, fully covered ${v.full} (${v.fullPct}%), true half only ${v.trueOnly} (${v.trueOnlyPct}%), uncovered ${v.uncovered} (${v.uncoveredPct}%)`);
   const h = s.halves;

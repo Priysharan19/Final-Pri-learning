@@ -17,14 +17,14 @@ True half:
 
 Wrong half, for the same question: a one-line mutation of a middle step (one of the first two provably false mutants of the middle-most line that has any, judged by the independent evaluator of `tools/marking-mutation-harness.mjs`, never the product engine) is crossed at exactly that line, not later, not earlier, not ticked, not missed. A question with no provable mutation of any step fails this half.
 
-Statuses: fully covered needs both halves; true half only has the first and not the second; everything else is uncovered. The two halves are reported separately.
+Statuses: fully covered needs both halves; true half only has the first and not the second; everything else is uncovered; not-applicable is multiple choice (above). The two halves are reported separately.
 
 ## Scope
 
 - Generated: every issued difficulty of every NSW generator of Years 11-12 (`y11`, `y12`, `me11`, `me12`), seeds 1 to 200 grouped into forms (the answer type and the headings of the worked steps), the first two seeds of each form marked. A form is covered only when every seed marked is. Its id is `gen:<generator>:d<difficulty>:<hash of the form>`. A form that no seed from 1 to 200 reaches is not seen.
 - Bank: every part of the committed pack `server/content/qbank`, the auto-marked parts and the worked-solution parts, by the part id.
 
-A multiple-choice question has no working page and counts as uncovered. A worked-solution line that cannot be written as a typed line (TeX the reader does not know, such as `\alpha`, `\binom`, `\pm`) is counted as uncovered with that command named, never dropped.
+A multiple-choice question has no working page. It is `not-applicable: multiple choice`: it is measured as that, counted on its own (173 generator forms today; the summary's `notApplicable`), left out of every denominator and every baseline, and the gate fails if one is left on the baseline. Nothing is faked for it. A worked-solution line that cannot be written as a typed line (TeX the reader does not know, such as `\alpha`, `\binom`, `\pm`) is counted as uncovered with that command named, never dropped.
 
 ## Run it
 
@@ -58,3 +58,11 @@ The gate proves itself: a planted uncovered new question, a planted baseline add
 When the engine covers more, run `node tools/annotation-coverage.mjs --write` and commit the smaller baseline with the summary. When a question is added, make it fully covered; its id is then not on the baseline and never needs to be. Never add an id to the baseline to make the gate pass: the ratchet check against the base refuses it.
 
 The numbers and the ranked causes are in `summary.json`. They are measurements of the engine as it stands, not a target.
+
+## What the report layer now says (display fields only)
+
+Three causes of an uncovered unit were report-completeness, not mathematics. They are fixed in the display layer (`client/src/engine/displayFields.js`, `server/platform/markerOps.js`, `client/src/components/markedPageTeacher.js`); no tick, cross, mark or `stepReport` moves (the marker's `stepReport` carries none of the new fields, and `shownReport` is that report with display fields added). `bankSteps.js`, `bankGenericSteps.js`, `genericSteps.js` and the author approvals are untouched, with the same digests.
+
+- A tick has a class. Every ticked line of the author bank now carries `tickClass`, the same stable ids the generated path emits, read from the proof that ticked it: `matches-worked-step` (the only proof is that the line equals a step of the author's worked solution; phrase "Matches a step of the worked solution"), `restated-question`, `restated-function`, `arithmetic-chain`, `solution-list`, `equal-to-line-above`, and `true-as-written` (a tick with no proof field, the generated path's own fallback). A class never claims more than its proof. Where the page itself read a named rule between two lines, that rule's phrase is shown in place of the two weak ids (`true-as-written`, `matches-worked-step`); a proved class is never replaced.
+- The answer-bearing line. `answerLine` is the last ticked line before the first cross one of whose results the server's answer check accepts (the end of a chain, the tail after an arrow, the line itself, one bracket pair read through), and it is set only when the answer was marked correct. A later line that gives the same quantity (the answer's own name, or the answer box's label) another value contradicts it and no line is named; a check line that names another quantity does not. The tool counts only a final line as recognised, so a worked solution that goes on to check its answer, or that never writes its final value in a maths line (`t = 15` for a key of 2035, a bare `(9-1)/(3-1)` for 4, `x = 2` and `x = 4` as two lines for a set), stays uncovered by this cause: that is the author's page, not the report.
+- A line report wherever there are lines. A page the marker used to judge to nothing (no line arithmetic, none matched to a step) used to come back with no report at all. It now returns the arithmetic reading's own report, every line a note, none ticked, none crossed. Where a question cannot be line-marked the marker returns `noLineReport.reason` (`no-working`, `multiple-choice`, `graph-sketch`, `board-scheme`, `lines-not-readable`), and the reply carries it, so the page can say so. The tool names it: `no line report from the marker (graph-sketch)`.
