@@ -8,7 +8,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { alignCards } from './markedPageModel.js';
-import { TEXT, figureLabel, markBoxLabel, markLabel, placeMarks, stepMarkText, textHeight } from './markedPageTeacher.js';
+import { TEXT, figureLabel, listWords, markBoxLabel, markLabel, placeMarks, stepMarkText, textHeight } from './markedPageTeacher.js';
 import './MarkedPageTeacher.css';
 
 const TICK_PATH = 'M3 13 C5.6 14.8 7.6 17.4 9.6 21 C13 13.6 17.6 7.2 23.6 2.6';
@@ -43,8 +43,10 @@ const useSize = (ref, fallback) => {
 
 const boxStyle = b => ({ left: `${b.x * 100}%`, top: `${b.y * 100}%`, width: `${b.w * 100}%`, height: `${b.h * 100}%` });
 
+const GUTTER_WIDE = 150;
 /**
  * The page with its marking layer. `children` is the page itself (the photo or the ink), drawn exactly as before.
+ * The layer is a separate overlay of fixed size: the page's own height never depends on the view or on what the margin holds.
  */
 export function TeacherSheet({ kind, view, page, marks, selected, pick, onKey, markersRef, trace, children, viewBoxStyle }) {
   const pageRef = useRef(null);
@@ -52,25 +54,34 @@ export function TeacherSheet({ kind, view, page, marks, selected, pick, onKey, m
   const dim = useSize(pageRef, { w: 800, h: 1000 });
   const sheet = useSize(sheetRef, { w: 1000, h: 1000 });
   const marked = view !== 'original';
-  const roomy = sheet.w >= 600;
+  // Marked mode is a teacher's marks, not a commentary: words only at a cross and beside a mark the server paid. The list in Detailed feedback has the rest.
+  const words = useMemo(() => Object.fromEntries(marks.filter(m => m.phrase && (m.kind === 'wrong' || m.paid)).map(m => [m.n, m.phrase])), [marks]);
   // The tick is as large as the writing allows: on a small page of many lines it shrinks so neighbours do not sit on each other.
   const pitch = useMemo(() => { const ys = page.lines.filter(l => l.box).map(l => (l.box.y + l.box.h / 2) * dim.h).sort((x, y) => x - y); const d = []; for (let i = 1; i < ys.length; i += 1) d.push(ys[i] - ys[i - 1]); d.sort((x, y) => x - y); return d.length ? d[Math.floor(d.length / 2)] : Infinity; }, [page, dim.h]);
   const tick = Number.isFinite(pitch) ? Math.round(Math.min(24, Math.max(14, pitch * 0.9))) : 24;
-  const placements = useMemo(() => placeMarks({ marks, obstacles: page.lines, width: dim.w, height: dim.h, size: tick }), [marks, page, dim.w, dim.h, tick]);
+  const reserve = tick >= 18 ? 12 : 0;
+  const place = (w, h) => placeMarks({ marks, obstacles: page.lines, words, reserve, width: w, height: h, size: tick });
+  // The margin is only as wide as it has to be: wide when some words cannot stand beside their tick, judged as if it were wide (so the choice cannot flip back and forth).
+  const aspect = dim.h / dim.w;
+  const needWide = useMemo(() => {
+    if (sheet.w < 600) return false;
+    const w = sheet.w - GUTTER_WIDE - 2;
+    return place(w, w * aspect).some(p => p.word === 'gutter');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sheet.w, aspect, marks, page, words, tick]);
+  const placements = useMemo(() => place(dim.w, dim.h),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [marks, page, words, dim.w, dim.h, tick]);
   const at = n => placements.find(p => p.n === n);
-  // the words in the gutter: only where there is room for them (a phone reads them in the list below the page)
-  const gw = 230;
-  // Marked mode is a teacher's marks, not a commentary: words only at a cross and beside a mark the server paid. The list in Detailed feedback has the rest.
-  const phrases = useMemo(() => (roomy ? marks.filter(m => m.phrase && (m.kind === 'wrong' || m.paid)).map(m => ({ id: `p${m.n}`, from: m.n, to: m.n, kind: m.kind, text: m.phrase, y: (placements.find(p => p.n === m.n) || {}).y ?? null })) : []), [roomy, marks, placements]);
-  const colW = gw - 34 - 64;
-  const items = phrases.map(p => ({ id: p.id, y: p.y == null ? 0 : p.y / dim.h, h: textHeight(p.text.length + 4, colW, 17) }));
-  const tops = alignCards(items, dim.h, { gap: 6 });
-  const bottom = Math.max(0, ...tops.map((t, i) => t.top + items[i].h));
+  const gutterWords = needWide ? marks.filter(m => at(m.n)?.word === 'gutter').map(m => ({ id: `p${m.n}`, n: m.n, kind: m.kind, text: m.phrase, y: at(m.n).y })) : [];
+  const colW = GUTTER_WIDE - 34 - 58;
+  const items = gutterWords.map(p => ({ id: p.id, y: p.y / dim.h, h: textHeight(p.text.length + 2, colW, 15) }));
+  const tops = alignCards(items, dim.h, { gap: 4 }).map((t, i) => Math.max(0, Math.min(t.top, dim.h - items[i].h)));
   const paidMarks = marks.filter(m => m.paid && at(m.n));
   const markTops = alignCards(paidMarks.map(m => ({ id: m.n, y: at(m.n).y / dim.h, h: 24 })), dim.h, { gap: 4 });
 
   return (
-    <div className="mp-sheet mp-t-sheet" data-mp-sheet={kind} data-mp-view={view} data-mp-size={roomy ? 'roomy' : 'compact'} data-mp-tick={tick < 18 ? 'small' : 'full'} style={{ '--mp-tick': `${tick}px` }} ref={sheetRef}>
+    <div className="mp-sheet mp-t-sheet" data-mp-sheet={kind} data-mp-view={view} data-mp-size={needWide ? 'roomy' : 'compact'} ref={sheetRef}>
       <div className="mp-sheet-in" ref={pageRef} style={viewBoxStyle}>
         {children}
         {marked && (
@@ -83,16 +94,20 @@ export function TeacherSheet({ kind, view, page, marks, selected, pick, onKey, m
               <span key={`l${m.n}`} className={`mp-t-leader is-${m.kind}`} data-mp-leader={m.n} aria-hidden="true"
                 style={{ left: `${(p.leader.x0 / dim.w) * 100}%`, top: `${(p.leader.y / dim.h) * 100}%`, width: `${((p.leader.x1 - p.leader.x0) / dim.w) * 100}%` }} />
             ) : null; })}
+            {marks.map(m => { const p = at(m.n); return p && p.word && p.word !== 'gutter' ? (
+              <span key={`w${m.n}`} className={`mp-t-say is-${m.kind}`} data-mp-say={m.n} aria-hidden="true"
+                style={{ left: `${(p.word.x0 / dim.w) * 100}%`, top: `${(p.word.y / dim.h) * 100}%`, fontSize: `${p.word.font}px` }}>{p.word.text}</span>
+            ) : null; })}
             <div className="mp-markers mp-t-markers" ref={markersRef} role="group" aria-label={TEXT.marksOnPage} onKeyDown={onKey}>
               {marks.map((m, i) => {
                 const p = at(m.n);
                 if (!p) return null;
                 const onPage = p.where === 'page';
-                const style = onPage ? { left: `${(p.x / dim.w) * 100}%`, top: `${(p.y / dim.h) * 100}%` } : { top: `${(p.y / dim.h) * 100}%` };
+                const style = onPage ? { left: `${(p.x / dim.w) * 100}%`, top: `${(p.y / dim.h) * 100}%`, '--sz': `${p.size}px` } : { top: `${(p.y / dim.h) * 100}%`, '--sz': `${p.size}px` };
                 return (
-                  <button key={m.n} type="button" className={`mp-marker mp-t-tick is-${m.kind}${onPage ? '' : ' in-gutter'}${selected === m.n ? ' is-active' : ''}`}
+                  <button key={m.n} type="button" className={`mp-marker mp-t-tick is-${m.kind}${onPage ? '' : ' in-gutter'}${selected === m.n ? ' is-active' : ''}${p.num ? '' : ' is-small'}`}
                     data-mp-box={m.n} data-mp-status={m.kind === 'right' ? 'checked' : 'first-error'} data-mp-where={p.where} data-mp-placement={p.placement}
-                    data-mp-class={m.cls || undefined} aria-label={markLabel(m)} aria-pressed={selected === m.n} tabIndex={selected === m.n ? 0 : -1}
+                    data-mp-class={m.cls || undefined} data-mp-phrase={m.phrase || undefined} aria-label={markLabel(m)} aria-pressed={selected === m.n} tabIndex={selected === m.n ? 0 : -1}
                     style={style} onClick={() => pick(m.n, true)}>
                     <TickMark kind={m.kind} index={i} />
                     <span className="mp-t-num" aria-hidden="true">{m.n}</span>
@@ -103,22 +118,60 @@ export function TeacherSheet({ kind, view, page, marks, selected, pick, onKey, m
           </div>
         )}
       </div>
+      {!marked && <div className="mp-t-gutter" aria-hidden="true" />}
       {marked && (
-        <div className="mp-t-gutter" data-mp-gutter style={{ minHeight: bottom }} aria-hidden="false">
+        <div className="mp-t-gutter" data-mp-gutter>
           <span className="mp-t-rule" aria-hidden="true" />
           {paidMarks.map((m, i) => (
             <span key={`b${m.n}`} className={`mp-t-box${trace.has(m.n) ? ' is-traced' : ''}`} data-mp-markbox={m.n} data-mp-markbox-text={m.paid.text}
               role="img" aria-label={markBoxLabel(m)} style={{ top: markTops[i].top }}>{m.paid.text}</span>
           ))}
-          {phrases.map((p, i) => (
-            <button key={p.id} type="button" tabIndex={-1} aria-hidden="true" className={`mp-t-words is-${p.kind}`} data-mp-words={p.from} data-mp-words-to={p.to}
-              style={{ top: tops[i].top, maxHeight: items[i].h }} onClick={() => pick(p.from, true)}>
+          {gutterWords.map((p, i) => (
+            <button key={p.id} type="button" tabIndex={-1} aria-hidden="true" className={`mp-t-words is-${p.kind}`} data-mp-words={p.n}
+              style={{ top: tops[i], maxHeight: items[i].h }} onClick={() => pick(p.n, true)}>
               {p.text}
             </button>
           ))}
         </div>
       )}
     </div>
+  );
+}
+
+/** Detailed feedback: the words for every mark, numbered as on the page, and the unread lines, which can be typed in (never a cross). */
+export function MarkList({ page, marks, lineOpen, toggleLine, readingOfLine, canType, setEditing, textOf, pick }) {
+  const byN = new Map(marks.map(m => [m.n, m]));
+  return (
+    <ol className="mp-t-list" data-mp-list aria-label={TEXT.listLabel}>
+      {page.lines.filter(l => byN.has(l.n) || l.status === 'unread').map(l => {
+        const m = byN.get(l.n);
+        if (!m) {
+          return (
+            <li key={l.n} data-mp-list-n={l.n} data-mp-unread-item>
+              <span className="n">{l.n}</span>
+              <span className="mp-t-unread">{TEXT.unreadLine}{' '}
+                {canType
+                  ? <button type="button" className="mp-link" onClick={() => { if (!lineOpen(l.n)) toggleLine(l.n); setEditing({ line: l.n, text: textOf(l.n) }); }}>{TEXT.typeIt}</button>
+                  : null}
+                {lineOpen(l.n) && readingOfLine(l.n, true)}
+              </span>
+            </li>
+          );
+        }
+        const w = listWords(m);
+        return (
+          <li key={l.n} data-mp-list-n={l.n}>
+            <span className="n">{l.n}</span>
+            <span className={`is-${m.kind}`}>
+              <button type="button" className="mp-link" onClick={() => pick(l.n, true)}>{w.head}</button>
+              {w.tail ? <span className="hand"> {w.tail}</span> : null}
+              {w.corrected ? <span> {w.corrected}</span> : null}
+              {w.mark ? <span> {w.mark}</span> : null}
+            </span>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 

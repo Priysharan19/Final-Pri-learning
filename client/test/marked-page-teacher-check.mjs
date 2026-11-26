@@ -1,7 +1,7 @@
 // The teacher-marked page's pure logic: the phrase table, which lines are ticked, where a margin mark may stand, and where a tick is placed.
 // Nothing here marks anything: every input is a deterministic report the server produced, and the checks prove the layer only reads it.
 //   node client/test/marked-page-teacher-check.mjs
-import { PHRASES, TEXT, classOf, phraseOf, reasonOf, buildTeacherMarks, placeMarks, tallyOf, buildAssessment, groupPhrases, textHeight } from '../src/components/markedPageTeacher.js';
+import { PHRASES, TEXT, classOf, lineWord, phraseOf, reasonOf, buildTeacherMarks, placeMarks, tallyOf, buildAssessment, groupPhrases, textHeight, wordWidth } from '../src/components/markedPageTeacher.js';
 import { buildMarkedPage } from '../src/components/markedPageModel.js';
 
 let pass = 0; const failures = [];
@@ -18,6 +18,21 @@ ok(classOf({ status: 'first-error', how: { kind: 'factorised' } }) === null && c
 ok(phraseOf('nonsense') === null && phraseOf(null) === null && phraseOf('__proto__') === null && phraseOf('toString') === null, 'an unknown or inherited key has no phrase');
 ok(Object.values({ ...PHRASES, ...TEXT }).every(v => !/[—–ऀ-ॿ]/.test(v)), 'no dash and no Devanagari in any phrase');
 ok(Object.values(PHRASES).every(v => /^[A-Z]/.test(v) && !/[.!?]$/.test(v) && v.length <= 40), 'phrases are short fixed English');
+// every ticked line says the phrase of ITS OWN class, never another's
+const SAMPLES = [
+  [{ fact: { kind: 'proved', proof: 'derivative' } }, 'differentiation'], [{ how: { kind: 'derivative-rule' } }, 'differentiation'], [{ how: { kind: 'factorised' } }, 'factorisation'],
+  [{ how: { kind: 'expanded' } }, 'expansion'], [{ how: { kind: 'evaluated' } }, 'arithmetic'], [{ valueChain: 'arithmetic' }, 'arithmetic'], [{ fact: { kind: 'proved', proof: 'listed' } }, 'solutionList'],
+  [{ fact: { kind: 'proved', proof: 'substituted' } }, 'substitution'], [{ fact: { kind: 'solution-step', step: 3 } }, 'solutionStep'], [{ fact: { kind: 'both-sides' } }, 'equal'],
+  [{ valueChain: 'given', restated: true }, 'restated'], [{ valueChain: 'given' }, 'given'], [{ fact: { kind: 'conclusion' } }, 'conclusion'], [{ fact: { kind: 'heading' } }, 'heading'],
+  [{ rules: [{ rule: 'index-power' }] }, 'indexLaw'], [{ rules: [{ rule: 'compound-sin' }] }, 'trigIdentity']
+];
+for (const [card, want] of SAMPLES) {
+  const cls = classOf({ status: 'checked', ...card });
+  ok(cls === want && phraseOf(cls) === PHRASES[want], `class ${want}: got ${cls}`);
+}
+ok(PHRASES.conclusion === 'Correct answer' && PHRASES.restated === 'Question restated', 'a conclusion says "Correct answer"; a restated question says "Question restated"');
+ok(buildTeacherMarks({ page: { lines: [{ n: 1, status: 'checked', card: { n: 1, status: 'checked', fact: { kind: 'solution-step', step: 3 } }, box: null }], header: {} }, table: null })[0].phrase === PHRASES.solutionStep, 'a solution-step line never borrows another class\'s phrase');
+ok(lineWord({ fact: { kind: 'heading' } }) === 'Heading' && lineWord({ valueChain: 'given', restated: true }) === 'Question restated' && lineWord({ fact: { kind: 'x' } }) === null, 'a heading and a restated question have their own word, no dash');
 ok(reasonOf({ n: 3, facts: {} }) === 'This line does not follow from the one above.' && reasonOf({ n: 1 }) === 'This line is not correct.', 'no engine reason, the fixed sentence');
 ok(reasonOf({ n: 3, facts: { whyWrong: 'The sign changes. More words follow.' } }) === 'The sign changes.', 'the engine\'s own reason is used, first sentence only');
 
@@ -75,6 +90,27 @@ ok(obs[0].where === 'gutter', 'an unchecked line beside a marked one is writing 
 const fb = placeMarks({ marks: [{ n: 2, box: null }, { n: 3, box: null }, { n: 5, box: null }], width: W, height: H });
 ok(fb.every(p => p.where === 'gutter' && p.placement === 'order') && fb[0].y < fb[1].y && fb[1].y < fb[2].y, 'without line boxes the marks stand in the gutter in line order, labelled as such');
 ok(placeMarks({ marks: [{ n: 1, box: { x: 0.1, y: 0.1, w: 0.2, h: 0.04 } }, { n: 2, box: null }], width: W, height: H }).every(p => p.placement === 'order'), 'one missing box puts the whole page in line order (nothing half-placed)');
+
+// a tick is anchored to the right end of ITS OWN line, centred on it, shrinking into a narrow gap rather than moving to another row
+const stag = [
+  { n: 8, box: { x: 0.05, y: 0.20, w: 0.472, h: 0.044 } },    // ends at 0.522 (417.6 px)
+  { n: 9, box: { x: 0.556, y: 0.226, w: 0.38, h: 0.044 } }     // the second column starts 26 px lower and 0.034 (27 px) further right
+];
+const ps = placeMarks({ marks: [stag[0]], obstacles: stag, width: W, height: H });
+const own = stag[0].box;
+ok(ps[0].where === 'page' && ps[0].size < 24 && ps[0].size >= 14, `a narrow gap takes a smaller tick on the page, not a tick on another row (${ps[0].where} ${ps[0].size})`);
+ok(ps[0].y >= own.y * H && ps[0].y <= (own.y + own.h) * H, 'the tick centre lies within its own line\'s vertical range');
+ok(ps[0].x - ps[0].size / 2 >= (own.x + own.w) * W && ps[0].x - ps[0].size / 2 - (own.x + own.w) * W <= 8, 'and just right of the line\'s box');
+for (const [ps_, set] of [[pl, crowded], [pd, dense]]) for (const p of ps_) {
+  const m = set.find(q => q.n === p.n);
+  ok(p.y >= m.box.y * H - 0.5 && p.y <= (m.box.y + m.box.h) * H + 0.5, `mark ${p.n}: its y lies on its own line`);
+}
+// the words: straight after the tick on the same line when the space is free, else the gutter
+const wlist = placeMarks({ marks: [{ n: 4, box: { x: 0.05, y: 0.3, w: 0.2, h: 0.04 } }, { n: 5, box: { x: 0.05, y: 0.5, w: 0.2, h: 0.04 } }, { n: 6, box: { x: 0.05, y: 0.7, w: 0.78, h: 0.04 } }], words: { 4: 'Correct differentiation', 6: 'Matches a step of the worked solution' }, reserve: 12, width: W, height: H });
+ok(wlist[0].word && wlist[0].word !== 'gutter' && wlist[0].word.x0 > wlist[0].x && Math.abs(wlist[0].word.y - wlist[0].y) < 0.5, 'the words follow the tick on its own line');
+ok(wlist[1].word === null, 'no words wanted, none placed');
+ok(wlist[2].word === 'gutter', 'words that do not fit beside the tick go to the gutter');
+ok(wordWidth('Correct', 17) > wordWidth('Correct', 13), 'a smaller size is narrower');
 
 // ── the words ──────────────────────────────────────────────────────────────
 const g = groupPhrases([{ n: 2, kind: 'right', phrase: 'Correct arithmetic' }, { n: 3, kind: 'right', phrase: 'Correct arithmetic' }, { n: 4, kind: 'right', phrase: null }, { n: 6, kind: 'right', phrase: 'Correct arithmetic' }], [{ n: 2, y: 10 }, { n: 3, y: 30 }, { n: 6, y: 90 }]);

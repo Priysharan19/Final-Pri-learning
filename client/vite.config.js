@@ -405,6 +405,8 @@ export const ON_DEMAND = [
   // The diagram kit rides inside the notes page chunk (NotesParts.jsx, nsw/NswParts.jsx).
   // The handwriting face of the teacher-marked page (Prithagoras): marking is online-only, so a page that shows it is already online; it is
   // fetched when the first marked page opens, then kept by the runtime cache, and is not carried in the install.
+  // The marking layer of the teacher-marked page (Prithagoras, components/teacherLayer.js): needed only to look at a page just marked, which takes a connection.
+  [/(^|\/)teacherLayer-[^/]*\.(js|css)$/, 'teacher-marked page layer: fetched with the first marked page'],
   [/(^|\/)patrick-hand-[^/]*\.woff2$/, 'Patrick Hand, the annotation face of the marked page: fetched with the first marked page'],
   [/(^|\/)cmu-serif-[^/]*\.woff2$/, 'CMU Serif, the notes reading face (both editions): fetched with a chapter, then kept like the chapter itself'],
   [/(^|\/)(Notes|NswNotes|notesIndex|nswNotesIndex|notes-[a-z0-9]+(-[a-z0-9]+)*)-[A-Za-z0-9_-]{8}\.(js|css)$/, 'chapter notes'],

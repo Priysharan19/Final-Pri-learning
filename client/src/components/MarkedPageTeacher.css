@@ -24,9 +24,8 @@
 
 /* ── the sheet: the page, untouched, with the margin beside it ── */
 .mp-sheet.mp-t-sheet { display: grid; grid-template-columns: minmax(0, 1fr) var(--mp-gw, 76px); padding-left: 0; background: var(--mk-paper); border: 1px solid var(--mk-rule); }
-.mp-t-sheet[data-mp-size="roomy"] { --mp-gw: 230px; --mp-rule-x: 172px; }
+.mp-t-sheet[data-mp-size="roomy"] { --mp-gw: 150px; --mp-rule-x: 92px; }
 .mp-t-sheet[data-mp-size="compact"] { --mp-gw: 76px; --mp-rule-x: 30px; }
-.mp-t-sheet[data-mp-view="original"] { grid-template-columns: minmax(0, 1fr); }
 .mp-t-sheet .mp-sheet-in { min-width: 0; align-self: start; }
 .mp-t-over { position: absolute; inset: 0; pointer-events: none; }
 .mp-t-markers { position: absolute; inset: 0; pointer-events: none; }
@@ -36,12 +35,12 @@
 .mp-t-leader.is-right { color: var(--mk-correct); }
 .mp-t-leader.is-wrong { color: var(--mk-error); }
 
-.mp-marker.mp-t-tick { position: absolute; transform: translate(-50%, -50%); min-width: max(var(--mp-tick, 24px), 24px); min-height: max(var(--mp-tick, 24px), 24px); padding: 0; border: 0; background: transparent; border-radius: 6px; pointer-events: auto; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; color: var(--mk-graphite); }
+.mp-marker.mp-t-tick { position: absolute; transform: translate(-50%, -50%); min-width: max(var(--sz, 24px), 24px); min-height: max(var(--sz, 24px), 24px); padding: 0; border: 0; background: transparent; border-radius: 6px; pointer-events: auto; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; color: var(--mk-graphite); }
 .mp-marker.mp-t-tick.in-gutter { left: calc(100% + 16px); }
 .mp-marker.mp-t-tick.is-active { background: transparent; color: inherit; outline: 2px solid var(--mk-accent); outline-offset: -2px; }
 .mp-marker.mp-t-tick:focus-visible { outline: 2px solid var(--mk-accent); outline-offset: -2px; }
-.mp-t-num { position: absolute; right: -4px; top: 2px; font: 600 10.5px/1 var(--font); color: var(--mk-quiet); font-variant-numeric: tabular-nums; }
-.mp-t-glyph { width: calc(var(--mp-tick, 24px) * 1.08); height: var(--mp-tick, 24px); fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; overflow: visible; display: block; }
+.mp-t-num { position: absolute; left: calc(50% + var(--sz, 24px) * 0.56 + 1px); top: 50%; transform: translateY(-10%); font: 600 10.5px/1 var(--font); color: var(--mk-quiet); font-variant-numeric: tabular-nums; }
+.mp-t-glyph { width: calc(var(--sz, 24px) * 1.08); height: var(--sz, 24px); fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; overflow: visible; display: block; }
 .mp-t-glyph path { stroke: currentColor; stroke-dasharray: 1; stroke-dashoffset: 0; }
 .mp-t-glyph.is-right { color: var(--mk-correct); }
 .mp-t-glyph.is-wrong { color: var(--mk-error); }
@@ -52,12 +51,12 @@
 }
 
 /* the right margin: a red rule, the boxed marks on it, and a few handwritten words */
-.mp-t-gutter { position: relative; min-width: 0; align-self: stretch; }
+.mp-t-gutter { position: relative; min-width: 0; align-self: stretch; overflow: hidden; }
 .mp-t-rule { position: absolute; top: 0; bottom: 0; left: var(--mp-rule-x); border-left: 1px solid var(--mk-error); }
 .mp-t-box { position: absolute; left: calc(var(--mp-rule-x) + 1px); box-sizing: border-box; min-width: 42px; height: 24px; padding: 0 6px; border: 1px solid var(--mk-error); color: var(--mk-error); background: var(--mk-paper); font: 400 15px/22px var(--mk-hand); text-align: center; font-variant-numeric: tabular-nums; }
 .mp-t-box.is-traced { background: color-mix(in srgb, var(--mk-accent) 14%, var(--mk-paper)); outline: 2px solid var(--mk-accent); outline-offset: 1px; }
-.mp-t-words { position: absolute; left: 34px; width: calc(var(--mp-rule-x) - 40px); appearance: none; background: none; border: 0; padding: 0; text-align: left; cursor: pointer; overflow: hidden;
-  font: 400 17px/1.15 var(--mk-hand); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.mp-t-words { position: absolute; left: 30px; width: calc(var(--mp-rule-x) - 34px); appearance: none; background: none; border: 0; padding: 0; text-align: left; cursor: pointer; overflow: hidden;
+  font: 400 15px/1.1 var(--mk-hand); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
 .mp-t-words.is-right { color: var(--mk-correct); }
 .mp-t-words.is-wrong { color: var(--mk-error); }
 
@@ -102,7 +101,6 @@
 .mp-t-unread { color: var(--mk-quiet); }
 
 .mp-t-root .mp-panel[hidden], .mp-t-root .mp-live[hidden] { display: none; }
-.mp-t-root .mp-body[data-mp-body-view="original"] { grid-template-columns: minmax(0, 1fr); }
 .mp-t-root .mp-body { margin-top: var(--space-3); }
 
 /* the approval label stays; the table repeats the allocation the workspace already shows */
@@ -111,7 +109,12 @@
 @media (min-width: 800px) { .mp-t-root .mp-body { grid-template-columns: minmax(0, 9fr) minmax(280px, 4fr); } }
 .mp-t-root .mp-sentence { color: var(--mk-graphite); }
 
-.mp-t-sheet[data-mp-tick="small"] .mp-t-num { display: none; }
+.mp-t-tick.is-small .mp-t-num { display: none; }
 .mp-marker.mp-t-tick.is-active svg.mp-t-glyph.is-right, .mp-marker.mp-t-tick svg.mp-t-glyph.is-right { color: var(--mk-correct); }
 .mp-marker.mp-t-tick.is-active svg.mp-t-glyph.is-wrong, .mp-marker.mp-t-tick svg.mp-t-glyph.is-wrong { color: var(--mk-error); }
 .mp-t-score + .mp-t-foot { border-top: 0; padding-top: 0; }
+
+/* a few words straight after the tick, on the line they belong to */
+.mp-t-say { position: absolute; transform: translateY(-50%); white-space: nowrap; font-family: var(--mk-hand); line-height: 1; pointer-events: none; }
+.mp-t-say.is-right { color: var(--mk-correct); }
+.mp-t-say.is-wrong { color: var(--mk-error); }

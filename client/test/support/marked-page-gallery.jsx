@@ -50,9 +50,9 @@ const FIXTURE_PAGE = typeof window !== 'undefined' && window.__markedPageFixture
 // two columns in the middle so a tick at the end of line 7 would land on line 8's writing. The report carries the classes the engine emits.
 const V = (text, how, fact, extra = {}) => ({ text, status: 'ok', state: 'verified', note: null, ...(how ? { how } : {}), ...(fact ? { fact } : {}), ...extra });
 const U = text => ({ text, status: 'note', state: 'unverified' });
-const C = text => ({ text, status: 'note', state: 'unverified', context: true });
+const C = (text, fact) => ({ text, status: 'note', state: 'unverified', context: true, ...(fact ? { fact } : {}) });
 const OWNER19 = [
-  C('Solution:'),
+  C('Solution:', { kind: 'heading' }),
   V('y = 4x^3 - 36x^2', null, null, { state: 'given', solutionMatch: true }),
   V('dy/dx = 12x^2 - 72x', { kind: 'derivative-rule' }),
   C('Stationary points when dy/dx = 0:'),
@@ -70,7 +70,7 @@ const OWNER19 = [
   V('= 864 - 1296 = -432', null, null, { state: 'arithmetic' }),
   U('(0, 0) and (6, -432)'),
   U('The two stationary points are (0,0) and (6,-432).'),
-  V('The larger x-coordinate is 6', null, { kind: 'proved', proof: 'listed' })
+  V('The larger x-coordinate is 6', null, { kind: 'solution-step', step: 3 })   // the class main emits for a line that matches a step of the worked solution
 ];
 const OWNER19_COL = i => (i >= 8 && i <= 11 ? 1 : 0);   // lines 9 to 12 are the right-hand column
 function owner19Page() {
@@ -82,10 +82,10 @@ function owner19Page() {
   const lines = OWNER19.map((l, i) => {
     const right = OWNER19_COL(i) === 1;
     const x = right ? 478 : 40;
-    // lines 8 and 9 are written side by side: line 8 ends at x = 452 and line 9 starts at 478 a little lower
+    // lines 8 and 9 are written side by side: line 8 ends at x = 440 and line 9 starts at 478 a little lower
     const y = i < 8 ? 40 + i * 52 : i === 8 ? 40 + 7 * 52 + 26 : 40 + 7 * 52 + 26 + (i - 8) * 52;
     g.fillText(l.text.replace(/\^2/g, '\u00b2').replace(/\^3/g, '\u00b3'), x, y);
-    const w = i === 7 ? 412 : Math.min((right ? W - 478 - 20 : W - 80), g.measureText(l.text).width + 16);
+    const w = i === 7 ? 400 : Math.min((right ? W - 478 - 20 : W - 80), g.measureText(l.text).width + 16);
     return { text: l.text, box: { x: x / W, y: (y - 22) / H, w: w / W, h: 44 / H } };
   });
   return { src: canvas.toDataURL('image/png'), lines };

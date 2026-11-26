@@ -7,6 +7,7 @@ import { chromium } from '@playwright/test';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
+import { PHRASES } from '../src/components/markedPageTeacher.js';
 
 const CLIENT = fileURLToPath(new URL('..', import.meta.url));
 const shots = (process.argv.find(a => a.startsWith('--shots=')) || '').slice(8);
@@ -33,6 +34,7 @@ const open = async (page, u, view = 'marked') => {
 const lum = hex => { const c = hex.match(/\w\w/g).map(h => parseInt(h, 16) / 255).map(v => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
 const contrast = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
 const hexOf = rgb => '#' + rgb.match(/\d+/g).slice(0, 3).map(n => Number(n).toString(16).padStart(2, '0')).join('');
+const CLASS_OF = { 2: 'restated', 3: 'differentiation', 5: 'equal', 6: 'factorisation', 7: 'solutionList', 8: 'differentiation', 14: 'arithmetic', 15: 'arithmetic', 16: 'arithmetic', 19: 'solutionStep' };
 const CHECKED = [2, 3, 5, 6, 7, 8, 14, 15, 16, 19];          // the fixture lines the engine ticks
 const UNCHECKED = [1, 4, 9, 10, 11, 12, 13, 17, 18];         // conditions and lines it could not verify: no tick, no cross
 
@@ -47,10 +49,12 @@ for (const [size, viewport] of [['desktop', { width: 1280, height: 900 }], ['pho
       const rect = el => el.getBoundingClientRect().toJSON();
       const img = rect(sec.querySelector('.mp-img'));
       const boxes = JSON.parse(document.querySelector('[data-gallery-boxes]').getAttribute('data-gallery-boxes'));
-      const ticks = [...sec.querySelectorAll('.mp-t-tick')].map(b => ({ n: Number(b.getAttribute('data-mp-box')), label: b.getAttribute('aria-label'), where: b.getAttribute('data-mp-where'), r: rect(b.querySelector('svg')), tag: b.tagName }));
+      const ticks = [...sec.querySelectorAll('.mp-t-tick')].map(b => ({ n: Number(b.getAttribute('data-mp-box')), label: b.getAttribute('aria-label'), where: b.getAttribute('data-mp-where'), r: rect(b.querySelector('svg')), tag: b.tagName, cls: b.getAttribute('data-mp-class'), phrase: b.getAttribute('data-mp-phrase'), num: rect(b.querySelector('.mp-t-num')), numShown: getComputedStyle(b.querySelector('.mp-t-num')).display !== 'none' }));
       return {
         img, boxes, ticks, boxesPx: boxes.map(b => ({ x0: img.left + b.x * img.width, x1: img.left + (b.x + b.w) * img.width, y0: img.top + b.y * img.height, y1: img.top + (b.y + b.h) * img.height })),
-        markBoxes: [...sec.querySelectorAll('[data-mp-markbox]')].map(b => ({ n: b.getAttribute('data-mp-markbox'), text: b.textContent.trim(), label: b.getAttribute('aria-label') })),
+        markBoxes: [...sec.querySelectorAll('[data-mp-markbox]')].map(b => ({ n: b.getAttribute('data-mp-markbox'), text: b.textContent.trim(), label: b.getAttribute('aria-label'), r: rect(b) })),
+        says: [...sec.querySelectorAll('[data-mp-say]')].map(w => ({ n: w.getAttribute('data-mp-say'), text: w.textContent.trim(), r: rect(w), font: getComputedStyle(w).fontFamily })),
+        sheetH: rect(sec.querySelector('.mp-sheet-in')).height, sheetTop: rect(sec.querySelector('.mp-sheet-in')).top,
         words: [...sec.querySelectorAll('[data-mp-words]')].map(w => ({ n: w.getAttribute('data-mp-words'), text: w.textContent.trim(), font: getComputedStyle(w).fontFamily })),
         tally: sec.querySelector('[data-mp-tally]')?.textContent, figure: sec.querySelector('[data-mp-figure]')?.getAttribute('data-mp-figure'), stateWord: sec.querySelector('[data-mp-state-word]')?.textContent,
         foot: sec.querySelector('[data-mp-foot]')?.textContent, assess: sec.querySelector('[data-mp-assess] summary')?.innerText.replace(/\s+/g, ' ').trim(),
@@ -76,14 +80,27 @@ for (const [size, viewport] of [['desktop', { width: 1280, height: 900 }], ['pho
     // no tick sits on the student's writing
     const onInk = got.ticks.filter(t => t.where === 'page').filter(t => got.boxesPx.some(b => t.r.left < b.x1 && b.x0 < t.r.right && t.r.top < b.y1 && b.y0 < t.r.bottom));
     ok(onInk.length === 0, `${where}: no tick covers a line of writing ${JSON.stringify(onInk.map(t => t.n))}`);
-    ok(got.ticks.find(t => t.n === 8).where === 'gutter', `${where}: line 8's tick would land on the second column, so it stands in the gutter`);
-    ok(got.ticks.filter(t => t.n !== 8).every(t => t.where === 'page'), `${where}: the others stand at the end of their lines`);
     if (size === 'desktop') {
       const pg = got.ticks.filter(t => t.where === 'page');
       ok(pg.every((a, i) => pg.every((b, j) => i === j || !(a.r.left < b.r.right && b.r.left < a.r.right && a.r.top < b.r.bottom && b.r.top < a.r.bottom))), `${where}: no two ticks overlap`);
-      ok(got.sheetAttr === 'roomy' && got.words.some(w => w.n === '19' && w.text === 'Correct solutions' && /Pri Hand/.test(w.font)), `${where}: a few short handwritten words stand in the margin, in the bundled face ${JSON.stringify(got.words)}`);
     }
-    ok(got.words.length <= 3, `${where}: only a few words at most (${got.words.length})`);
+    // every tick is anchored to ITS line: centre inside the line's own vertical range, just right of its box (a gutter tick is at the margin, still level with it)
+    const anchored = got.ticks.map(t => { const b = got.boxesPx[t.n - 1]; const cy = (t.r.top + t.r.bottom) / 2; return { n: t.n, where: t.where, dy: cy >= b.y0 - 1 && cy <= b.y1 + 1, dx: t.where === 'gutter' || (t.r.left - b.x1 >= -1 && t.r.left - b.x1 <= 14) }; });
+    ok(anchored.every(a => a.dy && a.dx), `${where}: every tick sits on its own line, just after it ${JSON.stringify(anchored.filter(a => !(a.dy && a.dx)))}`);
+    ok(size !== 'desktop' || got.ticks.every(t => t.where === 'page'), `${where}: even line 8, beside the second column, keeps its tick on its own line`);
+    // the phrase on each tick is the phrase of that line's own class
+    ok(got.ticks.every(t => t.cls === CLASS_OF[t.n] && (t.phrase || null) === (PHRASES[CLASS_OF[t.n]] || null)), `${where}: every phrase is its own line's class ${JSON.stringify(got.ticks.filter(t => t.cls !== CLASS_OF[t.n]).map(t => [t.n, t.cls]))}`);
+    ok(got.ticks.find(t => t.n === 19).phrase === 'Matches a step of the worked solution' && !/Correct solutions/.test(got.text), `${where}: line 19 says its own class, not a solution list`);
+    // the number is clear of the stroke
+    ok(got.ticks.filter(t => t.numShown).every(t => t.num.left >= t.r.right - 3), `${where}: tick numbers stand clear of the stroke`);
+    ok(got.ticks.filter(t => t.numShown).every(t => !got.boxesPx.some((b, i) => i + 1 !== t.n && t.num.left < b.x1 && b.x0 < t.num.right && t.num.top < b.y1 && b.y0 < t.num.bottom)), `${where}: a number never lands on another line's writing`);
+    // the margin mark is level with its line; the few words follow the tick on the same line
+    ok(got.markBoxes.every(m => { const b = got.boxesPx[Number(m.n) - 1]; const cy = (m.r.top + m.r.bottom) / 2; return cy >= b.y0 - 1 && cy <= b.y1 + 1; }), `${where}: each margin mark is level with its own line`);
+    if (size === 'desktop') ok(got.says.length === 1 && got.says[0].n === '19' && got.says[0].text === 'Matches a step of the worked solution' && /Pri Hand/.test(got.says[0].font), `${where}: one short comment, in the bundled face ${JSON.stringify(got.says.map(w => w.text))}`);
+    if (got.says.length) { const t19 = got.ticks.find(t => t.n === 19); const w = got.says[0]; ok(w.r.left >= t19.r.right - 1 && w.r.left - t19.r.right <= 30 && Math.abs((w.r.top + w.r.bottom) / 2 - (t19.r.top + t19.r.bottom) / 2) <= 10, `${where}: the comment follows its tick on the same line`);
+      ok(!got.boxesPx.some(b => w.r.left < b.x1 && b.x0 < w.r.right && w.r.top < b.y1 && b.y0 < w.r.bottom), `${where}: the comment covers no writing`); }
+    ok(got.sheetAttr === 'compact', `${where}: no wide empty margin when every comment fits beside its tick (${got.sheetAttr})`);
+    ok(got.says.length + got.words.length <= 3, `${where}: only a few words at most`);
     ok(got.fontOk, `${where}: the bundled handwriting face loads`);
     ok(got.tally === '10 lines correct. 0 wrong. 9 not checked.' || /^10 lines correct\. 0 wrong\. \d+ not checked\.$/.test(got.tally), `${where}: the tally counts maths lines only: ${got.tally}`);
     ok(got.figure === '1/1' && got.stateWord === 'Fully correct', `${where}: the server's mark and its one-word state ${got.figure} ${got.stateWord}`);
@@ -111,15 +128,15 @@ for (const [size, viewport] of [['desktop', { width: 1280, height: 900 }], ['pho
     const cross = await page.evaluate(() => {
       const b = document.querySelector('.mp-t-tick.is-wrong');
       return { n: b?.getAttribute('data-mp-box'), label: b?.getAttribute('aria-label'), color: b && getComputedStyle(b.querySelector('svg')).color, under: document.querySelectorAll('[data-mp-under]').length,
-        words: [...document.querySelectorAll('[data-mp-words]')].map(w => w.textContent.trim()), ticks: document.querySelectorAll('.mp-t-tick.is-right').length,
+        words: [...document.querySelectorAll('[data-mp-say], [data-mp-words]')].map(w => w.textContent.trim()), ticks: document.querySelectorAll('.mp-t-tick.is-right').length,
         none: ['5', '6', '7'].every(n => !document.querySelector(`[data-mp-box="${n}"]`)) };
     });
     ok(cross.n === '9' && /^Line 9: wrong\. /.test(cross.label) && cross.under === 1 && cross.ticks === 4 && cross.none, `${where}: one cross on the first wrong line, with its underline; none on unverified lines ${JSON.stringify(cross)}`);
-    if (size === 'desktop') ok(cross.words.length === 1 && /does not follow from the one above/.test(cross.words[0]), `${where}: the cross says why, in the engine's fixed words ${cross.words}`);
+    if (cross.words.length) ok(cross.words.length === 1 && /does not follow from the one above/.test(cross.words[0]), `${where}: the cross says why, in the engine's fixed words ${cross.words}`);
     ok(contrast(hexOf(cross.color), theme === 'light' ? '#f8f7f3' : '#1d1d1b') >= 4.5, `${where}: the cross is red enough to read`);
     if (shots) {
       for (const v of ['marked', 'detailed', 'original']) {
-        await open(page, url('owner19', { theme, extra: 'criteria=3' }), v);
+        await open(page, url('owner19', { theme, extra: 'criteria=1' }), v);
         await page.screenshot({ path: `${shots}/teacher-marked-${v}-${size}-${theme}.png`, fullPage: true });
       }
       await open(page, url('crossed', { theme }), 'detailed');
@@ -147,6 +164,26 @@ for (const [size, viewport] of [['desktop', { width: 1280, height: 900 }], ['pho
   await page.locator('[data-mp-view-option="original"]').focus(); await page.keyboard.press('ArrowRight'); await page.keyboard.press('ArrowRight');
   ok(await page.locator('[data-mp-view-option="detailed"]').getAttribute('aria-checked') === 'true', 'arrow keys move between the views');
 
+  // the page never changes height between views, and every mark stays level with its line in each
+  const heights = {};
+  for (const v of ['original', 'marked', 'detailed']) {
+    await open(page, url('owner19', { extra: 'criteria=3' }), v);
+    heights[v] = await page.evaluate(() => {
+      const img = document.querySelector('.mp-img').getBoundingClientRect();
+      const sheet = document.querySelector('.mp-sheet-in').getBoundingClientRect();
+      const boxes = JSON.parse(document.querySelector('[data-gallery-boxes]').getAttribute('data-gallery-boxes'));
+      const lvl = el => { const r = el.getBoundingClientRect(); return (r.top + r.bottom) / 2; };
+      const off = [...document.querySelectorAll('[data-mp-box], [data-mp-markbox]')].map(e => { const n = Number(e.getAttribute('data-mp-box') || e.getAttribute('data-mp-markbox')); const b = boxes[n - 1]; const y0 = img.top + b.y * img.height, y1 = img.top + (b.y + b.h) * img.height; const cy = lvl(e); return cy >= y0 - 1 && cy <= y1 + 1 ? null : n; }).filter(Boolean);
+      return { h: Math.round(sheet.height), top: Math.round(sheet.top), off, imgH: Math.round(img.height) };
+    });
+  }
+  ok(heights.original.h === heights.marked.h && heights.marked.h === heights.detailed.h && heights.original.top === heights.detailed.top, `the page keeps its height and place in every view ${JSON.stringify(heights)}`);
+  ok(heights.marked.off.length === 0 && heights.detailed.off.length === 0, `marks stay level with their lines in Marked and Detailed ${JSON.stringify([heights.marked.off, heights.detailed.off])}`);
+  await open(page, url('owner19', { extra: 'criteria=3' }), 'detailed');
+  const first = await page.evaluate(() => ({ state: document.querySelector('.mp-state')?.innerText.replace(/\s+/g, ' ').trim(), icons: document.querySelectorAll('.mp-state svg').length }));
+  ok(/^Heading/.test(first.state) && first.icons === 0 && !/[\u2013\u2014\u2012-]\s*Context/.test(first.state), `a heading says Heading, with no dash glyph: ${first.state}`);
+  await page.locator('[data-mp-box="2"]').click();
+  ok(/^Question restated/.test(await page.locator('.mp-state').innerText()), 'the restated question says Question restated');
   // Detailed: steps are keyboard reachable, name the step with its mark and one sentence, and trace to the page
   ok(await page.locator('[data-mp-chip]').count() === 3, 'one step chip per real criterion');
   await page.locator('[data-mp-chip="stationary"]').focus(); await page.keyboard.press('Enter');
@@ -179,10 +216,12 @@ for (const [size, viewport] of [['desktop', { width: 1280, height: 900 }], ['pho
 
   // India renders exactly as before: no marking root, no ticks, the old markers, the old header, in Hindi
   const hi = await browser.newContext({ viewport: { width: 1280, height: 900 } }); const ph = await hi.newPage();
+  const requested = []; ph.on('request', r => requested.push(r.url()));
   await ph.goto(url('stationary', { edition: 'priyabhata', teacher: false }), { waitUntil: 'networkidle' }); await ph.waitForSelector('[data-marked-page]');
   const india = await ph.evaluate(() => ({ root: document.querySelector('.mp-t-root, .mp-t-sheet, .mp-t-tick, [data-mp-views], [data-mp-tally], [data-mp-assess], [data-mp-gutter]') !== null, markers: document.querySelectorAll('.mp-marker[data-mp-box]').length, sentence: !!document.querySelector('[data-mp-counts]'), hasPhoto: document.querySelector('.mp-img') !== null || document.querySelector('.mp-ink') !== null,
     photo: document.querySelector('.mp-img')?.getAttribute('data-mp-photo') || null }));
   ok(!india.root && india.markers > 0 && india.sentence, `India: no teacher marks, the old markers and header ${JSON.stringify(india)}`);
+  ok(!requested.some(u => /teacherLayer|TeacherMarks|markedPageTeacher|MarkedPageTeacher/.test(u)), 'India never fetches the marking layer');
   await hi.close();
   const src = readFileSync(new URL('../src/components/MarkedPage.jsx', import.meta.url), 'utf8');
   ok(/teacherMarks = EDITION === 'prithagoras'/.test(src), 'the teacher-marked page is on only in the Prithagoras build');

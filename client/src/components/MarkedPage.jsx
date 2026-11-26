@@ -11,7 +11,7 @@
 // own and shows no mark but the server's. The line list is the screen-reader source, in line order; the markers repeat it.
 // A state is always an icon and a word as well as a colour.
 // ─────────────────────────────────────────────────────────────────────────────
-import React, { useId, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import Icon from './Icon.jsx';
 import { useT, useLanguage } from '../i18n/index.js';
 import { commentFor } from '../engine/lineCommentary.js';
@@ -27,8 +27,6 @@ import SchemeTable from './SchemeTable.jsx';
 import { firstSentence } from './lineReportText.js';
 import { typesetProse } from './typesetProse.js';
 import { EDITION } from '../platform/edition.js';
-import { TeacherSheet, ViewToggle, Assessment, StepChips } from './TeacherMarks.jsx';
-import { TEXT, buildAssessment, buildTeacherMarks, listWords, tallyOf } from './markedPageTeacher.js';
 import './MarkedPage.css';
 
 const pointsOf = s => (Array.isArray(s) ? s : Array.isArray(s?.points) ? s.points : []);
@@ -37,46 +35,16 @@ const WIDE = '(min-width: 800px)';
 const wide = () => typeof window !== 'undefined' && !!window.matchMedia?.(WIDE)?.matches;
 const VIEW_KEY = 'pri.markedPage.view';
 const readView = () => { try { const v = localStorage.getItem(VIEW_KEY); return v === 'original' || v === 'detailed' ? v : 'marked'; } catch { return 'marked'; } };
-/** Detailed feedback: the words for every mark, numbered as on the page, and the unread lines, which can be typed in (never a cross). */
-function MarkList({ page, marks, lineOpen, toggleLine, readingOfLine, canType, setEditing, textOf, pick }) {
-  const byN = new Map(marks.map(m => [m.n, m]));
-  return (
-    <ol className="mp-t-list" data-mp-list aria-label={TEXT.listLabel}>
-      {page.lines.filter(l => byN.has(l.n) || l.status === 'unread').map(l => {
-        const m = byN.get(l.n);
-        if (!m) {
-          return (
-            <li key={l.n} data-mp-list-n={l.n} data-mp-unread-item>
-              <span className="n">{l.n}</span>
-              <span className="mp-t-unread">{TEXT.unreadLine}{' '}
-                {canType
-                  ? <button type="button" className="mp-link" onClick={() => { if (!lineOpen(l.n)) toggleLine(l.n); setEditing({ line: l.n, text: textOf(l.n) }); }}>{TEXT.typeIt}</button>
-                  : null}
-                {lineOpen(l.n) && readingOfLine(l.n, true)}
-              </span>
-            </li>
-          );
-        }
-        return (
-          <li key={l.n} data-mp-list-n={l.n}>
-            <span className="n">{l.n}</span>
-            <ListEntry m={m} line={l.n} pick={pick} />
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
-function ListEntry({ m, line, pick }) {
-  const w = listWords(m);
-  return (
-    <span className={`is-${m.kind}`}>
-      <button type="button" className="mp-link" onClick={() => pick(line, true)}>{w.head}</button>
-      {w.tail ? <span className="hand"> {w.tail}</span> : null}
-      {w.corrected ? <span> {w.corrected}</span> : null}
-      {w.mark ? <span> {w.mark}</span> : null}
-    </span>
-  );
+/** The teacher-marked layer is its own chunk, fetched when a Prithagoras page is marked: the India edition never loads it. */
+function useTeacherLayer(on) {
+  const [state, setState] = useState({ mod: null, failed: false });
+  useEffect(() => {
+    if (!on) return undefined;
+    let live = true;
+    import('./teacherLayer.js').then(mod => { if (live) setState({ mod, failed: false }); }).catch(() => { if (live) setState({ mod: null, failed: true }); });
+    return () => { live = false; };
+  }, [on]);
+  return state;
 }
 const reducedMotion = () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
 
@@ -210,8 +178,10 @@ export default function MarkedPage({ teacherMarks = EDITION === 'prithagoras', e
   const [view, setViewState] = useState(readView);
   const setView = v => { setViewState(v); try { localStorage.setItem(VIEW_KEY, v); } catch { /* the choice is only a convenience */ } };
   const [rowFocus, setRowFocus] = useState(null);
-  const marks = useMemo(() => (teacherMarks && page ? buildTeacherMarks({ page, table }) : []), [teacherMarks, page, table]);
-  const assessment = useMemo(() => (teacherMarks && page ? buildAssessment({ page, table, attempt: model?.attempt ?? null }) : null), [teacherMarks, page, table, model]);
+  const { mod: T, failed: layerFailed } = useTeacherLayer(teacherMarks);
+  const tm = !!T;   // the marking layer, once its chunk has arrived
+  const marks = useMemo(() => (T && page ? T.buildTeacherMarks({ page, table }) : []), [T, page, table]);
+  const assessment = useMemo(() => (T && page ? T.buildAssessment({ page, table, attempt: model?.attempt ?? null }) : null), [T, page, table, model]);
   const detailRef = useRef(null);
   const listRef = useRef(null);
   const markersRef = useRef(null);
@@ -337,8 +307,8 @@ export default function MarkedPage({ teacherMarks = EDITION === 'prithagoras', e
           </span>
         </div>
         <p className="mp-state" data-mp-state={state}>
-          <Icon name={st.icon} size={16} />
-          <b>{t(STATE_WORD[state])}</b>
+          {!(tm && status === 'condition') && <Icon name={st.icon} size={16} />}
+          <b>{(tm && T.lineWord(card)) || t(STATE_WORD[state])}</b>
           <span className="mp-state-n">{t('mp.line', { n })}</span>
         </p>
         {wrong && fromText && field('from', t('mp.from', { n: from }), <p className="mp-expr mp-prev" data-mp-from><Typeset text={fromText} texOf={lineOf} /></p>)}
@@ -356,22 +326,24 @@ export default function MarkedPage({ teacherMarks = EDITION === 'prithagoras', e
   };
 
   return (
-    <section className={`mp${teacherMarks ? ' mp-t-root' : ''}`} aria-labelledby={`${uid}-h`} data-marked-page data-mp-source={source.kind} data-mp-aligned={page.aligned ? 'true' : 'false'} data-mp-selected={selected}>
+    <section className={`mp${tm ? ' mp-t-root' : ''}`} aria-labelledby={`${uid}-h`} data-marked-page data-mp-source={source.kind} data-mp-aligned={page.aligned ? 'true' : 'false'} data-mp-selected={selected}>
       <h3 className="sr-only" id={`${uid}-h`}>{t('mp.title')}</h3>
-      <Header page={page} t={t} hasTable={!!table || stepMarks} scoreShown={scoreShown} teacher={teacherMarks} />
-      {teacherMarks && (
+      <Header page={page} t={t} hasTable={!!table || stepMarks} scoreShown={scoreShown} teacher={tm} />
+      {tm && (
         <div className="mp-t-bar">
-          <p className="mp-t-tally" data-mp-tally>{tallyOf(page)}</p>
-          <ViewToggle view={view} setView={setView} />
+          <p className="mp-t-tally" data-mp-tally>{T.tallyOf(page)}</p>
+          <T.ViewToggle view={view} setView={setView} />
         </div>
       )}
-      <div className="mp-body" data-mp-body-view={teacherMarks ? view : undefined}>
+      <div className="mp-body" data-mp-body-view={tm ? view : undefined}>
         <figure className="mp-page">
-          {teacherMarks
-            ? <TeacherSheet kind={source.kind} view={view} page={page} marks={marks} selected={selected} pick={pick} onKey={onKey(markersRef)} markersRef={markersRef} trace={trace}
-                viewBoxStyle={geometry?.view ? { '--mp-ar': geometry.view.w / geometry.view.h } : undefined}><PageArt source={source} view={geometry?.view || null} t={t} cleaned={cleaned} /></TeacherSheet>
-            : <Sheet source={source} geometry={geometry} page={page} selected={selected} pick={pick} onKey={onKey(markersRef)} markersRef={markersRef} t={t} cleaned={cleaned} />}
-          {teacherMarks && view === 'detailed' && <MarkList page={page} marks={marks} lineOpen={lineOpen} toggleLine={toggleLine} readingOfLine={readingOfLine} canType={!!onCorrect} setEditing={setEditing} textOf={textOf} pick={pick} />}
+          {tm
+            ? <T.TeacherSheet kind={source.kind} view={view} page={page} marks={marks} selected={selected} pick={pick} onKey={onKey(markersRef)} markersRef={markersRef} trace={trace}
+                viewBoxStyle={geometry?.view ? { '--mp-ar': geometry.view.w / geometry.view.h } : undefined}><PageArt source={source} view={geometry?.view || null} t={t} cleaned={cleaned} /></T.TeacherSheet>
+            : teacherMarks && !layerFailed
+              ? <div className="mp-sheet" data-mp-sheet={source.kind}><div className="mp-sheet-in"><PageArt source={source} view={geometry?.view || null} t={t} cleaned={cleaned} /></div></div>
+              : <Sheet source={source} geometry={geometry} page={page} selected={selected} pick={pick} onKey={onKey(markersRef)} markersRef={markersRef} t={t} cleaned={cleaned} />}
+          {tm && view === 'detailed' && <T.MarkList page={page} marks={marks} lineOpen={lineOpen} toggleLine={toggleLine} readingOfLine={readingOfLine} canType={!!onCorrect} setEditing={setEditing} textOf={textOf} pick={pick} />}
           {/* Everything about how the page was read is one quiet disclosure under the photo. */}
           <details className="mp-about" data-mp-about>
             <summary>{t('mp.about')}</summary>
@@ -400,10 +372,10 @@ export default function MarkedPage({ teacherMarks = EDITION === 'prithagoras', e
             </div>
           </details>
         </figure>
-        <div className="mp-panel" hidden={teacherMarks && view === 'original'}>
-          {teacherMarks && <Assessment model={assessment} rowFocus={rowFocus} setRowFocus={setRowFocus} tracedRows={tracedRows} examinerNote={examinerNote} />}
-          {teacherMarks && view === 'detailed' && <StepChips rows={rows} rowFocus={rowFocus} setRowFocus={setRowFocus} />}
-          <div className="mp-live" aria-live="polite" aria-atomic="false" hidden={teacherMarks && view !== 'detailed'}>{detail()}</div>
+        <div className="mp-panel" hidden={tm && view === 'original'}>
+          {tm && <T.Assessment model={assessment} rowFocus={rowFocus} setRowFocus={setRowFocus} tracedRows={tracedRows} examinerNote={examinerNote} />}
+          {tm && view === 'detailed' && <T.StepChips rows={rows} rowFocus={rowFocus} setRowFocus={setRowFocus} />}
+          <div className="mp-live" aria-live="polite" aria-atomic="false" hidden={tm && view !== 'detailed'}>{detail()}</div>
           {/* The screen-reader list of every line, in order; sighted navigation is the markers and the stepper. */}
           <ol className="mp-comments sr-only" ref={listRef} aria-label={t('mp.comments')} onKeyDown={onKey(listRef)}>
             {lines.map(l => (

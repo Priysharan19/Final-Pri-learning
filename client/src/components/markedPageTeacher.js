@@ -22,7 +22,7 @@ export const PHRASES = Object.freeze({
   substitution: 'Correct substitution',
   solutionList: 'Correct solutions',
   rounding: 'Correct rounding',
-  restated: 'Restates the question',
+  restated: 'Question restated',
   given: 'Given in the question',
   identity: 'True identity',
   one: 'Multiplies by 1',
@@ -39,7 +39,11 @@ export const PHRASES = Object.freeze({
   indexLaw: 'Correct index law',
   logLaw: 'Correct log law',
   trigIdentity: 'Correct trig identity',
-  fractions: 'Correct fraction work'
+  fractions: 'Correct fraction work',
+  // classes the line-coverage work may emit; unknown to main today, so nothing maps to them unless the engine names them
+  conclusion: 'Correct answer',
+  heading: 'Heading',
+  question: 'Question restated'
 });
 
 export const TEXT = Object.freeze({
@@ -58,6 +62,8 @@ export const TEXT = Object.freeze({
   markedView: 'Marked',
   detailed: 'Detailed feedback',
   steps: 'Steps',
+  heading: 'Heading',
+  question: 'Question restated',
   step: 'Step',
   marksOnPage: 'Marks on the page',
   listLabel: 'Marks, line by line',
@@ -73,7 +79,7 @@ const HOW = {
   expanded: 'expansion', collected: 'collecting', factorised: 'factorisation', cancelled: 'cancelling', evaluated: 'arithmetic', 'equal-above': 'equal',
   listed: 'solutionList', rounded: 'rounding'
 };
-const FACT = { 'rule-statement': 'ruleStatement', 'solution-step': 'solutionStep', 'both-sides': 'equal', 'equals-line-above': 'equal', 'factors-of-question': 'factors' };
+const FACT = { conclusion: 'conclusion', heading: 'heading', question: 'question', 'rule-statement': 'ruleStatement', 'solution-step': 'solutionStep', 'both-sides': 'equal', 'equals-line-above': 'equal', 'factors-of-question': 'factors' };
 const RULE = {
   factorise: 'factorisation', expand: 'expansion', 'difference-of-squares': 'differenceOfSquares', 'cancel-common-factor': 'cancelling',
   'index-product': 'indexLaw', 'index-power': 'indexLaw', 'index-quotient-power': 'indexLaw',
@@ -89,6 +95,7 @@ export function classOf(card) {
   if (!card || card.status !== 'checked') return null;
   const f = card.fact && typeof card.fact === 'object' ? card.fact : {};
   const h = card.how && typeof card.how === 'object' ? card.how : {};
+  if (h.kind === 'conclusion' || h.kind === 'heading' || h.kind === 'question') return h.kind;
   if (f.kind === 'proved') return PROVED[f.proof] || null;
   if (card.valueChain === 'given') return card.restated ? 'restated' : 'given';
   if (HOW[h.kind]) return HOW[h.kind];
@@ -147,36 +154,70 @@ export function tallyOf(page) {
 }
 
 const rectsOverlap = (a, b) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+const WORD_FONTS = [17, 15, 13];
+/** The width in px of a handwritten phrase at a font size (a fixed estimate: the face is a fixed one). */
+export const wordWidth = (text, font) => Math.ceil(String(text).length * font * 0.47) + 4;
 
 /**
- * Where each tick or cross sits, in pixels of the page. At the end of its line when that space lies on the page, clear of every
- * line's box and of the marks already placed; otherwise in the right gutter, joined to the end of its line by a thin leader that stops
- * at the first writing in its way. A page whose lines have no boxes is not placed on the page at all: the marks stand in the gutter in
- * line order (`placement: 'order'`), which is a fallback and says so.
- * @param {{ n, box }[]} marks  the lines to mark; box in fractions of the page, or null
+ * Where each tick or cross sits, in pixels of the page, and where its few words go.
+ *
+ * The tick is anchored to the right end of ITS OWN line's box, vertically centred on it, and shrinks (never below `min`) to fit the free
+ * space beside the line; if even the smallest does not fit clear of every other line's box and of the marks already placed, it stands in
+ * the right gutter, joined to the end of its line by a thin leader that stops at the first writing in its way. The words (`words`: line
+ * number to phrase) come straight after the tick on the same line when the free space holds them (the largest of three sizes that fits);
+ * otherwise `word` is 'gutter'. A page whose lines have no boxes is not placed on the page at all: the marks stand in the gutter in line
+ * order (`placement: 'order'`), a fallback that says so.
+ * @param {{ n, box }[]} marks      the lines to mark; box in fractions of the page, or null
  * @param {{ n, box }[]} obstacles  every line of the page (default: the marks), for the writing a mark must not cover
- * @returns {{ n, where: 'page'|'gutter', x, y, leader: null|{x0,x1,y}, placement: 'box'|'order' }[]}  x, y in px (y is the line's centre)
+ * @param {Object<number,string>} words  phrases to write beside ticks
+ * @param {number} reserve  px kept clear after a tick for its small number
+ * @returns {{ n, where: 'page'|'gutter', x, y, size, leader, placement, word: null|'gutter'|{x0,x1,y,font,text} }[]}  x, y in px (y is the line's centre)
  */
-export function placeMarks({ marks, obstacles = null, width, height, size = 24, gap = 4 }) {
+export function placeMarks({ marks, obstacles = null, words = {}, reserve = 0, width, height, size = 24, min = 14, gap = 4 }) {
   const W = Math.max(1, Number(width) || 1), H = Math.max(1, Number(height) || 1);
-  // every line's box is writing a mark must keep clear of, judged or not
   const all = (obstacles || marks).filter(m => m.box).map(m => ({ n: m.n, x0: m.box.x * W, x1: (m.box.x + m.box.w) * W, y0: m.box.y * H, y1: (m.box.y + m.box.h) * H }));
   const placed = [];
   const out = [];
   const boxed = marks.every(m => m.box);
+  const clearOf = (r, n) => !all.some(b => b.n !== n && rectsOverlap(r, { x0: b.x0 - 2, x1: b.x1 + 2, y0: b.y0, y1: b.y1 })) && !placed.some(p => rectsOverlap(r, p));
   marks.forEach((m, i) => {
-    if (!m.box || !boxed) { out.push({ n: m.n, where: 'gutter', x: W, y: ((i + 0.5) / Math.max(1, marks.length)) * H, leader: null, placement: 'order' }); return; }
+    const wanted = Object.hasOwn(words, m.n) ? String(words[m.n]) : null;
+    if (!m.box || !boxed) { out.push({ n: m.n, where: 'gutter', x: W, y: ((i + 0.5) / Math.max(1, marks.length)) * H, size, leader: null, placement: 'order', word: wanted ? 'gutter' : null, num: false }); return; }
     const own = all.find(b => b.n === m.n);
     const cy = (own.y0 + own.y1) / 2;
-    const tick = { x0: own.x1 + gap, y0: cy - size / 2, x1: own.x1 + gap + size, y1: cy + size / 2 };
-    const clear = tick.x1 <= W - 1 && tick.y0 >= 0 && !all.some(b => b.n !== m.n && rectsOverlap(tick, { x0: b.x0 - 2, x1: b.x1 + 2, y0: b.y0, y1: b.y1 })) && !placed.some(p => rectsOverlap(tick, p));
-    if (clear) { placed.push(tick); out.push({ n: m.n, where: 'page', x: tick.x0 + size / 2, y: cy, leader: null, placement: 'box' }); return; }
+    let tick = null, tsize = size;
+    for (const k of [1, 0.85, 0.7]) {
+      const sz = Math.round(size * k);
+      if (sz < min) break;
+      const r = { x0: own.x1 + gap, y0: cy - sz / 2, x1: own.x1 + gap + sz, y1: cy + sz / 2 };
+      if (r.x1 <= W - 1 && r.y0 >= 0 && clearOf(r, m.n)) { tick = r; tsize = sz; break; }
+    }
+    if (tick) {
+      // the small number stands right after the tick when that space is clear of writing; otherwise it is left off (the label still names the line)
+      const nw = reserve ? String(m.n).length * 6.5 + 4 : 0;
+      const numRect = nw ? { x0: tick.x1, y0: cy - 6, x1: tick.x1 + nw, y1: cy + 6 } : null;
+      const num = !!numRect && numRect.x1 <= W - 1 && clearOf(numRect, m.n) && tsize >= 18;
+      placed.push(tick);
+      if (num) placed.push(numRect);
+      let word = null;
+      if (wanted) {
+        const x0 = tick.x1 + (num ? nw : 0) + 3;
+        for (const font of WORD_FONTS) {
+          const w = wordWidth(wanted, font);
+          const r = { x0, y0: cy - font * 0.62, x1: x0 + w, y1: cy + font * 0.62 };
+          if (r.x1 <= W - 2 && clearOf(r, m.n)) { word = { x0, x1: r.x1, y: cy, font, text: wanted }; placed.push(r); break; }
+        }
+        if (!word) word = 'gutter';
+      }
+      out.push({ n: m.n, where: 'page', x: tick.x0 + tsize / 2, y: cy, size: tsize, leader: null, placement: 'box', word, num });
+      return;
+    }
     // the gutter: the leader runs along the foot of the line and stops where other writing begins
     const ly = own.y1 + 1;
     const blockers = all.filter(b => b.n !== m.n && b.x0 > own.x1 && b.y0 <= ly && b.y1 >= ly).map(b => b.x0 - 2);
     const x1 = Math.min(W, ...blockers);
     const x0 = own.x1 + gap;
-    out.push({ n: m.n, where: 'gutter', x: W, y: cy, leader: x1 - x0 >= 10 ? { x0, x1, y: ly } : null, placement: 'box' });
+    out.push({ n: m.n, where: 'gutter', x: W, y: cy, size, leader: x1 - x0 >= 10 ? { x0, x1, y: ly } : null, placement: 'box', word: wanted ? 'gutter' : null, num: false });
   });
   return out;
 }
@@ -237,3 +278,12 @@ export const listWords = m => ({
   corrected: m.kind === 'wrong' && m.corrected ? `Corrected line: ${m.corrected}` : null,
   mark: m.paid ? `Mark ${m.paid.text}.` : null
 });
+
+/** The one word the detail panel opens with for a line that is a heading or the restated question; null leaves the usual word. */
+export function lineWord(card) {
+  if (!card) return null;
+  const kinds = [card.fact?.kind, card.how?.kind];
+  if (kinds.includes('heading')) return TEXT.heading;
+  if (kinds.includes('question') || (card.valueChain === 'given' && card.restated)) return TEXT.question;
+  return null;
+}
