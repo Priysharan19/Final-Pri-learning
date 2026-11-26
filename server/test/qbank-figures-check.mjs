@@ -39,7 +39,15 @@ const sha = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const entries = qb.qbankEntries().map(e => ({ ...e.entry, family: e.family }));
 const withFigure = entries.filter(e => e.diagram);
 c.ok(withFigure.length > 100, `the pack holds ${withFigure.length} parts that have a figure`);
-{ const { HELD_BY_EYE } = await import('../../tools/qbank-figure-risk.mjs'); c.deq(withFigure.filter(e => HELD_BY_EYE[e.group]).map(e => e.id), [], 'no packed question has a figure that was held after looking at it'); }
+{
+  // A figure held after looking at it is packed only where the author's decision of 26 Nov 2026 (tools/qbank-step-figures.json) names the part and
+  // the by-eye reason says the figure shows a step of the working; a by-eye hold for the answer or a legibility defect is never waived.
+  const { HELD_BY_EYE, STEP_FIGURE_DECISION } = await import('../../tools/qbank-figure-risk.mjs');
+  const cleared = new Set(STEP_FIGURE_DECISION.byEyeCleared);
+  c.deq(withFigure.filter(e => HELD_BY_EYE[e.group] && !cleared.has(e.id)).map(e => e.id), [], 'no packed question has a figure that was held after looking at it, unless the author cleared it as a step result');
+  c.deq(withFigure.filter(e => HELD_BY_EYE[e.group] && /answer|legibility|mismatch/i.test(HELD_BY_EYE[e.group]) && !/step/i.test(HELD_BY_EYE[e.group])).map(e => e.id), [], 'and none whose held reason is the answer, a legibility defect or a mismatch');
+  c.deq(Object.keys(STEP_FIGURE_DECISION.notReleased).filter(id => withFigure.some(e => e.id === id)), [], 'a part the decision file lists as not released is not in the pack');
+}
 
 // ── the committed files, against the pack and the sanitiser ─────────────────
 const dir = path.join(qb.DEFAULT_PACK_DIR, 'figures');

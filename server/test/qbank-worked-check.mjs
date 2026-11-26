@@ -170,7 +170,11 @@ try {
   }
   // A worked-solution question with a figure: the same route, the same checks (the figure shows nothing of his steps; the file is the pack's).
   {
-    const withFig = workedAll.find(w => w.entry.diagram && w.place.ordinal !== null);
+    // The worked question with a figure that sits in the smallest pool (same sub-topic, dot point and level), so the seeded search below reaches it
+    // within the request limit however many figures the pack holds.
+    const poolOf = w => `${w.place.subtopic}|${w.place.ordinal}|${w.entry.level}`;
+    const poolSize = new Map(); for (const w of workedAll) poolSize.set(poolOf(w), (poolSize.get(poolOf(w)) || 0) + 1);
+    const withFig = workedAll.filter(w => w.entry.diagram && w.place.ordinal !== null).sort((x, y) => poolSize.get(poolOf(x)) - poolSize.get(poolOf(y)) || (x.entry.id < y.entry.id ? -1 : 1))[0];
     const gotF = await find(a, withFig);
     c.ok(!!gotF && gotF.r.data.question.diagram?.alt === withFig.entry.diagram.alt, `a worked-solution question with a figure was issued (${withFig.entry.id})`);
     const fig = await h.request(`/v1/practice/${gotF.r.data.question.id}/figure`, { jar: a.jar });
