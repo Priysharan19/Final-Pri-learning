@@ -88,7 +88,24 @@ export function exactForm(v) {
 // In a comment a value is a `$…$` span the client typesets (the plain form is exactForm(v).plain).
 const shown = v => `$${exactForm(v).tex}$`;
 
+// A one-letter name in front of a worked chain of plain numbers: `k = 9 - 3 = 5`, `Δ = (7)^2 - 4(-3)(3) = 49 - (-36)`, `d_1 = 8 - 3 = 5`.
+// The name says what the chain is for and is never what the chain states: the claim is that the numbers after it are equal, and that
+// holds (or fails) whatever the name is. The name is set aside like `Area =` in front of it, so the chain is judged by the plain-number
+// check below with every one of its guards (a decimal or an ≈ is a note, a bare number in front of worked sides is a note, a reading
+// that makes it true is a note, e or π on only one side is a note). It applies only when EVERY side after the name is a number once
+// worked out (no letter at all but e, π and the named functions on numbers), and there are at least two such sides. A name with a
+// letter on any later side (`T_n = S_n - S_{n-1} = 2n + 3`), a name that is itself a number or a function value (`f(2) = …`), and the
+// constants e and π as the name are left exactly as they were.
+const NAME_LABEL = /^([A-Za-zΔΣθαβφλμσ](?:_\{?[A-Za-z0-9]{1,3}\}?)?)\s*=\s*(\S.*)$/;
+function nameLabelOnNumbers(whole, name, rest) {
+  if (name === 'e' || name === 'π' || /^pi$/i.test(name)) return whole;
+  const sides = rest.replace(/[−–—]/g, '-').replace(/[×·]/g, '*').replace(/÷/g, '/').split('=').map(x => x.trim());
+  if (sides.length < 2 || sides.some(x => !x || /[<>≤≥≠≈≃~,;:?]/.test(x))) return whole;
+  return sides.every(x => valueOfPlain(x) !== null) ? rest : whole;
+}
+
 /** The value of one side when it is plain arithmetic on numbers; null otherwise. */
+function valueOfPlain(side) { return valueOf(side); }
 function valueOf(side) {
   let ast;
   try { ast = parse(normalize(String(side).replace(/⁄/g, '/'))); } catch { return null; }
@@ -1203,6 +1220,91 @@ function pageDefinitionsOnce(raw, out, firstBreak, prep, degreePrimed, tickOnly,
   return broke;
 }
 
+// ── An equation that does not follow from the equations above it ───────────────────────────────────────────────────────────
+// Owner rule, 26 November 2026: a line that does not follow from the line above is crossed at that line (`3x = 12` after `3x + 2 = 11`).
+// An equation in ONE letter is not true or false on its own, but a rewriting of an equation keeps its solutions (moving terms, expanding,
+// multiplying through, completing the square), or keeps some of them (taking one branch, dividing out a factor), or gains some (squaring both
+// sides). A line whose solutions are NEITHER a part of the solutions of an equation above it NOR contain them is not a rewriting of it.
+// Crossed only when ALL of these hold, and a note otherwise (when in doubt, a note):
+//   · the line and the line directly above it are each one equation in the same single letter, a polynomial of degree 1 or 2 in it
+//     (fitted and checked at nine points: a fraction in the letter, a root, a function, a cubic is not read), no words, no ±, no comma,
+//     no part label, no inequality;
+//   · each has finitely many real solutions (at least one) found exactly; the two sets are different and neither holds the other
+//     (so a squared equation that gained roots, a divided one that lost roots, one branch of a quadratic, `x = 2` after `x² = 4` are never crossed);
+//   · no decimal (a rounded value is not the exact one), and the line directly above is not a bare value either (`x = 0` after `x = -3`, `x = -1` is a
+//     new fact about x, not a rewriting);
+//   · the same holds against EVERY equation of that letter in the four lines above it that is not a bare value (`x = 2`), and at least one such
+//     equation is there: a second branch (`x - 2 = 0` after `x - 1 = 0`, both from `(x - 1)(x - 2) = 0`) is a part of an equation above it,
+//     and two bare values with no equation above them (`x = 2`, `x = 3`) are not judged.
+const REWRITE_WORDS = /[<>≤≥≠≈≃~%°,;:?±∓]|[A-Za-z]{2,}|\bor\b|\band\b/;
+const REWRITE_PART = /^\(?(?:[a-h]|i{1,3}|iv|v|vi{0,3})[.)]\s|^\([a-h]\)|^(?:part|question|q)\s*\(?[a-h0-9]/i;
+// `P(1)`, `f(x+1)`: a letter before a bracket that does not hold that letter is a function applied to something, not a product.
+function functionLike(t) {
+  for (const m of t.matchAll(/([A-Za-z])\s*\(/g)) {
+    let depth = 0, end = -1;
+    for (let k = m.index + m[0].length - 1; k < t.length; k++) { if (t[k] === '(') depth++; else if (t[k] === ')' && --depth === 0) { end = k; break; } }
+    if (end < 0 || !new RegExp(`(?<![A-Za-z])${m[1]}(?![A-Za-z])`).test(t.slice(m.index + m[0].length, end))) return true;
+  }
+  return false;
+}
+function polyEquation(rawLine) {
+  let t = String(rawLine).replace(/\s*[.;]\s*$/, '').replace(/[−–—]/g, '-').replace(/[×·]/g, '*').replace(/÷/g, '/').replace(/^∴\s*/, '');
+  if (!t || /π|\bpi\b|\||\d\.\d|(?<![\d])\.\d/.test(t) || functionLike(t) || REWRITE_PART.test(t) || REWRITE_WORDS.test(t.replace(/(?<![A-Za-z])[A-Za-z](?![A-Za-z])/g, '#')) || (t.match(/=/g) || []).length !== 1 || /[=]{2}|=>|<=|>=|!=/.test(t) || /\d\s+\d|\d\s*\.\s+\d/.test(t)) return null;
+  t = cleanStatement(t);
+  const [l, r] = t.split('=').map(x => x.trim());
+  if (!l || !r) return null;
+  let a, b;
+  try { a = parse(normalize(l)); b = parse(normalize(r)); } catch { return null; }
+  if (!a || !b || a.t === 'equation' || b.t === 'equation') return null;
+  const vars = [...new Set([...variablesOf(a), ...variablesOf(b)])];
+  if (vars.length !== 1 || vars[0] === 'e' || vars[0] === 'π') return null;
+  const v = vars[0];
+  const f = x => { const p = evaluate(a, { [v]: x }), q = evaluate(b, { [v]: x }); if (typeof p !== 'number' || typeof q !== 'number' || !Number.isFinite(p) || !Number.isFinite(q)) throw new Error('nf'); return p - q; };
+  let c, up, dn;
+  try { c = f(0); up = f(1); dn = f(-1); } catch { return null; }
+  const A = (up + dn) / 2 - c, B = (up - dn) / 2;
+  const scale = Math.max(1, Math.abs(A), Math.abs(B), Math.abs(c));
+  try { for (const x of [-3, -2, -0.5, 0.5, 2, 3, 4.5]) { const y = f(x), z = A * x * x + B * x + c; if (Math.abs(y - z) > 1e-8 * Math.max(scale, Math.abs(y), 1) * Math.max(1, x * x)) return null; } } catch { return null; }
+  const tiny = 1e-9 * scale;
+  let roots;
+  if (Math.abs(A) <= tiny) { if (Math.abs(B) <= tiny) return null; roots = [-c / B]; }
+  else { const d = B * B - 4 * A * c; if (d < -tiny) return null; roots = d <= tiny ? [-B / (2 * A)] : [(-B + Math.sqrt(d)) / (2 * A), (-B - Math.sqrt(d)) / (2 * A)]; }
+  const bare = /^[A-Za-z]$/.test(l) && valueOf(r) !== null || /^[A-Za-z]$/.test(r) && valueOf(l) !== null;
+  const side = (n, sign) => x => sign * evaluate(n, { [v]: x });
+  return { v, roots: roots.sort((x, y) => x - y), bare, l: x => evaluate(a, { [v]: x }), r: x => evaluate(b, { [v]: x }) };
+}
+const sameRoot = (x, y) => Math.abs(x - y) <= 1e-7 * Math.max(1, Math.abs(x), Math.abs(y));
+const holds = (set, x) => set.some(y => sameRoot(x, y));
+/** 'incomparable' when neither set holds the other; otherwise 'related'. */
+const rootRelation = (p, q) => ((p.every(x => holds(q, x)) || q.every(x => holds(p, x))) ? 'related' : 'incomparable');
+// One line is the other with ONE side negated (`2x - 1 = x + 2` and `2x - 1 = -(x + 2)`, the two cases of an absolute value), or the same equation with both sides negated and one
+// swapped: the second case of a split, never a rewriting of the first.
+const FLIP_POINTS = [-2.3, -1.1, 0.7, 1.6, 2.9];
+const sameFn = (f, g, sign) => FLIP_POINTS.every(x => { const p = f(x), q = sign * g(x); return Number.isFinite(p) && Number.isFinite(q) && Math.abs(p - q) <= 1e-9 * Math.max(1, Math.abs(p), Math.abs(q)); });
+function caseSplit(A, B) {
+  for (const [l, r] of [[A.l, A.r], [A.r, A.l]]) if ((sameFn(B.l, l, 1) && sameFn(B.r, r, -1)) || (sameFn(B.l, l, -1) && sameFn(B.r, r, 1))) return true;
+  return false;
+}
+function equationRewrite(raw, out) {
+  const parsed = raw.map(l => { try { return polyEquation(l); } catch { return null; } });
+  for (let i = 0; i < raw.length; i++) {
+    if (out[i].status !== 'note' || out[i].unreadable || out[i].note === 'Follows from the earlier slip.') continue;
+    const B = parsed[i], A = i > 0 ? parsed[i - 1] : null;
+    if (!B || (i > 0 && out[i - 1].status === 'break')) continue;
+    const recent = [];
+    for (let k = Math.max(0, i - 4); k < i; k++) if (parsed[k] && parsed[k].v === B.v && !REWRITE_PART.test(raw[k + 1] || '') && !(k + 1 === i && false)) recent.push(parsed[k]);
+    // a part label (a), (b) anywhere between the lines used and this one: a new part, not a rewriting
+    const fresh = raw.slice(Math.max(0, i - 4), i + 1).some(l => REWRITE_PART.test(l));
+    if (fresh) continue;
+    if (recent.some(r => caseSplit(r, B))) continue;
+    // (1) against the equations above it: neither a part of them nor holding them (see above)
+    const aboveFails = !!A && !A.bare && A.v === B.v && recent.some(r => !r.bare) && recent.every(r => rootRelation(B.roots, r.roots) === 'incomparable');
+    if (!aboveFails) continue;
+    return { index: i, rule: 'equation-rewrite', message: `This line is not a rewriting of the equation above it: its solutions (${B.roots.map(x => `${B.v} = ${exactForm(x).plain}`).join(', ')}) are not those of ${mathSpan(raw[i - 1].replace(/\s*[.;]\s*$/, ''))} or a part of them.` };
+  }
+  return null;
+}
+
 /**
  * `opts.latex`: the reader's TeX for lines of the working, as [{ text, latex }] (a line is matched by its trimmed text).
  * `opts.extendedTex`: read that TeX with the extended reading of engine/texToPlain.js (degrees, counting, powered and inverse trig, logs to a base, integrals, primes…).
@@ -1223,11 +1325,14 @@ let SOLUTION_VALUES = null;
 let ANSWER_VALUE = null;
 // The function values (`f|3`) the question or its worked solution writes, when a question is in hand; null without one.
 let KNOWN_LABELS = null;
+// Set only by the Australian marking path for a one-part question (server/platform/markerOps.js oneAustralianPart): see equationRewrite.
+let REWRITE_OK = false;
 export function stepCheckArithmetic(workingText, opts = null) {
   SOLUTION_VALUES = opts && Array.isArray(opts.solutionValues) ? opts.solutionValues.filter(v => Number.isFinite(v)) : null;
   ANSWER_VALUE = opts && Number.isFinite(opts.answerValue) ? opts.answerValue : null;
   KNOWN_LABELS = opts && Array.isArray(opts.knownLabels) ? new Set(opts.knownLabels) : null;
-  try { return stepCheckArithmeticBudgeted(workingText, opts); } finally { SOLUTION_VALUES = null; ANSWER_VALUE = null; KNOWN_LABELS = null; }
+  REWRITE_OK = !!(opts && opts.equationRewrite === true);
+  try { return stepCheckArithmeticBudgeted(workingText, opts); } finally { SOLUTION_VALUES = null; ANSWER_VALUE = null; KNOWN_LABELS = null; REWRITE_OK = false; }
 }
 function stepCheckArithmeticBudgeted(workingText, opts) {
   return withEvaluationBudget(PAGE_BUDGET, () => {
@@ -1276,7 +1381,7 @@ function sameStatement(text, converted) {
 /** Notes that mean "not judged as one statement" (a label, a trailing equation number, a comma, words), never upgraded. */
 function notOneStatement(text) {
   const t = String(text).replace(/[−–—]/g, '-');
-  if (/^\(?\d{1,3}[.)](?:\s|$)|^\(\d{1,3}\)|\s\(\d{1,3}\)\s*$|[,;:]|^[+*/×÷]|^-\s|\d\s+\.\s*\d|\d\s*\.\s+\d/.test(t)) return true;
+  if (/^\(?\d{1,3}[.)](?:\s|$)|^\(\d{1,3}\)(?!\^)|\s\(\d{1,3}\)\s*$|[,;:]|^[+*/×÷]|^-\s|\d\s+\.\s*\d|\d\s*\.\s+\d/.test(t)) return true;
   const known = new RegExp(`^(?:${FN_RE})$`);
   for (const w of t.toLowerCase().match(/[a-z]+/g) || []) {
     if (known.test(w) || w.length === 1) continue;
@@ -1673,7 +1778,8 @@ function stepCheckArithmeticWithinBudget(workingText, prep = null, tickOnly = fa
     const src0 = line.replace(/\s*[;.]\s*$/, '').replace(/^(?!(?:sin|cos|tan|sec|cosec|csc|cot|ln|log|sqrt|exp|abs|pi|ans|answer|lhs|rhs)\b)[A-Za-z]{3,14}\s*=\s*(?=\S)/i, '').replace(/^[A-Za-z][A-Za-z ]{1,24}:\s*(?=\S)/, '').replace(/^(?:LHS|RHS|L\.H\.S\.?|R\.H\.S\.?)\s*=\s*(?=\S)/i, '').replace(DERIVATIVE_LABEL, '')
       .replace(/\s*(?:\/\/|∎|□)\s*$/, '').replace(/\s*=\s*(?:LHS|RHS|L\.H\.S\.?|R\.H\.S\.?)\s*$/i, '')
       // `t = 4: 6(16) + 8(4) + 5`: the substitution in front is set aside like any other label (a line that follows it is held to the expression). Tick only (see `substituted`).
-      .replace(SUBSTITUTION_PREFIX, '');
+      .replace(SUBSTITUTION_PREFIX, '')
+      .replace(NAME_LABEL, nameLabelOnNumbers);
     const substituted = SUBSTITUTION_PREFIX.test(line);
     // Owner, 19 November 2026 (a sign slip a competitor caught: `a(2) = (4 - 8 + 2)e^(-2) = 2e^(-2) > 0 so …`):
     //   · a value of a function in front of a worked chain (`a(2) = … = …`) is a label for the chain;
@@ -1786,7 +1892,7 @@ function stepCheckArithmeticWithinBudget(workingText, prep = null, tickOnly = fa
     //   a line label or a trailing equation number (`1. 2+3 = 5`, `(2) 2+3 = 5`, `2 + 3 = 5 (2)`), which would be multiplied in;
     //   a comma (two statements on a line, or a decimal comma); a line that starts with an operator and so carries the
     //   line above forward (`- 1 = 2`); a spaced dot (`3 . 4`).
-    if (/^\(?\d{1,3}[.)](?:\s|$)|^\(\d{1,3}\)|\s\(\d{1,3}\)\s*$|[,;:]|^[+*/×÷]|^-\s|\d\s+\.\s*\d|\d\s*\.\s+\d/.test(src.replace(/[−–—]/g, '-'))) return note(line, NOTE);
+    if (/^\(?\d{1,3}[.)](?:\s|$)|^\(\d{1,3}\)(?!\^)|\s\(\d{1,3}\)\s*$|[,;:]|^[+*/×÷]|^-\s|\d\s+\.\s*\d|\d\s*\.\s+\d/.test(src.replace(/[−–—]/g, '-'))) return note(line, NOTE);
     // A mixed number (2 1/2) or a spaced thousand (1 000) reads as a product: two numbers side by side are not judged.
     if (/[<>≤≥≠%°]|==|!=|\d\s+\d/.test(text)) return note(line, NOTE);
     // Any letter left (a variable, π, e, a unit, a function name) and the line is not arithmetic on numbers alone.
@@ -2000,9 +2106,12 @@ function stepCheckArithmeticWithinBudget(workingText, prep = null, tickOnly = fa
   {
     let broke = null;
     try { broke = pageDefinitions(raw, out, firstBreak, prep, degreePrimed, tickOnly); } catch { broke = null; }
+    if (!broke && !tickOnly && REWRITE_OK && firstBreak === -1) { try { broke = equationRewrite(raw, out); } catch { broke = null; } }
     if (broke) {
       const message = broke.message;
-      diagnosis = { code: 'page-definition-not-held', title: 'This line does not agree with what you wrote above', message, fix: 'Put the value from the earlier line in again and work this line out once more.', confidence: 'high' };
+      diagnosis = broke.rule === 'equation-rewrite'
+        ? { code: 'equation-not-a-rewriting', title: 'This line does not follow from the line above', message, fix: 'Rewrite the equation above again, doing the same thing to both sides, and check the line against it.', confidence: 'high' }
+        : { code: 'page-definition-not-held', title: 'This line does not agree with what you wrote above', message, fix: 'Put the value from the earlier line in again and work this line out once more.', confidence: 'high' };
       firstBreak = broke.index;
       out[broke.index] = { text: out[broke.index].text, status: 'break', note: message, diagnosis, ...(broke.rule ? { valueChain: { rule: broke.rule } } : {}) };
       for (let k = broke.index + 1; k < out.length; k++) out[k] = { text: out[k].text, status: 'note', unverified: true, note: 'Follows from the earlier slip.' };

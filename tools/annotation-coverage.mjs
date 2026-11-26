@@ -50,6 +50,7 @@ const { buildAnnotatedWorking } = await import('../client/src/components/annotat
 const { buildMarkedPage } = await import('../client/src/components/markedPageModel.js');
 const { classOf, phraseOf } = await import('../client/src/components/markedPageTeacher.js');
 const SM = await import('../client/src/engine/solutionMatch.js');
+const EX = await import('../client/src/engine/expr.js');
 
 export const markerViewOf = markerView;
 
@@ -193,19 +194,94 @@ export function trueHalf(q, lines, answer, { unreadable = 0, worked = false, fir
 }
 
 const squash = s => String(s).replace(/\s+/g, '').toLowerCase();
-/** Up to two provably false one-line mutants of the line, different kinds first. */
+
+// A mutant is PROVABLY FALSE ON ITS OWN when two neighbouring sides of one `=` chain are plain numbers (no letter, no function, no constant) that
+// disagree by more than any rounding could explain: `Δ = (8)^2 - 4(-3)(3) = 49 - (-36)`. Most other mutants of a worked line (`3x - 18 = 8x - 8`
+// for `4x - 18 = ...`, `x = 4` for `x = 3`, `h = 5(2)^2 + ...`) are false only against the lines around them, and the engine rightly keeps a line of
+// that kind as a note: it may be a different equation (another part), a different value, or a step to another form. Such a mutant is not a test
+// of the engine (it would be a test that the engine knows the question), so the wrong half is first tried on a line whose mutant is false by itself.
+const NAMED_FN = /(?<![A-Za-z])(?:sin|cos|tan|sec|cosec|csc|cot|ln|log|sqrt|exp|arcsin|arccos|arctan|abs)(?![A-Za-z])/;
+const bareNumber = x => /^-?\d+(?:\.\d+)?$/.test(String(x).replace(/\s+/g, ''));
+const unitOf = x => { const t = String(x).replace(/\s+/g, '').replace(/^-/, ''); return t.includes('.') ? 10 ** -(t.split('.')[1].length) : 10 ** ((/[1-9](0+)$/.exec(t) || [0, ''])[1].length); };
+export function falseOnItsOwn(text) {
+  const t = String(text);
+  if (/[<>≤≥≈≠,;:!]|\bpi\b|π|\be\b/.test(t.replace(/\be\^/g, '')) || NAMED_FN.test(t) || /[A-Za-z]{2,}/.test(t.replace(/\b(?:sqrt)\b/g, ''))) return false;
+  let sides;
+  try { sides = H.sidesOf(t); } catch { return false; }
+  if (sides.length < 2 || sides.some(x => !x)) return false;
+  // the first side may be the name of the chain (one letter, with a subscript): the sides after it are the claim
+  const claim = sides.length >= 3 && /^[A-Za-zΔΣθαβφλμσ](?:_\{?[A-Za-z0-9]{1,3}\}?)?$/.test(sides[0]) ? sides.slice(1) : sides;
+  if (claim.length < 2 || claim.some(x => H.lettersIn(x).length)) return false;
+  // a bare number in front of worked sides is margin work to the engine (never a cross)
+  if (bareNumber(claim[0]) && claim.slice(1).some(x => !bareNumber(x))) return false;
+  const vals = claim.map(x => { const v = H.sideValues(x, []); return v && v[0] !== null ? v[0] : null; });
+  if (vals.some(v => v === null)) return false;
+  for (let k = 0; k + 1 < claim.length; k++) {
+    if (Math.abs(vals[k] - vals[k + 1]) <= 1e-9 * Math.max(1, Math.abs(vals[k]), Math.abs(vals[k + 1]))) continue;
+    const bares = [claim[k], claim[k + 1]].filter(bareNumber);
+    if (bares.length === 2) continue;   // two bare numbers: words lost in reading, not a sum
+    if (!/\d\.\d|^\.\d/.test(claim.join(' '))) return true;   // no decimal on the line: no rounding is in play
+    const places = [...`${claim[k]} ${claim[k + 1]}`.matchAll(/\d*\.(\d+)/g)].map(m => m[1].length);
+    const band = bares.length ? Math.min(...bares.map(unitOf)) : places.length ? 10 ** -Math.min(...places) : 0;
+    if (Math.abs(vals[k] - vals[k + 1]) > band * (1 + 1e-9)) return true;
+  }
+  return false;
+}
+
+// A mutant of an equation in one letter is provably false GIVEN THE PAGE when its real solutions (found here by scanning, not by the engine's exact
+// roots) are neither a part of, nor hold, the solutions of any equation of that letter in the four lines above it, and at least one of those is not a
+// bare value (`x = 3`): it contradicts the line it was derived from. A mutant that keeps the same solutions (`7(x - 1)(x - 7) = 0` for `6(x - 1)(x - 7) = 0`)
+// is still true, and is dropped as a tool artefact.
+const oneEquation = text => {
+  const t = String(text).replace(/[−–—]/g, '-').replace(/[×·]/g, '*').replace(/\s*[.;]\s*$/, '');
+  if (/[<>≤≥≠≈,;:±%°]|[A-Za-z]{2,}/.test(t.replace(/(?<![A-Za-z])[A-Za-z](?![A-Za-z])/g, '#')) || (t.match(/=/g) || []).length !== 1) return null;
+  const [l, r] = t.split('=').map(x => x.trim());
+  if (!l || !r) return null;
+  let a, b;
+  try { a = EX.parse(EX.normalize(l)); b = EX.parse(EX.normalize(r)); } catch { return null; }
+  const vars = [...new Set([...EX.variablesOf(a), ...EX.variablesOf(b)])];
+  if (vars.length !== 1 || vars[0] === 'e') return null;
+  const v = vars[0];
+  const f = x => { try { const p = EX.evaluate(a, { [v]: x }), q = EX.evaluate(b, { [v]: x }); return Number.isFinite(p) && Number.isFinite(q) ? p - q : NaN; } catch { return NaN; } };
+  const roots = [];
+  let prevX = -60, prevY = f(prevX);
+  for (let x = -59.95; x <= 60.0001; x += 0.05) {
+    const y = f(x);
+    if (Number.isFinite(prevY) && Number.isFinite(y)) {
+      if (Math.abs(y) < 1e-12) { if (!roots.some(z => Math.abs(z - x) < 0.02)) roots.push(x); }
+      else if (prevY * y < 0) { let lo = prevX, hi = x, flo = prevY; for (let k = 0; k < 60; k++) { const mid = (lo + hi) / 2, fm = f(mid); if (!Number.isFinite(fm)) break; if (flo * fm <= 0) hi = mid; else { lo = mid; flo = fm; } } const z = (lo + hi) / 2; if (!roots.some(w => Math.abs(w - z) < 0.02)) roots.push(z); }
+    }
+    prevX = x; prevY = y;
+  }
+  if (!roots.length || roots.length > 6) return null;
+  const bare = (/^[A-Za-z]$/.test(l) && !/[A-Za-z]/.test(r)) || (/^[A-Za-z]$/.test(r) && !/[A-Za-z]/.test(l));
+  return { v, roots: roots.sort((x, y) => x - y), bare };
+};
+const rootIn = (set, x) => set.some(y => Math.abs(x - y) <= 1e-4 * Math.max(1, Math.abs(x)));
+const related = (p, q) => p.every(x => rootIn(q, x)) || q.every(x => rootIn(p, x));
+export function contradictsLineAbove(lines, i, text) {
+  const B = oneEquation(text);
+  if (!B) return false;
+  const recent = [];
+  for (let k = Math.max(0, i - 4); k < i; k++) { const e = oneEquation(lines[k]); if (e && e.v === B.v) recent.push(e); }
+  return recent.some(r => !r.bare) && recent.every(r => !related(B.roots, r.roots));
+}
+/** True when the mutant is provably false given the page: false by itself, or contradicting the equation(s) above it. */
+export const provableGivenPage = (lines, i, text) => falseOnItsOwn(text) || contradictsLineAbove(lines, i, text);
+
+/** Up to two one-line mutants of the line that are provably false given the page, different kinds first. */
 export function mutantsOf(lines, i) {
   const line = lines[i];
   const others = new Set(lines.filter((_, j) => j !== i).map(squash));
   const all = [];
-  try { for (const m of H.mutationsOf(line)) { if (!others.has(squash(m.text)) && H.judgeMutant(line, m.text) === 'wrong') all.push(m); } } catch { return []; }
+  try { for (const m of H.mutationsOf(line)) { if (!others.has(squash(m.text)) && H.judgeMutant(line, m.text) === 'wrong' && provableGivenPage(lines, i, m.text)) all.push(m); } } catch { return []; }
   const picked = [], kinds = new Set();
   for (const m of all) if (!kinds.has(m.kind)) { picked.push(m); kinds.add(m.kind); if (picked.length === 2) return picked; }
   for (const m of all) if (!picked.includes(m)) { picked.push(m); if (picked.length === 2) break; }
   return picked;
 }
 
-/** The middle-most line that has a provable mutant: for three or more lines the interior ones (the middle first), else the lines in order. */
+/** The middle-most line that has a mutant provably false given the page: for three or more lines the interior ones (the middle first), else the lines in order. */
 export function chooseMutantLine(lines) {
   const n = lines.length;
   const order = n >= 3 ? [...Array(n - 2).keys()].map(k => k + 1).sort((a, b) => Math.abs(a - (n - 1) / 2) - Math.abs(b - (n - 1) / 2) || a - b) : [...Array(n).keys()];
