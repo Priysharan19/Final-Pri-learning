@@ -311,14 +311,18 @@ function matchInequality(chain, sol, list = sol.inequalities) {
 }
 
 // ── the worked solution, read once ───────────────────────────────────────────
-function readSolution(q) {
+function readSolution(q, opts = null) {
   const steps = Array.isArray(q?.steps) ? q.steps : [];
   const labelled = [], conditions = [], values = [], numeric = [], verbatim = [], every = [], limits = new Set();
   for (const t of [String(q?.prompt ?? ''), ...steps.map(x => String(x?.d ?? ''))]) for (const m of t.replace(/\\\$/g, '\u0001').matchAll(TEX_SPAN)) { const pl = spanToPlain(m[1]); if (pl) for (const k of limitKeys(braces(pl))) limits.add(k); }
+  // An inequality line is ticked as a worked-solution statement for an Australian Years 11-12 question only (a bank question, or a generator of y11, y12, me11, me12);
+  // every other question, India's included, is read exactly as before.
+  // (decided by the caller, never read from the question: `opts.inequalities`, set by server/platform/markerOps.js)
+  const australian = !!(opts && opts.inequalities === true);
   const inequalities = [];
   steps.forEach((st, i) => {
     const heading = String(st?.h ?? '').trim();
-    for (const chain of inequalitiesOfSpans(st?.d)) inequalities.push({ step: i, heading, chain });
+    if (australian) for (const chain of inequalitiesOfSpans(st?.d)) inequalities.push({ step: i, heading, chain });
     for (const m of String(st?.d ?? '').matchAll(TEX_SPAN)) { const r = roundedTail(m[1]); if (r !== null) values.push({ step: i, heading, v: Number(r), rounded: true }); }
     for (const s of statementsOfSpans(st?.d)) {
       s.parts.forEach(p => { const v = numericOf(p); if (v !== null) values.push({ step: i, heading, v }); });
@@ -350,7 +354,7 @@ function readSolution(q) {
     stated.set(l.label.name, set);
   }
   const multiRoot = [...stated.values()].some(set => set.size > 1);
-  return { steps, labelled, conditions, numeric, verbatim, every, limits, values, multiRoot, inequalities, promptInequalities: inequalitiesOfSpans(String(q?.prompt ?? '').slice(0, 2000)).map(chain => ({ chain })), final: values.length ? values[values.length - 1] : null };
+  return { steps, labelled, conditions, numeric, verbatim, every, limits, values, multiRoot, inequalities, promptInequalities: australian ? inequalitiesOfSpans(String(q?.prompt ?? '').slice(0, 2000)).map(chain => ({ chain })) : [], final: values.length ? values[values.length - 1] : null };
 }
 
 function readPrompt(q) {
@@ -496,9 +500,9 @@ export const noteValue = (m, v) => `This is the value at step ${m.step + 1} of t
  * { report, matched } (report unchanged and matched 0 when nothing is recognised). `report.lines[i].text` is the
  * student's line i. Pure, deterministic, inside one evaluation budget.
  */
-export function solutionMatch(q, report) {
+export function solutionMatch(q, report, opts = null) {
   if (!q || !report || !Array.isArray(report.lines) || !report.lines.length) return { report, matched: 0 };
-  try { return withEvaluationBudget(PAGE_BUDGET, () => run(q, report)); } catch { return { report, matched: 0 }; }
+  try { return withEvaluationBudget(PAGE_BUDGET, () => run(q, report, opts)); } catch { return { report, matched: 0 }; }
 }
 
 function functionNames(q) {
@@ -520,10 +524,10 @@ function knownSubstitutions(q) {
   return out;
 }
 
-function run(q, report) {
+function run(q, report, opts = null) {
   FUNCS = functionNames(q);
   const lines = report.lines.slice(0, MAX_LINES);
-  const sol = readSolution(q);
+  const sol = readSolution(q, opts);
   const prompt = readPrompt(q);
   let stop = Number.isInteger(report.firstBreak) && report.firstBreak >= 0 ? report.firstBreak : Infinity;
   const brk = lines.findIndex(l => l?.status === 'break');

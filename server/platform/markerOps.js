@@ -65,8 +65,10 @@ export const usesExtendedTex = q => !!q && typeof q._bank === 'string';
 // y11, y12, me11, me12) that has ONE part: with several parts the equations of different parts follow one another on the page and are not rewritings.
 const NSW_SUBTOPIC = /^(?:y11|y12|me11|me12)-/;
 const PART_MARK = /(?<![A-Za-z0-9])\(\s*(?:[a-h]|i{1,3}|iv)\s*\)/g;
+/** An Australian Years 11-12 question: a bank question, or a generator of y11, y12, me11, me12. */
+export const australianQuestion = q => !!q && (typeof q._bank === 'string' || NSW_SUBTOPIC.test(String(q.subtopic ?? '')));
 export function oneAustralianPart(q) {
-  if (!q || !(typeof q._bank === 'string' || NSW_SUBTOPIC.test(String(q.subtopic ?? '')))) return false;
+  if (!australianQuestion(q)) return false;
   const prompt = String(q.prompt ?? '');
   if (new Set((prompt.match(PART_MARK) || []).map(x => x.replace(/\s+/g, ''))).size >= 2) return false;
   const steps = Array.isArray(q.steps) ? q.steps : [];
@@ -387,7 +389,7 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
   if (typeof steps === 'string' && steps.trim() && !OBJECTIVE.has(q.answerType) && q.answerType !== 'graph-sketch' && !Array.isArray(q.boardScheme) && !(opts && opts.solutionMatch === false)) {
     try {
       const base = report || trueAsWritten(q, steps, opts);
-      const matched = base ? solutionMatch(q, base) : null;
+      const matched = base ? solutionMatch(q, base, { inequalities: australianQuestion(q) }) : null;
       if (matched && matched.matched > 0) report = matched.report;
     } catch { /* the report stands */ }
     // Feedback only, after solutionMatch: chains, integrals, vectors and a slip warning (engine/lineChains.js). Never a mark, never a cross.
