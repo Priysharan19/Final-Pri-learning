@@ -34,6 +34,8 @@ export const PHRASES = Object.freeze({
   equal: 'Equal to the line above',
   ruleStatement: 'Correct statement of the rule',
   solutionStep: 'Matches a step of the worked solution',
+  satisfiesEquation: 'Satisfies the equation above',
+  sameEquation: 'Same equation as the line above',
   factors: 'Good choice of factors',
   differenceOfSquares: 'Difference of squares',
   indexLaw: 'Correct index law',
@@ -98,7 +100,7 @@ const TICK = {
   'arithmetic-chain': 'arithmetic', 'second-derivative-value': 'secondDerivative', 'sign-claim': 'signClaim', 'nature-claim': 'natureClaim', 'point-claim': 'pointClaim',
   'conclusion-matches': 'conclusionMatches', 'condition-line': 'conditionLine', 'restated-question': 'restated', 'restated-function': 'given', heading: 'heading',
   'solution-list': 'solutionList', 'rounded-value': 'rounding', identity: 'identity', 'true-as-written': 'trueAsWritten', restated: 'restated',
-  'matches-worked-step': 'solutionStep', 'equal-to-line-above': 'equal'
+  'matches-worked-step': 'solutionStep', 'equal-to-line-above': 'equal', 'satisfies-equation-above': 'satisfiesEquation', 'same-equation-as-line-above': 'sameEquation'
 };
 // ids the engine gives a tick when it had no specific proof to name; a named rule the page itself read between the two lines (`card.rules`) is more specific, so it is shown instead
 const WEAK_TICK = new Set(['true-as-written', 'matches-worked-step']);

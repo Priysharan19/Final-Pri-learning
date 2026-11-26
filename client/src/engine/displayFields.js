@@ -23,7 +23,7 @@
 import { evaluate, variablesOf, exprEquivalent } from './expr.js';
 import { isHeading, worldOf, labelOf, clean, lead, astOf, constOf, fitPoly, polyD, rootsComplete } from './pageProofs.js';
 
-export const CLASSES = Object.freeze(['power-rule-differentiation', 'differentiation', 'factorisation', 'roots-of-a-product', 'equation-setup', 'substitution-evaluated', 'arithmetic-chain', 'second-derivative-value', 'sign-claim', 'nature-claim', 'point-claim', 'conclusion-matches', 'condition-line', 'restated-question', 'restated-function', 'heading', 'solution-list', 'rounded-value', 'labelled-substitution', 'identity', 'derivative-rule', 'true-as-written', 'matches-worked-step', 'equal-to-line-above']);
+export const CLASSES = Object.freeze(['power-rule-differentiation', 'differentiation', 'factorisation', 'roots-of-a-product', 'equation-setup', 'substitution-evaluated', 'arithmetic-chain', 'second-derivative-value', 'sign-claim', 'nature-claim', 'point-claim', 'conclusion-matches', 'condition-line', 'restated-question', 'restated-function', 'heading', 'solution-list', 'rounded-value', 'labelled-substitution', 'identity', 'derivative-rule', 'true-as-written', 'matches-worked-step', 'equal-to-line-above', 'satisfies-equation-above', 'same-equation-as-line-above']);
 const PROVED = { listed: 'solution-list', rounded: 'rounded-value', substituted: 'labelled-substitution', restated: 'restated-question', identity: 'identity', derivative: 'derivative-rule' };
 const NUM = String.raw`-?\d+(?:\.\d+)?`;
 
@@ -92,17 +92,32 @@ function labelOfLine(text) {
   const head = t.split('=')[0].trim().replace(/\s+/g, '');
   return /^(?:[A-Za-z][A-Za-z0-9_']*(?:\([^()=]*\))?|d\^?2?[A-Za-z]+\/d[A-Za-z]+\^?2?)$/.test(head) ? head : '';
 }
+/** What a line states as its value, for the contradiction rule: { label, last } from the end of an `=` / `≈` chain, the tail after an arrow, or the bare line (`Hence 5`, `5`). */
+function statedValue(text) {
+  let t = lead(String(text ?? '')).replace(/[.]+$/, '').trim();
+  const arrow = t.split(ARROWS);
+  if (arrow.length > 1) t = arrow[arrow.length - 1].trim();
+  if (!t || t.length > 200 || /[<>≤≥≠]|!=/.test(t)) return null;
+  const head = t.split(/[=≈]/)[0];
+  // a substitution under `At x = 2:` / `When ...:` states a value of another quantity at another point, never the answer
+  if (/:/.test(head) || /^\s*(?:at|when|for|if|check|put|substituting)\b/i.test(t)) return null;
+  const sides = t.replace(/^[=≈]\s*/, '').split(/[=≈]/).map(x => x.trim());
+  if (sides.some(x => !x)) return null;
+  const label = sides.length > 1 ? labelOfLine(t.replace(/≈/g, '=')) : '';
+  return { label, last: sides[sides.length - 1] };
+}
 /**
  * The index of the line that states the answer: the LAST line before the first cross, ticked, one of whose results (end of a chain, tail after an arrow, the line
- * itself) the server's answer check accepts, and only when the answer was marked correct. A later line that gives the same quantity (the answer's own name, or
- * the answer box's label such as `x =`) a different value (`x = 5` after `x = 3`) contradicts it, and then no line is named; a check line that names another quantity
- * does not. A key met on an earlier line by coincidence is therefore never the answer line when the page goes on to state a different value for the answer.
+ * itself) the server's answer check accepts, and only when the answer was marked correct.
+ * It is withdrawn (no line is named) whenever a LATER line, ticked or not, before or after a cross, states another value for the answer: a constant that the
+ * answer check does not accept (`x = 5`, `= 5`, `≈ 5`, `Hence 5`, a bare `5`, a chain ending at another number, whatever its label), or any value under the answer's
+ * own name or the answer box's label. When it is unsure it names no line. Only a line under `At x = a:` / `When ...:` and a not-equal line are set aside.
  */
-function answerLineOf(q, lines, accepts, correct) {
+function answerLineOf(q, lines, accepts, correct, limit = lines.length) {
   if (correct !== true || typeof accepts !== 'function' || !ANSWER_TYPES.has(q?.answerType)) return -1;
   const ok = c => { try { return accepts(c) === true; } catch { return false; } };
   let at = -1;
-  for (let i = 0; i < lines.length; i++) {
+  for (let i = 0; i < Math.min(limit, lines.length); i++) {
     const l = lines[i];
     if (!l || l.status !== 'ok' || l.context === true) continue;
     if (resultTexts(l.text, q.answerType).some(ok)) at = i;
@@ -114,14 +129,13 @@ function answerLineOf(q, lines, accepts, correct) {
   names.delete('');
   for (let j = at + 1; j < lines.length; j++) {
     const l = lines[j];
-    if (!l || l.status !== 'ok' || l.context === true) continue;
-    const t = lead(String(l.text ?? '')).replace(/[.]+$/, '').trim();
-    if (/:|\b(?:at|when|check|substitut\w*)\b/i.test(t.split('=')[0] || '') || ARROWS.test(t) || /[<>≤≥]/.test(t) || !t.includes('=')) continue;
-    const sides = t.split('=').map(x => x.trim());
-    if (sides.some(x => !x)) continue;
-    const label = labelOfLine(t), last = sides[sides.length - 1];
-    // only a later statement of the SAME quantity (`x = 5` after `x = 3`) contradicts: a check that substitutes back (`17 + 22 = 39`) names another quantity
-    if (label !== '' && names.has(label) && !ok(last)) return -1;
+    if (!l || l.context === true || typeof l.text !== 'string' || isHeading(l.text)) continue;
+    const v = statedValue(l.text);
+    if (!v) continue;
+    let accepted = ok(v.last);
+    if (!accepted) for (const c of resultTexts(l.text, q.answerType)) if (ok(c)) { accepted = true; break; }
+    if (accepted) continue;
+    if (constOf(v.last) !== null || (v.label !== '' && names.has(v.label))) return -1;
   }
   return at;
 }
@@ -253,7 +267,7 @@ export function displayFields(q, report, ctx = null) {
   const lines = report.lines;
   const brk = lines.findIndex(l => l?.status === 'break');
   const limit = brk >= 0 ? brk : lines.length;
-  let answerLine = -1; try { answerLine = answerLineOf(q, lines.slice(0, limit), ctx && ctx.accepts, ctx && ctx.correct); } catch { answerLine = -1; }
+  let answerLine = -1; try { answerLine = answerLineOf(q, lines, ctx && ctx.accepts, ctx && ctx.correct, limit); } catch { answerLine = -1; }
   let changed = false;
   const v = w ? w.v : (/^[a-z]$/.test(String(q?.variable ?? '')) ? q.variable : 'x');
   const out = [];
@@ -291,16 +305,26 @@ export function displayFields(q, report, ctx = null) {
 // fallback the generated path uses. DISPLAY ONLY: no status, state, note or text is changed, so no tick, cross or mark moves.
 function bankClass(l) {
   if (l.tickClass) return l.tickClass;
+  const note = String(l.note ?? '');
   if (l.state === 'given' && (l.solutionMatch === true || l.restates === true)) return 'restated-question';
   const rule = l.valueChain && typeof l.valueChain === 'object' ? l.valueChain.rule : null;
   if (l.fact?.kind === 'proved' && PROVED[l.fact.proof]) return PROVED[l.fact.proof];
   if (rule === 'question-given') return 'restated-function';
-  if (l.how?.kind === 'equal-above' || l.fact?.kind === 'equal-above' || l.fact?.kind === 'equals-line-above') return 'equal-to-line-above';
+  if (l.how?.kind === 'equal-above' || l.fact?.kind === 'equal-above' || l.fact?.kind === 'equals-line-above' || rule === 'continuation' || /^This equals the line above/.test(note)) return 'equal-to-line-above';
   if (l.solutionMatch === true) return 'matches-worked-step';
   if (rule === 'derivative') return 'differentiation';
   if (rule === 'stationary-values') return 'roots-of-a-product';
-  if (rule === 'continuation' || rule === 'arithmetic' || rule === 'page-definitions') return 'arithmetic-chain';
   if (l.coversAll === true) return 'solution-list';
+  // `page-definitions` is one rule for several different proofs: the class follows what the engine's own sentence says it proved, never the rule's name
+  if (rule === 'page-definitions') {
+    if (/\b(?:satisfies|each satisfy) .*(?:equation|above)|satisfies the equation before it/.test(note)) return 'satisfies-equation-above';
+    if (/^The same equation as the one before it/.test(note)) return 'same-equation-as-line-above';
+    if (/^This is the (?:value of the )?derivative\b/.test(note)) return 'derivative-rule';
+    if (/\beach side comes to\b/i.test(note)) return 'arithmetic-chain';
+    return 'true-as-written';
+  }
+  // a numeric chain: both sides evaluate to one value
+  if (rule === 'arithmetic' && l.fact?.kind === 'both-sides') return 'arithmetic-chain';
   return 'true-as-written';
 }
 
@@ -314,7 +338,7 @@ export function bankDisplayFields(q, report, ctx = null) {
   const lines = report.lines;
   const brk = lines.findIndex(l => l?.status === 'break');
   const limit = brk >= 0 ? brk : lines.length;
-  let answerLine = -1; try { answerLine = answerLineOf(q, lines.slice(0, limit), ctx && ctx.accepts, ctx && ctx.correct); } catch { answerLine = -1; }
+  let answerLine = -1; try { answerLine = answerLineOf(q, lines, ctx && ctx.accepts, ctx && ctx.correct, limit); } catch { answerLine = -1; }
   let changed = false;
   const out = lines.map((l, i) => {
     if (!l || l.status !== 'ok') return l;

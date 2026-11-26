@@ -57,15 +57,35 @@ const al = (q, report, correct, accepts) => displayFields(q, report, { correct, 
   ok(al(q, rep(line('x = 3'), line('x = 5')), true, accepting('3')) === undefined, 'x = 3 by coincidence then x = 5: no line is named');
   ok(al(numeric(6, { answerPrefix: 'x =' }), rep(line('2*3 = 6'), line('x = 8')), true, accepting('6')) === undefined, 'a value met by coincidence, then the answer box\'s own quantity given another value: no line is named');
   ok(al(numeric(6, { answerPrefix: 'x =' }), rep(line('k = -2*-3 = 6'), line('x = 6')), true, accepting('6')) === 1, 'a different quantity earlier does not matter: the last accepted line is named');
-  // a check that substitutes back names another quantity and does not contradict
-  ok(al(numeric(29), rep(line('c = 34 - 5 = 29'), line('(2/2)*(10 + 29) = 39'), line('17 + 22 = 39')), true, accepting('29')) === 0, 'check lines after the answer (another quantity) do not contradict it');
+  // a later line that states another value withdraws the answer line, ticked or not, whatever its form or label (when unsure, no line)
+  {
+    const a3 = (...later) => al(q, { lines: [line('x = 3'), ...later] }, true, accepting('3'));
+    ok(a3(line('x = 5')) === undefined, 'later x = 5 (same label)');
+    ok(a3(line('y = 5')) === undefined, 'later y = 5 (another label)');
+    ok(a3(line('= 5')) === undefined, 'later bare = 5');
+    ok(a3(line('x ≈ 5')) === undefined, 'later x ≈ 5');
+    ok(a3(line('so x ≈ 5.0')) === undefined, 'later so x ≈ 5.0');
+    ok(a3(line('Hence 5')) === undefined, 'later Hence 5');
+    ok(a3(line('5')) === undefined, 'later bare number 5');
+    ok(a3(line('2 + 3 = 5')) === undefined, 'later chain ending at another number');
+    ok(a3(line('(2/2)*(10 + 3) = 13')) === undefined, 'later check ending at another number');
+    ok(a3({ text: 'x = 5', status: 'note', state: 'unverified' }) === undefined, 'later x = 5 that is only a note (unticked)');
+    ok(a3({ text: '= 5', status: 'break', state: 'wrong' }) === undefined, 'later = 5 that is crossed');
+    ok(al(q, { lines: [line('x = 3'), { text: 'x = 9', status: 'break', state: 'wrong' }, { text: 'Hence 5', status: 'note' }] }, true, accepting('3')) === undefined, 'a later value after a cross still withdraws it');
+    ok(al(numeric(3, { answerPrefix: 'x =' }), { lines: [line('2 + 1 = 3'), { text: 'x = 7', status: 'note' }] }, true, accepting('3')) === undefined, 'the answer box\'s own label, unticked');
+    ok(a3(line('x = 3')) === 1, 'the same value again does not withdraw it (the later line is the answer line)');
+    ok(a3(line('At x = 2: y = 7')) === 0, 'a substitution under At x = a: is set aside');
+    ok(a3(line('Solution:', { context: true, status: 'note' })) === 0, 'a heading is not a value');
+    ok(a3({ text: 'so x is the root', status: 'note' }) === 0, 'prose with no value does not withdraw it');
+    ok(a3(line('x + 1 = 4')) === undefined, 'a later line ending at another constant (4)');
+  }
+  ok(displayFields(numeric(29), rep(line('c = 34 - 5 = 29'), line('17 + 22 = 39')), { correct: true, accepts: accepting('29') }).answerLine === undefined, 'a check ending at 39 after c = 29 withdraws it (unsure: none)');
   ok(al(numeric(6), rep(line('k = -2*-3 = 6'), line('18 != -3*-5')), true, accepting('6')) === 0, 'a not-equal check line does not contradict it');
-  ok(displayFields(numeric(29), rep(line('c = 34 - 5 = 29'), line('17 + 22 = 39')), { correct: true, accepts: accepting('29') }).lines[1].notRequired === true, 'a proved line after the answer line is not required');
-  ok(al(q, rep(line('At x = 2: y = 7'), line('x = 3')), true, accepting('3')) === 1, 'a line under At x = a: names a value of y and is not the answer');
+    ok(al(q, rep(line('At x = 2: y = 7'), line('x = 3')), true, accepting('3')) === 1, 'a line under At x = a: names a value of y and is not the answer');
   // only a ticked, judged line, before the first cross
   ok(al(q, { lines: [{ text: 'x = 3', status: 'note', state: 'unverified' }] }, true, accepting('3')) === undefined, 'an unticked line is never the answer line');
   ok(al(q, { lines: [line('x = 2'), { text: 'x = 3 - 1', status: 'break', state: 'wrong' }, line('x = 3')] }, true, accepting('3')) === undefined, 'a line after the first cross is never the answer line');
-  ok(al(q, { lines: [line('x = 3'), { text: 'x = 9', status: 'break', state: 'wrong' }] }, true, accepting('3')) === 0, 'a line before the first cross can be');
+  ok(al(q, { lines: [line('x = 3'), { text: 'x + 0', status: 'break', state: 'wrong' }] }, true, accepting('3')) === 0, 'a line before the first cross can be');
   ok(al(q, { lines: [{ text: 'x = 3', status: 'note', context: true, state: 'condition' }] }, true, accepting('3')) === undefined, 'a stated condition is never the answer line');
   // types
   ok(al({ answerType: 'set', answer: { values: [0, 6] }, prompt: 'Solve.' }, rep(line('x = 0 or x = 6')), true, accepting('x = 0 or x = 6')) === 0, 'a set answer is named by the line that states the whole set');
@@ -95,7 +115,7 @@ const al = (q, report, correct, accepts) => displayFields(q, report, { correct, 
   const cls = l => bankDisplayFields(q, rep(l)).lines[0].tickClass;
   ok(cls(line('x', { solutionMatch: true, note: 'Matches step 2 of the worked solution (Expand).' })) === 'matches-worked-step', 'a line that only equals a step of the worked solution is matches-worked-step');
   ok(cls({ text: 'a', status: 'ok', state: 'given', solutionMatch: true }) === 'restated-question', 'a restated question is restated-question');
-  ok(cls(line('x', { state: 'arithmetic', valueChain: { rule: 'continuation' } })) === 'arithmetic-chain', 'a continuation is an arithmetic chain');
+  ok(cls(line('x', { state: 'arithmetic', valueChain: { rule: 'continuation' } })) === 'equal-to-line-above', 'a continuation equals the line above');
   ok(cls(line('x', { state: 'arithmetic', valueChain: { rule: 'arithmetic' }, fact: { kind: 'both-sides' } })) === 'arithmetic-chain', 'both sides coming to one value is arithmetic');
   ok(cls(line('x', { state: 'arithmetic', valueChain: { rule: 'true-as-written' } })) === 'true-as-written', 'a true-as-written line stays true-as-written');
   ok(cls(line('x', { state: 'arithmetic', valueChain: { rule: 'question-given' } })) === 'restated-function', 'a given of the question is named so');
@@ -104,6 +124,21 @@ const al = (q, report, correct, accepts) => displayFields(q, report, { correct, 
   ok(cls(line('x', { how: { kind: 'equal-above' } })) === 'equal-to-line-above', 'a line equal to the one above says so');
   ok(cls(line('x')) === 'true-as-written', 'a tick with no proof field is true-as-written, the generated path\'s own fallback (never a more specific reason)');
   ok(cls(line('x', { tickClass: 'factorisation' })) === 'factorisation', 'a class the engine already gave is kept');
+  // `page-definitions` is one rule with several proofs: the class follows the engine's sentence, never the rule's name
+  const pd = note => cls(line('x', { state: 'arithmetic', valueChain: { rule: 'page-definitions' }, note }));
+  ok(pd('$x = -2$, $x = 1$ each satisfy the equation above. This does not say these are all the solutions.') === 'satisfies-equation-above', 'A12-C4-016 x=-2,1: each satisfies the equation above');
+  ok(pd('$y = 3$, $y = -4$ each satisfy the equation above. This does not say these are all the solutions.') === 'satisfies-equation-above', 'A11-F1-180 y=3,-4: each satisfies the equation above');
+  ok(pd('The same equation as the one before it, rearranged.') === 'same-equation-as-line-above', 'A12-F2-070 y^2+y-2=0: the same equation, rearranged');
+  ok(pd('$x = 1$ satisfies the equation before it.') === 'satisfies-equation-above', 'A12-C3-087 x=1: satisfies the equation before it');
+  ok(pd('Each side comes to $2$.') === 'arithmetic-chain' && pd('With $r = 3$ from the question, each side comes to $36\\pi$.') === 'arithmetic-chain', 'a real numeric chain is arithmetic');
+  ok(pd('This is the derivative of $x^2$, by the product rule.') === 'derivative-rule', 'a derivative is a derivative');
+  ok(pd('something the engine says that is not listed') === 'true-as-written' && pd(undefined) === 'true-as-written', 'an unknown proof is true-as-written');
+  // every (rule, how, fact) shape the engine emits on a bank page, sampled from the real pack: the class is one the proof guarantees
+  ok(cls(line('x', { state: 'arithmetic', valueChain: { rule: 'arithmetic' }, fact: { kind: 'both-sides' }, note: 'Both sides come to $5$.' })) === 'arithmetic-chain', 'both sides come to a number: arithmetic');
+  ok(cls(line('x', { state: 'arithmetic', valueChain: { rule: 'arithmetic' }, note: 'something else' })) === 'true-as-written', 'rule arithmetic without both sides: no specific reason');
+  ok(cls(line('x', { state: 'arithmetic', valueChain: { rule: 'true-as-written' }, fact: { kind: 'both-sides' } })) === 'true-as-written', 'true-as-written with both sides stays so');
+  ok(cls(line('x', { state: 'arithmetic', valueChain: { rule: 'arithmetic' }, fact: { kind: 'equals-line-above' }, note: 'This equals the line above: $5$.' })) === 'equal-to-line-above', 'this equals the line above');
+  ok(cls(line('x', { state: 'incomplete', note: 'x = 2 is also a solution' })) === 'true-as-written', 'an incomplete-solution tick has no specific reason');
   const src = rep(line('a', { solutionMatch: true }), { text: 'b', status: 'note', state: 'unverified', note: 'n' }, { text: 'c', status: 'break', state: 'wrong', note: 'w' });
   const out = bankDisplayFields(q, src);
   ok(out.lines.every((l, i) => ['text', 'status', 'state', 'note', 'solutionMatch'].every(k => l[k] === src.lines[i][k])), 'no text, status, state or note moves');
@@ -212,6 +247,19 @@ ok(answerLines > 50 && answerLineWrong === 0 && answerLineOnWrong === 0, `answer
     }
   }
   ok(mutants > 300 && mutantTicked === 0, `one-line mutants (${mutants}) get no tick or cross from the display layer: ${mutantTicked}`);
+}
+
+// the four real lines the review found with a wrong reason
+for (const [id, text, want] of [['A12-C4-016', 'x=-2,1', 'satisfies-equation-above'], ['A11-F1-180', 'y=3,-4', 'satisfies-equation-above'], ['A12-F2-070', 'y^(2)+y-2=0', 'same-equation-as-line-above'], ['A12-C3-087', 'x=1', null]]) {
+  let q, worked = false;
+  try { q = A.markerViewOf(W.pack.qbankEntryQuestion(id, 17)); } catch { q = { ...A.markerViewOf(W.pack.qbankManualQuestion(id, 17)), _bankWorked: true }; worked = true; }
+  const { lines } = A.authoredLines(q, s => SM._internals.withBankReading(() => SM._internals.spanToPlain(s)));
+  const ev = run(q, worked ? '' : A.keyText(q), lines.join('\n'));
+  const shown = (ev && (ev.shownReport || ev.stepReport))?.lines || [];
+  const i = shown.findIndex(l => String(l.text).replace(/\s/g, '') === text);
+  const l = shown[i];
+  const arithmeticLabel = l && l.tickClass === 'arithmetic-chain' && !/each side comes to|Both sides come to/i.test(String(l.note));
+  ok(i >= 0 && l.status === 'ok' && !arithmeticLabel && (want === null || l.tickClass === want), `${id} ${text}: class ${l && l.tickClass} (${String(l && l.note).slice(0, 50)}) is not "Correct arithmetic" unless it is a numeric chain`);
 }
 
 // 4. the report where there were none, and the reason where there cannot be one
