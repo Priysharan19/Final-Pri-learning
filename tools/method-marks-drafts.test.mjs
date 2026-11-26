@@ -5,6 +5,8 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { build, diffFiles, BANNER, OUT_DIR, readApprovals, bannerFor } from './method-marks-drafts.mjs';
 import { GENERIC_ID, genericDigest } from '../server/platform/genericSteps.js';
+import { BANK_ID, bankDigest } from '../server/platform/bankSteps.js';
+import { BANK_GENERIC_ID, bankGenericDigest } from '../server/platform/bankGenericSteps.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 let pass = 0; const failures = [];
@@ -24,9 +26,9 @@ ok(json.types.every(t => !('approved' in t)), 'no type in types.json carries an 
 for (const [name, text] of first.files) {
   // a packet starts with the DRAFT banner, or with the plain statement of approval only when the author's own record names that packet's digest
   if (name.endsWith('.md') && name !== 'INDEX.md') {
-    const id = name.replace(/\.md$/, ''), digest = id === GENERIC_ID ? genericDigest() : json.types.find(t => t.id === id)?.digest;
+    const id = name.replace(/\.md$/, ''), digest = id === GENERIC_ID ? genericDigest() : id === BANK_ID ? bankDigest() : id === BANK_GENERIC_ID ? bankGenericDigest() : json.types.find(t => t.id === id)?.digest;
     const rec = readApprovals().find(r => r.typeId === id && r.digest === digest && r.verdict === 'approved');
-    ok(text.split('\n')[0] === (rec ? bannerFor(id, digest) : BANNER) && (rec ? /^APPROVED by the author, Priysharan Tripathi \(tutor\), on 2026-11-24/.test(text) : text.startsWith('DRAFT')), `${name} starts with the banner its record decides (${rec ? 'approved at this digest' : 'draft, not approved'})`);
+    ok(text.split('\n')[0] === (rec ? bannerFor(id, digest) : BANNER) && (rec ? text.startsWith(`APPROVED by the author, Priysharan Tripathi (tutor), on ${rec.date}`) : text.startsWith('DRAFT')), `${name} starts with the banner its record decides (${rec ? 'approved at this digest' : 'draft, not approved'})`);
   } else if (name === 'INDEX.md') ok(/approved by the author|^DRAFT/.test(text.split('\n')[0]), 'INDEX.md states its status on the first line');
   ok(!/—/.test(text), `${name} has no em dash`);
   ok(!/examiner-certified|NESA approved/i.test(text), `${name} avoids the forbidden claims`);
