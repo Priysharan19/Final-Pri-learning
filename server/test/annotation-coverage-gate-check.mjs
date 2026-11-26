@@ -72,16 +72,11 @@ const seconds = Math.round((Date.now() - t0) / 1000);
 const summary = A.summarise(records);
 const gen = records.filter(r => r.kind === 'generated'), bank = records.filter(r => r.kind !== 'generated');
 ok(gen.length > 1000 && bank.length > 4000, `the scope is measured: ${gen.length} generated forms, ${bank.length} bank parts`);
-// a multiple-choice question has no working page, and a question in which no provably false error can be planted has no wrong half to test: both are
-// not-applicable, each counted on its own, in no denominator and on no baseline
-const MC = ['mcq', 'multi-mcq', 'matrix-match'];
+// a multiple-choice question has no working page: not-applicable, counted on its own, in no denominator and on no baseline
 const na = records.filter(r => r.status === A.STATUS.notApplicable);
-const naMc = na.filter(r => MC.includes(r.answerType)), naNp = na.filter(r => !MC.includes(r.answerType));
-ok(naMc.length > 0 && naMc.every(r => MC.includes(r.answerType)), `the multiple-choice not-applicable units (${naMc.length})`);
-ok(records.filter(r => MC.includes(r.answerType)).every(r => r.status === A.STATUS.notApplicable), 'every multiple-choice unit is not-applicable');
-ok(naNp.every(r => r.t.ok && r.w.na === true && r.w.cause === 'no plantable error'), `every other not-applicable unit has lines that mark well and no plantable error (${naNp.length})`);
-ok(records.filter(r => r.t.ok && r.w.na === true).every(r => r.status === A.STATUS.notApplicable), 'every unit with good lines and no plantable error is not-applicable');
-ok(summary.notApplicable.multipleChoice === naMc.length && summary.notApplicable.noPlantableError === naNp.length && summary.total.total === records.length - na.length, `the summary counts them apart (${summary.notApplicable.multipleChoice} multiple choice, ${summary.notApplicable.noPlantableError} no plantable error) and leaves them out of the ${summary.total.total} units`);
+ok(na.length > 0 && na.every(r => ['mcq', 'multi-mcq', 'matrix-match'].includes(r.answerType)), `every not-applicable unit is a multiple-choice question (${na.length})`);
+ok(records.filter(r => ['mcq', 'multi-mcq', 'matrix-match'].includes(r.answerType)).every(r => r.status === A.STATUS.notApplicable), 'every multiple-choice unit is not-applicable');
+ok(summary.notApplicable.multipleChoice === na.length && summary.total.total === records.length - na.length, `the summary counts them apart (${summary.notApplicable.multipleChoice}) and leaves them out of the ${summary.total.total} units`);
 ok(na.every(r => baseline.ids[r.id] === undefined), 'no not-applicable unit is on the baseline');
 ok(A.compareToBaseline([na[0]], { ...baseline, ids: {} }).length === 0 && A.compareToBaseline([na[0]], { ...baseline, ids: { [na[0].id]: 'u0' } }).some(x => x.kind === 'now-covered'), 'a not-applicable unit passes as new, and fails if left on the baseline');
 ok(new Set(records.map(r => r.id)).size === records.length, 'every unit id is unique');
@@ -145,8 +140,28 @@ ok(fs.statSync(A.SUMMARY_FILE).size < 500 * 1024, 'the committed summary stays u
   ok(held.summary.questions + held.summary.manualQuestions === 11 - held.held.length, 'a held part is out of the pack, every other part is in it');
 }
 
-console.log(`annotation coverage: ${summary.total.total} units (${gen.filter(r => r.status !== A.STATUS.notApplicable).length} generated forms, ${bank.filter(r => r.status !== A.STATUS.notApplicable).length} bank parts) measured in ${seconds} s; fully covered ${summary.total.full}, true half only ${summary.total.trueOnly}, uncovered ${summary.total.uncovered}; baseline ${Object.keys(baseline.ids).length} ids`);
-console.log(`annotation coverage not applicable: ${naMc.length} multiple-choice questions (no working page), in no denominator and on no baseline`);
-console.log(`annotation coverage not applicable: ${naNp.length} questions with no plantable error, in no denominator and on no baseline`);
+// ── the wrong half is required of every question: a planted new question whose only possible mutation is a self-false one (rung b) ──────────────────────
+{
+  const mk = (steps, value) => A.markerViewOf({ prompt: 'Calculate the value.', answerType: 'numeric', answer: { value }, steps: steps.map(d => ({ h: 'Step', d: '$' + d + '$' })), marks: 2, _marking: 'final-answer-only' });
+  // (1) nothing can be planted on the line above (no operation on it gives the line), so the only mutation is a self-false one, rung b: it is tried, and crossed
+  const good = mk(['a=9-3=6', 'b=6*4=24', 'b=24'], 24);
+  const mg = A.measureQuestion(good, { toPlain: A.genToPlain });
+  ok(A.chooseMutantLine(mg.lines)?.rung === 'b', 'a planted question with no operation to plant on takes the self-false rung (b)');
+  ok(mg.w.ok === true && mg.w.mutants.every(x => x.verdict === 'crossed here'), 'its self-false mutants are crossed at the line');
+  // (2) the same kind of question whose self-false mutant the marker leaves unjudged (a function value at another argument): the wrong half FAILS it, so the
+  // gate refuses a new question like it (not on the baseline, not fully covered)
+  const bad = mk(['f(x)=3x+1', 'f(2)=3(2)+1=7', 'f(2)=7'], 7);
+  const mb = A.measureQuestion(bad, { toPlain: A.genToPlain });
+  ok(A.chooseMutantLine(mb.lines)?.rung === 'b' && mb.w.ok === false && /^wrong step/.test(mb.w.cause), `a planted question whose self-false mutant is not crossed fails its wrong half (${mb.w.cause})`);
+  const planted = { id: 'planted:self-false', kind: 'bank', answerType: 'numeric', status: A.STATUS.trueOnly, t: { ...mb.t, ok: true }, w: mb.w };
+  const refused = A.compareToBaseline([planted], { ...baseline, ids: {} });
+  ok(refused.length === 1 && refused[0].kind === 'new-uncovered' && /wrong step/.test(refused[0].message), 'the gate refuses a new question whose wrong half fails: the self-false mutation must be crossed');
+  // (3) a worked solution with no maths line has no wrong half to test: it is not covered, and never excused
+  const mw = A.measureQuestion({ ...mk([], 1), steps: [{ h: 'Reason', d: 'Because the function is increasing.' }] }, { toPlain: A.genToPlain });
+  ok(mw.w.ok === false && mw.lines.length === 0, 'a worked solution with no maths line has no wrong half: not covered, not excused');
+}
+
+console.log(`annotation coverage: ${summary.total.total} units (${gen.length - na.length} generated forms, ${bank.length} bank parts) measured in ${seconds} s; fully covered ${summary.total.full}, true half only ${summary.total.trueOnly}, uncovered ${summary.total.uncovered}; baseline ${Object.keys(baseline.ids).length} ids`);
+console.log(`annotation coverage not applicable: ${na.length} multiple-choice questions (no working page), in no denominator and on no baseline`);
 done();
 console.log(`ANNOTATION COVERAGE GATE: PASS: ${pass} checks`);

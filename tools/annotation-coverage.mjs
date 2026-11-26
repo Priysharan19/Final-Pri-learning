@@ -271,23 +271,39 @@ export function plantedOnLineAbove(lines, i, text) {
 /** True when the mutant is provably false: false on its own, or the one-error plant on the correct result of a single operation on the line above. */
 export const provableGivenPage = (lines, i, text) => falseOnItsOwn(text) || plantedOnLineAbove(lines, i, text);
 
-/** Up to two one-line mutants of the line that are provably false given the page, different kinds first. */
-export function mutantsOf(lines, i) {
+// The ladder of mutations the wrong half tries, in order. Every unit with a maths line in its worked solution gets a wrong-half test:
+//   (a) PLANTED: one coefficient of the correct result of a single known operation on the line above is changed (plantedOnLineAbove);
+//   (b) SELF-FALSE: a number of a middle line is changed so that the line is no longer true (an arithmetic chain link, a function value, a derivative
+//       coefficient, a substituted value): the evaluator of tools/marking-mutation-harness.mjs finds a different value, and for an equation in one letter
+//       the solutions are not the same (7(x - 1)(x - 7) = 0 for 6(x - 1)(x - 7) = 0 is still true, and is dropped);
+//   (c) the same on any line, the first and the last included (a changed final value in a chain).
+// The first rung that has a mutant is used; the unit is not-applicable for the wrong half only when it is multiple choice, and has no wrong half to test
+// (a failure, never an excuse) when its worked solution has no maths line at all.
+const sameRoots = (a, b) => !!a && !!b && a.v === b.v && a.roots.length > 0 && a.roots.length === b.roots.length && a.roots.every((x, k) => Math.abs(x - b.roots[k]) < 1e-4);
+const stillTrueMutant = (line, text) => { try { return sameRoots(H.rootsOf(line), H.rootsOf(text)); } catch { return false; } };
+export function mutantsOf(lines, i, rung = 'b') {
   const line = lines[i];
   const others = new Set(lines.filter((_, j) => j !== i).map(squash));
   const all = [];
-  try { for (const m of H.mutationsOf(line)) { if (!others.has(squash(m.text)) && H.judgeMutant(line, m.text) === 'wrong' && provableGivenPage(lines, i, m.text)) all.push(m); } } catch { return []; }
+  try {
+    for (const m of H.mutationsOf(line)) {
+      if (others.has(squash(m.text)) || H.judgeMutant(line, m.text) !== 'wrong') continue;
+      if (rung === 'a' ? !plantedOnLineAbove(lines, i, m.text) : stillTrueMutant(line, m.text)) continue;
+      all.push(m);
+    }
+  } catch { return []; }
   const picked = [], kinds = new Set();
   for (const m of all) if (!kinds.has(m.kind)) { picked.push(m); kinds.add(m.kind); if (picked.length === 2) return picked; }
   for (const m of all) if (!picked.includes(m)) { picked.push(m); if (picked.length === 2) break; }
   return picked;
 }
 
-/** The middle-most line that has a mutant provably false given the page: for three or more lines the interior ones (the middle first), else the lines in order. */
+/** The first rung of the ladder that has a mutant, on the middle-most line that has one (rung c: any line, in order). */
 export function chooseMutantLine(lines) {
   const n = lines.length;
-  const order = n >= 3 ? [...Array(n - 2).keys()].map(k => k + 1).sort((a, b) => Math.abs(a - (n - 1) / 2) - Math.abs(b - (n - 1) / 2) || a - b) : [...Array(n).keys()];
-  for (const i of order) { const ms = mutantsOf(lines, i); if (ms.length) return { i, mutants: ms }; }
+  const interior = n >= 3 ? [...Array(n - 2).keys()].map(k => k + 1).sort((a, b) => Math.abs(a - (n - 1) / 2) - Math.abs(b - (n - 1) / 2) || a - b) : [...Array(n).keys()];
+  const every = [...Array(n).keys()];
+  for (const [rung, order] of [['a', interior], ['b', interior], ['c', every]]) for (const i of order) { const ms = mutantsOf(lines, i, rung === 'a' ? 'a' : 'b'); if (ms.length) return { i, mutants: ms, rung }; }
   return null;
 }
 
@@ -298,7 +314,7 @@ export function wrongHalf(q, lines, { unreadable = 0, firstUnreadable = null } =
   if (!lines.length) return fail('no maths lines in the worked solution');
   if (unreadable) return fail(unreadableCause(firstUnreadable));
   const pick = chooseMutantLine(lines);
-  if (!pick) return fail('no plantable error', -1, { na: true });
+  if (!pick) return fail('no provable one-line mutation of any step');
   const tried = [];
   for (const m of pick.mutants) {
     const page = lines.map((l, j) => (j === pick.i ? m.text : l));
@@ -324,9 +340,7 @@ export function measureQuestion(q, { toPlain, worked = false } = {}) {
   return { lines, t, w };
 }
 
-// not-applicable: a multiple-choice question (no working page), or a question whose lines mark well but in which the tool can plant no error that is provably
-// false (no line of the page is false on its own or the corrected result of one operation on the line above): counted apart, in no denominator and on no baseline
-const statusOf = (t, w, q = null) => (q && QUESTION_BUCKET[q.answerType] ? STATUS.notApplicable : t.ok && w.na ? STATUS.notApplicable : t.ok && w.ok ? STATUS.full : t.ok ? STATUS.trueOnly : STATUS.uncovered);
+const statusOf = (t, w, q = null) => (q && QUESTION_BUCKET[q.answerType] ? STATUS.notApplicable : t.ok && w.ok ? STATUS.full : t.ok ? STATUS.trueOnly : STATUS.uncovered);
 
 // ── the generated side ───────────────────────────────────────────────────────
 const formKeyOf = q => `${q.answerType}|${(q.steps || []).map(s => String(s?.h ?? '').replace(/\d+(?:\.\d+)?/g, 'N')).join('>')}`;
@@ -414,10 +428,10 @@ const add = (o, r) => { o.total++; if (r.status === STATUS.full) o.full++; else 
 const pct = (n, d) => (d ? Math.round((n / d) * 10000) / 100 : 0);
 
 export function summarise(records) {
-  const total = blank(), byKind = {}, byTopic = {}, byDotpoint = {}, causes = {}, wrongCauses = {}, notApplicable = { multipleChoice: 0, noPlantableError: 0, byKind: {} };
+  const total = blank(), byKind = {}, byTopic = {}, byDotpoint = {}, causes = {}, wrongCauses = {}, notApplicable = { multipleChoice: 0, byKind: {} };
   let trueOk = 0, wrongOk = 0, linesOk = 0, answerOk = 0, answerNA = 0, weakTicks = 0;
   // A multiple-choice question has no working page: it is not-applicable, counted here and in no denominator below.
-  for (const r of records.filter(x => x.status === STATUS.notApplicable)) { if (QUESTION_BUCKET[r.answerType]) notApplicable.multipleChoice++; else notApplicable.noPlantableError++; bump(notApplicable.byKind, r.kind); }
+  for (const r of records.filter(x => x.status === STATUS.notApplicable)) { notApplicable.multipleChoice++; bump(notApplicable.byKind, r.kind); }
   records = records.filter(x => x.status !== STATUS.notApplicable);
   for (const r of records) {
     add(total, r); add(byKind[r.kind] ||= blank(), r); add(byTopic[`${r.kind === 'generated' ? 'gen' : 'bank'}:${r.topic}`] ||= blank(), r); add(byDotpoint[`${r.kind === 'generated' ? 'gen' : 'bank'}:${r.dp}`] ||= blank(), r);
@@ -435,7 +449,7 @@ export function summarise(records) {
     scope: { edition: 'prithagoras', generated: `NSW generators y11, y12, me11, me12 (every issued difficulty), seeds 1-${GEN_SEED_SCAN} grouped into forms, the first ${GEN_SEEDS_PER_FORM} seeds of each form marked`, bank: 'every part of server/content/qbank: auto-marked parts and worked-solution parts' },
     definition: 'units = every unit that is not multiple choice; covered = own worked solution, line by line through the server marking path: every maths line ticked with a class that has a phrase, headings and the restated question neutral, none unchecked, none crossed, and (for a question with a key) the key marked correct and the final line the report\'s answerLine (true half); and a one-line mutation of a middle step crossed at that line (wrong half)',
     units: 'a generated unit is a form (answer type and step headings) of a generator at a difficulty; a bank unit is one part',
-    notApplicable: { ...notApplicable, note: 'not-applicable, counted here, in no denominator and in no baseline: multiple-choice questions (no working page), and questions whose lines mark well but in which no error can be planted that is provably false (not-applicable: no plantable error)' },
+    notApplicable: { ...notApplicable, note: 'multiple-choice questions have no working page (not-applicable: multiple choice): counted here, in no denominator and in no baseline' },
     total: rate(total),
     halves: { trueHalfPasses: trueOk, trueHalfPassPct: pct(trueOk, total.total), wrongHalfPasses: wrongOk, wrongHalfPassPct: pct(wrongOk, total.total), allLinesTickedAndNoneCrossed: linesOk, allLinesPct: pct(linesOk, total.total), answerLineRecognisedAndKeyCorrect: answerOk, answerLineOfKeyedUnits: total.total - answerNA, answerLinePct: pct(answerOk, total.total - answerNA), answerHalfNotApplicableNoKey: answerNA, linesTickedOnlyAsTrueAsWritten: weakTicks },
     byKind: sortKeys(byKind),
@@ -504,7 +518,7 @@ export function detailOf(records) {
 export const printable = s => {
   const lines = [];
   const t = s.total;
-  lines.push(`not applicable (multiple choice, no working page): ${s.notApplicable.multipleChoice}; (no plantable error): ${s.notApplicable.noPlantableError}; in no denominator`);
+  lines.push(`not applicable (multiple choice, no working page): ${s.notApplicable.multipleChoice}, in no denominator`);
   lines.push(`units ${t.total}: fully covered ${t.full} (${t.fullPct}%), true half only ${t.trueOnly} (${t.trueOnlyPct}%), uncovered ${t.uncovered} (${t.uncoveredPct}%)`);
   for (const [k, v] of Object.entries(s.byKind)) lines.push(`  ${k}: ${v.total} units, fully covered ${v.full} (${v.fullPct}%), true half only ${v.trueOnly} (${v.trueOnlyPct}%), uncovered ${v.uncovered} (${v.uncoveredPct}%)`);
   const h = s.halves;
