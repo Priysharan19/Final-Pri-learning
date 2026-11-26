@@ -123,7 +123,14 @@ export const TEXT = Object.freeze({
   correct: 'Correct',
   wrong: 'Wrong',
   unreadLine: 'Pri could not read this line.',
-  typeIt: 'Tap to type it.'
+  typeIt: 'Tap to type it.',
+  // The AI line check (server/platform/aiLineCheck): lines the engine could not check, read by an AI model. Never engine-verified, never a mark.
+  aiChecked: 'Checked by AI',
+  aiDoubt: 'AI doubt',
+  aiDoubtLead: 'AI thinks this line may be wrong:',
+  aiWhat: 'AI-checked: the engine could not check this line, so an AI model read it. It is not verified by Pri\u2019s engine, and it never changes your marks.',
+  aiMarks: 'Marks are set only by Pri\u2019s engine.',
+  aiCorrection: 'The AI suggests:'
 });
 
 // the stable class ids the engine's display fields emit on every tick (engine/displayFields.js CLASSES), to a phrase; a class not listed has no phrase
@@ -215,17 +222,31 @@ export function buildTeacherMarks({ page, table = null } = {}) {
     const at = Math.max(...row.lines);
     paidAt.set(at, (paidAt.get(at) || 0) + row.marks);
   }
-  return page.lines.filter(l => l.status === 'checked' || l.status === 'first-error').map(l => {
+  return page.lines.filter(l => ['checked', 'first-error', 'ai-checked', 'ai-doubt'].includes(l.status)).map(l => {
+    const paid = paidAt.has(l.n) ? { marks: paidAt.get(l.n), text: `${paidAt.get(l.n)}/${paidAt.get(l.n)}` } : null;
+    // An AI line is a comment, not a verdict: its own kind, its own words, never a class, never a margin mark.
+    if (l.status === 'ai-checked' || l.status === 'ai-doubt') {
+      const ai = l.card.ai || { comment: '', generic: true };
+      const doubt = l.status === 'ai-doubt';
+      return { n: l.n, kind: doubt ? 'doubt' : 'ai', cls: null, phrase: aiPhrase(doubt, ai.comment), classPhrase: null, explain: null, reason: null, reasonRaw: null, corrected: null, aiComment: ai.comment, aiCorrected: ai.corrected || null, paid: null, box: l.box || null };
+    }
     const right = l.status === 'checked';
     const cls = right ? classOf(l.card) : null;   // the line's own class, as the engine reported it; nothing is inferred from position or total
     const ex = right ? explanationOf(page, l) : null;
     return {
       n: l.n, kind: right ? 'right' : 'wrong', cls, phrase: right ? (ex ? ex.short : phraseOf(cls)) : reasonOf(l.card), classPhrase: right ? phraseOf(cls) : null, explain: ex,
       reason: right ? null : reasonOf(l.card), reasonRaw: right ? null : (reasonRaw(l.card) || null), corrected: right ? null : (l.card.corrected || null),
-      paid: paidAt.has(l.n) ? { marks: paidAt.get(l.n), text: `${paidAt.get(l.n)}/${paidAt.get(l.n)}` } : null,
+      paid,
       box: l.box || null
     };
   });
+}
+
+/** The few words written beside an AI line: the label, then the model's comment when it is short enough to stand there. Plain text. */
+export function aiPhrase(doubt, comment) {
+  const lead = doubt ? 'AI doubt' : TEXT.aiChecked;
+  const c = String(comment ?? '').replace(/\s+/g, ' ').trim();
+  return c && c.length <= 48 ? `${lead}: ${c}` : lead;
 }
 
 /**
@@ -237,14 +258,21 @@ export function explanationOf(page, line) {
   return e && typeof e.short === 'string' && e.short ? e : null;
 }
 
-/** "9 lines correct. 0 wrong. 3 not checked." Counts the maths lines only: a stated condition is neither. */
+/**
+ * "9 lines correct. 0 wrong. 3 not checked." Counts the maths lines only: a stated condition is neither.
+ * With the AI line check on a page, the engine's lines and the AI's are counted apart and never added:
+ * "9 lines correct (engine). 3 AI-checked. 0 wrong. 0 not checked."
+ */
 export function tallyOf(page) {
   const lines = page?.lines || [];
   const right = lines.filter(l => l.status === 'checked').length;
   const wrong = lines.filter(l => l.status === 'first-error').length;
-  const unchecked = lines.filter(l => !['checked', 'first-error', 'condition'].includes(l.status)).length;
+  const ai = lines.filter(l => l.status === 'ai-checked').length;
+  const doubt = lines.filter(l => l.status === 'ai-doubt').length;
+  const unchecked = lines.filter(l => !['checked', 'first-error', 'condition', 'ai-checked', 'ai-doubt'].includes(l.status)).length;
   const s = n => (n === 1 ? '' : 's');
-  return `${right} line${s(right)} correct. ${wrong} wrong. ${unchecked} not checked.`;
+  if (!ai && !doubt) return `${right} line${s(right)} correct. ${wrong} wrong. ${unchecked} not checked.`;
+  return `${right} line${s(right)} correct (engine). ${ai} AI-checked. ${doubt ? `${doubt} AI doubt${s(doubt)}. ` : ''}${wrong} wrong. ${unchecked} not checked.`;
 }
 
 const rectsOverlap = (a, b) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
@@ -382,19 +410,25 @@ export function buildAssessment({ page, table = null, attempt = null } = {}) {
   const corrections = page.header.counts.wrong;
   const satisfied = rows.filter(r => r.awarded).length;
   const s = n => (n === 1 ? '' : 's');
-  const footer = [`${corrections} correction${s(corrections)}`, ...(rows.length ? [`${satisfied} criteri${satisfied === 1 ? 'on' : 'a'} satisfied`] : [])].join(' · ');
-  return { attempt: Number.isInteger(attempt) && attempt >= 1 ? attempt : 1, mark, state, rows, footer, corrections, satisfied };
+  const aiChecked = page.lines.filter(l => l.status === 'ai-checked').length, aiDoubt = page.lines.filter(l => l.status === 'ai-doubt').length;
+  const footer = [`${corrections} correction${s(corrections)}`, ...(aiChecked ? [`${aiChecked} AI-checked`] : []), ...(aiDoubt ? [`${aiDoubt} AI doubt${s(aiDoubt)}`] : []), ...(rows.length ? [`${satisfied} criteri${satisfied === 1 ? 'on' : 'a'} satisfied`] : [])].join(' · ');
+  return { attempt: Number.isInteger(attempt) && attempt >= 1 ? attempt : 1, mark, state, rows, footer, corrections, satisfied, aiChecked, aiDoubt, aiNote: aiChecked || aiDoubt ? `${TEXT.aiWhat} ${TEXT.aiMarks}` : null };
 }
 
 /** What a screen reader hears for a mark: "Line 4: correct. Correct differentiation." */
-export const markLabel = m => (m.kind === 'right'
+export const markLabel = m => (m.kind === 'ai' ? `Line ${m.n}: checked by AI, not verified by the engine. ${m.aiComment || ''}`.trim()
+  : m.kind === 'doubt' ? `Line ${m.n}: AI doubt, advisory only. ${m.aiComment || ''}`.trim()
+  : m.kind === 'right'
   ? `Line ${m.n}: correct.${m.phrase ? ` ${m.phrase}.` : ''}${m.paid ? ` ${m.paid.text} mark.` : ''}`
   : `Line ${m.n}: wrong. ${m.reason}`);
 export const markBoxLabel = m => `Line ${m.n}: ${m.paid.marks} ${m.paid.marks === 1 ? 'mark' : 'marks'} awarded`;
 export const figureLabel = mark => `${mark.awarded} of ${mark.possible} marks`;
 export const stepMarkText = r => `${r.awarded ? r.marks : 0}/${r.marks} ${r.marks === 1 ? 'mark' : 'marks'}.`;
 /** One entry of the Detailed feedback list: the words, the corrected line the engine gave, the mark. */
-export const listWords = m => ({
+export const listWords = m => (m.kind === 'ai' || m.kind === 'doubt' ? {
+  head: m.kind === 'ai' ? `${TEXT.aiChecked}: ${m.aiComment || ''}`.trim() : `${TEXT.aiDoubtLead} ${m.aiComment || ''}`.trim(),
+  tail: null, corrected: m.aiCorrected ? `${TEXT.aiCorrection} ${m.aiCorrected}` : null, mark: null
+} : {
   head: m.kind === 'right' ? (m.phrase || TEXT.correct) : TEXT.wrong,
   tail: m.kind === 'wrong' && m.phrase ? m.phrase : null,
   corrected: m.kind === 'wrong' && m.corrected ? `Corrected line: ${m.corrected}` : null,
@@ -404,6 +438,8 @@ export const listWords = m => ({
 /** The one word the detail panel opens with for a line that is a heading or the restated question; null leaves the usual word. */
 export function lineWord(card) {
   if (!card) return null;
+  if (card.status === 'ai-checked') return TEXT.aiChecked;
+  if (card.status === 'ai-doubt') return TEXT.aiDoubt;
   const kinds = [card.fact?.kind, card.how?.kind];
   if (kinds.includes('heading') || card.tickClass === 'heading') return TEXT.heading;
   if (Number.isInteger(card.followsFromError)) return TEXT.followsFrom(card.followsFromError);
@@ -508,6 +544,13 @@ function piecesSentence(cls, how, fact) {
  * @returns {{ title, lines: {t,v}[][], mark: string|null }}
  */
 export function detailFor(m, card = null) {
+  if (m.kind === 'ai' || m.kind === 'doubt') {
+    const said = m.aiComment || '';
+    const lines = [[m.kind === 'ai' ? T(`${TEXT.aiChecked}: ${said}`) : T(`${TEXT.aiDoubtLead} ${said}`)]];
+    if (m.aiCorrected) lines.push([T(`${TEXT.aiCorrection} `), M(String(m.aiCorrected))]);
+    lines.push([T(m.kind === 'ai' ? TEXT.aiWhat : `${TEXT.aiMarks} The engine could not check this line, so this is advice only.`)]);
+    return { title: m.kind === 'ai' ? `Line ${m.n}: checked by AI` : `Line ${m.n}: AI doubt`, lines, mark: null };
+  }
   if (m.kind === 'wrong') {
     const lines = [m.reasonRaw ? [{ t: 'prose', v: m.reasonRaw }] : [T(m.reason)]];
     const f = card?.facts || {};

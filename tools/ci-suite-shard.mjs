@@ -40,7 +40,9 @@ const WEIGHTS = {
   'test:marking:mutation:g': 107, 'test:marking:mutation:m': 4, 'test:marking:mutation:b': 117, 'test:marking:mutation:s': 156,
   'test:page:proofs3:mutation': 62, 'test:page:proofs3': 6,
   // measured locally (26 Nov 2026): the annotation-coverage gate marks every Years 11-12 generator form and every bank part twice, about 25 s
-  'test:annotation:coverage': 30
+  'test:annotation:coverage': 30,
+  // measured locally (27 Nov 2026): the AI line check suites (a fake provider; unit 3.3 s, over HTTP 1.1 s, page model 0.1 s), about 6 s with start-up
+  'test:ai:line:check': 6
 };
 const DEFAULT_WEIGHT = 3;
 

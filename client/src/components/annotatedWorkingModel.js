@@ -26,6 +26,15 @@ const breakIndexOf = r => (Number.isInteger(r?.firstBreak) && r.firstBreak >= 0 
 const commentOf = l => clip(l?.diagnosis?.comment ?? l?.how ?? l?.comment, 300);
 const correctedOf = l => clip(l?.diagnosis?.corrected ?? l?.corrected ?? l?.correctedLine, 200);
 
+// An AI line check on a line the engine left open (server/platform/aiLineCheck): { verdict: 'checked'|'doubt', comment, generic, corrected? }.
+// It is a comment on a line the engine did not judge; it never makes a line "checked".
+const aiOf = l => {
+  const a = l?.ai;
+  if (!a || (a.verdict !== 'checked' && a.verdict !== 'doubt') || typeof a.comment !== 'string' || !a.comment) return null;
+  return { verdict: a.verdict, comment: a.comment.slice(0, 200), generic: a.generic === true, corrected: typeof a.corrected === 'string' && a.corrected ? a.corrected.slice(0, 120) : null };
+};
+const aiStatus = (status, ai) => (ai && status === 'not-verified' ? (ai.verdict === 'checked' ? 'ai-checked' : 'ai-doubt') : status);
+
 /** 6, 7, 8 → "6–8"; 2, 4 → "2, 4". */
 export function lineRange(ns) {
   const out = [];
@@ -97,8 +106,10 @@ export function buildAnnotatedWorking({ lines, stepReport, receipt = null, solut
     else if (l?.status === 'ok') status = 'checked';
     else status = 'not-verified';
     const from = a.steps[0]?.fromLine;
+    const ai = aiOf(l);
+    status = aiStatus(status, ai);
     return {
-      n: i + 1, line: i, status,
+      n: i + 1, line: i, status, ai: status === 'ai-checked' || status === 'ai-doubt' ? ai : null,
       start: status === 'checked' && a.steps.length === 0,
       startSide: a.side || null,
       rules: status === 'checked' || status === 'follows' ? merged.rules : [],
@@ -125,6 +136,7 @@ export function buildAnnotatedWorking({ lines, stepReport, receipt = null, solut
   // "Every line was checked" is said only when every line is: a line Pri could not place, read or verify is not a checked line.
   const allChecked = cards.length > 0 && cards.every(c => c.status === 'checked');
   const noneChecked = checked === 0 && firstBreak < 0;
+  const aiChecked = cards.filter(c => c.status === 'ai-checked').map(c => c.n), aiDoubt = cards.filter(c => c.status === 'ai-doubt').map(c => c.n);
   const plain = named.size === 0;   // no named rule: the sentence about named rules is dropped, not said as "0 were found"
   let summary;
   if (firstBreak >= 0) summary = { key: 'aw.summary.breaks', vars: { n: firstBreak + 1, checked } };
@@ -151,7 +163,7 @@ export function buildAnnotatedWorking({ lines, stepReport, receipt = null, solut
   const marks = receipt && Number.isFinite(Number(receipt.awarded)) && Number(receipt.possible) > 0
     ? { awarded: Number(receipt.awarded), possible: Number(receipt.possible), receiptId: typeof receipt.id === 'string' && receipt.id ? receipt.id.slice(-8) : null } : null;
   const firstBreakIndex = breakIndexOf(stepReport);
-  return { cards, proof, summary, marks, criteria, jumps, followThrough, source, firstBreakIndex, allChecked, noneChecked, attempt: Number.isInteger(attempt) && attempt > 1 ? attempt : null };
+  return { cards, proof, summary, marks, criteria, jumps, followThrough, source, firstBreakIndex, allChecked, noneChecked, aiChecked, aiDoubt, attempt: Number.isInteger(attempt) && attempt > 1 ? attempt : null };
 }
 
 /**
@@ -166,8 +178,10 @@ function buildValueChainModel({ report: reportIn, stepReport, receipt, source, a
   // (a milestone tick added after the check carries no state: read it from its status)
   report = report.map(l => ({ ...l, state: l?.state === 'unverified' && l.status === 'ok' ? 'verified' : l?.state || (l?.status === 'ok' ? 'verified' : l?.status === 'break' ? 'wrong' : 'unverified') }));
   const firstBreak = report.findIndex(l => l?.state === 'wrong');
+  const base = report.map(l => (l?.context === true && !['wrong', 'verified', 'given', 'arithmetic', 'unread'].includes(l?.state) ? 'condition' : STATUS[l?.state] || 'not-verified'));
   const cards = report.map((l, i) => ({
-    n: i + 1, line: i, status: l?.context === true && !['wrong', 'verified', 'given', 'arithmetic', 'unread'].includes(l?.state) ? 'condition' : STATUS[l?.state] || 'not-verified', valueChain: l?.state || 'unverified', vcRule: typeof l?.valueChain?.rule === 'string' ? l.valueChain.rule : null,
+    n: i + 1, line: i, status: aiStatus(base[i], aiOf(l)), ai: base[i] === 'not-verified' ? aiOf(l) : null,
+    valueChain: l?.state || 'unverified', vcRule: typeof l?.valueChain?.rule === 'string' ? l.valueChain.rule : null,
     start: false, startSide: null, rules: [], more: false, same: false, unnamed: false, followsFrom: null,
     diagnosis: l?.state === 'wrong' ? (l.diagnosis || null) : null, note: l?.state === 'wrong' || l?.state === 'given' || l?.state === 'incomplete' || l?.state === 'arithmetic' || l?.state === 'verified' ? (l.note || null) : null,
     previousText: null, text: String(l?.text ?? ''), restated: l?.state === 'given' && l?.solutionMatch === true, restates: l?.restates === true, answerLine: l?.answerLine === true || (Number.isInteger(stepReport?.answerLine) && stepReport.answerLine === i && l?.status === 'ok'), tickClass: typeof l?.tickClass === 'string' ? l.tickClass : null, notRequired: l?.notRequired === true, followsFromError: l?.followsFromError === true ? (Number.isInteger(l.followsFrom) ? l.followsFrom : true) : null, fact: l?.fact || null, explain: l?.explain && typeof l.explain.short === 'string' ? l.explain : null, how: l?.how || null,
@@ -177,6 +191,7 @@ function buildValueChainModel({ report: reportIn, stepReport, receipt, source, a
   const summaryOf = stepReport.summary || {};
   const unverified = cards.filter(c => c.status === 'not-verified' || c.status === 'unread').map(c => c.n);
   const checked = cards.filter(c => c.status === 'checked').length;
+  const aiChecked = cards.filter(c => c.status === 'ai-checked').map(c => c.n), aiDoubt = cards.filter(c => c.status === 'ai-doubt').map(c => c.n);
   const total = cards.length;
   // Every tick only says the line is true as written: the headline must not say "checked" (it is not checked as the right step).
   const onlyArithmetic = checked > 0 && firstBreak < 0 && cards.every(c => c.status === 'checked' && c.valueChain === 'arithmetic');
@@ -185,13 +200,14 @@ function buildValueChainModel({ report: reportIn, stepReport, receipt, source, a
     : onlyArithmetic ? { key: 'aw.summary.arithmeticAll', vars: { total, checked } }
     : mixedAll ? { key: 'aw.summary.mixedAll', vars: { total, checked } }
     : checked === 0 ? { key: 'aw.summary.none', vars: { total, checked } }
-    : (unverified.length || cards.some(c => c.status === 'incomplete')) ? { key: 'aw.summary.some', vars: { checked, total } }
+    : (unverified.length || aiChecked.length || aiDoubt.length || cards.some(c => c.status === 'incomplete')) ? { key: 'aw.summary.some', vars: { checked, total } }
       : { key: 'aw.summary.valueAll', vars: { checked, total } };
   return {
     firstBreakIndex: breakIndexOf(stepReport),
     cards, proof: null, summary, marks: receipt && Number.isFinite(Number(receipt.awarded)) && Number(receipt.possible) > 0 ? { awarded: Number(receipt.awarded), possible: Number(receipt.possible), receiptId: typeof receipt.id === 'string' && receipt.id ? receipt.id.slice(-8) : null } : null,
     criteria: [], jumps: [], followThrough: [], source, attempt: Number.isInteger(attempt) && attempt > 1 ? attempt : null,
-    allChecked: unverified.length === 0 && firstBreak < 0 && !cards.some(c => c.status === 'incomplete'),
+    allChecked: unverified.length === 0 && aiChecked.length === 0 && aiDoubt.length === 0 && firstBreak < 0 && !cards.some(c => c.status === 'incomplete'),
+    aiChecked, aiDoubt,
     noneChecked: checked === 0 && firstBreak < 0,
     onlyArithmetic, mixedAll,
     unverified: unverified.length ? { lines: unverified, reason: summaryOf.reason || null } : null
