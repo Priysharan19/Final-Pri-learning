@@ -218,7 +218,6 @@ try {
   c.eq(schemePay({ q, report: { lines: [] }, correct: false, marksPossible: marksPossibleFor(q), env: { PRI_METHOD_MARKS: 'on', PRI_EDITION: 'priyabhata' }, list: approvedSchemeTypes() }).paid, false, 'India: the rule pays nothing');
 }
 
-function N_of(q) { return marksPossibleFor(q); }
 fs.rmSync(scratch, { recursive: true, force: true });
 for (const key of keys) { if (before[key] === undefined) delete process.env[key]; else process.env[key] = before[key]; }
 console.log(`parts ${R.parts}: full ${R.full}; step marks on wrong final answer on ${R.partial}; wrong-line pages ${R.wrongLinePages} (after-wrong ${R.afterWrong}); restated ${R.restate} (paid ${R.restatePaid}); bare ${R.bare} (paid ${R.barePaid})`);

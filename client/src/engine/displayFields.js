@@ -18,7 +18,7 @@
 //
 // Reads the question's prompt for the function (pageProofs.worldOf) and `answer.value` ONLY for the answer-bearing line (a numeric key).
 // ─────────────────────────────────────────────────────────────────────────────
-import { evaluate, variablesOf, exprEquivalent } from './expr.js';
+import { evaluate, variablesOf } from './expr.js';
 import { isHeading, worldOf, labelOf, clean, lead, astOf, constOf, fitPoly, polyD, rootsComplete } from './pageProofs.js';
 
 export const CLASSES = Object.freeze(['power-rule-differentiation', 'differentiation', 'factorisation', 'roots-of-a-product', 'equation-setup', 'substitution-evaluated', 'arithmetic-chain', 'second-derivative-value', 'sign-claim', 'nature-claim', 'point-claim', 'conclusion-matches', 'condition-line', 'restated-question', 'restated-function', 'heading', 'solution-list', 'rounded-value', 'labelled-substitution', 'identity', 'derivative-rule', 'true-as-written']);

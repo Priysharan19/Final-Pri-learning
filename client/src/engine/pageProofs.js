@@ -189,9 +189,6 @@ const FILLER = new Set(['for', 'the', 'so', 'hence', 'then', 'therefore', 'set',
 const NUMWORD = { one: 1, two: 2, three: 3, four: 4, 1: 1, 2: 2, 3: 3, 4: 4 };
 
 function normQ(s) { return String(s).toLowerCase().replace(MINUS, '-').replace(/[²³⁴]/g, c => SUP[c]).replace(/(?<!\d)\.|\.(?!\d)/g, '').replace(/[^a-z0-9=+\-^/.<>()]/g, ''); }
-function promptPlain(prompt) {
-  return String(prompt ?? '').replace(/\\\$/g, '\u0001').replace(/\$\$?([^$]+)\$\$?/g, (m, tex) => { try { return texToPlain(tex) || tex; } catch { return tex; } }).replace(/\*\*/g, '').replace(/\u0001/g, '$');
-}
 
 const HEAD_WORDS = /^(?:solution|answer|working|working out|workings|method|solve|conclusion|step\s*\d+|part\s*\(?[a-z0-9]\)?|stationary points|the stationary points are|nature of (?:the )?stationary points|second derivative test|the second derivative|to find (?:the )?stationary points|finding (?:the )?stationary points)$/i;
 /** A heading is one of a short fixed set of label forms: a line with a number, a relation or any assertion ("The larger root is zero:") is never one. */
