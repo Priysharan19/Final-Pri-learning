@@ -27,9 +27,9 @@ if (edition) {
   const s = r.stats;
   const exact = (name, got, want) => ok(got === want, `${edition}: ${name} is ${want}, got ${got}`);
   exact('the questions swept (every generator, four levels, seeds 1-30)', s.questions, 49440);
-  exact('the expression keys', s.keyed, 1057); exact('the keys marked correct as authored', s.keyAccepted, 1057);
-  exact('the packed bank questions', s.bankQuestions, 2254); exact('the bank keys', s.bankKeyed, 386); exact('the bank keys marked correct as authored', s.bankKeyAccepted, 386);
-  exact('the unbracketed conventional forms typed', s.conventional, 184); exact('…refused', s.conventionalRefused, 0);
+  exact('the expression keys', s.keyed, 1049); exact('the keys marked correct as authored', s.keyAccepted, 1049);
+  exact('the packed bank questions', s.bankQuestions, 2229); exact('the bank keys', s.bankKeyed, 378); exact('the bank keys marked correct as authored', s.bankKeyAccepted, 378);
+  exact('the unbracketed conventional forms typed', s.conventional, 183); exact('…refused', s.conventionalRefused, 0);
   exact('the two-reading forms typed (e^2x, sqrt2x, log2x)', s.ambiguous, 20); exact('…refused', s.ambiguousRefused, 0);
   exact('the explicit-multiplication typings (e^2*x, e^2·x, e^2×x, sqrt2*x, log2*x)', s.explicit, 60); exact('…marked correct', s.explicitAccepted, 0);
   exact('the misreadings of f(kx) typed', s.misreadings, 136); exact('the trap typings (bracketed and unbracketed)', s.trapsTyped, 463);

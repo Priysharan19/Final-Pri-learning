@@ -20,41 +20,41 @@ It pays only while the Australian server has the method-marks switch on, the que
 
 ## Coverage: how many bank parts the rule can pay
 
-Of 1472 parts worth 2 or more marks, 413 (28.1%) can pay at least one step, and 308 of those can pay a mark for every step below full marks.
+Of 1457 parts worth 2 or more marks, 409 (28.1%) can pay at least one step, and 306 of those can pay a mark for every step below full marks.
 
 | Course | Parts worth 2 or more | Can pay a step | Share | Can pay all N-1 |
 |---|---:|---:|---:|---:|
-| Advanced Y11 | 403 | 113 | 28.0% | 87 |
-| Advanced Y12 | 373 | 102 | 27.3% | 81 |
+| Advanced Y11 | 400 | 113 | 28.3% | 87 |
+| Advanced Y12 | 364 | 98 | 26.9% | 79 |
 | Extension 1 Y11 | 325 | 110 | 33.8% | 76 |
-| Extension 1 Y12 | 371 | 88 | 23.7% | 64 |
-| ALL | 1472 | 413 | 28.1% | 308 |
+| Extension 1 Y12 | 368 | 88 | 23.9% | 64 |
+| ALL | 1457 | 409 | 28.1% | 306 |
 
 Why the other parts cannot pay, with an example each:
 
-- no usable step lines ticked but no step is real progress or reached: 653. For example A11-C1-006: Differentiate $y=\dfrac{x^{2}+1}{x-2}$.
-- one step solution: 296. For example A11-C1-065: Find the gradient of $y=\dfrac{x}{x^{2}+1}$ at $x=1$.
-- authored working not read: 87. For example A11-C1-072: For which values of $x$ is $y=x^{3}-12x$ decreasing?
+- no usable step lines ticked but no step is real progress or reached: 650. For example A11-C1-006: Differentiate $y=\dfrac{x^{2}+1}{x-2}$.
+- one step solution: 289. For example A11-C1-065: Find the gradient of $y=\dfrac{x}{x^{2}+1}$ at $x=1$.
+- authored working not read: 86. For example A11-C1-072: For which values of $x$ is $y=x^{3}-12x$ decreasing?
 - no usable step engine ticks none of his lines: 12. For example A11-F1-016(ii): A rectangular pen is built against a long straight wall using $60$ m of fencing for the ot
 - no lines: 11. For example A11-T2-006: Solve $\tan^{2}\theta=3$ for $0^\circ\le\theta\le360^\circ$.
 
 ## The sweep: does it pay anything it should not
 
-Run with the rule approved in the test process only, over every part that can pay: 413 parts, 8645 marked pages.
+Run with the rule approved in the test process only, over every part that can pay: 409 parts, 8559 marked pages.
 
 ```
-bank rule: 413 eligible parts swept, 8645 pages marked
-(a) final line wrong, 413 pages: marks 0:18 1:370 2:25
-(b) his lines in full: the right answer earned N on 413 of 413; a wrong typed answer at N on 0 of 413
-(c) one middle line made wrong then his lines: 796 pages, marks 392 against an ideal of 392; earned by a line at or after the wrong one 0
-(d) given-numbers: 408 pages, earned a mark on 0, exceptions 0
-(d) plain-word-false-claim-then-his-lines: 1239 pages, earned a mark on 1215, exceptions 0, of which his true lines after pure prose paid (the approved generic rule does not treat prose as a claim) 1215
-(d) digit-free-claim-then-his-lines: 1652 pages, earned a mark on 0, exceptions 0
-(d) another-questions-working: 387 pages, earned a mark on 1, exceptions 0, coincidences (his criterion line is also true for this question) 1
-(d) restate-the-question: 395 pages, earned a mark on 0, exceptions 0
-(e) bare intermediate values: alone 360 pages, earned 0; after his lines before them 360 pages, earned 164 (the bare line itself earned a criterion on 1; on 163 only the true lines before it earned)
-(f) a trap answer with his working up to it: 1396 pages, marks 1035, at N on 0
-(g) 8645 pages: wrong answer at full 0, over N 0, correct not full 0, earned on an unticked line 0, at or after a cross 0, answer criterion by working 0, table not the mark 0, not paid 0
+bank rule: 409 eligible parts swept, 8559 pages marked
+(a) final line wrong, 409 pages: marks 0:18 1:366 2:25
+(b) his lines in full: the right answer earned N on 409 of 409; a wrong typed answer at N on 0 of 409
+(c) one middle line made wrong then his lines: 790 pages, marks 388 against an ideal of 388; earned by a line at or after the wrong one 0
+(d) given-numbers: 404 pages, earned a mark on 0, exceptions 0
+(d) plain-word-false-claim-then-his-lines: 1227 pages, earned a mark on 1203, exceptions 0, of which his true lines after pure prose paid (the approved generic rule does not treat prose as a claim) 1203
+(d) digit-free-claim-then-his-lines: 1636 pages, earned a mark on 0, exceptions 0
+(d) another-questions-working: 383 pages, earned a mark on 1, exceptions 0, coincidences (his criterion line is also true for this question) 1
+(d) restate-the-question: 391 pages, earned a mark on 0, exceptions 0
+(e) bare intermediate values: alone 356 pages, earned 0; after his lines before them 356 pages, earned 160 (the bare line itself earned a criterion on 1; on 159 only the true lines before it earned)
+(f) a trap answer with his working up to it: 1380 pages, marks 1023, at N on 0
+(g) 8559 pages: wrong answer at full 0, over N 0, correct not full 0, earned on an unticked line 0, at or after a cross 0, answer criterion by working 0, table not the mark 0, not paid 0
 ```
 
 Violations: 0. Gamed pages that earned a mark other than for your own true lines: 0. Another question's working that earned a mark by coincidence: 1.
@@ -380,24 +380,24 @@ Marks: **3 of 3**.
 
 These are measured, in the same run, and rewritten each time the packet is generated.
 
-- **It pays 28.1% of the parts.** The rest have a one-step solution (296), no readable steps, or no step that the page ticks and counts as real progress. See the next section.
-- **A different valid method earns less.** Your steps with only the last line wrong earn on average 1.02 marks (413 pages; 18 earn 0).
-- **A right method with a wrong last line still earns marks.** On average 1.02 marks over all 413 pages, by marks available: 2 marks 0.95 (282 pages); 3 marks 1.15 (129 pages); 4 marks 1.50 (2 pages). That is the rule working as approved: a mark for each key step reached, at most N minus 1. (The independent review of this draft measured about 1.0 on average: 0.98 at 2 marks, 1.19 at 3, 1.5 at 4.)
-- **A false statement in plain words does not stop the paying.** In the sweep, 1215 of 1239 pages that put a false plain-word sentence before his true lines still earned their step marks: the approved rule does not treat prose as a claim.
-- **Working from a different question can earn a mark where steps are genuinely shared.** In the sweep, 1 of 387 pages of another question's working earned a mark; these are listed as coincidences, not hidden, and the paying line is a line that is also true for this question. (The independent review found 5 such pages over its own, larger set of other-question pages.)
+- **It pays 28.1% of the parts.** The rest have a one-step solution (289), no readable steps, or no step that the page ticks and counts as real progress. See the next section.
+- **A different valid method earns less.** Your steps with only the last line wrong earn on average 1.02 marks (409 pages; 18 earn 0).
+- **A right method with a wrong last line still earns marks.** On average 1.02 marks over all 409 pages, by marks available: 2 marks 0.95 (280 pages); 3 marks 1.15 (127 pages); 4 marks 1.50 (2 pages). That is the rule working as approved: a mark for each key step reached, at most N minus 1. (The independent review of this draft measured about 1.0 on average: 0.98 at 2 marks, 1.19 at 3, 1.5 at 4.)
+- **A false statement in plain words does not stop the paying.** In the sweep, 1203 of 1227 pages that put a false plain-word sentence before his true lines still earned their step marks: the approved rule does not treat prose as a claim.
+- **Working from a different question can earn a mark where steps are genuinely shared.** In the sweep, 1 of 383 pages of another question's working earned a mark; these are listed as coincidences, not hidden, and the paying line is a line that is also true for this question. (The independent review found 5 such pages over its own, larger set of other-question pages.)
 - **It trusts the page's ticks.** A wrong tick by the page could be paid; the sweep cannot prove none remains.
 - **Prose is let through.** As said above, plain words are not a claim to this rule, so a false sentence does not stop your true lines after it.
-- **Your criteria are not shown.** The table shows your step headings and the step's result, not your marking criteria. Your criteria rule (a separate, unapproved draft) pays on only 194 parts; on the 133 parts where both apply this rule paid more on 100 of 546 test pages and less on 10. On 78 pages only this rule paid and on 1 only the criteria rule did, and in the six pages of that kind checked by hand the extra mark was for a true line of your own working.
+- **Your criteria are not shown.** The table shows your step headings and the step's result, not your marking criteria. Your criteria rule (a separate, unapproved draft) pays on only 191 parts; on the 132 parts where both apply this rule paid more on 100 of 541 test pages and less on 10. On 78 pages only this rule paid and on 1 only the criteria rule did, and in the six pages of that kind checked by hand the extra mark was for a true line of your own working.
 - It never pays a question worth one mark, a worked-solution question, and never for a model's reading: only the engine's own tick.
 
 ## What would raise the number most
 
-Your 1472 parts worth 2 or more marks have 3241 worked lines the page can read, of which 2578 are ticked and 663 are not. The commonest kinds of line it does not tick:
+Your 1457 parts worth 2 or more marks have 3213 worked lines the page can read, of which 2556 are ticked and 657 are not. The commonest kinds of line it does not tick:
 
-- 121 lines, a bare number. For example A11-C1-055: 1
-- 112 lines, a single equation or statement. For example A11-C1-141: t=(10/7)
+- 119 lines, a bare number. For example A11-C1-055: 1
+- 110 lines, a single equation or statement. For example A11-C1-141: t=(10/7)
 - 97 lines, a bare expression with no equals sign. For example A11-C1-156: (3/2)*x^(1/2)-2x^(-3/2)
-- 83 lines, a trig, log or exponential statement. For example A11-E1-001: x=(log(5)/log(2))-1=((ln(5))/(ln(2)))-1=1.32
+- 82 lines, a trig, log or exponential statement. For example A11-E1-001: x=(log(5)/log(2))-1=((ln(5))/(ln(2)))-1=1.32
 - 74 lines, an inequality or an interval. For example A11-E1-002: x > 2
 - 74 lines, a list of values or solutions (a comma). For example A11-E1-050: 2^(x)=2,4
 
@@ -405,8 +405,8 @@ And the maths the line reader cannot turn into a line at all, by the command it 
 
 - 25 pieces with \int. For example A12-C4-115: \int_0^1v=\tfrac43
 - 25 pieces with \sum. For example X11-A1-213: (1+1)^{9}+(1-1)^{9}=2\sum\text{even}
-- 14 pieces with \in. For example A11-T2-114: 2x+\tfrac{\pi}{3}\in\left[\tfrac{\pi}{3},\tfrac{7\pi}{3}\right]
 - 12 pieces with \pm. For example A11-F1-137: (\pm3,3)
+- 12 pieces with \in. For example A11-T2-114: 2x+\tfrac{\pi}{3}\in\left[\tfrac{\pi}{3},\tfrac{7\pi}{3}\right]
 - 11 pieces with \ln. For example A11-E1-043: n>\dfrac{\ln0.1}{\ln0.8}\approx10.3
 - 10 pieces with \dot. For example X11-C1-011: \dot x=100\sec^{2}\theta\,\dot\theta=100(2)(0.2)
 
