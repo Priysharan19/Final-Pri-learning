@@ -1,4 +1,4 @@
-DRAFT for the author's review: not approved. Nothing in this file is switched on.
+APPROVED by the author, Priysharan Tripathi (tutor), on 2026-11-26, at the digest named in this file. It pays on Prithagoras only while the server has PRI_METHOD_MARKS=on. Not an official NESA guideline.
 
 # Step marks drawn from the author's worked solution of his own bank question (the approved generic rule, applied to the bank)
 
@@ -6,7 +6,7 @@ Approval id: `generic-solution-steps-bank`. This is the generic rule you approve
 
 ## What you are asked to decide
 
-Whether a question of your own bank may pay step marks, in Australia only, when the student's method is right and the final answer is wrong or missing. Today a wrong final answer on a bank question earns 0. You have not approved this. Nothing here pays, and nothing will until you file your own record for it.
+Whether a question of your own bank may pay step marks, in Australia only, when the student's method is right and the final answer is wrong or missing. Today a wrong final answer on a bank question earns 0. You approved this on 2026-11-26, at the digest at the foot of this packet.
 
 It pays only while the Australian server has the method-marks switch on, the question was marked as a bank question of this rule when it was issued, and your record names the digest at the foot of this packet. It is never used in Rush, Match, the placement check, papers or for the worked-solution questions.
 
