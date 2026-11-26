@@ -35,6 +35,7 @@ import { annotateMilestones } from '../../client/src/engine/milestones.js';
 import { solutionMatch, _internals as SOLUTION_INTERNALS } from '../../client/src/engine/solutionMatch.js';
 import { lineChains } from '../../client/src/engine/lineChains.js';
 import { provedLines } from '../../client/src/engine/provedLines.js';
+import { displayFields } from '../../client/src/engine/displayFields.js';
 import { awardBoardScheme, matchBoardPoints } from '../../client/src/engine/boardScheme.js';
 import { constrainToShown, unsupportedCredit } from '../../client/src/engine/markExplanation.js';
 import { holdFaultCrosses } from './bankFaults.js';
@@ -193,20 +194,27 @@ export function foldTrueAsWritten(report, arithmetic) {
   const brk = report.lines.findIndex(l => l?.status === 'break');
   const limit = brk >= 0 ? brk : report.lines.length;
   let folded = 0;
+  const crossed = [];
   const lines = report.lines.map((l, i) => {
     const a = arithmetic.lines[i];
     const unjudged = l?.status === 'note' && (l.state === undefined || l.state === 'unverified' || l.state === 'unread') && l.note !== 'Follows from the earlier slip.';
+    // The ONE cross that is copied: a value of the student's own function that contradicts the definition the student wrote (QA 26 Nov 2026, item 12).
+    if (i < limit && unjudged && a?.status === 'break' && a.valueChain?.rule === 'function-value') {
+      crossed.push(i);
+      return { text: l.text, status: 'break', state: 'wrong', note: a.note, diagnosis: a.diagnosis, valueChain: a.valueChain };
+    }
     if (i >= limit || !unjudged || a?.status !== 'ok' || a.state !== 'arithmetic') return l;
     folded++;
     return { text: l.text, status: 'ok', state: 'arithmetic', note: a.note, valueChain: a.valueChain, ...(a.fact ? { fact: a.fact } : {}) };
   });
-  if (!folded) return report;
+  if (!folded && !crossed.length) return report;
   // The report is now one that judges each line on its own (a state on every line), so the card says WHICH lines were checked.
   const stated = lines.map(l => ({ ...l, state: l.state || (l.status === 'ok' ? 'verified' : l.status === 'break' ? 'wrong' : l.unreadable ? 'unread' : 'unverified') }));
   const at = st => stated.flatMap((l, k) => (l.state === st ? [k + 1] : []));
   const unverified = at('unverified'), unread = at('unread');
   return {
     ...report, lines: stated, source: 'value-chain', folded: true,
+    ...(crossed.length && !(report.firstBreak >= 0) ? { firstBreak: crossed[0], diagnosis: report.diagnosis ?? lines[crossed[0]].diagnosis } : {}),
     summary: {
       ...(report.summary || {}), total: stated.length, checked: stated.filter(l => l.status === 'ok').length,
       given: at('given'), verified: at('verified'), arithmetic: at('arithmetic'), conditions: at('condition'), wrong: at('wrong'), unverified, unread,
@@ -234,6 +242,20 @@ function blankGaps(steps) {
   const out = []; let kept = 0, blank = false;
   for (const raw of steps.split('\n')) { if (!raw.trim()) { blank = kept > 0; continue; } if (blank) out.push(kept); blank = false; kept++; }
   return out;
+}
+
+/** A line whose sides are the same text, or are all bare numbers of one value (`1=1`, `2.0=2`, `x=x`): it says nothing about the question. */
+export function isIdentityLine(text) {
+  if (typeof text !== 'string') return false;
+  const sides = text.replace(/\$/g, '').split('=').map(x => x.replace(/\s+/g, '').replace(/^\((.*)\)$/, '$1').replace(/·/g, '*'));
+  if (sides.length < 2 || sides.some(x => x === '')) return false;
+  if (sides.every(x => x === sides[0])) return true;
+  return sides.every(x => /^[-+]?\d+(?:\.\d+)?$/.test(x)) && sides.every(x => Number(x) === Number(sides[0]));
+}
+/** The report with each identity line kept true but neutral: marked as restating what is given (`restates`), which the step-mark rules neither credit nor treat as a stop. */
+export function holdIdentityLines(report) {
+  if (!report || !Array.isArray(report.lines) || !report.lines.some(l => l?.status === 'ok' && isIdentityLine(l.text))) return report;
+  return { ...report, lines: report.lines.map(l => (l?.status === 'ok' && isIdentityLine(l.text) ? { text: l.text, status: 'ok', restates: true, note: 'This line says a thing equals itself. It is true, and it shows no working, so it is not counted towards a step.' } : l)) };
 }
 
 export function stepEvidence(q, answer, steps, result, opts = null) {
@@ -467,9 +489,22 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
       }
     }
   } catch { /* the report stands */ }
+  // Feedback only, last of all: the display fields the marked page reads (engine/displayFields.js): a stable class id on every tick, `notRequired` on proved
+  // lines after the answer-bearing line, the first wrong line's reason id and corrected right-hand side, `followsFromError` on later lines that are correct
+  // consequences, and `answerLine`. Added to the DISPLAYED report only (`stepReport` is untouched, so no mark, scheme pay or stored record reads them).
+  try {
+    if (typeof steps === 'string' && steps.trim() && !OBJECTIVE.has(q.answerType) && q.answerType !== 'graph-sketch' && !Array.isArray(q.boardScheme) && !(opts && (opts.proved === false || opts.solutionMatch === false)) && /^gen:(?:y11|y12|me11|me12)-/.test(String(q.contentId ?? ''))) {
+      const base = shownReport || report;
+      const more = base ? displayFields(q, base) : null;
+      if (more && more !== base) shownReport = more;
+    }
+  } catch { /* the report stands */ }
   // A scheme question (schemeAward.js) also learns which lines the topic check ITSELF verified: the page ticks more than that (a copied
   // given, a rule statement, a true-as-written sum), and "writes a correct derivative" is earned only by a line the check found equal to it.
-  const topicTicks = q._methodScheme ? (decided ? decided.lines.flatMap((l, i) => (l?.status === 'ok' ? [i] : [])) : null) : undefined;
+  // A step-mark question (stamped at issue) never credits a line that only says a thing equals itself (`1=1`, `x=x`): it reaches no key step, whatever the
+  // step's value is. Applied here, to the report every pay reads; the lines the topic check verified are filtered the same way.
+  if (q._methodScheme && report) report = holdIdentityLines(report);
+  const topicTicks = q._methodScheme ? (decided ? decided.lines.flatMap((l, i) => (l?.status === 'ok' && !isIdentityLine(l.text) ? [i] : [])) : null) : undefined;
   // A question of the author's bank whose own worked step disagrees with its own answer (bankFaults.js) is never crossed on the page: a cross is shown as a note. After every mark.
   return { stepReport: holdFaultCrosses(q, report), ...(shownReport ? { shownReport: holdFaultCrosses(q, shownReport) } : {}), partial, ...(board ? { board } : {}), ...(markingReport ? { markingReport } : {}), ...(topicTicks !== undefined ? { topicTicks } : {}) };
 }

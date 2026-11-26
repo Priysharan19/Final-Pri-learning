@@ -32,6 +32,8 @@ const { buildHintLadder, ladderAvailable } = await import('../../client/src/engi
 const { leakReason, rungDropReason, isMethodName } = await import('../../tools/qbank-leak.mjs');
 const { bankPolicy, sealForEdition, FINAL_ANSWER_MARKING } = await import('../platform/editionBanks.js');
 const { marksPossibleFor, markerView, stepEvidence } = await import('../platform/markerOps.js');
+const { BANK_ID } = await import('../platform/bankSteps.js');
+const { BANK_GENERIC_ID } = await import('../platform/bankGenericSteps.js');
 const { productPlaceOf } = await import('../platform/qbankDotpoints.js');
 const { dotpointById } = await import('../../client/src/engine/curriculum.js');
 const { safeQuestion } = await import('../platform/practice.js');
@@ -103,7 +105,7 @@ const policy = bankPolicy('prithagoras');
   c.deq(fewWrongs, [], 'every derived key has at least three plausible wrong values to refuse');
   c.deq(wrongAccepted, [], `and the real marker refuses all ${wrongs} of them`);
 }
-let rungsShown = 0, rungsTested = 0, authoredHints = 0, withRungs = { 0: 0, 1: 0, 2: 0, 3: 0 }, displayed = 0, badDisplay = 0, hinted = 0, hintIsAnswer = 0, crossed = 0, ticked = 0, traps = 0, rungs = 0, accepted = 0, sealed = 0, marksOk = 0, leaks = 0;
+let rungsShown = 0, rungsTested = 0, authoredHints = 0, withRungs = { 0: 0, 1: 0, 2: 0, 3: 0 }, displayed = 0, badDisplay = 0, hinted = 0, hintIsAnswer = 0, crossed = 0, ticked = 0, traps = 0, rungs = 0, accepted = 0, sealed = 0, stamped = 0, marksOk = 0, leaks = 0;
 const bad = { accepted: [], trap: [], marks: [], seal: [], wire: [], hint: [] };
 for (const e of entries) {
   const full = qb.qbankEntryQuestion(e.id, 17);
@@ -119,7 +121,7 @@ for (const e of entries) {
   if (marksPossibleFor(full) === e.marks) marksOk++; else bad.marks.push(e.id);
   const sq = JSON.parse(JSON.stringify(full));
   sq._generator = full.subtopic;
-  if (sealForEdition(sq, policy) && sq._marking === FINAL_ANSWER_MARKING && sq._methodScheme === undefined && sq._curriculum?.outcomes?.length) sealed++; else bad.seal.push(e.id);
+  if (sealForEdition(sq, policy) && ((sq._methodScheme === undefined && sq._marking === FINAL_ANSWER_MARKING) || ((sq._methodScheme === BANK_ID || sq._methodScheme === BANK_GENERIC_ID) && sq._marking === undefined)) && sq._curriculum?.outcomes?.length) { sealed++; if (sq._methodScheme !== undefined) stamped++; } else bad.seal.push(e.id);
   if (full.answerDisplay) { displayed++; const m = full.answerDisplay.match(/(-?\d+)\/(\d+)$/); if (!m || Math.abs(Number(m[1]) / Number(m[2]) - e.answer.value) > 1e-9) badDisplay++; }
   if (full.inputHint) { hinted++; if (checkBankAnswer(q, String(full.inputHint).replace(/^e\.g\.\s*/i, ''))?.correct === true) hintIsAnswer++; }
   // Line marking never crosses a true line: the author's own worked steps, typed as a student's working through the marker as the product runs it
@@ -163,7 +165,10 @@ c.deq(bad.accepted, [], 'no packed key is refused');
 c.ok(traps > 1200, `every trap is a wrong answer (${traps} tried)`);
 c.deq(bad.trap, [], 'and none is marked correct');
 c.eq(marksOk, entries.length, 'every question is worth the marks its author set');
-c.eq(sealed, entries.length, 'every question seals final-answer-only with a curriculum identity and no method scheme');
+// The owner's records for the two bank step rules are on the repository list (task/bank-step-approval), so a question whose parts passed a rule's import-time
+// proof carries THAT rule's scheme and no other; every other question carries none. Nothing else may be stamped (qbank-sealed-check proves exactly which).
+c.eq(sealed, entries.length, 'every question seals final-answer-only with a curriculum identity and no method scheme other than the owner-approved bank step rules');
+c.ok(stamped > 0 && stamped < entries.length, `only the questions the bank rules proved are stamped (${stamped} of ${entries.length})`);
 c.eq(crossed, 0, `no line of any authored worked solution is crossed by the step report (${ticked} questions have at least one line ticked)`);
 c.ok(ticked > 1000, 'the step report ticks the author\'s lines where it can');
 c.ok(hinted > 150 && hintIsAnswer === 0, `a set, interval, equation or point shows the form it is written in (${hinted} do) and no shown form is the answer`);

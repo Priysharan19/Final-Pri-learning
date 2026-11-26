@@ -25,7 +25,7 @@ const banks = bankPolicy('prithagoras');
 const lcg = a => () => { a = (Math.imul(a, 1664525) + 1013904223) >>> 0; return a; };
 
 // What origin/main dealt for these requests (d599df4e5), counted by this script there.
-const MAIN = { questions: 2244, bank: 246, refused: 0 };
+const MAIN = { questions: 2244, bank: 251, refused: 0 };
 let questions = 0, bank = 0, refused = 0;
 for (const s of SUBTOPICS) {
   if (s.year < 11 || !NSW_ISSUED_CELLS[s.id]) continue;

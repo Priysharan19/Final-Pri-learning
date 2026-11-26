@@ -66,4 +66,4 @@ Besides the per-type schemes above, one generic rule can pay step marks for a wr
 
 ## The same generic rule, for your own question bank
 
-The generic rule above, unchanged, can also pay step marks on the questions of your own bank, with your worked steps as the authored solution and your marks as N. It is a separate approval with its own id, and it is not approved: nothing pays on your bank until you file your own record for it. Read [generic-solution-steps-bank.md](generic-solution-steps-bank.md).
+The generic rule above, unchanged, can also pay step marks on the questions of your own bank, with your worked steps as the authored solution and your marks as N. It is a separate approval with its own id, and the author approved it on 2026-11-26, at the digest named in its packet. Read [generic-solution-steps-bank.md](generic-solution-steps-bank.md).

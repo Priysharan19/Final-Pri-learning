@@ -2,8 +2,8 @@
 // Pri Learning · the approved GENERIC step-mark rule applied to the author's own BANK (server/platform/bankGenericSteps.js), a DRAFT
 //
 // R4 (marking authority). genericSteps.js is imported and applied unchanged, with his worked steps as the authored solution and his marks as N, under
-// its own approval id `generic-solution-steps-bank`. The author has filed no record for it, so in the repository it pays nothing. This suite approves it
-// IN THIS TEST PROCESS ONLY, by passing a list, and never creates a record.
+// its own approval id `generic-solution-steps-bank`. The author filed his own record for it on 26 Nov 2026 (docs/marking/author-approvals). This suite
+// creates no record; where it narrows the list it does so in this test process only.
 //   1. the gates   2. sealing over the committed pack   3. paying   4. eligibility and the two rules side by side (printed numbers pinned)
 //   5. the sweep, every hard assertion   6. no model, network or clock
 //   node server/test/bank-generic-check.mjs
@@ -27,15 +27,17 @@ const sweep = await import('../../tools/bank-steps-sweep.mjs');
 const measure = await import('../../tools/bank-generic-measure.mjs');
 
 // The numbers printed by `node tools/bank-generic-measure.mjs` and `BANK_RULE=generic node tools/bank-steps-sweep.mjs` on the committed pack.
-const PIN = { parts: 1294, eligible: 367, all: 285, sweepPages: 7558, bothParts: 120, bothPages: 483, prose: 1080 };
+const PIN = { parts: 1445, eligible: 405, all: 303, sweepPages: 8461, bothParts: 130, bothPages: 532, prose: 1191 };
 const c = checks();
 const here = path.dirname(fileURLToPath(import.meta.url));
 await qb.ensureQbank(process.env, { strict: true });
 
 {
   const records = readRecords();
-  c.ok(!records.some(r => r.record.typeId === BANK_GENERIC_ID) && !fs.existsSync(path.join(here, '../../docs/marking/author-approvals', `${BANK_GENERIC_ID}.json`)), 'the author has filed no record for the bank-scoped generic rule: it is a draft');
-  c.ok(!approvedSchemeTypes().some(a => a.typeId === BANK_GENERIC_ID), 'the repository list does not name it');
+  const filed = records.find(r => r.record.typeId === BANK_GENERIC_ID);
+  c.ok(filed && filed.record.verdict === 'approved' && filed.record.approvedBy === 'Priysharan Tripathi' && filed.record.role === 'author (tutor)' && filed.record.digest === bankGenericDigest(), 'the author filed his own approved record for the bank-scoped generic rule at its current digest (26 Nov 2026)');
+  c.ok(approvedSchemeTypes().some(a => a.typeId === BANK_GENERIC_ID && a.digest === bankGenericDigest()), 'the repository list names it at that digest');
+  c.ok(!approvedSchemeTypes().some(a => a.typeId === BANK_ID), 'the bank criteria rule stays a draft: not on the list');
   c.ok(bankGenericDigest() !== genericDigest() && /^[0-9a-f]{64}$/.test(bankGenericDigest()), 'it has its own digest, not the generic rule\'s');
   c.eq(records.find(r => r.record.typeId === GENERIC_ID).record.digest, genericDigest(), 'the existing generic id and digest are unchanged');
   c.ok(allTypes().some(t => t.id === BANK_GENERIC_ID && t.digest === bankGenericDigest()), 'the approval machinery knows the id at the current digest');
@@ -47,7 +49,8 @@ const prit = bankPolicy('prithagoras');
 {
   const run = list => { let stamped = 0, sealed = 0, other = 0, bad = 0; for (const { entry } of entries) { const q = served(entry.id); q._generator = q.subtopic; if (!sealForEdition(q, { ...prit, methodSchemeTypes: list })) bad++; if (q._methodScheme === BANK_GENERIC_ID) { stamped++; if (!bankGenericEligible(q)) bad++; } else if (q._methodScheme !== undefined) other++; else if (q._marking === FINAL_ANSWER_MARKING) sealed++; } return { stamped, sealed, other, bad }; };
   const none = run(approvedSchemeTypes()), alone = run([{ typeId: BANK_GENERIC_ID, digest: bankGenericDigest() }]), stale = run([{ typeId: BANK_GENERIC_ID, digest: '0'.repeat(64) }]), both = run([{ typeId: BANK_GENERIC_ID, digest: bankGenericDigest() }, { typeId: BANK_ID, digest: bankDigest() }]);
-  c.eq(none.stamped + none.other, 0, 'with the repository list no bank question is stamped');
+  c.eq(none.other, 0, 'with the repository list no bank question is stamped with any other rule');
+  c.eq(none.stamped, alone.stamped, 'with the repository list exactly the eligible parts are stamped, as when it is approved alone');
   c.eq(stale.stamped, 0, 'a stale digest stamps nothing');
   c.eq(alone.bad, 0, 'every question seals, and only an eligible part is stamped');
   c.eq(alone.stamped + alone.sealed, entries.length, 'approved alone, every packed question is stamped or sealed final-answer-only');
@@ -71,7 +74,8 @@ const prit = bankPolicy('prithagoras');
   c.eq(pay({ env: { PRI_EDITION: 'prithagoras' } }).reason, 'method-marks-off', 'switch off: nothing');
   c.eq(pay({ env: { PRI_METHOD_MARKS: 'on', PRI_EDITION: 'priyabhata' } }).reason, 'bank-generic-author-tier-only', 'India untouched');
   c.eq(pay({ list: [{ typeId: BANK_GENERIC_ID, digest: '1'.repeat(64) }] }).reason, 'type-not-approved', 'stale digest: nothing');
-  c.eq(pay({ list: approvedSchemeTypes() }).reason, 'type-not-approved', 'repository list: nothing');
+  c.ok(pay({ list: approvedSchemeTypes() }).paid === true, 'repository list: it pays (the author\'s record)');
+  c.eq(pay({ list: approvedSchemeTypes().filter(a => a.typeId !== BANK_GENERIC_ID) }).reason, 'type-not-approved', 'the repository list without his record: nothing');
   for (const mode of ['rush', 'match', 'placement']) c.eq(schemePay({ q: { ...q, _practiceMode: mode }, report: rep, correct: false, marksPossible: N, env, list }).reason, 'mode-final-answer-only', `${mode} stays final-answer-only`);
   c.eq(schemePay({ q, report: rep, correct: true, marksPossible: N, env, list }).awarded, N, 'a correct answer is N');
 }

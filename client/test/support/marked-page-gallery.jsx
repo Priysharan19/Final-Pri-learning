@@ -13,6 +13,7 @@ import { stepCheck } from '../../src/engine/checker.js';
 import { exprToLatex } from '../../src/ink/inkLatex.js';
 import { setLanguage } from '../../src/i18n/index.js';
 import realProductRule from './product-rule-real-report.json';
+import realPages from './teacher-page-real-reports.json';
 
 const q = new URLSearchParams(location.search);
 const theme = q.get('theme') === 'dark' ? 'dark' : 'light';
@@ -46,7 +47,36 @@ const CASES = {
 // A test may hand the page its own picture and reader boxes (window.__markedPageFixture = { src, lines: [{ text, box }] }),
 // to check where the outlines fall on that picture. Nothing in the real build reads this.
 const FIXTURE_PAGE = typeof window !== 'undefined' && window.__markedPageFixture && source === 'photo' ? window.__markedPageFixture : null;
-const c = FIXTURE_PAGE ? { ...CASES.buoy, lines: FIXTURE_PAGE.lines.map(l => l.text) } : (CASES[which] || CASES.buoy);
+// ?case=owner19: a SYNTHETIC 19-line page of the stationary-points question (fixture lines, report and boxes; no photograph of anyone), with
+// two columns in the middle so a tick at the end of line 7 would land on line 8's writing. The report carries the classes the engine emits.
+// The reports are the engine's REAL output (server/test/support/teacher-page-real-reports.mjs runs checkAnswer and stepEvidence on the transcribed lines and
+// saves what comes back; server/test/teacher-page-real-reports-check.mjs fails if the saved file drifts). Nothing in them is typed by hand.
+const REAL = realPages.pages;
+const OWNER19 = REAL.owner19.lines.map(text => ({ text }));
+const OWNER19_COL = i => (i >= 8 && i <= 11 ? 1 : 0);   // lines 9 to 12 are the right-hand column
+function owner19Page() {
+  const W = 900, H = 1010;
+  const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H;
+  const g = canvas.getContext('2d');
+  g.fillStyle = '#fbfaf6'; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#1d2a55'; g.font = '30px "Bradley Hand","Segoe Print","Comic Sans MS",cursive'; g.textBaseline = 'middle';
+  // the right-hand column starts 44 px after line 8's writing ends, a little lower, so a tick at the end of line 8 has to fit in a narrow gap
+  const rightX = Math.round(40 + g.measureText(OWNER19[7].text).width + 6 + 44);
+  const lines = OWNER19.map((l, i) => {
+    const right = OWNER19_COL(i) === 1;
+    const x = right ? rightX : 40;
+    // lines 8 and 9 are written side by side: line 8 ends where its writing ends and line 9 starts 44 px further right, a little lower
+    const y = i < 8 ? 40 + i * 52 : i === 8 ? 40 + 7 * 52 + 26 : 40 + 7 * 52 + 26 + (i - 8) * 52;
+    g.fillText(l.text.replace(/\^2/g, '\u00b2').replace(/\^3/g, '\u00b3'), x, y);
+    const w = Math.min((right ? W - rightX - 20 : W - 80), g.measureText(l.text).width + 6);
+    return { text: l.text, box: { x: x / W, y: (y - 22) / H, w: w / W, h: 44 / H } };
+  });
+  return { src: canvas.toDataURL('image/png'), lines };
+}
+const O19 = which === 'owner19' ? owner19Page() : null;
+
+const c = which === 'owner19' ? { meta: null, lines: REAL.owner19.lines, report: REAL.owner19.shownReport || REAL.owner19.stepReport, receipt: q.get('criteria') === '3' ? { awarded: 3, possible: 3 } : { awarded: 1, possible: 1 } }
+  : which === 'wrong' ? { meta: null, lines: REAL.wrong.lines, report: REAL.wrong.shownReport || REAL.wrong.stepReport, receipt: { awarded: 0, possible: 1 } } : which === 'followed' ? { meta: null, lines: REAL.followed.lines, report: REAL.followed.shownReport || REAL.followed.stepReport, receipt: { awarded: 0, possible: 1 } } : FIXTURE_PAGE ? { ...CASES.buoy, lines: FIXTURE_PAGE.lines.map(l => l.text) } : (CASES[which] || CASES.buoy);
 const stepReport = c.report || stepCheck(c.meta, c.lines.join('\n'));
 // ?facts=1: the optional fields the engine may add (a first-break index, a corrected line on the crossed line). Absent otherwise.
 if (q.get('facts') === '1' && !c.report) {
@@ -86,13 +116,22 @@ function photoPage(lines) {
   return { src: canvas.toDataURL('image/png'), boxes };
 }
 
-const props = source === 'ink'
+const props = O19 ? { source: { kind: 'photo', src: O19.src, lines: O19.lines } } : source === 'ink'
   ? { source: { kind: 'ink', strokes: inkPage(c.lines) } }
   : FIXTURE_PAGE ? { source: { kind: 'photo', src: FIXTURE_PAGE.src, lines: FIXTURE_PAGE.lines } }
   : (() => { const p = photoPage(c.lines); return { source: { kind: 'photo', src: p.src, lines: c.lines.map((text, i) => ({ text, box: p.boxes[i] })) } }; })();
 
 // A FIXTURE approval, test only: the real build has no approved type. ?criteria=1 shows the table it would draw.
-const FIXTURE = q.get('criteria') === '1' && which === 'buoy' ? {
+// test-only approval: the criteria text is fixture text; in production it comes from the server's methodCriteria for an author-approved scheme
+const O19_ITEMS = q.get('criteria') === '3'
+  ? [{ key: 'derivative', text: 'Differentiates correctly', marks: 1, awarded: true, lines: [3], reason: 'Line 3 is the derivative.' },
+    { key: 'stationary', text: 'Finds the stationary values', marks: 1, awarded: true, lines: [7], reason: 'Line 7 gives x = 0 or x = 6.' },
+    { key: 'points', text: 'Evaluates the stationary point', marks: 1, awarded: true, lines: [16], reason: 'Line 16 gives -432.' }]
+  : [{ key: 'stationary', text: 'Finds the stationary values', marks: 1, awarded: true, lines: [7], reason: 'Line 7 gives x = 0 or x = 6.' }];
+const FIXTURE = (q.get('criteria') === '1' || q.get('criteria') === '3') && which === 'owner19' ? {
+  approved: [{ typeId: 'fixture-owner19', digest: 'd'.repeat(64), approvedBy: 'Fixture Author', date: '2026-11-26' }],
+  criteria: { typeId: 'fixture-owner19', digest: 'd'.repeat(64), items: O19_ITEMS }
+} : q.get('criteria') === '1' && which === 'buoy' ? {
   approved: [{ typeId: 'fixture-buoy', digest: 'c'.repeat(64), approvedBy: 'Fixture Author', date: '2026-11-19' }],
   criteria: { typeId: 'fixture-buoy', digest: 'c'.repeat(64), items: [
     { key: 'max', text: 'States the maximum as 22 + 5', marks: 1, awarded: true, lines: [2], reason: 'Line 2 states it.' },
@@ -102,6 +141,6 @@ const FIXTURE = q.get('criteria') === '1' && which === 'buoy' ? {
 createRoot(document.getElementById('root')).render(
   <div style={{ padding: '16px', maxWidth: 1100, margin: '0 auto' }} data-gallery-case={`${which}/${source}/${edition}`}
     data-gallery-boxes={props.source.kind === 'photo' ? JSON.stringify(props.source.lines.map(l => l.box)) : undefined}>
-    <MarkedPage input={input} texOf={s => exprToLatex(s) || '\\;'} {...props} {...FIXTURE} {...(q.get('score') === '1' ? { scoreShown: true } : {})} {...(q.get('reading') === '1' ? { reading: { lines: c.lines }, onCorrect: () => {} } : {})} />
+    <MarkedPage teacherMarks={q.get('teacher') === '1'} input={input} texOf={s => exprToLatex(s) || '\\;'} {...props} {...FIXTURE} {...(q.get('score') === '1' ? { scoreShown: true } : {})} {...(q.get('reading') === '1' ? { reading: { lines: c.lines }, onCorrect: () => {} } : {})} />
   </div>
 );

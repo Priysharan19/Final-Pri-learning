@@ -47,18 +47,20 @@ const everything = [...SCHEMES.map(s => ({ typeId: s.id, digest: schemeDigest(s)
 c.ok(repoList.length > 0, `the repository's own approved list is in force (${repoList.length} types)`);
 const lists = [['the repository list', repoList], ['every scheme and the generic rule approved', everything]];
 for (const [name, list] of lists) {
-  let stamped = 0, sealed = 0, noMarking = 0;
+  let stamped = 0, sealed = 0, noMarking = 0, stampedBankGeneric = 0;
   for (const e of entries) {
     const q = JSON.parse(JSON.stringify(qb.qbankEntryQuestion(e.id, 17)));
     q._generator = q.subtopic;
     const ok = sealForEdition(q, { ...bankPolicy('prithagoras'), methodSchemeTypes: list });
     if (!ok) { noMarking++; continue; }
-    if (q._methodScheme !== undefined) stamped++;
+    if (q._methodScheme !== undefined) { stamped++; if (q._methodScheme === BANK_GENERIC_ID && bankGenericEligible(q)) stampedBankGeneric++; }
     if (q._marking === FINAL_ANSWER_MARKING) sealed++;
   }
   c.eq(noMarking, 0, `${name}: every packed question seals`);
-  c.eq(stamped, 0, `${name}: none of the ${entries.length} packed questions is stamped with a scheme or the generic rule`);
-  c.eq(sealed, entries.length, `${name}: every one is sealed final-answer-only`);
+  // The repository list now holds the bank generic rule (author record of 26 Nov 2026): it alone may stamp a bank part, only an eligible one (2+ marks).
+  const only = name === 'the repository list';
+  c.eq(stamped, only ? stampedBankGeneric : 0, `${name}: ${only ? 'only the bank generic rule stamps a packed question' : `none of the ${entries.length} packed questions is stamped with a scheme or the generic rule`}`);
+  c.eq(sealed + (only ? stamped : 0), entries.length, `${name}: every one is stamped by the bank generic rule or sealed final-answer-only`);
 }
 
 // The bank rule (bankSteps.js, approval id `bank-author-criteria`) is the ONE rule that may pay a bank question, and only once the author files his own
@@ -98,10 +100,11 @@ for (const [name, list] of lists) {
   c.ok(stamped > 100, `approved alone it stamps ${stamped} of ${entries.length}`);
 }
 
-// Neither draft bank rule is on the repository's approved list, and a worked-solution question is never stamped by either, whatever is approved.
+// Only the bank criteria rule is a draft (the bank generic rule is approved), and a worked-solution question is never stamped by either, whatever is approved.
 {
   const draftIds = [BANK_ID, BANK_GENERIC_ID];
-  c.eq(repoList.filter(t => draftIds.includes(t.typeId)).length, 0, 'neither draft bank rule is on the repository approved list');
+  c.eq(repoList.filter(t => t.typeId === BANK_ID).length, 0, 'the bank criteria rule is still a draft: not on the repository approved list');
+  c.ok(repoList.some(t => t.typeId === BANK_GENERIC_ID && t.digest === bankGenericDigest()), 'the bank generic rule is on the repository approved list at its current digest (author record, 26 Nov 2026)');
   const bothDrafts = [{ typeId: BANK_ID, digest: bankDigest() }, { typeId: BANK_GENERIC_ID, digest: bankGenericDigest() }];
   const worked = qb.qbankManualEntries();
   let stampedWorked = 0, unsealedWorked = 0;
@@ -117,7 +120,7 @@ for (const [name, list] of lists) {
 }
 
 // (computed before the server starts: a long synchronous loop beside an open keep-alive socket gets it reset)
-const eligibleDraft = entries.filter(e => e.marks >= 2 && (bankEligible(qb.qbankEntryQuestion(e.id, 17)) || bankGenericEligible(qb.qbankEntryQuestion(e.id, 17))));
+const eligibleDraft = entries.filter(e => e.marks >= 2 && bankEligible(qb.qbankEntryQuestion(e.id, 17)) && !bankGenericEligible(qb.qbankEntryQuestion(e.id, 17)));
 
 // Over the real routes, with the REAL repository list and the method-marks switch on (no test override): nothing is stamped or paid by either draft rule
 // or by any approved scheme, a wrong answer earns 0, and a right answer earns what a final-answer-only question earns.
@@ -130,7 +133,7 @@ try {
   const call = async (p, body, headers = {}) => { if (p.endsWith('/issue')) used++; return h.request(p, { method: 'POST', jar: a.jar, headers, body }); };
   {
     c.eq(approvedSchemeTypes().length, repoList.length, 'over HTTP the real repository list is in force');
-    c.ok(eligibleDraft.length > 100, `${eligibleDraft.length} parts could be paid by a draft rule if it were approved`);
+    c.ok(eligibleDraft.length > 20, `${eligibleDraft.length} parts could be paid only by the draft criteria rule if it were approved`);
     let drawn = 0, stampedReal = 0, paidReal = 0, wrongPaid = 0, rightShort = 0;
     for (let i = 0; drawn < 24 && i < 3000; i++) {
       if (used >= 80) await fresh();
@@ -231,6 +234,48 @@ try {
     }
   }
   c.ok(drawn > 0 && paid > 0, `the bank rule paid ${paid} of ${drawn} eligible parts drawn through the real routes`);
+  // A step a student can read off a released figure is never paid as working that was never written (the author's decision of 26 Nov 2026 shows the
+  // figures that give a step result as drawn): with the bank rule approved, a released step-figure part earns nothing for a page that is empty or
+  // restates the question, and its step marks only for the lines the student wrote that the page ticked; the marks follow the lines, never the figure.
+  {
+    const { STEP_FIGURE_DECISION } = await import('../../tools/qbank-figure-risk.mjs');
+    const onList = new Set(STEP_FIGURE_DECISION.parts);
+    const figureEligible = eligibleEntries.filter(e => e.diagram && onList.has(e.id));
+    c.ok(figureEligible.length > 0, `${figureEligible.length} released step-figure parts pass the bank rule's proof`);
+    let probed = 0, emptyPaid = 0, linesNotPaid = 0, moreThanLines = 0, tableMismatch = 0;
+    for (let i = 0; probed < 3 && i < figureEligible.length && used < 70; i++) {
+      const pick = figureEligible[i];
+      const place = productPlaceOf(pick.family, pick.dp);
+      if (!place) continue;
+      const dp = place.ordinal === null ? null : dotpointById(`${place.subtopic}.${place.ordinal + 1}`);
+      const asked = dp && dp.forms.includes(pick.level) ? { dotpoint: dp.id } : {};
+      let found = null;
+      for (let t = 0; t < 600 && found === null; t++) { const s2 = (seed += 7919) % 0x7fffffff; if (qb.qbankDraw(place.subtopic, pick.level, s2 >>> 0, asked.dotpoint ?? null)?._bank === pick.id) found = s2; }
+      if (found === null) continue;
+      const r = await call('/v1/practice/issue', { curriculum: 'nsw', generator: place.subtopic, difficulty: pick.level, ...asked, seed: found });
+      if (r.status !== 201) continue;
+      const row = await h.db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=?", [a.account.id, r.data.question.id]);
+      const sealedQ = JSON.parse(row.response_json);
+      if (sealedQ._bank !== pick.id || sealedQ._methodScheme !== BANK_ID) continue;
+      const qq = qb.qbankEntryQuestion(pick.id, 17);
+      const lines = bankAuthoredLines(qq).map(l => l.text);
+      const sub = async (k, steps) => { const go = n => call(`/v1/practice/${r.data.question.id}/submit`, { submissionId: `fig-${i}-${k}-${n}`, answer: '99991', steps, mode: 'typed' }, { 'Idempotency-Key': `fig-${i}-${k}-${n}` }); const f = await go(1); return f.data.resolved ? f : go(2); };
+      probed++;
+      const none = await sub('none', '');
+      if ((none.data.marksEarned ?? 0) !== 0 || (none.data.methodCriteria?.items || []).some(x => x.awarded)) emptyPaid++;
+      const all = await sub('all', lines.join('\n'));
+      const first = await sub('first', lines.slice(0, 1).join('\n'));
+      const table = r2 => (r2.data.methodCriteria?.items || []).reduce((n, x) => n + (x.awarded ? x.marks : 0), 0);
+      if (table(all) !== (all.data.marksEarned ?? 0) || table(first) !== (first.data.marksEarned ?? 0)) tableMismatch++;
+      if ((first.data.marksEarned ?? 0) > (all.data.marksEarned ?? 0)) moreThanLines++;
+      if ((all.data.marksEarned ?? 0) >= pick.marks) linesNotPaid++;
+    }
+    c.ok(probed >= 1, `${probed} released step-figure parts drawn through the real routes`);
+    c.eq(emptyPaid, 0, 'a page with no line written earns nothing on a released step-figure part, whatever its figure shows');
+    c.eq(moreThanLines, 0, 'one line written never earns more than all of his lines written');
+    c.eq(linesNotPaid, 0, 'a wrong answer never earns the full marks, however many lines are written (the answer criterion is never paid from working)');
+    c.eq(tableMismatch, 0, 'and every mark it does earn is a criterion of his that the table shows as met by a line the student wrote');
+  }
 } finally {
   await h.close();
   for (const key of keys) { if (before[key] === undefined) delete process.env[key]; else process.env[key] = before[key]; }

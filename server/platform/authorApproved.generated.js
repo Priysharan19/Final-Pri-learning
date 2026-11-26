@@ -4,6 +4,10 @@
 // Lists only the types with a committed, valid record. Being listed never turns method marks on by itself: PRI_METHOD_MARKS=on is also needed.
 export const AUTHOR_APPROVED_SERVER = Object.freeze([
   {
+    "typeId": "generic-solution-steps-bank",
+    "digest": "83e159283e2d466356727e52315b0ef79b92ddf33cc55749c5936206e85f40d8"
+  },
+  {
     "typeId": "generic-solution-steps",
     "digest": "d8f1119ae311c778679bebfa49b836e73a67838e3e4a35d7054dfa2c81f5c329"
   },

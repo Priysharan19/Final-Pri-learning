@@ -11,7 +11,13 @@
 //   (d) a worked step's RESULT (a point, or any value but zero) is a coordinate, label or tick of the figure.
 // FAIL CLOSED: where the test needs the geometry and a coordinate or plotted expression cannot be read, the figure is held.
 // Deterministic. No clock, no network, no model, no randomness.
+//
+// ONE waiver, by the author (26 Nov 2026, tools/qbank-step-figures.json): for the parts on that list a figure that shows a STEP RESULT is shown
+// as drawn. It waives only the lines worded "step result: ..." (and the HELD_BY_EYE entry of a part the file names in `byEyeCleared`). The rules
+// above are not loosened: an answer drawn or printed, a sketch asked for, a legibility or mismatch hold and every other gate hold as before.
 // ─────────────────────────────────────────────────────────────────────────────
+
+import { readFileSync } from 'node:fs';
 
 // ── a small safe evaluator for the numbers and functions TikZ and the answer keys write ──────────────────────
 const FN = {
@@ -408,11 +414,29 @@ export const HELD_BY_EYE = Object.freeze({
   'A11-T1-030': 'legibility: the 40 degree label is overlapped'
 });
 
+const STEP_FIGURES_FILE = new URL('./qbank-step-figures.json', import.meta.url);
+/** The author's decision file (26 Nov 2026): which parts may show a step result as drawn. */
+export const STEP_FIGURE_DECISION = JSON.parse(readFileSync(STEP_FIGURES_FILE, 'utf8'));
+const STEP_FIGURE_PARTS = new Set(STEP_FIGURE_DECISION.parts), STEP_FIGURE_EYE = new Set(STEP_FIGURE_DECISION.byEyeCleared);
+/** The part id as the owner's list writes it: the question id and the label, A11-C1-007(i). */
+export const partIdOf = part => `${part?.question ?? ''}${part?.label ?? ''}`;
+/** { eye } when the part is on the author's list (eye: its by-eye hold, a step of the working, is waived too), else null. */
+export const stepFigureWaiver = part => { const id = partIdOf(part); return STEP_FIGURE_PARTS.has(id) ? { eye: STEP_FIGURE_EYE.has(id) } : null; };
+
 /**
  * Why the DRAWING of this figure gives away the answer of `part` (an archive part: prompt, answerType, answer, criteria, steps), or [].
  * `parsed` is { texts, ticks } from qbank-diagrams.mjs (figureTexts, figureTicks).
  */
 export function structuralLeaks(tikz, part, parsed) {
+  const all = structuralLeaksUnwaived(tikz, part, parsed);
+  const w = stepFigureWaiver(part);
+  const held = STEP_FIGURE_DECISION.notReleased[partIdOf(part)];
+  if (held) all.push(`held by the step-figure decision file: ${held}`);
+  return w ? all.filter(r => !r.startsWith('step result:') && !(w.eye && r.startsWith('seen by eye:'))) : all;
+}
+
+/** The rule as it was before the author's decision: every leak, nothing waived. */
+export function structuralLeaksUnwaived(tikz, part, parsed) {
   const out = [];
   if (HELD_BY_EYE[part?.question]) out.push(`seen by eye: ${HELD_BY_EYE[part.question]}`);
   const geo = geometryOf(tikz);

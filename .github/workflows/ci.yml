@@ -963,6 +963,9 @@ jobs:
             node client/test/page-leaving-draft-check.mjs 2>&1 | tee -a browser.log
             node client/test/tour-explain-v2.js --no-build 2>&1 | tee -a browser.log
             node client/test/tour-hindi.js --no-build 2>&1 | tee -a browser.log
+            # The teacher-marked page (Prithagoras): ticks, a cross and margin marks on the student's own page, three views, the examiner's workspace.
+            # Here, not in a11y-boot: that shard runs about 17 of its 20 minutes; this one about 6.
+            node client/test/tour-teacher-marked-page.mjs 2>&1 | tee -a browser.log
               ;;
             e2e-accounts)
             # npm run test:e2e, part 2, in order, ending with tour-ai-tutor.js
