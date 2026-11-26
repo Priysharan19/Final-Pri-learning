@@ -33,7 +33,7 @@ const EXPECT = {
   buoy: { statuses: ['checked', 'checked', 'checked'], sentence: 'Every line was checked.', mark: '2/2', selected: 1, word: 'Correct', cross: null },
   stationary: { statuses: ['checked', 'checked', 'condition', 'checked', 'checked', 'checked', 'checked', 'first-error'], sentence: 'Correct up to line 7. The first error is on line 8. 6 lines checked and correct. 1 line wrong.', mark: '0/3', selected: 8, word: 'Wrong', cross: 8 },
   mixed: { statuses: ['checked', 'unread', 'checked', 'not-verified', 'checked', 'checked'], sentence: 'The lines Pri could check are correct. The final answer is not. 4 lines checked and correct. 2 lines not checked.', mark: '0/3', selected: 1, word: 'Correct', cross: null },
-  crossed: { statuses: ['checked', 'checked', 'condition', 'checked', 'not-verified', 'unread', 'not-verified', 'checked', 'first-error'], sentence: 'The first error is on line 9. 4 lines checked and correct. 1 line wrong. 3 lines not checked.', mark: '0/3', selected: 9, word: 'Wrong', cross: 9 },
+  crossed: { statuses: ['checked', 'checked', 'condition', 'checked', 'first-error', 'not-verified', 'not-verified', 'not-verified', 'not-verified'], sentence: 'Correct up to line 4. The first error is on line 5. 3 lines checked and correct. 1 line wrong. 4 lines not checked.', mark: '0/3', selected: 5, word: 'Wrong', cross: 5 },
   product: { statuses: ['condition', 'checked', 'checked', 'condition', 'checked', 'checked', 'checked', 'checked', 'first-error'], sentence: 'Correct up to line 8. The first error is on line 9. 6 lines checked and correct. 1 line wrong.', mark: '0/3', selected: 9, word: 'Wrong', cross: 9 },
   wrongfinal: { statuses: ['checked', 'checked', 'condition', 'checked', 'checked', 'checked', 'checked'], sentence: 'The lines Pri could check are correct. The final answer is not. 6 lines checked and correct.', mark: '0/3', selected: 1, word: 'Correct', cross: null }
 };
@@ -66,27 +66,31 @@ const browser0 = await chromium.launch();
   const nums = await pg.locator('[data-mp-card]').evaluateAll(es => es.map(e => Number(e.getAttribute('data-mp-card'))));
   ok(nums.length === 9 && nums.every((n, i) => n === i + 1), `the line list holds every line, in line order (${nums})`);
   ok(await pg.locator('[data-mp-card="collapsed"]').count() === 0, 'there is no separate "Not verified" box: the unchecked lines are rows like the rest');
-  ok(await pg.locator('[data-mp-see-line]').count() === 0 && await pg.locator('[data-mp-detail] [data-mp-reading="9"]').count() === 1 && /How Pri read this line/.test(await pg.locator('[data-mp-detail]').innerText()), 'on a wrong line "How Pri read this line" is shown and there is no second "See how Pri read this line" link');
+  ok(await pg.locator('[data-mp-see-line]').count() === 0 && await pg.locator('[data-mp-detail] [data-mp-reading="5"]').count() === 1 && /How Pri read this line/.test(await pg.locator('[data-mp-detail]').innerText()), 'on a wrong line "How Pri read this line" is shown and there is no second "See how Pri read this line" link');
   ok(await pg.locator('[data-mp-box="3"] svg').count() === 1 && await pg.locator('[data-mp-pick="3"] svg').count() === 1 && await pg.locator('[data-mp-box="3"] path[d="M7 12h10"]').count() === 1 && await pg.locator('[data-mp-pick="3"] path[d="M7 12h10"]').count() === 1 && await pg.locator('[data-mp-box="1"] path[d="m5 12.5 4.5 4.5L19 7.5"]').count() === 1, 'a Context line has a plain dash, not a tick, in the list and on its marker');
-  ok(await pg.locator('[data-marked-page]').getAttribute('data-mp-selected') === '9' && /Line 9/.test(await pg.locator('[data-mp-detail]').innerText()) && /Wrong/.test(await pg.locator('[data-mp-detail]').innerText()), 'the panel opens on the first crossed line, in words');
-  ok(await pg.locator('[data-mp-box="9"]').getAttribute('aria-label') === 'Line 9, wrong' && await pg.locator('[data-mp-box="1"]').getAttribute('aria-label') === 'Line 1, correct' && await pg.locator('[data-mp-box="6"]').getAttribute('aria-label') === 'Line 6, not checked' && await pg.locator('[data-mp-box="3"]').getAttribute('aria-label') === 'Line 3, context', 'markers are named buttons: Line 9, wrong');
+  ok(await pg.locator('[data-marked-page]').getAttribute('data-mp-selected') === '5' && /Line 5/.test(await pg.locator('[data-mp-detail]').innerText()) && /Wrong/.test(await pg.locator('[data-mp-detail]').innerText()), 'the panel opens on the first crossed line, in words');
+  ok(await pg.locator('[data-mp-box="5"]').getAttribute('aria-label') === 'Line 5, wrong' && await pg.locator('[data-mp-box="1"]').getAttribute('aria-label') === 'Line 1, correct' && await pg.locator('[data-mp-box="6"]').getAttribute('aria-label') === 'Line 6, not checked' && await pg.locator('[data-mp-box="3"]').getAttribute('aria-label') === 'Line 3, context', 'markers are named buttons: Line 5, wrong');
   ok(await pg.locator('button[data-mp-box]').count() === 9, 'every marker is a real button');
   // click a marker
   await pg.locator('[data-mp-box="2"]').click();
   ok(await pg.locator('[data-marked-page]').getAttribute('data-mp-selected') === '2' && /Line 2/.test(await pg.locator('[data-mp-detail]').innerText()) && /Correct/.test(await pg.locator('[data-mp-detail]').innerText()) && await pg.locator('[data-mp-card="2"] button').getAttribute('aria-current') === 'true', 'clicking a marker selects the line: panel and list follow');
-  ok(await pg.locator('[data-mp-box="2"]').getAttribute('aria-pressed') === 'true' && await pg.locator('[data-mp-box="9"]').getAttribute('aria-pressed') === 'false', 'the selected marker says so, not only by colour');
+  ok(await pg.locator('[data-mp-box="2"]').getAttribute('aria-pressed') === 'true' && await pg.locator('[data-mp-box="5"]').getAttribute('aria-pressed') === 'false', 'the selected marker says so, not only by colour');
   // click a not-checked marker and an unread one
-  await pg.locator('[data-mp-box="5"]').click();
+  await pg.locator('[data-mp-box="7"]').click();
   ok(/Not checked/.test(await pg.locator('[data-mp-detail]').innerText()) && /wasn’t checked/.test(await pg.locator('[data-mp-detail]').innerText()), 'a not-checked line is called Not checked, never right or wrong');
-  await pg.locator('[data-mp-box="6"]').click();
+  // (the crossed page has no unread line now: the engine does not judge lines after the first error, so the unread checks run on the mixed fixture, whose line 2 is unread)
+  await pg.goto(`${url('mixed', 'photo', 'prithagoras', 'light')}&reading=1`, { waitUntil: 'networkidle' }); await pg.waitForSelector('[data-marked-page]');
+  await pg.locator('[data-mp-box="2"]').click();
   ok(/couldn’t read it/.test(await pg.locator('[data-mp-detail]').innerText()) && /Rewrite it, or type it/.test(await pg.locator('[data-mp-detail]').innerText()), 'an unread line says Pri could not read it and what to do');
   ok(await pg.locator('[data-mp-see-line]').count() === 0, 'an unread line has no reading to offer');
+  await pg.goto(`${url('crossed', 'photo', 'prithagoras', 'light')}&reading=1`, { waitUntil: 'networkidle' }); await pg.waitForSelector('[data-marked-page]');
   // keyboard on the list: Tab into the list stops once; arrows move
+  await pg.locator('[data-mp-box="6"]').click();
   await pg.locator('[data-mp-pick="6"]').focus();
   await pg.keyboard.press('ArrowDown');
   ok(await pg.locator('[data-marked-page]').getAttribute('data-mp-selected') === '7' && await pg.evaluate(() => document.activeElement?.getAttribute('data-mp-pick')) === '7', 'ArrowDown moves to line 7 and focus goes with it');
   await pg.keyboard.press('End');
-  ok(await pg.locator('[data-marked-page]').getAttribute('data-mp-selected') === '9' && /Wrong/.test(await pg.locator('[data-mp-detail]').innerText()), 'End goes to the last line');
+  ok(await pg.locator('[data-marked-page]').getAttribute('data-mp-selected') === '9' && /Not checked/.test(await pg.locator('[data-mp-detail]').innerText()), 'End goes to the last line');
   await pg.keyboard.press('Home'); await pg.keyboard.press('ArrowUp');
   ok(await pg.locator('[data-marked-page]').getAttribute('data-mp-selected') === '1', 'Home goes to line 1, and ArrowUp stops there');
   ok(await pg.locator('[data-mp-pick]').evaluateAll(bs => bs.filter(b => b.tabIndex === 0).length) === 0, 'the screen-reader list adds no tab stops');
@@ -115,16 +119,21 @@ const browser0 = await chromium.launch();
   ok(await pg.locator('[data-mp-about]').evaluate(d => d.open === false) && /About this reading/.test(await pg.locator('[data-mp-about] summary').innerText()), 'the disclosure is closed to begin with');
   const list = await pg.locator('.mp-comments').evaluate(o => { const r = o.getBoundingClientRect(); return { w: r.width, h: r.height }; });
   ok(list.w <= 2 && list.h <= 2, 'the nine-row status list is not drawn: the markers are the navigation');
+  ok(/Line 5 of 9/.test(await pg.locator('[data-mp-step-of]').innerText()) && await pg.locator('[data-mp-step="next"]').isEnabled() && await pg.locator('[data-mp-step="prev"]').isEnabled(), 'a compact stepper says Line 5 of 9, with Next and Previous both on in the middle');
+  await pg.locator('[data-mp-step="prev"]').click();
+  ok(await pg.locator('[data-marked-page]').getAttribute('data-mp-selected') === '4' && /Line 4 of 9/.test(await pg.locator('[data-mp-step-of]').innerText()), 'Previous moves to line 4');
+  // the end of the page (the old assertions, kept): the last line is Line 9 of 9 with Next off, and Previous moves to line 8
+  await pg.locator('[data-mp-box="9"]').click();
   ok(/Line 9 of 9/.test(await pg.locator('[data-mp-step-of]').innerText()) && await pg.locator('[data-mp-step="next"]').isDisabled() && await pg.locator('[data-mp-step="prev"]').isEnabled(), 'a compact stepper says Line 9 of 9, with Next off at the end');
   await pg.locator('[data-mp-step="prev"]').click();
   ok(await pg.locator('[data-marked-page]').getAttribute('data-mp-selected') === '8' && /Line 8 of 9/.test(await pg.locator('[data-mp-step-of]').innerText()), 'Previous moves to line 8');
   const box = await pg.locator('.mp-detail').evaluate(d => { const s = getComputedStyle(d); return { b: s.borderTopWidth, bg: s.backgroundColor }; });
   ok(box.b === '0px' && box.bg === 'rgba(0, 0, 0, 0)', 'the panel is a calm column, not a box');
-  const q = await pg.evaluate(() => { const g = id => getComputedStyle(document.querySelector(`[data-mp-box="${id}"]`)); return { tick: g(1).borderTopColor, quiet: g(5).borderTopColor, quietOpacity: g(5).opacity, tickOpacity: g(1).opacity }; });
+  const q = await pg.evaluate(() => { const g = id => getComputedStyle(document.querySelector(`[data-mp-box="${id}"]`)); return { tick: g(1).borderTopColor, quiet: g(6).borderTopColor, quietOpacity: g(6).opacity, tickOpacity: g(1).opacity }; });
   ok(q.quiet === 'rgba(0, 0, 0, 0)' && parseFloat(q.quietOpacity) < 1 && q.tick !== 'rgba(0, 0, 0, 0)' && q.tickOpacity === '1', 'a not-checked marker is quieter than a tick');
   await pg.locator('[data-mp-about] summary').click();
   await pg.locator('[data-mp-see-page]').click();
-  ok(await pg.locator('[data-mp-all] [data-mp-reading]').count() === 8 && await pg.locator('[data-mp-reading]').count() === 8, 'the whole-page reading lists each line Pri read once');
+  ok(await pg.locator('[data-mp-all] [data-mp-reading]').count() === 9 && await pg.locator('[data-mp-reading]').count() === 9, 'the whole-page reading lists each line Pri read once');
   await ctx.close();
 }
 {
@@ -152,7 +161,7 @@ const browser0 = await chromium.launch();
 {
   // The engine's optional facts: a first-break index and a corrected line. Shown when present, absent without them.
   const ctx = await browser0.newContext({ viewport: { width: 1280, height: 900 } }); const pg = await ctx.newPage();
-  await pg.goto(`${url('crossed', 'photo', 'prithagoras', 'light')}`, { waitUntil: 'networkidle' }); await pg.waitForSelector('[data-marked-page]');
+  await pg.goto(`${url('stationary', 'photo', 'prithagoras', 'light')}`, { waitUntil: 'networkidle' }); await pg.waitForSelector('[data-marked-page]');
   ok(await pg.locator('[data-mp-corrected]').count() === 0 && await pg.locator('[data-mp-fact="corrected"]').count() === 0, 'with no corrected line from the engine the panel shows none and invents none');
   await pg.goto(`${url('crossed', 'photo', 'prithagoras', 'light')}&facts=1`, { waitUntil: 'networkidle' }); await pg.waitForSelector('[data-marked-page]');
   ok(await pg.locator('[data-mp-corrected] .katex').count() > 0 && /Corrected line/.test(await pg.locator('[data-mp-fact="corrected"]').innerText()), 'a corrected line from the engine is shown typeset on the wrong line');

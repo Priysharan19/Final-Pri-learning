@@ -448,7 +448,7 @@ export function provedLines(q, meta, report) {
   });
   // The page-level proofs (pageProofs.js): substitutions, chains, second derivative, sign and nature, conclusions, conditions, the restated question
   // and headings, each proved from the question's own function and the roots an earlier ticked line of the page established.
-  let pageN = 0, final = lines;
+  let pageN = 0, final;
   try { const pp = pageProofs(q, lines, limit, (l, i) => openNote(l)); final = pp.lines; pageN = pp.n + pp.lines.filter((l, i) => l !== lines[i] && l.status !== 'ok').length; } catch { final = lines; pageN = 0; }
   if (!n && !pageN) return report;
   return withLines(report, final);
