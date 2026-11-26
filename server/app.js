@@ -28,6 +28,7 @@ import { captureError } from './platform/errorSink.js';
 import { staticCacheHeaders } from './platform/staticCache.js';
 import { releaseShaForLogs } from './platform/releaseIdentity.js';
 import { assertEditionAgreement, bindDatabaseEdition, serverEdition } from './platform/edition.js';
+import { isAppPath } from './platform/appPaths.js';
 import { rejectUnsafeText } from './platform/text.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -221,6 +222,7 @@ export async function createServerApp(db, {
     res.status(status).json({ error: 'Something went wrong on the server.', requestId: req.requestId });
   });
 
+  const auEdition = serverEdition() === 'prithagoras';
   if (dist && existsSync(dist)) {
     // Caching policy (platform/staticCache.js): hashed assets are immutable for
     // a year; the shell, sw.js and release.json are always revalidated;
@@ -229,6 +231,8 @@ export async function createServerApp(db, {
     app.use(express.static(dist, { etag: true, lastModified: true, index: 'index.html', setHeaders: staticCacheHeaders }));
     app.get(/^(?!\/(?:api|v1)).*/, (req, res) => {
       res.set('Cache-Control', 'no-cache');
+      // Prithagoras: an address that is no route is a real 404 (the shell still loads and draws "Page not found").
+      if (auEdition && !isAppPath(req.path)) res.status(404);
       res.sendFile(join(dist, 'index.html'));
     });
   }
