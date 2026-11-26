@@ -315,10 +315,13 @@ function readSolution(q) {
   const steps = Array.isArray(q?.steps) ? q.steps : [];
   const labelled = [], conditions = [], values = [], numeric = [], verbatim = [], every = [], limits = new Set();
   for (const t of [String(q?.prompt ?? ''), ...steps.map(x => String(x?.d ?? ''))]) for (const m of t.replace(/\\\$/g, '\u0001').matchAll(TEX_SPAN)) { const pl = spanToPlain(m[1]); if (pl) for (const k of limitKeys(braces(pl))) limits.add(k); }
+  // An inequality line is ticked as a worked-solution statement for an Australian Years 11-12 question only (a bank question, or a generator of y11, y12, me11, me12);
+  // every other question, India's included, is read exactly as before.
+  const australian = typeof q?._bank === 'string' || /^(?:y11|y12|me11|me12)-/.test(String(q?.subtopic ?? ''));
   const inequalities = [];
   steps.forEach((st, i) => {
     const heading = String(st?.h ?? '').trim();
-    for (const chain of inequalitiesOfSpans(st?.d)) inequalities.push({ step: i, heading, chain });
+    if (australian) for (const chain of inequalitiesOfSpans(st?.d)) inequalities.push({ step: i, heading, chain });
     for (const m of String(st?.d ?? '').matchAll(TEX_SPAN)) { const r = roundedTail(m[1]); if (r !== null) values.push({ step: i, heading, v: Number(r), rounded: true }); }
     for (const s of statementsOfSpans(st?.d)) {
       s.parts.forEach(p => { const v = numericOf(p); if (v !== null) values.push({ step: i, heading, v }); });
@@ -350,7 +353,7 @@ function readSolution(q) {
     stated.set(l.label.name, set);
   }
   const multiRoot = [...stated.values()].some(set => set.size > 1);
-  return { steps, labelled, conditions, numeric, verbatim, every, limits, values, multiRoot, inequalities, promptInequalities: inequalitiesOfSpans(String(q?.prompt ?? '').slice(0, 2000)).map(chain => ({ chain })), final: values.length ? values[values.length - 1] : null };
+  return { steps, labelled, conditions, numeric, verbatim, every, limits, values, multiRoot, inequalities, promptInequalities: australian ? inequalitiesOfSpans(String(q?.prompt ?? '').slice(0, 2000)).map(chain => ({ chain })) : [], final: values.length ? values[values.length - 1] : null };
 }
 
 function readPrompt(q) {
