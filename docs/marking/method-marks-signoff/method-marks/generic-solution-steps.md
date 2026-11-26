@@ -71,12 +71,12 @@ Measured on the generated Year 11 and 12 Advanced and Extension 1 written questi
 | Advanced · Trigonometry | 362 | 6 | 77 | 21.3% | 53 |
 | Extension 1 · Algebra | 590 | 0 | 206 | 34.9% | 112 |
 | Extension 1 · Calculus | 518 | 0 | 188 | 36.3% | 116 |
-| Extension 1 · Functions | 109 | 0 | 72 | 66.1% | 30 |
+| Extension 1 · Functions | 109 | 0 | 71 | 65.1% | 29 |
 | Extension 1 · Statistics & Probability | 307 | 0 | 96 | 31.3% | 72 |
 | Extension 1 · Trigonometry | 330 | 0 | 199 | 60.3% | 59 |
-| ALL | 4599 | 169 | 2026 | 44.1% | 1200 |
+| ALL | 4599 | 169 | 2025 | 44.0% | 1199 |
 
-Before this rule only 3.7% of these questions could earn a step mark. With it, 44.1% can. On the 2026 questions it can pay, it can pay 2348 of the 3240 marks below full (72.5%).
+Before this rule only 3.7% of these questions could earn a step mark. With it, 44.0% can. On the 2025 questions it can pay, it can pay 2347 of the 3239 marks below full (72.5%).
 
 ## The sweep: does it pay anything it should not
 
@@ -85,7 +85,7 @@ Run with the rule approved in the test process only (nothing is approved in the 
 - Authored working with only the final line wrong (291 pages): marks earned 1 mark(s) on 228, 2 mark(s) on 60, 3 mark(s) on 3.
 - Authored working in full with the right answer: N on 229 of 229. Full working with a wrong typed answer: N on 0 of 293.
 - Wrong from a key step onward (359 pages): marks earned on or after the wrong step: 0. One wrong line only (355 pages): the wrong line earned 0, anything at or after a crossed line earned 0.
-- Gaming, restate the question (293 pages): a mark was earned on 1, exceptions 1.
+- Gaming, restate the question (293 pages): a mark was earned on 0, exceptions 0.
 - Gaming, another questions working (269 pages): a mark was earned on 0, exceptions 0.
 - Gaming, given numbers (293 pages): a mark was earned on 0, exceptions 0.
 - Gaming, irrelevant true arithmetic (293 pages): a mark was earned on 0, exceptions 0.
@@ -204,13 +204,13 @@ Final answer typed: `99991`. The answer checker says it is not correct.
 | Line | What the student wrote | What the marked page shows | Earns |
 |---:|---|---|---|
 | 1 | `48*240.39-10000=1538.72` | ticked | step 1 |
-| 2 | `60*198.96-10000=1937.55` | crossed (first wrong line) | nothing |
+| 2 | `60*198.96-10000=1937.55` | not checked | nothing |
 | 3 | `398.629` | not checked | nothing |
 
 | Criterion | Marks | Result | Lines |
 |---|---:|---|---|
 | Step 1 of the worked solution (Plan 1): 48*240.39-10000=1538.72 | 1 | earned | 1 |
-| Step 2 of the worked solution (Plan 2): 60*198.96-10000=1937.6 | 1 | not earned | - |
+| Step 2 of the worked solution (Plan 2): 60*198.96-10000=1937.6 | 1 | not verified | - |
 | Gives the final answer correctly, in the form the question asks. | 1 | not earned | - |
 
 Marks: **1 of 3**.
@@ -446,9 +446,9 @@ Marks: **2 of 2**.
 These are measured, in the same sweep (seeds 1 to 6), and rewritten each time the packet is generated.
 
 - **A different valid method earns less.** The same correct route, with a wrong last line, earns on average 1.24 marks when it is written the way the author wrote it (263 pages). Written with the sides of each equation swapped it earns 0.56, and with every equation moved to one side it earns 1.17. The rule recognises the authored route best. A student who solves it another valid way, or writes an equivalent line in a different shape, is paid less than they deserve and sometimes nothing.
-- **Over-credit after a wrong line the page cannot see.** One middle line was made wrong in turn, and the authored lines left after it (695 pages, hard test, tolerance 0): 335 marks were earned against an ideal of 371 (the steps written before the wrong line); pages above the ideal: 0; marks earned by the wrong line or a line after it: 0. The cost of the stop rule is that true working is sometimes not paid: a true line the page can only note (a bare list of numbers, an inequality, a definition it does not read) ends the paying. The stop rule and the bare-line test together reduced the questions the rule can pay from 52.5 percent to 44.8 percent of the multi-mark written questions (45.8 percent with the seven types approved when this was measured), seeds 1 to 40, and the marks paid on the authored route with a wrong last line from 2702 over 2260 pages (1.20 a page) to 2257 over 1940 pages (1.16 a page): a loss of 16.5 percent of marks, almost all of it questions that no longer pay at all, not a lower mark on those that still do.
+- **Over-credit after a wrong line the page cannot see.** One middle line was made wrong in turn, and the authored lines left after it (695 pages, hard test, tolerance 0): 334 marks were earned against an ideal of 371 (the steps written before the wrong line); pages above the ideal: 0; marks earned by the wrong line or a line after it: 0. The cost of the stop rule is that true working is sometimes not paid: a true line the page can only note (a bare list of numbers, an inequality, a definition it does not read) ends the paying. The stop rule and the bare-line test together reduced the questions the rule can pay from 52.5 percent to 44.8 percent of the multi-mark written questions (45.8 percent with the seven types approved when this was measured), seeds 1 to 40, and the marks paid on the authored route with a wrong last line from 2702 over 2260 pages (1.20 a page) to 2257 over 1940 pages (1.16 a page): a loss of 16.5 percent of marks, almost all of it questions that no longer pay at all, not a lower mark on those that still do.
 - **A single bare line.** A letter equal to a number, or a number, alone (257 pages, hard test, tolerance 0): a mark was earned on 9, every one a step whose one result that is (9); over-credit 0. Examples that no longer earn: v = 0 alone, and x = -6 alone for the domain of a composite function.
-- **A true first line, then nothing readable.** 293 pages: a mark was earned on 220. In 210 of those the step is the first step of the solution, and the line is a derived expression on 220 and a bare value on 0. This is intended: a derived first line (a derivative, the equation set up from the question) is a true result a student had to find, and it earns one mark, the same as it does at the answer step of an examiner's scheme. A bare value as the first step does not pay (it is set-up).
+- **A true first line, then nothing readable.** 293 pages: a mark was earned on 219. In 209 of those the step is the first step of the solution, and the line is a derived expression on 219 and a bare value on 0. This is intended: a derived first line (a derivative, the equation set up from the question) is a true result a student had to find, and it earns one mark, the same as it does at the answer step of an examiner's scheme. A bare value as the first step does not pay (it is set-up).
 - It reads only what the page can tick. A question whose solution is in words, in a table, as an inequality, as a sketch or as a vector or matrix the page cannot read has no usable steps, and stays on the final answer.
 - A value counts for a numeric step only if it is worked from the question's or the solution's own numbers with the same operations on the same numbers as the authored step (so 2 + 2 = 4 is not the step 2^2 = 4, and 9 / 3 = 3 is not 27 / 9 = 3).
 - Another question's correct working earns nothing, except where one of its lines is also a true statement of this question's own solution (the same root, an equivalent equation). That is rare in the sweep and each case is listed in the test output.

@@ -42,7 +42,7 @@ export const GEN_SEED_SCAN = 200;       // seeds 1..200 of each issued cell are 
 export const GEN_SEEDS_PER_FORM = 2;    // the first two seeds of each form are marked
 export const WRONG_SEED_ANSWER = '99991';
 export const SCOPE = /^(y11|y12|me11|me12)-/;
-export const STATUS = Object.freeze({ full: 'full', trueOnly: 'true-only', uncovered: 'uncovered' });
+export const STATUS = Object.freeze({ full: 'full', trueOnly: 'true-only', uncovered: 'uncovered', notApplicable: 'not-applicable' });
 
 const { MARKER_OPS, markerView } = await import('../server/platform/markerOps.js');
 const H = await import('./marking-mutation-harness.mjs');
@@ -118,7 +118,7 @@ export function markPage(q, answer, lines) {
   let r;
   try { r = MARKER_OPS.practice({ q, answer, working: lines.join('\n'), evidenceIfWrong: true, policy: { methodMarks: true } }, () => {}); } catch { return null; }
   const rep = r?.evidence?.shownReport || r?.evidence?.stepReport || null;
-  if (!rep || !Array.isArray(rep.lines)) return { correct: r?.result?.correct === true, cards: null, answerLine: -1, report: null };
+  if (!rep || !Array.isArray(rep.lines)) return { correct: r?.result?.correct === true, cards: null, answerLine: -1, report: null, noLineReport: r?.evidence?.noLineReport || null };
   let cards = null;
   try {
     const model = buildAnnotatedWorking({ lines, stepReport: rep, page: true });
@@ -176,7 +176,7 @@ export function trueHalf(q, lines, answer, { unreadable = 0, worked = false, fir
   if (!lines.length) return out(q.answerType === 'working' ? 'proof' : q.answerType === 'manual' ? `worked solution (${q._worked || 'find'}) with no maths lines` : 'no maths lines in the worked solution (words only)');
   if (unreadable) return out(unreadableCause(firstUnreadable), -1, { unreadable, text: firstUnreadable });
   const m = markPage(q, worked ? '' : answer, lines);
-  if (!m || !m.cards) return out('no line report from the marker');
+  if (!m || !m.cards) return out(m && m.noLineReport ? `no line report from the marker (${m.noLineReport.reason})` : 'no line report from the marker');
   if (m.cards.length !== lines.length) return out('report does not judge every line', -1, { judged: m.cards.length });
   const statuses = m.cards.map(c => c.status);
   const cross = statuses.indexOf('first-error');
@@ -205,23 +205,22 @@ const bareNumber = x => /^-?\d+(?:\.\d+)?$/.test(String(x).replace(/\s+/g, ''));
 const unitOf = x => { const t = String(x).replace(/\s+/g, '').replace(/^-/, ''); return t.includes('.') ? 10 ** -(t.split('.')[1].length) : 10 ** ((/[1-9](0+)$/.exec(t) || [0, ''])[1].length); };
 export function falseOnItsOwn(text) {
   const t = String(text);
-  if (/[<>≤≥≈≠,;:!]|\bpi\b|π|\be\b/.test(t.replace(/\be\^/g, '')) || NAMED_FN.test(t) || /[A-Za-z]{2,}/.test(t.replace(/\b(?:sqrt)\b/g, ''))) return false;
+  if (/[<>≤≥≈≠,;:]|\bpi\b|π|\be\b/.test(t.replace(/\be\^/g, '')) || NAMED_FN.test(t) || /[A-Za-z]{2,}/.test(t.replace(/\b(?:sqrt)\b/g, ''))) return false;
   let sides;
   try { sides = H.sidesOf(t); } catch { return false; }
   if (sides.length < 2 || sides.some(x => !x)) return false;
-  // the first side may be the name of the chain (one letter, with a subscript): the sides after it are the claim
-  const claim = sides.length >= 3 && /^[A-Za-zΔΣθαβφλμσ](?:_\{?[A-Za-z0-9]{1,3}\}?)?$/.test(sides[0]) ? sides.slice(1) : sides;
-  if (claim.length < 2 || claim.some(x => H.lettersIn(x).length)) return false;
-  // a bare number in front of worked sides is margin work to the engine (never a cross)
-  if (bareNumber(claim[0]) && claim.slice(1).some(x => !bareNumber(x))) return false;
-  const vals = claim.map(x => { const v = H.sideValues(x, []); return v && v[0] !== null ? v[0] : null; });
-  if (vals.some(v => v === null)) return false;
-  for (let k = 0; k + 1 < claim.length; k++) {
+  const free = sides.map(x => !H.lettersIn(x).length);
+  const vals = sides.map((x, k) => { if (!free[k]) return null; const v = H.sideValues(x, []); return v && v[0] !== null ? v[0] : null; });
+  const decimal = /\d\.\d|^\.\d/.test(t);
+  for (let k = 0; k + 1 < sides.length; k++) {
+    // two neighbouring sides that are plain numbers once worked out (a name or a letter elsewhere on the line does not matter)
+    if (vals[k] === null || vals[k + 1] === null) continue;
     if (Math.abs(vals[k] - vals[k + 1]) <= 1e-9 * Math.max(1, Math.abs(vals[k]), Math.abs(vals[k + 1]))) continue;
-    const bares = [claim[k], claim[k + 1]].filter(bareNumber);
+    const bares = [sides[k], sides[k + 1]].filter(bareNumber);
     if (bares.length === 2) continue;   // two bare numbers: words lost in reading, not a sum
-    if (!/\d\.\d|^\.\d/.test(claim.join(' '))) return true;   // no decimal on the line: no rounding is in play
-    const places = [...`${claim[k]} ${claim[k + 1]}`.matchAll(/\d*\.(\d+)/g)].map(m => m[1].length);
+    if (k === 0 && bareNumber(sides[0]) && sides.slice(1).some(x => !bareNumber(x))) continue;   // a bare number in front of worked sides is margin work to the engine
+    if (!decimal) return true;   // no decimal on the line: no rounding is in play
+    const places = [...`${sides[k]} ${sides[k + 1]}`.matchAll(/\d*\.(\d+)/g)].map(m => m[1].length);
     const band = bares.length ? Math.min(...bares.map(unitOf)) : places.length ? 10 ** -Math.min(...places) : 0;
     if (Math.abs(vals[k] - vals[k + 1]) > band * (1 + 1e-9)) return true;
   }
@@ -232,7 +231,9 @@ export function falseOnItsOwn(text) {
 // roots) are neither a part of, nor hold, the solutions of any equation of that letter in the four lines above it, and at least one of those is not a
 // bare value (`x = 3`): it contradicts the line it was derived from. A mutant that keeps the same solutions (`7(x - 1)(x - 7) = 0` for `6(x - 1)(x - 7) = 0`)
 // is still true, and is dropped as a tool artefact.
-const oneEquation = text => {
+const EQ_CACHE = new Map();
+const oneEquation = text => { const k = String(text); if (!EQ_CACHE.has(k)) { if (EQ_CACHE.size > 20000) EQ_CACHE.clear(); EQ_CACHE.set(k, oneEquationUncached(k)); } return EQ_CACHE.get(k); };
+const oneEquationUncached = text => {
   const t = String(text).replace(/[−–—]/g, '-').replace(/[×·]/g, '*').replace(/\s*[.;]\s*$/, '');
   if (/[<>≤≥≠≈,;:±%°]|[A-Za-z]{2,}/.test(t.replace(/(?<![A-Za-z])[A-Za-z](?![A-Za-z])/g, '#')) || (t.match(/=/g) || []).length !== 1) return null;
   const [l, r] = t.split('=').map(x => x.trim());
@@ -244,9 +245,13 @@ const oneEquation = text => {
   const v = vars[0];
   const f = x => { try { const p = EX.evaluate(a, { [v]: x }), q = EX.evaluate(b, { [v]: x }); return Number.isFinite(p) && Number.isFinite(q) ? p - q : NaN; } catch { return NaN; } };
   const roots = [];
-  let prevX = -60, prevY = f(prevX);
-  for (let x = -59.95; x <= 60.0001; x += 0.05) {
-    const y = f(x);
+  const grid = [];
+  for (let x = -3000; x < -60; x += 1) grid.push(x);
+  for (let x = -60; x <= 60.0001; x += 0.05) grid.push(Math.round(x * 100) / 100);
+  for (let x = 61; x <= 3000; x += 1) grid.push(x);
+  let prevX = grid[0], prevY = f(prevX);
+  for (let g = 1; g < grid.length; g++) {
+    const x = grid[g], y = f(x);
     if (Number.isFinite(prevY) && Number.isFinite(y)) {
       if (Math.abs(y) < 1e-12) { if (!roots.some(z => Math.abs(z - x) < 0.02)) roots.push(x); }
       else if (prevY * y < 0) { let lo = prevX, hi = x, flo = prevY; for (let k = 0; k < 60; k++) { const mid = (lo + hi) / 2, fm = f(mid); if (!Number.isFinite(fm)) break; if (flo * fm <= 0) hi = mid; else { lo = mid; flo = fm; } } const z = (lo + hi) / 2; if (!roots.some(w => Math.abs(w - z) < 0.02)) roots.push(z); }
@@ -267,7 +272,37 @@ export function contradictsLineAbove(lines, i, text) {
   return recent.some(r => !r.bare) && recent.every(r => !related(B.roots, r.roots));
 }
 /** True when the mutant is provably false given the page: false by itself, or contradicting the equation(s) above it. */
-export const provableGivenPage = (lines, i, text) => falseOnItsOwn(text) || contradictsLineAbove(lines, i, text);
+// `a = ((-320)/64) = -5`: a one-letter name set equal to a chain of plain numbers: the value it comes to (null otherwise).
+function chainValue(line, v) {
+  const t = String(line);
+  if (/[<>≤≥≠≈,;:]|[A-Za-z]{2,}/.test(t.replace(/(?<![A-Za-z])[A-Za-z](?![A-Za-z])/g, '#'))) return null;
+  let sides; try { sides = H.sidesOf(t); } catch { return null; }
+  if (sides.length < 2 || sides[0] !== v || sides.slice(1).some(x => H.lettersIn(x).length)) return null;
+  const vals = sides.slice(1).map(x => { const r = H.sideValues(x, []); return r && r[0] !== null ? r[0] : null; });
+  return vals.every(x => x !== null && Math.abs(x - vals[0]) <= 1e-9 * Math.max(1, Math.abs(x))) ? vals[0] : null;
+}
+// `h = -6` straight after `h = ((-14 + 0)/2)`: a value for a name that the line above has just worked out as another number.
+const contradictsValueAbove = (lines, i, text) => {
+  const m = /^\s*([A-Za-z])\s*=\s*(-?\d+(?:\.\d+)?)\s*$/.exec(String(text));
+  if (!m || i < 1) return false;
+  const above = chainValue(lines[i - 1], m[1]);
+  return above !== null && Math.abs(above - Number(m[2])) > 1e-9 * Math.max(1, Math.abs(above));
+};
+const WRONG_CTX = { answer: null };   // the question's own numeric answer while its wrong half is measured (the question is part of the page)
+// A line with no relation sign is an expression the working says is the next value (a derivative, a simplification). One that is not the same function
+// as the authored line is not that value: it contradicts the page (the line above, or the question when it is the first line).
+const bareExpression = text => !/[=<>≤≥≠≈,;:]/.test(String(text));
+// An equation in one letter on the way to the solution keeps the solution's value (a squared equation gains roots, a divided one loses others, none loses the
+// answer). When the authored line has the value another authored line gives that letter (`k = 9`), a mutant of it whose solutions do not include that
+// value is not on the way. (When the authored line itself lacks the value, nothing is said.)
+export function contradictsSolution(lines, i, text) {
+  const B = oneEquation(text), O = oneEquation(lines[i]);
+  if (!B || !O || B.bare) return false;
+  const given = Number.isFinite(WRONG_CTX.answer) ? [WRONG_CTX.answer] : [];
+  lines.forEach((l, k) => { if (k === i) return; const e = oneEquation(l); if (e && e.v === B.v && e.bare && e.roots.length === 1) given.push(e.roots[0]); else { const c = chainValue(l, B.v); if (c !== null) given.push(c); } });
+  return given.length > 0 && given.some(c => rootIn(O.roots, c)) && !given.some(c => rootIn(B.roots, c));
+}
+export const provableGivenPage = (lines, i, text) => falseOnItsOwn(text) || contradictsLineAbove(lines, i, text) || bareExpression(text) || contradictsSolution(lines, i, text) || contradictsValueAbove(lines, i, text);
 
 /** Up to two one-line mutants of the line that are provably false given the page, different kinds first. */
 export function mutantsOf(lines, i) {
@@ -295,7 +330,10 @@ export function wrongHalf(q, lines, { unreadable = 0, firstUnreadable = null } =
   if (QUESTION_BUCKET[q.answerType]) return fail(QUESTION_BUCKET[q.answerType]);
   if (!lines.length) return fail('no maths lines in the worked solution');
   if (unreadable) return fail(unreadableCause(firstUnreadable));
-  const pick = chooseMutantLine(lines);
+  const keyNumber = Number(keyText(q));
+  WRONG_CTX.answer = q.answerType === 'numeric' && Number.isFinite(keyNumber) && keyText(q) !== '' ? keyNumber : null;
+  let pick;
+  try { pick = chooseMutantLine(lines); } finally { WRONG_CTX.answer = null; }
   if (!pick) return fail('no provable one-line mutation of any step');
   const tried = [];
   for (const m of pick.mutants) {
@@ -322,7 +360,7 @@ export function measureQuestion(q, { toPlain, worked = false } = {}) {
   return { lines, t, w };
 }
 
-const statusOf = (t, w) => (t.ok && w.ok ? STATUS.full : t.ok ? STATUS.trueOnly : STATUS.uncovered);
+const statusOf = (t, w, q = null) => (q && QUESTION_BUCKET[q.answerType] ? STATUS.notApplicable : t.ok && w.ok ? STATUS.full : t.ok ? STATUS.trueOnly : STATUS.uncovered);
 
 // ── the generated side ───────────────────────────────────────────────────────
 const formKeyOf = q => `${q.answerType}|${(q.steps || []).map(s => String(s?.h ?? '').replace(/\d+(?:\.\d+)?/g, 'N')).join('>')}`;
@@ -362,14 +400,14 @@ export function measureGeneratedForm(W, form) {
   const worstT = per.find(p => !p.t.ok), worstW = per.find(p => !p.w.ok);
   const t = worstT ? worstT.t : per[0].t, w = worstW ? worstW.w : per[0].w;
   const first = worstT || worstW || per[0];
-  return { id: form.id, kind: 'generated', topic: form.generator, dp: first.q.dotpoint || (first.q.dotpoints || []).join('+') || 'none', difficulty: form.difficulty, answerType: first.q.answerType, status: statusOf(t, w), t, w, seeds: form.seeds, samples: per.map(p => ({ seed: p.seed, lines: p.lines, statuses: p.t.statuses })) };
+  return { id: form.id, kind: 'generated', topic: form.generator, dp: first.q.dotpoint || (first.q.dotpoints || []).join('+') || 'none', difficulty: form.difficulty, answerType: first.q.answerType, status: statusOf(t, w, first.q), t, w, seeds: form.seeds, samples: per.map(p => ({ seed: p.seed, lines: p.lines, statuses: p.t.statuses })) };
 }
 
 // ── the bank side ────────────────────────────────────────────────────────────
 export function measureBankEntry(W, entry, family, { worked = false } = {}) {
   const q = markerView(worked ? W.pack.qbankManualQuestion(entry.id, 17) : W.pack.qbankEntryQuestion(entry.id, 17));
   const { t, w, lines } = measureQuestion({ ...q, ...(worked ? { _bankWorked: true } : {}) }, { toPlain: bankToPlain, worked });
-  return { id: entry.id, kind: worked ? 'bank-worked' : 'bank', topic: family.replace(/^qb-/, ''), dp: entry.dp, difficulty: entry.level, answerType: q.answerType, status: statusOf(t, w), t, w, samples: [{ seed: 17, lines, statuses: t.statuses }] };
+  return { id: entry.id, kind: worked ? 'bank-worked' : 'bank', topic: family.replace(/^qb-/, ''), dp: entry.dp, difficulty: entry.level, answerType: q.answerType, status: statusOf(t, w, q), t, w, samples: [{ seed: 17, lines, statuses: t.statuses }] };
 }
 
 export function bankEntriesOf(W) {
@@ -410,8 +448,11 @@ const add = (o, r) => { o.total++; if (r.status === STATUS.full) o.full++; else 
 const pct = (n, d) => (d ? Math.round((n / d) * 10000) / 100 : 0);
 
 export function summarise(records) {
-  const total = blank(), byKind = {}, byTopic = {}, byDotpoint = {}, causes = {}, wrongCauses = {};
+  const total = blank(), byKind = {}, byTopic = {}, byDotpoint = {}, causes = {}, wrongCauses = {}, notApplicable = { multipleChoice: 0, byKind: {} };
   let trueOk = 0, wrongOk = 0, linesOk = 0, answerOk = 0, answerNA = 0, weakTicks = 0;
+  // A multiple-choice question has no working page: it is not-applicable, counted here and in no denominator below.
+  for (const r of records.filter(x => x.status === STATUS.notApplicable)) { notApplicable.multipleChoice++; bump(notApplicable.byKind, r.kind); }
+  records = records.filter(x => x.status !== STATUS.notApplicable);
   for (const r of records) {
     add(total, r); add(byKind[r.kind] ||= blank(), r); add(byTopic[`${r.kind === 'generated' ? 'gen' : 'bank'}:${r.topic}`] ||= blank(), r); add(byDotpoint[`${r.kind === 'generated' ? 'gen' : 'bank'}:${r.dp}`] ||= blank(), r);
     if (r.t.ok) trueOk++; if (r.w.ok) wrongOk++; if (r.t.linesHalf) linesOk++; if (r.t.answerNA) answerNA++; else if (r.t.answerHalf) answerOk++;
@@ -426,8 +467,9 @@ export function summarise(records) {
   return {
     format: 'pri-annotation-coverage-v1',
     scope: { edition: 'prithagoras', generated: `NSW generators y11, y12, me11, me12 (every issued difficulty), seeds 1-${GEN_SEED_SCAN} grouped into forms, the first ${GEN_SEEDS_PER_FORM} seeds of each form marked`, bank: 'every part of server/content/qbank: auto-marked parts and worked-solution parts' },
-    definition: 'covered = own worked solution, line by line through the server marking path: every maths line ticked with a class that has a phrase, headings and the restated question neutral, none unchecked, none crossed, and (for a question with a key) the key marked correct and the final line the report\'s answerLine (true half); and a one-line mutation of a middle step crossed at that line (wrong half)',
+    definition: 'units = every unit that is not multiple choice; covered = own worked solution, line by line through the server marking path: every maths line ticked with a class that has a phrase, headings and the restated question neutral, none unchecked, none crossed, and (for a question with a key) the key marked correct and the final line the report\'s answerLine (true half); and a one-line mutation of a middle step crossed at that line (wrong half)',
     units: 'a generated unit is a form (answer type and step headings) of a generator at a difficulty; a bank unit is one part',
+    notApplicable: { ...notApplicable, note: 'multiple-choice questions have no working page (not-applicable: multiple choice): counted here, in no denominator and in no baseline' },
     total: rate(total),
     halves: { trueHalfPasses: trueOk, trueHalfPassPct: pct(trueOk, total.total), wrongHalfPasses: wrongOk, wrongHalfPassPct: pct(wrongOk, total.total), allLinesTickedAndNoneCrossed: linesOk, allLinesPct: pct(linesOk, total.total), answerLineRecognisedAndKeyCorrect: answerOk, answerLineOfKeyedUnits: total.total - answerNA, answerLinePct: pct(answerOk, total.total - answerNA), answerHalfNotApplicableNoKey: answerNA, linesTickedOnlyAsTrueAsWritten: weakTicks },
     byKind: sortKeys(byKind),
@@ -458,6 +500,7 @@ export function compareToBaseline(records, baseline) {
   for (const r of records) {
     seen.add(r.id);
     const rec = baseline.ids[r.id];
+    if (r.status === STATUS.notApplicable) { if (rec !== undefined) violations.push({ kind: 'now-covered', id: r.id, message: `${r.id} is not-applicable (multiple choice) now: remove it from the baseline (node tools/annotation-coverage.mjs --write)` }); continue; }
     if (rec === undefined) {
       if (r.status !== STATUS.full) {
         const line = r.t.ok ? r.w : r.t;
@@ -480,7 +523,7 @@ export function baselineOf(records) {
   const causes = [];
   const ids = {};
   for (const r of records.slice().sort((a, b) => (a.id < b.id ? -1 : 1))) {
-    if (r.status === STATUS.full) continue;
+    if (r.status === STATUS.full || r.status === STATUS.notApplicable) continue;
     const c = causeOf(r) || '';
     let k = causes.indexOf(c); if (k < 0) { causes.push(c); k = causes.length - 1; }
     ids[r.id] = `${SHORT[r.status]}${k}`;
@@ -495,6 +538,7 @@ export function detailOf(records) {
 export const printable = s => {
   const lines = [];
   const t = s.total;
+  lines.push(`not applicable (multiple choice, no working page): ${s.notApplicable.multipleChoice}, in no denominator`);
   lines.push(`units ${t.total}: fully covered ${t.full} (${t.fullPct}%), true half only ${t.trueOnly} (${t.trueOnlyPct}%), uncovered ${t.uncovered} (${t.uncoveredPct}%)`);
   for (const [k, v] of Object.entries(s.byKind)) lines.push(`  ${k}: ${v.total} units, fully covered ${v.full} (${v.fullPct}%), true half only ${v.trueOnly} (${v.trueOnlyPct}%), uncovered ${v.uncovered} (${v.uncoveredPct}%)`);
   const h = s.halves;

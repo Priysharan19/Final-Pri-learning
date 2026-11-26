@@ -67,6 +67,25 @@ neverCrossed('substitution lines', ['x=2', '3(2)+1=7']);
 neverCrossed('the equation given then its value', ['2x+1=7', 'x=3']);
 neverCrossed('the root of a quadratic by formula', ['x^2-5x+6=0', 'x=(5+1)/2', 'x=(5-1)/2']);
 
+// ── the five moves that change the solutions without being wrong: notes, never crosses ──────────────────
+neverCrossed('squaring both sides, linear', ['2x+1=5', '(2x+1)^2=25']);
+neverCrossed('squaring both sides, a value', ['x=3', 'x^2=9']);
+neverCrossed('squaring both sides, then both roots', ['x-1=2', '(x-1)^2=4', 'x-1=-2', 'x=-1']);
+neverCrossed('multiplying by an expression in the variable', ['x-2=0', 'x(x-2)=0']);
+neverCrossed('multiplying through by (x - 1)', ['x+1=3', '(x-1)(x+1)=3(x-1)']);
+neverCrossed('multiplying by the variable, a quadratic', ['x-3=0', 'x^2-3x=0', 'x(x-3)=0']);
+neverCrossed('dividing by the variable', ['x(x-3)=2x', 'x-3=2']);
+neverCrossed('dividing by a factor', ['(x-1)(x-2)=0', 'x-2=0']);
+neverCrossed('dividing out a factor, then the other', ['x^2-x=0', 'x-1=0', 'x=1']);
+neverCrossed('taking a root, positive', ['x^2=9', 'x=3']);
+neverCrossed('taking a root, negative', ['x^2=9', 'x=-3']);
+neverCrossed('taking a root of a bracket', ['(x-1)^2=4', 'x-1=2']);
+neverCrossed('taking a root of a bracket, the other sign', ['(x-1)^2=4', 'x-1=-2']);
+neverCrossed('splitting into cases from a product', ['(x-2)(x+3)=0', 'x-2=0', 'x+3=0']);
+neverCrossed('splitting into cases from a variable factor', ['x^2=4x', 'x=0', 'x=4']);
+neverCrossed('splitting, factor then the other factor', ['x(x-4)=0', 'x=0', 'x-4=0']);
+neverCrossed('splitting, cases written as equations in the variable', ['x^2-9=0', 'x-3=0', 'x+3=0']);
+
 // ── the question has parts, or is not Australian: the option is not set ───────────────────────────────
 const nsw = { subtopic: 'y11-quadfunc', prompt: 'Solve $2x+1=7$.', steps: [{ h: 'Solve', d: '$2x=6$' }] };
 ok(oneAustralianPart(nsw) === true, 'one Australian part');

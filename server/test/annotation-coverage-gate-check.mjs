@@ -72,6 +72,13 @@ const seconds = Math.round((Date.now() - t0) / 1000);
 const summary = A.summarise(records);
 const gen = records.filter(r => r.kind === 'generated'), bank = records.filter(r => r.kind !== 'generated');
 ok(gen.length > 1000 && bank.length > 4000, `the scope is measured: ${gen.length} generated forms, ${bank.length} bank parts`);
+// a multiple-choice question has no working page: not-applicable, counted on its own, in no denominator and on no baseline
+const na = records.filter(r => r.status === A.STATUS.notApplicable);
+ok(na.length > 0 && na.every(r => ['mcq', 'multi-mcq', 'matrix-match'].includes(r.answerType)), `every not-applicable unit is a multiple-choice question (${na.length})`);
+ok(records.filter(r => ['mcq', 'multi-mcq', 'matrix-match'].includes(r.answerType)).every(r => r.status === A.STATUS.notApplicable), 'every multiple-choice unit is not-applicable');
+ok(summary.notApplicable.multipleChoice === na.length && summary.total.total === records.length - na.length, `the summary counts them apart (${summary.notApplicable.multipleChoice}) and leaves them out of the ${summary.total.total} units`);
+ok(na.every(r => baseline.ids[r.id] === undefined), 'no not-applicable unit is on the baseline');
+ok(A.compareToBaseline([na[0]], { ...baseline, ids: {} }).length === 0 && A.compareToBaseline([na[0]], { ...baseline, ids: { [na[0].id]: 'u0' } }).some(x => x.kind === 'now-covered'), 'a not-applicable unit passes as new, and fails if left on the baseline');
 ok(new Set(records.map(r => r.id)).size === records.length, 'every unit id is unique');
 
 // a, b: against the baseline
@@ -133,6 +140,7 @@ ok(fs.statSync(A.SUMMARY_FILE).size < 500 * 1024, 'the committed summary stays u
   ok(held.summary.questions + held.summary.manualQuestions === 11 - held.held.length, 'a held part is out of the pack, every other part is in it');
 }
 
-console.log(`annotation coverage: ${summary.total.total} units (${gen.length} generated forms, ${bank.length} bank parts) measured in ${seconds} s; fully covered ${summary.total.full}, true half only ${summary.total.trueOnly}, uncovered ${summary.total.uncovered}; baseline ${Object.keys(baseline.ids).length} ids`);
+console.log(`annotation coverage: ${summary.total.total} units (${gen.length - na.length} generated forms, ${bank.length} bank parts) measured in ${seconds} s; fully covered ${summary.total.full}, true half only ${summary.total.trueOnly}, uncovered ${summary.total.uncovered}; baseline ${Object.keys(baseline.ids).length} ids`);
+console.log(`annotation coverage not applicable: ${na.length} multiple-choice questions (no working page), in no denominator and on no baseline`);
 done();
 console.log(`ANNOTATION COVERAGE GATE: PASS: ${pass} checks`);
