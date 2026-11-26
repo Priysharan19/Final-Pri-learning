@@ -430,6 +430,8 @@ export const stepFigureWaiver = part => { const id = partIdOf(part); return STEP
 export function structuralLeaks(tikz, part, parsed) {
   const all = structuralLeaksUnwaived(tikz, part, parsed);
   const w = stepFigureWaiver(part);
+  const held = STEP_FIGURE_DECISION.notReleased[partIdOf(part)];
+  if (held) all.push(`held by the step-figure decision file: ${held}`);
   return w ? all.filter(r => !r.startsWith('step result:') && !(w.eye && r.startsWith('seen by eye:'))) : all;
 }
 
