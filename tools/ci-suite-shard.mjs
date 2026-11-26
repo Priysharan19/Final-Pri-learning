@@ -34,7 +34,11 @@ const WEIGHTS = {
   'test:misconceptions': 13, 'test:india:adaptive': 11, 'test:exam:session': 10,
   'test:india:hardest': 9, 'test:marker:progress': 8,
   // measured locally, not from run 39186561084: the mutation check inside it (seeds 1-6 of the harness plus the recorded corpus) is ~80 s
-  'test:first:wrong:step': 120,
+  // the marking mutation check (it was inside this suite) is split into four suites by MM_PART, and the page-proofs3 checks are their own suites. The weights above are
+  // on the scale of this list, which a run of the same shards showed is about the seconds this Mac takes (a shard of weight 495 ran 13, 20 and 26 minutes on CI): local seconds, measured 27 Nov 2026.
+  'test:first:wrong:step': 40,
+  'test:marking:mutation:g': 107, 'test:marking:mutation:m': 4, 'test:marking:mutation:b': 117, 'test:marking:mutation:s': 156,
+  'test:page:proofs3:mutation': 62, 'test:page:proofs3': 6,
   // measured locally (26 Nov 2026): the annotation-coverage gate marks every Years 11-12 generator form and every bank part twice, about 25 s
   'test:annotation:coverage': 30
 };

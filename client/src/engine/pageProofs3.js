@@ -605,15 +605,27 @@ const tickLine = (l, cls, note, says, saysTex) => ({ text: l.text, status: 'ok',
  * @param open   (l, i) => may this line take a new tick? Notes only.
  * @returns the new lines (the same array when nothing changed) and the number of lines that changed
  */
+// What the prompt fixes (an expansion, an integral, a triangle, an interval) is read once per prompt: a page is marked many times, and the prompt does not change between marks.
+const FACTS = new Map(), INTEG = new Map();
+function factsOf(prompt) {
+  const key = String(prompt ?? '');
+  let f = FACTS.get(key);
+  if (!f) {
+    if (FACTS.size > 300) { FACTS.clear(); INTEG.clear(); }
+    const safe = fn => { try { return fn(); } catch { return null; } };
+    const doms = new Map();
+    f = { ask: safe(() => binomialAsk(key)), integ: safe(() => integralAsk(key)), tri: safe(() => triangleWorld(key)), domFor: v => { if (!doms.has(v)) doms.set(v, safe(() => domainOfPrompt(key, v))); return doms.get(v); } };
+    FACTS.set(key, f);
+  }
+  return f;
+}
+const integCacheOf = prompt => { const key = String(prompt ?? ''); if (!INTEG.has(key)) INTEG.set(key, {}); return INTEG.get(key); };
 export function pageProofs3(q, lines, limit, open) {
   if (!australianQuestion(q) || !Array.isArray(lines)) return { lines, n: 0 };
   const out = lines.slice();
   let n = 0;
-  let ask; try { ask = binomialAsk(q.prompt); } catch { ask = null; }
-  let integ; try { integ = integralAsk(q.prompt); } catch { integ = null; }
-  const integCache = {};
-  const domFor = v => { try { return domainOfPrompt(q.prompt, v); } catch { return null; } };
-  let tri; try { tri = triangleWorld(q.prompt); } catch { tri = null; }
+  const { ask, integ, tri, domFor } = factsOf(q.prompt);
+  const integCache = integCacheOf(q.prompt);
   for (let i = 0; i < Math.min(limit, lines.length); i++) {
     const l = lines[i];
     if (!l || l.status !== 'note' || !open(l, i) || l.unread || l.unreadable) continue;
