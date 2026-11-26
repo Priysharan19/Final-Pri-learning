@@ -46,7 +46,7 @@ for (const e of entries) {
   if (on.shownReport) {
     shown++;
     const A = on.stepReport?.lines, B = on.shownReport.lines;
-    const SHOWN_ONLY = new Set(['tickClass', 'notRequired']);
+    const SHOWN_ONLY = new Set(['tickClass', 'notRequired', 'explain']);
     const strip = l => Object.fromEntries(Object.entries(l || {}).filter(([k]) => !SHOWN_ONLY.has(k)));
     // a page whose marker report is absent has an all-notes shown report: no tick, no cross
     const same = A ? A.length === B.length && A.every((l, i) => JSON.stringify(strip(B[i])) === JSON.stringify(strip(l))) : B.every(l => l.status === 'note');

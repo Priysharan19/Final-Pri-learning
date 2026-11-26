@@ -21,9 +21,10 @@
 // `ctx.accepts` (text -> boolean); this module never reads the key itself.
 // ─────────────────────────────────────────────────────────────────────────────
 import { evaluate, variablesOf } from './expr.js';
+import { explainLines } from './stepExplain.js';
 import { isHeading, worldOf, labelOf, clean, lead, astOf, constOf, fitPoly, polyD, rootsComplete } from './pageProofs.js';
 
-export const CLASSES = Object.freeze(['power-rule-differentiation', 'differentiation', 'factorisation', 'roots-of-a-product', 'equation-setup', 'substitution-evaluated', 'arithmetic-chain', 'second-derivative-value', 'sign-claim', 'nature-claim', 'point-claim', 'conclusion-matches', 'condition-line', 'restated-question', 'restated-function', 'heading', 'solution-list', 'rounded-value', 'labelled-substitution', 'identity', 'derivative-rule', 'true-as-written', 'matches-worked-step', 'equal-to-line-above', 'satisfies-equation-above', 'same-equation-as-line-above', 'substitution-defined', 'substitution-consistent', 'derivative-of-substitution', 'differential-form', 'change-of-variable', 'integral-rewritten', 'antiderivative-checked', 'back-substitution', 'equivalent-expressions', 'definite-integral-evaluated', 'several-claims']);
+export const CLASSES = Object.freeze(['power-rule-differentiation', 'differentiation', 'factorisation', 'roots-of-a-product', 'equation-setup', 'substitution-evaluated', 'arithmetic-chain', 'second-derivative-value', 'sign-claim', 'nature-claim', 'point-claim', 'conclusion-matches', 'condition-line', 'restated-question', 'restated-function', 'heading', 'solution-list', 'rounded-value', 'labelled-substitution', 'identity', 'derivative-rule', 'true-as-written', 'matches-worked-step', 'equal-to-line-above', 'satisfies-equation-above', 'same-equation-as-line-above', 'substitution-defined', 'substitution-consistent', 'derivative-of-substitution', 'differential-form', 'change-of-variable', 'integral-rewritten', 'antiderivative-checked', 'back-substitution', 'equivalent-expressions', 'definite-integral-evaluated', 'several-claims', 'given-data', 'method-claim', 'method-stated', 'defines', 'condition-value', 'model', 'substitution-formula', 'conclusion-sentence', 'formula-value']);
 const PROVED = { listed: 'solution-list', rounded: 'rounded-value', substituted: 'labelled-substitution', restated: 'restated-question', identity: 'identity', derivative: 'derivative-rule' };
 const NUM = String.raw`-?\d+(?:\.\d+)?`;
 
@@ -136,7 +137,8 @@ function answerLineOf(q, lines, accepts, correct, limit = lines.length) {
   for (let i = 0; i < Math.min(limit, lines.length); i++) {
     const l = lines[i];
     if (!l || l.status !== 'ok' || l.context === true) continue;
-    if (resultTexts(l.text, q.answerType).some(ok)) at = i;
+    const texts = l.fact && l.fact.proof === 'conclusion-sentence' && typeof l.fact.valueText === 'string' ? [l.fact.valueText] : resultTexts(l.text, q.answerType);
+    if (texts.some(ok)) at = i;
   }
   if (at < 0) return -1;
   const names = new Set([labelOfLine(lines[at].text)]);
@@ -284,6 +286,7 @@ export function displayFields(q, report, ctx = null) {
   const brk = lines.findIndex(l => l?.status === 'break');
   const limit = brk >= 0 ? brk : lines.length;
   let answerLine = -1; try { answerLine = answerLineOf(q, lines, ctx && ctx.accepts, ctx && ctx.correct, limit); } catch { answerLine = -1; }
+  let explained = []; try { explained = explainLines(lines, limit, answerLine); } catch { explained = []; }
   let changed = false;
   const v = w ? w.v : (/^[a-z]$/.test(String(q?.variable ?? '')) ? q.variable : 'x');
   const out = [];
@@ -294,6 +297,7 @@ export function displayFields(q, report, ctx = null) {
       const cls = engineClass(l, w);
       if (cls && l.tickClass !== cls) add.tickClass = cls;
       if (answerLine >= 0 && i > answerLine && i < limit) add.notRequired = true;
+      if (explained[i]) add.explain = explained[i];
     }
     if (i === brk) Object.assign(add, (() => { try { return wrongLineFields(w, l, i); } catch { return {}; } })());
     if (brk >= 0 && i > brk && l.status === 'note' && !l.candidate) {
@@ -355,10 +359,12 @@ export function bankDisplayFields(q, report, ctx = null) {
   const brk = lines.findIndex(l => l?.status === 'break');
   const limit = brk >= 0 ? brk : lines.length;
   let answerLine = -1; try { answerLine = answerLineOf(q, lines, ctx && ctx.accepts, ctx && ctx.correct, limit); } catch { answerLine = -1; }
+  let explained = []; try { explained = explainLines(lines, limit, answerLine); } catch { explained = []; }
   let changed = false;
   const out = lines.map((l, i) => {
     if (!l || l.status !== 'ok') return l;
     const add = {};
+    if (explained[i]) add.explain = explained[i];
     const cls = bankClass(l);
     if (cls && l.tickClass !== cls) add.tickClass = cls;
     if (answerLine >= 0 && i > answerLine && i < limit) add.notRequired = true;

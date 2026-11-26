@@ -166,7 +166,7 @@ const { buildAnnotatedWorking } = await import('../../client/src/components/anno
 const { buildMarkedPage } = await import('../../client/src/components/markedPageModel.js');
 const SM = await import('../../client/src/engine/solutionMatch.js');
 const W = await A.loadWorld();
-const DISPLAY = new Set(['tickClass', 'notRequired', 'reasonId', 'correctedLine', 'correctedRhs', 'followsFromError', 'followsFrom']);
+const DISPLAY = new Set(['tickClass', 'notRequired', 'explain', 'reasonId', 'correctedLine', 'correctedRhs', 'followsFromError', 'followsFrom']);
 const strip = l => Object.fromEntries(Object.entries(l || {}).filter(([k]) => !DISPLAY.has(k)));
 const pages = [];
 {

@@ -67,7 +67,16 @@ export const PHRASES = Object.freeze({
   backSubstitution: 'Correct back-substitution',
   equivalentExpressions: 'Equivalent expressions',
   definiteIntegral: 'Correct evaluation of the integral',
-  severalClaims: 'Every statement on this line is correct'
+  severalClaims: 'Every statement on this line is correct',
+  givenData: 'Given in the question',
+  formulaValue: 'Value of the formula',
+  methodStated: 'Method stated',
+  defines: 'Defines a letter',
+  methodClaim: 'Stated in the question',
+  conditionValue: 'Condition from the question',
+  model: 'Correct model',
+  substitutionFormula: 'Correct substitution',
+  conclusionSentence: 'Correct conclusion'
 });
 
 export const TEXT = Object.freeze({
@@ -115,7 +124,8 @@ const TICK = {
   'matches-worked-step': 'solutionStep', 'equal-to-line-above': 'equal', 'satisfies-equation-above': 'satisfiesEquation', 'same-equation-as-line-above': 'sameEquation',
   'substitution-defined': 'substitutionDefined', 'substitution-consistent': 'substitutionConsistent', 'derivative-of-substitution': 'substitutionDerivative', 'differential-form': 'differentialForm',
   'change-of-variable': 'changeOfVariable', 'integral-rewritten': 'integralRewritten', 'antiderivative-checked': 'antiderivativeChecked', 'back-substitution': 'backSubstitution',
-  'equivalent-expressions': 'equivalentExpressions', 'definite-integral-evaluated': 'definiteIntegral', 'several-claims': 'severalClaims'
+  'equivalent-expressions': 'equivalentExpressions', 'definite-integral-evaluated': 'definiteIntegral', 'several-claims': 'severalClaims',
+  'given-data': 'givenData', 'method-stated': 'methodStated', 'formula-value': 'formulaValue', defines: 'defines', 'method-claim': 'methodClaim', 'condition-value': 'conditionValue', model: 'model', 'substitution-formula': 'substitutionFormula', 'conclusion-sentence': 'conclusionSentence'
 };
 // ids the engine gives a tick when it had no specific proof to name; a named rule the page itself read between the two lines (`card.rules`) is more specific, so it is shown instead
 const WEAK_TICK = new Set(['true-as-written', 'matches-worked-step']);
@@ -194,13 +204,23 @@ export function buildTeacherMarks({ page, table = null } = {}) {
   return page.lines.filter(l => l.status === 'checked' || l.status === 'first-error').map(l => {
     const right = l.status === 'checked';
     const cls = right ? classOf(l.card) : null;   // the line's own class, as the engine reported it; nothing is inferred from position or total
+    const ex = right ? explanationOf(page, l) : null;
     return {
-      n: l.n, kind: right ? 'right' : 'wrong', cls, phrase: right ? phraseOf(cls) : reasonOf(l.card),
+      n: l.n, kind: right ? 'right' : 'wrong', cls, phrase: right ? (ex ? ex.short : phraseOf(cls)) : reasonOf(l.card), classPhrase: right ? phraseOf(cls) : null, explain: ex,
       reason: right ? null : reasonOf(l.card), reasonRaw: right ? null : (reasonRaw(l.card) || null), corrected: right ? null : (l.card.corrected || null),
       paid: paidAt.has(l.n) ? { marks: paidAt.get(l.n), text: `${paidAt.get(l.n)}/${paidAt.get(l.n)}` } : null,
       box: l.box || null
     };
   });
+}
+
+/**
+ * What a ticked line DID, as the server's report states it (`line.explain`, computed and verified by the engine on the server: this page
+ * only draws it). null keeps the class phrase.
+ */
+export function explanationOf(page, line) {
+  const e = line.card?.explain;
+  return e && typeof e.short === 'string' && e.short ? e : null;
 }
 
 /** "9 lines correct. 0 wrong. 3 not checked." Counts the maths lines only: a stated condition is neither. */
@@ -233,7 +253,7 @@ export const wordWidth = (text, font) => Math.ceil(String(text).length * font * 
  * @param {number} reserve  px kept clear after a tick for its small number
  * @returns {{ n, where: 'page'|'gutter', x, y, size, leader, placement, word: null|'gutter'|{x0,x1,y,font,text} }[]}  x, y in px (y is the line's centre)
  */
-export function placeMarks({ marks, obstacles = null, words = {}, reserve = 0, width, height, size = 24, min = 16, gap = 4 }) {
+export function placeMarks({ marks, obstacles = null, words = {}, reserve = 0, width, height, size = 24, min = 16, gap = 4, heavy = null }) {
   const W = Math.max(1, Number(width) || 1), H = Math.max(1, Number(height) || 1);
   const all = (obstacles || marks).filter(m => m.box).map(m => ({ n: m.n, x0: m.box.x * W, x1: (m.box.x + m.box.w) * W, y0: m.box.y * H, y1: (m.box.y + m.box.h) * H }));
   const placed = [];
@@ -262,24 +282,7 @@ export function placeMarks({ marks, obstacles = null, words = {}, reserve = 0, w
       const num = !!numRect && numRect.x1 <= W - 1 && clearOf(numRect, m.n) && tsize >= 18;
       placed.push(tick);
       if (num) placed.push(numRect);
-      let word = null;
-      if (wanted) {
-        const x0 = tick.x1 + (num ? nw : 0) + 3;
-        for (const font of WORD_FONTS) {
-          const w = wordWidth(wanted, font);
-          const r = { x0, y0: cy - font * 0.62, x1: x0 + w, y1: cy + font * 0.62 };
-          if (r.x1 <= W - 2 && clearOf(r, m.n)) { word = { x0, x1: r.x1, y: cy, font, text: wanted }; placed.push(r); break; }
-        }
-        if (!word) word = 'gutter';
-      }
-      // a phrase that cannot stand beside its tick goes to the gutter, joined by a thin leader along the free part of the line's level
-      let leader = null;
-      if (word === 'gutter') {
-        const lx0 = tick.x1 + (num ? nw : 0) + 2;
-        const stop = Math.min(W, ...all.filter(b => b.n !== m.n && b.x0 > lx0 && b.y0 <= cy && b.y1 >= cy).map(b => b.x0 - 2));
-        if (stop - lx0 >= 10) leader = { x0: lx0, x1: stop, y: cy };
-      }
-      out.push({ n: m.n, where: 'page', x: tick.x0 + tsize / 2, y: cy, size: tsize, leader, placement: 'box', word, num });
+      out.push({ n: m.n, where: 'page', x: tick.x0 + tsize / 2, y: cy, size: tsize, leader: null, placement: 'box', word: null, num, _w: wanted ? { wanted, x0: tick.x1 + (num ? nw : 0) + 3, lx0: tick.x1 + (num ? nw : 0) + 2, cy } : null });
       return;
     }
     // the gutter: the leader runs along the foot of the line and stops where other writing begins
@@ -289,6 +292,41 @@ export function placeMarks({ marks, obstacles = null, words = {}, reserve = 0, w
     const x0 = own.x1 + gap;
     out.push({ n: m.n, where: 'gutter', x: W, y: cy, size, leader: x1 - x0 >= 10 ? { x0, x1, y: ly } : null, placement: 'box', word: wanted ? 'gutter' : null, num: false });
   });
+  // The words come after every tick is placed, so a phrase never takes the room a later line's tick needs.
+  for (const o of out) {
+    if (!o._w) { delete o._w; continue; }
+    const { wanted, x0, lx0, cy } = o._w; delete o._w;
+    const n = o.n;
+    let word = null;
+    for (const font of WORD_FONTS) {
+      const w = wordWidth(wanted, font) * (heavy && heavy.has(n) ? 1.3 : 1);
+      const r = { x0, y0: cy - font * (heavy && heavy.has(n) ? 1.1 : 0.62), x1: x0 + w, y1: cy + font * (heavy && heavy.has(n) ? 1.1 : 0.62) };
+      if (r.x1 <= W - 2 && clearOf(r, n)) { word = { x0, x1: r.x1, y: cy, font, text: wanted }; placed.push(r); break; }
+    }
+    // no single line fits: two lines at a smaller size, in the free paper beside the line
+    if (!word && !(heavy && heavy.has(n))) {
+      for (const font of [15, 14, 13]) {
+        const w2 = Math.ceil(wordWidth(wanted, font) * (heavy && heavy.has(n) ? 1.3 : 1) / 1.8) + 8;
+        const r = { x0, y0: cy - font * 1.15, x1: x0 + w2, y1: cy + font * 1.15 };
+        if (r.x1 <= W - 2 && clearOf(r, n)) { word = { x0, x1: r.x1, y: cy, font, text: wanted, wrap: true }; placed.push(r); break; }
+      }
+    }
+    // or three lines, smaller still
+    if (!word && !(heavy && heavy.has(n))) {
+      for (const font of [14, 13, 12]) {
+        const w3 = Math.ceil(wordWidth(wanted, font) * (heavy && heavy.has(n) ? 1.3 : 1) / 2.6) + 8;
+        const r = { x0, y0: cy - font * 1.7, x1: x0 + w3, y1: cy + font * 1.7 };
+        if (r.x1 <= W - 2 && clearOf(r, n)) { word = { x0, x1: r.x1, y: cy, font, text: wanted, wrap: true }; placed.push(r); break; }
+      }
+    }
+    if (!word) word = 'gutter';
+    // a phrase that cannot stand beside its tick goes to the gutter, joined by a thin leader along the free part of the line's level
+    if (word === 'gutter') {
+      const stop = Math.min(W, ...all.filter(b => b.n !== n && b.x0 > lx0 && b.y0 <= cy && b.y1 >= cy).map(b => b.x0 - 2));
+      if (stop - lx0 >= 10) o.leader = { x0: lx0, x1: stop, y: cy };
+    }
+    o.word = word;
+  }
   return out;
 }
 
@@ -411,7 +449,16 @@ export const DETAILS = Object.freeze({
   backSubstitution: 'Differentiating the result with respect to the original variable gives the integrand, so putting the substitution back is correct.',
   equivalentExpressions: 'Both sides are the same expression.',
   definiteIntegral: 'The limits are put in correctly.',
-  severalClaims: 'Every statement on this line was checked and is correct.'
+  severalClaims: 'Every statement on this line was checked and is correct.',
+  formulaValue: 'This line is the formula worked out at a value; it is not checked against what the question asks.',
+  methodStated: 'This line states the method: there is no step in it to check.',
+  defines: 'This line defines a letter: there is no step in it to check.',
+  givenData: 'Every fact on this line is a fact the question states.',
+  methodClaim: 'The method is named, and the claim in it is stated by the question.',
+  conditionValue: 'The value set here is the one the question gives.',
+  model: 'The model gives the start value and the change the question states.',
+  substitutionFormula: 'The value was substituted into the formula correctly.',
+  conclusionSentence: 'The sentence states the value the working reached.'
 });
 const clip = (v, n = 90) => { const t = String(v ?? '').replace(/\$/g, '').replace(/\s+/g, ' ').trim(); return t.length > n ? '' : t; };
 const T = v => ({ t: 'text', v });
@@ -445,7 +492,8 @@ export function detailFor(m, card = null) {
     return { title: `Line ${m.n}: wrong`, lines, mark: null };
   }
   const general = m.cls && Object.hasOwn(DETAILS, m.cls) ? DETAILS[m.cls] : TEXT.provedTrue;
-  return { title: `Line ${m.n}: correct`, lines: [piecesSentence(m.cls, card?.how, card?.fact) || [T(general)]], mark: m.paid ? `${TEXT.markAwarded} ${m.paid.text}.` : null };
+  const specific = m.explain && m.explain.sentence ? [{ t: 'prose', v: m.explain.sentence }] : null;
+  return { title: `Line ${m.n}: correct`, lines: [specific || piecesSentence(m.cls, card?.how, card?.fact) || [T(general)]], mark: m.paid ? `${TEXT.markAwarded} ${m.paid.text}.` : null };
 }
 
 /**
