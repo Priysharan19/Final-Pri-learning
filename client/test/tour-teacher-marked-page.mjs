@@ -147,6 +147,13 @@ for (const [size, viewport] of [['desktop', { width: 1280, height: 900 }], ['pho
     // three criteria: three margin boxes, none invented; no criteria at all: none
     await open(page, url('owner19', { theme, extra: 'criteria=3' }));
     ok(JSON.stringify(await page.locator('[data-mp-markbox]').evaluateAll(es => es.map(e => e.getAttribute('data-mp-markbox')))) === '["3","7","16"]', `${where}: three criteria, three margin marks, each on its own line`);
+    // for every fixture, the boxes in the margin never add up to more than the server's marks, and nothing is boxed that the server did not pay
+    for (const [cs, extra, total] of [['owner19', 'criteria=3', 3], ['owner19', 'criteria=1', 1], ['owner19', '', 1], ['wrong', '', 0]]) {
+      await open(page, url(cs, { theme, extra }));
+      const sum = await page.evaluate(() => [...document.querySelectorAll('[data-mp-markbox]')].reduce((a, b) => a + Number(b.getAttribute('data-mp-markbox-text').split('/')[0]), 0));
+      const fig = await page.evaluate(() => document.querySelector('[data-mp-figure]').getAttribute('data-mp-figure'));
+      ok(sum <= Number(fig.split('/')[0]) && sum <= total, `${where}: ${cs} ${extra || 'no criteria'}: margin boxes add to ${sum}, the server's marks are ${fig}`);
+    }
     await open(page, url('owner19', { theme }));
     ok(await page.locator('[data-mp-markbox]').count() === 0, `${where}: no approved criteria, no margin mark and no allocation rows (nothing invented)`);
     ok(await page.locator('[data-mp-row]').count() === 0, `${where}: no invented rows`);
@@ -231,6 +238,14 @@ for (const [size, viewport] of [['desktop', { width: 1280, height: 900 }], ['pho
   ok(list >= 6, `Detailed feedback lists every mark in words (${list})`);
   await ctx.close();
 
+  // nothing the server has not released is in the page: no worked solution, no step text, no question text or answer key (they are not given to this component)
+  const lc = await browser.newContext({ viewport: { width: 1280, height: 900 } }); const lp = await lc.newPage();
+  await open(lp, url('owner19', { extra: 'criteria=1' }), 'detailed');
+  const leak = await lp.evaluate(() => { const h = document.documentElement.outerHTML; return ['Stationary $x$-values', 'The larger is', 'has two stationary points', 'owner-stationary', 'solutionFor', '"answer"'].filter(t => h.includes(t)); });
+  await lc.close();
+  ok(leak.length === 0, `no answer, solution or question text anywhere in the marked page's DOM ${JSON.stringify(leak)}`);
+  const qc = readFileSync(new URL('../src/components/QuestionCard.jsx', import.meta.url), 'utf8');
+  ok(/const awInput = useMemo\(\(\) => \{\s*if \(!resolved \|\| previousAttempt \|\| !res \|\| res\.revealed \|\| res\.invalid/.test(qc), 'the marked page is built only for a resolved, unrevealed, valid result: there is nothing to draw before marking');
   // reduced motion: drawn, not animated
   const rm = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce' }); const pr = await rm.newPage();
   await open(pr, url('owner19'), 'marked');

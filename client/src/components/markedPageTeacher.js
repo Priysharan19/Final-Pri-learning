@@ -105,6 +105,8 @@ const RULE = {
 /** The proof class the engine gave a ticked line (from the facts it emitted), or null. Unknown values give null, never a guess. */
 export function classOf(card) {
   if (!card || card.status !== 'checked') return null;
+  // "Correct answer" only when the server's report itself names this line as the answer-bearing one (a field the line-coverage engine work adds; absent today)
+  if (card.answerLine === true) return 'conclusion';
   const f = card.fact && typeof card.fact === 'object' ? card.fact : {};
   const h = card.how && typeof card.how === 'object' ? card.how : {};
   if (h.kind === 'conclusion' || h.kind === 'heading' || h.kind === 'question') return h.kind;
@@ -149,14 +151,9 @@ export function buildTeacherMarks({ page, table = null } = {}) {
     const at = Math.max(...row.lines);
     paidAt.set(at, (paidAt.get(at) || 0) + row.marks);
   }
-  // The answer-bearing line is the last line of working the page judges; it is said to be the correct answer only when the server's own mark is the
-  // full mark (the server marked the answer right) and the engine ticked the line.
-  const judged = page.lines.filter(l => l.status !== 'condition');
-  const answerN = judged.length ? judged[judged.length - 1].n : null;
-  const fullMark = !!page.header?.mark && page.header.mark.awarded >= page.header.mark.possible && page.header.mark.possible > 0;
   return page.lines.filter(l => l.status === 'checked' || l.status === 'first-error').map(l => {
     const right = l.status === 'checked';
-    const cls = right ? (l.n === answerN && fullMark && l.card?.valueChain !== 'given' ? 'conclusion' : classOf(l.card)) : null;
+    const cls = right ? classOf(l.card) : null;   // the line's own class, as the engine reported it; nothing is inferred from position or total
     return {
       n: l.n, kind: right ? 'right' : 'wrong', cls, phrase: right ? phraseOf(cls) : reasonOf(l.card),
       reason: right ? null : reasonOf(l.card), reasonRaw: right ? null : (reasonRaw(l.card) || null), corrected: right ? null : (l.card.corrected || null),

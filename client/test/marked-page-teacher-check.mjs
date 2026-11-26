@@ -61,11 +61,40 @@ ok(marks.find(m => m.n === 7).corrected === 'x = 6' && marks.find(m => m.n === 7
 ok(tallyOf(page) === '3 lines correct. 1 wrong. 3 not checked.', `tally counts maths lines only: ${tallyOf(page)}`);
 ok(tallyOf({ lines: [line(1, 'checked'), line(2, 'condition')] }) === '1 line correct. 0 wrong. 0 not checked.', 'a stated condition is not "not checked"');
 
-// the answer-bearing line says "Correct answer" only when the server marked the answer right
-const cp = (awarded, lastStatus) => ({ lines: [line(1, 'checked', { how: { kind: 'derivative-rule' } }), line(2, 'condition'), line(3, lastStatus, { fact: { kind: 'solution-step', step: 2 } })], header: { mark: { awarded, possible: 1 } } });
-ok(buildTeacherMarks({ page: cp(1, 'checked') }).find(m => m.n === 3).phrase === 'Correct answer' && buildTeacherMarks({ page: cp(1, 'checked') }).find(m => m.n === 1).phrase === 'Correct differentiation', 'the last judged line is the correct answer when the server marked it right; no other line changes');
-ok(buildTeacherMarks({ page: cp(0, 'checked') }).find(m => m.n === 3).phrase === PHRASES.solutionStep, 'a page the server did not mark right keeps the line\'s own class');
-ok(buildTeacherMarks({ page: cp(1, 'not-verified') }).every(m => m.n !== 3), 'an unchecked last line gets no phrase at all');
+// "Correct answer" is only ever the server's word: a line is the answer line when the report says so, never because it is last and the total is full
+const cp = (awarded, lastCard, lastStatus = 'checked') => ({ lines: [line(1, 'checked', { how: { kind: 'derivative-rule' } }), line(2, 'condition'), line(3, lastStatus, lastCard)], header: { mark: { awarded, possible: 1 } } });
+const ph = (awarded, card, status) => buildTeacherMarks({ page: cp(awarded, card, status) }).find(m => m.n === 3)?.phrase;
+ok(ph(1, { fact: { kind: 'solution-step', step: 2 } }) === PHRASES.solutionStep, 'the last ticked line on a full-mark page keeps its OWN class: nothing is inferred from position and total');
+ok(ph(0, { fact: { kind: 'solution-step', step: 2 } }) === PHRASES.solutionStep, 'and the same on a page the server did not mark right');
+ok(ph(1, { vcRule: 'arithmetic', valueChain: 'verified' }) === PHRASES.arithmetic, 'an intermediate arithmetic line that happens to be last is still arithmetic');
+ok(ph(1, { answerLine: true, fact: { kind: 'solution-step', step: 2 } }) === 'Correct answer', 'a line the server report marks as the answer line says "Correct answer"');
+ok(ph(1, { answerLine: false }) === null && ph(1, {}, 'not-verified') === undefined, 'no field, no phrase; an unchecked line gets none');
+// ── margin marks never exceed the server's total, and an award with no line is never given a position ─────────────────────────────
+import { criteriaView } from '../src/components/criteriaTableModel.js';
+const APPROVED = [{ typeId: 't', digest: 'd'.repeat(64), approvedBy: 'x', date: '2026-11-26' }];
+const mk = (cards, items, mark) => { const view = criteriaView({ criteria: { typeId: 't', digest: 'd'.repeat(64), items }, mark, cards, approved: APPROVED }); return view; };
+const cards4 = [1, 2, 3, 4].map(n => ({ n, status: 'checked' }));
+const pg4 = awarded => ({ lines: cards4.map(c => line(c.n, 'checked', {}, box(c.n))), header: { mark: { awarded, possible: 3 }, counts: { wrong: 0 } } });
+const CASES = [
+  ['0 of 3', [{ key: 'a', text: 'A', marks: 1, awarded: false, lines: [], verified: true }, { key: 'b', text: 'B', marks: 2, awarded: false, lines: [], verified: true }], 0],
+  ['partial 1 of 3', [{ key: 'a', text: 'A', marks: 1, awarded: true, lines: [2] }, { key: 'b', text: 'B', marks: 2, awarded: false, lines: [], verified: true }], 1],
+  ['3 of 3', [{ key: 'a', text: 'A', marks: 1, awarded: true, lines: [2] }, { key: 'b', text: 'B', marks: 2, awarded: true, lines: [3, 4] }], 3],
+  ['3 of 3, one award by the final answer with no line', [{ key: 'a', text: 'A', marks: 1, awarded: true, lines: [2] }, { key: 'b', text: 'B', marks: 2, awarded: true, lines: [], basis: 'answer' }], 3]
+];
+for (const [name, items, awarded] of CASES) {
+  const view = mk(cards4, items, { awarded, possible: 3 });
+  ok(!!view, `${name}: the criteria table is accepted`);
+  const pgx = pg4(awarded);
+  const boxes = buildTeacherMarks({ page: pgx, table: view }).filter(m => m.paid);
+  const sum = boxes.reduce((a, m) => a + m.paid.marks, 0);
+  ok(sum <= awarded, `${name}: the margin boxes (${sum}) never exceed the server's marks (${awarded})`);
+  const assess = buildAssessment({ page: pgx, table: view });
+  const noLine = items.filter(i => i.awarded && !(i.lines || []).length);
+  ok(noLine.length === 0 || (assess.rows.filter(r => r.awarded && !r.lines.length).length === noLine.length && sum === awarded - noLine.reduce((a, i) => a + i.marks, 0)), `${name}: an award with no line is in the panel and has no box on the page (no invented position)`);
+  ok(assess.rows.reduce((a, r) => a + (r.awarded ? r.marks : 0), 0) === awarded, `${name}: the panel's rows add up to the server's marks`);
+}
+ok(buildTeacherMarks({ page: pg4(3), table: mk(cards4, CASES[3][1], { awarded: 3, possible: 3 }) }).filter(m => m.paid).length === 1, 'one boxed line when one of two awards has no line');
+ok(mk(cards4, [{ key: 'a', text: 'A', marks: 3, awarded: true, lines: [2] }], { awarded: 1, possible: 3 }) === null, 'criteria that add up to more than the server\'s mark are refused: no box at all');
 // ── placement: never on the writing, a gutter tick with a leader when the line end is taken ────────
 const W = 800, H = 1000;
 const rects = (arr, pl, size = 24) => pl.filter(p => p.where === 'page').map(p => ({ x0: p.x - size / 2, x1: p.x + size / 2, y0: p.y - size / 2, y1: p.y + size / 2 }));

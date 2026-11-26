@@ -167,7 +167,7 @@ function buildValueChainModel({ report: reportIn, stepReport, receipt, source, a
     n: i + 1, line: i, status: l?.context === true && !['wrong', 'verified', 'given', 'arithmetic', 'unread'].includes(l?.state) ? 'condition' : STATUS[l?.state] || 'not-verified', valueChain: l?.state || 'unverified', vcRule: typeof l?.valueChain?.rule === 'string' ? l.valueChain.rule : null,
     start: false, startSide: null, rules: [], more: false, same: false, unnamed: false, followsFrom: null,
     diagnosis: l?.state === 'wrong' ? (l.diagnosis || null) : null, note: l?.state === 'wrong' || l?.state === 'given' || l?.state === 'incomplete' || l?.state === 'arithmetic' || l?.state === 'verified' ? (l.note || null) : null,
-    previousText: null, text: String(l?.text ?? ''), restated: l?.state === 'given' && l?.solutionMatch === true, restates: l?.restates === true, fact: l?.fact || null, how: l?.how || null,
+    previousText: null, text: String(l?.text ?? ''), restated: l?.state === 'given' && l?.solutionMatch === true, restates: l?.restates === true, answerLine: l?.answerLine === true, fact: l?.fact || null, how: l?.how || null,
     corrected: l?.state === 'wrong' ? correctedOf(l) : null,
     comment: commentOf(l), facts: l?.state === 'wrong' ? factsOf(l) : null
   }));
