@@ -40,6 +40,10 @@ export const PHRASES = Object.freeze({
   logLaw: 'Correct log law',
   trigIdentity: 'Correct trig identity',
   fractions: 'Correct fraction work',
+  stationaryEquation: 'Correct stationary equation',
+  stationaryValues: 'Correct stationary values',
+  choice: 'Correct choice of value',
+  trueAsWritten: 'True as written',
   // classes the line-coverage work may emit; unknown to main today, so nothing maps to them unless the engine names them
   conclusion: 'Correct answer',
   heading: 'Heading',
@@ -85,6 +89,8 @@ const HOW = {
   expanded: 'expansion', collected: 'collecting', factorised: 'factorisation', cancelled: 'cancelling', evaluated: 'arithmetic', 'equal-above': 'equal',
   listed: 'solutionList', rounded: 'rounding'
 };
+// the engine's own rule on a value-chain line (`valueChain.rule`); a rule not listed has no phrase
+const VC = { derivative: 'differentiation', 'stationary-equation': 'stationaryEquation', 'stationary-values': 'stationaryValues', choice: 'choice', restated: 'restated', 'question-given': 'given', continuation: 'equal', arithmetic: 'arithmetic', 'true-as-written': 'trueAsWritten' };
 const FACT = { conclusion: 'conclusion', heading: 'heading', question: 'question', 'rule-statement': 'ruleStatement', 'solution-step': 'solutionStep', 'both-sides': 'equal', 'equals-line-above': 'equal', 'factors-of-question': 'factors' };
 const RULE = {
   factorise: 'factorisation', expand: 'expansion', 'difference-of-squares': 'differenceOfSquares', 'cancel-common-factor': 'cancelling',
@@ -103,8 +109,9 @@ export function classOf(card) {
   const h = card.how && typeof card.how === 'object' ? card.how : {};
   if (h.kind === 'conclusion' || h.kind === 'heading' || h.kind === 'question') return h.kind;
   if (f.kind === 'proved') return PROVED[f.proof] || null;
-  if (card.valueChain === 'given') return card.restated ? 'restated' : 'given';
+  if (card.valueChain === 'given') return card.restated || card.restates ? 'restated' : 'given';
   if (HOW[h.kind]) return HOW[h.kind];
+  if (card.vcRule && VC[card.vcRule]) return VC[card.vcRule];
   if (FACT[f.kind]) return FACT[f.kind];
   if (card.valueChain === 'arithmetic') return 'arithmetic';
   const r = Array.isArray(card.rules) && card.rules[0] ? card.rules[0].rule : null;
@@ -115,10 +122,15 @@ export const phraseOf = cls => (cls && Object.hasOwn(PHRASES, cls) ? PHRASES[cls
 const plain = s => String(s ?? '').replace(/\$/g, '').replace(/\s+/g, ' ').trim();
 const firstSentence = s => { const p = plain(s); const m = /^(.+?[.!?])(\s|$)/.exec(p); return (m ? m[1] : p).slice(0, 110); };
 
+/** The raw first sentence of a reason (maths spans kept), from the engine's own fields; '' when it gave none. */
+const reasonRaw = card => {
+  const f = card?.facts || {};
+  const take = v => { const p = String(v ?? '').replace(/\s+/g, ' ').trim(); const m = /^(.+?[.!?])(\s|$)/.exec(p); return (m ? m[1] : p).slice(0, 140); };
+  return take(f.whyWrong) || take(card?.diagnosis?.message) || '';
+};
 /** The reason shown on the cross: the engine's own, where it gave one; else one fixed sentence. */
 export function reasonOf(card) {
-  const f = card?.facts || {};
-  const given = firstSentence(f.whyWrong || '');
+  const given = firstSentence(reasonRaw(card));
   if (given) return given;
   return card && card.n > 1 ? TEXT.noReason : TEXT.noReasonFirst;
 }
@@ -147,7 +159,7 @@ export function buildTeacherMarks({ page, table = null } = {}) {
     const cls = right ? (l.n === answerN && fullMark && l.card?.valueChain !== 'given' ? 'conclusion' : classOf(l.card)) : null;
     return {
       n: l.n, kind: right ? 'right' : 'wrong', cls, phrase: right ? phraseOf(cls) : reasonOf(l.card),
-      reason: right ? null : reasonOf(l.card), corrected: right ? null : (l.card.corrected || null),
+      reason: right ? null : reasonOf(l.card), reasonRaw: right ? null : (reasonRaw(l.card) || null), corrected: right ? null : (l.card.corrected || null),
       paid: paidAt.has(l.n) ? { marks: paidAt.get(l.n), text: `${paidAt.get(l.n)}/${paidAt.get(l.n)}` } : null,
       box: l.box || null
     };
@@ -190,7 +202,10 @@ export function placeMarks({ marks, obstacles = null, words = {}, reserve = 0, w
   const placed = [];
   const out = [];
   const boxed = marks.every(m => m.box);
-  const clearOf = (r, n) => !all.some(b => b.n !== n && rectsOverlap(r, { x0: b.x0 - 2, x1: b.x1 + 2, y0: b.y0, y1: b.y1 })) && !placed.some(p => rectsOverlap(r, p));
+  // A mark keeps off other writing by its core (the middle 60% of its height: a check mark is thin at its ends), so on a small page where lines are
+  // closer than the tick is tall, a tick still stands at the end of its own line instead of being sent to the margin. Marks never overlap each other.
+  const core = r => { const k = (r.y1 - r.y0) * 0.2; return { x0: r.x0, x1: r.x1, y0: r.y0 + k, y1: r.y1 - k }; };
+  const clearOf = (r, n) => !all.some(b => b.n !== n && rectsOverlap(core(r), { x0: b.x0 - 2, x1: b.x1 + 2, y0: b.y0, y1: b.y1 })) && !placed.some(p => rectsOverlap({ x0: r.x0 + 1.5, x1: r.x1 - 1.5, y0: r.y0 + 1.5, y1: r.y1 - 1.5 }, p));
   marks.forEach((m, i) => {
     const wanted = Object.hasOwn(words, m.n) ? String(words[m.n]) : null;
     if (!m.box || !boxed) { out.push({ n: m.n, where: 'gutter', x: W, y: ((i + 0.5) / Math.max(1, marks.length)) * H, size, leader: null, placement: 'order', word: wanted ? 'gutter' : null, num: false }); return; }
@@ -302,7 +317,7 @@ export function lineWord(card) {
   if (!card) return null;
   const kinds = [card.fact?.kind, card.how?.kind];
   if (kinds.includes('heading')) return TEXT.heading;
-  if (kinds.includes('question') || (card.valueChain === 'given' && card.restated)) return TEXT.question;
+  if (kinds.includes('question') || (card.valueChain === 'given' && (card.restated || card.restates))) return TEXT.question;
   return null;
 }
 
@@ -332,36 +347,47 @@ export const DETAILS = Object.freeze({
   logLaw: 'The log law is applied correctly.',
   trigIdentity: 'The trigonometric identity is applied correctly.',
   fractions: 'The fraction work is correct.',
+  stationaryEquation: 'The stationary condition is set up and solved correctly.',
+  stationaryValues: 'These are the stationary values of the curve.',
+  choice: 'The value chosen is the one the question asks for.',
+  trueAsWritten: 'This line is true as written.',
   conclusion: 'This is the answer the question asks for, and it is correct.',
   heading: 'A heading: nothing to check.',
   question: 'This line restates the question.'
 });
 const clip = (v, n = 90) => { const t = String(v ?? '').replace(/\$/g, '').replace(/\s+/g, ' ').trim(); return t.length > n ? '' : t; };
+const T = v => ({ t: 'text', v });
+const M = v => ({ t: 'math', v });
+/** A popover line as one plain string (for tests and screen readers' fallbacks). */
+export const plainLine = segs => segs.map(x => x.v).join('');
 
-/** The one sentence the engine's own pieces allow for a class, or null (then the class's general sentence stands). */
-function piecesSentence(cls, how) {
+/** The sentence the engine's own pieces allow for a class, as segments (text and maths), or null: then the class's general sentence stands. */
+function piecesSentence(cls, how, fact) {
   const h = how && typeof how === 'object' ? how : {};
-  if (cls === 'differentiation' && h.kind === 'derivative-rule' && clip(h.exprText) && clip(h.rhsText) && clip(h.v, 4)) return `The derivative of ${clip(h.exprText)} with respect to ${clip(h.v, 4)} is ${clip(h.rhsText)}.`;
-  if (cls === 'substitution' && h.kind === 'substituted-at' && clip(h.name, 12) && clip(h.argText, 24) && clip(h.valueText, 24)) return `${clip(h.name, 12)}(${clip(h.argText, 24)}) = ${clip(h.valueText, 24)} is substituted correctly.`;
+  const f = fact && typeof fact === 'object' ? fact : {};
+  if ((cls === 'arithmetic' || cls === 'equal') && f.kind === 'both-sides' && typeof f.tex === 'string' && f.tex.length > 0 && f.tex.length <= 40 && !f.tex.includes('$')) return [T('Both sides come to '), { t: 'prose', v: '$' + f.tex + '$' }, T('.')];
+  if (cls === 'differentiation' && h.kind === 'derivative-rule' && clip(h.exprText) && clip(h.rhsText) && clip(h.v, 4)) return [T('The derivative of '), M(clip(h.exprText)), T(' with respect to '), M(clip(h.v, 4)), T(' is '), M(clip(h.rhsText)), T('.')];
+  if (cls === 'substitution' && h.kind === 'substituted-at' && clip(h.name, 12) && clip(h.argText, 24) && clip(h.valueText, 24)) return [M(`${clip(h.name, 12)}(${clip(h.argText, 24)}) = ${clip(h.valueText, 24)}`), T(' is substituted correctly.')];
   return null;
 }
 
 /**
- * What the popover on a tick or cross says. From the deterministic class table and the engine's own fields; no model text.
- * @returns {{ title, lines: string[], mark: string|null }}
+ * What the popover on a tick or cross says. From the deterministic class table and the engine's own fields; no model text. Each line is a list of
+ * segments: plain text, a maths span (drawn by the app's maths renderer) or engine prose that may carry `$...$` spans.
+ * @returns {{ title, lines: {t,v}[][], mark: string|null }}
  */
 export function detailFor(m, card = null) {
   if (m.kind === 'wrong') {
-    const lines = [m.reason];
+    const lines = [m.reasonRaw ? [{ t: 'prose', v: m.reasonRaw }] : [T(m.reason)]];
     const f = card?.facts || {};
-    const why = firstSentence(f.whatChanged || '');
-    if (why && why !== m.reason) lines.push(why);
-    if (m.corrected) lines.push(`${TEXT.corrected} ${plain(m.corrected)}`);
+    const why = String(f.whatChanged || '').replace(/\s+/g, ' ').trim();
+    const sentence = (/^(.+?[.!?])(\s|$)/.exec(why) || [])[1] || '';
+    if (sentence && sentence !== m.reasonRaw) lines.push([{ t: 'prose', v: sentence.slice(0, 160) }]);
+    if (m.corrected) lines.push([T(`${TEXT.corrected} `), M(String(m.corrected))]);
     return { title: `Line ${m.n}: wrong`, lines, mark: null };
   }
   const general = m.cls && Object.hasOwn(DETAILS, m.cls) ? DETAILS[m.cls] : TEXT.provedTrue;
-  const lines = [piecesSentence(m.cls, card?.how) || general];
-  return { title: `Line ${m.n}: correct`, lines, mark: m.paid ? `${TEXT.markAwarded} ${m.paid.text}.` : null };
+  return { title: `Line ${m.n}: correct`, lines: [piecesSentence(m.cls, card?.how, card?.fact) || [T(general)]], mark: m.paid ? `${TEXT.markAwarded} ${m.paid.text}.` : null };
 }
 
 /**

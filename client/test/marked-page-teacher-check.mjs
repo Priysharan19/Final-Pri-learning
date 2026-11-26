@@ -1,7 +1,7 @@
 // The teacher-marked page's pure logic: the phrase table, which lines are ticked, where a margin mark may stand, and where a tick is placed.
 // Nothing here marks anything: every input is a deterministic report the server produced, and the checks prove the layer only reads it.
 //   node client/test/marked-page-teacher-check.mjs
-import { DETAILS, PHRASES, TEXT, detailFor, placePopover, classOf, lineWord, phraseOf, reasonOf, buildTeacherMarks, placeMarks, tallyOf, buildAssessment, groupPhrases, textHeight, wordWidth } from '../src/components/markedPageTeacher.js';
+import { DETAILS, PHRASES, TEXT, detailFor, placePopover, plainLine, classOf, lineWord, phraseOf, reasonOf, buildTeacherMarks, placeMarks, tallyOf, buildAssessment, groupPhrases, textHeight, wordWidth } from '../src/components/markedPageTeacher.js';
 import { buildMarkedPage } from '../src/components/markedPageModel.js';
 
 let pass = 0; const failures = [];
@@ -30,6 +30,10 @@ for (const [card, want] of SAMPLES) {
   const cls = classOf({ status: 'checked', ...card });
   ok(cls === want && phraseOf(cls) === PHRASES[want], `class ${want}: got ${cls}`);
 }
+// the engine's own rule on a value-chain line is the class
+for (const [rule, want] of [['derivative', 'differentiation'], ['stationary-equation', 'stationaryEquation'], ['stationary-values', 'stationaryValues'], ['restated', 'restated'], ['arithmetic', 'arithmetic'], ['continuation', 'equal'], ['true-as-written', 'trueAsWritten']]) ok(classOf({ status: 'checked', valueChain: 'verified', vcRule: rule }) === want, `valueChain rule ${rule} is ${want}`);
+ok(classOf({ status: 'checked', valueChain: 'verified', vcRule: 'interpreter' }) === null && classOf({ status: 'checked', valueChain: 'verified', vcRule: 'page-definitions' }) === null, 'an interpreter or definitions rule has no phrase');
+ok(reasonOf({ n: 9, facts: {}, diagnosis: { message: '$x = -3$ is smaller than $x = 0$, so use $x = -3$: $y(-3) = 27$.' } }) === 'x = -3 is smaller than x = 0, so use x = -3: y(-3) = 27.', 'the engine\'s diagnosis message is the reason when it gave one');
 ok(PHRASES.conclusion === 'Correct answer' && PHRASES.restated === 'Question restated', 'a conclusion says "Correct answer"; a restated question says "Question restated"');
 ok(buildTeacherMarks({ page: { lines: [{ n: 1, status: 'checked', card: { n: 1, status: 'checked', fact: { kind: 'solution-step', step: 3 } }, box: null }], header: {} }, table: null })[0].phrase === PHRASES.solutionStep, 'a solution-step line never borrows another class\'s phrase');
 ok(lineWord({ fact: { kind: 'heading' } }) === 'Heading' && lineWord({ valueChain: 'given', restated: true }) === 'Question restated' && lineWord({ fact: { kind: 'x' } }) === null, 'a heading and a restated question have their own word, no dash');
@@ -139,15 +143,15 @@ ok(buildAssessment({ page: null }) === null, 'no page, no assessment');
 ok(Object.keys(PHRASES).every(k => typeof DETAILS[k] === 'string' && DETAILS[k].length > 10), 'every class has its general sentence');
 ok(Object.values(DETAILS).every(v => !/[\u2014\u2013]/.test(v)), 'no dash in a sentence');
 const d3 = detailFor({ n: 3, kind: 'right', cls: 'differentiation', paid: { marks: 1, text: '1/1' } }, { how: { kind: 'derivative-rule', v: 'x', exprText: '4x^3 - 36x^2', rhsText: '12x^2 - 72x' } });
-ok(d3.title === 'Line 3: correct' && d3.lines[0] === 'The derivative of 4x^3 - 36x^2 with respect to x is 12x^2 - 72x.' && d3.mark === 'Mark awarded here: 1/1.', `the engine's own pieces fill the sentence: ${JSON.stringify(d3)}`);
+ok(d3.title === 'Line 3: correct' && plainLine(d3.lines[0]) === 'The derivative of 4x^3 - 36x^2 with respect to x is 12x^2 - 72x.' && d3.mark === 'Mark awarded here: 1/1.', `the engine's own pieces fill the sentence: ${JSON.stringify(d3)}`);
 const dg = detailFor({ n: 3, kind: 'right', cls: 'differentiation', paid: null }, { how: { kind: 'derivatives' } });
-ok(dg.lines[0] === DETAILS.differentiation && dg.mark === null, 'without pieces, the class\'s general sentence; no mark where none was earned');
-ok(detailFor({ n: 4, kind: 'right', cls: null, paid: null }).lines[0] === TEXT.provedTrue, 'a tick with no class still says the engine proved it');
-ok(detailFor({ n: 4, kind: 'right', cls: 'unheard-of', paid: null }).lines[0] === TEXT.provedTrue, 'an unknown class is tolerated');
+ok(plainLine(dg.lines[0]) === DETAILS.differentiation && dg.mark === null, 'without pieces, the class\'s general sentence; no mark where none was earned');
+ok(plainLine(detailFor({ n: 4, kind: 'right', cls: null, paid: null }).lines[0]) === TEXT.provedTrue, 'a tick with no class still says the engine proved it');
+ok(plainLine(detailFor({ n: 4, kind: 'right', cls: 'unheard-of', paid: null }).lines[0]) === TEXT.provedTrue, 'an unknown class is tolerated');
 const dw = detailFor({ n: 9, kind: 'wrong', reason: TEXT.noReason, corrected: 'x = 6' }, { facts: { whatChanged: 'The sign changed. Then more.' } });
-ok(dw.lines.join('|') === `${TEXT.noReason}|The sign changed.|Corrected line: x = 6` && dw.mark === null, `a cross: the reason, what changed and the corrected line as the server sent them: ${dw.lines}`);
+ok(dw.lines.map(plainLine).join('|') === `${TEXT.noReason}|The sign changed.|Corrected line: x = 6` && dw.mark === null, `a cross: the reason, what changed and the corrected line as the server sent them: ${dw.lines}`);
 ok(detailFor({ n: 9, kind: 'wrong', reason: TEXT.noReason, corrected: null }).lines.length === 1, 'no corrected line sent, none shown');
-ok(detailFor({ n: 3, kind: 'right', cls: 'differentiation' }, { how: { kind: 'derivative-rule', v: 'x', exprText: 'a'.repeat(200), rhsText: 'b' } }).lines[0] === DETAILS.differentiation, 'an over-long piece falls back to the general sentence');
+ok(plainLine(detailFor({ n: 3, kind: 'right', cls: 'differentiation' }, { how: { kind: 'derivative-rule', v: 'x', exprText: 'a'.repeat(200), rhsText: 'b' } }).lines[0]) === DETAILS.differentiation, 'an over-long piece falls back to the general sentence');
 const PL = { x0: 40, x1: 300, y0: 100, y1: 140 };
 let pp = placePopover({ line: PL, tick: { x: 310, y: 120 }, width: 600, height: 800, h: 80 });
 ok(pp.side === 'below' && pp.top >= PL.y1 && pp.left >= 4 && pp.left + pp.width <= 596, 'the popover stands below its line and inside the page');

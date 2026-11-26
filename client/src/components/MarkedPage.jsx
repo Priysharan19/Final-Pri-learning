@@ -339,7 +339,8 @@ export default function MarkedPage({ teacherMarks = EDITION === 'prithagoras', e
         <figure className="mp-page">
           {tm
             ? <T.TeacherSheet kind={source.kind} view={view} page={page} marks={marks} selected={selected} pick={pick} onKey={onKey(markersRef)} markersRef={markersRef} trace={trace}
-                viewBoxStyle={geometry?.view ? { '--mp-ar': geometry.view.w / geometry.view.h } : undefined}><PageArt source={source} view={geometry?.view || null} t={t} cleaned={cleaned} /></T.TeacherSheet>
+                viewBoxStyle={geometry?.view ? { '--mp-ar': geometry.view.w / geometry.view.h } : undefined}
+                math={s => <Typeset text={s} texOf={lineOf} />} prose={s => <EngineComment text={typesetProse(s)} lang="en" />}><PageArt source={source} view={geometry?.view || null} t={t} cleaned={cleaned} /></T.TeacherSheet>
             : teacherMarks && !layerFailed
               ? <div className="mp-sheet" data-mp-sheet={source.kind}><div className="mp-sheet-in"><PageArt source={source} view={geometry?.view || null} t={t} cleaned={cleaned} /></div></div>
               : <Sheet source={source} geometry={geometry} page={page} selected={selected} pick={pick} onKey={onKey(markersRef)} markersRef={markersRef} t={t} cleaned={cleaned} />}

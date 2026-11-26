@@ -13,6 +13,7 @@ import { stepCheck } from '../../src/engine/checker.js';
 import { exprToLatex } from '../../src/ink/inkLatex.js';
 import { setLanguage } from '../../src/i18n/index.js';
 import realProductRule from './product-rule-real-report.json';
+import realPages from './teacher-page-real-reports.json';
 
 const q = new URLSearchParams(location.search);
 const theme = q.get('theme') === 'dark' ? 'dark' : 'light';
@@ -48,30 +49,10 @@ const CASES = {
 const FIXTURE_PAGE = typeof window !== 'undefined' && window.__markedPageFixture && source === 'photo' ? window.__markedPageFixture : null;
 // ?case=owner19: a SYNTHETIC 19-line page of the stationary-points question (fixture lines, report and boxes; no photograph of anyone), with
 // two columns in the middle so a tick at the end of line 7 would land on line 8's writing. The report carries the classes the engine emits.
-const V = (text, how, fact, extra = {}) => ({ text, status: 'ok', state: 'verified', note: null, ...(how ? { how } : {}), ...(fact ? { fact } : {}), ...extra });
-const U = text => ({ text, status: 'note', state: 'unverified' });
-const C = (text, fact) => ({ text, status: 'note', state: 'unverified', context: true, ...(fact ? { fact } : {}) });
-const OWNER19 = [
-  C('Solution:', { kind: 'heading' }),
-  V('y = 4x^3 - 36x^2', null, null, { state: 'given', solutionMatch: true }),
-  V('dy/dx = 12x^2 - 72x', { kind: 'derivative-rule', v: 'x', exprText: '4x^3 - 36x^2', rhsText: '12x^2 - 72x' }),
-  C('Stationary points when dy/dx = 0:'),
-  V('12x^2 - 72x = 0', null, { kind: 'both-sides' }),
-  V('12x(x - 6) = 0', { kind: 'factorised', factors: [] }),
-  V('x = 0 or x = 6', null, { kind: 'proved', proof: 'listed' }),
-  V('d2y/dx2 = 24x - 72', { kind: 'derivative-rule' }),
-  U('At x = 0: d2y/dx2 = -72 < 0'),
-  U('(local maximum)'),
-  U('At x = 6: d2y/dx2 = 72 > 0'),
-  U('(local minimum)'),
-  C('The stationary points are:'),
-  V('At x = 0: y = 4(0)^3 - 36(0)^2 = 0', null, null, { state: 'arithmetic' }),
-  V('At x = 6: y = 4(6)^3 - 36(6)^2 = 4(216) - 36(36)', null, null, { state: 'arithmetic' }),
-  V('= 864 - 1296 = -432', null, null, { state: 'arithmetic' }),
-  U('(0, 0) and (6, -432)'),
-  U('The two stationary points are (0,0) and (6,-432).'),
-  V('The larger x-coordinate is 6', null, { kind: 'solution-step', step: 3 })   // the class main emits for a line that matches a step of the worked solution
-];
+// The reports are the engine's REAL output (server/test/support/teacher-page-real-reports.mjs runs checkAnswer and stepEvidence on the transcribed lines and
+// saves what comes back; server/test/teacher-page-real-reports-check.mjs fails if the saved file drifts). Nothing in them is typed by hand.
+const REAL = realPages.pages;
+const OWNER19 = REAL.owner19.lines.map(text => ({ text }));
 const OWNER19_COL = i => (i >= 8 && i <= 11 ? 1 : 0);   // lines 9 to 12 are the right-hand column
 function owner19Page() {
   const W = 900, H = 1010;
@@ -94,7 +75,8 @@ function owner19Page() {
 }
 const O19 = which === 'owner19' ? owner19Page() : null;
 
-const c = which === 'owner19' ? { meta: null, lines: OWNER19.map(l => l.text), report: { kind: 'value-chain', source: 'value-chain', lines: OWNER19, summary: {} }, receipt: q.get('criteria') === '3' ? { awarded: 3, possible: 3 } : { awarded: 1, possible: 1 } } : FIXTURE_PAGE ? { ...CASES.buoy, lines: FIXTURE_PAGE.lines.map(l => l.text) } : (CASES[which] || CASES.buoy);
+const c = which === 'owner19' ? { meta: null, lines: REAL.owner19.lines, report: REAL.owner19.stepReport, receipt: q.get('criteria') === '3' ? { awarded: 3, possible: 3 } : { awarded: 1, possible: 1 } }
+  : which === 'wrong' ? { meta: null, lines: REAL.wrong.lines, report: REAL.wrong.stepReport, receipt: { awarded: 0, possible: 1 } } : FIXTURE_PAGE ? { ...CASES.buoy, lines: FIXTURE_PAGE.lines.map(l => l.text) } : (CASES[which] || CASES.buoy);
 const stepReport = c.report || stepCheck(c.meta, c.lines.join('\n'));
 // ?facts=1: the optional fields the engine may add (a first-break index, a corrected line on the crossed line). Absent otherwise.
 if (q.get('facts') === '1' && !c.report) {
@@ -140,11 +122,12 @@ const props = O19 ? { source: { kind: 'photo', src: O19.src, lines: O19.lines } 
   : (() => { const p = photoPage(c.lines); return { source: { kind: 'photo', src: p.src, lines: c.lines.map((text, i) => ({ text, box: p.boxes[i] })) } }; })();
 
 // A FIXTURE approval, test only: the real build has no approved type. ?criteria=1 shows the table it would draw.
+// test-only approval: the criteria text is fixture text; in production it comes from the server's methodCriteria for an author-approved scheme
 const O19_ITEMS = q.get('criteria') === '3'
   ? [{ key: 'derivative', text: 'Differentiates correctly', marks: 1, awarded: true, lines: [3], reason: 'Line 3 is the derivative.' },
     { key: 'stationary', text: 'Finds the stationary values', marks: 1, awarded: true, lines: [7], reason: 'Line 7 gives x = 0 or x = 6.' },
-    { key: 'answer', text: 'States the larger x-coordinate', marks: 1, awarded: true, lines: [19], reason: 'Line 19 gives 6.' }]
-  : [{ key: 'answer', text: 'States the larger x-coordinate', marks: 1, awarded: true, lines: [19], reason: 'Line 19 gives 6.' }];
+    { key: 'points', text: 'Evaluates the stationary point', marks: 1, awarded: true, lines: [16], reason: 'Line 16 gives -432.' }]
+  : [{ key: 'stationary', text: 'Finds the stationary values', marks: 1, awarded: true, lines: [7], reason: 'Line 7 gives x = 0 or x = 6.' }];
 const FIXTURE = (q.get('criteria') === '1' || q.get('criteria') === '3') && which === 'owner19' ? {
   approved: [{ typeId: 'fixture-owner19', digest: 'd'.repeat(64), approvedBy: 'Fixture Author', date: '2026-11-26' }],
   criteria: { typeId: 'fixture-owner19', digest: 'd'.repeat(64), items: O19_ITEMS }

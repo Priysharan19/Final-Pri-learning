@@ -48,7 +48,7 @@ const GUTTER_WIDE = 200;
  * The page with its marking layer. `children` is the page itself (the photo or the ink), drawn exactly as before.
  * The layer is a separate overlay of fixed size: the page's own height never depends on the view or on what the margin holds.
  */
-export function TeacherSheet({ kind, view, page, marks, selected, pick, onKey, markersRef, trace, children, viewBoxStyle }) {
+export function TeacherSheet({ kind, view, page, marks, selected, pick, onKey, markersRef, trace, children, viewBoxStyle, math = null, prose = null }) {
   const pageRef = useRef(null);
   const sheetRef = useRef(null);
   const dim = useSize(pageRef, { w: 800, h: 1000 });
@@ -70,7 +70,8 @@ export function TeacherSheet({ kind, view, page, marks, selected, pick, onKey, m
   useLayoutEffect(() => { if (open && popRef.current) { const h = popRef.current.getBoundingClientRect().height; if (h > 0 && Math.abs(h - popH) > 1) setPopH(h); } }, [open, popH, dim.w]);
   const marked = view !== 'original';
   // Every tick and cross carries its short phrase: straight after it when there is room, else in the margin with a leader. (A phone's margin is too narrow for words: the popover and the list carry them there.)
-  const words = useMemo(() => Object.fromEntries(marks.filter(m => m.phrase).map(m => [m.n, m.phrase])), [marks]);
+  const showWords = sheet.w >= 600;
+  const words = useMemo(() => (showWords ? Object.fromEntries(marks.filter(m => m.phrase).map(m => [m.n, m.phrase])) : {}), [marks, showWords]);
   const important = useMemo(() => new Set(marks.filter(m => m.phrase).map(m => m.n)), [marks]);
   // The tick is as large as the writing allows: on a small page of many lines it shrinks so neighbours do not sit on each other.
   const pitch = useMemo(() => { const ys = page.lines.filter(l => l.box).map(l => (l.box.y + l.box.h / 2) * dim.h).sort((x, y) => x - y); const d = []; for (let i = 1; i < ys.length; i += 1) d.push(ys[i] - ys[i - 1]); d.sort((x, y) => x - y); return d.length ? d[Math.floor(d.length / 2)] : Infinity; }, [page, dim.h]);
@@ -145,7 +146,7 @@ export function TeacherSheet({ kind, view, page, marks, selected, pick, onKey, m
                 <div id={`${uid}-pop`} ref={popRef} role="tooltip" className={`mp-t-pop is-${m.kind}`} data-mp-pop={m.n} data-mp-pop-side={pos.side} data-mp-pop-via={open.via}
                   style={{ left: pos.left, top: pos.top, width: pos.width }}>
                   <p className="mp-t-pop-h">{d.title}</p>
-                  {d.lines.map((t, i) => <p key={i} className="mp-t-pop-p">{t}</p>)}
+                  {d.lines.map((segs, i) => <p key={i} className="mp-t-pop-p">{segs.map((x, k) => <React.Fragment key={k}>{x.t === 'math' && math ? math(x.v) : x.t === 'prose' && prose ? prose(x.v) : x.v}</React.Fragment>)}</p>)}
                   {d.mark && <p className="mp-t-pop-m">{d.mark}</p>}
                 </div>
               );
