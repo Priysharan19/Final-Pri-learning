@@ -9,7 +9,7 @@ const q = {
   prompt: 'Given that $x > 0$, solve $2x + 3 \\ge 1$ and find the range of $h$.',
   steps: [{ h: 'Solve', d: '$2x \\ge -2$' }, { h: 'Divide', d: '$x \\ge -1$' }, { h: 'Range', d: '$6 \\le h \\le 38$' }, { h: 'Sign', d: '$P\'\' = -2 < 0$' }]
 };
-const mark = text => { const r = solutionMatch(q, { lines: [{ text, status: 'note', state: 'unverified', unverified: true }] }); return r.report.lines[0]; };
+const mark = (text, opts = { inequalities: true }) => { const r = solutionMatch(q, { lines: [{ text, status: 'note', state: 'unverified', unverified: true }] }, opts); return r.report.lines[0]; };
 const stepTick = text => { const l = mark(text); return l.status === 'ok' && l.state === 'verified'; };
 ok(stepTick('x >= -1'), 'the solution\'s own inequality is a step');
 ok(stepTick('x≥-1'), 'unicode sign');
@@ -31,6 +31,9 @@ ok(!stepTick('x != -1'), 'a not-equal is not an inequality step');
 const g = mark('x > 0');
 ok(g.status === 'ok' && g.state === 'given', 'the question\'s own inequality is the question restated');
 ok(['ok', 'note'].includes(mark('x >= 5').status) && mark('x >= 5').status !== 'break', 'a wrong inequality is never crossed here');
+
+// not asked for (every question but an Australian Years 11-12 one, India's included): read exactly as before, nothing is ticked
+ok(mark('x >= -1', null).status === 'note' && mark('x >= -1', {}).status === 'note' && mark('x > 0', null).status === 'note', 'without the option an inequality line is a note, as it always was');
 
 if (failures.length) { console.log(failures.join('\n')); console.log(`INEQUALITY STATEMENT TICKS: FAIL ${failures.length} of ${pass + failures.length}`); process.exit(1); }
 console.log(`INEQUALITY STATEMENT TICKS: PASS: ${pass} checks`);
