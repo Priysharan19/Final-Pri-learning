@@ -35,7 +35,7 @@ ok(one('Let $P(t)=100e^{0.05t}$ for $0\\le t\\le 10$.', 'P(10) = 100e^(0.5) = 16
 
 // 2. implications
 ok(one(V, '12 - 6t = 0 => t = 2.') === 'tick:equation-solved', 'the owner\'s implication is ticked');
-for (const s of ['12 - 6t = 0 so t = 2', '12 - 6t = 0 ∴ t = 2', '12 - 6t = 0 → t = 2', '12 - 6t = 0, t = 2', '12 - 6t = 0 ⇒ t = 2', '12 - 6t = 0 hence t = 2']) ok(one(V, s) === 'tick:equation-solved', `implication form: ${s}`);
+for (const s of ['12 - 6t = 0 so t = 2', '12 - 6t = 0 ∴ t = 2', '12 - 6t = 0 → t = 2', '12 - 6t = 0 ⇒ t = 2', '12 - 6t = 0 hence t = 2']) ok(one(V, s) === 'tick:equation-solved', `implication form: ${s}`);
 ok(one(V, '12 - 6t = 0 => t = 3') === 'note' && wit(V, '12 - 6t = 0 => t = 3').rule === 'implication', 'a wrong root is crossed');
 ok(wit(V, '12 - 6t = 0 => t = 2 or t = 3').index === 0, 'a wrong root among right ones is crossed');
 ok(one('Solve $x^2-5x+6=0$.', 'x^2 - 5x + 6 = 0 => x = 2 or x = 3') === 'tick:equation-solved', 'both roots ticked');
@@ -63,21 +63,22 @@ ok(one('For $f(x)=e^{2x}$, find the gradient.', "f'(x) = 2e^(2x)") === 'tick:der
 
 // 5. closed-interval extreme
 { const Q = 'For $f(x)=x^3-3x$, $-2\\le x\\le 3$, find the greatest value of $f$.';
-  ok(one(Q, 'The greatest value of f is 2 at x = -1') === 'note' && wit(Q, 'The greatest value of f is 2 at x = -1').rule === 'extremum', 'the maximum claimed at the stationary point, when it is at an endpoint, is crossed and never ticked');
+  ok(one(Q, 'The greatest value of f is 2 at x = -1') === 'note' && wit(Q, 'The greatest value of f is 2 at x = -1') === null, 'the maximum claimed at the stationary point, when it is at an endpoint, is never ticked and, being a local extreme value, is a note not a cross');
+  ok(wit(Q, 'The greatest value of f is 20').rule === 'extremum' && one(Q, 'The greatest value of f is 20') === 'note', 'a value that is no end value and no local extreme value of f is crossed');
   ok(one(Q, 'The greatest value of f is 18 at x = 3') === 'tick:conclusion-extremum', 'the maximum at the endpoint is ticked');
-  ok(one(Q, 'The greatest value of f is 18 at x = -1') === 'note' && wit(Q, 'The greatest value of f is 18 at x = -1').rule === 'extremum', 'the right value at the wrong place is crossed');
+  ok(one(Q, 'The greatest value of f is 18 at x = -1') === 'note' && wit(Q, 'The greatest value of f is 18 at x = -1') === null, 'the right value at the wrong place is a note');
   const Q2 = 'For $f(x)=x^3-3x$, $-2\\le x\\le 3$, find the least value of $f$.';
   ok(one(Q2, 'The greatest value of f is 18 at x = 3') === 'note' && wit(Q2, 'The greatest value of f is 18 at x = 3') === null, 'a minimum asked and a maximum given is not ticked and not crossed'); }
 ok(one(V, 'Conclusion: The maximum velocity is 12 m s^-1, obtained at t = 2.') === 'tick:conclusion-extremum', 'the owner\'s conclusion');
 ok(one(V, 'Conclusion: The maximum velocity is 12 ms^-1, obtained at t:') === 'tick:conclusion-extremum', 'the reader\'s truncated conclusion');
 ok(one(V, 'Conclusion: The maximum velocity is 12 m s^-1, obtained at t =') === 'tick:conclusion-extremum', 'the reader\'s other truncated conclusion');
 ok(one(V, 'The maximum velocity is 12 m/s') === 'tick:conclusion-extremum', 'a value with no place is ticked when right');
-ok(one(V, 'The maximum velocity is 14 m/s at t = 2') === 'note' && wit(V, 'The maximum velocity is 14 m/s at t = 2').rule === 'extremum', 'a wrong maximum is crossed');
-ok(wit(V, 'The maximum velocity is 12 m/s at t = 3').rule === 'extremum', 'a right maximum at the wrong place is crossed');
+ok(one(V, 'The maximum velocity is 14 m/s at t = 2') === 'note' && wit(V, 'The maximum velocity is 14 m/s at t = 2').rule === 'extremum', 'a wrong maximum (no end or local value) is crossed');
+ok(one(V, 'The maximum velocity is 12 m/s at t = 3') === 'note' && wit(V, 'The maximum velocity is 12 m/s at t = 3') === null, 'a right maximum at the wrong place is a note');
 ok(one(V, 'The minimum velocity is 0 m/s') === 'note', 'the minimum is not what is asked: a note');
 ok(wit(V, 'The minimum velocity is 7') === null, 'a minimum when a maximum is asked is never crossed');
 ok(one('A particle has speed $v=12t-3t^{2}$ for $0\\le t\\le1$. Find the maximum speed.', 'The maximum speed is 9 at t = 1') === 'tick:conclusion-extremum', 'a maximum at an endpoint');
-ok(wit('A particle has speed $v=12t-3t^{2}$ for $0\\le t\\le1$. Find the maximum speed.', 'The maximum speed is 12 at t = 2').rule === 'extremum', 'the stationary value outside the interval is not the maximum');
+ok(one('A particle has speed $v=12t-3t^{2}$ for $0\\le t\\le1$. Find the maximum speed.', 'The maximum speed is 12 at t = 2') === 'note', 'the stationary value outside the interval is not ticked as the maximum');
 ok(one('The height is $h = 12t - 3t^{2}$ for $0\\le t\\le4$. Find the minimum height.', 'The minimum height is 0 at t = 0 and t = 4') === 'tick:conclusion-extremum', 'a minimum at both endpoints');
 ok(one(V, 'The maximum is 12') === 'note' && one(V, 'max = 12') === 'note', 'a conclusion that names no quantity is not read');
 ok(one('Let $f(x)=\\sin x$ for $0\\le x\\le 360$. Find the maximum value of $f$.', 'The maximum value of f is 1') === 'note', 'trig on a numeric interval: degrees or radians unknown, a note');
@@ -98,6 +99,52 @@ ok(one(V, '(2, 13)') === 'note' && one(V, '(5, -15)') === 'note' && one(V, '(3, 
 { const r = mark(V, ['v', '(2, 12)', '12', '0', '2', '4', 't']).map(kind); ok(r.join() === 'neutral:figure-label,neutral:figure-label,neutral:figure-label,neutral:figure-label,neutral:figure-label,neutral:figure-label,neutral:figure-label', 'a run of ticks and axis names is figure-label'); }
 ok(kind(mark(V, ['The answer is above', '12', 'so done'])[1]) === 'note', 'a single bare number is not a label');
 ok(kind(mark(V, ['7', '9'])[0]) === 'note', 'bare numbers that are not key values of the sketch are not labels');
+
+// ── the reviewer's cases (PR #1137 review), with the exact inputs ───────────────────────────────────────────────────────────────────────
+{
+  // 1. a comma list of `<var> = <number>` is a solution list, never an implication
+  for (const [pr, line] of [[V, 't = 0, t = 4'], ['Solve $x^2-5x+6=0$.', 'x = 2, x = 3'], ['Solve $x^2-4=0$.', 'x = 2, x = −2'], ['Solve $x^2-4=0$.', 'x = 2 or x = -2'], ['Solve $x^2-4=0$.', 'x = 2 and x = 3']]) {
+    ok(wit(pr, line) === null, `a solution list is never crossed: ${line}`);
+    ok(kind(mark(pr, [line])[0]) === 'note', `a solution list is not an implication: ${line}`);
+  }
+  ok(wit(V, '12 - 6t = 0, t = 3') === null && wit(V, '12 - 6t = 0, t = 2') === null, 'a comma is not an arrow (the second half of `E, t = 3` is not read as the solution of E)');
+  for (const w of ['gives', 'then', 'so', 'hence', 'therefore', '∴', '⇒', '→']) ok(one(V, `12 - 6t = 0 ${w} t = 2`) === 'tick:equation-solved' && wit(V, `12 - 6t = 0 ${w} t = 3`).rule === 'implication', `an explicit ${w} makes an implication`);
+  ok(wit(V, 't = 2 => t = 3') === null, 'a bare `<var> = <number>` on the left is not an equation to solve');
+}
+{
+  // 2. speed is not velocity: the quantity must be exactly the one whose function the prompt gives
+  const S5 = 'The velocity of a car is $v=12t-3t^{2}$ m/s for $0\\le t\\le5$. Find the maximum speed.';
+  const V5 = 'The velocity of a car is $v=12t-3t^{2}$ m/s for $0\\le t\\le5$. Find the maximum velocity.';
+  for (const l of ['The maximum speed is 12 at t = 2', 'The greatest speed is 15', 'The maximum speed is 15 at t = 5', 'The maximum velocity is 12 at t = 2', 'The maximum distance is 3']) ok(one(S5, l) === 'note' && wit(S5, l) === null, `a question about the maximum speed is not judged: ${l}`);
+  for (const l of ['The maximum speed is 12 at t = 2', 'The greatest speed is 15']) ok(one(V5, l) === 'note' && wit(V5, l) === null, `speed under a velocity question is not judged: ${l}`);
+  ok(one(V5, 'The maximum velocity is 12 at t = 2') === 'tick:conclusion-extremum', 'velocity under a velocity question is read');
+  ok(one('The height of a ball is $h=12t-3t^{2}$ for $0\\le t\\le4$. Find the maximum height.', 'The maximum height is 12 at t = 2') === 'tick:conclusion-extremum', 'height for h');
+  ok(one('The height of a ball is $h=12t-3t^{2}$ for $0\\le t\\le4$. Find the maximum height.', 'The maximum velocity is 12') === 'note', 'another quantity than the asked one is not read');
+}
+{
+  // 3. a further interval or time qualifier, or a domain written in prose, means the conclusion is not judged
+  const base = 'The velocity of a car is $v=12t-3t^{2}$ m/s';
+  for (const pr of [`${base}. Find the maximum velocity during the first second.`, `${base} for $0\\le t\\le4$. Find the maximum velocity between $t=0$ and $t=1$.`, `${base} for 0 ≤ t ≤ 1. Find the maximum velocity.`, `${base} for t ≥ 3. Find the maximum velocity.`, `${base} for $0\\le t\\le4$. Find the maximum velocity after 3 seconds.`, `${base} for $0\\le t\\le4$. Find the maximum velocity in the first second, for t ≤ 1.`]) {
+    for (const l of ['The maximum velocity is 9 at t = 1', 'The maximum velocity is 12 at t = 2', 'The maximum velocity is 0 at t = 4', 'The maximum velocity is 3']) ok(one(pr, l) === 'note' && wit(pr, l) === null, `not judged under a qualifier or a prose domain: ${pr.slice(40, 130)} / ${l}`);
+  }
+}
+{
+  // 4. local / stationary / turning wording: the global-extremum prover does not run
+  const base = 'For $f(x)=x^3-3x$, $-2\\le x\\le 3$, ';
+  for (const pr of [`${base}find the local maximum value of $f$.`, `${base}find the stationary points and their nature.`, `${base}find the stationary values of $f$.`, `${base}find the turning point where $f$ is a maximum.`, `${base}find the relative maximum value of $f$.`]) {
+    for (const l of ['The maximum value of f is 2 at x = -1', 'The maximum value of f is 18 at x = 3', 'The maximum value of f is 2']) ok(one(pr, l) === 'note' && wit(pr, l) === null, `no global-extremum judgement under local wording: ${pr.slice(33)} / ${l}`);
+  }
+  const Q = `${base}find the greatest value of $f$.`;
+  ok(wit(Q, 'The maximum value of f is 2 at x = -1') === null && one(Q, 'The maximum value of f is 2 at x = -1') === 'note', 'a local extreme value is never crossed and never ticked as the global one');
+  ok(one(Q, 'The maximum value of f is 18') === 'tick:conclusion-extremum', 'the true global value is ticked');
+}
+{
+  // 5. a function defined again in another part: not judged
+  const M = '(a) Let $f(x)=x^2$. Find $f(2)$. (b) Now $f(x)=3x$. Find $f(2)$.';
+  for (const l of ['f(2) = 4', 'f(2) = 6', 'f(2) = 5', 'f\'(x) = 2x']) ok(one(M, l) === 'note' && wit(M, l) === null, `function-value lines of a multi-part prompt are not judged: ${l}`);
+  const M2 = 'The velocity is $v=12t-3t^{2}$ for $0\\le t\\le4$. (a) Find $v(2)$. (b) Find the maximum velocity.';
+  ok(one(M2, 'v(2) = 12') === 'note' && wit(M2, 'v(2) = 13') === null && one(M2, 'The maximum velocity is 12') === 'note', 'a multi-part prompt binds nothing');
+}
 
 // the pass only ever turns an OPEN note into a tick or a neutral line: a tick, a cross, a candidate, a slip follow-on or a context line is never overturned
 {
@@ -136,6 +183,42 @@ const run = (lines, answer) => { const r = MARKER_OPS.practice({ q, answer, work
   ok(displayed.lines.slice(0, 18).every(l => l.status !== 'break'), 'nothing before it is crossed');
   const wrongRoot = PAGE.map(l => (l.startsWith('12 - 6t') ? '12 - 6t = 0 => t = 3.' : l));
   ok(run(wrongRoot, '12').displayed.lines.findIndex(l => l.status === 'break') === 8, 'a wrong root is crossed at line 9');
+}
+
+
+// ── when the pass runs ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+// The display pass runs for a generated NSW question (`gen:y11|y12|me11|me12-`, through provedLines) and for the author's bank (`_bank`, through provedLinesBank); the cross runs only for a
+// ONE-PART Australian question (oneAustralianPart: a bank question or an NSW subtopic). Never for the India edition's questions, and never where the prompt has several parts.
+{
+  const { stepEvidence } = await import('../platform/markerOps.js');
+  const G = await import('../../client/src/engine/generators/index.js');
+  await G.loadAllBanks();
+  const P2 = new Set(Object.values(P.CLASS));
+  const wrongPage = ['dv/dt = 12 - 6t', '12 - 6t = 0 => t = 3', 'v(2) = 12(2) - 3(2)^2 = 24 - 12 = 13', 'The maximum velocity is 14 m/s at t = 2'];
+  const mine = ev => [...(ev.stepReport?.lines || []), ...(ev.shownReport?.lines || [])];
+  const touched = ev => mine(ev).some(l => P2.has(l.tickClass) || /^claim-false-/.test(l.diagnosis?.code || ''));
+  // India: a question of the India edition (a `c11-` generator), given the very prompt and page that the pass proves on an Australian one
+  const ind = G.generateQuestion('c11-radian-unit-circle-reasoning', 1, 1);
+  for (const q2 of [{ ...ind, prompt: V }, { ...ind, prompt: V, subtopic: 'c11-functions', contentId: 'gen:c11-functions:d1:x' }]) {
+    const ev = stepEvidence(q2, '12', PAGE.join('\n'), { correct: true }, { slipWarnings: true });
+    ok(!touched(ev), 'the India edition\'s questions are never touched by the second page pass');
+    const ev2 = stepEvidence(q2, '99991', wrongPage.join('\n'), { correct: false }, { slipWarnings: true });
+    ok(!touched(ev2) && !(ev2.stepReport?.lines || []).some(l => l.status === 'break' && /claim-false/.test(l.diagnosis?.code || '')), 'a wrong page under an India question is never crossed by it');
+  }
+  // an Australian generated question and the bank question run it (positive controls)
+  const au = G.generateQuestion('y12-appdiff', 1, 450);
+  const evAu = stepEvidence({ ...au, prompt: V }, '12', PAGE.join('\n'), { correct: true }, { slipWarnings: true });
+  ok(mine(evAu).some(l => P2.has(l.tickClass)), 'positive control: a generated Australian question gets the display pass');
+  const evBank = stepEvidence(q, '99991', wrongPage.join('\n'), { correct: false }, { slipWarnings: true });
+  ok((evBank.stepReport?.lines || []).some(l => l.status === 'break' && /^claim-false-/.test(l.diagnosis?.code || '')), 'positive control: a bank question crosses a false claim');
+  // a multi-part question: no cross and no tick of a claim about the function
+  const multi = { ...q, prompt: 'The velocity of a car is $v=12t-3t^{2}$ m/s for $0\\le t\\le4$. (a) Find $v(2)$. (b) Find the maximum velocity.' };
+  const evM = stepEvidence(multi, '99991', wrongPage.join('\n'), { correct: false }, { slipWarnings: true });
+  ok(!(evM.stepReport?.lines || []).some(l => l.status === 'break' && /^claim-false-/.test(l.diagnosis?.code || '')), 'a multi-part question is never crossed by it');
+  ok(!mine(evM).some(l => [P.CLASS.value, P.CLASS.derivative, P.CLASS.extremum, P.CLASS.point].includes(l.tickClass)), 'a multi-part question binds no function: no function value, derivative, conclusion or point is ticked');
+  // the reviewer's page: a true solution list on the bank question is not crossed
+  const evList = stepEvidence(q, '12', ['12 - 6t = 0', 't = 0, t = 4'].join('\n'), { correct: true }, { slipWarnings: true });
+  ok(!(evList.stepReport?.lines || []).some(l => l.status === 'break'), 'A12-C3-093: `t = 0, t = 4` after `12 - 6t = 0` is not crossed');
 }
 
 if (failures.length) { console.error(`PAGE PROOFS 2: FAIL (${failures.length})`); for (const f of failures) console.error('  ' + f); process.exit(1); }

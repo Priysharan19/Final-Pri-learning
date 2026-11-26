@@ -26,8 +26,8 @@
  "halves": {
   "trueHalfPasses": 2079,
   "trueHalfPassPct": 37.18,
-  "wrongHalfPasses": 547,
-  "wrongHalfPassPct": 9.78,
+  "wrongHalfPasses": 548,
+  "wrongHalfPassPct": 9.8,
   "allLinesTickedAndNoneCrossed": 3141,
   "allLinesPct": 56.17,
   "answerLineRecognisedAndKeyCorrect": 915,
@@ -1057,7 +1057,7 @@
   }
  },
  "wrongHalfFailures": {
-  "wrong step missed": 3730,
+  "wrong step missed": 3729,
   "no provable one-line mutation of any step": 271,
   "no maths lines in the worked solution": 252,
   "TeX not readable as a typed line (\\pm)": 103,

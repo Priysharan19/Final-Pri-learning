@@ -28,7 +28,7 @@ import { clean, lead, astOf, constOf, worldOf, fitPoly, polyAt, polyD } from './
 
 const close = (a, b, tol = 1e-9) => Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= tol * Math.max(1, Math.abs(a), Math.abs(b));
 const NUMRE = String.raw`-?\d+(?:\.\d+)?(?:/\d+(?:\.\d+)?)?`;
-const ARROW_SRC = String.raw`(?:⇒|⟹|=>|⟶|→|->|∴|\bso\b|\bhence\b|\btherefore\b|\bthus\b)`;
+const ARROW_SRC = String.raw`(?:⇒|⟹|=>|⟶|→|->|∴|\bso\b|\bhence\b|\btherefore\b|\bthus\b|\bgives\b|\bgiving\b|\bthen\b|\bimplies\b)`;
 export const CLASS = Object.freeze({
   value: 'function-value', implication: 'equation-solved', condition: 'condition-stated', derivative: 'derivative-of-function',
   extremum: 'conclusion-extremum', checkList: 'check-values-list', figure: 'figure-label', point: 'point-on-curve'
@@ -62,7 +62,8 @@ function promptPlain(prompt) {
 /** `0 <= t <= 4`, `t >= 0`, `1 < x < 5`, `x > 2`: the domain the prompt states for the variable v (a bound is null when not stated). null when none. */
 export function domainOf(prompt, v) {
   const { spans, text } = promptPlain(prompt);
-  const pieces = [...spans, ...text.split(/[;,]|\band\b|\bfor\b|\bwhere\b|\bwhen\b/i)].map(s => s.trim());
+  // only a maths span is read (exact); a domain written in prose (`for 0 ≤ t ≤ 1`, `for t ≥ 3`) is not normalised
+  const pieces = spans.map(s => s.trim());
   let dom = null;
   const set = (side, val, closed) => { dom = dom || { lo: null, hi: null, loClosed: false, hiClosed: false }; if (side === 'lo') { dom.lo = val; dom.loClosed = closed; } else { dom.hi = val; dom.hiClosed = closed; } };
   const N = String.raw`(-?\d+(?:\.\d+)?)`;
@@ -86,14 +87,50 @@ export function taskOf(prompt) {
 const TRIG = /\b(?:sin|cos|tan|sec|cosec|csc|cot|asin|acos|atan|arcsin|arccos|arctan)\b/;
 const ABS_LIKE = /\b(?:abs|floor|ceil|sgn|sign|round)\b|\|/;
 /** The question's world: its prompt text, task, and (when the prompt gives exactly one) its function with domain; `fn` is null otherwise. */
+const PART_MARK = /(?<![A-Za-z0-9])\(\s*(?:[a-h]|i{1,3}|iv)\s*\)/g;
+const QUALIFIER = /\b(?:during|between|after|before|within|first|last|next|until|from|at least|at most|more than|less than|greater than|exceeds|once|initially|interval|period)\b|[<>≤≥]/i;
+const STOPN = new Set(['the', 'a', 'an', 'of', 'is', 'are', 'its', 'his', 'her', 'their', 'at', 'in', 'on', 'for', 'and', 'modelled', 'modeled', 'by', 'given', 'where', 'let', 'with', 'when', 'time', 'after', 'seconds', 'second', 'moves', 'model', 'function', 'curve', 'graph', 'find', 'to', 'it', 'as', 'that', 'this', 'has', 'have', 'defined', 'described']);
+/** The words the question uses for the quantity whose function it defines: the words before the definition in its sentence (`velocity` in `The velocity of a car is v = ...`). */
+function boundNouns(prompt, name, v) {
+  const text = String(prompt ?? '').replace(/\\\$/g, '\u0001');
+  const re = /\$\$?([^$]+)\$\$?/g; let m, idx = -1, before = '', last = 0;
+  while ((m = re.exec(text))) {
+    let plain = m[1]; try { plain = texToPlain(m[1]) || m[1]; } catch { /* as written */ }
+    if (idx < 0 && new RegExp(String.raw`^\s*${name}\s*(?:\(\s*${v}\s*\))?\s*=`).test(norm(plain))) { idx = m.index; before = text.slice(last, m.index); break; }
+    last = m.index + m[0].length;
+  }
+  if (idx < 0) return new Set();
+  const sentence = before.split(/[.?!]/).pop().replace(/\$[^$]*\$/g, ' ');
+  return new Set(sentence.toLowerCase().split(/[^a-z]+/).filter(x => x.length > 2 && !STOPN.has(x)));
+}
+/** The question's world: its prompt text, task, and (when the prompt gives exactly one function in one part) its function with domain; `fn` is null otherwise. */
 export function world2(q) {
-  const text = promptPlain(q?.prompt).text;
-  let fn = null;
-  try {
-    const w = worldOf(q);
-    if (w && !ambiguousForms(w.expr).length && !ABS_LIKE.test(w.expr)) fn = { ...w, domain: domainOf(q?.prompt, w.v), trig: TRIG.test(w.expr), exprPlain: norm(w.expr) };
-  } catch { fn = null; }
-  return { fn, text, task: taskOf(q?.prompt), prompt: String(q?.prompt ?? ''), domainFor: v => (fn && fn.v === v ? fn.domain : domainOf(q?.prompt, v)) };
+  const prompt = String(q?.prompt ?? '');
+  const text = promptPlain(prompt).text;
+  const multi = new Set((prompt.match(PART_MARK) || []).map(x => x.replace(/\s+/g, ''))).size >= 2 || /\bpart\s*\(?[a-h0-9]/i.test(prompt);
+  let fn = null, nouns = new Set(), extremumOk = false, asksValue = false, qualified = false;
+  if (!multi) {
+    try {
+      const w = worldOf(q);
+      if (w && !ambiguousForms(w.expr).length && !ABS_LIKE.test(w.expr)) {
+        // a domain is trusted only when the one maths span states it and the rest of the question has no further interval or time qualifier (`during the first second`, `after 3 seconds`)
+        const rest = prompt.replace(/\$\$?[^$]+\$\$?/g, ' § ');
+        const inequalSpans = promptPlain(prompt).spans.filter(sp => /[<>]/.test(sp.replace(/=>|->/g, ''))).length;
+        qualified = QUALIFIER.test(rest) || inequalSpans > 1;
+        fn = { ...w, domain: qualified ? null : domainOf(prompt, w.v), trig: TRIG.test(w.expr), exprPlain: norm(w.expr) };
+        nouns = boundNouns(prompt, w.name, w.v);
+        // the global-extremum prover runs only when the question asks the greatest/least VALUE of the bound quantity: no local, stationary or turning wording, and the word asked is exactly it
+        const local = /\b(?:local|relative|stationary|turning|inflex\w*|nature|concav\w*|critical)\b/i.test(prompt);
+        const ask = /\b(?:maxim(?:um|a)|greatest|largest|highest|biggest|minim(?:um|a)|least|smallest|lowest)\s+(?:possible\s+)?(?:(values?)(?:\s+of\s+\$?\s*([A-Za-z]))?|([A-Za-z]+))/i.exec(text);
+        if (ask && !local && !qualified) {
+          if (ask[1]) { asksValue = !!ask[2] && ask[2] === w.name; extremumOk = asksValue; }
+          else { const word = ask[3].toLowerCase(); extremumOk = word === w.name.toLowerCase() || nouns.has(word) || nouns.has(word.replace(/s$/, '')); }
+        }
+      }
+    } catch { fn = null; }
+  }
+  const dom = v => (fn && fn.v === v ? fn.domain : null);
+  return { fn, text, task: taskOf(prompt), prompt, nouns, extremumOk, asksValue, qualified, multi, domainFor: dom };
 }
 
 // ── numbers: exactness, rounding ─────────────────────────────────────────────
@@ -302,11 +339,12 @@ function solutionList(text) {
 /** Split `E1 <arrow> E2`: [E1, E2] or null. A comma joins them only when the part after it starts `v =`. */
 function splitImplication(text) {
   const t = stripEnd(norm(text));
-  let m = new RegExp(String.raw`^(.*?=.*?)\s*,?\s*${ARROW_SRC}\s*:?\s*(.+)$`, 'i').exec(t);
-  if (m && m[2].includes('=') && !new RegExp(ARROW_SRC, 'i').test(m[2])) return [m[1].trim(), m[2].trim()];
-  m = /^(.*?=.*?[^,\s])\s*,\s*([a-z]\s*=\s*.+)$/.exec(t);
-  if (m) return [m[1].trim(), m[2].trim()];
-  return null;
+  // an implication needs an explicit arrow or word between an EQUATION and its solution: a comma, `or` or `and` joins items of a solution list (`t = 0, t = 4`), never an implication
+  const m = new RegExp(String.raw`^(.*?=.*?)\s*,?\s*${ARROW_SRC}\s*:?\s*(.+)$`, 'i').exec(t);
+  if (!m || !m[2].includes('=') || new RegExp(ARROW_SRC, 'i').test(m[2])) return null;
+  const left = m[1].trim();
+  if (solutionList(left) || /^[a-z]\s*=\s*-?[\d./]+$/i.test(left)) return null;     // a bare `<var> = <number>` (or a list of them) is a solution, not an equation to solve
+  return [left, m[2].trim()];
 }
 
 /** The equation of a left side: { v, co (coefficients of L - R), label } for a polynomial equation in one letter, else null. */
@@ -448,10 +486,8 @@ export function extremumClaim(world, text) {
   // WHAT is the maximum of: `max = 21` may be the value or the place it is reached, and `min = -2` may be of another function, so a conclusion is read only
   // when it names the quantity: the function's own letter, or a word the question itself uses (`maximum velocity` under a question that asks for the maximum velocity)
   const named = subject.toLowerCase().split(/[^a-z0-9']+/).filter(x => x && !GENERIC.has(x));
-  const words = new Set(world.text.toLowerCase().split(/[^a-z0-9']+/).filter(Boolean));
-  const inPrompt = x => words.has(x) || words.has(x.replace(/s$/, '')) || words.has(`${x}s`);
-  const asksValue = /\b(?:maxim(?:um|a)|greatest|largest|highest|biggest|minim(?:um|a)|least|smallest|lowest)\s+values?\b/i.test(world.text);
-  if (named.length ? !named.every(x => x === w.name.toLowerCase() || inPrompt(x)) : !(asksValue && /\bvalues?\b/i.test(subject))) return null;
+  const bound = x => x === w.name.toLowerCase() || world.nouns.has(x) || world.nouns.has(x.replace(/s$/, ''));
+  if (named.length ? !named.every(bound) : !(world.asksValue && /\bvalues?\b/i.test(subject))) return null;
   rest = rest.slice(verb.index + verb[0].length).trim().replace(/^=\s*/, '');
   const num = new RegExp(String.raw`^(?:${w.name}\s*=\s*|${w.name}\(\s*${w.v}\s*\)\s*=\s*)?(${NUMRE})(?![\d.])\s*(.*)$`).exec(rest);
   if (!num) return null;
@@ -473,14 +509,24 @@ export function extremumClaim(world, text) {
 /** The verdict on a conclusion: 'true' | 'false' | 'note' (undecidable, or not what the question asks) with the engine's extreme. */
 export function conclusionVerdict(world, claim) {
   const w = world.fn;
+  if (!world.extremumOk || !w.domain) return { verdict: 'note', why: 'not-the-asked-quantity' };
   if (world.task && claim.nature !== world.task) return { verdict: 'note', why: 'other-extreme' };
   const ex = extremeOver(w, w.domain, claim.nature);
   if (!ex) return { verdict: 'note', why: 'no-extreme' };
   const how = against(claim.valueText, claim.value, ex.value, w.poly ? 1e-9 : 1e-6);
   if (how === 'near') return { verdict: 'note', why: 'near-rounding', ex };
-  if (how === 'ne') return { verdict: 'false', ex, claim, part: 'value' };
-  if (claim.at !== null && !ex.at.some(x => close(x, claim.at, 1e-6))) return { verdict: 'false', ex, claim, part: 'place' };
-  return { verdict: 'true', ex, claim, rounded: how === 'rounded' };
+  if (how === 'eq' || how === 'rounded') {
+    // the true global value: a tick, but a place that is not where it is reached is only a note (never a cross)
+    if (claim.at !== null && !ex.at.some(x => close(x, claim.at, 1e-6))) return { verdict: 'note', why: 'place', ex };
+    return { verdict: 'true', ex, claim, rounded: how === 'rounded' };
+  }
+  // a cross needs a polynomial (every stationary point of the real line is known) and a value that is neither an end value nor ANY local extreme value of the function
+  if (!w.dpoly) return { verdict: 'note', why: 'not-provably-wrong', ex };
+  const rr = realRoots(w.dpoly);
+  if (rr === null) return { verdict: 'note', why: 'not-provably-wrong', ex };
+  const known = [...ex.all.map(p => p.y), ...rr.map(x => w.f(x))];
+  if (known.some(y => close(y, claim.value, 1e-6))) return { verdict: 'note', why: 'a-local-or-end-value', ex };
+  return { verdict: 'false', ex, claim, part: 'value' };
 }
 
 // ── 6. check list ────────────────────────────────────────────────────────────
@@ -625,7 +671,7 @@ function endpointFacts(w, texts, i, ex) {
 function checkListLine(world, l, text) {
   const w = world.fn;
   const nums = checkListOf(w, text);
-  if (!nums || !w.domain || !world.task) return null;
+  if (!nums || !w.domain || !world.task || !world.extremumOk) return null;
   const ex = extremeOver(w, w.domain, world.task);
   if (!ex) return null;
   const want = [...new Set([...ex.ends, ...ex.stationary].map(x => Math.round(x * 1e9) / 1e9))].sort((a, b) => a - b);
