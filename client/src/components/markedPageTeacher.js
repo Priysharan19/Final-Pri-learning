@@ -365,6 +365,8 @@ export const DETAILS = Object.freeze({
   equal: 'This line is equal to the line above.',
   ruleStatement: 'The rule is stated correctly.',
   solutionStep: 'This line matches a step of the worked solution.',
+  satisfiesEquation: 'Each value on this line satisfies the equation above it.',
+  sameEquation: 'This is the same equation as the line above, rearranged.',
   factors: 'The factors chosen multiply to the function in the question.',
   differenceOfSquares: 'The difference of squares is applied correctly.',
   indexLaw: 'The index law is applied correctly.',
