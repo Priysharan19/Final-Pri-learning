@@ -863,6 +863,40 @@ function pageDefinitions(raw, out, firstBreak, prep = null, degreePrimed = null,
   }
   return plain.broke;
 }
+// ── A function value is a claim about a function the page itself defined (QA of 26 November 2026, item 12) ───────────────────────────
+// `F(x) = x^3 - x^2` then `F(0) = 3`: the page defined F, and F(0) is 0 by that very line. A value of the student's OWN function at a number,
+// written alone or in a list (`F(3) = 18, F(0) = 3`), is a claim that either holds or does not; it is no equation to solve and no label. It is
+// crossed only when it provably contradicts the definition the student wrote, and only on the narrowest ground:
+//   · the line is nothing but `NAME(number) = number` claims (integers or fractions, no decimal, no unit, no words);
+//   · NAME is a one-letter function the page defined on an earlier line and has not re-set since (a definition the question gave is not used: it
+//     may be restricted or piecewise), the definition has one variable and no trigonometric or logarithmic part (the angle unit and the base
+//     are not known), and no unbracketed exponent or fraction that may be read two ways;
+//   · both values are exact numbers and differ clearly.
+// A line that cannot be decided, or any part that is not such a claim, is left exactly as it was. A tick is never given here.
+const FN_CLAIM = /^([A-Za-z])\s*\(\s*(-?\d+(?:\/\d+)?)\s*\)\s*=\s*(-?\d+(?:\/\d+)?)$/;
+const FN_TWO_WAYS = /[\/÷]\s*\d+(?:\.\d+)?\s*[A-Za-z(]|[\/÷]\s*[A-Za-z]\s*[A-Za-z(]|\^\s*-?\d+(?:\.\d+)?[A-Za-z]|\^\s*[A-Za-z][A-Za-z0-9(]/;
+const FN_UNIT_UNKNOWN = /\b(?:sin|cos|tan|sec|cosec|csc|cot|log|asin|acos|atan|arcsin|arccos|arctan)\b/i;
+function wrongFunctionValue(src, defs, raw, i) {
+  const pieces = src.replace(/[−–—]/g, '-').replace(/\s*\.\s*$/, '').split(/\s*(?:,|;|\band\b)\s*/i).map(x => x.trim());
+  if (!pieces.length || !pieces.every(x => FN_CLAIM.test(x))) return null;
+  let wrong = null;
+  for (const piece of pieces) {
+    const [, name, arg, claim] = FN_CLAIM.exec(piece);
+    const d = defs[name];
+    if (!d || !d.variable || d.given || d.glued || d.open || !(d.line >= 0) || d.line >= i) return null;
+    if (FN_UNIT_UNKNOWN.test(d.expr) || FN_UNIT_UNKNOWN.test(d.shown || '') || FN_TWO_WAYS.test(d.shown || '') || FN_TWO_WAYS.test(d.expr)) return null;
+    if (/\d\.\d|(?:^|[^\d])\.\d/.test(d.shown || '') || /\d\.\d/.test(d.expr)) return null;
+    // the definition must still be the latest word on the letter: a later line that sets it again (`F(x) = …`, `F = …`) is not read
+    const set = new RegExp(`(?<![A-Za-z'])${name}\\s*(?:\\(\\s*[A-Za-z]\\s*\\))?\\s*=`);
+    if (raw.slice(d.line + 1, i).some(l => set.test(l.replace(/[−–—]/g, '-')))) return null;
+    const put = putIn(`${name}(${arg})`, defs, null);
+    const truth = put ? numberOf(put.text) : null, said = numberOf(claim);
+    if (truth === null || said === null || !Number.isFinite(truth) || !Number.isFinite(said)) return null;
+    if (Math.abs(truth - said) <= 1e-6 * Math.max(1, Math.abs(truth), Math.abs(said))) continue;
+    if (!wrong) wrong = `With ${assignSpan(`${name}(${d.variable})`, d.shown)} from above, ${mathSpan(`${name}(${arg})`)} comes to ${shown(truth)}, but this line gives ${shown(said)}.`;
+  }
+  return wrong;
+}
 function pageDefinitionsOnce(raw, out, firstBreak, prep, degreePrimed, tickOnly, glueMode) {
   const defs = prep ? { ...prep.seeds } : {};   // 'k' → { expr, line }, 'f' → { expr, variable, line }, "u'" → …   (what the question gives is in from the start)
   let afterPart = false;
@@ -956,6 +990,8 @@ function pageDefinitionsOnce(raw, out, firstBreak, prep, degreePrimed, tickOnly,
         }
       }
     }
+    { const fv = out[i].status === 'note' ? wrongFunctionValue(src, defs, raw, i) : null;
+      if (fv) { if (tickOnly) continue; broke = { index: i, message: fv, rule: 'function-value' }; break; } }
     if (/[<>≤≥≠≈%°,;:]|==|!=|√\s*\[|∫|\]_/.test(src)) continue;
     const decimal = /\d\.\d|(?:^|[^\d])\.\d/.test(src);
     const ticks = [], facts = [];
@@ -1951,7 +1987,7 @@ function stepCheckArithmeticWithinBudget(workingText, prep = null, tickOnly = fa
       const message = broke.message;
       diagnosis = { code: 'page-definition-not-held', title: 'This line does not agree with what you wrote above', message, fix: 'Put the value from the earlier line in again and work this line out once more.', confidence: 'high' };
       firstBreak = broke.index;
-      out[broke.index] = { text: out[broke.index].text, status: 'break', note: message, diagnosis };
+      out[broke.index] = { text: out[broke.index].text, status: 'break', note: message, diagnosis, ...(broke.rule ? { valueChain: { rule: broke.rule } } : {}) };
       for (let k = broke.index + 1; k < out.length; k++) out[k] = { text: out[k].text, status: 'note', unverified: true, note: 'Follows from the earlier slip.' };
     }
   }
