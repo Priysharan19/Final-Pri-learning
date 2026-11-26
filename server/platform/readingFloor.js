@@ -15,6 +15,17 @@
 
 const norm = s => String(s ?? '').replace(/\s+/g, ' ').trim();
 
+/** `value` stands in `text` as a whole token, not inside a longer number or word: "= 12 m/s" has 12; "= 120", "x12" and "1.12" do not. */
+const statesValue = (text, value) => {
+  const t = String(text);
+  for (let i = t.indexOf(value); i >= 0; i = t.indexOf(value, i + 1)) {
+    const before = t[i - 1] ?? ' ', after = t.slice(i + value.length, i + value.length + 2);
+    if (/[\p{L}\p{N}._]/u.test(before) || /^\p{N}|^[.,]\p{N}/u.test(after)) continue;
+    return true;
+  }
+  return false;
+};
+
 /** A line is judgeable only when the reader gave a confidence at or above the floor and the line is not blank. */
 export const lineJudgeable = (line, floor) => {
   const c = Number(line?.confidence);
@@ -48,6 +59,10 @@ export function applyReadingFloor({ readLines, floor, steps, answer, answerTyped
   // `answerTyped`: the student typed the final answer themselves (the box that asks for it when Pri could not read
   // the line). It is their own text even when it equals the text of a below-floor line; it is never read from the page.
   // An absent answer is unreadable either way.
-  const answerUnreadable = given === '' || (answerTyped !== true && below.has(given) && !above.has(given));
+  // A number that is also the text of an unrelated doubtful line (a tick mark "12" on a graph, read below the floor) is still
+  // the answer when a line the reader WAS sure of states it as a value of its own ("The maximum velocity is 12 m/s"). The
+  // answer is unreadable only when nothing the reader was sure of says it.
+  const statedAbove = [...above].some(text => text !== given && statesValue(text, given));
+  const answerUnreadable = given === '' || (answerTyped !== true && below.has(given) && !above.has(given) && !statedAbove);
   return { judged, excluded, answer: answerUnreadable ? '' : given, answerUnreadable, unconfirmed: true };
 }

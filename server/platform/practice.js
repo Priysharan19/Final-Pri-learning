@@ -1639,7 +1639,9 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
           // fail closed: a kept read with no per-line record is one doubtful block, never a judgeable page
           : String(read.result.text || '').split('\n').map(t => ({ text: t, confidence: Number(read.result.confidence), uncertain: read.result.needsConfirmation === true }));
         const floorOf = Number.isFinite(Number(read.result.confidenceFloor)) ? Number(read.result.confidenceFloor) : providerStaticStatus(env).confidenceFloor;
-        const stepsSent = Array.isArray(body.steps) ? body.steps.map(String) : [];
+        // The card sends the working as ONE string, a line to each row (a list is accepted too). A string used to leave this empty,
+        // so the reading floor saw no working lines and a line the reader was unsure of was still checked (26 Nov 2026).
+        const stepsSent = Array.isArray(body.steps) ? body.steps.map(String) : (typeof body.steps === 'string' && body.steps.trim() ? body.steps.split('\n') : []);
         // A question answered BY its working (answerType 'working') sends its lines as the answer itself: there is no
         // separate final-answer line, so the floor is applied to those lines and the answer is unreadable only when no
         // judged line is left. Any other question: the working is `steps` and the final answer is `answer`.

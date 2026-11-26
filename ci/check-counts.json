@@ -354,7 +354,7 @@
       "job": "platform-contracts",
       "log": "photo-pipeline.log",
       "pins": [
-        {"has":"PHOTO PIPELINE: PASS — 905/905 checks","note":"860 → 880 (#196 review N4): a reply over the reader's schema limits (422 HANDWRITING_MALFORMED) is offered as one Try again and never resent by itself; a garbled 502 may be. 880 → 905 (Train 4, #739's 25 checks on top; re-derived by running the suite on the merged tree)."}
+        {"has":"PHOTO PIPELINE: PASS — 907/907 checks","note":"905 → 907 (final answer from the page's conclusion: \"area = 12 cm^2.\" is now read as 12 cm² and two more per-case checks run; re-derived by running the suite). 860 → 880 (#196 review N4): a reply over the reader's schema limits (422 HANDWRITING_MALFORMED) is offered as one Try again and never resent by itself; a garbled 502 may be. 880 → 905 (Train 4, #739's 25 checks on top; re-derived by running the suite on the merged tree)."}
       ]
     },
     "platform/photo-pipeline.log#2": {

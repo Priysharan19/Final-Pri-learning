@@ -22,7 +22,7 @@ import {
   parseVectorInput, sameVector,
   parseComplexInput, sameComplex
 } from './answer-forms.js';
-import { canonicalUnit, unitContradicts, withoutUnit, writtenUnit, unitsStated, unitDimension, angleUnitWritten, withoutAngleUnit, angleUnitOfSuffix, convertAngle } from './units.js';
+import { canonicalUnit, unitContradicts, withoutUnit, writtenUnit, unitsStated, unitsNamed, unitDimension, angleUnitWritten, withoutAngleUnit, angleUnitOfSuffix, convertAngle } from './units.js';
 import { acceptsNumeric } from './tolerance.js';
 import { exactValue, fraction, sameFraction, ExactLimit } from './exact.js';
 
@@ -376,7 +376,11 @@ function askedDimensions(question) {
 function unitFits(question, unit) {
   const base = u => (u.includes('/') ? u : u.replace(/[²³]$/, ''));
   const stated = [...unitsStated(question?.prompt)].map(base);
-  return askedDimensions(question).has(unitDimension(unit)) && (/^units/.test(unit) || stated.includes(base(unit)));
+  // A rate the prompt writes itself ("... m/s for 0 ≤ t ≤ 4. Find the maximum velocity.") is stated by the prompt even with no
+  // number in front of it: the unit the question uses, so "12 m/s" is the answer in the question's own unit. A different
+  // rate ("12 km/h") is still not (26 Nov 2026, the owner's velocity page).
+  const named = unit.includes('/') && unitsNamed(question?.prompt).has(unit);
+  return askedDimensions(question).has(unitDimension(unit)) && (/^units/.test(unit) || stated.includes(base(unit)) || named);
 }
 
 /**

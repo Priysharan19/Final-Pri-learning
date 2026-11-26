@@ -21,6 +21,13 @@ ok(applyReadingFloor({ readLines: read, floor: FLOOR, steps: ['3x = 15', 'x = 5 
 ok(applyReadingFloor({ readLines: read, floor: FLOOR, steps: ['3x = 15', 'x = 5'], answer: 'x = 5', answerTyped: true }).answerUnreadable === false, 'a final answer the student typed is theirs even when it equals a below-floor line');
 ok(applyReadingFloor({ readLines: read, floor: FLOOR, steps: ['3x = 15'], answer: '', answerTyped: true }).answerUnreadable === true, 'but an absent typed answer is still absent');
 ok(JSON.stringify(applyReadingFloor({ readLines: [], floor: FLOOR, steps: ['a'], answer: 'a' }).judged) === '["a"]', 'with no read (typed working) nothing is excluded');
+// A tick mark "12" read below the floor does not make a stated "12" unreadable (the owner's velocity page, 26 Nov 2026) ...
+const page = [L('The maximum velocity is 12 m s^-1', 0.95), L('12', 0.5)];
+ok(applyReadingFloor({ readLines: page, floor: FLOOR, steps: ['The maximum velocity is 12 m s^-1', '12'], answer: '12' }).answerUnreadable === false, 'an answer a sure line states is readable although an unrelated doubtful line is the same bare number');
+// ... but only a whole value: 12 is not "120", "1.12" or "x12".
+ok(applyReadingFloor({ readLines: [L('area = 120', 0.95), L('12', 0.5)], floor: FLOOR, steps: ['area = 120', '12'], answer: '12' }).answerUnreadable === true, 'a longer number in a sure line does not state the doubtful 12');
+ok(applyReadingFloor({ readLines: [L('x = 1.12', 0.95), L('12', 0.5)], floor: FLOOR, steps: ['x = 1.12', '12'], answer: '12' }).answerUnreadable === true, 'the tail of a decimal does not state it either');
+ok(applyReadingFloor({ readLines: [L('12', 0.5)], floor: FLOOR, steps: ['12'], answer: '12' }).answerUnreadable === true, 'with nothing sure that says it, a doubtful 12 is still unreadable');
 // no combination of confidences lets a below-floor text through
 let leaked = 0;
 for (let c = 0; c < 82; c += 3) { const rr = applyReadingFloor({ readLines: [L('y = 1', c / 100)], floor: FLOOR, steps: ['y = 1'], answer: 'y = 1' }); if (rr.judged.length || rr.answer) leaked++; }
