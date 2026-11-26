@@ -34,7 +34,8 @@ import { infoOf as arithmeticInfo, cleanStatement } from '../../client/src/engin
 import { annotateMilestones } from '../../client/src/engine/milestones.js';
 import { solutionMatch, _internals as SOLUTION_INTERNALS } from '../../client/src/engine/solutionMatch.js';
 import { lineChains } from '../../client/src/engine/lineChains.js';
-import { provedLines } from '../../client/src/engine/provedLines.js';
+import { provedLines, provedLinesBank } from '../../client/src/engine/provedLines.js';
+import { witnessOf } from '../../client/src/engine/pageProofs2.js';
 import { displayFields, bankDisplayFields } from '../../client/src/engine/displayFields.js';
 import { awardBoardScheme, matchBoardPoints } from '../../client/src/engine/boardScheme.js';
 import { constrainToShown, unsupportedCredit } from '../../client/src/engine/markExplanation.js';
@@ -185,7 +186,7 @@ function trueAsWritten(q, steps, opts) {
     const facts = opts && Object.hasOwn(opts, 'facts') ? opts.facts : questionFacts(q);
     const solutionValues = solutionNumbers(q);
     // the reader's TeX is read with the extended reading (engine/texToPlain.js) on an author-bank question only (usesExtendedTex); every other question, India's included, is read as before
-    return stepCheckArithmetic(steps, { latex: opts && Array.isArray(opts.latex) ? opts.latex : null, ...(usesExtendedTex(q) ? { extendedTex: true } : {}), facts, solutionValues, knownLabels: functionLabels(q), answerValue: typeof q?.answer?.value === 'number' ? q.answer.value : null, equationRewrite: oneAustralianPart(q) });
+    return stepCheckArithmetic(steps, { latex: opts && Array.isArray(opts.latex) ? opts.latex : null, ...(usesExtendedTex(q) ? { extendedTex: true } : {}), facts, solutionValues, knownLabels: functionLabels(q), answerValue: typeof q?.answer?.value === 'number' ? q.answer.value : null, equationRewrite: oneAustralianPart(q), ...(oneAustralianPart(q) ? { pageWitness: (texts, skip) => witnessOf(q, texts, skip) } : {}) });
   } catch { return null; }
 }
 
@@ -510,6 +511,15 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
       const base = shownReport || report;
       const more = base ? displayFields(q, base, displayCtx) : null;
       if (more && more !== base) shownReport = more;
+    }
+  } catch { /* the report stands */ }
+  // The author's bank gets the second page pass (engine/pageProofs2.js) only: function values, implications, conditions, derivatives, the closed-interval extreme, check
+  // lists and the labels of a sketch, each proved from the question's prompt. Display only, like the pass above: `stepReport` is not touched by it.
+  try {
+    if (typeof steps === 'string' && steps.trim() && !OBJECTIVE.has(q.answerType) && q.answerType !== 'graph-sketch' && !Array.isArray(q.boardScheme) && !(opts && (opts.proved === false || opts.solutionMatch === false)) && typeof q._bank === 'string') {
+      const base = shownReport || report || trueAsWritten(q, steps, opts);
+      const more = base ? provedLinesBank(q, base) : null;
+      if (more && more !== base) shownReport = holdAmbiguous(more);
     }
   } catch { /* the report stands */ }
   // The author's bank gets the same fields (bankDisplayFields): a class id on every tick read from the proof that ticked it, and `answerLine`. Display only.

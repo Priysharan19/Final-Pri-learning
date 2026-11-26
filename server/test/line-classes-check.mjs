@@ -185,6 +185,7 @@ const pages = [];
   }
 }
 ok(pages.length >= 450, `real pages: ${pages.length}`);
+const P2_CLASSES = new Set(['function-value', 'equation-solved', 'condition-stated', 'derivative-of-function', 'conclusion-extremum', 'check-values-list', 'figure-label', 'point-on-curve']);
 let noReportPage = null, ticks = 0, withoutClass = 0, withoutPhrase = 0, stepReportDirty = 0, shownMoved = 0, answerLines = 0, answerLineWrong = 0, mutants = 0, mutantTicked = 0, shownCount = 0, answerLineOnWrong = 0;
 const run = (q, answer, text, opts = {}) => { try { return stepEvidence(q, answer, text, checkAnswer(q, answer), { slipWarnings: true, ...opts }); } catch { return null; } };
 for (const p of pages) {
@@ -196,10 +197,13 @@ for (const p of pages) {
   if (!shown) continue;
   shownCount++;
   if (base) {
-    const same = base.lines.length === shown.lines.length && base.lines.every((l, i) => JSON.stringify(strip(l)) === JSON.stringify(strip(shown.lines[i])));
+    // the one change a bank page may carry beyond display fields: a note that the SECOND page pass (engine/pageProofs2.js) ticked or marked neutral, with its own class
+    const P2 = new Set(['function-value', 'equation-solved', 'condition-stated', 'derivative-of-function', 'conclusion-extremum', 'check-values-list', 'figure-label', 'point-on-curve']);
+    const byPass2 = (l, w) => !!l && !!w && l.status === 'note' && P2.has(w.tickClass) && String(l.text) === String(w.text);
+    const same = base.lines.length === shown.lines.length && base.lines.every((l, i) => byPass2(l, shown.lines[i]) || JSON.stringify(strip(l)) === JSON.stringify(strip(shown.lines[i])));
     if (!same && !p.bank) continue;      // a generated page's displayed report also carries the proved-line ticks (engine/provedLines.js): its own check holds those
     if (!same) { shownMoved++; if (process.env.DBG) console.log('MOVED', p.id, JSON.stringify(base.lines.map(strip)).slice(0, 400), JSON.stringify(shown.lines.map(strip)).slice(0, 400)); }
-  } else { if (p.bank && !shown.lines.every(l => l.status === 'note')) { shownMoved++; if (process.env.DBG) console.log('NOBASE', p.id, JSON.stringify(shown.lines).slice(0, 500)); } if (p.bank || shown.lines.every(l => l.status === 'note')) noReportPage ||= p; }
+  } else { if (p.bank && !shown.lines.every(l => l.status === 'note' || P2_CLASSES.has(l.tickClass))) { shownMoved++; if (process.env.DBG) console.log('NOBASE', p.id, JSON.stringify(shown.lines).slice(0, 500)); } if (p.bank || shown.lines.every(l => l.status === 'note')) noReportPage ||= p; }
   if (p.bank) {
     for (const l of shown.lines) if (l.status === 'ok') { ticks++; if (!l.tickClass) withoutClass++; else if (!CLASSES.includes(l.tickClass)) withoutClass++; }
   }
@@ -241,8 +245,9 @@ ok(answerLines > 50 && answerLineWrong === 0 && answerLineOnWrong === 0, `answer
         mutants++;
         const mine = (a.shownReport || a.stepReport)?.lines?.map(l => l.status) || [], theirs = a.stepReport?.lines?.map(l => l.status) || [];
         if (a.stepReport && !p.bank) continue;     // generated pages carry the proved-line ticks the other checks hold
-        if (a.stepReport && mine.some((s, j) => s !== theirs[j])) mutantTicked++;
-        if (!a.stepReport && mine.some(s => s !== 'note')) mutantTicked++;
+        if (a.stepReport && mine.some((s, j) => s !== theirs[j])) { mutantTicked++; if (process.env.DBG) console.log('MUTANT TICKED', p.id, m.text, JSON.stringify(page), mine.join(), theirs.join()); }
+        // only the line made false is judged: another, true line of the page may be proved by the second page pass (engine/pageProofs2.js)
+        if (!a.stepReport && mine[i] !== undefined && mine[i] !== 'note') { mutantTicked++; if (process.env.DBG) console.log('MUTANT TICKED (no base)', p.id, JSON.stringify(page), mine.join()); }
       }
     }
   }

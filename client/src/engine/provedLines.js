@@ -24,6 +24,7 @@ import { normalize, parse, evaluate, variablesOf } from './expr.js';
 import { texToPlain } from './texToPlain.js';
 import { questionFacts } from './questionFacts.js';
 import { pageProofs } from './pageProofs.js';
+import { pageProofs2, NEUTRAL as NEUTRAL_CLASSES } from './pageProofs2.js';
 
 const MINUS = /[−–—]/g;
 const clean = t => String(t ?? '').replace(MINUS, '-').replace(/\s+/g, ' ').trim();
@@ -450,8 +451,22 @@ export function provedLines(q, meta, report) {
   // and headings, each proved from the question's own function and the roots an earlier ticked line of the page established.
   let pageN = 0, final;
   try { const pp = pageProofs(q, lines, limit, (l, i) => openNote(l)); final = pp.lines; pageN = pp.n + pp.lines.filter((l, i) => l !== lines[i] && l.status !== 'ok').length; } catch { final = lines; pageN = 0; }
+  // The second page pass (pageProofs2.js): function values, implications, conditions, derivatives, the closed-interval extreme, check lists and the labels of a sketch.
+  try { const p2 = pageProofs2(q, final, limit, (l, i) => openNote(l)); if (p2.n) { final = p2.lines; pageN += p2.n; } } catch { /* the first pass stands */ }
   if (!n && !pageN) return report;
   return withLines(report, final);
+}
+
+/**
+ * The author's bank (a packed `qbank:` question): ONLY the second page pass (pageProofs2.js), on the page the marker made. The first pass and the older proofs
+ * above are for the generated Years 11-12 banks and do not run here. Returns the same report when nothing is proved. Display only: never a cross, never a mark.
+ */
+export function provedLinesBank(q, report) {
+  if (!report || !Array.isArray(report.lines)) return report;
+  const brk = report.lines.findIndex(l => l?.status === 'break');
+  const limit = brk >= 0 ? brk : report.lines.length;
+  const p2 = pageProofs2(q, report.lines, limit, (l, i) => openNote(l));
+  return p2.n ? withLines(report, p2.lines) : report;
 }
 
 // The report with these lines in place of its own, the summary counted again from them.
@@ -484,7 +499,7 @@ export function adoptProved(displayed, shown) {
     if (!l || !w || String(w.text ?? '') !== String(l.text ?? '')) return l;
     if (brk < 0 || i < brk) {
       // a heading is context, never a tick; a page-proved tick may replace any open note, an older proved tick only an unjudged one
-      if (w.context === true && (w.tickClass === 'heading' || w.tickClass === 'restated') && openNote(l)) { n++; return w; }
+      if (w.context === true && (w.tickClass === 'heading' || w.tickClass === 'restated' || NEUTRAL_CLASSES.has(w.tickClass)) && openNote(l)) { n++; return w; }
       if (w.status === 'ok' && (unjudged(l) || (w.fact?.kind === 'proved' && openNote(l)))) { n++; return w; }
     }
     // display-only fields (displayFields.js) are copied onto a line that keeps its own status and state

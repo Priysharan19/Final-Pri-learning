@@ -222,6 +222,13 @@ ok(tallyOf({ lines: [{ status: 'checked' }, { status: 'condition' }, { status: '
   ok(om.find(m => m.n === 19).phrase === 'Correct answer' && om.find(m => m.n === 18).phrase === 'Correct conclusion', 'only the server\'s answer-bearing line says Correct answer');
   ok(![1, 13, 17].some(n => om.some(m => m.n === n)), 'headings and the unread point list carry no tick');
   ok(tallyOf(o.page) === '16 lines correct. 0 wrong. 1 not checked.', `the tally counts maths lines only: ${tallyOf(o.page)}`);
+  // the owner's real photo page (key 12), the reader's own 21 lines, graph labels included: each line's phrase
+  const k = pageOf('key12');
+  const km = buildTeacherMarks({ page: k.page });
+  const want = { 7: 'Correct derivative', 9: 'Correct solution of the equation', 11: 'Point on the curve', 18: 'Correct function value', 19: 'Correct function value', 20: 'Correct function value', 21: 'Correct answer' };
+  ok(km.length === 7 && km.every(m => m.kind === 'right' && m.phrase === want[m.n]), `the photo page: 7 ticks, each with its own phrase: ${JSON.stringify(km.map(m => [m.n, m.phrase]))}`);
+  ok(k.model.cards.filter(c => c.status === 'condition').length === 8 && k.model.cards.filter(c => c.status === 'first-error').length === 0, 'the photo page: 8 neutral lines (condition, check list, six sketch labels), none crossed');
+  ok(k.model.cards.filter(c => c.status === 'not-verified').map(c => c.n).join() === '1,2,3,4,5,6', 'the photo page: only the six lines owned by the restated-question and method-statement lane are not checked');
 }
 
 if (failures.length) { console.error(`marked-page-teacher-check: ${failures.length} failed`); for (const f of failures) console.error(' - ' + f); process.exit(1); }

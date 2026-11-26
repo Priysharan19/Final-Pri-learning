@@ -2,7 +2,7 @@
 //
 // The pass is for the generated Years 11-12 banks (`gen:y11|y12|me11|me12-…`). A packed bank question (`qbank:…`) is never touched by it. Over the authored
 // worked steps of 300 packed bank questions, marked as a student's true working with a wrong typed answer, this proves:
-//   1. the pass did not run: `shownReport`, where a bank page has one, differs from `stepReport` ONLY by the display fields (a class id on a tick, `notRequired`, `answerLine`) and,
+//   1. the first page pass did not run (the second one, engine/pageProofs2.js, does run on the bank, and may only turn a note into a tick or a neutral line of its own class): `shownReport`, where a bank page has one, differs from `stepReport` ONLY by the display fields (a class id on a tick, `notRequired`, `answerLine`) and,
 //      for a page the marker judged to nothing, is that page's own all-notes report; no line's text, status, state or note moves; and the report is identical with the pass on and off;
 //   2. no authored true line is crossed that the report without the pass did not also cross (the pass adds no cross);
 //   3. over one-line mutants (a sign, a number, an exponent, a function: tools/marking-mutation-harness.mjs, judged false by its own evaluator) the lines ticked
@@ -49,7 +49,10 @@ for (const e of entries) {
     const SHOWN_ONLY = new Set(['tickClass', 'notRequired']);
     const strip = l => Object.fromEntries(Object.entries(l || {}).filter(([k]) => !SHOWN_ONLY.has(k)));
     // a page whose marker report is absent has an all-notes shown report: no tick, no cross
-    const same = A ? A.length === B.length && A.every((l, i) => JSON.stringify(strip(B[i])) === JSON.stringify(strip(l))) : B.every(l => l.status === 'note');
+    // beyond display fields, a bank page may carry notes the SECOND page pass (engine/pageProofs2.js) ticked or marked neutral, each with its own class and the same text
+    const P2 = new Set(['function-value', 'equation-solved', 'condition-stated', 'derivative-of-function', 'conclusion-extremum', 'check-values-list', 'figure-label', 'point-on-curve']);
+    const byPass2 = (l, w) => !!l && !!w && l.status === 'note' && P2.has(w.tickClass) && String(l.text) === String(w.text);
+    const same = A ? A.length === B.length && A.every((l, i) => byPass2(l, B[i]) || JSON.stringify(strip(B[i])) === JSON.stringify(strip(l))) : B.every(l => l.status === 'note' || P2.has(l.tickClass));
     if (!same) shownMoved++;
   }
   if (JSON.stringify(on.stepReport) !== JSON.stringify(off.stepReport)) differ++;
