@@ -23,6 +23,7 @@
 import { normalize, parse, evaluate, variablesOf } from './expr.js';
 import { texToPlain } from './texToPlain.js';
 import { questionFacts } from './questionFacts.js';
+import { pageProofs } from './pageProofs.js';
 
 const MINUS = /[−–—]/g;
 const clean = t => String(t ?? '').replace(MINUS, '-').replace(/\s+/g, ' ').trim();
@@ -410,6 +411,9 @@ function proveChainRule(text) {
 // ── the pass ─────────────────────────────────────────────────────────────────
 const unjudged = l => l && l.status === 'note' && !l.unread && !l.unreadable && (l.state === undefined || l.state === 'unverified') && l.note !== 'Follows from the earlier slip.';
 
+/** A note the page proofs (pageProofs.js) may turn into a tick or a heading: unjudged, unread, or a stated condition; never a candidate root or a slip follow-on. */
+export const openNote = l => !!l && l.status === 'note' && !l.candidate && !l.slipFollow && l.note !== 'Follows from the earlier slip.' && l.state !== 'wrong' && !l.context;
+
 /**
  * @param q       the question (only `prompt` is read)
  * @param meta    the question's step meta (markerOps.stepMetaFor)
@@ -442,15 +446,19 @@ export function provedLines(q, meta, report) {
     // state 'arithmetic' = true as written: the page says once that such a line is true, not that it is the right step; the note is shown as it is
     return { text: l.text, status: 'ok', state: 'arithmetic', note: proof.note, valueChain: { rule: 'proved' }, fact: { kind: 'proved', proof: proof.kind, ...(proof.how || {}) } };
   });
-  if (!n) return report;
-  return withLines(report, lines);
+  // The page-level proofs (pageProofs.js): substitutions, chains, second derivative, sign and nature, conclusions, conditions, the restated question
+  // and headings, each proved from the question's own function and the roots an earlier ticked line of the page established.
+  let pageN = 0, final = lines;
+  try { const pp = pageProofs(q, lines, limit, (l, i) => openNote(l)); final = pp.lines; pageN = pp.n + pp.lines.filter((l, i) => l !== lines[i] && l.status !== 'ok').length; } catch { final = lines; pageN = 0; }
+  if (!n && !pageN) return report;
+  return withLines(report, final);
 }
 
 // The report with these lines in place of its own, the summary counted again from them.
 function withLines(report, lines) {
   const stated = lines.map(l => ({ ...l, state: l.state || (l.status === 'ok' ? 'verified' : l.status === 'break' ? 'wrong' : l.unreadable ? 'unread' : 'unverified') }));
   const at = st => stated.flatMap((l, k) => (l.state === st ? [k + 1] : []));
-  const unverified = at('unverified'), unread = at('unread');
+  const unverified = stated.flatMap((l, k) => (l.state === 'unverified' && l.context !== true ? [k + 1] : [])), unread = at('unread');
   return {
     ...report, lines: stated, folded: report.folded || undefined,
     summary: {
@@ -466,15 +474,26 @@ function withLines(report, lines) {
  * lines ticked, `displayed` is the report the page would draw without them. Only a line that is still an unjudged note there takes the proved tick;
  * every other line (ticked, crossed, folded) stays exactly as it is, so this can only turn a note into a tick.
  */
+const DISPLAY_FIELDS = ['tickClass', 'notRequired', 'reasonId', 'correctedLine', 'correctedRhs', 'followsFromError', 'followsFrom'];
 export function adoptProved(displayed, shown) {
   if (!displayed || !shown || !Array.isArray(displayed.lines) || !Array.isArray(shown.lines) || displayed.lines.length !== shown.lines.length) return displayed;
   const brk = displayed.lines.findIndex(l => l?.status === 'break');
   let n = 0;
   const lines = displayed.lines.map((l, i) => {
     const w = shown.lines[i];
-    if ((brk >= 0 && i >= brk) || !unjudged(l) || !w || w.status !== 'ok' || String(w.text ?? '') !== String(l.text ?? '')) return l;
+    if (!l || !w || String(w.text ?? '') !== String(l.text ?? '')) return l;
+    if (brk < 0 || i < brk) {
+      // a heading is context, never a tick; a page-proved tick may replace any open note, an older proved tick only an unjudged one
+      if (w.context === true && w.tickClass === 'heading' && openNote(l)) { n++; return w; }
+      if (w.status === 'ok' && (unjudged(l) || (w.fact?.kind === 'proved' && openNote(l)))) { n++; return w; }
+    }
+    // display-only fields (displayFields.js) are copied onto a line that keeps its own status and state
+    const add = Object.fromEntries(DISPLAY_FIELDS.filter(k => w[k] !== undefined && l[k] === undefined && (k !== 'tickClass' || l.status === 'ok') && (k !== 'notRequired' || l.status === 'ok')).map(k => [k, w[k]]));
+    if (!Object.keys(add).length) return l;
     n++;
-    return w;
+    return { ...l, ...add };
   });
-  return n ? withLines(displayed, lines) : displayed;
+  if (!n) return displayed;
+  const out = withLines(displayed, lines);
+  return shown.answerLine !== undefined ? { ...out, answerLine: shown.answerLine } : out;
 }
