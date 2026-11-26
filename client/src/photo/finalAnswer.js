@@ -23,6 +23,7 @@ import { normalize, parse } from '../engine/expr.js';
 import { parseIntervalInput, parseMatrixInput, parseVectorInput } from '../engine/answer-forms.js';
 import { canonicalUnit, withoutUnit } from '../engine/units.js';
 import { unboxed, LIST_TYPES } from '../engine/boxes.js';
+import { joinGroupedNumbers } from '../engine/groupedNumber.js';
 
 /** Answer types this module can propose for. A choice or a page of working has no final-answer field. */
 export const PROPOSABLE_TYPES = Object.freeze(['numeric', 'expression', 'set', 'point', 'ratio', 'interval', 'matrix', 'vector']);
@@ -136,10 +137,12 @@ export { unboxed };
 const CLAUSE_VERBS = '(?:is|are|was|were|occurs?|occurring|occurred|happens?|obtained|attained|achieved|reached|found|given|seen|realised|realized|got|gained|taking\\s+place|being\\s+reached|attained)';
 const TRAILING_CLAUSE = new RegExp(`\\s*[,;(]?\\s*(?:\\b(?:which|that|this|it|and)\\s+)?(?:\\b${CLAUSE_VERBS}\\s+)+(?:at|when|whenever|where|if|for|after|during|by|as|on|in|with)\\b[^]*$`, 'iu');
 const TRAILING_PAREN = /\s*\(\s*(?:at|when|where|if|for|occurs|reached|attained)\b[^()]*\)\s*[.,;]?\s*$/iu;
+// "13040 users after 4 weeks": when the value was reached, as a number and a unit of time. Its number is never a candidate.
+const TRAILING_WHEN = /\s*[,;(]?\s*\b(?:after|in|within|over|during|at|by|for)\s+(?:the\s+)?(?:(?:first|last|next)\s+)?\d+(?:\.\d+)?\s+[a-z]+\s*[).,;]*\s*$/iu;
 /** The sentence without a trailing "obtained at …" clause — only when a value is still left in front of it. */
 export function withoutTrailingClause(text) {
   const s = String(text ?? '');
-  for (const re of [TRAILING_PAREN, TRAILING_CLAUSE]) {
+  for (const re of [TRAILING_PAREN, TRAILING_CLAUSE, TRAILING_WHEN]) {
     const m = re.exec(s);
     if (m && /\d|π/u.test(s.slice(0, m.index))) return s.slice(0, m.index).trim();
   }
@@ -148,7 +151,8 @@ export function withoutTrailingClause(text) {
 
 /** One line as the reader returned it, without the box and the trailing where-clause. */
 export function tidyLine(text, type = 'numeric') {
-  return withoutTrailingClause(unboxed(text, type));
+  // A number written with a thousands separator ("13 040") is one number, as the marked page reads it (engine/groupedNumber.js).
+  return withoutTrailingClause(joinGroupedNumbers(unboxed(text, type), { commas: type === 'numeric' }));
 }
 
 // Units written after a number, in any notation the student's pen used.
@@ -200,6 +204,14 @@ export function canonicalUnitText(tail) {
   return `${spell(num).join(' ')}${below}`;
 }
 
+const NOT_NOUNS = new Set(['less', 'plus', 'thus', 'minus', 'this', 'was', 'has', 'does', 'its', 'always', 'across', 'unless', 'perhaps', 'yes']);
+/** One to three plural words after a number ("users", "square units", "bus seats"): what was counted. */
+function countNouns(tail) {
+  const words = String(tail ?? '').trim().split(/\s+/);
+  if (!words.length || words.length > 3 || !words.every(w => /^[a-z]{3,}$/i.test(w) && !PROSE_AFTER_NUMBER.has(w.toLowerCase()) && !NOT_NOUNS.has(w.toLowerCase()))) return false;
+  return /^[a-z]{3,}s$/i.test(words.at(-1)) && !/ss$/i.test(words.at(-1));
+}
+
 const NUMBER_THEN_TAIL = /^([-+−–]?\s*(?:\d[\d,]*(?:\.\d+)?|\.\d+)(?:\s*\/\s*\d+)?)\s*([A-Za-zµμΩ][^]*)$/u;
 
 /**
@@ -220,6 +232,8 @@ function readableValue(text, question) {
   // A unit the marker does not read (kg m⁻³, N m, J/kg): a rate, a power or short symbols after the number. With no unit
   // in the question's box, or the box's own unit, the number is the answer and the box shows the unit. A DIFFERENT unit
   // is never taken off: that is the student's to check.
+  // "13040 users": a count of things, said in plural words. The words are not a unit, and the number is the answer.
+  if (!String(question?.answerSuffix ?? '').trim() && countNouns(m[2])) return readsAsAnswer(number, question) ? number : null;
   const letters = m[2].match(/[A-Za-zµμΩ]+/gu) || [];
   const unitish = w => !!canonicalUnit(w) || w.length <= 3 || ['per', 'square', 'sq', 'cubic', 'cu'].includes(w.toLowerCase());
   const shape = /^[A-Za-zµμΩ\s·.*/^(){}⁻⁺⁰¹²³⁴⁵⁶⁷⁸⁹0-9−–-]+$/u.test(m[2]) && !/\d[\d\s]*\d/.test(m[2].replace(/\^\s*[({]?-?\d+[)}]?/g, ''));
@@ -526,6 +540,49 @@ function fromLastConnector(s) {
   return rest && /[\d)π]/u.test(rest) ? rest : s;
 }
 
+// ── A sentence that names the quantity the question asks for ─────────────────
+// 27 Nov 2026 (real reader output, "The value of k is 7, so the area is 84 square units." under "Find k"): the line states two values, and the
+// answer was "ambiguous (84 or 7)". When the question names one quantity by a letter ("Find k", "the value of k") and the sentence assigns a
+// value to that letter, that value is the answer and the other quantities in the sentence are not candidates. Read from the public prompt
+// only: no key, no solution.
+const ASK_VERBS = String.raw`(?:find|calculate|determine|work\s+out|evaluate|solve\s+for|state|what\s+is|show\s+that\s+the\s+value\s+of)`;
+/** The one letter the question names as the thing to find ("Find $k$.", "the value of k"), or null when it names none or several. */
+export function askedName(question = {}) {
+  const prompt = String(question?.askedPrompt ?? question?.prompt ?? '').replace(/\\\$/g, '\u0001');
+  if (!prompt) return null;
+  const found = new Set();
+  const take = (letter, delimited) => { if (letter && (letter !== 'a' || delimited)) found.add(letter); };
+  for (const m of prompt.matchAll(new RegExp(String.raw`(?:^|[^\p{L}])${ASK_VERBS}\s+(?:the\s+)?(?:value\s+of\s+)?(?:(\$)\s*([A-Za-z])\s*\$|([A-Za-z]))(?=[\s.,?;]|$)`, 'giu'))) take(m[2] || m[3], !!m[1]);
+  for (const m of prompt.matchAll(/(?:^|[^\p{L}])value\s+of\s+(?:(\$)\s*([A-Za-z])\s*\$|([A-Za-z]))(?=[\s.,?;]|$)/giu)) take(m[2] || m[3], !!m[1]);
+  if (found.size !== 1) return null;
+  // Bind only when the prompt asks for EXACTLY ONE quantity (independent review of PR #1140): a second imperative ("hence find the area"), a second target
+  // ("Find k and the area"), a part label or a question word leaves nothing bound, and the card keeps offering the choices.
+  const imperatives = prompt.match(/(?:^|[^\p{L}])(?:find|determine|calculate|work\s+out|evaluate|state|solve|show|prove|hence|sketch|explain|justify|write|what|how\s+(?:many|much)|give|express|simplify|expand|factorise|factorize|differentiate|integrate)(?![\p{L}])/giu) || [];
+  if (imperatives.length !== 1) return null;
+  if (/(?:^|[\s(])\(\s*(?:[a-h]|[ivx]{1,4})\s*\)|\bpart\b/iu.test(prompt)) return null;
+  for (const m of prompt.matchAll(new RegExp(String.raw`(?:^|[^\p{L}])${ASK_VERBS}[^.?]*`, 'giu'))) {
+    if (/(?:^|[^\p{L}])and(?![\p{L}])/iu.test(m[0]) || /[;]/.test(m[0])) return null;
+  }
+  // "Find $k$ and $m$.": the sentence that asks names more than one letter, so no one of them is bound.
+  for (const m of prompt.matchAll(new RegExp(String.raw`(?:^|[^\p{L}])${ASK_VERBS}[^.?]*`, 'giu'))) {
+    const letters = new Set([...m[0].matchAll(/\$\s*([A-Za-z])\s*\$/g)].map(x => x[1]));
+    if (letters.size > 1) return null;
+  }
+  return [...found][0];
+}
+const CLAUSE_BREAK = /\s*(?:[,;]|(?<![\p{L}])(?:so|and|hence|thus|therefore|giving|gives|which)(?![\p{L}]))\s*/giu;
+/** The value a sentence gives the asked letter, when the sentence also states other values; null when it is not that shape. */
+function valueOfNamed(text, V, question) {
+  const assigns = new RegExp(String.raw`(?:^|[^\p{L}\d_])${V}(?:\s*\([^()]{0,12}\))?\s*(?:=|≈|is|equals)(?=\s)`, 'u');
+  const clauses = text.split(CLAUSE_BREAK).map(c => c.trim()).filter(Boolean).map(c => ({ c, v: valueOf(c, question) })).filter(x => x.v);
+  if (clauses.length < 2) return null;
+  const mine = clauses.filter(x => assigns.test(x.c));
+  if (!mine.length || mine.length === clauses.length) return null;
+  // "k = 7 or k = -12" is two values of k, not the last one
+  const values = distinct(mine.flatMap(x => (/\s(?:or|या)\s/iu.test(x.c) ? x.c.split(/\s+(?:or|या)\s+/iu).map(piece => valueOf(piece, question)) : [x.v])).filter(Boolean), question);
+  return values.length === 1 ? { status: 'proposed', answer: values[0], bound: true } : { status: 'ambiguous', candidates: values };
+}
+
 /**
  * What one line states as an answer.
  *   { status: 'proposed', answer }
@@ -533,9 +590,24 @@ function fromLastConnector(s) {
  *   { status: 'none' }
  */
 export function answerFromLine(line, question = {}) {
+  const found = answerFromJoinedLine(line, question);
+  // The student's own spelling of a grouped number ("1,234", "13 040") is what the field shows; a thin or no-break space is shown as digits.
+  if (found.status !== 'proposed' || (question?.answerType || 'numeric') !== 'numeric' || !/^-?\d+$/.test(found.answer)) return found;
+  const digits = found.answer.replace(/^-/, '');
+  const spelt = [...String(line ?? '').matchAll(/(?<![\p{L}\d.,^_])[1-9]\d{0,2}(?:(?: \d{3})+|(?:,\d{3})+)(?!\d)/gu)].map(m => m[0]).find(s => s.replace(/[ ,]/g, '') === digits);
+  return spelt ? { ...found, answer: (found.answer.startsWith('-') ? '-' : '') + spelt } : found;
+}
+
+function answerFromJoinedLine(line, question = {}) {
   const type = question?.answerType || 'numeric';
   if (!PROPOSABLE_TYPES.includes(type)) return { status: 'none' };
-  const s = fromLastConnector(stripSentence(tidyLine(line, type)));
+  const tidy = stripSentence(tidyLine(line, type));
+  const named = askedName(question);
+  if (named && ['numeric', 'expression'].includes(type)) {
+    const bound = valueOfNamed(tidy, named, question);
+    if (bound) return bound;
+  }
+  const s = fromLastConnector(tidy);
   if (!s) return { status: 'none' };
   if (type === 'point') return pointFromLine(s, question);
   if (type === 'set') {
@@ -648,7 +720,7 @@ function proposeFromWorking(lines, question = {}) {
   // something other than what was asked, so nothing is proposed — the student
   // is asked to enter the answer (#670 review: the photo path took whatever
   // followed the last "=" and so accepted what the typed field refused).
-  if (type === 'numeric' && fromLast.status === 'proposed' && !labelNamesTheAsk(last.text, fromLast.answer, question)) return { status: 'none' };
+  if (type === 'numeric' && fromLast.status === 'proposed' && !fromLast.bound && !labelNamesTheAsk(last.text, fromLast.answer, question)) return { status: 'none' };
   const all = distinct([
     ...(fromLast.status === 'proposed' ? [fromLast.answer] : []),
     ...announced.flatMap(l => (l.found.status === 'proposed' ? [l.found.answer] : l.found.candidates))

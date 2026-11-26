@@ -39,7 +39,10 @@
 
 export const VECTOR_CHAIN = 'vector-chain';
 
-const LIMITS = { lines: 12, chars: 160 };
+// The page limit is the working limit the checker already enforces (checker.js WORKING_LIMITS: 100 lines). It was 12, a guess made when working was a
+// few typed lines; a false link far down a real page of 20 to 60 lines was then left unchecked under a reason that was not true of it (27 Nov 2026: "= 864 - 1296 = -436" on line 15).
+// Each line costs one parse and one evaluation of a one-variable function, so the cost grows with the line count and nothing else. A line longer than `chars` is still left.
+const LIMITS = { lines: 100, chars: 160 };
 const GENERIC_NOTE = 'Not verified: Pri cannot check this line against the question.';
 const UNREAD_NOTE = 'This line could not be read as maths, so it is not checked.';
 const SUSPECT_NOTE = 'Not verified: a vector on this line may have been misread, so the line is not marked.';
@@ -257,7 +260,8 @@ export function stepCheckVectorChain(meta, workingText) {
 
   raw.forEach((line, i) => {
     if (!m) return note(line, GENERIC_NOTE);
-    if (i >= LIMITS.lines || line.length > LIMITS.chars) return note(line, 'Not verified: this line is too long or too far down the working to check.');
+    if (i >= LIMITS.lines) return note(line, 'Not verified: this is past the first 100 lines of the working, which is as far as a page is checked.');
+    if (line.length > LIMITS.chars) return note(line, 'Not verified: this line is too long to check. Write one step per line.');
     if (firstBreak !== -1) return note(line, 'Follows from the earlier slip.');
     const text = line.replace(/[−–—]/g, '-').replace(/[×·]/g, '*').replace(/≈/g, '=').replace(/√/g, ' sqrt ').replace(/²/g, '^2').replace(/³/g, '^3').replace(/([A-Za-z])[~̰]/g, '$1')
       .replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore|thus)\s+/i, '');

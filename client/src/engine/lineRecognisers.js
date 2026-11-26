@@ -22,12 +22,12 @@
 // thousands space is one number). Pure, deterministic, no model.
 // ─────────────────────────────────────────────────────────────────────────────
 import { texToPlain } from './texToPlain.js';
+import { NUM_SOURCE, numOf } from './groupedNumber.js';
 import { variablesOf, evaluate } from './expr.js';
 import { astOf, unwrap, closed, valueOf, same, polyOf, equalByEngine, findSubstitution, printPlain, printTex, printCanon } from './stepExplain.js';
 
 const MINUS = /[−–—]/g;
-const NUM = String.raw`(\d{1,3}(?:[ , ]\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)`;
-const numOf = s => Number(String(s).replace(/[ , ]/g, ''));
+const NUM = NUM_SOURCE;
 const sup = { '²': '2', '³': '3' };
 const lc = t => String(t ?? '').replace(MINUS, '-').replace(/[²³]/g, c => '^' + sup[c]).replace(/\\boxed\{([^}]*)\}/g, '$1').replace(/\[\s*([\d ,.]+)\s*\]/g, '$1').replace(/\s+/g, ' ').trim();
 const strip = t => lc(t).replace(/[.]+$/, '').replace(/^(?:∴|so|hence|then|therefore|thus)\s*:?\s*/i, '').trim();

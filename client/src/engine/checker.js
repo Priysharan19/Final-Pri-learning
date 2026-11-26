@@ -761,6 +761,9 @@ function lineVersusPrevious(prevText, text, meta) {
     const r = assessRelationLine({ text: pb, previous: pa, previousTrusted: true, meta: {} });
     return r.status === 'ok' ? 'same' : r.status === 'break' ? 'different' : 'unknown';
   }
+  // A lone "x" between a number or bracket and the next number or bracket is the reader's "×" as often as it is the letter: "2(2x^2 - 4) x 2x". Read as the
+  // letter it is a different line, and a "second slip" would be said of a line that is the line above simplified. Not a disproof: unknown.
+  if (/[\d)]\s+x\s+[\d(]/i.test(`${a} ${b}`)) return 'unknown';
   const na = normalize(a), nb = normalize(b);
   if (meta?.kind === 'equation') {
     if (!na.includes('=') || !nb.includes('=')) return 'unknown';
@@ -1874,7 +1877,13 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
           // is a line about another quantity: it is not the integral or the derivative, so it is
           // not held to it.
           status = 'note';
-          note = 'This defines something the method uses, so it is not checked against the answer.';
+          // Only a line that IS a definition says so; a line about the method's own letter says that; any other line the engine could not prove (a bare
+          // expression, a sentence, the answer line) says only that it was not checked: "defines something" on a final answer was not true of it.
+          note = SIDE_DEFINITION.test(squashed)
+            ? 'This defines something the method uses, so it is not checked against the answer.'
+            : AUXILIARY_CALCULUS.test(proseClean)
+              ? 'This is about a quantity the method introduces, not the answer itself, so it is not checked against the answer.'
+              : 'Not checked: Pri cannot tell from this line alone whether it is true.';
         } else if (assessed) {
           status = assessed.status;
           note = assessed.note;

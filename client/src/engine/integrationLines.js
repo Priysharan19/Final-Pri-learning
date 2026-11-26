@@ -363,7 +363,10 @@ function defClaim(c, st, lineNo, back) {
   const have = st.subs.get(L);
   if (have) {
     const cmp = compare(have.fn, val);
-    if (cmp.verdict === 'same') return { verdict: 'consistent', cls: 'substitution-consistent', note: `${L} = ${plain(rhs)} is the substitution defined above`, L };
+    // line 0 is the question's own sentence ("Differentiate y = ..."): nothing is "defined above" it, so it is said to be given
+    if (cmp.verdict === 'same') return have.line === 0
+      ? { verdict: 'consistent', cls: 'restated-function', note: `${L} = ${plain(rhs)} is the function given in the question`, L }
+      : { verdict: 'consistent', cls: 'substitution-consistent', note: `${L} = ${plain(rhs)} is the substitution defined above`, L };
     // a definition cannot be false: another expression for the same letter (a second part, a new try) REPLACES the old one, and later lines are checked against the latest
     if (cmp.verdict !== 'differ') return unknown('substitution not comparable');
   }

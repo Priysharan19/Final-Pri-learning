@@ -1,0 +1,3345 @@
+{
+ "about": "Production-reader outputs (text, confidence, boxes) of photographed or rendered pages, 26-27 Nov 2026. No image, no key, no student data; the owner pages are the owner's own. Used as regression fixtures; synthetic pages are marked as such in their note.",
+ "pages": {
+  "real48-815-users": {
+   "note": "Owner screenshot 48. The last line has a thousands space (\"13 040\") and \"4 weeks\" after it.",
+   "question": {
+    "custom": {
+     "prompt": "A phone app starts with 815 users and the number is multiplied by 2 every week. How many are there after 4 weeks?",
+     "answerType": "numeric"
+    }
+   },
+   "reading": {
+    "engine": "cloud-gpt-5.6-terra",
+    "confidence": 0.99,
+    "needsConfirmation": false,
+    "lines": [
+     {
+      "text": "Solution:",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.059,
+       "y": 0,
+       "w": 0.118,
+       "h": 0.046
+      }
+     },
+     {
+      "text": "Given: Initial users = 815, and the number of users doubles every week.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.06,
+       "y": 0.099,
+       "w": 0.923,
+       "h": 0.049
+      }
+     },
+     {
+      "text": "Method: Use a geometric sequence with common ratio r = 2.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.058,
+       "y": 0.207,
+       "w": 0.81,
+       "h": 0.053
+      }
+     },
+     {
+      "text": "Working:",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.057,
+       "y": 0.32,
+       "w": 0.128,
+       "h": 0.049
+      }
+     },
+     {
+      "text": "Let U_n be the number of users after n weeks.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.102,
+       "y": 0.383,
+       "w": 0.639,
+       "h": 0.044
+      }
+     },
+     {
+      "text": "Then U_n = 815 x 2^n.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.099,
+       "y": 0.454,
+       "w": 0.301,
+       "h": 0.045
+      }
+     },
+     {
+      "text": "After 4 weeks (n = 4),",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.077,
+       "y": 0.539,
+       "w": 0.329,
+       "h": 0.049
+      }
+     },
+     {
+      "text": "U_4 = 815 x 2^4",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.165,
+       "y": 0.613,
+       "w": 0.25,
+       "h": 0.046
+      }
+     },
+     {
+      "text": "= 815 x 16",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.209,
+       "y": 0.677,
+       "w": 0.18,
+       "h": 0.041
+      }
+     },
+     {
+      "text": "= 13 040.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.211,
+       "y": 0.744,
+       "w": 0.157,
+       "h": 0.042
+      }
+     },
+     {
+      "text": "Conclusion: There are 13 040 users after 4 weeks.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.054,
+       "y": 0.843,
+       "w": 0.807,
+       "h": 0.065
+      }
+     }
+    ]
+   }
+  },
+  "synth1-integration": {
+   "note": "Two columns; last line \"The value of k is 7, so the area is 84 square units.\" under \"Find k\".",
+   "question": {
+    "gen": "y12-integration",
+    "level": 3,
+    "seed": 1
+   },
+   "reading": {
+    "engine": "cloud-gpt-5.6-terra",
+    "confidence": 0.99,
+    "needsConfirmation": false,
+    "lines": [
+     {
+      "text": "Question: area under y = 2x + 5 from 0 to k is 84. Find k.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.08,
+       "y": 0.06,
+       "w": 0.54,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "Solution:",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.08,
+       "y": 0.11,
+       "w": 0.1,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "Area = ∫(2x + 5) dx from 0 to k",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.09,
+       "y": 0.16,
+       "w": 0.36,
+       "h": 0.04
+      }
+     },
+     {
+      "text": "= [x^2 + 5x] from 0 to k",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.09,
+       "y": 0.21,
+       "w": 0.29,
+       "h": 0.04
+      }
+     },
+     {
+      "text": "= k^2 + 5k - 0",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.09,
+       "y": 0.26,
+       "w": 0.2,
+       "h": 0.04
+      }
+     },
+     {
+      "text": "Factorise:",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.53,
+       "y": 0.16,
+       "w": 0.11,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "(k + 12)(k - 7) = 0",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.53,
+       "y": 0.21,
+       "w": 0.2,
+       "h": 0.04
+      }
+     },
+     {
+      "text": "k = -12 or k = 7",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.53,
+       "y": 0.26,
+       "w": 0.21,
+       "h": 0.04
+      }
+     },
+     {
+      "text": "So k^2 + 5k = 84",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.09,
+       "y": 0.31,
+       "w": 0.26,
+       "h": 0.04
+      }
+     },
+     {
+      "text": "k^2 + 5k - 84 = 0",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.09,
+       "y": 0.36,
+       "w": 0.22,
+       "h": 0.04
+      }
+     },
+     {
+      "text": "k > 0 so reject -12",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.53,
+       "y": 0.31,
+       "w": 0.24,
+       "h": 0.04
+      }
+     },
+     {
+      "text": "k = 7",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.53,
+       "y": 0.36,
+       "w": 0.07,
+       "h": 0.04
+      }
+     },
+     {
+      "text": "Check: 7^2 + 5(7) = 49 + 35 = 84 (true)",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.08,
+       "y": 0.47,
+       "w": 0.42,
+       "h": 0.04
+      }
+     },
+     {
+      "text": "Answer: k = 7",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.08,
+       "y": 0.54,
+       "w": 0.2,
+       "h": 0.05
+      }
+     },
+     {
+      "text": "The value of k is 7, so the area is 84 square units.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.08,
+       "y": 0.63,
+       "w": 0.51,
+       "h": 0.04
+      }
+     }
+    ]
+   }
+  },
+  "real-key12-velocity": {
+   "note": "Owner screenshot 46; the reader returned the conclusion cut off at \"obtained at t =\" and flagged it.",
+   "question": {
+    "qbank": "A12-C3-093"
+   },
+   "reading": {
+    "engine": "cloud-gpt-5.6-sol",
+    "confidence": 0.97,
+    "needsConfirmation": true,
+    "lines": [
+     {
+      "text": "Solution:",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.055,
+       "y": 0.014,
+       "w": 0.126,
+       "h": 0.044
+      }
+     },
+     {
+      "text": "Given v = 12t - 3t^2, 0 <= t <= 4.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.088,
+       "y": 0.061,
+       "w": 0.462,
+       "h": 0.046
+      }
+     },
+     {
+      "text": "To find the maximum velocity.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.088,
+       "y": 0.117,
+       "w": 0.425,
+       "h": 0.043
+      }
+     },
+     {
+      "text": "Method: Find the stationary point(s) of v(t) using",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.055,
+       "y": 0.193,
+       "w": 0.714,
+       "h": 0.052
+      }
+     },
+     {
+      "text": "dv/dt = 0, and compare with the endpoints t = 0 and t = 4.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.148,
+       "y": 0.26,
+       "w": 0.721,
+       "h": 0.066
+      }
+     },
+     {
+      "text": "Working:",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.052,
+       "y": 0.37,
+       "w": 0.119,
+       "h": 0.044
+      }
+     },
+     {
+      "text": "dv/dt = 12 - 6t.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.132,
+       "y": 0.428,
+       "w": 0.176,
+       "h": 0.066
+      }
+     },
+     {
+      "text": "Set dv/dt = 0:",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.087,
+       "y": 0.51,
+       "w": 0.183,
+       "h": 0.066
+      }
+     },
+     {
+      "text": "12 - 6t = 0 => t = 2.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.144,
+       "y": 0.586,
+       "w": 0.289,
+       "h": 0.035
+      }
+     },
+     {
+      "text": "v",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.708,
+       "y": 0.424,
+       "w": 0.017,
+       "h": 0.024
+      }
+     },
+     {
+      "text": "(2, 12)",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.795,
+       "y": 0.463,
+       "w": 0.066,
+       "h": 0.031
+      }
+     },
+     {
+      "text": "12",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.674,
+       "y": 0.518,
+       "w": 0.027,
+       "h": 0.028
+      }
+     },
+     {
+      "text": "Check values of v at t = 0, 2, 4:",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.067,
+       "y": 0.647,
+       "w": 0.407,
+       "h": 0.047
+      }
+     },
+     {
+      "text": "0",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.7,
+       "y": 0.67,
+       "w": 0.014,
+       "h": 0.025
+      }
+     },
+     {
+      "text": "2",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.787,
+       "y": 0.67,
+       "w": 0.013,
+       "h": 0.024
+      }
+     },
+     {
+      "text": "4",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.873,
+       "y": 0.671,
+       "w": 0.014,
+       "h": 0.025
+      }
+     },
+     {
+      "text": "t",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.928,
+       "y": 0.645,
+       "w": 0.016,
+       "h": 0.027
+      }
+     },
+     {
+      "text": "v(0) = 12(0) - 3(0)^2 = 0",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.091,
+       "y": 0.713,
+       "w": 0.3,
+       "h": 0.04
+      }
+     },
+     {
+      "text": "v(2) = 12(2) - 3(2)^2 = 24 - 12 = 12",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.091,
+       "y": 0.765,
+       "w": 0.382,
+       "h": 0.041
+      }
+     },
+     {
+      "text": "v(4) = 12(4) - 3(4)^2 = 48 - 48 = 0.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.091,
+       "y": 0.817,
+       "w": 0.393,
+       "h": 0.041
+      }
+     },
+     {
+      "text": "Conclusion: The maximum velocity is 12 m s^-1, obtained at t =",
+      "confidence": 0.97,
+      "uncertain": true,
+      "doubt": "The value after t = is obscured or cropped",
+      "gapBefore": true,
+      "box": {
+       "x": 0.043,
+       "y": 0.919,
+       "w": 0.816,
+       "h": 0.056
+      }
+     }
+    ]
+   }
+  },
+  "real-key6-two-column-interleaved": {
+   "note": "Fresh read of the stationary-points page: the reader interleaved the two columns row by row.",
+   "question": {
+    "gen": "y12-appdiff",
+    "level": 1,
+    "promptRe": "4x\\^3 - 36x\\^2\\$ has two stationary points\\. Find the \\*\\*larger\\*\\*"
+   },
+   "reading": {
+    "engine": "cloud-gpt-5.6-terra",
+    "confidence": 0.99,
+    "needsConfirmation": false,
+    "lines": [
+     {
+      "text": "The curve y = 4x^3 - 36x^2 has two stationary points. Find the larger x-coordinate.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.104,
+       "y": 0.014,
+       "w": 0.796,
+       "h": 0.057
+      }
+     },
+     {
+      "text": "Solution:",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.106,
+       "y": 0.092,
+       "w": 0.104,
+       "h": 0.041
+      }
+     },
+     {
+      "text": "y = 4x^3 - 36x^2",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.147,
+       "y": 0.137,
+       "w": 0.194,
+       "h": 0.05
+      }
+     },
+     {
+      "text": "d^2y/dx^2 = 24x - 72",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.653,
+       "y": 0.127,
+       "w": 0.203,
+       "h": 0.084
+      }
+     },
+     {
+      "text": "dy/dx = 12x^2 - 72x",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.14,
+       "y": 0.207,
+       "w": 0.23,
+       "h": 0.076
+      }
+     },
+     {
+      "text": "At x = 0: d^2y/dx^2 = -72 < 0",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.65,
+       "y": 0.238,
+       "w": 0.302,
+       "h": 0.084
+      }
+     },
+     {
+      "text": "Stationary points when dy/dx = 0:",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.121,
+       "y": 0.29,
+       "w": 0.337,
+       "h": 0.072
+      }
+     },
+     {
+      "text": "(local maximum)",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.822,
+       "y": 0.325,
+       "w": 0.163,
+       "h": 0.039
+      }
+     },
+     {
+      "text": "12x^2 - 72x = 0",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.171,
+       "y": 0.372,
+       "w": 0.155,
+       "h": 0.045
+      }
+     },
+     {
+      "text": "At x = 6: d^2y/dx^2 = 72 > 0",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.65,
+       "y": 0.39,
+       "w": 0.3,
+       "h": 0.085
+      }
+     },
+     {
+      "text": "12x(x - 6) = 0",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.172,
+       "y": 0.438,
+       "w": 0.162,
+       "h": 0.045
+      }
+     },
+     {
+      "text": "(local minimum)",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.819,
+       "y": 0.477,
+       "w": 0.168,
+       "h": 0.039
+      }
+     },
+     {
+      "text": "So x = 0 or x = 6.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.149,
+       "y": 0.5,
+       "w": 0.238,
+       "h": 0.044
+      }
+     },
+     {
+      "text": "The stationary points are:",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.116,
+       "y": 0.563,
+       "w": 0.279,
+       "h": 0.042
+      }
+     },
+     {
+      "text": "At x = 0: y = 4(0)^3 - 36(0)^2 = 0 => (0,0)",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.126,
+       "y": 0.62,
+       "w": 0.493,
+       "h": 0.046
+      }
+     },
+     {
+      "text": "At x = 6: y = 4(6)^3 - 36(6)^2 = 4(216) - 36(36)",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.126,
+       "y": 0.678,
+       "w": 0.512,
+       "h": 0.045
+      }
+     },
+     {
+      "text": "= 864 - 1296 = -432 => (6,-432)",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.263,
+       "y": 0.739,
+       "w": 0.441,
+       "h": 0.04
+      }
+     },
+     {
+      "text": "The two stationary points are (0,0) and (6,-432).",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.108,
+       "y": 0.843,
+       "w": 0.578,
+       "h": 0.049
+      }
+     },
+     {
+      "text": "The larger x-coordinate is 6.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.111,
+       "y": 0.914,
+       "w": 0.357,
+       "h": 0.052
+      }
+     }
+    ]
+   }
+  },
+  "real-key6-two-column-in-order": {
+   "note": "The earlier read of the same page: the columns already one after the other.",
+   "question": {
+    "gen": "y12-appdiff",
+    "level": 1,
+    "promptRe": "4x\\^3 - 36x\\^2\\$ has two stationary points\\. Find the \\*\\*larger\\*\\*"
+   },
+   "reading": {
+    "engine": "cloud-gpt-5.6-terra",
+    "confidence": 0.99,
+    "needsConfirmation": false,
+    "lines": [
+     {
+      "text": "The curve y = 4x^3 - 36x^2 has two stationary points. Find the larger x-coordinate.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.105,
+       "y": 0.014,
+       "w": 0.881,
+       "h": 0.055
+      }
+     },
+     {
+      "text": "Solution:",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.105,
+       "y": 0.091,
+       "w": 0.098,
+       "h": 0.044
+      }
+     },
+     {
+      "text": "y = 4x^3 - 36x^2",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.146,
+       "y": 0.137,
+       "w": 0.222,
+       "h": 0.049
+      }
+     },
+     {
+      "text": "dy/dx = 12x^2 - 72x",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.135,
+       "y": 0.208,
+       "w": 0.233,
+       "h": 0.078
+      }
+     },
+     {
+      "text": "Stationary points when dy/dx = 0:",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.118,
+       "y": 0.311,
+       "w": 0.346,
+       "h": 0.063
+      }
+     },
+     {
+      "text": "12x^2 - 72x = 0",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.171,
+       "y": 0.377,
+       "w": 0.171,
+       "h": 0.04
+      }
+     },
+     {
+      "text": "12x (x - 6) = 0",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.175,
+       "y": 0.442,
+       "w": 0.171,
+       "h": 0.039
+      }
+     },
+     {
+      "text": "So x = 0 or x = 6.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.15,
+       "y": 0.503,
+       "w": 0.239,
+       "h": 0.041
+      }
+     },
+     {
+      "text": "The stationary points are:",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.116,
+       "y": 0.566,
+       "w": 0.296,
+       "h": 0.038
+      }
+     },
+     {
+      "text": "At x = 0: y = 4(0)^3 - 36(0)^2 = 0 => (0,0)",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.127,
+       "y": 0.62,
+       "w": 0.494,
+       "h": 0.041
+      }
+     },
+     {
+      "text": "At x = 6: y = 4(6)^3 - 36(6)^2 = 4(216) - 36(36)",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.127,
+       "y": 0.679,
+       "w": 0.607,
+       "h": 0.042
+      }
+     },
+     {
+      "text": "= 864 - 1296 = -432 => (6,-432)",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.263,
+       "y": 0.741,
+       "w": 0.421,
+       "h": 0.04
+      }
+     },
+     {
+      "text": "d^2y/dx^2 = 24x - 72",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.654,
+       "y": 0.127,
+       "w": 0.235,
+       "h": 0.082
+      }
+     },
+     {
+      "text": "At x = 0: d^2y/dx^2 = -72 < 0",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.65,
+       "y": 0.246,
+       "w": 0.304,
+       "h": 0.073
+      }
+     },
+     {
+      "text": "(local maximum)",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.818,
+       "y": 0.324,
+       "w": 0.169,
+       "h": 0.039
+      }
+     },
+     {
+      "text": "At x = 6: d^2y/dx^2 = 72 > 0",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.65,
+       "y": 0.394,
+       "w": 0.303,
+       "h": 0.075
+      }
+     },
+     {
+      "text": "(local minimum)",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.816,
+       "y": 0.477,
+       "w": 0.171,
+       "h": 0.04
+      }
+     },
+     {
+      "text": "The two stationary points are (0,0) and (6,-432).",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.106,
+       "y": 0.848,
+       "w": 0.593,
+       "h": 0.043
+      }
+     },
+     {
+      "text": "The larger x-coordinate is 6.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.112,
+       "y": 0.917,
+       "w": 0.359,
+       "h": 0.051
+      }
+     }
+    ]
+   }
+  },
+  "synth8-arithmetic-slip": {
+   "note": "Two columns, interleaved; \"= 864 - 1296 = -436 => (6, -436)\" is false (-432) and is line 15.",
+   "question": {
+    "gen": "y12-appdiff",
+    "level": 1,
+    "promptRe": "4x\\^3 - 36x\\^2\\$ has two stationary points\\. Find the \\*\\*larger\\*\\*"
+   },
+   "reading": {
+    "engine": "cloud-gpt-5.6-terra",
+    "confidence": 0.98,
+    "needsConfirmation": false,
+    "lines": [
+     {
+      "text": "The curve y = 4x^3 - 36x^2 has two stationary points. Find the larger x-coordinate.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.079,
+       "y": 0.06,
+       "w": 0.815,
+       "h": 0.025
+      }
+     },
+     {
+      "text": "Solution:",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.078,
+       "y": 0.112,
+       "w": 0.13,
+       "h": 0.025
+      }
+     },
+     {
+      "text": "y = 4x^3 - 36x^2",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.092,
+       "y": 0.165,
+       "w": 0.208,
+       "h": 0.029
+      }
+     },
+     {
+      "text": "d^2y/dx^2 = 24x - 72",
+      "confidence": 0.98,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.546,
+       "y": 0.163,
+       "w": 0.239,
+       "h": 0.029
+      }
+     },
+     {
+      "text": "dy/dx = 12x^2 - 72x",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.093,
+       "y": 0.211,
+       "w": 0.254,
+       "h": 0.055
+      }
+     },
+     {
+      "text": "At x = 0: d^2y/dx^2 = -72 < 0",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.545,
+       "y": 0.226,
+       "w": 0.324,
+       "h": 0.027
+      }
+     },
+     {
+      "text": "(local maximum)",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.549,
+       "y": 0.279,
+       "w": 0.207,
+       "h": 0.027
+      }
+     },
+     {
+      "text": "12x^2 - 72x = 0",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.092,
+       "y": 0.306,
+       "w": 0.201,
+       "h": 0.025
+      }
+     },
+     {
+      "text": "At x = 6: d^2y/dx^2 = 72 > 0",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.545,
+       "y": 0.343,
+       "w": 0.309,
+       "h": 0.027
+      }
+     },
+     {
+      "text": "12x(x - 6) = 0",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.092,
+       "y": 0.359,
+       "w": 0.18,
+       "h": 0.026
+      }
+     },
+     {
+      "text": "(local minimum)",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.549,
+       "y": 0.396,
+       "w": 0.203,
+       "h": 0.026
+      }
+     },
+     {
+      "text": "So x = 0 or x = 6.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.092,
+       "y": 0.413,
+       "w": 0.217,
+       "h": 0.025
+      }
+     },
+     {
+      "text": "The stationary points are:",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.079,
+       "y": 0.518,
+       "w": 0.284,
+       "h": 0.027
+      }
+     },
+     {
+      "text": "At x = 6: y = 4(6)^3 - 36(6)^2 = 4(216) - 36(36)",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.098,
+       "y": 0.572,
+       "w": 0.536,
+       "h": 0.025
+      }
+     },
+     {
+      "text": "= 864 - 1296 = -436 => (6, -436)",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.175,
+       "y": 0.626,
+       "w": 0.427,
+       "h": 0.025
+      }
+     },
+     {
+      "text": "The larger x-coordinate is",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.079,
+       "y": 0.72,
+       "w": 0.34,
+       "h": 0.027
+      }
+     },
+     {
+      "text": "6",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.425,
+       "y": 0.706,
+       "w": 0.041,
+       "h": 0.051
+      }
+     }
+    ]
+   }
+  },
+  "synth6-wrong-middle-step": {
+   "note": "du/dx = 2x is the deliberate slip (4x).",
+   "question": {
+    "gen": "y12-diff",
+    "level": 2,
+    "seed": 4
+   },
+   "reading": {
+    "engine": "cloud-gpt-5.6-terra",
+    "confidence": 0.99,
+    "needsConfirmation": false,
+    "lines": [
+     {
+      "text": "Differentiate y = (2x^2 - 4)^2",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.08,
+       "y": 0.055,
+       "w": 0.306,
+       "h": 0.036
+      }
+     },
+     {
+      "text": "Chain rule",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.08,
+       "y": 0.111,
+       "w": 0.108,
+       "h": 0.034
+      }
+     },
+     {
+      "text": "Let u = 2x^2 - 4",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.08,
+       "y": 0.174,
+       "w": 0.145,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "du/dx = 2x",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.08,
+       "y": 0.232,
+       "w": 0.129,
+       "h": 0.027
+      }
+     },
+     {
+      "text": "y = u^2 so dy/du = 2u",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.08,
+       "y": 0.283,
+       "w": 0.207,
+       "h": 0.029
+      }
+     },
+     {
+      "text": "dy/dx = dy/du x du/dx",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.08,
+       "y": 0.347,
+       "w": 0.245,
+       "h": 0.029
+      }
+     },
+     {
+      "text": "dy/dx = 2(2x^2 - 4) x 2x",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.08,
+       "y": 0.401,
+       "w": 0.262,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "dy/dx = 4x(2x^2 - 4)",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.08,
+       "y": 0.455,
+       "w": 0.223,
+       "h": 0.029
+      }
+     },
+     {
+      "text": "Answer:",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.08,
+       "y": 0.546,
+       "w": 0.109,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "4x(2x^2 - 4)",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.215,
+       "y": 0.538,
+       "w": 0.201,
+       "h": 0.049
+      }
+     },
+     {
+      "text": "So the derivative is 4x(2x^2 - 4).",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.08,
+       "y": 0.629,
+       "w": 0.324,
+       "h": 0.03
+      }
+     }
+    ]
+   }
+  },
+  "synth7-slip-then-right": {
+   "note": "h = -6 is false, h = -7 is right.",
+   "question": {
+    "gen": "y11-quadfunc",
+    "level": 2,
+    "seed": 3
+   },
+   "reading": {
+    "engine": "cloud-gpt-5.6-terra",
+    "confidence": 0.99,
+    "needsConfirmation": false,
+    "lines": [
+     {
+      "text": "A parabola crosses the x-axis at x = -14 and x = 0. Find the axis of symmetry x = h.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.079,
+       "y": 0.061,
+       "w": 0.687,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "Solution",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.08,
+       "y": 0.116,
+       "w": 0.08,
+       "h": 0.034
+      }
+     },
+     {
+      "text": "h = (-14 + 0) / 2",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.099,
+       "y": 0.178,
+       "w": 0.182,
+       "h": 0.035
+      }
+     },
+     {
+      "text": "h = -14 / 2",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.099,
+       "y": 0.233,
+       "w": 0.12,
+       "h": 0.033
+      }
+     },
+     {
+      "text": "h = -6",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.099,
+       "y": 0.288,
+       "w": 0.068,
+       "h": 0.032
+      }
+     },
+     {
+      "text": "h = -7",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.099,
+       "y": 0.344,
+       "w": 0.067,
+       "h": 0.032
+      }
+     },
+     {
+      "text": "Answer:",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.079,
+       "y": 0.435,
+       "w": 0.088,
+       "h": 0.033
+      }
+     },
+     {
+      "text": "x = -7",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.214,
+       "y": 0.435,
+       "w": 0.087,
+       "h": 0.031
+      }
+     },
+     {
+      "text": "The axis of symmetry is x = -7.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.079,
+       "y": 0.519,
+       "w": 0.321,
+       "h": 0.035
+      }
+     }
+    ]
+   }
+  },
+  "control-key6-annotated": {
+   "note": "Stored reader output used only to show that a page the reader already ordered is left as it came.",
+   "question": null,
+   "reading": {
+    "engine": "cloud-gpt-5.6-terra",
+    "confidence": 0.99,
+    "needsConfirmation": false,
+    "lines": [
+     {
+      "text": "The curve y = 4x^3 - 36x^2 has two stationary points. Find the larger",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.033,
+       "y": 0.009,
+       "w": 0.956,
+       "h": 0.049
+      }
+     },
+     {
+      "text": "x-coordinate.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.036,
+       "y": 0.067,
+       "w": 0.184,
+       "h": 0.032
+      }
+     },
+     {
+      "text": "Solution:",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.029,
+       "y": 0.126,
+       "w": 0.125,
+       "h": 0.038
+      }
+     },
+     {
+      "text": "y = 4x^3 - 36x^2",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.076,
+       "y": 0.171,
+       "w": 0.217,
+       "h": 0.043
+      }
+     },
+     {
+      "text": "d y/d x = 12x^2 - 72x",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.066,
+       "y": 0.236,
+       "w": 0.254,
+       "h": 0.07
+      }
+     },
+     {
+      "text": "Correct differentiation",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.352,
+       "y": 0.234,
+       "w": 0.239,
+       "h": 0.033
+      }
+     },
+     {
+      "text": "(power rule)",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.353,
+       "y": 0.27,
+       "w": 0.142,
+       "h": 0.031
+      }
+     },
+     {
+      "text": "d^2y/dx^2 = 24x - 72",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.633,
+       "y": 0.159,
+       "w": 0.221,
+       "h": 0.071
+      }
+     },
+     {
+      "text": "Stationary points when d y/d x = 0:",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.028,
+       "y": 0.319,
+       "w": 0.409,
+       "h": 0.061
+      }
+     },
+     {
+      "text": "12x^2 - 72x = 0",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.081,
+       "y": 0.388,
+       "w": 0.203,
+       "h": 0.034
+      }
+     },
+     {
+      "text": "At x = 0: d^2y/dx^2 = -72 < 0",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.609,
+       "y": 0.259,
+       "w": 0.33,
+       "h": 0.062
+      }
+     },
+     {
+      "text": "(local maximum)",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.773,
+       "y": 0.321,
+       "w": 0.157,
+       "h": 0.032
+      }
+     },
+     {
+      "text": "12x(x - 6) = 0",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.083,
+       "y": 0.439,
+       "w": 0.205,
+       "h": 0.037
+      }
+     },
+     {
+      "text": "Correct condition,",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.371,
+       "y": 0.425,
+       "w": 0.209,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "factorisation and",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.389,
+       "y": 0.459,
+       "w": 0.177,
+       "h": 0.029
+      }
+     },
+     {
+      "text": "stationary values",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.4,
+       "y": 0.493,
+       "w": 0.177,
+       "h": 0.032
+      }
+     },
+     {
+      "text": "At x = 6: d^2y/dx^2 = 72 > 0",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.61,
+       "y": 0.371,
+       "w": 0.328,
+       "h": 0.062
+      }
+     },
+     {
+      "text": "(local minimum)",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.771,
+       "y": 0.442,
+       "w": 0.162,
+       "h": 0.033
+      }
+     },
+     {
+      "text": "So x = 0 or x = 6.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.057,
+       "y": 0.495,
+       "w": 0.31,
+       "h": 0.036
+      }
+     },
+     {
+      "text": "The stationary points are:",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.021,
+       "y": 0.554,
+       "w": 0.355,
+       "h": 0.038
+      }
+     },
+     {
+      "text": "At x = 0: y = 4(0)^3 - 36(0)^2 = 0 => (0,0)",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.038,
+       "y": 0.614,
+       "w": 0.583,
+       "h": 0.038
+      }
+     },
+     {
+      "text": "At x = 6: y = 4(6)^3 - 36(6)^2 = 4(216) - 36(36)",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.036,
+       "y": 0.669,
+       "w": 0.702,
+       "h": 0.039
+      }
+     },
+     {
+      "text": "= 864 - 1296 = -432 => (6,-432)",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.236,
+       "y": 0.726,
+       "w": 0.501,
+       "h": 0.038
+      }
+     },
+     {
+      "text": "Correct, but",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.767,
+       "y": 0.588,
+       "w": 0.161,
+       "h": 0.031
+      }
+     },
+     {
+      "text": "not required",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.792,
+       "y": 0.62,
+       "w": 0.144,
+       "h": 0.031
+      }
+     },
+     {
+      "text": "(unnecessary",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.778,
+       "y": 0.655,
+       "w": 0.157,
+       "h": 0.032
+      }
+     },
+     {
+      "text": "working)",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.811,
+       "y": 0.69,
+       "w": 0.108,
+       "h": 0.031
+      }
+     },
+     {
+      "text": "The two stationary points are (0,0) and (6,-432).",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.022,
+       "y": 0.808,
+       "w": 0.712,
+       "h": 0.04
+      }
+     },
+     {
+      "text": "The larger x-coordinate is 6.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.022,
+       "y": 0.88,
+       "w": 0.449,
+       "h": 0.041
+      }
+     },
+     {
+      "text": "1/1",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.945,
+       "y": 0.22,
+       "w": 0.052,
+       "h": 0.04
+      }
+     },
+     {
+      "text": "1/1",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.945,
+       "y": 0.42,
+       "w": 0.054,
+       "h": 0.041
+      }
+     },
+     {
+      "text": "1/1",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.945,
+       "y": 0.879,
+       "w": 0.052,
+       "h": 0.041
+      }
+     }
+    ]
+   }
+  },
+  "real-key12-overlay-masked": {
+   "note": "Stored reader output used only to show that a page the reader already ordered is left as it came.",
+   "question": null,
+   "reading": {
+    "engine": "cloud-gpt-5.6-terra",
+    "confidence": 0.98,
+    "needsConfirmation": false,
+    "lines": [
+     {
+      "text": "Solution:",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.057,
+       "y": 0.014,
+       "w": 0.121,
+       "h": 0.049
+      }
+     },
+     {
+      "text": "Given v = 12t - 3t^2, 0 <= t <= 4.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.087,
+       "y": 0.061,
+       "w": 0.47,
+       "h": 0.046
+      }
+     },
+     {
+      "text": "To find the maximum velocity.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.086,
+       "y": 0.116,
+       "w": 0.412,
+       "h": 0.043
+      }
+     },
+     {
+      "text": "Method: Find the stationary point(s) of v(t) using",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.052,
+       "y": 0.195,
+       "w": 0.713,
+       "h": 0.05
+      }
+     },
+     {
+      "text": "dv/dt = 0, and compare with the endpoints t = 0 and t = 4.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.149,
+       "y": 0.264,
+       "w": 0.749,
+       "h": 0.07
+      }
+     },
+     {
+      "text": "Working:",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.05,
+       "y": 0.372,
+       "w": 0.131,
+       "h": 0.043
+      }
+     },
+     {
+      "text": "dv/dt = 12 - 6t.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.133,
+       "y": 0.424,
+       "w": 0.271,
+       "h": 0.071
+      }
+     },
+     {
+      "text": "Set dv/dt = 0:",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.085,
+       "y": 0.516,
+       "w": 0.173,
+       "h": 0.067
+      }
+     },
+     {
+      "text": "12 - 6t = 0 => t = 2.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.144,
+       "y": 0.589,
+       "w": 0.288,
+       "h": 0.039
+      }
+     },
+     {
+      "text": "Check values of v at t=0, 2, 4:",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.064,
+       "y": 0.666,
+       "w": 0.412,
+       "h": 0.039
+      }
+     },
+     {
+      "text": "v(0) = 12(0) - 3(0)^2 = 0",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.09,
+       "y": 0.722,
+       "w": 0.318,
+       "h": 0.039
+      }
+     },
+     {
+      "text": "v(2) = 12(2) - 3(2)^2 = 24 - 12 = 12",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.09,
+       "y": 0.774,
+       "w": 0.439,
+       "h": 0.04
+      }
+     },
+     {
+      "text": "v(4) = 12(4) - 3(4)^2 = 48 - 48 = 0.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.09,
+       "y": 0.825,
+       "w": 0.452,
+       "h": 0.041
+      }
+     },
+     {
+      "text": "v",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.709,
+       "y": 0.425,
+       "w": 0.013,
+       "h": 0.026
+      }
+     },
+     {
+      "text": "(2,12)",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.796,
+       "y": 0.465,
+       "w": 0.071,
+       "h": 0.031
+      }
+     },
+     {
+      "text": "12",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.672,
+       "y": 0.523,
+       "w": 0.021,
+       "h": 0.024
+      }
+     },
+     {
+      "text": "0",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.701,
+       "y": 0.687,
+       "w": 0.013,
+       "h": 0.024
+      }
+     },
+     {
+      "text": "2",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.783,
+       "y": 0.683,
+       "w": 0.013,
+       "h": 0.024
+      }
+     },
+     {
+      "text": "4",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.87,
+       "y": 0.683,
+       "w": 0.012,
+       "h": 0.026
+      }
+     },
+     {
+      "text": "t",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.928,
+       "y": 0.651,
+       "w": 0.012,
+       "h": 0.028
+      }
+     },
+     {
+      "text": "Conclusion: The maximum velocity is 12 ms^-1, obtained at t:",
+      "confidence": 0.98,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.042,
+       "y": 0.927,
+       "w": 0.81,
+       "h": 0.062
+      }
+     }
+    ]
+   }
+  },
+  "synth2": {
+   "note": "Stored reader output used only to show that a page the reader already ordered is left as it came.",
+   "question": null,
+   "reading": {
+    "engine": "cloud-gpt-5.6-terra",
+    "confidence": 0.99,
+    "needsConfirmation": false,
+    "lines": [
+     {
+      "text": "Rates of change - pond",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.078,
+       "y": 0.063,
+       "w": 0.284,
+       "h": 0.028
+      }
+     },
+     {
+      "text": "A = (t + 5)(5t + 9)",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.079,
+       "y": 0.116,
+       "w": 0.287,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "A = 5t^2 + 9t + 25t + 45",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.079,
+       "y": 0.175,
+       "w": 0.318,
+       "h": 0.024
+      }
+     },
+     {
+      "text": "A = 5t^2 + 34t + 45",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.079,
+       "y": 0.229,
+       "w": 0.258,
+       "h": 0.024
+      }
+     },
+     {
+      "text": "Rate: dA/dt = 10t + 34",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.079,
+       "y": 0.271,
+       "w": 0.327,
+       "h": 0.058
+      }
+     },
+     {
+      "text": "When t = 2:",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.079,
+       "y": 0.349,
+       "w": 0.153,
+       "h": 0.025
+      }
+     },
+     {
+      "text": "dA/dt = 10(2) + 34",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.1,
+       "y": 0.39,
+       "w": 0.266,
+       "h": 0.06
+      }
+     },
+     {
+      "text": "= 20 + 34",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.081,
+       "y": 0.482,
+       "w": 0.153,
+       "h": 0.023
+      }
+     },
+     {
+      "text": "= 54",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.081,
+       "y": 0.537,
+       "w": 0.066,
+       "h": 0.02
+      }
+     },
+     {
+      "text": "Answer: 54 m^2/day",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.079,
+       "y": 0.606,
+       "w": 0.301,
+       "h": 0.051
+      }
+     },
+     {
+      "text": "After 2 days the area is increasing at 54 m^2/day.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.079,
+       "y": 0.69,
+       "w": 0.613,
+       "h": 0.03
+      }
+     }
+    ]
+   }
+  },
+  "synth3": {
+   "note": "Stored reader output used only to show that a page the reader already ordered is left as it came.",
+   "question": null,
+   "reading": {
+    "engine": "cloud-gpt-5.6-terra",
+    "confidence": 0.99,
+    "needsConfirmation": false,
+    "lines": [
+     {
+      "text": "In triangle ABC, A = 49°, a = 22 cm, b = 15 cm, B acute. Find C.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.078,
+       "y": 0.06,
+       "w": 0.62,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "sin B/15 = sin 49°/22",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.086,
+       "y": 0.164,
+       "w": 0.182,
+       "h": 0.063
+      }
+     },
+     {
+      "text": "Angle sum of a triangle:",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.532,
+       "y": 0.166,
+       "w": 0.278,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "C = 180° - 49° - 31°",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.533,
+       "y": 0.219,
+       "w": 0.289,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "sin B = 15 sin 49° / 22",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.093,
+       "y": 0.267,
+       "w": 0.276,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "C = 100°",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.533,
+       "y": 0.274,
+       "w": 0.118,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "sin B = 0.5146...",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.094,
+       "y": 0.321,
+       "w": 0.17,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "B = arcsin(0.5146)",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.094,
+       "y": 0.375,
+       "w": 0.25,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "Check: largest angle opposite",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.531,
+       "y": 0.362,
+       "w": 0.336,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "B = 31° (nearest degree)",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.092,
+       "y": 0.428,
+       "w": 0.245,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "largest side a. ok",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.532,
+       "y": 0.409,
+       "w": 0.226,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "Answer: C = 100°",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.093,
+       "y": 0.585,
+       "w": 0.258,
+       "h": 0.05
+      }
+     },
+     {
+      "text": "So angle C is 100° to the nearest degree.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.079,
+       "y": 0.676,
+       "w": 0.405,
+       "h": 0.03
+      }
+     }
+    ]
+   }
+  },
+  "synth4": {
+   "note": "Stored reader output used only to show that a page the reader already ordered is left as it came.",
+   "question": null,
+   "reading": {
+    "engine": "cloud-gpt-5.6-terra",
+    "confidence": 0.99,
+    "needsConfirmation": false,
+    "lines": [
+     {
+      "text": "Parallel fence",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.079,
+       "y": 0.056,
+       "w": 0.162,
+       "h": 0.033
+      }
+     },
+     {
+      "text": "Given fence: y = -2x - 4, so gradient m = -2",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.079,
+       "y": 0.112,
+       "w": 0.403,
+       "h": 0.031
+      }
+     },
+     {
+      "text": "Parallel lines have the same gradient: m = -2",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.079,
+       "y": 0.167,
+       "w": 0.382,
+       "h": 0.031
+      }
+     },
+     {
+      "text": "New fence: y = -2x + c",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.079,
+       "y": 0.221,
+       "w": 0.243,
+       "h": 0.032
+      }
+     },
+     {
+      "text": "Through (5, 2):",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.079,
+       "y": 0.276,
+       "w": 0.156,
+       "h": 0.031
+      }
+     },
+     {
+      "text": "2 = -2(5) + c",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.106,
+       "y": 0.33,
+       "w": 0.118,
+       "h": 0.032
+      }
+     },
+     {
+      "text": "2 = -10 + c",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.107,
+       "y": 0.385,
+       "w": 0.112,
+       "h": 0.032
+      }
+     },
+     {
+      "text": "c = 12",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.107,
+       "y": 0.439,
+       "w": 0.063,
+       "h": 0.031
+      }
+     },
+     {
+      "text": "So the equation is y = -2x + 12.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.079,
+       "y": 0.507,
+       "w": 0.31,
+       "h": 0.032
+      }
+     },
+     {
+      "text": "y-intercept = 12 m",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.079,
+       "y": 0.594,
+       "w": 0.28,
+       "h": 0.051
+      }
+     },
+     {
+      "text": "The new fence crosses the y-axis at 12 metres.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.079,
+       "y": 0.668,
+       "w": 0.494,
+       "h": 0.032
+      }
+     }
+    ]
+   }
+  },
+  "synth5": {
+   "note": "Stored reader output used only to show that a page the reader already ordered is left as it came.",
+   "question": null,
+   "reading": {
+    "engine": "cloud-gpt-5.6-terra",
+    "confidence": 0.99,
+    "needsConfirmation": false,
+    "lines": [
+     {
+      "text": "Evaluate Σ (2k + 12) for k = 1 to 25",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.08,
+       "y": 0.064,
+       "w": 0.42,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "Solution",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.08,
+       "y": 0.12,
+       "w": 0.13,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "Σ (2k + 12) = 2Σk + 12Σ1",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.095,
+       "y": 0.179,
+       "w": 0.37,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "Σk = 25(26)/2 = 325",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.095,
+       "y": 0.232,
+       "w": 0.3,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "Σ1 = 25",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.095,
+       "y": 0.285,
+       "w": 0.14,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "= 2(325) + 12(25)",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.095,
+       "y": 0.347,
+       "w": 0.26,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "= 650 + 300",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.095,
+       "y": 0.4,
+       "w": 0.18,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "= 950",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.095,
+       "y": 0.454,
+       "w": 0.1,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "Check using AP:",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.532,
+       "y": 0.179,
+       "w": 0.23,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "first term = 14",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.532,
+       "y": 0.232,
+       "w": 0.22,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "last term = 62",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.532,
+       "y": 0.285,
+       "w": 0.21,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "S = 25/2 (14 + 62)",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.532,
+       "y": 0.338,
+       "w": 0.29,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "S = 12.5 x 76 = 950",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.532,
+       "y": 0.392,
+       "w": 0.3,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "Answer: 950",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.08,
+       "y": 0.579,
+       "w": 0.21,
+       "h": 0.05
+      }
+     },
+     {
+      "text": "The sum of the series is 950.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.08,
+       "y": 0.663,
+       "w": 0.34,
+       "h": 0.03
+      }
+     }
+    ]
+   }
+  },
+  "real47": {
+   "note": "Stored reader output used only to show that a page the reader already ordered is left as it came.",
+   "question": null,
+   "reading": {
+    "engine": "cloud-gpt-5.6-terra",
+    "confidence": 0.99,
+    "needsConfirmation": false,
+    "lines": [
+     {
+      "text": "Solution:",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.072,
+       "y": 0.016,
+       "w": 0.137,
+       "h": 0.056
+      }
+     },
+     {
+      "text": "Let u = x^2 + 8. Then du/dx = 2x => du = 2x dx.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.078,
+       "y": 0.108,
+       "w": 0.76,
+       "h": 0.086
+      }
+     },
+     {
+      "text": "Hence 12x dx = 6 du. Also, x^2 + 8 = u, so",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.084,
+       "y": 0.254,
+       "w": 0.713,
+       "h": 0.063
+      }
+     },
+     {
+      "text": "∫ 12x (x^2 + 8)^5 dx = ∫ 6u^5 du.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.094,
+       "y": 0.361,
+       "w": 0.573,
+       "h": 0.11
+      }
+     },
+     {
+      "text": "∫ 6u^5 du = 6 · u^6/6 + C = u^6 + C.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.096,
+       "y": 0.527,
+       "w": 0.604,
+       "h": 0.108
+      }
+     },
+     {
+      "text": "Substituting back u = x^2 + 8,",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.085,
+       "y": 0.699,
+       "w": 0.468,
+       "h": 0.066
+      }
+     },
+     {
+      "text": "∫ 12x (x^2 + 8)^5 dx = (x^2 + 8)^6 + C.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.131,
+       "y": 0.812,
+       "w": 0.647,
+       "h": 0.105
+      }
+     }
+    ]
+   }
+  },
+  "real43": {
+   "note": "Stored reader output used only to show that a page the reader already ordered is left as it came.",
+   "question": null,
+   "reading": {
+    "engine": "cloud-gpt-5.6-terra",
+    "confidence": 0.98,
+    "needsConfirmation": false,
+    "lines": [
+     {
+      "text": "Differentiate y = x^2(x-1) using the product rule.",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.135,
+       "y": 0.096,
+       "w": 0.812,
+       "h": 0.068
+      }
+     },
+     {
+      "text": "Let u = x^2 and v = x-1.",
+      "confidence": 0.98,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.136,
+       "y": 0.235,
+       "w": 0.465,
+       "h": 0.059
+      }
+     },
+     {
+      "text": "Then u′ = 2x and v′ = 1.",
+      "confidence": 0.98,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.131,
+       "y": 0.306,
+       "w": 0.442,
+       "h": 0.054
+      }
+     },
+     {
+      "text": "By the product rule,",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.132,
+       "y": 0.445,
+       "w": 0.349,
+       "h": 0.05
+      }
+     },
+     {
+      "text": "dy/dx = u′v + uv′",
+      "confidence": 0.98,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.186,
+       "y": 0.518,
+       "w": 0.299,
+       "h": 0.073
+      }
+     },
+     {
+      "text": "= 2x(x-1) + x^2(1)",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": true,
+      "box": {
+       "x": 0.245,
+       "y": 0.63,
+       "w": 0.3,
+       "h": 0.055
+      }
+     },
+     {
+      "text": "= 2x(x-1) + x^2",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.245,
+       "y": 0.706,
+       "w": 0.266,
+       "h": 0.05
+      }
+     },
+     {
+      "text": "= 2x^2 - 2x + x^2",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.246,
+       "y": 0.781,
+       "w": 0.272,
+       "h": 0.053
+      }
+     },
+     {
+      "text": "= 3x^2 - x",
+      "confidence": 0.99,
+      "uncertain": false,
+      "doubt": null,
+      "gapBefore": false,
+      "box": {
+       "x": 0.244,
+       "y": 0.854,
+       "w": 0.189,
+       "h": 0.08
+      }
+     }
+    ]
+   }
+  }
+ }
+}

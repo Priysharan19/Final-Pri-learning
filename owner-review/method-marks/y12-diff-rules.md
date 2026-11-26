@@ -86,7 +86,7 @@ Transcript with an earlier slip, on the same question:
 | # | What the student wrote | What the marked page shows | Counts toward |
 |---:|---|---|---|
 | 1 | `dy/dx = -4*(3*x + 1)^(-2)` | wrong here (At x = 2 this line is -0.0816327, but the derivative is -0.0612245 there.) | nothing |
-| 2 | `= -4*(3*x + 1)^(-2)` | no verdict (This defines something the method uses, so it is not checked against the answer.) | nothing |
+| 2 | `= -4*(3*x + 1)^(-2)` | no verdict (Not checked: the checker cannot tell from this line alone whether it is true.) | nothing |
 
 Award: **0 of 2**. Criteria earned: none.
 Final answer check: not correct.

@@ -50,7 +50,7 @@ export const PHRASES = Object.freeze({
   secondDerivative: 'Correct second derivative',
   signClaim: 'Correct sign',
   natureClaim: 'Correct nature',
-  pointClaim: 'Correct stationary point',
+  pointClaim: 'Point is on the curve',
   conclusionMatches: 'Correct conclusion',
   conditionLine: 'Condition stated',
   functionValue: 'Correct function value',
