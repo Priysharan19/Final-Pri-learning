@@ -34,7 +34,10 @@ import { infoOf as arithmeticInfo, cleanStatement } from '../../client/src/engin
 import { annotateMilestones } from '../../client/src/engine/milestones.js';
 import { solutionMatch, _internals as SOLUTION_INTERNALS } from '../../client/src/engine/solutionMatch.js';
 import { lineChains } from '../../client/src/engine/lineChains.js';
-import { provedLines } from '../../client/src/engine/provedLines.js';
+import { provedLines, provedLinesBank, openNote, withLines } from '../../client/src/engine/provedLines.js';
+import { integrationLines } from '../../client/src/engine/integrationLines.js';
+import { witnessOf } from '../../client/src/engine/pageProofs2.js';
+import { unboxed } from '../../client/src/engine/boxes.js';
 import { displayFields, bankDisplayFields } from '../../client/src/engine/displayFields.js';
 import { awardBoardScheme, matchBoardPoints } from '../../client/src/engine/boardScheme.js';
 import { constrainToShown, unsupportedCredit } from '../../client/src/engine/markExplanation.js';
@@ -58,6 +61,19 @@ export const markerView = q => (q && typeof q._bank === 'string' && typeof q._fa
  */
 /** The extended TeX reading (engine/texToPlain.js) is the author bank's alone: a generator or paper question, however it is sealed, uses the default reader. */
 export const usesExtendedTex = q => !!q && typeof q._bank === 'string';
+// The equation-rewrite cross (engine/arithmeticLines.js, equationRewrite) is for an Australian Years 11-12 question (a bank question, or a generator of
+// y11, y12, me11, me12) that has ONE part: with several parts the equations of different parts follow one another on the page and are not rewritings.
+const NSW_SUBTOPIC = /^(?:y11|y12|me11|me12)-/;
+const PART_MARK = /(?<![A-Za-z0-9])\(\s*(?:[a-h]|i{1,3}|iv)\s*\)/g;
+/** An Australian Years 11-12 question: a bank question, or a generator of y11, y12, me11, me12. */
+export const australianQuestion = q => !!q && (typeof q._bank === 'string' || NSW_SUBTOPIC.test(String(q.subtopic ?? '')));
+export function oneAustralianPart(q) {
+  if (!australianQuestion(q)) return false;
+  const prompt = String(q.prompt ?? '');
+  if (new Set((prompt.match(PART_MARK) || []).map(x => x.replace(/\s+/g, ''))).size >= 2) return false;
+  const steps = Array.isArray(q.steps) ? q.steps : [];
+  return steps.filter(st => /^\(?[a-h]\)?\.?$/i.test(String(st?.h ?? '').trim())).length < 2;
+}
 export const candidateRoots = q => !!q && (q._marking === 'final-answer-only' || typeof q._methodScheme === 'string' || typeof q._bank === 'string');
 /** The equations the question's own worked solution writes (plain text): what a derived line of the page may be a multiple of. */
 function authoredEquations(q) {
@@ -174,7 +190,7 @@ function trueAsWritten(q, steps, opts) {
     const facts = opts && Object.hasOwn(opts, 'facts') ? opts.facts : questionFacts(q);
     const solutionValues = solutionNumbers(q);
     // the reader's TeX is read with the extended reading (engine/texToPlain.js) on an author-bank question only (usesExtendedTex); every other question, India's included, is read as before
-    return stepCheckArithmetic(steps, { latex: opts && Array.isArray(opts.latex) ? opts.latex : null, ...(usesExtendedTex(q) ? { extendedTex: true } : {}), facts, solutionValues, knownLabels: functionLabels(q), answerValue: typeof q?.answer?.value === 'number' ? q.answer.value : null });
+    return stepCheckArithmetic(steps, { latex: opts && Array.isArray(opts.latex) ? opts.latex : null, ...(usesExtendedTex(q) ? { extendedTex: true } : {}), facts, solutionValues, knownLabels: functionLabels(q), answerValue: typeof q?.answer?.value === 'number' ? q.answer.value : null, equationRewrite: oneAustralianPart(q), ...(oneAustralianPart(q) ? { pageWitness: (texts, skip) => witnessOf(q, texts, skip) } : {}) });
   } catch { return null; }
 }
 
@@ -373,7 +389,7 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
   if (typeof steps === 'string' && steps.trim() && !OBJECTIVE.has(q.answerType) && q.answerType !== 'graph-sketch' && !Array.isArray(q.boardScheme) && !(opts && opts.solutionMatch === false)) {
     try {
       const base = report || trueAsWritten(q, steps, opts);
-      const matched = base ? solutionMatch(q, base) : null;
+      const matched = base ? solutionMatch(q, base, { inequalities: australianQuestion(q) }) : null;
       if (matched && matched.matched > 0) report = matched.report;
     } catch { /* the report stands */ }
     // Feedback only, after solutionMatch: chains, integrals, vectors and a slip warning (engine/lineChains.js). Never a mark, never a cross.
@@ -457,6 +473,16 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
       if (more && more !== base) shownReport = holdAmbiguous(more);
     } catch { /* the report stands */ }
   }
+  // Feedback only (engine/integrationLines.js): a page of integration is read claim by claim (a substitution, its derivative and differential, a change of
+  // variable, an antiderivative, a back-substitution). A line is ticked only when every claim on it is proved, crossed when one is provably false, and
+  // left alone otherwise. DISPLAY ONLY, like the proved lines above: `stepReport` and every mark are untouched. Australian edition (NSW Years 11-12) questions only.
+  try {
+    if (typeof steps === 'string' && steps.trim() && !OBJECTIVE.has(q.answerType) && q.answerType !== 'graph-sketch' && !Array.isArray(q.boardScheme) && !(opts && (opts.proved === false || opts.solutionMatch === false || opts.integrationLines === false)) && (/^gen:(?:y11|y12|me11|me12)-/.test(String(q.contentId ?? '')) || typeof q._bank === 'string')) {
+      const base = shownReport || report || trueAsWritten(q, steps, opts);
+      const more = base ? integrationLines(q, base, l => openNote(l)) : null;
+      if (more && more !== base) shownReport = holdAmbiguous(more);
+    }
+  } catch { /* the report stands */ }
   let markingReport = null;
   if (decided && decided !== report) {
     let reproduces = false;
@@ -494,11 +520,72 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
   // consequences, and `answerLine`. Added to the DISPLAYED report only (`stepReport` is untouched, so no mark, scheme pay or stored record reads them).
   // `answerLine` is named only when the answer was marked correct, and by the same answer check that marked it (`accepts`).
   const displayCtx = { correct: result.correct === true, accepts: text => (checkBankAnswer(q, text) || {}).correct === true };
+  // A box drawn round a line (`\\boxed{...}`, "(boxed)", "[boxed]", a bracket round the value) is layout, not mathematics (engine/boxes.js, the card's own reading), and it does not
+  // make a line true. The marker's line check does not read the box, so such a line stays a note on the displayed page. Display only, never a mark. Two things are done to an OPEN
+  // NOTE that carries a box, from its text without the box:
+  //   (1) a line that is only the boxed value, or `<the asked symbol> = value` (the question's own answer label), is ticked as stating the answer, and so may be the answer line,
+  //       when the answer was marked correct and the server's own answer check accepts that value;
+  //   (2) any other line (a function value, an arithmetic sum, a derivative, another variable: `v(1) = [12]`, `3 + 4 = [12]`, `t = [12]`) is judged by the same proofs a plain line
+  //       gets (the arithmetic check, the page passes): proved lines are ticked, a provably false line is crossed (never when an earlier line is crossed), anything undecidable stays a note.
+  try {
+    if (typeof steps === 'string' && /\\(?:boxed|fbox|mbox)\b|[(\[]\s*boxed\b|[⌈⎡▭□]/i.test(steps) && !OBJECTIVE.has(q.answerType) && q.answerType !== 'graph-sketch' && !Array.isArray(q.boardScheme) && !(opts && (opts.proved === false || opts.solutionMatch === false)) && (typeof q._bank === 'string' || /^gen:(?:y11|y12|me11|me12)-/.test(String(q.contentId ?? '')))) {
+      const base = shownReport || report;
+      if (base && Array.isArray(base.lines)) {
+        const brk = base.lines.findIndex(l => l?.status === 'break');
+        const asked = (/^([A-Za-z][A-Za-z0-9_']*(?:\([^()]*\))?)\s*=$/.exec(String(q.answerPrefix ?? '').trim()) || [])[1] || null;
+        const squash = t => String(t ?? '').replace(/[.\s]+$/, '').replace(/\s+/g, ' ').trim();
+        const bareOf = t => unboxed(t, q.answerType).replace(/^\s*(?:final\s+answer|answer|ans)\s*[:=\-–]\s*/i, '').replace(/[.\s]+$/, '');
+        const boxed = base.lines.map((l, i) => !!l && (brk < 0 || i < brk) && openNote(l) && typeof l.text === 'string' && !!bareOf(l.text) && bareOf(l.text) !== squash(l.text) && !/[<>≤≥≠]/.test(bareOf(l.text)));
+        const lines = base.lines.slice();
+        const rest = [];
+        let n = 0;
+        base.lines.forEach((l, i) => {
+          if (!boxed[i]) return;
+          const bare = bareOf(l.text), sides = bare.replace(/^=\s*/, '').split('=').map(x => x.trim());
+          if (!sides.every(Boolean)) return;
+          const bareValue = sides.length === 1 && !/[A-Za-z]{4,}/.test(bare);
+          const labelled = sides.length === 2 && asked !== null && sides[0].replace(/\s+/g, '') === asked;
+          if ((bareValue || labelled) && result.correct === true && displayCtx.accepts(sides[sides.length - 1])) {
+            n++; lines[i] = { text: l.text, status: 'ok', state: 'arithmetic', note: 'This line states the answer the check accepts.', valueChain: { rule: 'proved' }, fact: { kind: 'proved', proof: 'conclusion-matches' }, tickClass: 'conclusion-matches' };
+          } else if (!bareValue && !labelled) rest.push(i);
+        });
+        if (rest.length) {
+          // the same page with the boxes taken off those lines, read by the proofs a plain line gets; only those lines may change, and each keeps its own text
+          const rawLines = steps.split('\n');
+          const bareSteps = rawLines.map((t, k) => (rest.length && boxed[k] && rest.includes(k) ? bareOf(t) : t));
+          const shadow = { ...base, lines: base.lines.map((l, k) => (rest.includes(k) ? { ...l, text: bareOf(l.text) } : l)) };
+          let proved = shadow;
+          try { proved = typeof q._bank === 'string' ? provedLinesBank(q, shadow) : provedLines(q, meta, shadow); } catch { proved = shadow; }
+          let alt = null;
+          try { alt = rawLines.length === base.lines.length ? trueAsWritten(q, bareSteps.join('\n'), opts) : null; } catch { alt = null; }
+          let crossed = brk >= 0;
+          for (const i of rest) {
+            const a = proved.lines[i], b = alt && alt.lines && alt.lines.length === base.lines.length ? alt.lines[i] : null;
+            const pick = a && a !== shadow.lines[i] && (a.status === 'ok' || a.status === 'break') ? a : b && (b.status === 'ok' || b.status === 'break') ? b : null;
+            if (!pick) continue;
+            if (pick.status === 'break') { if (crossed) continue; crossed = true; }
+            else if (crossed && lines.slice(0, i).some(x => x?.status === 'break')) continue;
+            n++; lines[i] = { ...pick, text: base.lines[i].text };
+          }
+        }
+        if (n) shownReport = holdAmbiguous(withLines(base, lines));
+      }
+    }
+  } catch { /* the report stands */ }
   try {
     if (typeof steps === 'string' && steps.trim() && !OBJECTIVE.has(q.answerType) && q.answerType !== 'graph-sketch' && !Array.isArray(q.boardScheme) && !(opts && (opts.proved === false || opts.solutionMatch === false)) && /^gen:(?:y11|y12|me11|me12)-/.test(String(q.contentId ?? ''))) {
       const base = shownReport || report;
       const more = base ? displayFields(q, base, displayCtx) : null;
       if (more && more !== base) shownReport = more;
+    }
+  } catch { /* the report stands */ }
+  // The author's bank gets the second page pass (engine/pageProofs2.js) only: function values, implications, conditions, derivatives, the closed-interval extreme, check
+  // lists and the labels of a sketch, each proved from the question's prompt. Display only, like the pass above: `stepReport` is not touched by it.
+  try {
+    if (typeof steps === 'string' && steps.trim() && !OBJECTIVE.has(q.answerType) && q.answerType !== 'graph-sketch' && !Array.isArray(q.boardScheme) && !(opts && (opts.proved === false || opts.solutionMatch === false)) && typeof q._bank === 'string') {
+      const base = shownReport || report || trueAsWritten(q, steps, opts);
+      const more = base ? provedLinesBank(q, base) : null;
+      if (more && more !== base) shownReport = holdAmbiguous(more);
     }
   } catch { /* the report stands */ }
   // The author's bank gets the same fields (bankDisplayFields): a class id on every tick read from the proof that ticked it, and `answerLine`. Display only.

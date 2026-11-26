@@ -25,6 +25,7 @@
 import { normalize, parse, evaluate, variablesOf } from './expr.js';
 import { texToPlain } from './texToPlain.js';
 import { questionFacts } from './questionFacts.js';
+import { newState as recogniserState, observe as recogniserObserve, recognise } from './lineRecognisers.js';
 
 const MINUS = /[−–—]/g;
 const SUP = { '²': '^2', '³': '^3', '⁴': '^4' };
@@ -204,8 +205,8 @@ export function isHeading(text) {
  * @param open   (l, i) => may this line take a new tick? Notes only.
  * @returns the new lines (the same array when nothing changed) and a count
  */
-export function pageProofs(q, lines, limit, open) {
-  const w = worldOf(q);
+export function pageProofs(q, lines, limit, open, { promptOnly = false } = {}) {
+  const w = promptOnly ? null : worldOf(q);   // promptOnly (the author's bank, Train 8): only the recognisers that read the question's own words and numbers, never a function world
   const out = lines.slice();
   let n = 0;
   const roots = new Set();                       // x values an earlier ticked line of the page stated as solutions, each checked against the question's own derivative
@@ -223,25 +224,26 @@ export function pageProofs(q, lines, limit, open) {
     }
   };
   const knownRoots = () => [...roots];
+  const rs = recogniserState(q);                 // lineRecognisers.js: the question's own facts, the values and models this page has set
   const completeRoots = () => !!(w && w.dpoly && roots.size && rootsComplete(w.dpoly, knownRoots()));
 
   for (let i = 0; i < Math.min(limit, lines.length); i++) {
     const l = lines[i];
     if (!l) { ctx = null; continue; }
-    if (l.status === 'ok') { readRoots(String(l.text ?? '')); ctx = null; continue; }
+    if (l.status === 'ok') { readRoots(String(l.text ?? '')); recogniserObserve(rs, l); ctx = null; continue; }
     if (!open(l, i)) { ctx = null; continue; }
     const text = String(l.text ?? '');
     let res = null;
     const prevCtx = ctx; ctx = null;
     try {
-      const tries = [() => restatedQuestion(q, l, text), () => headingLine(l, text)];
+      const tries = [() => restatedQuestion(q, l, text), () => headingLine(l, text), () => recognise(rs, l, text, { restateOnly: promptOnly })];
       if (w) tries.push(() => conditionLine(w, l, text), () => derivativeLine(w, l, text), () => conclusionLine(w, l, text, roots, completeRoots, knownRoots), () => chainLine(w, l, text, prevCtx, roots, stationary));
       for (const tr of tries) { try { res = tr(); } catch (e) { if (process.env.DBGP) console.log(e); res = null; } if (res) break; }
     } catch (e) { if (process.env.DBGP) console.log(e); res = null; }
     if (!res) continue;
     out[i] = res.line;
     if (res.ctx) ctx = res.ctx;
-    if (res.line.status === 'ok') { n++; readRoots(text); if (res.addRoot !== undefined) roots.add(res.addRoot); }
+    if (res.line.status === 'ok') { n++; readRoots(text); recogniserObserve(rs, res.line); if (res.addRoot !== undefined) roots.add(res.addRoot); }
   }
   return { lines: out, n };
 }

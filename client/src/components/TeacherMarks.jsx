@@ -41,9 +41,16 @@ const useSize = (ref, fallback) => {
   return size;
 };
 
+/** What is written beside a tick: its words, with every piece of maths set by the app's maths renderer (the plain text is the label and the width). */
+export function Say({ mark, prose }) {
+  const segs = mark && mark.explain && Array.isArray(mark.explain.segs) ? mark.explain.segs : null;
+  if (!segs || !prose) return mark ? mark.phrase : null;
+  return segs.map((g, i) => (g.t === 'tex' ? <React.Fragment key={i}>{prose(`$${g.v.replace(/\\frac/g, '\\tfrac')}$`)}</React.Fragment> : g.v));
+}
 const boxStyle = b => ({ left: `${b.x * 100}%`, top: `${b.y * 100}%`, width: `${b.w * 100}%`, height: `${b.h * 100}%` });
 
-const GUTTER_WIDE = 200;
+const GUTTER_WIDE = 220;
+const GUTTER_COMPACT = 76;
 /**
  * The page with its marking layer. `children` is the page itself (the photo or the ink), drawn exactly as before.
  * The layer is a separate overlay of fixed size: the page's own height never depends on the view or on what the margin holds.
@@ -72,17 +79,20 @@ export function TeacherSheet({ kind, view, page, marks, selected, pick, onKey, m
   // Every tick and cross carries its short phrase: straight after it when there is room, else in the margin with a leader. (A phone's margin is too narrow for words: the popover and the list carry them there.)
   const showWords = sheet.w >= 600;
   const words = useMemo(() => (showWords ? Object.fromEntries(marks.filter(m => m.phrase).map(m => [m.n, m.phrase])) : {}), [marks, showWords]);
+  // a phrase with typeset maths is wider and taller than the same words in plain text
+  const heavy = useMemo(() => new Set(marks.filter(m => m.explain && Array.isArray(m.explain.segs) && m.explain.segs.some(g => g.t === 'tex')).map(m => m.n)), [marks]);
   const important = useMemo(() => new Set(marks.filter(m => m.phrase).map(m => m.n)), [marks]);
   // The tick is as large as the writing allows: on a small page of many lines it shrinks so neighbours do not sit on each other.
   const pitch = useMemo(() => { const ys = page.lines.filter(l => l.box).map(l => (l.box.y + l.box.h / 2) * dim.h).sort((x, y) => x - y); const d = []; for (let i = 1; i < ys.length; i += 1) d.push(ys[i] - ys[i - 1]); d.sort((x, y) => x - y); return d.length ? d[Math.floor(d.length / 2)] : Infinity; }, [page, dim.h]);
-  const tick = Number.isFinite(pitch) ? Math.round(Math.min(24, Math.max(16, pitch * 0.9))) : 24;
+  const tick = Number.isFinite(pitch) ? Math.round(Math.min(24, Math.max(sheet.w >= 600 ? 18 : 16, pitch * 0.9))) : 24;
   const reserve = tick >= 16 ? 12 : 0;
-  const place = (w, h) => placeMarks({ marks, obstacles: page.lines, words, reserve, width: w, height: h, size: tick });
+  // ticks are at least 18 px; a phone's narrow page keeps the smaller floor so a tick still stands at the end of its own line
+  const place = (w, h) => placeMarks({ marks, obstacles: page.lines, words, reserve, width: w, height: h, size: tick, min: sheet.w >= 600 ? 18 : 16, heavy });
   // The margin is only as wide as it has to be: wide when some words cannot stand beside their tick, judged as if it were wide (so the choice cannot flip back and forth).
   const aspect = dim.h / dim.w;
   const needWide = useMemo(() => {
     if (sheet.w < 600) return false;
-    const w = sheet.w - GUTTER_WIDE - 2;
+    const w = sheet.w - GUTTER_COMPACT - 2;   // judged as if the margin were narrow: the page keeps the width unless some words truly cannot stand on the paper
     return place(w, w * aspect).some(p => p.word === 'gutter' && important.has(p.n));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sheet.w, aspect, marks, page, words, tick, important]);
@@ -91,8 +101,8 @@ export function TeacherSheet({ kind, view, page, marks, selected, pick, onKey, m
   [marks, page, words, dim.w, dim.h, tick]);
   const at = n => placements.find(p => p.n === n);
   const gutterWords = needWide ? marks.filter(m => at(m.n)?.word === 'gutter' && important.has(m.n)).map(m => ({ id: `p${m.n}`, n: m.n, kind: m.kind, text: m.phrase, y: at(m.n).y })) : [];
-  const colW = GUTTER_WIDE - 30 - 66;
-  const items = gutterWords.map(p => ({ id: p.id, y: p.y / dim.h, h: textHeight(p.text.length + 2, colW, 14) }));
+  const colW = GUTTER_WIDE - 100;
+  const items = gutterWords.map(p => ({ id: p.id, y: p.y / dim.h, h: textHeight(p.text.length + 2, colW, 14, 1.15, 5) }));
   const tops = alignCards(items, dim.h, { gap: 4 }).map((t, i) => Math.max(0, Math.min(t.top, dim.h - items[i].h)));
   const paidMarks = marks.filter(m => m.paid && at(m.n));
   const markTops = alignCards(paidMarks.map(m => ({ id: m.n, y: at(m.n).y / dim.h, h: 24 })), dim.h, { gap: 4 });
@@ -114,8 +124,8 @@ export function TeacherSheet({ kind, view, page, marks, selected, pick, onKey, m
                 style={{ left: `${(p.leader.x0 / dim.w) * 100}%`, top: `${(p.leader.y / dim.h) * 100}%`, width: `${((p.leader.x1 - p.leader.x0) / dim.w) * 100}%` }} />
             ) : null; })}
             {marks.map(m => { const p = at(m.n); return p && p.word && p.word !== 'gutter' ? (
-              <span key={`w${m.n}`} className={`mp-t-say is-${m.kind}`} data-mp-say={m.n} aria-hidden="true"
-                style={{ left: `${(p.word.x0 / dim.w) * 100}%`, top: `${(p.word.y / dim.h) * 100}%`, fontSize: `${p.word.font}px` }}>{p.word.text}</span>
+              <span key={`w${m.n}`} className={`mp-t-say is-${m.kind}`} data-mp-say={m.n} data-mp-say-plain={p.word.text} aria-hidden="true"
+                style={{ left: `${(p.word.x0 / dim.w) * 100}%`, top: `${(p.word.y / dim.h) * 100}%`, fontSize: `${p.word.font}px`, ...(p.word.wrap ? { width: `${((p.word.x1 - p.word.x0) / dim.w) * 100}%`, whiteSpace: 'normal', lineHeight: 1.05 } : {}) }}><Say mark={m} prose={prose} /></span>
             ) : null; })}
             <div className="mp-markers mp-t-markers" ref={markersRef} role="group" aria-label={TEXT.marksOnPage} onKeyDown={e => { if (e.key === 'Escape' && open) { e.stopPropagation(); setOpen(null); } else onKey(e); }}>
               {marks.map((m, i) => {
@@ -163,9 +173,9 @@ export function TeacherSheet({ kind, view, page, marks, selected, pick, onKey, m
               role="img" aria-label={markBoxLabel(m)} style={{ top: markTops[i].top }}>{m.paid.text}</span>
           ))}
           {gutterWords.map((p, i) => (
-            <button key={p.id} type="button" tabIndex={-1} aria-hidden="true" className={`mp-t-words is-${p.kind}`} data-mp-words={p.n}
+            <button key={p.id} type="button" tabIndex={-1} aria-hidden="true" className={`mp-t-words is-${p.kind}`} data-mp-words={p.n} data-mp-say-plain={p.text}
               style={{ top: tops[i], maxHeight: items[i].h }} onClick={() => pick(p.n, true)}>
-              {p.text}
+              <Say mark={marks.find(x => x.n === p.n)} prose={prose} />
             </button>
           ))}
         </div>
@@ -180,7 +190,7 @@ export function TeacherSheet({ kind, view, page, marks, selected, pick, onKey, m
 }
 
 /** Detailed feedback: the words for every mark, numbered as on the page, and the unread lines, which can be typed in (never a cross). */
-export function MarkList({ page, marks, lineOpen, toggleLine, readingOfLine, canType, setEditing, textOf, pick }) {
+export function MarkList({ prose = null, page, marks, lineOpen, toggleLine, readingOfLine, canType, setEditing, textOf, pick }) {
   const byN = new Map(marks.map(m => [m.n, m]));
   return (
     <ol className="mp-t-list" data-mp-list aria-label={TEXT.listLabel}>
@@ -213,7 +223,7 @@ export function MarkList({ page, marks, lineOpen, toggleLine, readingOfLine, can
           <li key={l.n} data-mp-list-n={l.n}>
             <span className="n">{l.n}</span>
             <span className={`is-${m.kind}`}>
-              <button type="button" className="mp-link" onClick={() => pick(l.n, true)}>{w.head}</button>
+              <button type="button" className="mp-link" data-mp-plain={w.head} onClick={() => pick(l.n, true)}>{m.kind === 'right' ? <Say mark={m} prose={prose} /> : w.head}</button>
               {w.tail ? <span className="hand"> {w.tail}</span> : null}
               {w.corrected ? <span> {w.corrected}</span> : null}
               {w.mark ? <span> {w.mark}</span> : null}

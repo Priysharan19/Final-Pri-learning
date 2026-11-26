@@ -140,6 +140,27 @@ ok(fs.statSync(A.SUMMARY_FILE).size < 500 * 1024, 'the committed summary stays u
   ok(held.summary.questions + held.summary.manualQuestions === 11 - held.held.length, 'a held part is out of the pack, every other part is in it');
 }
 
+// ── the wrong half is required of every question: a planted new question whose only possible mutation is a self-false one (rung b) ──────────────────────
+{
+  const mk = (steps, value) => A.markerViewOf({ prompt: 'Calculate the value.', answerType: 'numeric', answer: { value }, steps: steps.map(d => ({ h: 'Step', d: '$' + d + '$' })), marks: 2, _marking: 'final-answer-only' });
+  // (1) nothing can be planted on the line above (no operation on it gives the line), so the only mutation is a self-false one, rung b: it is tried, and crossed
+  const good = mk(['a=9-3=6', 'b=6*4=24', 'b=24'], 24);
+  const mg = A.measureQuestion(good, { toPlain: A.genToPlain });
+  ok(A.chooseMutantLine(mg.lines)?.rung === 'b', 'a planted question with no operation to plant on takes the self-false rung (b)');
+  ok(mg.w.ok === true && mg.w.mutants.every(x => x.verdict === 'crossed here'), 'its self-false mutants are crossed at the line');
+  // (2) the same kind of question whose self-false mutant the marker leaves unjudged (a function value at another argument): the wrong half FAILS it, so the
+  // gate refuses a new question like it (not on the baseline, not fully covered)
+  const bad = mk(['f(x)=3x+1', 'f(2)=3(2)+1=7', 'f(2)=7'], 7);
+  const mb = A.measureQuestion(bad, { toPlain: A.genToPlain });
+  ok(A.chooseMutantLine(mb.lines)?.rung === 'b' && mb.w.ok === false && /^wrong step/.test(mb.w.cause), `a planted question whose self-false mutant is not crossed fails its wrong half (${mb.w.cause})`);
+  const planted = { id: 'planted:self-false', kind: 'bank', answerType: 'numeric', status: A.STATUS.trueOnly, t: { ...mb.t, ok: true }, w: mb.w };
+  const refused = A.compareToBaseline([planted], { ...baseline, ids: {} });
+  ok(refused.length === 1 && refused[0].kind === 'new-uncovered' && /wrong step/.test(refused[0].message), 'the gate refuses a new question whose wrong half fails: the self-false mutation must be crossed');
+  // (3) a worked solution with no maths line has no wrong half to test: it is not covered, and never excused
+  const mw = A.measureQuestion({ ...mk([], 1), steps: [{ h: 'Reason', d: 'Because the function is increasing.' }] }, { toPlain: A.genToPlain });
+  ok(mw.w.ok === false && mw.lines.length === 0, 'a worked solution with no maths line has no wrong half: not covered, not excused');
+}
+
 console.log(`annotation coverage: ${summary.total.total} units (${gen.length - na.length} generated forms, ${bank.length} bank parts) measured in ${seconds} s; fully covered ${summary.total.full}, true half only ${summary.total.trueOnly}, uncovered ${summary.total.uncovered}; baseline ${Object.keys(baseline.ids).length} ids`);
 console.log(`annotation coverage not applicable: ${na.length} multiple-choice questions (no working page), in no denominator and on no baseline`);
 done();

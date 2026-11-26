@@ -65,7 +65,7 @@ Final answer check: correct.
 | # | What the student wrote | What the marked page shows | Counts toward |
 |---:|---|---|---|
 | 1 | `P(-2) = (-2)^3-4*(-2)^2+5*(-2)+7` | true line (With $P = x^{3} - 4x^{2} + 5x + 7$ from the question, each side comes to $-27$.) | substitute |
-| 2 | `P(-2) = -26` | no verdict (Not checked: the checker cannot tell from this line alone whether it is true.) | nothing |
+| 2 | `P(-2) = -26` | wrong here (With $P(x) = x^{3} - 4x^{2} + 5x + 7$ from the question, $P(-2)$ comes to $-27$, but this line gives $-26$.) | nothing |
 
 Award: **1 of 2**. Criteria earned: substitute (1).
 Final answer check: not correct.
@@ -74,8 +74,8 @@ Final answer check: not correct.
 
 | # | What the student wrote | What the marked page shows | Counts toward |
 |---:|---|---|---|
-| 1 | `P(-2) = (-1)^3-4*(-1)^2+5*(-1)+7` | no verdict (Not checked: the checker cannot tell from this line alone whether it is true.) | nothing |
-| 2 | `P(-2) = -26` | no verdict (The arithmetic on this line is right, but this value was not accepted as the answer.) | nothing |
+| 1 | `P(-2) = (-1)^3-4*(-1)^2+5*(-1)+7` | wrong here (With $P(x) = x^{3} - 4x^{2} + 5x + 7$ from the question, $P(-2)$ comes to $-27$, but this line gives $-3$.) | nothing |
+| 2 | `P(-2) = -26` | no verdict (Follows from the earlier slip.) | nothing |
 
 Award: **0 of 2**. Criteria earned: none.
 Final answer check: not correct.
@@ -86,15 +86,15 @@ Transcript with an earlier slip, on the same question:
 
 | # | What the student wrote | What the marked page shows | Counts toward |
 |---:|---|---|---|
-| 1 | `P(-2) = (-1)^3-4*(-1)^2+5*(-1)+7` | no verdict (Not checked: the checker cannot tell from this line alone whether it is true.) | nothing |
-| 2 | `= -3` | no verdict (The arithmetic on this line is right, but this value was not accepted as the answer.) | nothing |
+| 1 | `P(-2) = (-1)^3-4*(-1)^2+5*(-1)+7` | wrong here (With $P(x) = x^{3} - 4x^{2} + 5x + 7$ from the question, $P(-2)$ comes to $-27$, but this line gives $-3$.) | nothing |
+| 2 | `= -3` | no verdict (Follows from the earlier slip.) | nothing |
 
 Award: **0 of 2**. Criteria earned: none.
 Final answer check: not correct.
 
-What the engine actually did: it did not name any line as wrong, so the slip showed only as lines that earned no tick.
+What the engine actually did: the first wrong line was line 1. After it, line 2: no verdict.
 
-The engine did not name any later line as following from the earlier mistake. No later line was found true. The engine pays nothing for a line that follows correctly from an earlier error here: the only rule that does so is a question plan marked for error carried forward, and this type has none. Whether a later criterion should earn after an earlier error is the author's decision, not the engine's.
+The engine named line(s) 2 as following from the earlier mistake, and gave them no tick. No later line was found true. The engine pays nothing for a line that follows correctly from an earlier error here: the only rule that does so is a question plan marked for error carried forward, and this type has none. Whether a later criterion should earn after an earlier error is the author's decision, not the engine's.
 
 ## Review record
 

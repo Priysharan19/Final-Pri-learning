@@ -90,7 +90,8 @@ const FINALS = [
   [['final:'], N, { status: 'none' }],
   [['b = {40,50,60}.'], N, { status: 'none' }],
   [['least value => six'], N, { status: 'none' }],
-  [['area = 12 cm^2.'], N, { status: 'none' }],
+  // 26 Nov 2026: a unit in any notation is read as the value and spelt as the marker reads it (it used to be unreadable).
+  [['area = 12 cm^2.'], N, proposed('12 cm²')],
   [[''], N, { status: 'none' }],
   [[], N, { status: 'none' }],
   // two different candidates: never a guess

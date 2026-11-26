@@ -147,7 +147,7 @@ for (const [ps_, set] of [[pl, crowded], [pd, dense]]) for (const p of ps_) {
   ok(p.y >= m.box.y * H - 0.5 && p.y <= (m.box.y + m.box.h) * H + 0.5, `mark ${p.n}: its y lies on its own line`);
 }
 // the words: straight after the tick on the same line when the space is free, else the gutter
-const wlist = placeMarks({ marks: [{ n: 4, box: { x: 0.05, y: 0.3, w: 0.2, h: 0.04 } }, { n: 5, box: { x: 0.05, y: 0.5, w: 0.2, h: 0.04 } }, { n: 6, box: { x: 0.05, y: 0.7, w: 0.78, h: 0.04 } }], words: { 4: 'Correct differentiation', 6: 'Matches a step of the worked solution' }, reserve: 12, width: W, height: H });
+const wlist = placeMarks({ marks: [{ n: 4, box: { x: 0.05, y: 0.3, w: 0.2, h: 0.04 } }, { n: 5, box: { x: 0.05, y: 0.5, w: 0.2, h: 0.04 } }, { n: 6, box: { x: 0.05, y: 0.7, w: 0.9, h: 0.04 } }], words: { 4: 'Correct differentiation', 6: 'Matches a step of the worked solution' }, reserve: 12, width: W, height: H });
 ok(wlist[0].word && wlist[0].word !== 'gutter' && wlist[0].word.x0 > wlist[0].x && Math.abs(wlist[0].word.y - wlist[0].y) < 0.5, 'the words follow the tick on its own line');
 ok(wlist[1].word === null, 'no words wanted, none placed');
 ok(wlist[2].word === 'gutter', 'words that do not fit beside the tick go to the gutter');
@@ -222,6 +222,15 @@ ok(tallyOf({ lines: [{ status: 'checked' }, { status: 'condition' }, { status: '
   ok(om.find(m => m.n === 19).phrase === 'Correct answer' && om.find(m => m.n === 18).phrase === 'Correct conclusion', 'only the server\'s answer-bearing line says Correct answer');
   ok(![1, 13, 17].some(n => om.some(m => m.n === n)), 'headings and the unread point list carry no tick');
   ok(tallyOf(o.page) === '16 lines correct. 0 wrong. 1 not checked.', `the tally counts maths lines only: ${tallyOf(o.page)}`);
+  // the owner's real photo page (key 12), the reader's own 21 lines, graph labels included: each line's phrase
+  const k = pageOf('key12');
+  const km = buildTeacherMarks({ page: k.page });
+  const want = { 7: 'Correct derivative', 9: 'Correct solution of the equation', 18: 'Correct function value', 19: 'Correct function value', 20: 'Correct function value', 21: 'Correct answer' };
+  // Train 8: the first pass's prompt-bound recognisers also run on a bank question, so line 2 ("Given v = ...", the question's own maths) is ticked too and lines 1 to 6 are no longer "not checked"
+  want[2] = 'Given in the question';
+  ok(km.length === 7 && km.every(m => m.kind === 'right' && m.phrase === want[m.n]), `the photo page: 7 ticks, each with its own phrase: ${JSON.stringify(km.map(m => [m.n, m.phrase]))}`);
+  ok(k.model.cards.filter(c => c.status === 'condition').length === 14 && k.model.cards.filter(c => c.status === 'first-error').length === 0, 'the photo page: 14 neutral lines (two headings, the aim, the method and its continuation, the condition, the check list, seven sketch labels), none crossed');
+  ok(k.model.cards.filter(c => c.status === 'not-verified').length === 0 && /0 not checked\.$/.test(tallyOf(k.page)), `the photo page: 0 not checked (${tallyOf(k.page)})`);
 }
 
 if (failures.length) { console.error(`marked-page-teacher-check: ${failures.length} failed`); for (const f of failures) console.error(' - ' + f); process.exit(1); }

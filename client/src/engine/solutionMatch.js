@@ -261,13 +261,68 @@ function proportional(f, g) {
   try { return exprEquivalent(`(${f.rawL})-(${f.rawR})`, `(${c[0]}/${c[1]})*((${g.rawL})-(${g.rawR}))`, { isolatedDomain: true }) === true; } catch { return false; }
 }
 
+// ── an inequality statement of the worked solution (TICK ONLY) ───────────────
+// `x >= -2`, `6 <= h <= 38`, `P'' = -2 < 0`: a chain of sides joined by =, <, >, <=, >=. A line of the student's is recognised only when it is the very
+// same statement as one the worked solution makes: the same relations in the same order and each side the same expression as the solution's (or the
+// whole chain read backwards, `-2 <= x` for `x >= -2`). It is never judged on its own: a different inequality (`x > -2` for `x >= -2`, `2x > 4` for
+// `x > 2`) is a note, and nothing here ever crosses a line.
+const REL_NORM = { '<=': '≤', '>=': '≥', '≤': '≤', '≥': '≥', '<': '<', '>': '>', '=': '=' };
+const REL_FLIP = { '≤': '≥', '≥': '≤', '<': '>', '>': '<', '=': '=' };
+/** { parts, rels } of a chain with at least one inequality sign; null for anything else (a comma, an arrow, `!=`, a lone relation sign, a side that is empty). */
+function chainOf(plain) {
+  const t = tidy(plain).replace(/\s+/g, ' ');
+  if (!t || t.length > 160 || /[,;]|=>|->|<-|!=|≠|==|<=>/.test(t) || !/[<>≤≥]/.test(t)) return null;
+  const parts = [], rels = [];
+  let depth = 0, cur = '';
+  for (let k = 0; k < t.length; k++) {
+    const c = t[k];
+    if ('([{'.includes(c)) depth += 1; else if (')]}'.includes(c)) depth -= 1;
+    if (depth === 0 && ('<>=≤≥'.includes(c))) {
+      let rel = c;
+      if ((c === '<' || c === '>') && t[k + 1] === '=') { rel = c + '='; k += 1; }
+      if (!REL_NORM[rel]) return null;
+      parts.push(cur.trim()); rels.push(REL_NORM[rel]); cur = '';
+      continue;
+    }
+    cur += c;
+  }
+  parts.push(cur.trim());
+  if (depth !== 0 || parts.length < 2 || parts.some(x => !x) || rels.length !== parts.length - 1 || !rels.some(r => r !== '=') || parts.length > 4) return null;
+  return { parts, rels };
+}
+function inequalitiesOfSpans(text) {
+  const out = [];
+  for (const m of String(text ?? '').replace(/\\\$/g, '\u0001').matchAll(TEX_SPAN)) {
+    const plain = spanToPlain(m[1]);
+    if (!plain) continue;
+    const c = chainOf(plain);
+    if (c) out.push(c);
+    if (out.length >= MAX_STATEMENTS) break;
+  }
+  return out;
+}
+const sameChain = (a, b) => a.parts.length === b.parts.length && a.rels.every((r, k) => r === b.rels[k])
+  && a.parts.every((p, k) => canon(p) === canon(b.parts[k]) || (() => { const x = readSide(p), y = readSide(b.parts[k]); return !!x && !!y && sameSide(x, y, p, b.parts[k]); })());
+/** The step of the worked solution that makes this very inequality statement, or null. */
+function matchInequality(chain, sol, list = sol.inequalities) {
+  const back = { parts: chain.parts.slice().reverse(), rels: chain.rels.slice().reverse().map(r => REL_FLIP[r]) };
+  for (const st of list) if (sameChain(chain, st.chain) || sameChain(back, st.chain)) return st;
+  return null;
+}
+
 // ── the worked solution, read once ───────────────────────────────────────────
-function readSolution(q) {
+function readSolution(q, opts = null) {
   const steps = Array.isArray(q?.steps) ? q.steps : [];
   const labelled = [], conditions = [], values = [], numeric = [], verbatim = [], every = [], limits = new Set();
   for (const t of [String(q?.prompt ?? ''), ...steps.map(x => String(x?.d ?? ''))]) for (const m of t.replace(/\\\$/g, '\u0001').matchAll(TEX_SPAN)) { const pl = spanToPlain(m[1]); if (pl) for (const k of limitKeys(braces(pl))) limits.add(k); }
+  // An inequality line is ticked as a worked-solution statement for an Australian Years 11-12 question only (a bank question, or a generator of y11, y12, me11, me12);
+  // every other question, India's included, is read exactly as before.
+  // (decided by the caller, never read from the question: `opts.inequalities`, set by server/platform/markerOps.js)
+  const australian = !!(opts && opts.inequalities === true);
+  const inequalities = [];
   steps.forEach((st, i) => {
     const heading = String(st?.h ?? '').trim();
+    if (australian) for (const chain of inequalitiesOfSpans(st?.d)) inequalities.push({ step: i, heading, chain });
     for (const m of String(st?.d ?? '').matchAll(TEX_SPAN)) { const r = roundedTail(m[1]); if (r !== null) values.push({ step: i, heading, v: Number(r), rounded: true }); }
     for (const s of statementsOfSpans(st?.d)) {
       s.parts.forEach(p => { const v = numericOf(p); if (v !== null) values.push({ step: i, heading, v }); });
@@ -299,7 +354,7 @@ function readSolution(q) {
     stated.set(l.label.name, set);
   }
   const multiRoot = [...stated.values()].some(set => set.size > 1);
-  return { steps, labelled, conditions, numeric, verbatim, every, limits, values, multiRoot, final: values.length ? values[values.length - 1] : null };
+  return { steps, labelled, conditions, numeric, verbatim, every, limits, values, multiRoot, inequalities, promptInequalities: australian ? inequalitiesOfSpans(String(q?.prompt ?? '').slice(0, 2000)).map(chain => ({ chain })) : [], final: values.length ? values[values.length - 1] : null };
 }
 
 function readPrompt(q) {
@@ -445,9 +500,9 @@ export const noteValue = (m, v) => `This is the value at step ${m.step + 1} of t
  * { report, matched } (report unchanged and matched 0 when nothing is recognised). `report.lines[i].text` is the
  * student's line i. Pure, deterministic, inside one evaluation budget.
  */
-export function solutionMatch(q, report) {
+export function solutionMatch(q, report, opts = null) {
   if (!q || !report || !Array.isArray(report.lines) || !report.lines.length) return { report, matched: 0 };
-  try { return withEvaluationBudget(PAGE_BUDGET, () => run(q, report)); } catch { return { report, matched: 0 }; }
+  try { return withEvaluationBudget(PAGE_BUDGET, () => run(q, report, opts)); } catch { return { report, matched: 0 }; }
 }
 
 function functionNames(q) {
@@ -469,10 +524,10 @@ function knownSubstitutions(q) {
   return out;
 }
 
-function run(q, report) {
+function run(q, report, opts = null) {
   FUNCS = functionNames(q);
   const lines = report.lines.slice(0, MAX_LINES);
-  const sol = readSolution(q);
+  const sol = readSolution(q, opts);
   const prompt = readPrompt(q);
   let stop = Number.isInteger(report.firstBreak) && report.firstBreak >= 0 ? report.firstBreak : Infinity;
   const brk = lines.findIndex(l => l?.status === 'break');
@@ -488,6 +543,23 @@ function run(q, report) {
     const judged = l.status === 'ok';
     const unjudged = l.status === 'note' && NOTE_STATES.has(l.state) && l.note !== 'Follows from the earlier slip.' && !/misread/i.test(String(l.note ?? '')) && l.unreadable !== true;
     if (!judged && !unjudged) continue;
+    // an inequality statement: ticked only as the very same statement the worked solution makes (tick only, never a cross)
+    if (unjudged && sol.inequalities.length && /[<>≤≥]/.test(l.text)) {
+      const chain = chainOf(l.text.replace(/^(?:∴|so\b|hence\b|thus\b|therefore\b)\s*/i, ''));
+      // the question's own inequality restated is the question restated (a given), never a step of the working
+      if (chain && matchInequality(chain, sol, sol.promptInequalities)) {
+        matched.add(i); matchedCount++; prevLabel = null; prevAbove = { value: null, hit: null };
+        out[i] = { text: l.text, status: 'ok', state: 'given', note: NOTE_GIVEN, solutionMatch: true };
+        continue;
+      }
+      const h = chain ? matchInequality(chain, sol) : null;
+      if (h) {
+        matched.add(i); matchedCount++; prevLabel = null; prevAbove = { value: null, hit: null };
+        if (Number.isInteger(h.step)) cur = Math.max(cur, h.step);
+        out[i] = { text: l.text, status: 'ok', state: 'verified', note: noteStep(h), solutionMatch: true, fact: { kind: 'solution-step', step: h.step + 1, heading: h.heading } };
+        continue;
+      }
+    }
     const s = readStudent(l.text);
     // what the line above says, for a continuation `= …` under it
     const carried = prevLabel, above = prevAbove;

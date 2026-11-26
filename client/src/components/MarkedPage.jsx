@@ -344,7 +344,7 @@ export default function MarkedPage({ teacherMarks = EDITION === 'prithagoras', e
             : teacherMarks && !layerFailed
               ? <div className="mp-sheet" data-mp-sheet={source.kind}><div className="mp-sheet-in"><PageArt source={source} view={geometry?.view || null} t={t} cleaned={cleaned} /></div></div>
               : <Sheet source={source} geometry={geometry} page={page} selected={selected} pick={pick} onKey={onKey(markersRef)} markersRef={markersRef} t={t} cleaned={cleaned} />}
-          {tm && view === 'detailed' && <T.MarkList page={page} marks={marks} lineOpen={lineOpen} toggleLine={toggleLine} readingOfLine={readingOfLine} canType={!!onCorrect} setEditing={setEditing} textOf={textOf} pick={pick} />}
+          {tm && view === 'detailed' && <T.MarkList prose={s => <EngineComment text={typesetProse(s)} lang="en" />} page={page} marks={marks} lineOpen={lineOpen} toggleLine={toggleLine} readingOfLine={readingOfLine} canType={!!onCorrect} setEditing={setEditing} textOf={textOf} pick={pick} />}
           {/* Everything about how the page was read is one quiet disclosure under the photo. */}
           <details className="mp-about" data-mp-about>
             <summary>{t('mp.about')}</summary>
