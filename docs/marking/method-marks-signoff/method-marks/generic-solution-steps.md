@@ -150,7 +150,7 @@ Final answer typed: `1042`. The answer checker says it is not correct.
 | 2 | `-6t+36=0` | ticked | step 2 |
 | 3 | `t=6` | ticked | nothing |
 | 4 | `h'' = -6` | ticked | step 3 |
-| 5 | `h(6)=1042` | not checked | nothing |
+| 5 | `h(6)=1042` | crossed (first wrong line) | nothing |
 
 | Criterion | Marks | Result | Lines |
 |---|---:|---|---|

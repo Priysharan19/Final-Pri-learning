@@ -735,7 +735,10 @@ function explainUnsafe(aboveRaw, lineRaw) {
   return build(all[0].kind, named, all, shortFinal, sentenceOf(all));
 }
 
-const NO_EXPLAIN = new Set(['heading', 'restated-question', 'restated-function', 'condition-line', 'solution-list', 'rounded-value', 'identity', 'given-data', 'method-stated', 'defines', 'conclusion-sentence', 'sign-claim', 'nature-claim', 'point-claim', 'second-derivative-value']);
+const NO_EXPLAIN = new Set(['heading', 'restated-question', 'restated-function', 'condition-line', 'solution-list', 'rounded-value', 'identity', 'given-data', 'method-stated', 'defines', 'conclusion-sentence', 'sign-claim', 'nature-claim', 'point-claim', 'second-derivative-value',
+  // Train 8 (#1135 x #1137): a value of a function, its derivative and a point on its curve are named by their own recogniser (pageProofs2.js), not explained as a rewrite of the line above:
+  // read as a rewrite, v(0) = 12(0) - 3(0)^2 was explained as the product v x 0
+  'function-value', 'derivative-of-function', 'point-on-curve']);
 /**
  * The explanation of each ticked line of a report, from the engine's own text of the line and of its parent (server side: this is what the page shows).
  * A line is explained only when the engine ticked it, it is before the first cross, it is not the answer line, and the step from its parent (the nearest

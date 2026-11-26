@@ -1918,27 +1918,7 @@
        "kind": "both-sides",
        "tex": "0"
       },
-      "tickClass": "function-value",
-      "explain": {
-       "kind": "simplify",
-       "named": false,
-       "short": "v × 0 = 12 × 0 − 3 × 0², 12 × 0 − 3 × 0² = 0",
-       "sentence": "Two changes: simplified $v \\times 0 = 12 \\times 0 - 3 \\times 0^{2}$; subtracted $12 \\times 0 - 3 \\times 0^{2} = 0$.",
-       "segs": [
-        {
-         "t": "tex",
-         "v": "v \\times 0 = 12 \\times 0 - 3 \\times 0^{2}"
-        },
-        {
-         "t": "text",
-         "v": ", "
-        },
-        {
-         "t": "tex",
-         "v": "12 \\times 0 - 3 \\times 0^{2} = 0"
-        }
-       ]
-      }
+      "tickClass": "function-value"
      },
      {
       "text": "v(2) = 12(2) - 3(2)^2 = 24 - 12 = 12",
