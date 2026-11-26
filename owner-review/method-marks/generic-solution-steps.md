@@ -120,7 +120,7 @@ Final answer typed: `62`. The answer checker says it is not correct.
 | Line | What the student wrote | What the marked page shows | Earns |
 |---:|---|---|---|
 | 1 | `k^2+5k-84=0` | ticked | step 2 |
-| 2 | `k=62` | crossed (first wrong line) | nothing |
+| 2 | `k=62` | not checked | nothing |
 
 | Criterion | Marks | Result | Lines |
 |---|---:|---|---|

@@ -98,7 +98,7 @@ const al = (q, report, correct, accepts) => displayFields(q, report, { correct, 
   {
     const q6 = { answerType: 'numeric', answer: { value: 6, simplestFraction: { n: 6, d: 1 } }, prompt: 'Find the larger $x$-coordinate.' };
     const real = t => checkAnswer(q6, t).correct === true;
-    ok(real('6') && real('6'), 'the real answer check takes 6');
+    ok(real('6') && !real('7'), 'the real answer check takes 6 and refuses 7');
     ok(al(q6, rep(line('x = 0 or x = 6')), true, real) === undefined, 'a line that lists x = 0 or x = 6 is not the answer to "find the larger x" (numeric key 6)');
     ok(al(q6, rep(line('x = 0 or x = 6'), line('The larger x-coordinate is 6')), true, real) === 1, 'the sentence that states the single value is');
     ok(al(q6, rep(line('The two stationary points are (0,0) and (6,-432).')), true, real) === undefined, 'a sentence naming points is not');

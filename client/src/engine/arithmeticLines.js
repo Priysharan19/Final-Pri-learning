@@ -91,7 +91,7 @@ const shown = v => `$${exactForm(v).tex}$`;
 // A one-letter name in front of a worked chain of plain numbers: `k = 9 - 3 = 5`, `Δ = (7)^2 - 4(-3)(3) = 49 - (-36)`, `d_1 = 8 - 3 = 5`.
 // The name says what the chain is for and is never what the chain states: the claim is that the numbers after it are equal, and that
 // holds (or fails) whatever the name is. The name is set aside like `Area =` in front of it, so the chain is judged by the plain-number
-// check below with every one of its guards (a decimal or an ≈ is a note, a bare number in front of worked sides is a note, a reading
+// check below with every one of its guards (only a chain that DISAGREES is handed over; one that holds is read as it always was) (a decimal or an ≈ is a note, a bare number in front of worked sides is a note, a reading
 // that makes it true is a note, e or π on only one side is a note). It applies only when EVERY side after the name is a number once
 // worked out (no letter at all but e, π and the named functions on numbers), and there are at least two such sides. A name with a
 // letter on any later side (`T_n = S_n - S_{n-1} = 2n + 3`), a name that is itself a number or a function value (`f(2) = …`), and the
@@ -101,7 +101,10 @@ function nameLabelOnNumbers(whole, name, rest) {
   if (name === 'e' || name === 'π' || /^pi$/i.test(name)) return whole;
   const sides = rest.replace(/[−–—]/g, '-').replace(/[×·]/g, '*').replace(/÷/g, '/').split('=').map(x => x.trim());
   if (sides.length < 2 || sides.some(x => !x || /[<>≤≥≠≈≃~,;:?]/.test(x))) return whole;
-  return sides.every(x => valueOfPlain(x) !== null) ? rest : whole;
+  const values = sides.map(x => valueOfPlain(x));
+  if (values.some(v => v === null)) return whole;
+  // only a chain that disagrees is handed to the plain-number check (which crosses or notes it); a chain that holds is read exactly as it always was
+  return values.every(v => close(v, values[0])) ? whole : rest;
 }
 
 /** The value of one side when it is plain arithmetic on numbers; null otherwise. */
@@ -1220,22 +1223,19 @@ function pageDefinitionsOnce(raw, out, firstBreak, prep, degreePrimed, tickOnly,
   return broke;
 }
 
-// ── An equation that does not follow from the equations above it ───────────────────────────────────────────────────────────
-// Owner rule, 26 November 2026: a line that does not follow from the line above is crossed at that line (`3x = 12` after `3x + 2 = 11`).
-// An equation in ONE letter is not true or false on its own, but a rewriting of an equation keeps its solutions (moving terms, expanding,
-// multiplying through, completing the square), or keeps some of them (taking one branch, dividing out a factor), or gains some (squaring both
-// sides). A line whose solutions are NEITHER a part of the solutions of an equation above it NOR contain them is not a rewriting of it.
-// Crossed only when ALL of these hold, and a note otherwise (when in doubt, a note):
-//   · the line and the line directly above it are each one equation in the same single letter, a polynomial of degree 1 or 2 in it
-//     (fitted and checked at nine points: a fraction in the letter, a root, a function, a cubic is not read), no words, no ±, no comma,
-//     no part label, no inequality;
-//   · each has finitely many real solutions (at least one) found exactly; the two sets are different and neither holds the other
-//     (so a squared equation that gained roots, a divided one that lost roots, one branch of a quadratic, `x = 2` after `x² = 4` are never crossed);
-//   · no decimal (a rounded value is not the exact one), and the line directly above is not a bare value either (`x = 0` after `x = -3`, `x = -1` is a
-//     new fact about x, not a rewriting);
-//   · the same holds against EVERY equation of that letter in the four lines above it that is not a bare value (`x = 2`), and at least one such
-//     equation is there: a second branch (`x - 2 = 0` after `x - 1 = 0`, both from `(x - 1)(x - 2) = 0`) is a part of an equation above it,
-//     and two bare values with no equation above them (`x = 2`, `x = 3`) are not judged.
+// ── A slip in one step from the equation above it ──────────────────────────────────────────────────────────────────────────
+// Owner rule, 26 November 2026: a line that does not follow from the line above is crossed at that line. A different solution set is NOT evidence of
+// that (a new equation, the other branch, an equation for another quantity all have one). The evidence is a WITNESS: a standard single operation on the
+// line directly above, whose correct result has the shape of the written line and differs from it in exactly one coefficient, constant or sign:
+//   · add or subtract one term on both sides (which includes moving a term across), then multiply or divide both sides by a nonzero constant;
+// the corrected line is then known and says what the slip was (`3x + 2 = 11` and then `3x = 12`: subtracting 2 from both sides gives `3x = 9`).
+// No witness, no cross: a note. Never a cross, whatever the witness, when
+//   · the line is satisfied by a solution of ANY earlier equation of that letter on the page (a branch, a root already found);
+//   · the page has a part label, the line is the other case of a split (one side negated), or the line above is a bare value (`x = 2`);
+//   · either line has a decimal, a function, a root, a fraction in the letter, π, a bar, a word, ± or a sign of inequality, or is not an equation of
+//     degree 1 or 2 in ONE letter (read at nine points, so a cubic or a fraction is not read);
+//   · the operation does nothing (multiplying by 1 and adding 0): a line that differs from the one above in one coefficient with no operation between
+//     them is another equation (`x^2 - 4 = 0` then `x^2 - 9 = 0`), and rewriting the same equation another way (expanding, collecting, factorising) is a tick.
 const REWRITE_WORDS = /[<>≤≥≠≈≃~%°,;:?±∓]|[A-Za-z]{2,}|\bor\b|\band\b/;
 const REWRITE_PART = /^\(?(?:[a-h]|i{1,3}|iv|v|vi{0,3})[.)]\s|^\([a-h]\)|^(?:part|question|q)\s*\(?[a-h0-9]/i;
 // `P(1)`, `f(x+1)`: a letter before a bracket that does not hold that letter is a function applied to something, not a product.
@@ -1247,9 +1247,10 @@ function functionLike(t) {
   }
   return false;
 }
+/** { v, l: [c0, c1, c2], r: [c0, c1, c2], roots, bare } for one equation in one letter, a polynomial of degree 1 or 2 on each side; null otherwise. */
 function polyEquation(rawLine) {
   let t = String(rawLine).replace(/\s*[.;]\s*$/, '').replace(/[−–—]/g, '-').replace(/[×·]/g, '*').replace(/÷/g, '/').replace(/^∴\s*/, '');
-  if (!t || /π|\bpi\b|\||\d\.\d|(?<![\d])\.\d/.test(t) || functionLike(t) || REWRITE_PART.test(t) || REWRITE_WORDS.test(t.replace(/(?<![A-Za-z])[A-Za-z](?![A-Za-z])/g, '#')) || (t.match(/=/g) || []).length !== 1 || /[=]{2}|=>|<=|>=|!=/.test(t) || /\d\s+\d|\d\s*\.\s+\d/.test(t)) return null;
+  if (!t || /π|\bpi\b|\||\d\.\d|(?<![\d])\.\d|\/\s*\d+(?:\.\d+)?\s*[A-Za-z(]|\/\s*[A-Za-z]\s*[A-Za-z(]|\^\s*-?\d+(?:\.\d+)?\s*[A-Za-z]|\^\s*[A-Za-z]/.test(t) || functionLike(t) || REWRITE_PART.test(t) || REWRITE_WORDS.test(t.replace(/(?<![A-Za-z])[A-Za-z](?![A-Za-z])/g, '#')) || (t.match(/=/g) || []).length !== 1 || /[=]{2}|=>|<=|>=|!=/.test(t) || /\d\s+\d|\d\s*\.\s+\d/.test(t)) return null;
   t = cleanStatement(t);
   const [l, r] = t.split('=').map(x => x.trim());
   if (!l || !r) return null;
@@ -1259,48 +1260,93 @@ function polyEquation(rawLine) {
   const vars = [...new Set([...variablesOf(a), ...variablesOf(b)])];
   if (vars.length !== 1 || vars[0] === 'e' || vars[0] === 'π') return null;
   const v = vars[0];
-  const f = x => { const p = evaluate(a, { [v]: x }), q = evaluate(b, { [v]: x }); if (typeof p !== 'number' || typeof q !== 'number' || !Number.isFinite(p) || !Number.isFinite(q)) throw new Error('nf'); return p - q; };
-  let c, up, dn;
-  try { c = f(0); up = f(1); dn = f(-1); } catch { return null; }
-  const A = (up + dn) / 2 - c, B = (up - dn) / 2;
-  const scale = Math.max(1, Math.abs(A), Math.abs(B), Math.abs(c));
-  try { for (const x of [-3, -2, -0.5, 0.5, 2, 3, 4.5]) { const y = f(x), z = A * x * x + B * x + c; if (Math.abs(y - z) > 1e-8 * Math.max(scale, Math.abs(y), 1) * Math.max(1, x * x)) return null; } } catch { return null; }
-  const tiny = 1e-9 * scale;
+  const coefficients = n => {
+    const f = x => { const y = evaluate(n, { [v]: x }); if (typeof y !== 'number' || !Number.isFinite(y)) throw new Error('nf'); return y; };
+    const c = f(0), up = f(1), dn = f(-1), c2 = (up + dn) / 2 - c, c1 = (up - dn) / 2;
+    const scale = Math.max(1, Math.abs(c), Math.abs(c1), Math.abs(c2));
+    for (const x of [-3, -2, -0.5, 0.5, 2, 3, 4.5]) if (Math.abs(f(x) - (c2 * x * x + c1 * x + c)) > 1e-8 * Math.max(scale, Math.abs(f(x)), 1) * Math.max(1, x * x)) return null;
+    return [c, c1, c2];
+  };
+  let lc, rc;
+  try { lc = coefficients(a); rc = coefficients(b); } catch { return null; }
+  if (!lc || !rc) return null;
+  const A = lc[2] - rc[2], B = lc[1] - rc[1], c = lc[0] - rc[0];
+  const scale = Math.max(1, Math.abs(A), Math.abs(B), Math.abs(c)), tiny = 1e-9 * scale;
   let roots;
   if (Math.abs(A) <= tiny) { if (Math.abs(B) <= tiny) return null; roots = [-c / B]; }
   else { const d = B * B - 4 * A * c; if (d < -tiny) return null; roots = d <= tiny ? [-B / (2 * A)] : [(-B + Math.sqrt(d)) / (2 * A), (-B - Math.sqrt(d)) / (2 * A)]; }
-  const bare = /^[A-Za-z]$/.test(l) && valueOf(r) !== null || /^[A-Za-z]$/.test(r) && valueOf(l) !== null;
-  const side = (n, sign) => x => sign * evaluate(n, { [v]: x });
-  return { v, roots: roots.sort((x, y) => x - y), bare, l: x => evaluate(a, { [v]: x }), r: x => evaluate(b, { [v]: x }) };
+  const bare = (/^[A-Za-z]$/.test(l) && valueOf(r) !== null) || (/^[A-Za-z]$/.test(r) && valueOf(l) !== null);
+  return { v, l: lc, r: rc, roots: roots.sort((x, y) => x - y), bare, lf: x => evaluate(a, { [v]: x }), rf: x => evaluate(b, { [v]: x }) };
 }
 const sameRoot = (x, y) => Math.abs(x - y) <= 1e-7 * Math.max(1, Math.abs(x), Math.abs(y));
 const holds = (set, x) => set.some(y => sameRoot(x, y));
-/** 'incomparable' when neither set holds the other; otherwise 'related'. */
-const rootRelation = (p, q) => ((p.every(x => holds(q, x)) || q.every(x => holds(p, x))) ? 'related' : 'incomparable');
-// One line is the other with ONE side negated (`2x - 1 = x + 2` and `2x - 1 = -(x + 2)`, the two cases of an absolute value), or the same equation with both sides negated and one
-// swapped: the second case of a split, never a rewriting of the first.
+const SAME = (x, y) => Math.abs(x - y) <= 1e-9 * Math.max(1, Math.abs(x), Math.abs(y));
+// One side negated, or both sides negated and one swapped: the second case of a split, never a rewriting of the first.
 const FLIP_POINTS = [-2.3, -1.1, 0.7, 1.6, 2.9];
 const sameFn = (f, g, sign) => FLIP_POINTS.every(x => { const p = f(x), q = sign * g(x); return Number.isFinite(p) && Number.isFinite(q) && Math.abs(p - q) <= 1e-9 * Math.max(1, Math.abs(p), Math.abs(q)); });
 function caseSplit(A, B) {
-  for (const [l, r] of [[A.l, A.r], [A.r, A.l]]) if ((sameFn(B.l, l, 1) && sameFn(B.r, r, -1)) || (sameFn(B.l, l, -1) && sameFn(B.r, r, 1))) return true;
+  for (const [l, r] of [[A.lf, A.rf], [A.rf, A.lf]]) if ((sameFn(B.lf, l, 1) && sameFn(B.rf, r, -1)) || (sameFn(B.lf, l, -1) && sameFn(B.rf, r, 1))) return true;
   return false;
+}
+const MULTIPLIERS = (() => { const out = new Map(); for (let p = 1; p <= 12; p++) for (let q = 1; q <= 12; q++) for (const sg of [1, -1]) { const k = sg * p / q; out.set(Math.round(k * 1e9), k); } return [...out.values()]; })();
+const showPoly = c => {
+  const parts = [];
+  for (let d = 2; d >= 0; d--) {
+    const x = c[d]; if (Math.abs(x) < 1e-9) continue;
+    const mag = Math.abs(x), n = Math.abs(mag - Math.round(mag)) < 1e-9 ? String(Math.round(mag)) : exactForm(mag).plain;
+    const body = d === 0 ? n : `${mag === 1 ? '' : n}${d === 1 ? 'x' : 'x^2'}`;
+    parts.push(`${parts.length ? (x < 0 ? ' - ' : ' + ') : (x < 0 ? '-' : '')}${body}`);
+  }
+  return parts.length ? parts.join('') : '0';
+};
+const isInt = x => Math.abs(x - Math.round(x)) < 1e-9;
+/**
+ * { corrected: [l, r], how } for a standard SINGLE operation on A whose correct result is B in all but one coefficient; null for none (or for two
+ * different corrections: then nothing is said). The operations, each natural: take away a term that is on one side (add its opposite to both sides, so
+ * that side loses it); divide both sides by a whole number that divides every coefficient (or by -1); multiply both sides by a whole number to clear a
+ * fraction (every coefficient of the result a whole number).
+ */
+function slipWitness(A, B) {
+  const slots = [...A.l, ...A.r];
+  const wholeA = slots.every(isInt);
+  const found = [];
+  const test = (k, d, c, how) => {
+    const res = [A.l.map((x, j) => k * (x + (j === d ? c : 0))), A.r.map((x, j) => k * (x + (j === d ? c : 0)))];
+    const written = [B.l, B.r];
+    let count = 0;
+    for (let s = 0; s < 2 && count < 2; s++) for (let j = 0; j < 3; j++) if (!SAME(res[s][j], written[s][j])) count++;
+    if (count === 1) found.push({ corrected: res, how });
+  };
+  const term = (c, d) => showPoly([d === 0 ? Math.abs(c) : 0, d === 1 ? Math.abs(c) : 0, d === 2 ? Math.abs(c) : 0]);
+  for (let d = 0; d <= 2; d++) for (const [side, vals] of [['l', A.l], ['r', A.r]]) {
+    const c = -vals[d];
+    if (!isInt(c) || Math.abs(c) < 1e-9 || Math.abs(c) > 1000) continue;
+    test(1, d, c, `${c > 0 ? 'adding' : 'subtracting'} ${term(c, d)} ${c > 0 ? 'to' : 'from'} both sides`);
+  }
+  if (wholeA) {
+    for (let m = 2; m <= 12; m++) if (slots.every(x => isInt(x / m))) test(1 / m, 0, 0, `dividing both sides by ${m}`);
+    test(-1, 0, 0, 'multiplying both sides by -1');
+  } else {
+    for (let m = 2; m <= 12; m++) if (slots.every(x => isInt(x * m))) test(m, 0, 0, `multiplying both sides by ${m}`);
+  }
+  if (!found.length) return null;
+  const keys = new Set(found.map(f => JSON.stringify(f.corrected.map(side => side.map(x => Math.round(x * 1e6) / 1e6)))));
+  return keys.size === 1 ? found[0] : null;
 }
 function equationRewrite(raw, out) {
   const parsed = raw.map(l => { try { return polyEquation(l); } catch { return null; } });
-  for (let i = 0; i < raw.length; i++) {
+  for (let i = 1; i < raw.length; i++) {
     if (out[i].status !== 'note' || out[i].unreadable || out[i].note === 'Follows from the earlier slip.') continue;
-    const B = parsed[i], A = i > 0 ? parsed[i - 1] : null;
-    if (!B || (i > 0 && out[i - 1].status === 'break')) continue;
-    const recent = [];
-    for (let k = Math.max(0, i - 4); k < i; k++) if (parsed[k] && parsed[k].v === B.v && !REWRITE_PART.test(raw[k + 1] || '') && !(k + 1 === i && false)) recent.push(parsed[k]);
-    // a part label (a), (b) anywhere between the lines used and this one: a new part, not a rewriting
-    const fresh = raw.slice(Math.max(0, i - 4), i + 1).some(l => REWRITE_PART.test(l));
-    if (fresh) continue;
-    if (recent.some(r => caseSplit(r, B))) continue;
-    // (1) against the equations above it: neither a part of them nor holding them (see above)
-    const aboveFails = !!A && !A.bare && A.v === B.v && recent.some(r => !r.bare) && recent.every(r => rootRelation(B.roots, r.roots) === 'incomparable');
-    if (!aboveFails) continue;
-    return { index: i, rule: 'equation-rewrite', message: `This line is not a rewriting of the equation above it: its solutions (${B.roots.map(x => `${B.v} = ${exactForm(x).plain}`).join(', ')}) are not those of ${mathSpan(raw[i - 1].replace(/\s*[.;]\s*$/, ''))} or a part of them.` };
+    const B = parsed[i], A = parsed[i - 1];
+    if (!B || !A || A.v !== B.v || A.bare || out[i - 1].status === 'break') continue;
+    if (raw.slice(0, i + 1).some(l => REWRITE_PART.test(l))) continue;
+    // satisfied by a solution of ANY earlier equation of that letter on the page: a branch or a root already found
+    if (parsed.slice(0, i).some(r => r && r.v === B.v && B.roots.some(x => holds(r.roots, x)))) continue;
+    if (parsed.slice(0, i).some(r => r && r.v === B.v && caseSplit(r, B))) continue;
+    const w = slipWitness(A, B);
+    if (!w) continue;
+    const corrected = `${showPoly(w.corrected[0])} = ${showPoly(w.corrected[1])}`;
+    return { index: i, rule: 'equation-rewrite', message: `${w.how.charAt(0).toUpperCase()}${w.how.slice(1)} on ${mathSpan(raw[i - 1].replace(/\s*[.;]\s*$/, ''))} gives ${mathSpan(corrected)}, not ${mathSpan(raw[i].replace(/\s*[.;]\s*$/, ''))}.`, corrected };
   }
   return null;
 }
@@ -1778,15 +1824,16 @@ function stepCheckArithmeticWithinBudget(workingText, prep = null, tickOnly = fa
     const src0 = line.replace(/\s*[;.]\s*$/, '').replace(/^(?!(?:sin|cos|tan|sec|cosec|csc|cot|ln|log|sqrt|exp|abs|pi|ans|answer|lhs|rhs)\b)[A-Za-z]{3,14}\s*=\s*(?=\S)/i, '').replace(/^[A-Za-z][A-Za-z ]{1,24}:\s*(?=\S)/, '').replace(/^(?:LHS|RHS|L\.H\.S\.?|R\.H\.S\.?)\s*=\s*(?=\S)/i, '').replace(DERIVATIVE_LABEL, '')
       .replace(/\s*(?:\/\/|∎|□)\s*$/, '').replace(/\s*=\s*(?:LHS|RHS|L\.H\.S\.?|R\.H\.S\.?)\s*$/i, '')
       // `t = 4: 6(16) + 8(4) + 5`: the substitution in front is set aside like any other label (a line that follows it is held to the expression). Tick only (see `substituted`).
-      .replace(SUBSTITUTION_PREFIX, '')
-      .replace(NAME_LABEL, nameLabelOnNumbers);
+      .replace(SUBSTITUTION_PREFIX, '');
+    // a one-letter name in front of a plain-number chain is set aside for the check, and is not a label for the line below (as before it was)
+    const src0n = src0.replace(NAME_LABEL, nameLabelOnNumbers), nameOnly = src0n !== src0;
     const substituted = SUBSTITUTION_PREFIX.test(line);
     // Owner, 19 November 2026 (a sign slip a competitor caught: `a(2) = (4 - 8 + 2)e^(-2) = 2e^(-2) > 0 so …`):
     //   · a value of a function in front of a worked chain (`a(2) = … = …`) is a label for the chain;
     //   · words after the chain are set aside; `> 0` or `< 0` after it is kept as a claim about the chain's value,
     //     and a tick needs that claim to be true as well.
     let labelFalse = false;
-    let src = src0.replace(/^\(?[a-h]\)(?:\s*\((?:i{1,3}|iv|v)\))?\s+(?=\S)|^\((?:i{1,3}|iv|v)\)\s+(?=\S)/i, ''), signClaim = null;
+    let src = src0n.replace(/^\(?[a-h]\)(?:\s*\((?:i{1,3}|iv|v)\))?\s+(?=\S)|^\((?:i{1,3}|iv|v)\)\s+(?=\S)/i, ''), signClaim = null;
     { const tail = src.match(/^(.*=.*?)\s*([<>])\s*0\s*(?:(?:so|hence|therefore|thus|which)\b[^=<>]*)?$/i);
       if (tail) { src = tail[1]; signClaim = tail[2]; }
       else { const words = src.match(/^(.*=.*?[\d)])\s+(?:so|hence|therefore|thus)\s+[A-Za-z][^=<>\d]*$/i); if (words) src = words[1]; }
@@ -1809,7 +1856,7 @@ function stepCheckArithmeticWithinBudget(workingText, prep = null, tickOnly = fa
         }
       }
       src = src.replace(/^[A-Za-z]'{0,2}\(\s*-?\d+(?:\.\d+)?\s*\)\s*=\s*(?=[^=]+=)/, ''); }
-    const afterLabel = labelled; labelled = src !== line;
+    const afterLabel = labelled; labelled = src !== line && !nameOnly;
     if (labelFalse) { prev = null; return note(line, NOT_PROVED); }
     const beforeComma = src;
     src = commaVectorsAsColumns(src, carried);

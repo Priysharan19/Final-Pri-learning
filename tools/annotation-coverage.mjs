@@ -109,7 +109,6 @@ export function keyText(q) {
 }
 
 // ── marking a page: the server's path, then the page's own model ─────────────
-const CARD = { ok: 'checked', break: 'first-error' };
 /**
  * Marks `lines` as the answer `answer` through the server's practice operation, and reads the report the page shows as the marked page does.
  * Returns { correct, cards: [{ status, cls, phrase, line }], answerLine, report } or null when the marker produced no line report.
@@ -227,15 +226,15 @@ export function falseOnItsOwn(text) {
   return false;
 }
 
-// A mutant of an equation in one letter is provably false GIVEN THE PAGE when its real solutions (found here by scanning, not by the engine's exact
-// roots) are neither a part of, nor hold, the solutions of any equation of that letter in the four lines above it, and at least one of those is not a
-// bare value (`x = 3`): it contradicts the line it was derived from. A mutant that keeps the same solutions (`7(x - 1)(x - 7) = 0` for `6(x - 1)(x - 7) = 0`)
-// is still true, and is dropped as a tool artefact.
-const EQ_CACHE = new Map();
-const oneEquation = text => { const k = String(text); if (!EQ_CACHE.has(k)) { if (EQ_CACHE.size > 20000) EQ_CACHE.clear(); EQ_CACHE.set(k, oneEquationUncached(k)); } return EQ_CACHE.get(k); };
-const oneEquationUncached = text => {
+// A mutant is provably false only in one of two ways, neither of which reads the engine under test:
+//   1. false on its own (falseOnItsOwn above);
+//   2. PLANTED: the authored line is the correct result of one standard single operation on the line above it (add or subtract one term on both sides, or
+//      multiply both sides by a nonzero constant), and the mutant differs from that correct result in exactly one coefficient, constant or sign. The tool
+//      planted that one error, so it knows the line is wrong: it is the correct result with one thing changed.
+// A mutant that is merely a different equation from its neighbours (a different solution set) is not provably false: it may be a new equation.
+const polyOf = text => {
   const t = String(text).replace(/[−–—]/g, '-').replace(/[×·]/g, '*').replace(/\s*[.;]\s*$/, '');
-  if (/[<>≤≥≠≈,;:±%°]|[A-Za-z]{2,}/.test(t.replace(/(?<![A-Za-z])[A-Za-z](?![A-Za-z])/g, '#')) || (t.match(/=/g) || []).length !== 1) return null;
+  if (/[<>≤≥≠≈,;:±%°|]|[A-Za-z]{2,}|\d\.\d/.test(t.replace(/(?<![A-Za-z])[A-Za-z](?![A-Za-z])/g, '#')) || (t.match(/=/g) || []).length !== 1) return null;
   const [l, r] = t.split('=').map(x => x.trim());
   if (!l || !r) return null;
   let a, b;
@@ -243,84 +242,68 @@ const oneEquationUncached = text => {
   const vars = [...new Set([...EX.variablesOf(a), ...EX.variablesOf(b)])];
   if (vars.length !== 1 || vars[0] === 'e') return null;
   const v = vars[0];
-  const f = x => { try { const p = EX.evaluate(a, { [v]: x }), q = EX.evaluate(b, { [v]: x }); return Number.isFinite(p) && Number.isFinite(q) ? p - q : NaN; } catch { return NaN; } };
-  const roots = [];
-  const grid = [];
-  for (let x = -3000; x < -60; x += 1) grid.push(x);
-  for (let x = -60; x <= 60.0001; x += 0.05) grid.push(Math.round(x * 100) / 100);
-  for (let x = 61; x <= 3000; x += 1) grid.push(x);
-  let prevX = grid[0], prevY = f(prevX);
-  for (let g = 1; g < grid.length; g++) {
-    const x = grid[g], y = f(x);
-    if (Number.isFinite(prevY) && Number.isFinite(y)) {
-      if (Math.abs(y) < 1e-12) { if (!roots.some(z => Math.abs(z - x) < 0.02)) roots.push(x); }
-      else if (prevY * y < 0) { let lo = prevX, hi = x, flo = prevY; for (let k = 0; k < 60; k++) { const mid = (lo + hi) / 2, fm = f(mid); if (!Number.isFinite(fm)) break; if (flo * fm <= 0) hi = mid; else { lo = mid; flo = fm; } } const z = (lo + hi) / 2; if (!roots.some(w => Math.abs(w - z) < 0.02)) roots.push(z); }
-    }
-    prevX = x; prevY = y;
-  }
-  if (!roots.length || roots.length > 6) return null;
-  const bare = (/^[A-Za-z]$/.test(l) && !/[A-Za-z]/.test(r)) || (/^[A-Za-z]$/.test(r) && !/[A-Za-z]/.test(l));
-  return { v, roots: roots.sort((x, y) => x - y), bare };
+  const coef = n => {
+    const f = x => { const y = EX.evaluate(n, { [v]: x }); if (!Number.isFinite(y)) throw new Error('nf'); return y; };
+    const c0 = f(0), c2 = (f(1) + f(-1)) / 2 - c0, c1 = (f(1) - f(-1)) / 2;
+    for (const x of [-3, -1.5, 2, 3.5]) if (Math.abs(f(x) - (c2 * x * x + c1 * x + c0)) > 1e-8 * Math.max(1, Math.abs(f(x)))) return null;
+    return [c0, c1, c2];
+  };
+  try { const L = coef(a), R = coef(b); return L && R ? { v, L, R } : null; } catch { return null; }
 };
-const rootIn = (set, x) => set.some(y => Math.abs(x - y) <= 1e-4 * Math.max(1, Math.abs(x)));
-const related = (p, q) => p.every(x => rootIn(q, x)) || q.every(x => rootIn(p, x));
-export function contradictsLineAbove(lines, i, text) {
-  const B = oneEquation(text);
-  if (!B) return false;
-  const recent = [];
-  for (let k = Math.max(0, i - 4); k < i; k++) { const e = oneEquation(lines[k]); if (e && e.v === B.v) recent.push(e); }
-  return recent.some(r => !r.bare) && recent.every(r => !related(B.roots, r.roots));
-}
-/** True when the mutant is provably false given the page: false by itself, or contradicting the equation(s) above it. */
-// `a = ((-320)/64) = -5`: a one-letter name set equal to a chain of plain numbers: the value it comes to (null otherwise).
-function chainValue(line, v) {
-  const t = String(line);
-  if (/[<>≤≥≠≈,;:]|[A-Za-z]{2,}/.test(t.replace(/(?<![A-Za-z])[A-Za-z](?![A-Za-z])/g, '#'))) return null;
-  let sides; try { sides = H.sidesOf(t); } catch { return null; }
-  if (sides.length < 2 || sides[0] !== v || sides.slice(1).some(x => H.lettersIn(x).length)) return null;
-  const vals = sides.slice(1).map(x => { const r = H.sideValues(x, []); return r && r[0] !== null ? r[0] : null; });
-  return vals.every(x => x !== null && Math.abs(x - vals[0]) <= 1e-9 * Math.max(1, Math.abs(x))) ? vals[0] : null;
-}
-// `h = -6` straight after `h = ((-14 + 0)/2)`: a value for a name that the line above has just worked out as another number.
-const contradictsValueAbove = (lines, i, text) => {
-  const m = /^\s*([A-Za-z])\s*=\s*(-?\d+(?:\.\d+)?)\s*$/.exec(String(text));
-  if (!m || i < 1) return false;
-  const above = chainValue(lines[i - 1], m[1]);
-  return above !== null && Math.abs(above - Number(m[2])) > 1e-9 * Math.max(1, Math.abs(above));
+const eqSlot = (x, y) => Math.abs(x - y) <= 1e-9 * Math.max(1, Math.abs(x), Math.abs(y));
+// the results of every single operation on P, nontrivial: [{ L, R }]
+const operationsOn = P => {
+  const out = [];
+  for (let d = 0; d < 3; d++) for (let c = -200; c <= 200; c++) { if (!c) continue; out.push({ L: P.L.map((x, j) => (j === d ? x + c : x)), R: P.R.map((x, j) => (j === d ? x + c : x)) }); }
+  for (let p = 1; p <= 24; p++) for (let q = 1; q <= 24; q++) for (const sg of [1, -1]) { const k = sg * p / q; if (k === 1) continue; out.push({ L: P.L.map(x => k * x), R: P.R.map(x => k * x) }); }
+  return out;
 };
-const WRONG_CTX = { answer: null };   // the question's own numeric answer while its wrong half is measured (the question is part of the page)
-// A line with no relation sign is an expression the working says is the next value (a derivative, a simplification). One that is not the same function
-// as the authored line is not that value: it contradicts the page (the line above, or the question when it is the first line).
-const bareExpression = text => !/[=<>≤≥≠≈,;:]/.test(String(text));
-// An equation in one letter on the way to the solution keeps the solution's value (a squared equation gains roots, a divided one loses others, none loses the
-// answer). When the authored line has the value another authored line gives that letter (`k = 9`), a mutant of it whose solutions do not include that
-// value is not on the way. (When the authored line itself lacks the value, nothing is said.)
-export function contradictsSolution(lines, i, text) {
-  const B = oneEquation(text), O = oneEquation(lines[i]);
-  if (!B || !O || B.bare) return false;
-  const given = Number.isFinite(WRONG_CTX.answer) ? [WRONG_CTX.answer] : [];
-  lines.forEach((l, k) => { if (k === i) return; const e = oneEquation(l); if (e && e.v === B.v && e.bare && e.roots.length === 1) given.push(e.roots[0]); else { const c = chainValue(l, B.v); if (c !== null) given.push(c); } });
-  return given.length > 0 && given.some(c => rootIn(O.roots, c)) && !given.some(c => rootIn(B.roots, c));
+const slotsDiffering = (X, Y) => [...X.L, ...X.R].filter((x, j) => !eqSlot(x, [...Y.L, ...Y.R][j])).length;
+const PLANT_CACHE = new Map();
+export function plantedOnLineAbove(lines, i, text) {
+  if (i < 1) return false;
+  const A = polyOf(lines[i - 1]), O = polyOf(lines[i]), M = polyOf(text);
+  if (!A || !O || !M || A.v !== O.v || O.v !== M.v) return false;
+  const key = `${lines[i - 1]}|${lines[i]}`;
+  if (!PLANT_CACHE.has(key)) { if (PLANT_CACHE.size > 5000) PLANT_CACHE.clear(); PLANT_CACHE.set(key, operationsOn(A).some(R => slotsDiffering(R, O) === 0)); }
+  return PLANT_CACHE.get(key) && slotsDiffering(O, M) === 1;
 }
-export const provableGivenPage = (lines, i, text) => falseOnItsOwn(text) || contradictsLineAbove(lines, i, text) || bareExpression(text) || contradictsSolution(lines, i, text) || contradictsValueAbove(lines, i, text);
+/** True when the mutant is provably false: false on its own, or the one-error plant on the correct result of a single operation on the line above. */
+export const provableGivenPage = (lines, i, text) => falseOnItsOwn(text) || plantedOnLineAbove(lines, i, text);
 
-/** Up to two one-line mutants of the line that are provably false given the page, different kinds first. */
-export function mutantsOf(lines, i) {
+// The ladder of mutations the wrong half tries, in order. Every unit with a maths line in its worked solution gets a wrong-half test:
+//   (a) PLANTED: one coefficient of the correct result of a single known operation on the line above is changed (plantedOnLineAbove);
+//   (b) SELF-FALSE: a number of a middle line is changed so that the line is no longer true (an arithmetic chain link, a function value, a derivative
+//       coefficient, a substituted value): the evaluator of tools/marking-mutation-harness.mjs finds a different value, and for an equation in one letter
+//       the solutions are not the same (7(x - 1)(x - 7) = 0 for 6(x - 1)(x - 7) = 0 is still true, and is dropped);
+//   (c) the same on any line, the first and the last included (a changed final value in a chain).
+// The first rung that has a mutant is used; the unit is not-applicable for the wrong half only when it is multiple choice, and has no wrong half to test
+// (a failure, never an excuse) when its worked solution has no maths line at all.
+const sameRoots = (a, b) => !!a && !!b && a.v === b.v && a.roots.length > 0 && a.roots.length === b.roots.length && a.roots.every((x, k) => Math.abs(x - b.roots[k]) < 1e-4);
+const stillTrueMutant = (line, text) => { try { return sameRoots(H.rootsOf(line), H.rootsOf(text)); } catch { return false; } };
+export function mutantsOf(lines, i, rung = 'b') {
   const line = lines[i];
   const others = new Set(lines.filter((_, j) => j !== i).map(squash));
   const all = [];
-  try { for (const m of H.mutationsOf(line)) { if (!others.has(squash(m.text)) && H.judgeMutant(line, m.text) === 'wrong' && provableGivenPage(lines, i, m.text)) all.push(m); } } catch { return []; }
+  try {
+    for (const m of H.mutationsOf(line)) {
+      if (others.has(squash(m.text)) || H.judgeMutant(line, m.text) !== 'wrong') continue;
+      if (rung === 'a' ? !plantedOnLineAbove(lines, i, m.text) : stillTrueMutant(line, m.text)) continue;
+      all.push(m);
+    }
+  } catch { return []; }
   const picked = [], kinds = new Set();
   for (const m of all) if (!kinds.has(m.kind)) { picked.push(m); kinds.add(m.kind); if (picked.length === 2) return picked; }
   for (const m of all) if (!picked.includes(m)) { picked.push(m); if (picked.length === 2) break; }
   return picked;
 }
 
-/** The middle-most line that has a mutant provably false given the page: for three or more lines the interior ones (the middle first), else the lines in order. */
+/** The first rung of the ladder that has a mutant, on the middle-most line that has one (rung c: any line, in order). */
 export function chooseMutantLine(lines) {
   const n = lines.length;
-  const order = n >= 3 ? [...Array(n - 2).keys()].map(k => k + 1).sort((a, b) => Math.abs(a - (n - 1) / 2) - Math.abs(b - (n - 1) / 2) || a - b) : [...Array(n).keys()];
-  for (const i of order) { const ms = mutantsOf(lines, i); if (ms.length) return { i, mutants: ms }; }
+  const interior = n >= 3 ? [...Array(n - 2).keys()].map(k => k + 1).sort((a, b) => Math.abs(a - (n - 1) / 2) - Math.abs(b - (n - 1) / 2) || a - b) : [...Array(n).keys()];
+  const every = [...Array(n).keys()];
+  for (const [rung, order] of [['a', interior], ['b', interior], ['c', every]]) for (const i of order) { const ms = mutantsOf(lines, i, rung === 'a' ? 'a' : 'b'); if (ms.length) return { i, mutants: ms, rung }; }
   return null;
 }
 
@@ -330,10 +313,7 @@ export function wrongHalf(q, lines, { unreadable = 0, firstUnreadable = null } =
   if (QUESTION_BUCKET[q.answerType]) return fail(QUESTION_BUCKET[q.answerType]);
   if (!lines.length) return fail('no maths lines in the worked solution');
   if (unreadable) return fail(unreadableCause(firstUnreadable));
-  const keyNumber = Number(keyText(q));
-  WRONG_CTX.answer = q.answerType === 'numeric' && Number.isFinite(keyNumber) && keyText(q) !== '' ? keyNumber : null;
-  let pick;
-  try { pick = chooseMutantLine(lines); } finally { WRONG_CTX.answer = null; }
+  const pick = chooseMutantLine(lines);
   if (!pick) return fail('no provable one-line mutation of any step');
   const tried = [];
   for (const m of pick.mutants) {

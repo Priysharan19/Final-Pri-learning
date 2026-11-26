@@ -22,7 +22,7 @@
     "test:qbank:isolation": "node tools/qbank-isolation-check.mjs",
     "test:qbank:diagrams": "node tools/qbank-diagrams.test.mjs",
     "test:qbank:manual": "node tools/qbank-manual.test.mjs",
-    "test:annotation:coverage": "node server/test/annotation-coverage-gate-check.mjs && node server/test/equation-rewrite-check.mjs && node server/test/inequality-statement-ticks-check.mjs",
+    "test:annotation:coverage": "node server/test/annotation-coverage-gate-check.mjs && node server/test/equation-rewrite-check.mjs && node server/test/inequality-statement-ticks-check.mjs && node server/test/authored-pages-vs-base-check.mjs",
     "test:qbank:worked": "node server/test/qbank-worked-check.mjs",
     "test:qbank:figures": "node server/test/qbank-figures-check.mjs",
     "test:nsw:practice:bank:figure:tour": "node client/test/tour-nsw-practice-bank-figure.js",
