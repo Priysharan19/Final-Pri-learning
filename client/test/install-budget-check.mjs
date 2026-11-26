@@ -187,7 +187,11 @@ const INSTALL_GZIP_CEILING = 1_000_000;
 // manifests): 5,648,212 raw / 1,910,435 gzipped, over the 5,660,000 / 1,970,000 ceilings by only 11,788 / 59,565 bytes. The new ceilings keep the headroom the
 // two earlier re-baselines used, about 117 kB raw and 87 kB gzipped over the measure. A re-baseline for content, not a weaker gate: the install
 // ceilings, the banned-from-install list, render-from-install and offline coverage are unchanged.
-const FIRST_VISIT_RAW_CEILING = 5_765_000;
+// Raised 2026-11-26 (task/tick-every-true-line, under the same owner decision, size not a constraint): FIRST_VISIT_RAW 5,765,000 -> 5,890,000 bytes. What was
+// added: the page proofs and display fields of the marked page (engine/pageProofs.js, engine/displayFields.js, the false-continuation rule in
+// engine/valueChain.js), about 40 kB raw of the whole offline build. Measured on a clean tree with the real build of this check: origin/main cc4545cd2 5,600 kB, this branch 5,640 kB (about 5,775,000 bytes, over the old 5,765,000 ceiling); the new ceiling is that measure plus the precedent headroom of about 115 kB (commits 3baddb6bc, 8dbeed462).
+// The gzip ceiling and the install ceilings are unchanged; the banned-from-install list, render-from-install and offline coverage are unchanged.
+const FIRST_VISIT_RAW_CEILING = 5_890_000;
 const FIRST_VISIT_GZIP_CEILING = 1_998_000;
 
 // Things that must never be in the install again, and what each one costs.

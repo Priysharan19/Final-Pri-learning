@@ -35,6 +35,7 @@ import { annotateMilestones } from '../../client/src/engine/milestones.js';
 import { solutionMatch, _internals as SOLUTION_INTERNALS } from '../../client/src/engine/solutionMatch.js';
 import { lineChains } from '../../client/src/engine/lineChains.js';
 import { provedLines } from '../../client/src/engine/provedLines.js';
+import { displayFields } from '../../client/src/engine/displayFields.js';
 import { awardBoardScheme, matchBoardPoints } from '../../client/src/engine/boardScheme.js';
 import { constrainToShown, unsupportedCredit } from '../../client/src/engine/markExplanation.js';
 import { holdFaultCrosses } from './bankFaults.js';
@@ -472,6 +473,16 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
         const rejected = tickRejections(candMeta, base, { authored: authoredEquations(q), prompt: q.prompt });
         if (rejected !== base) shownReport = rejected;
       }
+    }
+  } catch { /* the report stands */ }
+  // Feedback only, last of all: the display fields the marked page reads (engine/displayFields.js): a stable class id on every tick, `notRequired` on proved
+  // lines after the answer-bearing line, the first wrong line's reason id and corrected right-hand side, `followsFromError` on later lines that are correct
+  // consequences, and `answerLine`. Added to the DISPLAYED report only (`stepReport` is untouched, so no mark, scheme pay or stored record reads them).
+  try {
+    if (typeof steps === 'string' && steps.trim() && !OBJECTIVE.has(q.answerType) && q.answerType !== 'graph-sketch' && !Array.isArray(q.boardScheme) && !(opts && (opts.proved === false || opts.solutionMatch === false)) && /^gen:(?:y11|y12|me11|me12)-/.test(String(q.contentId ?? ''))) {
+      const base = shownReport || report;
+      const more = base ? displayFields(q, base) : null;
+      if (more && more !== base) shownReport = more;
     }
   } catch { /* the report stands */ }
   // A scheme question (schemeAward.js) also learns which lines the topic check ITSELF verified: the page ticks more than that (a copied
