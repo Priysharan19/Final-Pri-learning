@@ -1073,6 +1073,8 @@ jobs:
             # The marked page (owner's two cases and a mixed page, ink and photo, both editions, light and dark, desktop and 390 px):
             # a real browser, so here and not in the suites shards.
             node client/test/tour-marked-page.mjs 2>&1 | tee -a browser.log
+            # The teacher-marked page (Prithagoras): ticks, a cross and margin marks on the student's own page, three views, the examiner's workspace.
+            node client/test/tour-teacher-marked-page.mjs 2>&1 | tee -a browser.log
             # Plan E5: a built Prithagoras client on a Prithagoras server shows
             # no price, plan or purchase control and reaches no store.
             node client/test/tour-paywall-edition.js 2>&1 | tee -a browser.log

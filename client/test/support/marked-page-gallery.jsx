@@ -46,7 +46,53 @@ const CASES = {
 // A test may hand the page its own picture and reader boxes (window.__markedPageFixture = { src, lines: [{ text, box }] }),
 // to check where the outlines fall on that picture. Nothing in the real build reads this.
 const FIXTURE_PAGE = typeof window !== 'undefined' && window.__markedPageFixture && source === 'photo' ? window.__markedPageFixture : null;
-const c = FIXTURE_PAGE ? { ...CASES.buoy, lines: FIXTURE_PAGE.lines.map(l => l.text) } : (CASES[which] || CASES.buoy);
+// ?case=owner19: a SYNTHETIC 19-line page of the stationary-points question (fixture lines, report and boxes; no photograph of anyone), with
+// two columns in the middle so a tick at the end of line 7 would land on line 8's writing. The report carries the classes the engine emits.
+const V = (text, how, fact, extra = {}) => ({ text, status: 'ok', state: 'verified', note: null, ...(how ? { how } : {}), ...(fact ? { fact } : {}), ...extra });
+const U = text => ({ text, status: 'note', state: 'unverified' });
+const C = text => ({ text, status: 'note', state: 'unverified', context: true });
+const OWNER19 = [
+  C('Solution:'),
+  V('y = 4x^3 - 36x^2', null, null, { state: 'given', solutionMatch: true }),
+  V('dy/dx = 12x^2 - 72x', { kind: 'derivative-rule' }),
+  C('Stationary points when dy/dx = 0:'),
+  V('12x^2 - 72x = 0', null, { kind: 'both-sides' }),
+  V('12x(x - 6) = 0', { kind: 'factorised', factors: [] }),
+  V('x = 0 or x = 6', null, { kind: 'proved', proof: 'listed' }),
+  V('d2y/dx2 = 24x - 72', { kind: 'derivative-rule' }),
+  U('At x = 0: d2y/dx2 = -72 < 0'),
+  U('(local maximum)'),
+  U('At x = 6: d2y/dx2 = 72 > 0'),
+  U('(local minimum)'),
+  C('The stationary points are:'),
+  V('At x = 0: y = 4(0)^3 - 36(0)^2 = 0', null, null, { state: 'arithmetic' }),
+  V('At x = 6: y = 4(6)^3 - 36(6)^2 = 4(216) - 36(36)', null, null, { state: 'arithmetic' }),
+  V('= 864 - 1296 = -432', null, null, { state: 'arithmetic' }),
+  U('(0, 0) and (6, -432)'),
+  U('The two stationary points are (0,0) and (6,-432).'),
+  V('The larger x-coordinate is 6', null, { kind: 'proved', proof: 'listed' })
+];
+const OWNER19_COL = i => (i >= 8 && i <= 11 ? 1 : 0);   // lines 9 to 12 are the right-hand column
+function owner19Page() {
+  const W = 900, H = 1010;
+  const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H;
+  const g = canvas.getContext('2d');
+  g.fillStyle = '#fbfaf6'; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#1d2a55'; g.font = '30px "Bradley Hand","Segoe Print","Comic Sans MS",cursive'; g.textBaseline = 'middle';
+  const lines = OWNER19.map((l, i) => {
+    const right = OWNER19_COL(i) === 1;
+    const x = right ? 478 : 40;
+    // lines 8 and 9 are written side by side: line 8 ends at x = 452 and line 9 starts at 478 a little lower
+    const y = i < 8 ? 40 + i * 52 : i === 8 ? 40 + 7 * 52 + 26 : 40 + 7 * 52 + 26 + (i - 8) * 52;
+    g.fillText(l.text.replace(/\^2/g, '\u00b2').replace(/\^3/g, '\u00b3'), x, y);
+    const w = i === 7 ? 412 : Math.min((right ? W - 478 - 20 : W - 80), g.measureText(l.text).width + 16);
+    return { text: l.text, box: { x: x / W, y: (y - 22) / H, w: w / W, h: 44 / H } };
+  });
+  return { src: canvas.toDataURL('image/png'), lines };
+}
+const O19 = which === 'owner19' ? owner19Page() : null;
+
+const c = which === 'owner19' ? { meta: null, lines: OWNER19.map(l => l.text), report: { kind: 'value-chain', source: 'value-chain', lines: OWNER19, summary: {} }, receipt: q.get('criteria') === '3' ? { awarded: 3, possible: 3 } : { awarded: 1, possible: 1 } } : FIXTURE_PAGE ? { ...CASES.buoy, lines: FIXTURE_PAGE.lines.map(l => l.text) } : (CASES[which] || CASES.buoy);
 const stepReport = c.report || stepCheck(c.meta, c.lines.join('\n'));
 // ?facts=1: the optional fields the engine may add (a first-break index, a corrected line on the crossed line). Absent otherwise.
 if (q.get('facts') === '1' && !c.report) {
@@ -86,13 +132,21 @@ function photoPage(lines) {
   return { src: canvas.toDataURL('image/png'), boxes };
 }
 
-const props = source === 'ink'
+const props = O19 ? { source: { kind: 'photo', src: O19.src, lines: O19.lines } } : source === 'ink'
   ? { source: { kind: 'ink', strokes: inkPage(c.lines) } }
   : FIXTURE_PAGE ? { source: { kind: 'photo', src: FIXTURE_PAGE.src, lines: FIXTURE_PAGE.lines } }
   : (() => { const p = photoPage(c.lines); return { source: { kind: 'photo', src: p.src, lines: c.lines.map((text, i) => ({ text, box: p.boxes[i] })) } }; })();
 
 // A FIXTURE approval, test only: the real build has no approved type. ?criteria=1 shows the table it would draw.
-const FIXTURE = q.get('criteria') === '1' && which === 'buoy' ? {
+const O19_ITEMS = q.get('criteria') === '3'
+  ? [{ key: 'derivative', text: 'Differentiates correctly', marks: 1, awarded: true, lines: [3], reason: 'Line 3 is the derivative.' },
+    { key: 'stationary', text: 'Finds the stationary values', marks: 1, awarded: true, lines: [7], reason: 'Line 7 gives x = 0 or x = 6.' },
+    { key: 'answer', text: 'States the larger x-coordinate', marks: 1, awarded: true, lines: [19], reason: 'Line 19 gives 6.' }]
+  : [{ key: 'answer', text: 'States the larger x-coordinate', marks: 1, awarded: true, lines: [19], reason: 'Line 19 gives 6.' }];
+const FIXTURE = (q.get('criteria') === '1' || q.get('criteria') === '3') && which === 'owner19' ? {
+  approved: [{ typeId: 'fixture-owner19', digest: 'd'.repeat(64), approvedBy: 'Fixture Author', date: '2026-11-26' }],
+  criteria: { typeId: 'fixture-owner19', digest: 'd'.repeat(64), items: O19_ITEMS }
+} : q.get('criteria') === '1' && which === 'buoy' ? {
   approved: [{ typeId: 'fixture-buoy', digest: 'c'.repeat(64), approvedBy: 'Fixture Author', date: '2026-11-19' }],
   criteria: { typeId: 'fixture-buoy', digest: 'c'.repeat(64), items: [
     { key: 'max', text: 'States the maximum as 22 + 5', marks: 1, awarded: true, lines: [2], reason: 'Line 2 states it.' },
@@ -102,6 +156,6 @@ const FIXTURE = q.get('criteria') === '1' && which === 'buoy' ? {
 createRoot(document.getElementById('root')).render(
   <div style={{ padding: '16px', maxWidth: 1100, margin: '0 auto' }} data-gallery-case={`${which}/${source}/${edition}`}
     data-gallery-boxes={props.source.kind === 'photo' ? JSON.stringify(props.source.lines.map(l => l.box)) : undefined}>
-    <MarkedPage input={input} texOf={s => exprToLatex(s) || '\\;'} {...props} {...FIXTURE} {...(q.get('score') === '1' ? { scoreShown: true } : {})} {...(q.get('reading') === '1' ? { reading: { lines: c.lines }, onCorrect: () => {} } : {})} />
+    <MarkedPage teacherMarks={q.get('teacher') === '1'} input={input} texOf={s => exprToLatex(s) || '\\;'} {...props} {...FIXTURE} {...(q.get('score') === '1' ? { scoreShown: true } : {})} {...(q.get('reading') === '1' ? { reading: { lines: c.lines }, onCorrect: () => {} } : {})} />
   </div>
 );

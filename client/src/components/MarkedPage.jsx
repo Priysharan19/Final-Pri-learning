@@ -26,12 +26,58 @@ import { criteriaView } from './criteriaTableModel.js';
 import SchemeTable from './SchemeTable.jsx';
 import { firstSentence } from './lineReportText.js';
 import { typesetProse } from './typesetProse.js';
+import { EDITION } from '../platform/edition.js';
+import { TeacherSheet, ViewToggle, Assessment, StepChips } from './TeacherMarks.jsx';
+import { TEXT, buildAssessment, buildTeacherMarks, listWords, tallyOf } from './markedPageTeacher.js';
 import './MarkedPage.css';
 
 const pointsOf = s => (Array.isArray(s) ? s : Array.isArray(s?.points) ? s.points : []);
 const xy = p => (Array.isArray(p) ? { x: Number(p[0]), y: Number(p[1]) } : { x: Number(p?.x), y: Number(p?.y) });
 const WIDE = '(min-width: 800px)';
 const wide = () => typeof window !== 'undefined' && !!window.matchMedia?.(WIDE)?.matches;
+const VIEW_KEY = 'pri.markedPage.view';
+const readView = () => { try { const v = localStorage.getItem(VIEW_KEY); return v === 'original' || v === 'detailed' ? v : 'marked'; } catch { return 'marked'; } };
+/** Detailed feedback: the words for every mark, numbered as on the page, and the unread lines, which can be typed in (never a cross). */
+function MarkList({ page, marks, lineOpen, toggleLine, readingOfLine, canType, setEditing, textOf, pick }) {
+  const byN = new Map(marks.map(m => [m.n, m]));
+  return (
+    <ol className="mp-t-list" data-mp-list aria-label={TEXT.listLabel}>
+      {page.lines.filter(l => byN.has(l.n) || l.status === 'unread').map(l => {
+        const m = byN.get(l.n);
+        if (!m) {
+          return (
+            <li key={l.n} data-mp-list-n={l.n} data-mp-unread-item>
+              <span className="n">{l.n}</span>
+              <span className="mp-t-unread">{TEXT.unreadLine}{' '}
+                {canType
+                  ? <button type="button" className="mp-link" onClick={() => { if (!lineOpen(l.n)) toggleLine(l.n); setEditing({ line: l.n, text: textOf(l.n) }); }}>{TEXT.typeIt}</button>
+                  : null}
+                {lineOpen(l.n) && readingOfLine(l.n, true)}
+              </span>
+            </li>
+          );
+        }
+        return (
+          <li key={l.n} data-mp-list-n={l.n}>
+            <span className="n">{l.n}</span>
+            <ListEntry m={m} line={l.n} pick={pick} />
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+function ListEntry({ m, line, pick }) {
+  const w = listWords(m);
+  return (
+    <span className={`is-${m.kind}`}>
+      <button type="button" className="mp-link" onClick={() => pick(line, true)}>{w.head}</button>
+      {w.tail ? <span className="hand"> {w.tail}</span> : null}
+      {w.corrected ? <span> {w.corrected}</span> : null}
+      {w.mark ? <span> {w.mark}</span> : null}
+    </span>
+  );
+}
 const reducedMotion = () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
 
 /** The specific reason a verified line is right, only where the engine has one; otherwise nothing (no filler sentence). */
@@ -49,7 +95,7 @@ function whyOf(card, t) {
 }
 /** True when the reason whyOf() returns is the engine's own sentence (maths marked with `$…$`), not an interface string. */
 const whyIsEngine = card => (card.valueChain === 'verified' || card.valueChain === 'arithmetic') && !!card.note;
-function Header({ page, t, hasTable, scoreShown }) {
+function Header({ page, t, hasTable, scoreShown, teacher = false }) {
   const { parts, mark } = page.header;
   // The mark is the server's, said truthfully and in proportion: a right answer shows it prominently; a wrong final answer
   // never headlines "0 of 1" beside a page of correct lines. No partial mark is invented here (method marks are the
@@ -63,13 +109,13 @@ function Header({ page, t, hasTable, scoreShown }) {
     <header className="mp-head">
       <p className="mp-sentence" data-mp-sentence role="status">
         {lead.length > 0 && <span data-mp-lead>{lead.map(p => t(p.key, p.vars)).join(' ')}</span>}
-        {lead.length > 0 && counts.length > 0 && ' '}
-        {counts.length > 0 && <span data-mp-counts>{counts.map(p => t(p.key, p.vars)).join(' ')}</span>}
+        {!teacher && lead.length > 0 && counts.length > 0 && ' '}
+        {!teacher && counts.length > 0 && <span data-mp-counts>{counts.map(p => t(p.key, p.vars)).join(' ')}</span>}
       </p>
       {/* The host's score card already shows the figure: it is not printed a second time, only what it does not say. */}
-      {mark && scoreShown && finalWrong && <p className="mp-mark-quiet" data-mp-mark-note>{t('mp.mark.finalWrongNote')}</p>}
-      {mark && !scoreShown && full && <p className="mp-mark" data-mp-mark={`${mark.awarded}/${mark.possible}`}>{t('mp.mark', { earned: mark.awarded, possible: mark.possible })}</p>}
-      {mark && !scoreShown && !full && (
+      {!teacher && mark && scoreShown && finalWrong && <p className="mp-mark-quiet" data-mp-mark-note>{t('mp.mark.finalWrongNote')}</p>}
+      {!teacher && mark && !scoreShown && full && <p className="mp-mark" data-mp-mark={`${mark.awarded}/${mark.possible}`}>{t('mp.mark', { earned: mark.awarded, possible: mark.possible })}</p>}
+      {!teacher && mark && !scoreShown && !full && (
         <p className="mp-mark-quiet" data-mp-mark={`${mark.awarded}/${mark.possible}`}>
           {t(finalWrong ? 'mp.mark.finalWrong' : 'mp.mark.quiet', { earned: mark.awarded, possible: mark.possible, count: mark.possible })}
         </p>
@@ -82,6 +128,18 @@ function Header({ page, t, hasTable, scoreShown }) {
 // Display only, deterministic: a gentle lift of the paper white and an even-out of soft shadow. The stored original is never altered.
 const CLEAN_FILTER = 'brightness(1.08) contrast(1.06) saturate(0.85)';
 const boxStyle = b => ({ left: `${b.x * 100}%`, top: `${b.y * 100}%`, width: `${b.w * 100}%`, height: `${b.h * 100}%` });
+/** The student's page exactly as it was: the photo, or the ink drawn through its own samples. Never re-typeset, cropped or rearranged. */
+function PageArt({ source, view, t, cleaned }) {
+  return source.kind === 'photo' ? (
+    <img className="mp-img" src={source.src} alt={t('mp.pageAlt.photo')} data-mp-photo={cleaned ? 'cleaned' : 'original'} style={cleaned ? { filter: CLEAN_FILTER } : undefined} />
+  ) : (
+    <svg className="mp-ink" role="img" aria-label={t('mp.pageAlt.ink')}
+      viewBox={view ? `${view.x} ${view.y} ${view.w} ${view.h}` : '0 0 1 1'} preserveAspectRatio="xMinYMin meet"
+      style={view ? { aspectRatio: `${view.w} / ${view.h}` } : undefined}>
+      {(source.strokes || []).map((s, i) => <path key={i} className="mp-stroke" d={strokePath(pointsOf(s).map(xy))} />)}
+    </svg>
+  );
+}
 function Sheet({ source, geometry, page, selected, pick, onKey, markersRef, t, cleaned }) {
   const view = geometry?.view || null;
   const placed = page.aligned && geometry ? page.lines.filter(l => l.box) : [];
@@ -92,15 +150,7 @@ function Sheet({ source, geometry, page, selected, pick, onKey, markersRef, t, c
   return (
     <div className="mp-sheet" data-mp-sheet={source.kind}>
      <div className="mp-sheet-in" style={view ? { '--mp-ar': view.w / view.h } : undefined}>
-      {source.kind === 'photo' ? (
-        <img className="mp-img" src={source.src} alt={t('mp.pageAlt.photo')} data-mp-photo={cleaned ? 'cleaned' : 'original'} style={cleaned ? { filter: CLEAN_FILTER } : undefined} />
-      ) : (
-        <svg className="mp-ink" role="img" aria-label={t('mp.pageAlt.ink')}
-          viewBox={view ? `${view.x} ${view.y} ${view.w} ${view.h}` : '0 0 1 1'} preserveAspectRatio="xMinYMin meet"
-          style={view ? { aspectRatio: `${view.w} / ${view.h}` } : undefined}>
-          {(source.strokes || []).map((s, i) => <path key={i} className="mp-stroke" d={strokePath(pointsOf(s).map(xy))} />)}
-        </svg>
-      )}
+      <PageArt source={source} view={view} t={t} cleaned={cleaned} />
       {/* Decoration, never over the ink's meaning: a thin underline under a wrong line, and an outline round the selected line of ink. */}
       {placed.map(l => (
         <React.Fragment key={`d${l.n}`}>
@@ -130,7 +180,7 @@ function Sheet({ source, geometry, page, selected, pick, onKey, markersRef, t, c
  * source: { kind: 'ink', strokes } or { kind: 'photo', src, lines } where `lines` are the judged
  * lines in order (each may carry the reader's normalised `box`). The geometry is worked out here.
  */
-export default function MarkedPage({ input, source, texOf = s => s, markReady = true, scoreShown = false, criteria = null, stepMarks = false, approved, reading = null, onCorrect = null, howRead = '' }) {
+export default function MarkedPage({ teacherMarks = EDITION === 'prithagoras', examinerNote = null, input, source, texOf = s => s, markReady = true, scoreShown = false, criteria = null, stepMarks = false, approved, reading = null, onCorrect = null, howRead = '' }) {
   const t = useT();
   const { language } = useLanguage();
   // The engine's own commentary from its structured facts (engine/lineCommentary.js): null keeps the engine's sentence as it was.
@@ -156,13 +206,22 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
   const [shown, setShown] = useState(() => new Set());
   const [showAll, setShowAll] = useState(false);
   const [editing, setEditing] = useState(null);   // { line, text }
-  const [cleaned, setCleaned] = useState(true);
+  const [cleaned, setCleaned] = useState(!teacherMarks);   // the teacher-marked page opens on the photograph exactly as it was taken
+  const [view, setViewState] = useState(readView);
+  const setView = v => { setViewState(v); try { localStorage.setItem(VIEW_KEY, v); } catch { /* the choice is only a convenience */ } };
+  const [rowFocus, setRowFocus] = useState(null);
+  const marks = useMemo(() => (teacherMarks && page ? buildTeacherMarks({ page, table }) : []), [teacherMarks, page, table]);
+  const assessment = useMemo(() => (teacherMarks && page ? buildAssessment({ page, table, attempt: model?.attempt ?? null }) : null), [teacherMarks, page, table, model]);
   const detailRef = useRef(null);
   const listRef = useRef(null);
   const markersRef = useRef(null);
 
   if (!page) return null;
   const known = n => page.lines.some(l => l.n === n);
+  // Rubric traceability: a focused criterion lights the lines that earned it; the selected line lights the criteria it earned.
+  const rows = assessment ? assessment.rows : [];
+  const trace = new Set(rowFocus ? (rows.find(r => r.key === rowFocus)?.lines || []) : []);
+  const tracedRows = new Set(chosen === null ? [] : rows.filter(r => r.lines.includes(chosen)).map(r => r.key));
   const selected = chosen !== null && known(chosen) ? chosen : defaultLine(page);
   // Selecting by tapping a marker on a phone brings the panel, which sits below the photo, into view.
   const pick = (n, fromMarker = false) => {
@@ -297,12 +356,22 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
   };
 
   return (
-    <section className="mp" aria-labelledby={`${uid}-h`} data-marked-page data-mp-source={source.kind} data-mp-aligned={page.aligned ? 'true' : 'false'} data-mp-selected={selected}>
+    <section className={`mp${teacherMarks ? ' mp-t-root' : ''}`} aria-labelledby={`${uid}-h`} data-marked-page data-mp-source={source.kind} data-mp-aligned={page.aligned ? 'true' : 'false'} data-mp-selected={selected}>
       <h3 className="sr-only" id={`${uid}-h`}>{t('mp.title')}</h3>
-      <Header page={page} t={t} hasTable={!!table || stepMarks} scoreShown={scoreShown} />
-      <div className="mp-body">
+      <Header page={page} t={t} hasTable={!!table || stepMarks} scoreShown={scoreShown} teacher={teacherMarks} />
+      {teacherMarks && (
+        <div className="mp-t-bar">
+          <p className="mp-t-tally" data-mp-tally>{tallyOf(page)}</p>
+          <ViewToggle view={view} setView={setView} />
+        </div>
+      )}
+      <div className="mp-body" data-mp-body-view={teacherMarks ? view : undefined}>
         <figure className="mp-page">
-          <Sheet source={source} geometry={geometry} page={page} selected={selected} pick={pick} onKey={onKey(markersRef)} markersRef={markersRef} t={t} cleaned={cleaned} />
+          {teacherMarks
+            ? <TeacherSheet kind={source.kind} view={view} page={page} marks={marks} selected={selected} pick={pick} onKey={onKey(markersRef)} markersRef={markersRef} trace={trace}
+                viewBoxStyle={geometry?.view ? { '--mp-ar': geometry.view.w / geometry.view.h } : undefined}><PageArt source={source} view={geometry?.view || null} t={t} cleaned={cleaned} /></TeacherSheet>
+            : <Sheet source={source} geometry={geometry} page={page} selected={selected} pick={pick} onKey={onKey(markersRef)} markersRef={markersRef} t={t} cleaned={cleaned} />}
+          {teacherMarks && view === 'detailed' && <MarkList page={page} marks={marks} lineOpen={lineOpen} toggleLine={toggleLine} readingOfLine={readingOfLine} canType={!!onCorrect} setEditing={setEditing} textOf={textOf} pick={pick} />}
           {/* Everything about how the page was read is one quiet disclosure under the photo. */}
           <details className="mp-about" data-mp-about>
             <summary>{t('mp.about')}</summary>
@@ -331,8 +400,10 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
             </div>
           </details>
         </figure>
-        <div className="mp-panel">
-          <div className="mp-live" aria-live="polite" aria-atomic="false">{detail()}</div>
+        <div className="mp-panel" hidden={teacherMarks && view === 'original'}>
+          {teacherMarks && <Assessment model={assessment} rowFocus={rowFocus} setRowFocus={setRowFocus} tracedRows={tracedRows} examinerNote={examinerNote} />}
+          {teacherMarks && view === 'detailed' && <StepChips rows={rows} rowFocus={rowFocus} setRowFocus={setRowFocus} />}
+          <div className="mp-live" aria-live="polite" aria-atomic="false" hidden={teacherMarks && view !== 'detailed'}>{detail()}</div>
           {/* The screen-reader list of every line, in order; sighted navigation is the markers and the stepper. */}
           <ol className="mp-comments sr-only" ref={listRef} aria-label={t('mp.comments')} onKeyDown={onKey(listRef)}>
             {lines.map(l => (

@@ -1,0 +1,117 @@
+/* The teacher-marked page (Prithagoras edition). Tokens are scoped to the marking root; nothing here changes the app's own accent or theme.
+   Green and red mean marking only. The handwriting face is for annotations alone: Patrick Hand, SIL Open Font License 1.1 (fonts/OFL.txt), Latin
+   subset, 23.9 kB, bundled, no network. */
+@font-face { font-family: 'Pri Hand'; font-style: normal; font-weight: 400; font-display: swap; src: url(./fonts/patrick-hand-latin-400.woff2) format('woff2'); }
+
+.mp-t-root {
+  --mk-paper: #F8F7F3; --mk-graphite: #20201E; --mk-ink: #243A68; --mk-accent: #7654A5;
+  --mk-correct: #287449; --mk-error: #B83238; --mk-advisory: #B18A42; --mk-advisory-text: #765A1C; --mk-rule: #DAD7CF; --mk-quiet: #5a5953;
+  --mk-hand: 'Pri Hand', 'Bradley Hand', 'Segoe Print', cursive;
+  background: var(--mk-paper); color: var(--mk-graphite); padding: var(--space-4); border-radius: var(--radius-lg);
+}
+[data-theme="dark"] .mp-t-root {
+  --mk-paper: #1D1D1B; --mk-graphite: #ECEBE6; --mk-ink: #AEBCEA; --mk-accent: #B79BE0;
+  --mk-correct: #6FCF93; --mk-error: #FF8D8F; --mk-advisory: #D8B36A; --mk-advisory-text: #D8B36A; --mk-rule: #3A3935; --mk-quiet: #aaa9a2;
+}
+
+/* ── the head: view choice and the one tally line ── */
+.mp-t-bar { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-2) var(--space-6); }
+.mp-t-tally { margin: 0; color: var(--mk-quiet); font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.mp-t-views { display: inline-flex; flex-wrap: wrap; gap: var(--space-5); }
+.mp-t-view { appearance: none; background: none; border: 0; border-bottom: 2px solid transparent; padding: 6px 0 4px; min-height: 32px; font: inherit; font-size: 14px; color: var(--mk-quiet); cursor: pointer; }
+.mp-t-view.is-on { color: var(--mk-graphite); border-bottom-color: var(--mk-graphite); font-weight: 600; }
+.mp-t-view:focus-visible, .mp-t-row:focus-visible, .mp-t-chip:focus-visible, .mp-t-assess summary:focus-visible { outline: 2px solid var(--mk-accent); outline-offset: 3px; border-radius: 2px; }
+
+/* ── the sheet: the page, untouched, with the margin beside it ── */
+.mp-sheet.mp-t-sheet { display: grid; grid-template-columns: minmax(0, 1fr) var(--mp-gw, 76px); padding-left: 0; background: var(--mk-paper); border: 1px solid var(--mk-rule); }
+.mp-t-sheet[data-mp-size="roomy"] { --mp-gw: 230px; --mp-rule-x: 172px; }
+.mp-t-sheet[data-mp-size="compact"] { --mp-gw: 76px; --mp-rule-x: 30px; }
+.mp-t-sheet[data-mp-view="original"] { grid-template-columns: minmax(0, 1fr); }
+.mp-t-sheet .mp-sheet-in { min-width: 0; align-self: start; }
+.mp-t-over { position: absolute; inset: 0; pointer-events: none; }
+.mp-t-markers { position: absolute; inset: 0; pointer-events: none; }
+.mp-t-trace { position: absolute; box-sizing: border-box; pointer-events: none; background: color-mix(in srgb, var(--mk-accent) 12%, transparent); outline: 1px solid color-mix(in srgb, var(--mk-accent) 60%, transparent); border-radius: 3px; }
+.mp-t-sheet .mp-under { border-bottom: 2px solid var(--mk-error); }
+.mp-t-leader { position: absolute; height: 0; border-top: 1px dashed currentColor; opacity: .45; pointer-events: none; }
+.mp-t-leader.is-right { color: var(--mk-correct); }
+.mp-t-leader.is-wrong { color: var(--mk-error); }
+
+.mp-marker.mp-t-tick { position: absolute; transform: translate(-50%, -50%); min-width: max(var(--mp-tick, 24px), 24px); min-height: max(var(--mp-tick, 24px), 24px); padding: 0; border: 0; background: transparent; border-radius: 6px; pointer-events: auto; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; color: var(--mk-graphite); }
+.mp-marker.mp-t-tick.in-gutter { left: calc(100% + 16px); }
+.mp-marker.mp-t-tick.is-active { background: transparent; color: inherit; outline: 2px solid var(--mk-accent); outline-offset: -2px; }
+.mp-marker.mp-t-tick:focus-visible { outline: 2px solid var(--mk-accent); outline-offset: -2px; }
+.mp-t-num { position: absolute; right: -4px; top: 2px; font: 600 10.5px/1 var(--font); color: var(--mk-quiet); font-variant-numeric: tabular-nums; }
+.mp-t-glyph { width: calc(var(--mp-tick, 24px) * 1.08); height: var(--mp-tick, 24px); fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; overflow: visible; display: block; }
+.mp-t-glyph path { stroke: currentColor; stroke-dasharray: 1; stroke-dashoffset: 0; }
+.mp-t-glyph.is-right { color: var(--mk-correct); }
+.mp-t-glyph.is-wrong { color: var(--mk-error); }
+@keyframes mp-t-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: no-preference) {
+  .mp-t-glyph path { animation: mp-t-draw .5s cubic-bezier(.3, .7, .2, 1) both; animation-delay: calc(var(--i, 0) * 55ms); }
+  .mp-t-glyph path.b { animation-delay: calc(var(--i, 0) * 55ms + 160ms); }
+}
+
+/* the right margin: a red rule, the boxed marks on it, and a few handwritten words */
+.mp-t-gutter { position: relative; min-width: 0; align-self: stretch; }
+.mp-t-rule { position: absolute; top: 0; bottom: 0; left: var(--mp-rule-x); border-left: 1px solid var(--mk-error); }
+.mp-t-box { position: absolute; left: calc(var(--mp-rule-x) + 1px); box-sizing: border-box; min-width: 42px; height: 24px; padding: 0 6px; border: 1px solid var(--mk-error); color: var(--mk-error); background: var(--mk-paper); font: 400 15px/22px var(--mk-hand); text-align: center; font-variant-numeric: tabular-nums; }
+.mp-t-box.is-traced { background: color-mix(in srgb, var(--mk-accent) 14%, var(--mk-paper)); outline: 2px solid var(--mk-accent); outline-offset: 1px; }
+.mp-t-words { position: absolute; left: 34px; width: calc(var(--mp-rule-x) - 40px); appearance: none; background: none; border: 0; padding: 0; text-align: left; cursor: pointer; overflow: hidden;
+  font: 400 17px/1.15 var(--mk-hand); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.mp-t-words.is-right { color: var(--mk-correct); }
+.mp-t-words.is-wrong { color: var(--mk-error); }
+
+/* ── the examiner's workspace: type and fine rules, no cards ── */
+.mp-t-assess { display: block; color: var(--mk-graphite); padding: var(--space-2) 0; }
+.mp-t-assess > summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; gap: var(--space-3); }
+.mp-t-assess > summary::-webkit-details-marker { display: none; }
+.mp-t-caps { margin: 0; font: 600 11.5px/1.4 var(--font); letter-spacing: .12em; text-transform: uppercase; color: var(--mk-quiet); }
+.mp-t-state-note { letter-spacing: .08em; }
+.mp-t-score { margin-top: var(--space-5); padding-bottom: var(--space-5); border-bottom: 1px solid var(--mk-rule); }
+.mp-t-figure { margin: 0; font-family: var(--font-math); font-size: 54px; line-height: 1; font-weight: 400; font-variant-numeric: lining-nums tabular-nums; color: var(--mk-graphite); }
+.mp-t-state { margin: var(--space-2) 0 0; font-family: var(--font-math); font-size: 19px; color: var(--mk-graphite); }
+.mp-t-h { margin-top: var(--space-6); margin-bottom: var(--space-1); }
+.mp-t-rows { list-style: none; margin: 0; padding: 0; }
+.mp-t-rows li + li .mp-t-row { border-top: 1px solid var(--mk-rule); }
+.mp-t-row { appearance: none; width: 100%; box-sizing: border-box; background: none; border: 0; text-align: left; font: inherit; color: inherit; cursor: pointer;
+  display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; column-gap: var(--space-3); row-gap: 2px; padding: var(--space-3) var(--space-1); }
+.mp-t-row.is-on, .mp-t-row.is-traced { background: color-mix(in srgb, var(--mk-accent) 9%, transparent); }
+.mp-t-ord { font: 600 12px/1.6 var(--font); color: var(--mk-quiet); font-variant-numeric: tabular-nums; letter-spacing: .06em; }
+.mp-t-name { font-weight: 600; font-size: 15px; line-height: 1.35; margin: 0; }
+.mp-t-got { font: 600 14px/1.4 var(--font); font-variant-numeric: tabular-nums; color: var(--mk-graphite); }
+.mp-t-row[data-awarded="yes"] .mp-t-got { color: var(--mk-correct); }
+.mp-t-row[data-awarded="no"] .mp-t-got { color: var(--mk-error); }
+.mp-t-ev { grid-column: 2 / -1; font-size: 13.5px; line-height: 1.45; color: var(--mk-quiet); margin: 0; }
+.mp-t-foot { margin: var(--space-5) 0 0; padding-top: var(--space-3); border-top: 1px solid var(--mk-rule); color: var(--mk-quiet); font-size: 13px; }
+.mp-t-note p { margin: 0; font-size: 14.5px; line-height: 1.55; }
+
+.mp-t-steps { margin: var(--space-4) 0; }
+.mp-t-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
+.mp-t-chip { appearance: none; background: none; font: inherit; font-size: 13.5px; color: var(--mk-graphite); border: 1px solid var(--mk-rule); border-radius: 4px; padding: 5px 12px; min-height: 32px; cursor: pointer; }
+.mp-t-chip.is-on { border-color: var(--mk-accent); background: color-mix(in srgb, var(--mk-accent) 10%, transparent); }
+.mp-t-stepdetail { margin-top: var(--space-3); display: grid; gap: 2px; }
+.mp-t-stepdetail .mp-t-ev { grid-column: auto; }
+
+/* the numbered list under the page (Detailed feedback): the words for every mark, for a phone and for a screen reader */
+.mp-t-list { list-style: none; margin: var(--space-3) 0 0; padding: 0; display: grid; gap: var(--space-2); font-size: 14px; }
+.mp-t-list li { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: var(--space-2); align-items: baseline; }
+.mp-t-list .n { color: var(--mk-quiet); font-variant-numeric: tabular-nums; font-size: 12.5px; }
+.mp-t-list .is-right { color: var(--mk-correct); }
+.mp-t-list .is-wrong { color: var(--mk-error); }
+.mp-t-list .hand { font-family: var(--mk-hand); font-size: 17px; }
+.mp-t-unread { color: var(--mk-quiet); }
+
+.mp-t-root .mp-panel[hidden], .mp-t-root .mp-live[hidden] { display: none; }
+.mp-t-root .mp-body[data-mp-body-view="original"] { grid-template-columns: minmax(0, 1fr); }
+.mp-t-root .mp-body { margin-top: var(--space-3); }
+
+/* the approval label stays; the table repeats the allocation the workspace already shows */
+.mp-t-root .mp-criteria .mp-table { display: none; }
+.mp-t-root .mp-body { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 800px) { .mp-t-root .mp-body { grid-template-columns: minmax(0, 9fr) minmax(280px, 4fr); } }
+.mp-t-root .mp-sentence { color: var(--mk-graphite); }
+
+.mp-t-sheet[data-mp-tick="small"] .mp-t-num { display: none; }
+.mp-marker.mp-t-tick.is-active svg.mp-t-glyph.is-right, .mp-marker.mp-t-tick svg.mp-t-glyph.is-right { color: var(--mk-correct); }
+.mp-marker.mp-t-tick.is-active svg.mp-t-glyph.is-wrong, .mp-marker.mp-t-tick svg.mp-t-glyph.is-wrong { color: var(--mk-error); }
+.mp-t-score + .mp-t-foot { border-top: 0; padding-top: 0; }
