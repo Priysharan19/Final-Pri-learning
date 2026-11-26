@@ -107,6 +107,14 @@ jobs:
       # real platform server in-process (client/test/support/online-authority.mjs).
       - name: Install server dependencies
         run: npm ci --prefix server
+      # Owner rule, 26 Nov 2026: no question joins the not-fully-covered list. The measuring gate itself (every generator form and bank part, the baseline
+      # held exact) is a suite of npm test (test:annotation:coverage); here only the one thing a single tree cannot show: the list is no longer than the base's.
+      - name: Annotation baseline only shrinks (no question joined the not-fully-covered list since the base)
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -euo pipefail
+          if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then echo "no base commit for this event; nothing to compare"; else node server/test/annotation-coverage-gate-check.mjs --ratchet-only --base-sha "$BASE_SHA"; fi
       - name: Sign-in email template matches what the real-provider acceptance asserts
         run: node tools/acceptance/auth-email-template-check.mjs
       - name: Runtime dependency security floor

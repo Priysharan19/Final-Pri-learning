@@ -161,11 +161,17 @@ fs.writeFileSync(path.join(fxData, 'pritagoras_qbank.json'), JSON.stringify(fx.q
 fs.writeFileSync(path.join(fxData, 'pritagoras_marking.json'), JSON.stringify(fx.parts));
 fs.writeFileSync(path.join(fxData, 'dotpoint_tags.json'), JSON.stringify(fx.tags));
 const packDir = path.join(t2, 'pack');
-ok(await main(['--pack', path.join(t2, 'archive'), '--out', packDir, '--quiet']) === 0, '--pack writes a pack');
+// The importer holds any part that is not on the annotation baseline and not fully line-markable (tools/annotation-coverage.mjs). These fixture parts are
+// invented here and are grandfathered by a baseline of their own, so this test keeps proving what it proved before the hold existed; the hold itself is
+// proved in server/test/annotation-coverage-gate-check.mjs.
+const lineBase = path.join(t2, 'line-baseline.json');
+const lineIds = [...cp.files.keys()].filter(k => k.startsWith('shards/')).flatMap(k => { const sh = JSON.parse(cp.files.get(k)); return [...sh.questions, ...(sh.manual || [])].map(q => [q.id, 'u0']); });
+fs.writeFileSync(lineBase, JSON.stringify({ format: 'pri-annotation-baseline-v1', causes: ['fixture'], ids: Object.fromEntries(lineIds) }));
+ok(await main(['--pack', path.join(t2, 'archive'), '--out', packDir, '--quiet', '--line-baseline', lineBase]) === 0, '--pack writes a pack');
 const loaded2 = await loadPack(directorySource(packDir));
 ok(loaded2.questionCount === 10 && loaded2.version === cp.summary.packVersion, 'the written pack loads and is the compiled one');
-ok(await main(['--pack', path.join(t2, 'archive'), '--out', packDir, '--quiet']) === 2, 'a non-empty output directory is refused without --overwrite');
-ok(await main(['--pack', path.join(t2, 'archive'), '--out', packDir, '--quiet', '--overwrite']) === 0, 'and written over with it');
+ok(await main(['--pack', path.join(t2, 'archive'), '--out', packDir, '--quiet', '--line-baseline', lineBase]) === 2, 'a non-empty output directory is refused without --overwrite');
+ok(await main(['--pack', path.join(t2, 'archive'), '--out', packDir, '--quiet', '--overwrite', '--line-baseline', lineBase]) === 0, 'and written over with it');
 ok(await main(['--pack', path.join(t2, 'archive'), '--out', path.join(ROOT, 'qbank-pack-should-not-exist'), '--quiet']) === 2 && !fs.existsSync(path.join(ROOT, 'qbank-pack-should-not-exist')), 'a pack directory inside the repository is refused');
 ok(await main(['--pack', path.join(t2, 'archive'), '--quiet']) === 2, '--pack without --out is a usage error');
 fs.rmSync(t2, { recursive: true, force: true });

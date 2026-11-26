@@ -2,7 +2,7 @@
 // Author question bank importer, VALIDATION ONLY (Prithagoras, NSW Years 11-12).
 //
 //   node tools/qbank-import.mjs <archive-dir> <report.json> [--ids A11-F1-001,X12-V1-200] [--limit N] [--no-steps] [--quiet]
-//   node tools/qbank-import.mjs --pack <archive-dir> --out <pack-dir>        compile the content pack (see PACK below)
+//   node tools/qbank-import.mjs --pack <archive-dir> --out <pack-dir> [--line-baseline <file>]   compile the content pack (see PACK below)
 //
 // Reads the owner's authored archive (data/pritagoras_qbank.json, data/pritagoras_marking.json, data/dotpoint_tags.json) as DATA.
 // It never runs anything in the archive, never writes into the archive and never writes into this repository: the report goes to the
@@ -29,6 +29,9 @@
 // its key is accepted and every trap refused by the engine, its text renders, it has no diagram (phase A), the engine crosses no line of
 // its authored steps, and none of its hints (or the hint ladder's rungs) is a correct answer. Step marks are not paid in this phase;
 // the criteria travel in the pack. Deterministic: the same archive gives the same bytes.
+// LINE-MARKABLE (owner rule, 26 Nov 2026): a part that is NOT on the annotation baseline (server/test/fixtures/annotation-coverage/baseline.json: the
+// parts already packed that lack full step-by-step annotated marking) is packed only when tools/annotation-coverage.mjs finds it fully covered; else it
+// is held with the reason "not line-markable" (compileWithLineHold).
 //
 // Pure and deterministic: no clock, no network, no model, no randomness.
 import fs from 'node:fs';
@@ -648,6 +651,9 @@ export function evaluateManual(part, question, archive, opts) {
   return { rec, reasons: [...new Set(reasons)], hints: kept, ladder, dropped, lineFeedback, diagram, kind: classifyManual(part.prompt) };
 }
 
+/** The reason a part is held when its own worked solution cannot be marked line by line (tools/annotation-coverage.mjs). */
+export const NOT_LINE_MARKABLE = 'not line-markable';
+
 export function compilePack(archive, opts = {}) {
   const byId = new Map(archive.questions.map(q => [q.id, q]));
   const printed = printedAnswers(archive);
@@ -703,6 +709,7 @@ export function compilePack(archive, opts = {}) {
       const rec = manual.rec;
       const reasons = manual.reasons;
       if (HELD_FOR_OWNER[rec.id] && !reasons.includes(HELD_FOR_OWNER[rec.id])) reasons.push(HELD_FOR_OWNER[rec.id]);
+      if (opts.lineHold?.has(rec.id) && !reasons.length) reasons.push(NOT_LINE_MARKABLE);
       if (reasons.length || !question || !archive.tags?.[original.question]) {
         const why = reasons.length ? reasons : [!question ? 'join:part-without-question' : 'join:no-dotpoint'];
         rejects.push({ id: rec.id, reasons: why.map(r => `manual:${r}`) });
@@ -721,6 +728,7 @@ export function compilePack(archive, opts = {}) {
     const { rec, q, lad } = ev;
     const reasons = ev.reasons;
     if (HELD_FOR_OWNER[rec.id] && !reasons.includes(HELD_FOR_OWNER[rec.id])) reasons.push(HELD_FOR_OWNER[rec.id]);
+    if (opts.lineHold?.has(rec.id) && !reasons.length) reasons.push(NOT_LINE_MARKABLE);
     if (reasons.length || !question || !archive.tags?.[part.question]) {
       rejects.push({ id: rec.id, reasons: reasons.length ? reasons : [!question ? 'join:part-without-question' : 'join:no-dotpoint'] });
       continue;
@@ -769,6 +777,33 @@ export function compilePack(archive, opts = {}) {
   if (opts.figures) for (const [name, text] of figureFiles(opts.figures, [...shards.values()].flatMap(sh => [...sh.questions, ...sh.manual].filter(e => e.diagram).map(e => e.group)))) files.set(name, text);
   files.set('rejects.json', json({ note: 'ids and reasons only', parts: rejects.length, reasons: Object.fromEntries(Object.entries(reasonCounts).sort()), rejects }));
   return { files, rejects, summary: { ladder: ladderStats, manual: derived, packVersion, questions: manifest.totals.questions, manualQuestions: manifest.totals.manualQuestions, shards: entries.length, bytes: manifest.totals.bytes, byCourse, rejectedParts: rejects.length, reasons: Object.fromEntries(Object.entries(reasonCounts).sort()) } };
+}
+
+/**
+ * compilePack, then the owner's rule of 26 November 2026: no new question without full step-by-step annotated marking. Every part that would be packed
+ * and is NOT on the annotation baseline (`opts.lineBaseline`, tools/annotation-coverage.mjs baseline: the parts already in the pack that are not
+ * fully covered) is measured as the pack would serve it; one that is not fully covered is held, with the reason 'not line-markable', and the pack is
+ * compiled again without it. Parts already packed and covered pass; parts already packed and not covered are grandfathered by the baseline.
+ * Returns the compiled pack and `held: [{ id, cause }]`. With no baseline nothing is measured.
+ */
+export async function compileWithLineHold(archive, opts = {}) {
+  const baseline = opts.lineBaseline;
+  const first = compilePack(archive, opts);
+  if (!baseline) return { ...first, held: [] };
+  const A = await import('./annotation-coverage.mjs');
+  const pack = await import('../server/platform/qbankPack.js');
+  installPack(await loadPack(memorySource(first.files)));
+  const held = [];
+  try {
+    for (const b of A.bankEntriesOf({ pack })) {
+      if (baseline.ids[b.entry.id] !== undefined) continue;
+      let rec = null;
+      try { rec = b.place ? A.measureBankEntry({ pack }, b.entry, b.family, { worked: b.worked }) : null; } catch { rec = null; }
+      if (!rec || rec.status !== A.STATUS.full) held.push({ id: b.entry.id, cause: rec ? A.causeOf(rec) : 'placed nowhere' });
+    }
+  } finally { resetQbank(); }
+  if (!held.length) return { ...first, held };
+  return { ...compilePack(archive, { ...opts, lineHold: new Set(held.map(h => h.id)) }), held };
 }
 
 /** 40 of the converted parts, in the order of a hash of their ids (the same 40 on every run), as markdown rows for a reader to verify. */
@@ -830,11 +865,13 @@ export async function main(argv) {
   }
   if (argv.includes('--pack')) {
     const archiveDir = flag('pack'), outDir = flag('out');
-    if (!archiveDir || !outDir || archiveDir.startsWith('--') || outDir.startsWith('--')) { console.error('usage: node tools/qbank-import.mjs --pack <archive-dir> --out <pack-dir> [--figures <diagrams-work-dir>] [--overwrite] [--quiet]'); return 2; }
+    if (!archiveDir || !outDir || archiveDir.startsWith('--') || outDir.startsWith('--')) { console.error('usage: node tools/qbank-import.mjs --pack <archive-dir> --out <pack-dir> [--figures <diagrams-work-dir>] [--line-baseline <file>] [--overwrite] [--quiet]'); return 2; }
     // The committed pack (server/content/qbank) is the one place in the repository a pack may be written.
     if (insideRepo(outDir) && path.resolve(outDir) !== path.resolve(DEFAULT_PACK_DIR)) { console.error(`refusing to write the pack inside the repository, except at ${path.relative(ROOT, DEFAULT_PACK_DIR)}: ${outDir}`); return 2; }
     if (fs.existsSync(outDir) && fs.readdirSync(outDir).length && !argv.includes('--overwrite')) { console.error(`${outDir} is not empty; pass --overwrite to write over a previous pack`); return 2; }
-    const compiled = compilePack(loadArchive(archiveDir), { figures: flag('figures') ? loadFigureResults(flag('figures')) : null });
+    // The annotation baseline (the committed one unless --line-baseline names another): parts not on it must be fully line-markable to be packed.
+    const { loadBaseline } = await import('./annotation-coverage.mjs');
+    const compiled = await compileWithLineHold(loadArchive(archiveDir), { figures: flag('figures') ? loadFigureResults(flag('figures')) : null, lineBaseline: flag('line-baseline') ? loadBaseline(flag('line-baseline')) : loadBaseline() });
     if (flag('derived-sample')) fs.writeFileSync(flag('derived-sample'), derivedSample(compiled.summary.manual.converted));
     // The pack must load exactly as the server will load it, before a byte is written.
     await loadPack(memorySource(compiled.files));
@@ -849,6 +886,7 @@ export async function main(argv) {
       console.log(`pack ${s.packVersion}: ${s.questions} questions in ${s.shards} shards, ${s.bytes} bytes; rejected parts ${s.rejectedParts}`);
       { const l = s.ladder; console.log(`hints: ${l.authoredHints} authored (at most three a question) over ${l.questions} auto-markable parts; kept ${l.rungsKept}, dropped ${l.rungsDropped}; questions with 3/2/1/0 rungs: ${l.withRungs[3]}/${l.withRungs[2]}/${l.withRungs[1]}/${l.withRungs[0]}`); console.log(`drop reasons ${JSON.stringify(Object.fromEntries(Object.entries(l.dropReasons).sort((x, y) => y[1] - x[1]).slice(0, 12)))}`); }
       { const m = s.manual; console.log(`manual parts by kind ${JSON.stringify(m.manualKinds)}; converted to auto-markable ${m.converted.length} ${JSON.stringify(m.byType)}; kept as worked-solution questions ${JSON.stringify(m.manualServed)} (${Object.values(m.manualServed).reduce((a, b) => a + b, 0)}); not served ${JSON.stringify(m.manualRejected)}`); console.log(`find parts left manual, why ${JSON.stringify(Object.fromEntries(Object.entries(m.held).sort((x, y) => y[1] - x[1])))}`); }
+      if (compiled.held.length) console.log(`held ${compiled.held.length} parts as ${NOT_LINE_MARKABLE}: ${compiled.held.slice(0, 20).map(h => h.id).join(', ')}${compiled.held.length > 20 ? ', ...' : ''}`);
       console.log(`by course ${JSON.stringify(s.byCourse)}`);
       console.log(`reject reasons ${JSON.stringify(s.reasons)}`);
       console.log(`written to ${outDir}`);
