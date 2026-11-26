@@ -15,20 +15,35 @@ const statuses = (page, opts = { equationRewrite: true }) => stepCheckArithmetic
 const crossedAt = (page, opts) => statuses(page, opts).indexOf('break');
 const neverCrossed = (label, page) => ok(!statuses(page).includes('break'), `${label}: a true page was crossed: ${page.join(' // ')}`);
 
-// ── wrong rewritings: crossed at the line ──────────────────────────────────────────────────────────
-for (const [page, at] of [
-  [['3x+2=11', '3x=12'], 1],                           // 3x = 9 was meant
-  [['2x-5=7', 'x=5'], 1],
-  [['x^2-5x+6=0', '(x-2)(x+3)=0'], 1],
-  [['x^2-5x+6=0', '(x-2)(x-3)=0', 'x=4'], 2],
-  [['x^2-5x+6=0', 'x=(5+3)/2'], 1],
-  [['4x-3=2x+7', '2x=4', 'x=2'], 1],
-  [['x^2=9', 'x=4'], 1],
-  [['5x=20', 'x=5'], 1],
-  [['(x+1)/2=3', 'x+1=5'], 1],
-  [['x^2+8x-16=0', '(x+4)^2=12'], 1]
-]) ok(crossedAt(page) === at, `wrong rewriting not crossed at ${at}: ${page.join(' // ')} -> ${statuses(page)}`);
+// ── a slip in one standard step from the line above (a witness): crossed at the line, and the correct result is the reason ──────────────
+for (const [page, at, fix] of [
+  [['3x+2=11', '3x=12'], 1, '3x = 9'],                 // subtract 2 from both sides
+  [['5x=20', 'x=5'], 1, 'x = 4'],                      // divide by 5
+  [['5x=3x+4', '2x=5'], 1, '2x = 4'],                  // subtract 3x
+  [['x/2=3', 'x=7'], 1, 'x = 6'],                      // multiply by 2
+  [['x^2-5=4', 'x^2=8'], 1, 'x^2 = 9'],                // add 5
+  [['(x+1)/2=3', 'x+1=5'], 1, 'x + 1 = 6'],
+  [['2x+3=11', '2x=7', 'x=3.5'], 1, '2x = 8']
+]) {
+  const r = stepCheckArithmetic(page.join('\n'), { equationRewrite: true });
+  ok(r.firstBreak === at && r.lines[at].status === 'break', `witnessed slip not crossed at ${at}: ${page.join(' // ')} -> ${r.lines.map(l => l.status)}`);
+  ok(r.lines[at].status !== 'break' || String(r.lines[at].note).replace(/[\s$\\{}]/g, '').includes(fix.replace(/[\s]/g, '')), `the corrected line ${fix} is the reason: ${r.lines[at].note}`);
+}
 
+// ── no witness: a note (a wrong line the engine cannot show a one-step correction for is not crossed by this rule) ──────────────────────
+for (const page of [
+  ['x^2-5x+6=0', '(x-2)(x+3)=0'], ['x^2-5x+6=0', 'x=(5+3)/2'], ['4x-3=2x+7', '2x=4', 'x=2'], ['x^2=9', 'x=4'],
+  ['x^2+8x-16=0', '(x+4)^2=12'], ['x^2-5x+6=0', '(x-2)(x-3)=0', 'x=4'], ['2x-5=7', 'x=5']
+]) neverCrossed('no one-step correction', page);
+
+// ── the reviewer\'s true lines (e5cbea006): crossed before, never now ───────────────────────────────────────────
+neverCrossed('f then g: x + 6 = 0 then 4x + 7 = -6', ['x+6=0', '4x+7=-6']);
+neverCrossed('x - 4 = 0 then 3x + 2 = 4', ['x-4=0', '3x+2=4']);
+neverCrossed('a new equation in the same letter', ['2x+1=9', '3x-5=4']);
+neverCrossed('a new equation of another degree', ['x+2=5', 'x^2=16']);
+neverCrossed('the same shape, another number (no operation between)', ['x^2-4=0', 'x^2-9=0']);
+neverCrossed('the other branch, the factored line far above', ['(x-3)(x+1)=0', 'x-3=0', 'x=3', 'check', '2x=6', 'x+1=0']);
+neverCrossed('the other branch, far above, no words', ['(x-3)(x+1)=0', 'x-3=0', '2x=6', 'x=3', '5x=15', 'x+1=0']);
 // ── off by default: no option, no cross (the client, India and every other caller are unchanged) ─────────
 ok(crossedAt(['3x+2=11', '3x=12'], null) === -1 && crossedAt(['3x+2=11', '3x=12'], {}) === -1, 'the cross is off without the option');
 
