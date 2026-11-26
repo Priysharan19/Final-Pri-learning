@@ -462,10 +462,6 @@ function chainClaim(c, st, lineNo, prevTail) {
   return { ...proved(cls, notes.join('; '), { classes: [...classes] }), tail: last };
 }
 
-const hxOfInt = (s, st) => {
-  const g = derivFnOfInt(s, st);
-  return g;
-};
 function derivFnOfInt(s, st) {
   // ∫ g dv per dx: coef · g(env) · v'(x)
   const rate = s.v === st.v ? () => 1 : (st.subs.get(s.v) && st.subs.get(s.v).dAst ? x => subDeriv(st, s.v, x) : null);

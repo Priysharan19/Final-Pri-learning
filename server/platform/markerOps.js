@@ -554,7 +554,7 @@ export function stepEvidence(q, answer, steps, result, opts = null) {
           const rawLines = steps.split('\n');
           const bareSteps = rawLines.map((t, k) => (rest.length && boxed[k] && rest.includes(k) ? bareOf(t) : t));
           const shadow = { ...base, lines: base.lines.map((l, k) => (rest.includes(k) ? { ...l, text: bareOf(l.text) } : l)) };
-          let proved = shadow;
+          let proved;
           try { proved = typeof q._bank === 'string' ? provedLinesBank(q, shadow) : provedLines(q, meta, shadow); } catch { proved = shadow; }
           let alt = null;
           try { alt = rawLines.length === base.lines.length ? trueAsWritten(q, bareSteps.join('\n'), opts) : null; } catch { alt = null; }

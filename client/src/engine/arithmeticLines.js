@@ -1288,7 +1288,6 @@ function caseSplit(A, B) {
   for (const [l, r] of [[A.lf, A.rf], [A.rf, A.lf]]) if ((sameFn(B.lf, l, 1) && sameFn(B.rf, r, -1)) || (sameFn(B.lf, l, -1) && sameFn(B.rf, r, 1))) return true;
   return false;
 }
-const MULTIPLIERS = (() => { const out = new Map(); for (let p = 1; p <= 12; p++) for (let q = 1; q <= 12; q++) for (const sg of [1, -1]) { const k = sg * p / q; out.set(Math.round(k * 1e9), k); } return [...out.values()]; })();
 const showPoly = c => {
   const parts = [];
   for (let d = 2; d >= 0; d--) {
@@ -1318,7 +1317,7 @@ function slipWitness(A, B) {
     if (count === 1) found.push({ corrected: res, how });
   };
   const term = (c, d) => showPoly([d === 0 ? Math.abs(c) : 0, d === 1 ? Math.abs(c) : 0, d === 2 ? Math.abs(c) : 0]);
-  for (let d = 0; d <= 2; d++) for (const [side, vals] of [['l', A.l], ['r', A.r]]) {
+  for (let d = 0; d <= 2; d++) for (const [, vals] of [['l', A.l], ['r', A.r]]) {
     const c = -vals[d];
     if (!isInt(c) || Math.abs(c) < 1e-9 || Math.abs(c) > 1000) continue;
     test(1, d, c, `${c > 0 ? 'adding' : 'subtracting'} ${term(c, d)} ${c > 0 ? 'to' : 'from'} both sides`);

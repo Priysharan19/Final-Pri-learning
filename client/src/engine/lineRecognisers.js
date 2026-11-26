@@ -22,7 +22,7 @@
 // thousands space is one number). Pure, deterministic, no model.
 // ─────────────────────────────────────────────────────────────────────────────
 import { texToPlain } from './texToPlain.js';
-import { variablesOf, evaluate } from './expr.js';
+import { variablesOf } from './expr.js';
 import { astOf, unwrap, closed, valueOf, same, polyOf, equalByEngine, findSubstitution, printPlain, printTex, printCanon } from './stepExplain.js';
 
 const MINUS = /[−–—]/g;
@@ -245,7 +245,6 @@ function dataRestated(Q, l, text) {
   if (!facts.length || !consumed(t, facts)) return null;
   const have = new Set(Q.facts.map(factKey));
   if (!facts.every(f => have.has(factKey(f)))) return null;
-  const said = facts.filter(f => f.k !== 'per').map(f => ({ initial: `start ${f.v}`, first: `first ${f.v}`, ratio: `ratio ${f.v}`, step: `step ${f.v}`, after: `${f.v} ${f.unit}s` }[f.k]));
   return { line: { ...tick(l, 'given-data', 'This line states what the question gives, and every number in it is the question\'s own.', 'Given in the question', null).line } };
 }
 
