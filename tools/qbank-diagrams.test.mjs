@@ -3,7 +3,7 @@
 // does run is everything that needs no TeX: the untrusted-input filter, the SVG sanitiser and verifier, the alt text and answer-leak rules,
 // and the check of the COMMITTED figures against their manifest hashes and the sanitiser (the figures are never re-rendered in CI).
 import fs from 'node:fs';
-import { HELD_BY_EYE } from './qbank-figure-risk.mjs';
+import { HELD_BY_EYE, STEP_FIGURE_DECISION, partIdOf, structuralLeaksUnwaived } from './qbank-figure-risk.mjs';
 import os from 'node:os';
 import path from 'node:path';
 import {
@@ -238,6 +238,25 @@ ok(committed.count > 100 && committed.bytes < 8_000_000, `the committed figures:
   ok(hold(txt, { prompt: 'Four numbers are chosen from 1 to 10 so that no two are consecutive.', answerType: 'numeric', answer: { value: 35 }, steps: [{ h: 'Gaps', d: 'Six unchosen numbers make 7 gaps.' }] }).some(x => /marking text or a step/.test(x)), 'text printed on the figure that is a step is held (b)');
   const tickc = String.raw`\begin{tikzpicture}\begin{axis}[xtick={-2,3},ytick=\empty]\addplot{(x+2)^2};\end{axis}\end{tikzpicture}`;
   ok(hold(tickc, { prompt: 'The graph of $f(x)=(x+2)^2$ is shown. Find the largest domain for an inverse.', answerType: 'expression', answer: { expr: 'sqrt(x)-2' }, criteria: [{ marks: 1, point: 'domain x >= -2', answer: false }, { marks: 1, point: 'sqrt(x)-2', answer: true }] }).some(x => /number in the marking/.test(x)), 'a tick equal to a number in a criterion point is held (c)');
+  // The author's decision of 26 Nov 2026 (tools/qbank-step-figures.json): a step result drawn is waived for a listed part and ONLY that.
+  {
+    const step = String.raw`\begin{tikzpicture}\begin{axis}[xtick={4},ytick={1}]\addplot{x^2-4*x+5};\end{axis}\end{tikzpicture}`;
+    const base = { prompt: 'The graph of $y=x^2-4x+5$ is shown. Find the minimum value.', answerType: 'numeric', answer: { value: 1.5 }, steps: [{ h: 'Step 1', d: '$x=4$' }] };
+    const stepLeak = r => r.filter(x => /^drawing: step result:/.test(x));
+    ok(stepLeak(hold(step, { ...base, question: 'Z99-Q9-001' })).length > 0, 'a part not on the list is judged as before: a step result on the figure holds it');
+    eq(stepLeak(hold(step, { ...base, question: 'A11-C1-057' })), [], 'a part on the list shows the step result as drawn');
+    eq(partIdOf({ question: 'A11-C1-007', label: '(i)' }), 'A11-C1-007(i)', 'a part id is the question id and its label');
+    ok(hold(String.raw`\begin{tikzpicture}\begin{axis}[xtick={4,1.5}]\addplot{x^2-4*x+5};\end{axis}\end{tikzpicture}`, { ...base, question: 'A11-C1-057' }).some(x => /answer/.test(x)), 'a listed part whose figure ALSO prints the answer stays held');
+    ok(structuralLeaksUnwaived(step, { ...base, question: 'A11-C1-057', difficulty: 2, criteria: [] }, { texts: figureTexts(step), ticks: figureTicks(step) }).some(x => /^step result:/.test(x)), 'the rule itself is not loosened: unwaived it still finds the step result');
+    const d = STEP_FIGURE_DECISION;
+    eq(d.decision, 'author decision: figure shows a step result, show as drawn', 'the decision is recorded in the author\'s words');
+    eq(d.decidedOn, '2026-11-26', 'with its date');
+    eq(new Set(d.parts).size, d.parts.length, 'no part is listed twice');
+    eq(d.parts.filter(i => i in d.notReleased), [], 'a part is either released or listed as not released, never both');
+    eq(d.parts.length + Object.keys(d.notReleased).length, 250, 'the 250 parts of the author\'s list are all accounted for');
+    eq(d.byEyeCleared.filter(i => !d.parts.includes(i)), [], 'a by-eye hold is cleared only for a listed part');
+    ok(d.byEyeCleared.every(i => !/answer|legibility|mismatch/i.test(HELD_BY_EYE[i.replace(/\(.*$/, '')] || '') || /step/i.test(HELD_BY_EYE[i.replace(/\(.*$/, '')])), 'and never one whose by-eye reason is the answer, a legibility defect or a mismatch');
+  }
   const hasHeld = Object.keys(HELD_BY_EYE).length > 10 && Object.values(HELD_BY_EYE).every(r => typeof r === 'string' && r.length > 10);
   ok(hasHeld, 'each figure held after looking at it states why');
   ok(!/Date\.now|Math\.random|new Date|fetch\(/.test(fs.readFileSync(new URL('./qbank-figure-risk.mjs', import.meta.url), 'utf8')), 'the risk test reads no clock and no randomness');

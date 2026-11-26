@@ -371,7 +371,7 @@ export const NSW_DOTPOINT_EXACT = Object.freeze({
   'y12-trig-model': {
     'y12-trig-model.1': [],
     'y12-trig-model.2': [],
-    'y12-trig-model.3': [2, 3]
+    'y12-trig-model.3': [2, 3, 4]
   },
   'y12-func-model': {
     'y12-func-model.1': [1, 2],
@@ -510,7 +510,7 @@ export const NSW_DOTPOINT_EXACT = Object.freeze({
   },
   'me11-inversetrig': {
     'me11-inversetrig.1': [1, 2, 3, 4],
-    'me11-inversetrig.2': [2, 3],
+    'me11-inversetrig.2': [2, 3, 4],
     'me11-inversetrig.3': [1, 2, 3, 4]
   },
   'me11-comb': {

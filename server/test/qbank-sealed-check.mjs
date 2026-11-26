@@ -234,6 +234,48 @@ try {
     }
   }
   c.ok(drawn > 0 && paid > 0, `the bank rule paid ${paid} of ${drawn} eligible parts drawn through the real routes`);
+  // A step a student can read off a released figure is never paid as working that was never written (the author's decision of 26 Nov 2026 shows the
+  // figures that give a step result as drawn): with the bank rule approved, a released step-figure part earns nothing for a page that is empty or
+  // restates the question, and its step marks only for the lines the student wrote that the page ticked; the marks follow the lines, never the figure.
+  {
+    const { STEP_FIGURE_DECISION } = await import('../../tools/qbank-figure-risk.mjs');
+    const onList = new Set(STEP_FIGURE_DECISION.parts);
+    const figureEligible = eligibleEntries.filter(e => e.diagram && onList.has(e.id));
+    c.ok(figureEligible.length > 0, `${figureEligible.length} released step-figure parts pass the bank rule's proof`);
+    let probed = 0, emptyPaid = 0, linesNotPaid = 0, moreThanLines = 0, tableMismatch = 0;
+    for (let i = 0; probed < 3 && i < figureEligible.length && used < 70; i++) {
+      const pick = figureEligible[i];
+      const place = productPlaceOf(pick.family, pick.dp);
+      if (!place) continue;
+      const dp = place.ordinal === null ? null : dotpointById(`${place.subtopic}.${place.ordinal + 1}`);
+      const asked = dp && dp.forms.includes(pick.level) ? { dotpoint: dp.id } : {};
+      let found = null;
+      for (let t = 0; t < 600 && found === null; t++) { const s2 = (seed += 7919) % 0x7fffffff; if (qb.qbankDraw(place.subtopic, pick.level, s2 >>> 0, asked.dotpoint ?? null)?._bank === pick.id) found = s2; }
+      if (found === null) continue;
+      const r = await call('/v1/practice/issue', { curriculum: 'nsw', generator: place.subtopic, difficulty: pick.level, ...asked, seed: found });
+      if (r.status !== 201) continue;
+      const row = await h.db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=?", [a.account.id, r.data.question.id]);
+      const sealedQ = JSON.parse(row.response_json);
+      if (sealedQ._bank !== pick.id || sealedQ._methodScheme !== BANK_ID) continue;
+      const qq = qb.qbankEntryQuestion(pick.id, 17);
+      const lines = bankAuthoredLines(qq).map(l => l.text);
+      const sub = async (k, steps) => { const go = n => call(`/v1/practice/${r.data.question.id}/submit`, { submissionId: `fig-${i}-${k}-${n}`, answer: '99991', steps, mode: 'typed' }, { 'Idempotency-Key': `fig-${i}-${k}-${n}` }); const f = await go(1); return f.data.resolved ? f : go(2); };
+      probed++;
+      const none = await sub('none', '');
+      if ((none.data.marksEarned ?? 0) !== 0 || (none.data.methodCriteria?.items || []).some(x => x.awarded)) emptyPaid++;
+      const all = await sub('all', lines.join('\n'));
+      const first = await sub('first', lines.slice(0, 1).join('\n'));
+      const table = r2 => (r2.data.methodCriteria?.items || []).reduce((n, x) => n + (x.awarded ? x.marks : 0), 0);
+      if (table(all) !== (all.data.marksEarned ?? 0) || table(first) !== (first.data.marksEarned ?? 0)) tableMismatch++;
+      if ((first.data.marksEarned ?? 0) > (all.data.marksEarned ?? 0)) moreThanLines++;
+      if ((all.data.marksEarned ?? 0) >= pick.marks) linesNotPaid++;
+    }
+    c.ok(probed >= 1, `${probed} released step-figure parts drawn through the real routes`);
+    c.eq(emptyPaid, 0, 'a page with no line written earns nothing on a released step-figure part, whatever its figure shows');
+    c.eq(moreThanLines, 0, 'one line written never earns more than all of his lines written');
+    c.eq(linesNotPaid, 0, 'a wrong answer never earns the full marks, however many lines are written (the answer criterion is never paid from working)');
+    c.eq(tableMismatch, 0, 'and every mark it does earn is a criterion of his that the table shows as met by a line the student wrote');
+  }
 } finally {
   await h.close();
   for (const key of keys) { if (before[key] === undefined) delete process.env[key]; else process.env[key] = before[key]; }
