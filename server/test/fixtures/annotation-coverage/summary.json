@@ -17,22 +17,22 @@
  "total": {
   "total": 5592,
   "full": 352,
-  "trueOnly": 2143,
-  "uncovered": 3097,
+  "trueOnly": 2140,
+  "uncovered": 3100,
   "fullPct": 6.29,
-  "trueOnlyPct": 38.32,
-  "uncoveredPct": 55.38
+  "trueOnlyPct": 38.27,
+  "uncoveredPct": 55.44
  },
  "halves": {
-  "trueHalfPasses": 2495,
-  "trueHalfPassPct": 44.62,
+  "trueHalfPasses": 2492,
+  "trueHalfPassPct": 44.56,
   "wrongHalfPasses": 542,
   "wrongHalfPassPct": 9.69,
-  "allLinesTickedAndNoneCrossed": 3138,
-  "allLinesPct": 56.12,
-  "answerLineRecognisedAndKeyCorrect": 1339,
+  "allLinesTickedAndNoneCrossed": 3134,
+  "allLinesPct": 56.04,
+  "answerLineRecognisedAndKeyCorrect": 1336,
   "answerLineOfKeyedUnits": 4436,
-  "answerLinePct": 30.18,
+  "answerLinePct": 30.12,
   "answerHalfNotApplicableNoKey": 1156,
   "linesTickedOnlyAsTrueAsWritten": 1801
  },
@@ -40,11 +40,11 @@
   "bank": {
    "total": 2214,
    "full": 172,
-   "trueOnly": 637,
-   "uncovered": 1405,
+   "trueOnly": 636,
+   "uncovered": 1406,
    "fullPct": 7.77,
-   "trueOnlyPct": 28.77,
-   "uncoveredPct": 63.46
+   "trueOnlyPct": 28.73,
+   "uncoveredPct": 63.5
   },
   "bank-worked": {
    "total": 2247,
@@ -58,31 +58,31 @@
   "generated": {
    "total": 1131,
    "full": 118,
-   "trueOnly": 412,
-   "uncovered": 601,
+   "trueOnly": 410,
+   "uncovered": 603,
    "fullPct": 10.43,
-   "trueOnlyPct": 36.43,
-   "uncoveredPct": 53.14
+   "trueOnlyPct": 36.25,
+   "uncoveredPct": 53.32
   }
  },
  "causes": {
   "wrong step missed": {
-   "count": 1140,
+   "count": 1139,
    "example": {
     "id": "gen:y11-quadfunc:d1:4faffdc",
     "line": "-3x^2+2x+6=0"
    },
    "byKind": {
     "generated": 167,
-    "bank": 449,
+    "bank": 448,
     "bank-worked": 524
    }
   },
   "no provable one-line mutation of any step": {
-   "count": 943,
+   "count": 941,
    "example": null,
    "byKind": {
-    "generated": 202,
+    "generated": 200,
     "bank": 183,
     "bank-worked": 558
    }
@@ -100,37 +100,37 @@
    }
   },
   "answer line not recognised (numeric)": {
-   "count": 417,
+   "count": 416,
    "example": {
     "id": "gen:y11-quadfunc:d1:c2b8b95",
     "line": "Δ > 0"
    },
    "byKind": {
     "generated": 43,
-    "bank": 374
+    "bank": 373
    }
   },
   "trig step": {
-   "count": 218,
+   "count": 220,
    "example": {
     "id": "gen:y11-sine-cosine-rule:d2:a2cf3cf",
     "line": "sin B=((bsin A)/(a))"
    },
    "byKind": {
-    "generated": 13,
+    "generated": 15,
     "bank": 126,
     "bank-worked": 79
    }
   },
   "algebra equation": {
-   "count": 162,
+   "count": 164,
    "example": {
     "id": "gen:y11-quadfunc:d2:aaadc5a",
     "line": "y=0"
    },
    "byKind": {
     "generated": 41,
-    "bank": 57,
+    "bank": 59,
     "bank-worked": 64
    }
   },
@@ -1305,11 +1305,11 @@
   "bank:x12-me-c2": {
    "total": 205,
    "full": 18,
-   "trueOnly": 36,
-   "uncovered": 151,
+   "trueOnly": 35,
+   "uncovered": 152,
    "fullPct": 8.78,
-   "trueOnlyPct": 17.56,
-   "uncoveredPct": 73.66
+   "trueOnlyPct": 17.07,
+   "uncoveredPct": 74.15
   },
   "bank:x12-me-c3": {
    "total": 187,
@@ -1764,11 +1764,11 @@
   "gen:y12-trigcalc": {
    "total": 31,
    "full": 0,
-   "trueOnly": 15,
-   "uncovered": 16,
+   "trueOnly": 13,
+   "uncovered": 18,
    "fullPct": 0,
-   "trueOnlyPct": 48.39,
-   "uncoveredPct": 51.61
+   "trueOnlyPct": 41.94,
+   "uncoveredPct": 58.06
   }
  },
  "byDotpoint": {
@@ -1901,11 +1901,11 @@
   "bank:C2.2a": {
    "total": 106,
    "full": 25,
-   "trueOnly": 37,
-   "uncovered": 44,
+   "trueOnly": 36,
+   "uncovered": 45,
    "fullPct": 23.58,
-   "trueOnlyPct": 34.91,
-   "uncoveredPct": 41.51
+   "trueOnlyPct": 33.96,
+   "uncoveredPct": 42.45
   },
   "bank:C2.2b": {
    "total": 70,
@@ -3836,11 +3836,11 @@
   "gen:y12-trigcalc.1": {
    "total": 12,
    "full": 0,
-   "trueOnly": 6,
-   "uncovered": 6,
+   "trueOnly": 5,
+   "uncovered": 7,
    "fullPct": 0,
-   "trueOnlyPct": 50,
-   "uncoveredPct": 50
+   "trueOnlyPct": 41.67,
+   "uncoveredPct": 58.33
   },
   "gen:y12-trigcalc.2": {
    "total": 6,
@@ -3854,11 +3854,11 @@
   "gen:y12-trigcalc.3": {
    "total": 13,
    "full": 0,
-   "trueOnly": 7,
-   "uncovered": 6,
+   "trueOnly": 6,
+   "uncovered": 7,
    "fullPct": 0,
-   "trueOnlyPct": 53.85,
-   "uncoveredPct": 46.15
+   "trueOnlyPct": 46.15,
+   "uncoveredPct": 53.85
   }
  }
 }
