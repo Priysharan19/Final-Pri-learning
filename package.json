@@ -263,7 +263,7 @@
     "test:photo:cloud": "node client/test/cloud-photo-client-check.mjs && node client/test/photo-account-recovery-check.mjs",
     "test:photo:practise": "node client/test/question-photo-client-check.mjs",
     "test:photo:intake:tour": "node client/test/tour-photo-intake.js",
-    "test:photo:intake": "node client/test/photo-intake-check.mjs && node client/test/photo-asked-quantity-check.mjs",
+    "test:photo:intake": "node client/test/photo-intake-check.mjs && node client/test/photo-asked-quantity-check.mjs && node client/test/final-answer-conclusion-check.mjs",
     "test:predictor": "node client/test/mark-predictor-check.mjs && node client/test/forecast-parity-check.mjs",
     "preflight": "node tools/production-preflight.mjs",
     "test:pdf": "node client/test/pdf-working-check.mjs && node client/test/ink-pdf-resource-check.mjs",

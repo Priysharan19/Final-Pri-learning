@@ -220,6 +220,19 @@ try {
     c.ok(t.includes('excludedLines') && t.includes('studentConfirmed') && t.includes('readLines'), 'the export shows the excluded lines, studentConfirmed and the reading used');
   }
 
+  // ══ 4b · The card sends the working as one string; the floor reads it line by line (26 Nov 2026) ═════════════
+  const stella = await person();
+  {
+    const qid = await issue(stella.jar);
+    const img = picture('2x = 18@0.95;x - 3 = 99@0.41;9@0.96', 's1');
+    await read(stella.jar, img);
+    const r = await submit(stella.jar, qid, 'floor-string-steps', { answer: '9', steps: '2x = 18\nx - 3 = 99\n9', image: img });
+    c.eq(r.status, 200, 'a page whose working arrives as one string is marked');
+    c.deq(r.data.reading?.excludedLines, [1], 'the unreadable working line is named by its index, as for a list');
+    c.deq(r.data.reading?.lineStates, ['judged', 'not-read', 'judged'], 'and comes back as not read');
+    c.ok(!JSON.stringify(r.data.stepReport || {}).includes('x - 3 = 99'), 'the excluded text never reached the step check');
+  }
+
   // ══ 5 · A wrong, doubtful line is never a cross: only the engine decides, and only on judged lines ════════
   const dave = await person();
   {

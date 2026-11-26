@@ -31,7 +31,9 @@ import { cloudReadingEnabled, forgetCloudReads, setReadingQuestion, INK_READER_S
 import { retryClock, retryWhen } from '../ink/readerFailure.js';
 import { preparePhoto } from '../ink/photoRaster.js';
 import { buildTranscript, editLine, includedLatex, includedLines, reviveTranscript, unreadablePage, workingOf } from '../photo/transcript.js';
-import { proposeFinalAnswer, readsAsWritten } from '../photo/finalAnswer.js';
+import { proposeFinalAnswer, readsAsWritten, spellUnits } from '../photo/finalAnswer.js';
+import { EDITION_ID } from '../brand/edition.js';
+import { AU_FINAL_ANSWER_NOTE } from '../i18n/strings.au.js';
 import { clearPhotoDraft, confirmPhotoDraftSaved, readPhotoDraft, savePhotoDraft } from '../local/photoDrafts.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
 import QuestionReport from './QuestionReport.jsx';
@@ -342,6 +344,30 @@ const REASON_TAG_KEY = {
 // and nothing that belongs to practice is offered — no hints, no favourite, no
 // reveal, no self-marking, no XP or mastery tags. `I don't know` records a miss.
 /** How Pri read the page after a wrong first try: the lines it could not read, and the reading on demand, with Edit. */
+/**
+ * "Pri couldn't read your final answer" says which line it looked at, and offers what it read there as tappable choices
+ * (the one reading it found, or both values of a line that states two): nothing is chosen for the student, and a tap is
+ * the student's own typed answer. Without a line to name it is the plain sentence.
+ */
+function FinalAnswerNote({ t, note, onPick, id }) {
+  const choices = note?.status === 'ambiguous' ? (note.candidates || []) : (note?.best ? [note.best] : []);
+  if (EDITION_ID !== 'prithagoras' || !note?.lineText) return <p className="photo-lines-note" id={id} role="status" data-final-answer-sentence data-final-answer-unreadable="true">{t('mark.finalUnreadable')}</p>;
+  return (
+    <>
+      <p className="photo-lines-note" id={id} role="status" data-final-answer-sentence data-final-answer-unreadable="true" data-final-answer-line={note.lineText}>
+        {(choices.length ? AU_FINAL_ANSWER_NOTE.pick : AU_FINAL_ANSWER_NOTE.none)(note.lineText)}
+      </p>
+      {choices.length > 0 && (
+        <div className="final-answer-choices" role="group" aria-label={t('verdict.finalAnswer')} data-final-answer-choices>
+          {choices.map(choice => (
+            <button key={choice} type="button" className="btn btn-quiet btn-sm" lang="en" data-final-answer-choice={choice} onClick={() => onPick(choice)}>{choice}</button>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
 function OpenTryReading({ t, texOf, lines, unread, onCorrect }) {
   const [open, setOpen] = React.useState(false);
   const [editing, setEditing] = React.useState(null);
@@ -1542,6 +1568,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       if (String(given).trim() === '') { if (mode === 'photo') setFinalUnreadable(true); return; }
       steps = (workingOpen || mode === 'photo') && working.trim() ? working : undefined;
     }
+    // A unit written in a notation the marker does not read ("12 m s⁻¹") is sent in the one it does ("12 m/s"). Nothing else changes.
+    if (!isMcq && !isWorking) given = spellUnits(given, publicAnswerShape);
     // The student's own page goes with the answer, to be kept with the mark
     // (standard #08): the pen samples as written, never the reading. Built
     // from the full strokes, before they are compacted for the device's
@@ -3078,7 +3106,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               ) : (mode === 'photo' && !photoFieldShown) ? null : (
                 <>
                 {mode === 'photo' && photoOCR.phase === 'done' && !String(answer).trim() && !resolved && (
-                  <p className="photo-lines-note" role="status" data-final-answer-sentence data-final-answer-unreadable="true">{t('mark.finalUnreadable')}</p>
+                  <FinalAnswerNote t={t} note={photoNote} onPick={editPhotoAnswer} />
                 )}
                 <TypedAnswerFields
                   question={question} totalMarks={totalMarks} inputRef={inputRef} stepMarks={question.stepMarks === true}
@@ -3130,7 +3158,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               )}
               {(inkFinalUnreadable || finalUnreadable || inkAnswerTyped) && !resolved && !isWorking && (
                 <div className="ink-final-answer" data-ink-answer-proposal={inkAnswerTyped ? 'student' : 'unreadable'} data-final-answer-unreadable={inkFinalUnreadable || finalUnreadable ? 'true' : undefined}>
-                  <p className="photo-lines-note" id={`ink-final-note-${question.id}`} role="status" data-final-answer-sentence>{t('mark.finalUnreadable')}</p>
+                  <FinalAnswerNote t={t} note={inkProposal} id={`ink-final-note-${question.id}`}
+                    onPick={value => { setInkAnswerEdit(value); setFinalUnreadable(false); noteEdited(submissionContentKey(String(value).trim(), inkResult.lines.join('\n'))); }} />
                   <label className="sc-label" style={{ display: 'block' }} htmlFor={`ink-final-${question.id}`}>{t('verdict.finalAnswer')}</label>
                   <div className="answer-row">
                     {question.answerPrefix && <span className="answer-prefix" lang="en"><MathText text={question.answerPrefix} /></span>}

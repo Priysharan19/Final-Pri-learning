@@ -21,7 +21,7 @@
 import { cleanInput, parseNumericInput, readAnswerLabel } from '../engine/checker-core.js';
 import { normalize, parse } from '../engine/expr.js';
 import { parseIntervalInput, parseMatrixInput, parseVectorInput } from '../engine/answer-forms.js';
-import { withoutUnit } from '../engine/units.js';
+import { canonicalUnit, withoutUnit } from '../engine/units.js';
 
 /** Answer types this module can propose for. A choice or a page of working has no final-answer field. */
 export const PROPOSABLE_TYPES = Object.freeze(['numeric', 'expression', 'set', 'point', 'ratio', 'interval', 'matrix', 'vector']);
@@ -30,13 +30,13 @@ const ARROWS = ['⇒', '⟹', '=>', '→', '⟶', '->', '↦'];
 const INEQUALITIES = ['>=', '<=', '!=', '≥', '≤', '≠', '⩾', '⩽', '≧', '≦', '<', '>'];
 // Words a student writes in front of the value. Matched as whole words.
 const ANSWER_WORDS = [
-  'final answer', 'answer', 'ans', 'least value', 'greatest value', 'minimum value', 'maximum value',
+  'final answer', 'answer', 'ans', 'conclusion', 'least value', 'greatest value', 'minimum value', 'maximum value',
   'min value', 'max value', 'minimum', 'maximum', 'min', 'max', 'value', 'result', 'solution', 'required',
-  'therefore', 'hence', 'thus', 'so', 'is', 'are', 'equals', 'gives', 'get', 'we get',
+  'therefore', 'hence', 'thus', 'so', 'is', 'are', 'of', 'equals', 'gives', 'get', 'we get',
   'उत्तर', 'अतः', 'इसलिए', 'न्यूनतम मान', 'अधिकतम मान', 'मान', 'है'
 ];
 // The ones that announce THE answer, wherever on the page they are written.
-const STRONG_WORDS = /(^|[^\p{L}])(final\s+answer|answer|ans|उत्तर)(?=$|[^\p{L}])/iu;
+const STRONG_WORDS = /(^|[^\p{L}])(final\s+answer|answer|ans|conclusion|उत्तर)(?=$|[^\p{L}])/iu;
 const LEAD_MARKS = /^(?:[∴∵•·*▪◦➤➔]|⇒|⟹|=>|→|⟶|->|[-–—](?=\s))\s*/u;
 const WORD_NAMES = new Set(['sin', 'cos', 'tan', 'cot', 'sec', 'cosec', 'csc', 'log', 'ln', 'exp', 'sqrt', 'cbrt', 'abs', 'pi', 'asin', 'acos', 'atan', 'arcsin', 'arccos', 'arctan', 'nCr', 'nPr', 'inf', 'infinity', 'or', 'and']);
 
@@ -118,6 +118,126 @@ function beforeOwnUnit(text, suffix) {
   if (!unit || s.length <= unit.length || !s.toLowerCase().endsWith(unit.toLowerCase())) return null;
   const body = s.slice(0, -unit.length).trim();
   return /[\d)π]$/.test(body) ? body : null;
+}
+
+
+// ── What a page's conclusion looks like on paper ────────────────────────────
+// 20 Nov 2026 (owner's photo of a fully correct page: "Conclusion: The maximum velocity is
+// [12 m s⁻¹] (boxed), obtained at t = 2." came back "couldn't read your final answer"). Three things
+// about a conclusion are layout and spelling, not mathematics, and none of them may make it unreadable:
+// a box drawn round the value, a unit written after it in any notation, and a clause that says WHERE
+// the value was reached. Everything here is read from the page's own words; no key is ever consulted.
+
+const BOX_NOTE = /\s*[(\[]\s*(?:boxed(?:\s+answer)?|in\s+(?:a\s+)?box|box|circled|underlined|highlighted)\s*[)\]]/giu;
+/** The value a box was drawn round, without the box: "\boxed{12}", "[12 m/s]", "⌈12⌉", "(boxed)". */
+export function unboxed(text, type = 'numeric') {
+  let s = String(text ?? '');
+  s = s.replace(/\\(?:boxed|fbox|mbox)\s*\{((?:[^{}]|\{[^{}]*\})*)\}/g, ' $1 ');
+  s = s.replace(BOX_NOTE, ' ');
+  // A bracket round a value is a box on a number-like answer; for list-shaped answers it is an interval or a set.
+  if (!LIST_TYPES.has(type)) {
+    s = s.replace(/(?<![\p{L}\p{N})\]])[[⌈⎡【〔▭□]\s*([^[\]⌈⌉⎡⎤【】〔〕▭□,;]*?\S)\s*[\]⌉⎤】〕▭□]/gu, (m, inner) => (/[\d]|π/u.test(inner) ? ` ${inner} ` : m));
+  }
+  return s.replace(/\s+/g, ' ').trim();
+}
+
+// "…, obtained at t = 2", "which occurs when x = 3", "(at t = 2)": where the value was reached, not the value.
+const CLAUSE_VERBS = '(?:is|are|was|were|occurs?|occurring|occurred|happens?|obtained|attained|achieved|reached|found|given|seen|realised|realized|got|gained|taking\\s+place|being\\s+reached|attained)';
+const TRAILING_CLAUSE = new RegExp(`\\s*[,;(]?\\s*(?:\\b(?:which|that|this|it|and)\\s+)?(?:\\b${CLAUSE_VERBS}\\s+)+(?:at|when|whenever|where|if|for|after|during|by|as|on|in|with)\\b[^]*$`, 'iu');
+const TRAILING_PAREN = /\s*\(\s*(?:at|when|where|if|for|occurs|reached|attained)\b[^()]*\)\s*[.,;]?\s*$/iu;
+/** The sentence without a trailing "obtained at …" clause — only when a value is still left in front of it. */
+export function withoutTrailingClause(text) {
+  const s = String(text ?? '');
+  for (const re of [TRAILING_PAREN, TRAILING_CLAUSE]) {
+    const m = re.exec(s);
+    if (m && /\d|π/u.test(s.slice(0, m.index))) return s.slice(0, m.index).trim();
+  }
+  return s;
+}
+
+/** One line as the reader returned it, without the box and the trailing where-clause. */
+export function tidyLine(text, type = 'numeric') {
+  return withoutTrailingClause(unboxed(text, type));
+}
+
+// Units written after a number, in any notation the student's pen used.
+const PROSE_AFTER_NUMBER = new Set(['is', 'are', 'was', 'at', 'when', 'where', 'if', 'for', 'and', 'or', 'the', 'of', 'to', 'by', 'in', 'on', 'with', 'as', 'so', 'obtained', 'occurs', 'which', 'that', 'then', 'hence', 'thus', 'therefore', 'when', 'after', 'before', 'during', 'answer', 'ans', 'where', 'since', 'because', 'but', 'from', 'than']);
+const SUPERSCRIPTS = { '⁰': 0, '¹': 1, '²': 2, '³': 3, '⁴': 4, '⁵': 5, '⁶': 6, '⁷': 7, '⁸': 8, '⁹': 9 };
+const UNIT_TOKENS = /[A-Za-zµμΩ]+|\^\s*[({]?\s*[-−–]?\s*\d+\s*[)}]?|[⁻⁺]?[⁰¹²³⁴⁵⁶⁷⁸⁹]+|[-−–]\s*\d+|[·.*/]/gu;
+
+function exponentOf(token) {
+  const sup = token.match(/^([⁻⁺]?)([⁰¹²³⁴⁵⁶⁷⁸⁹]+)$/u);
+  if (sup) return (sup[1] === '⁻' ? -1 : 1) * Number([...sup[2]].map(c => SUPERSCRIPTS[c]).join(''));
+  const digits = token.match(/(\d+)/);
+  return digits ? (/[-−–]/.test(token) ? -1 : 1) * Number(digits[1]) : null;
+}
+/** "ms" written for "m s" before a negative power: split a word into two known units when it is none itself. */
+function splitCompound(word) {
+  if (canonicalUnit(word)) return [word];
+  for (let i = 1; i < word.length; i += 1) if (canonicalUnit(word.slice(0, i)) && canonicalUnit(word.slice(i))) return [word.slice(0, i), word.slice(i)];
+  return [word];
+}
+const POWER_SPELLING = { 2: '²', 3: '³' };
+const withPower = (name, exp) => (exp === 1 ? name : `${name}${POWER_SPELLING[exp] || `^${exp}`}`);
+
+/**
+ * A unit written after a number as the spelling the marker reads ("m s⁻¹", "ms^-1", "m s^{-1}" → "m/s"), or null
+ * when what follows the number is not a unit this can set down in one piece.
+ */
+export function canonicalUnitText(tail) {
+  const text = String(tail ?? '').trim();
+  if (!text) return null;
+  const tokens = text.match(UNIT_TOKENS) || [];
+  if (tokens.join('').length !== text.replace(/\s+/g, '').length || tokens.length > 10) return null;
+  const top = [], bottom = [];
+  let slash = false, last = null;
+  for (const token of tokens) {
+    if (/^[A-Za-zµμΩ]+$/u.test(token)) {
+      if (PROSE_AFTER_NUMBER.has(token.toLowerCase()) || token.length > 12) return null;
+      const parts = splitCompound(token);
+      parts.forEach(part => { last = { name: part, exp: 1, below: slash }; (slash ? bottom : top).push(last); });
+    } else if (token === '/') { slash = true; last = null; }
+    else if (/^[·.*]$/.test(token)) { /* separators */ }
+    else if (last) { last.exp = exponentOf(token) ?? 1; if (last.exp < 0) { last.exp = -last.exp; last.below = !last.below; } }
+    else return null;
+  }
+  const num = top.filter(u => !u.below).concat(bottom.filter(u => !u.below));
+  const den = top.filter(u => u.below).concat(bottom.filter(u => u.below));
+  if (!num.length || num.length > 3 || den.length > 2) return null;
+  const spell = list => list.map(u => withPower(u.name, u.exp));
+  const below = den.length === 0 ? '' : den.length === 1 ? `/${spell(den)[0]}` : `/(${spell(den).join(' ')})`;
+  return `${spell(num).join(' ')}${below}`;
+}
+
+const NUMBER_THEN_TAIL = /^([-+−–]?\s*(?:\d[\d,]*(?:\.\d+)?|\.\d+)(?:\s*\/\s*\d+)?)\s*([A-Za-zµμΩ][^]*)$/u;
+
+/**
+ * The text of a value that reads as an answer of this question's type, or null. A number followed by units in any
+ * notation ("12 m s⁻¹", "12 ms^-1", "12 kg m⁻³") is that number with its unit spelt as the marker reads it; a unit that
+ * cannot be spelt leaves the bare number. Units never make an answer unreadable.
+ */
+function readableValue(text, question) {
+  const s = String(text ?? '').trim();
+  if (!s) return null;
+  if (readsAsAnswer(s, question)) return s;
+  if ((question?.answerType || 'numeric') !== 'numeric') return null;
+  const m = NUMBER_THEN_TAIL.exec(s);
+  if (!m) return null;
+  const number = m[1].replace(/\s+/g, '');
+  const unit = canonicalUnitText(m[2]);
+  if (unit && readsAsAnswer(`${number} ${unit}`, question)) return `${number} ${unit}`;
+  // A unit the marker does not read (kg m⁻³, N m, J/kg): a rate, a power or short symbols after the number. With no unit
+  // in the question's box, or the box's own unit, the number is the answer and the box shows the unit. A DIFFERENT unit
+  // is never taken off: that is the student's to check.
+  const letters = m[2].match(/[A-Za-zµμΩ]+/gu) || [];
+  const unitish = w => !!canonicalUnit(w) || w.length <= 3 || ['per', 'square', 'sq', 'cubic', 'cu'].includes(w.toLowerCase());
+  const shape = /^[A-Za-zµμΩ\s·.*/^(){}⁻⁺⁰¹²³⁴⁵⁶⁷⁸⁹0-9−–-]+$/u.test(m[2]) && !/\d[\d\s]*\d/.test(m[2].replace(/\^\s*[({]?-?\d+[)}]?/g, ''));
+  if (shape && letters.length && letters.length <= 4 && letters.every(unitish) && !letters.some(w => PROSE_AFTER_NUMBER.has(w.toLowerCase()))) {
+    const suffix = String(question?.answerSuffix ?? '').trim();
+    const own = !suffix || (unit !== null && canonicalUnitText(suffix) === unit) || suffix.replace(/\s+/g, '').toLowerCase() === m[2].replace(/\s+/g, '').toLowerCase();
+    return own && readsAsAnswer(number, question) ? number : null;
+  }
+  return null;
 }
 
 /**
@@ -256,18 +376,21 @@ function valueOf(piece, question) {
     if (last.kind === 'inequality') return null;
     // "Ans. 6": the stop belongs to the abbreviation, not to the value.
     const tail = stripSentence(s.slice(last.end).replace(/^\s*[.:,]\s+/, ''));
-    if (tail && readsAsAnswer(tail, question)) return tail;
+    const said = tail ? readableValue(tail, question) : null;
+    if (said) return said;
     const bare = type === 'numeric' ? beforeOwnUnit(tail, question?.answerSuffix) : null;
     if (bare && readsAsAnswer(bare, question)) return bare;
     // "6 is the least value": the value stands in front of the words.
     const firstWord = words.sort((a, b) => a.at - b.at)[0];
     if (firstWord && !rel.length) {
       const head = stripSentence(s.slice(0, firstWord.at));
-      if (head && readsAsAnswer(head, question)) return head;
+      const said = head ? readableValue(head, question) : null;
+      if (said) return said;
     }
     return null;
   }
-  if (readsAsAnswer(s, question)) return s;
+  const whole = readableValue(s, question);
+  if (whole) return whole;
   const bare = type === 'numeric' ? beforeOwnUnit(s, question?.answerSuffix) : null;
   return bare && readsAsAnswer(bare, question) ? bare : null;
 }
@@ -291,6 +414,17 @@ function distinct(values, question) {
 }
 
 const NUMBER = { answerType: 'numeric' };
+
+/** A sentence that states a quantity: "The maximum velocity is 12", "Hence the area = 6", "∴ x = 3". */
+const CONCLUSION_SENTENCE = /^\s*(?:[∴•*]\s*)?(?:(?:so|hence|thus|therefore|finally|overall)[\s,]+)?(?:the\s+)?[\p{L}][\p{L}\s'’-]{2,40}?\s+(?:is|are|equals?|=)\s+\S/iu;
+/** A few marks from a graph or table (axis ticks, a point label, an axis name), not a line of working. */
+export function isDiagramFragment(text) {
+  const s = String(text ?? '').trim();
+  if (!s || s.length > 18) return false;
+  if (/[=≈⇒→∴<>]|=>|->|≥|≤/u.test(s)) return false;
+  if ((s.match(/\p{L}{3,}/gu) || []).length) return false;
+  return true;
+}
 
 /**
  * An ordered pair. Written as a pair it is taken as written. Written as its
@@ -392,6 +526,16 @@ function setFromLine(s, question) {
   return readsAsAnswer(answer, question) ? { status: 'proposed', answer } : { status: 'none' };
 }
 
+// "5h = 125, so h = 25": the step before the connector is a step; what follows "so", "hence", "∴" is what the line concludes.
+const CONNECTOR = /[,;]?\s*(?:^|(?<=[\s,;]))(?:so|hence|thus|therefore|∴|which\s+gives|giving|gives)(?=[\s:=⇒→]|$)\s*/giu;
+function fromLastConnector(s) {
+  let cut = -1, end = 0;
+  for (const m of s.matchAll(CONNECTOR)) { if (m.index > 0 || /^[,;]/.test(m[0])) { cut = m.index; end = m.index + m[0].length; } }
+  if (cut < 0) return s;
+  const rest = s.slice(end).trim();
+  return rest && /[\d)π]/u.test(rest) ? rest : s;
+}
+
 /**
  * What one line states as an answer.
  *   { status: 'proposed', answer }
@@ -401,7 +545,7 @@ function setFromLine(s, question) {
 export function answerFromLine(line, question = {}) {
   const type = question?.answerType || 'numeric';
   if (!PROPOSABLE_TYPES.includes(type)) return { status: 'none' };
-  const s = stripSentence(line);
+  const s = fromLastConnector(stripSentence(tidyLine(line, type)));
   if (!s) return { status: 'none' };
   if (type === 'point') return pointFromLine(s, question);
   if (type === 'set') {
@@ -422,6 +566,14 @@ export function answerFromLine(line, question = {}) {
   return whole ? { status: 'proposed', answer: whole } : { status: 'none' };
 }
 
+/** Every word of the label is a word of the question or the start of one ("max" for "maximum", "v_max"). */
+function abbreviatesTheAsk(label, prompt) {
+  const promptWords = (String(prompt ?? '').toLowerCase().match(/\p{L}{3,}/gu) || []);
+  const words = (String(label).toLowerCase().match(/\p{L}+/gu) || []).filter(w => w.length >= 2);
+  if (!words.length || !promptWords.length) return false;
+  return words.every(w => w.length >= 3 && promptWords.some(p => p === w || (p.startsWith(w) && w.length >= 3)));
+}
+
 /** Does the label in front of a final line (if any) name what the question asks for? */
 function labelNamesTheAsk(text, answer, question) {
   // "Ans: Perimeter = 72", "Answer: b = 50": the announcement is not the label.
@@ -439,6 +591,8 @@ function labelNamesTheAsk(text, answer, question) {
   if (read.refuse) return false;
   // Nothing to judge the label against (no asked quantity found): propose as before.
   if (!read.asked) return true;
+  // "max = 12" under "Find the maximum velocity": the label is the asked word, shortened as students do.
+  if (abbreviatesTheAsk(label, question?.prompt)) return true;
   // A one-letter label is read as the typed field always has; a longer one
   // must have been read off, or it names something else.
   return /^[\p{L}θ]$/u.test(label) || !/[=≈]/.test(String(read.input));
@@ -466,14 +620,38 @@ function proposeFromWorking(lines, question = {}) {
   // A trailing "check: 3 + 1 = 4" verifies the answer; it is not the answer.
   while (kept.length > 1 && isCheckLine(kept.at(-1).text)) kept.pop();
   if (isCheckLine(kept.at(-1).text)) return { status: 'none' };
+  // Marks drawn round a graph or a table that follow the conclusion on the sheet ("(2,12)", "0 2 4", "12", "v (m/s)") are
+  // not a last line of working. They are set aside when a line before them announces the answer in so many words, or is
+  // a sentence that states a quantity ("The maximum velocity is …"): the page's own structure, no key.
+  if (['numeric', 'expression'].includes(type)) {
+    for (;;) {
+      const tail = kept.at(-1);
+      if (kept.length < 2 || !isDiagramFragment(tail.text)) break;
+      const before = kept.slice(0, -1);
+      // A lone number could be the answer itself: it goes only when a line says in so many words that it is not.
+      const bare = /^[-+−–]?\s*[\d.,]+$/.test(tail.text.trim());
+      const announces = before.some(l => STRONG_WORDS.test(l.text)) || (!bare && before.some(l => CONCLUSION_SENTENCE.test(tidyLine(l.text, type))));
+      if (!announces) break;
+      kept.pop();
+    }
+  }
   const last = kept.at(-1);
   const fromLast = answerFromLine(last.text, question);
-  // A line that says "answer" anywhere on the page is a candidate final too.
+  // A line that says "answer" or "conclusion" anywhere on the page is a candidate final too.
   const announced = kept.slice(0, -1)
     .filter(l => STRONG_WORDS.test(l.text))
     .map(l => ({ ...l, found: answerFromLine(l.text, question) }))
     .filter(l => l.found.status !== 'none');
 
+  // A lone number under a conclusion sentence may be a mark on a graph or the answer written again: when it differs from what
+  // the sentence says, both are offered.
+  if (['numeric', 'expression'].includes(type) && isDiagramFragment(last.text) && /^[-+−–]?\s*[\d.,]+$/.test(last.text.trim())) {
+    const before = kept.slice(0, -1).reverse().find(l => !isDiagramFragment(l.text));
+    if (before && CONCLUSION_SENTENCE.test(tidyLine(before.text, type)) && !announced.some(l => l.index === before.index)) {
+      const found = answerFromLine(before.text, question);
+      if (found.status !== 'none') announced.push({ ...before, found });
+    }
+  }
   if (fromLast.status === 'ambiguous') return { status: 'ambiguous', candidates: fromLast.candidates };
   // The label on the final line is judged as the typed field judges it: a line
   // "b = 50" under "Find b²", or "Perimeter = 72" under "Find the area", names
@@ -487,6 +665,16 @@ function proposeFromWorking(lines, question = {}) {
   ], question);
   if (all.length > 1) return { status: 'ambiguous', candidates: all };
   if (fromLast.status === 'proposed') return { status: 'proposed', answer: fromLast.answer, line: last.index };
+  // Nothing on the last line (a comment, a note in the margin, words under the conclusion): the page's own conclusion
+  // sentence a few lines up is the final answer when every line after it states no value.
+  if (all.length === 0 && fromLast.status === 'none' && ['numeric', 'expression'].includes(type)) {
+    for (let i = kept.length - 2; i >= Math.max(0, kept.length - 8); i -= 1) {
+      const found = answerFromLine(kept[i].text, question);
+      if (found.status === 'none') continue;
+      if (found.status === 'proposed' && CONCLUSION_SENTENCE.test(tidyLine(kept[i].text, type))) return { status: 'proposed', answer: found.answer, line: kept[i].index };
+      break;
+    }
+  }
   if (all.length === 1) {
     const source = announced.find(l => l.found.status === 'proposed');
     return { status: 'proposed', answer: all[0], line: source ? source.index : last.index };
@@ -556,7 +744,7 @@ function statedLines(kept, V) {
   return out;
 }
 
-export function proposeFinalAnswer(lines, question = {}) {
+function proposeFinalAnswerFrom(lines, question = {}) {
   const base = proposeFromWorking(lines, question);
   const V = askedVariable(question);
   const type = question?.answerType || 'numeric';
@@ -578,4 +766,90 @@ export function proposeFinalAnswer(lines, question = {}) {
   if (answers.length === 1) return { status: 'proposed', answer: answers[0], line: valid.at(-1).index };
   if (answers.length > 1) return { status: 'ambiguous', candidates: answers };
   return { status: 'none', missing: V };
+}
+
+/** The text of a line as the student would be shown it: one line, a sensible length. */
+const shown = text => String(text ?? '').replace(/\s+/g, ' ').trim().slice(0, 140);
+
+/**
+ * The line the final answer was looked for on, and the one value on it that reads as an answer (or null). The line is
+ * the page's own conclusion when there is one near the end, else the last line of working that is not a mark on a
+ * graph. Said to the student so that "couldn't read" is never a blank: they see which line was meant, and one tap
+ * confirms the reading. Never chosen with a key.
+ */
+export function lookedAt(lines, question = {}) {
+  const type = question?.answerType || 'numeric';
+  const kept = (Array.isArray(lines) ? lines : String(lines ?? '').split('\n'))
+    .map((text, index) => ({ text: String(text ?? '').trim(), index })).filter(l => l.text && !isCheckLine(l.text));
+  if (!kept.length) return { lineText: '', best: null };
+  const numericLike = ['numeric', 'expression'].includes(type);
+  const body = numericLike ? kept.filter((l, i) => !(i > 0 && isDiagramFragment(l.text) && /[^\d.,\s−-]/.test(l.text))) : kept;
+  const pool = body.length ? body : kept;
+  const near = pool.slice(-6);
+  const conclusion = [...near].reverse().find(l => STRONG_WORDS.test(l.text) || CONCLUSION_SENTENCE.test(tidyLine(l.text, type)));
+  const line = conclusion || pool.at(-1);
+  const stripped = stripSentence(tidyLine(line.text, type));
+  const tidy = withoutCondition(stripped) || stripped;
+  let best = null;
+  if (numericLike || type === 'ratio') {
+    const starts = [...tidy.matchAll(/(?<![\p{L}\d.^_])(?<!\^\s*[({]?\s*[-−–]?)[-+−–]?\s*(?:\d[\d,]*(?:\.\d+)?|\.\d+)/gu)].map(m => m.index).reverse();
+    for (const at of starts) {
+      const value = readableValue(tidy.slice(at).trim(), type === 'ratio' ? question : { ...question, answerType: 'numeric' });
+      if (value) { best = value; break; }
+    }
+  } else {
+    const cut = tidy.split(/[=⇒→:]|\bis\b/i).pop().trim();
+    best = cut && readsAsAnswer(cut, question) ? cut : null;
+  }
+  return { lineText: shown(line.text), lineIndex: line.index, best };
+}
+
+/**
+ * A mark someone else put on the page, not the student's working: a teacher's "1/1" or "2 / 2" in the margin, a tick or
+ * cross, or a word of praise ("Correct", "Well done"). It is never an answer candidate (a real photo of a marked page
+ * came back with "1/1" as the final answer and a correct page got 0/1). A fraction counts only when both numbers are
+ * the same or it is written as marks, so "3/4" stays a fraction.
+ */
+export function isMarginMark(text) {
+  const s = String(text ?? '').trim();
+  if (!s) return false;
+  const frac = s.match(/^[\s(\[]*(\d+)\s*\/\s*(\d+)[\s)\]]*(marks?)?\s*$/i);
+  if (frac) return frac[1] === frac[2] || !!frac[3];
+  if (/^[\s✓✔✗✘✕✖☑☒×]+$/u.test(s)) return true;
+  return /^(?:well done|good(?: work)?|correct|right|excellent|nice(?: work)?|great)(?![\p{L}])/iu.test(s) && !/[=\d]/.test(s) && s.split(/\s+/).length <= 6;
+}
+
+/**
+ * Which lines are marks on a graph or table (axis ticks, a point label, an axis name) rather than working: short lines
+ * with no relation sign, three or more of them on the page. A last line that is a lone number is left (it may be the
+ * answer). The page's structure only; nothing about the question or its key.
+ */
+export function figureLabelIndexes(texts) {
+  const list = Array.isArray(texts) ? texts : [];
+  const at = list.map((t, i) => (isDiagramFragment(t) && !isMarginMark(t) ? i : -1)).filter(i => i >= 0);
+  if (at.length < 3) return new Set();
+  const lastBare = list.length - 1;
+  return new Set(at.filter(i => !(i === lastBare && /^[-+−–]?\s*[\d.,]+$/.test(String(list[i]).trim()))));
+}
+
+export function proposeFinalAnswer(rawLines, question = {}) {
+  const lines = (Array.isArray(rawLines) ? rawLines : String(rawLines ?? '').split('\n')).map(l => (isMarginMark(l) ? '' : l));
+  const out = proposeFinalAnswerFrom(lines, question);
+  if (out.status !== 'none' && out.status !== 'ambiguous') return out;
+  const type = question?.answerType || 'numeric';
+  if (!PROPOSABLE_TYPES.includes(type)) return out;
+  const seen = lookedAt(lines, question);
+  // An ambiguous line is offered as its candidates; the line itself is still named.
+  return { ...out, lineText: seen.lineText, lineIndex: seen.lineIndex, ...(out.status === 'none' ? { best: seen.best } : {}) };
+}
+
+/**
+ * A typed or confirmed final answer whose only fault is how its unit is written ("12 m s⁻¹", "12 ms^-1") as the
+ * spelling the marker reads ("12 m/s"); anything else — a sentence, a label, a different unit — is returned untouched.
+ */
+export function spellUnits(text, question = {}) {
+  const s = String(text ?? '').trim();
+  if ((question?.answerType || 'numeric') !== 'numeric' || !s || readsAsAnswer(s, question) || !NUMBER_THEN_TAIL.test(s)) return text;
+  const spelt = readableValue(s, question);
+  return spelt && spelt !== s ? spelt : text;
 }

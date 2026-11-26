@@ -125,3 +125,10 @@ export const AU_STRINGS = Object.freeze({
   // Signing out forgets the account link on the device, so the gate said the profile was not connected. It is signed out.
   'activation.notLinked': 'This profile is not signed in to a Pri account. Sign in to check your answers.'
 });
+
+// Prithagoras only (no catalogue key, so no Hindi): which line Pri looked at for the final answer, and what it offers.
+// The Priyabhata edition keeps its one sentence (mark.finalUnreadable).
+export const AU_FINAL_ANSWER_NOTE = Object.freeze({
+  pick: line => `Pri looked at this line for your final answer: ${line} Tap the answer you mean, or type it here.`,
+  none: line => `Pri looked at this line for your final answer: ${line} It does not give one Pri can take. Type it here.`
+});

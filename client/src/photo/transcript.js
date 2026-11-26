@@ -19,7 +19,7 @@
 //
 // Pure: no network, no storage, no DOM.
 // ─────────────────────────────────────────────────────────────────────────────
-import { stripSentence } from './finalAnswer.js';
+import { stripSentence, isMarginMark, figureLabelIndexes } from './finalAnswer.js';
 import { cleanLatex } from '../engine/texSafe.js';
 
 export const MAX_LINES = 60;
@@ -259,8 +259,10 @@ export function buildTranscript(transcription, question = {}) {
     .filter(line => line.text)
     .slice(0, MAX_LINES);
   const relevance = proposeRelevance(read, question?.prompt);
+  // Marks on a graph and marks someone else wrote in the margin are not working: left out here (the student can bring either back).
+  const figures = figureLabelIndexes(read.map(l => l.text));
   const lines = read.map((line, index) => {
-    const out = excludedAt(relevance, index);
+    const out = (isMarginMark(line.text) ? { index, why: 'margin' } : null) || excludedAt(relevance, index) || (figures.has(index) ? { index, why: 'figure' } : null);
     const letter = relevance.letterDoubts.find(d => d.index === index) || null;
     const below = line.confidence !== null && Number.isFinite(floor) && line.confidence < floor;
     return {
@@ -336,7 +338,7 @@ export function reviveTranscript(value) {
     ...(cleanLatex(l?.latex) ? { latex: cleanLatex(l.latex) } : {}),
     ...(cleanBox(l?.box) ? { box: cleanBox(l.box) } : {}),
     excluded: l?.excluded === true,
-    why: ['before-question', 'after-break', 'student'].includes(l?.why) ? l.why : null,
+    why: ['before-question', 'after-break', 'margin', 'figure', 'student'].includes(l?.why) ? l.why : null,
     edited: l?.edited === true,
     confirmed: l?.confirmed === true
   }));
