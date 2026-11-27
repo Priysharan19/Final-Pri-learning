@@ -18,6 +18,7 @@
 
 /** Every fixed phrase, by proof class. No em dashes. A class not listed here has no phrase. */
 export const PHRASES = Object.freeze({
+  expectationLinearity: 'Correct linearity of expectation',
   differentiation: 'Correct differentiation',
   substitution: 'Correct substitution',
   solutionList: 'Correct solutions',
@@ -128,7 +129,8 @@ export const TEXT = Object.freeze({
 
 // the stable class ids the engine's display fields emit on every tick (engine/displayFields.js CLASSES), to a phrase; a class not listed has no phrase
 const TICK = {
-  'power-rule-differentiation': 'differentiation', differentiation: 'differentiation', 'derivative-rule': 'differentiation', factorisation: 'factorisation',
+  'power-rule-differentiation': 'differentiation',
+  'expectation-linearity': 'expectationLinearity', differentiation: 'differentiation', 'derivative-rule': 'differentiation', factorisation: 'factorisation',
   'roots-of-a-product': 'stationaryValues', 'equation-setup': 'stationaryEquation', 'substitution-evaluated': 'substitution', 'labelled-substitution': 'substitution',
   'arithmetic-chain': 'arithmetic', 'second-derivative-value': 'secondDerivative', 'sign-claim': 'signClaim', 'nature-claim': 'natureClaim', 'point-claim': 'pointClaim',
   'conclusion-matches': 'conclusionMatches', 'condition-line': 'conditionLine', 'restated-question': 'restated', 'restated-function': 'given', heading: 'heading',
@@ -416,6 +418,7 @@ export function lineWord(card) {
 
 /** One general sentence per proof class: what the engine established. Nothing here says more than the class does. */
 export const DETAILS = Object.freeze({
+  expectationLinearity: 'Expectation is linear: multiply the mean by the coefficient and add the constant.',
   differentiation: 'The derivative on this line is correct.',
   substitution: 'The value was substituted correctly.',
   solutionList: 'These values are exactly the solutions of the question.',
