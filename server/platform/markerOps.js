@@ -15,6 +15,7 @@
 // image ships — see Dockerfile and production-runtime-image-check.mjs). It
 // must never import a server module: the worker has no store and no secrets.
 import { derivedMetaOff } from '../../client/src/engine/derivedMetaOff.js';
+import { stepCheckExpectation } from '../../client/src/engine/expectationLines.js';
 import { checkAnswer, stepCheck, methodMarks, claimFreeReport, tickRejections, AMBIGUOUS_FORM_NOTE } from '../../client/src/engine/checker.js';
 import { ambiguousReadings, ambiguousForms } from '../../client/src/engine/expr.js';
 import en from '../../client/src/i18n/strings.en.js';
@@ -276,6 +277,16 @@ export function holdIdentityLines(report) {
 
 export function stepEvidence(q, answer, steps, result, opts = null) {
   const meta = stepMetaFor(q);
+  // Domain-specific feedback: generic algebra overlays must not reinterpret E(X).
+  // The existing answer check still decides all marks.
+  if (!meta) {
+    const expectation = stepCheckExpectation(q, steps, opts);
+    if (expectation) {
+      const displayCtx = { correct: result.correct === true, accepts: text => (checkBankAnswer(q, text) || {}).correct === true, domainOwnsContinuations: true };
+      const shown = displayFields(q, expectation, displayCtx);
+      return { stepReport: expectation, shownReport: shown, partial: null };
+    }
+  }
   let report = result.stepReport || null;
   if (meta && steps && !report) {
     // The prompt lets a true line about another unknown of the question be
